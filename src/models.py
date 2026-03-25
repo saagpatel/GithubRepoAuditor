@@ -117,6 +117,7 @@ class AuditReport:
     most_neglected: list[str] = field(default_factory=list)
     highest_scored: list[str] = field(default_factory=list)
     lowest_scored: list[str] = field(default_factory=list)
+    reconciliation: object | None = None  # RegistryReconciliation when --registry used
 
     @classmethod
     def from_audits(
@@ -194,4 +195,5 @@ class AuditReport:
             },
             "audits": [a.to_dict() for a in self.audits],
             "errors": self.errors,
+            "reconciliation": self.reconciliation.to_dict() if self.reconciliation else None,
         }

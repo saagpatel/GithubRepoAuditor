@@ -7,6 +7,7 @@ import time
 
 import requests
 
+from src.cache import ResponseCache
 from src.models import RepoMetadata
 
 logger = logging.getLogger(__name__)
@@ -21,8 +22,13 @@ class GitHubClientError(Exception):
 class GitHubClient:
     """Minimal GitHub REST API v3 client with pagination and rate-limit handling."""
 
-    def __init__(self, token: str | None = None) -> None:
+    def __init__(
+        self,
+        token: str | None = None,
+        cache: ResponseCache | None = None,
+    ) -> None:
         self.token = token
+        self.cache = cache
         self.session = requests.Session()
         self.session.headers.update({
             "Accept": "application/vnd.github.v3+json",
@@ -106,6 +112,39 @@ class GitHubClient:
 
         return response  # type: ignore[possibly-undefined]
 
+    def _fetch_json(self, url: str, params: dict | None = None) -> object:
+        """Fetch JSON from a URL, checking cache first.
+
+        Used for leaf endpoints (languages, commits). NOT for paginated list endpoints.
+        """
+        if self.cache:
+            cached = self.cache.get(url, params)
+            if cached is not None:
+                return cached
+
+        response = self._request(url, params)
+        data = response.json()
+
+        if self.cache:
+            self.cache.put(url, params, data)
+
+        return data
+
+    def _fetch_json_with_202_retry(self, url: str, params: dict | None = None) -> object:
+        """Fetch JSON with 202 retry, checking cache first."""
+        if self.cache:
+            cached = self.cache.get(url, params)
+            if cached is not None:
+                return cached
+
+        response = self._request_with_202_retry(url, params)
+        data = response.json()
+
+        if self.cache:
+            self.cache.put(url, params, data)
+
+        return data
+
     # ── public API ────────────────────────────────────────────────────
 
     def get_authenticated_user(self) -> str | None:
@@ -138,8 +177,7 @@ class GitHubClient:
     def get_languages(self, owner: str, repo: str) -> dict[str, int]:
         """Fetch language byte counts for a repo."""
         try:
-            response = self._request(f"{API_BASE}/repos/{owner}/{repo}/languages")
-            return response.json()
+            return self._fetch_json(f"{API_BASE}/repos/{owner}/{repo}/languages")
         except requests.HTTPError as exc:
             logger.warning("Failed to fetch languages for %s/%s: %s", owner, repo, exc)
             return {}
@@ -149,11 +187,11 @@ class GitHubClient:
     ) -> list[dict]:
         """Fetch the most recent commits for a repo."""
         try:
-            response = self._request(
+            data = self._fetch_json(
                 f"{API_BASE}/repos/{owner}/{repo}/commits",
                 {"per_page": str(count)},
             )
-            return response.json()
+            return data if isinstance(data, list) else []
         except requests.HTTPError as exc:
             logger.warning("Failed to fetch commits for %s/%s: %s", owner, repo, exc)
             return []
@@ -165,10 +203,9 @@ class GitHubClient:
         Stats endpoints return 202 on first call — retries with backoff.
         """
         try:
-            response = self._request_with_202_retry(
+            data = self._fetch_json_with_202_retry(
                 f"{API_BASE}/repos/{owner}/{repo}/stats/commit_activity"
             )
-            data = response.json()
             return data if isinstance(data, list) else []
         except requests.HTTPError as exc:
             logger.warning("Failed to fetch commit activity for %s/%s: %s", owner, repo, exc)
@@ -180,10 +217,9 @@ class GitHubClient:
         Stats endpoints return 202 on first call — retries with backoff.
         """
         try:
-            response = self._request_with_202_retry(
+            data = self._fetch_json_with_202_retry(
                 f"{API_BASE}/repos/{owner}/{repo}/stats/contributors"
             )
-            data = response.json()
             return data if isinstance(data, list) else []
         except requests.HTTPError as exc:
             logger.warning("Failed to fetch contributor stats for %s/%s: %s", owner, repo, exc)

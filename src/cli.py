@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from src.analyzers import run_all_analyzers
+from src.cache import ResponseCache
 from src.cloner import clone_workspace
 from src.github_client import GitHubClient
 from src.models import AuditReport, RepoAudit, RepoMetadata
@@ -70,6 +71,17 @@ def build_parser() -> argparse.ArgumentParser:
         "--skip-clone",
         action="store_true",
         help="Skip the clone step (metadata only)",
+    )
+    parser.add_argument(
+        "--registry",
+        type=Path,
+        default=None,
+        help="Path to project-registry.md for reconciliation",
+    )
+    parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Bypass API response cache",
     )
     parser.add_argument(
         "--verbose",
@@ -169,8 +181,11 @@ def main() -> None:
             file=sys.stderr,
         )
 
+    # Set up cache
+    cache = None if args.no_cache else ResponseCache()
+
     # Fetch metadata from GitHub API
-    client = GitHubClient(token=args.token)
+    client = GitHubClient(token=args.token, cache=cache)
     all_repos, errors = client.get_repo_metadata(args.username)
     total_fetched = len(all_repos)
 
@@ -218,16 +233,31 @@ def main() -> None:
             args.username, audits, errors, total_fetched,
         )
 
+        # Registry reconciliation
+        if args.registry:
+            from src.registry_parser import parse_registry, reconcile
+            registry = parse_registry(args.registry)
+            report.reconciliation = reconcile(registry, audits)
+            print(
+                f"  Registry: {report.reconciliation.registry_total} projects, "
+                f"{len(report.reconciliation.matched)} matched",
+                file=sys.stderr,
+            )
+
         json_path = write_json_report(report, output_dir)
         md_path = write_markdown_report(report, output_dir)
         pcc_path = write_pcc_export(report, output_dir)
         raw_path = write_raw_metadata(report, output_dir)
 
+        cache_info = ""
+        if cache:
+            cache_info = f"\n  Cache: {cache.hits} hits, {cache.misses} misses"
+
         print(
             f"\n✓ Audited {report.repos_audited} repos for {report.username}\n"
             f"  Average score: {report.average_score:.2f}\n"
             f"  Tiers: {report.tier_distribution}\n"
-            f"  Errors: {len(report.errors)}\n"
+            f"  Errors: {len(report.errors)}{cache_info}\n"
             f"  Reports:\n"
             f"    {json_path}\n"
             f"    {md_path}\n"
