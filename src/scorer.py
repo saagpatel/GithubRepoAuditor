@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from src.badges import compute_badges, suggest_next_badges
 from src.models import AnalyzerResult, RepoAudit, RepoMetadata
 
 # Rebalanced completeness weights (sum = 1.0)
@@ -37,6 +38,16 @@ INTEREST_TIERS = [
 ]
 
 STALE_THRESHOLD_DAYS = 730  # 2 years
+
+GRADE_THRESHOLDS = [(0.85, "A"), (0.70, "B"), (0.55, "C"), (0.35, "D"), (0.0, "F")]
+
+
+def letter_grade(score: float) -> str:
+    """Map a 0.0-1.0 score to a letter grade A-F."""
+    for threshold, grade in GRADE_THRESHOLDS:
+        if score >= threshold:
+            return grade
+    return "F"
 
 
 def score_repo(
@@ -115,15 +126,23 @@ def score_repo(
         tier = "skeleton"
         flags.append("readme-only")
 
-    return RepoAudit(
+    audit = RepoAudit(
         metadata=metadata,
         analyzer_results=results,
         overall_score=overall_score,
         interest_score=interest_score,
         completeness_tier=tier,
         interest_tier=interest_tier,
+        grade=letter_grade(overall_score),
+        interest_grade=letter_grade(interest_score),
         flags=flags,
     )
+
+    # Compute badges and suggestions
+    audit.badges = compute_badges(audit)
+    audit.next_badges = suggest_next_badges(audit)
+
+    return audit
 
 
 def _count_meaningful_files(results: list[AnalyzerResult]) -> int:

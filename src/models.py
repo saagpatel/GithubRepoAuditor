@@ -92,6 +92,10 @@ class RepoAudit:
     completeness_tier: str
     interest_score: float = 0.0
     interest_tier: str = "mundane"
+    grade: str = "F"
+    interest_grade: str = "F"
+    badges: list[str] = field(default_factory=list)
+    next_badges: list[dict] = field(default_factory=list)
     flags: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -102,6 +106,10 @@ class RepoAudit:
             "interest_score": round(self.interest_score, 3),
             "completeness_tier": self.completeness_tier,
             "interest_tier": self.interest_tier,
+            "grade": self.grade,
+            "interest_grade": self.interest_grade,
+            "badges": self.badges,
+            "next_badges": self.next_badges,
             "flags": self.flags,
         }
 
@@ -117,6 +125,7 @@ class AuditReport:
     language_distribution: dict[str, int]
     audits: list[RepoAudit]
     errors: list[dict]
+    portfolio_grade: str = "F"
     most_active: list[str] = field(default_factory=list)
     most_neglected: list[str] = field(default_factory=list)
     highest_scored: list[str] = field(default_factory=list)
@@ -166,6 +175,10 @@ class AuditReport:
         most_active = [a.metadata.name for a in sorted_by_activity[:5]]
         most_neglected = [a.metadata.name for a in sorted_by_activity[-5:]]
 
+        # Portfolio grade
+        from src.scorer import letter_grade
+        p_grade = letter_grade(avg)
+
         return cls(
             username=username,
             generated_at=now,
@@ -174,6 +187,7 @@ class AuditReport:
             tier_distribution=tier_dist,
             average_score=round(avg, 3),
             language_distribution=lang_dist,
+            portfolio_grade=p_grade,
             audits=audits,
             errors=errors,
             most_active=most_active,
@@ -189,6 +203,7 @@ class AuditReport:
             "total_repos": self.total_repos,
             "repos_audited": self.repos_audited,
             "average_score": self.average_score,
+            "portfolio_grade": self.portfolio_grade,
             "tier_distribution": self.tier_distribution,
             "language_distribution": self.language_distribution,
             "summary": {

@@ -7,6 +7,7 @@ from openpyxl import Workbook
 from openpyxl.chart import BarChart, PieChart, Reference
 from openpyxl.chart.label import DataLabelList
 from openpyxl.chart.series import DataPoint
+from openpyxl.formatting.rule import DataBarRule
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
@@ -175,8 +176,8 @@ def _build_all_repos(wb: Workbook, data: dict) -> None:
     ws.sheet_properties.tabColor = "1565C0"
 
     headers = [
-        "Repo", "Tier", "Score", "Interest", "Interest Tier", "Language", "Private",
-        "Stars", "Forks", "Size (KB)", "Days Since Push",
+        "Repo", "Grade", "Tier", "Score", "Interest", "Interest Tier", "Badges",
+        "Language", "Private", "Stars", "Forks", "Size (KB)", "Days Since Push",
         "Total Commits", "Test Files", "Dep Count",
         "LOC", "TODO Density", "Flags", "Description",
     ]
@@ -192,12 +193,15 @@ def _build_all_repos(wb: Workbook, data: dict) -> None:
         m = audit["metadata"]
         details = {r["dimension"]: r.get("details", {}) for r in audit["analyzer_results"]}
 
+        badges_str = ", ".join(audit.get("badges", [])[:4]) if audit.get("badges") else ""
         values = [
             m["name"],
+            audit.get("grade", "F"),
             audit["completeness_tier"],
             round(audit["overall_score"], 3),
             round(audit.get("interest_score", 0), 3),
             audit.get("interest_tier", "mundane"),
+            badges_str,
             m["language"] or "—",
             "Yes" if m["private"] else "No",
             m["stars"],
@@ -216,14 +220,29 @@ def _build_all_repos(wb: Workbook, data: dict) -> None:
             ws.cell(row=row, column=col, value=val)
             _style_data_cell(ws, row, col)
 
-        # Color tier cell
-        tier_cell = ws.cell(row=row, column=2)
+        # Color tier cell (column 3 now)
+        tier_cell = ws.cell(row=row, column=3)
         tier = audit["completeness_tier"]
         if tier in TIER_FILLS:
             tier_cell.fill = TIER_FILLS[tier]
             tier_cell.font = TIER_TEXT_FONT
 
-    _auto_width(ws, len(headers), len(audits) + 1)
+    max_row = len(audits) + 1
+
+    # DataBar on Score column (col 4) and Interest column (col 5)
+    if max_row > 1:
+        score_bar = DataBarRule(start_type='num', start_value=0, end_type='num', end_value=1, color='2E7D32')
+        ws.conditional_formatting.add(f'D2:D{max_row}', score_bar)
+        interest_bar = DataBarRule(start_type='num', start_value=0, end_type='num', end_value=1, color='1565C0')
+        ws.conditional_formatting.add(f'E2:E{max_row}', interest_bar)
+
+    # Summary row
+    summary_row = max_row + 2
+    ws.cell(row=summary_row, column=1, value="SUMMARY").font = Font(bold=True)
+    ws.cell(row=summary_row, column=4, value=f"=AVERAGE(D2:D{max_row})").font = Font(bold=True)
+    ws.cell(row=summary_row, column=5, value=f"=AVERAGE(E2:E{max_row})").font = Font(bold=True)
+
+    _auto_width(ws, len(headers), max_row + 2)
 
 
 def _build_dimension_heatmap(wb: Workbook, data: dict) -> None:
@@ -449,6 +468,82 @@ def _build_reconciliation(wb: Workbook, data: dict) -> None:
 # ── Main entry point ─────────────────────────────────────────────────
 
 
+def _build_quick_wins(wb: Workbook, data: dict) -> None:
+    """Sheet 7: Quick Wins — repos closest to the next tier."""
+    from src.quick_wins import find_quick_wins
+    from src.models import AnalyzerResult, RepoAudit, RepoMetadata
+
+    # Reconstruct audit objects for quick_wins (it needs RepoAudit objects)
+    # For simplicity, use the JSON data directly
+    ws = wb.create_sheet("Quick Wins")
+    ws.sheet_properties.tabColor = "00695C"
+
+    # Build quick wins from raw data
+    audits_data = data.get("audits", [])
+    wins: list[dict] = []
+
+    tier_thresholds = {"abandoned": 0.15, "skeleton": 0.35, "wip": 0.55, "functional": 0.75, "shipped": 1.01}
+    tier_next = {"abandoned": ("skeleton", 0.15), "skeleton": ("wip", 0.35), "wip": ("functional", 0.55), "functional": ("shipped", 0.75)}
+
+    for audit in audits_data:
+        current_tier = audit["completeness_tier"]
+        if current_tier not in tier_next:
+            continue
+        next_name, threshold = tier_next[current_tier]
+        gap = threshold - audit["overall_score"]
+        if gap > 0.15 or gap <= 0:
+            continue
+
+        # Find lowest dimensions
+        dim_scores = {r["dimension"]: r["score"] for r in audit.get("analyzer_results", [])}
+        sorted_dims = sorted(dim_scores.items(), key=lambda x: x[1])
+        actions = [f"{d}={s:.1f}" for d, s in sorted_dims[:3]]
+
+        wins.append({
+            "name": audit["metadata"]["name"],
+            "grade": audit.get("grade", "F"),
+            "current_tier": current_tier,
+            "score": audit["overall_score"],
+            "next_tier": next_name,
+            "gap": gap,
+            "actions": ", ".join(actions),
+            "badges": len(audit.get("badges", [])),
+        })
+
+    wins.sort(key=lambda w: w["gap"])
+
+    if not wins:
+        ws.cell(row=1, column=1, value="No quick wins found — all repos are either at the top tier or too far from the next one.")
+        return
+
+    headers = ["Repo", "Grade", "Current Tier", "Score", "Next Tier", "Gap", "Lowest Dimensions", "Badges"]
+    for col, h in enumerate(headers, 1):
+        ws.cell(row=1, column=col, value=h)
+    _style_header_row(ws, 1, len(headers))
+
+    for row, win in enumerate(wins, 2):
+        ws.cell(row=row, column=1, value=win["name"]).border = THIN_BORDER
+        ws.cell(row=row, column=2, value=win["grade"]).border = THIN_BORDER
+        tier_cell = ws.cell(row=row, column=3, value=win["current_tier"])
+        tier_cell.border = THIN_BORDER
+        if win["current_tier"] in TIER_FILLS:
+            tier_cell.fill = TIER_FILLS[win["current_tier"]]
+            tier_cell.font = TIER_TEXT_FONT
+        ws.cell(row=row, column=4, value=round(win["score"], 3)).border = THIN_BORDER
+        ws.cell(row=row, column=5, value=win["next_tier"]).border = THIN_BORDER
+        ws.cell(row=row, column=6, value=round(win["gap"], 3)).border = THIN_BORDER
+        ws.cell(row=row, column=7, value=win["actions"]).border = THIN_BORDER
+        ws.cell(row=row, column=8, value=win["badges"]).border = THIN_BORDER
+
+    # DataBar on gap column (col 6) — green for small gaps
+    max_row = len(wins) + 1
+    if max_row > 1:
+        gap_bar = DataBarRule(start_type='num', start_value=0, end_type='num', end_value=0.15, color='2E7D32')
+        ws.conditional_formatting.add(f'F2:F{max_row}', gap_bar)
+
+    _auto_width(ws, len(headers), max_row)
+
+
 def export_excel(report_path: Path, output_path: Path) -> Path:
     """Generate a multi-sheet Excel workbook from an audit report JSON."""
     data = json.loads(report_path.read_text())
@@ -457,6 +552,7 @@ def export_excel(report_path: Path, output_path: Path) -> Path:
     _build_overview(wb, data)
     _build_all_repos(wb, data)
     _build_dimension_heatmap(wb, data)
+    _build_quick_wins(wb, data)
     _build_tier_breakdown(wb, data)
     _build_activity_dashboard(wb, data)
     _build_reconciliation(wb, data)

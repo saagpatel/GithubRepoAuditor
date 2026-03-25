@@ -108,7 +108,8 @@ def write_markdown_report(report: AuditReport, output_dir: Path) -> Path:
     _w(f"# GitHub Repo Audit: {report.username}")
     _w("")
     _w(f"*Generated: {_date_str(report.generated_at)} | "
-       f"Repos audited: {report.repos_audited} / {report.total_repos}*")
+       f"Repos audited: {report.repos_audited} / {report.total_repos} | "
+       f"Portfolio Grade: **{report.portfolio_grade}***")
     _w("")
 
     # Summary table
@@ -165,15 +166,31 @@ def write_markdown_report(report: AuditReport, output_dir: Path) -> Path:
             continue
         _w(f"## {tier.capitalize()} ({len(tier_audits)} repos)")
         _w("")
-        _w("| Repo | Score | Interest | Interest Tier | Language | Flags | Description |")
-        _w("|------|-------|----------|---------------|----------|-------|-------------|")
+        _w("| Repo | Grade | Score | Interest | Badges | Language | Description |")
+        _w("|------|-------|-------|----------|--------|----------|-------------|")
         for audit in tier_audits:
             m = audit.metadata
             name_link = f"[{m.name}]({m.html_url})"
-            flags = ", ".join(audit.flags) if audit.flags else ""
+            badges_str = " ".join(f"`{b}`" for b in audit.badges[:3]) if audit.badges else "—"
             desc = _truncate(m.description)
             lang = m.language or "—"
-            _w(f"| {name_link} | {audit.overall_score:.2f} | {audit.interest_score:.2f} | {audit.interest_tier} | {lang} | {flags} | {desc} |")
+            _w(f"| {name_link} | {audit.grade} | {audit.overall_score:.2f} | {audit.interest_score:.2f} | {badges_str} | {lang} | {desc} |")
+        _w("")
+
+    # Quick Wins section
+    from src.quick_wins import find_quick_wins
+    quick_wins = find_quick_wins(report.audits)
+    if quick_wins:
+        _w("---")
+        _w("")
+        _w(f"## Quick Wins ({len(quick_wins)} repos near next tier)")
+        _w("")
+        _w("| Repo | Current | Score | Next Tier | Gap | Top Action |")
+        _w("|------|---------|-------|-----------|-----|------------|")
+        for win in quick_wins:
+            action = win["actions"][0] if win["actions"] else "—"
+            _w(f"| {win['name']} | {win['current_tier']} | {win['score']:.2f} | "
+               f"{win['next_tier']} | {win['gap']:.3f} | {action} |")
         _w("")
 
     # Per-repo details
