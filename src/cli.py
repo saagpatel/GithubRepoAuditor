@@ -11,7 +11,13 @@ from pathlib import Path
 from src.analyzers import run_all_analyzers
 from src.cloner import clone_workspace
 from src.github_client import GitHubClient
-from src.models import RepoAudit, RepoMetadata
+from src.models import AuditReport, RepoAudit, RepoMetadata
+from src.reporter import (
+    write_json_report,
+    write_markdown_report,
+    write_pcc_export,
+    write_raw_metadata,
+)
 from src.scorer import score_repo
 
 
@@ -204,29 +210,36 @@ def main() -> None:
 
         print("  Clones cleaned up", file=sys.stderr)
 
-    # Write JSON output
+    # Generate reports
     output_dir = Path(args.output_dir)
-    output_path = _write_json(
-        args.username, repos, errors, total_fetched, output_dir,
-        audits=audits if audits else None,
-    )
 
-    # Summary
     if audits:
-        tier_dist = {}
-        for a in audits:
-            tier_dist[a.completeness_tier] = tier_dist.get(a.completeness_tier, 0) + 1
-        avg = sum(a.overall_score for a in audits) / len(audits)
+        report = AuditReport.from_audits(
+            args.username, audits, errors, total_fetched,
+        )
+
+        json_path = write_json_report(report, output_dir)
+        md_path = write_markdown_report(report, output_dir)
+        pcc_path = write_pcc_export(report, output_dir)
+        raw_path = write_raw_metadata(report, output_dir)
+
         print(
-            f"\n✓ Audited {len(audits)} repos for {args.username}\n"
-            f"  Average score: {avg:.2f}\n"
-            f"  Tiers: {tier_dist}\n"
-            f"  Errors: {len(errors)}\n"
-            f"  Output: {output_path}",
+            f"\n✓ Audited {report.repos_audited} repos for {report.username}\n"
+            f"  Average score: {report.average_score:.2f}\n"
+            f"  Tiers: {report.tier_distribution}\n"
+            f"  Errors: {len(report.errors)}\n"
+            f"  Reports:\n"
+            f"    {json_path}\n"
+            f"    {md_path}\n"
+            f"    {pcc_path}\n"
+            f"    {raw_path}",
         )
     else:
+        raw_path = _write_json(
+            args.username, repos, errors, total_fetched, output_dir,
+        )
         print(
             f"\n✓ Fetched {total_fetched} repos for {args.username}\n"
             f"  Included: {len(repos)} | Errors: {len(errors)}\n"
-            f"  Output: {output_path}",
+            f"  Output: {raw_path}",
         )

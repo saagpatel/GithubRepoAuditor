@@ -100,3 +100,98 @@ class RepoAudit:
             "completeness_tier": self.completeness_tier,
             "flags": self.flags,
         }
+
+
+@dataclass
+class AuditReport:
+    username: str
+    generated_at: datetime
+    total_repos: int
+    repos_audited: int
+    tier_distribution: dict[str, int]
+    average_score: float
+    language_distribution: dict[str, int]
+    audits: list[RepoAudit]
+    errors: list[dict]
+    most_active: list[str] = field(default_factory=list)
+    most_neglected: list[str] = field(default_factory=list)
+    highest_scored: list[str] = field(default_factory=list)
+    lowest_scored: list[str] = field(default_factory=list)
+
+    @classmethod
+    def from_audits(
+        cls,
+        username: str,
+        audits: list[RepoAudit],
+        errors: list[dict],
+        total_repos: int,
+    ) -> AuditReport:
+        """Construct an AuditReport with all derived statistics."""
+        now = datetime.now(tz=__import__("datetime").timezone.utc)
+
+        # Tier distribution
+        tier_dist: dict[str, int] = {}
+        for a in audits:
+            tier_dist[a.completeness_tier] = tier_dist.get(a.completeness_tier, 0) + 1
+
+        # Average score
+        avg = sum(a.overall_score for a in audits) / len(audits) if audits else 0.0
+
+        # Language distribution
+        from collections import Counter
+        lang_dist = dict(
+            Counter(
+                a.metadata.language or "Unknown" for a in audits
+            ).most_common()
+        )
+
+        # Summary lists (top/bottom 5)
+        sorted_by_score = sorted(audits, key=lambda a: a.overall_score, reverse=True)
+        highest = [a.metadata.name for a in sorted_by_score[:5]]
+        lowest = [a.metadata.name for a in sorted_by_score[-5:]]
+
+        # Most active: sort by activity dimension score
+        def _activity_score(audit: RepoAudit) -> float:
+            for r in audit.analyzer_results:
+                if r.dimension == "activity":
+                    return r.score
+            return 0.0
+
+        sorted_by_activity = sorted(audits, key=_activity_score, reverse=True)
+        most_active = [a.metadata.name for a in sorted_by_activity[:5]]
+        most_neglected = [a.metadata.name for a in sorted_by_activity[-5:]]
+
+        return cls(
+            username=username,
+            generated_at=now,
+            total_repos=total_repos,
+            repos_audited=len(audits),
+            tier_distribution=tier_dist,
+            average_score=round(avg, 3),
+            language_distribution=lang_dist,
+            audits=audits,
+            errors=errors,
+            most_active=most_active,
+            most_neglected=most_neglected,
+            highest_scored=highest,
+            lowest_scored=lowest,
+        )
+
+    def to_dict(self) -> dict:
+        return {
+            "username": self.username,
+            "generated_at": self.generated_at.isoformat(),
+            "total_repos": self.total_repos,
+            "repos_audited": self.repos_audited,
+            "average_score": self.average_score,
+            "tier_distribution": self.tier_distribution,
+            "language_distribution": self.language_distribution,
+            "summary": {
+                "most_active": self.most_active,
+                "most_neglected": self.most_neglected,
+                "highest_scored": self.highest_scored,
+                "lowest_scored": self.lowest_scored,
+            },
+            "audits": [a.to_dict() for a in self.audits],
+            "errors": self.errors,
+        }
