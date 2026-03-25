@@ -1,0 +1,36 @@
+name: Scheduled Audit
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'  # Every Monday at 6am UTC
+  workflow_dispatch:  # Manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run audit
+        env:
+          GITHUB_TOKEN: ${{ secrets.AUDIT_TOKEN }}
+        run: |
+          python -m src saagpatel --skip-clone
+
+      - name: Upload reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-reports-${{ github.run_number }}
+          path: output/
+          retention-days: 90

@@ -132,6 +132,16 @@ def _find_entry_point(repo_path: Path, language: str | None) -> str | None:
         if path.is_file() or path.is_dir():
             return candidate
 
+    # Swift/Xcode: check for @main or App.swift in any subdirectory
+    if language == "Swift":
+        for swift_file in repo_path.rglob("*App.swift"):
+            if "DerivedData" not in swift_file.parts:
+                return str(swift_file.relative_to(repo_path))
+        # Check for *.xcodeproj as an entry point signal
+        for child in repo_path.iterdir():
+            if child.suffix in (".xcodeproj", ".xcworkspace"):
+                return child.name
+
     return None
 
 

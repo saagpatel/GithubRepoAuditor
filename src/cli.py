@@ -22,6 +22,10 @@ from src.reporter import (
 from src.scorer import score_repo
 
 
+def _date_str(dt: datetime) -> str:
+    return dt.strftime("%Y-%m-%d")
+
+
 def _gh_auth_token() -> str | None:
     """Fall back to `gh auth token` if GITHUB_TOKEN env var is unset."""
     try:
@@ -87,6 +91,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--verbose",
         action="store_true",
         help="Print detailed output",
+    )
+    parser.add_argument(
+        "--diff",
+        type=Path,
+        default=None,
+        metavar="PREVIOUS_REPORT",
+        help="Compare against a previous audit-report JSON to show changes",
     )
     return parser
 
@@ -248,6 +259,20 @@ def main() -> None:
         md_path = write_markdown_report(report, output_dir)
         pcc_path = write_pcc_export(report, output_dir)
         raw_path = write_raw_metadata(report, output_dir)
+
+        # Historical diff
+        if args.diff:
+            from src.diff import diff_reports, format_diff_markdown
+            diff = diff_reports(args.diff, json_path)
+            diff_md_path = output_dir / f"audit-diff-{report.username}-{_date_str(report.generated_at)}.md"
+            diff_md_path.write_text(format_diff_markdown(diff))
+            diff_json_path = output_dir / f"audit-diff-{report.username}-{_date_str(report.generated_at)}.json"
+            diff_json_path.write_text(__import__("json").dumps(diff.to_dict(), indent=2))
+            print(
+                f"  Diff: {len(diff.tier_changes)} tier changes, "
+                f"{len([c for c in diff.score_changes if abs(c['delta']) > 0.05])} significant score changes",
+                file=sys.stderr,
+            )
 
         cache_info = ""
         if cache:

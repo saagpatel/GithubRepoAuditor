@@ -1,5 +1,6 @@
 output/*.json
 output/*.md
+output/.cache/
 !output/.gitkeep
 __pycache__/
 *.pyc
