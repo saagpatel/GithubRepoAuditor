@@ -1,0 +1,11 @@
+output/*.json
+output/*.md
+!output/.gitkeep
+__pycache__/
+*.pyc
+.env
+/tmp/audit-repos/
+*.egg-info/
+dist/
+build/
+.venv/
