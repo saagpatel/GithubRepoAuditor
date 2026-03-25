@@ -165,15 +165,15 @@ def write_markdown_report(report: AuditReport, output_dir: Path) -> Path:
             continue
         _w(f"## {tier.capitalize()} ({len(tier_audits)} repos)")
         _w("")
-        _w("| Repo | Score | Language | Flags | Description |")
-        _w("|------|-------|----------|-------|-------------|")
+        _w("| Repo | Score | Interest | Interest Tier | Language | Flags | Description |")
+        _w("|------|-------|----------|---------------|----------|-------|-------------|")
         for audit in tier_audits:
             m = audit.metadata
             name_link = f"[{m.name}]({m.html_url})"
             flags = ", ".join(audit.flags) if audit.flags else ""
             desc = _truncate(m.description)
             lang = m.language or "—"
-            _w(f"| {name_link} | {audit.overall_score:.2f} | {lang} | {flags} | {desc} |")
+            _w(f"| {name_link} | {audit.overall_score:.2f} | {audit.interest_score:.2f} | {audit.interest_tier} | {lang} | {flags} | {desc} |")
         _w("")
 
     # Per-repo details

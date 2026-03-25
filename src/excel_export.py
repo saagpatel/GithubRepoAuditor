@@ -175,7 +175,7 @@ def _build_all_repos(wb: Workbook, data: dict) -> None:
     ws.sheet_properties.tabColor = "1565C0"
 
     headers = [
-        "Repo", "Tier", "Score", "Language", "Private",
+        "Repo", "Tier", "Score", "Interest", "Interest Tier", "Language", "Private",
         "Stars", "Forks", "Size (KB)", "Days Since Push",
         "Total Commits", "Test Files", "Dep Count",
         "LOC", "TODO Density", "Flags", "Description",
@@ -196,6 +196,8 @@ def _build_all_repos(wb: Workbook, data: dict) -> None:
             m["name"],
             audit["completeness_tier"],
             round(audit["overall_score"], 3),
+            round(audit.get("interest_score", 0), 3),
+            audit.get("interest_tier", "mundane"),
             m["language"] or "—",
             "Yes" if m["private"] else "No",
             m["stars"],
@@ -232,6 +234,7 @@ def _build_dimension_heatmap(wb: Workbook, data: dict) -> None:
     dimensions = [
         "readme", "structure", "code_quality", "testing", "cicd",
         "dependencies", "activity", "documentation", "build_readiness",
+        "community_profile", "interest",
     ]
     headers = ["Repo", "Tier", "Overall"] + [d.replace("_", " ").title() for d in dimensions]
     for col, h in enumerate(headers, 1):

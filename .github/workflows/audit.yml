@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 jobs:
   audit:
@@ -22,11 +23,58 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Restore previous audit history
+        uses: actions/cache@v4
+        with:
+          path: output/history
+          key: audit-history-${{ github.repository }}
+          restore-keys: audit-history-
+
       - name: Run audit
         env:
           GITHUB_TOKEN: ${{ secrets.AUDIT_TOKEN }}
         run: |
           python -m src saagpatel --skip-clone
+
+      - name: Check for regressions
+        id: check-regressions
+        continue-on-error: true
+        run: |
+          DIFF_FILE=$(ls output/audit-diff-*.json 2>/dev/null | head -1)
+          if [ -n "$DIFF_FILE" ]; then
+            python3 -c "
+          import json, sys
+          diff = json.load(open('$DIFF_FILE'))
+          regressions = diff.get('score_regressions', [])
+          tier_changes = diff.get('tier_changes', [])
+          downgrades = [t for t in tier_changes if t.get('old_tier') in ('shipped','functional') and t.get('new_tier') in ('wip','skeleton','abandoned')]
+          if regressions or downgrades:
+              print(f'{len(regressions)} score regressions, {len(downgrades)} tier downgrades')
+              sys.exit(1)
+          print('No regressions detected')
+          "
+          else
+            echo "No diff file found (first run)"
+          fi
+
+      - name: Create issue on regression
+        if: steps.check-regressions.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DIFF_MD=$(ls output/audit-diff-*.md 2>/dev/null | head -1)
+          if [ -n "$DIFF_MD" ]; then
+            gh issue create \
+              --title "Audit Regression: $(date +%Y-%m-%d)" \
+              --body "$(cat $DIFF_MD)" \
+              --label "audit-regression"
+          fi
+
+      - name: Save audit history
+        uses: actions/cache/save@v4
+        with:
+          path: output/history
+          key: audit-history-${{ github.repository }}-${{ github.run_number }}
 
       - name: Upload reports
         uses: actions/upload-artifact@v4

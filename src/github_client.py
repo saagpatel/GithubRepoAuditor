@@ -147,6 +147,30 @@ class GitHubClient:
 
     # ── public API ────────────────────────────────────────────────────
 
+    def get_community_profile(self, owner: str, repo: str) -> dict:
+        """Fetch community health profile (README, LICENSE, CODE_OF_CONDUCT, etc).
+
+        Single API call returns presence of all health files.
+        """
+        try:
+            return self._fetch_json(f"{API_BASE}/repos/{owner}/{repo}/community/profile")
+        except requests.HTTPError as exc:
+            logger.warning("Failed to fetch community profile for %s/%s: %s", owner, repo, exc)
+            return {}
+
+    def get_participation_stats(self, owner: str, repo: str) -> dict:
+        """Fetch weekly commit counts split by owner vs all contributors.
+
+        Returns {all: [52 weeks], owner: [52 weeks]}.
+        """
+        try:
+            return self._fetch_json_with_202_retry(
+                f"{API_BASE}/repos/{owner}/{repo}/stats/participation"
+            )
+        except requests.HTTPError as exc:
+            logger.warning("Failed to fetch participation for %s/%s: %s", owner, repo, exc)
+            return {}
+
     def get_authenticated_user(self) -> str | None:
         """Return the login of the authenticated user, or None."""
         if not self.token:
@@ -159,20 +183,33 @@ class GitHubClient:
 
     def list_repos(self, username: str) -> list[dict]:
         """Fetch all repos for a user. Uses /user/repos for the authenticated user."""
+        # Check cache for the complete repo list
+        cache_key = f"{API_BASE}/list_repos/{username}"
+        if self.cache:
+            cached = self.cache.get(cache_key)
+            if cached is not None:
+                return cached
+
+        repos: list[dict] = []
         if self.token:
             authed_user = self.get_authenticated_user()
             if authed_user and authed_user.lower() == username.lower():
                 # Authenticated as this user — get private repos too
-                return self._paginate(
+                repos = self._paginate(
                     f"{API_BASE}/user/repos",
                     {"per_page": "100", "type": "owner"},
                 )
 
-        # Public-only or token belongs to a different user
-        return self._paginate(
-            f"{API_BASE}/users/{username}/repos",
-            {"per_page": "100"},
-        )
+        if not repos:
+            # Public-only or token belongs to a different user
+            repos = self._paginate(
+                f"{API_BASE}/users/{username}/repos",
+                {"per_page": "100"},
+            )
+
+        if self.cache:
+            self.cache.put(cache_key, None, repos)
+        return repos
 
     def get_languages(self, owner: str, repo: str) -> dict[str, int]:
         """Fetch language byte counts for a repo."""

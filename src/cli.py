@@ -83,6 +83,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to project-registry.md for reconciliation",
     )
     parser.add_argument(
+        "--sync-registry",
+        action="store_true",
+        help="Auto-add untracked GitHub repos to the registry (requires --registry)",
+    )
+    parser.add_argument(
         "--no-cache",
         action="store_true",
         help="Bypass API response cache",
@@ -207,9 +212,16 @@ def main() -> None:
         skip_archived=args.skip_archived,
     )
 
+    forks_excluded = sum(1 for r in all_repos if r.fork) if args.skip_forks else 0
+    archived_excluded = sum(1 for r in all_repos if r.archived) if args.skip_archived else 0
     skipped = total_fetched - len(repos)
     if skipped:
-        print(f"  Filtered out {skipped} repos (forks/archived)", file=sys.stderr)
+        parts = []
+        if forks_excluded:
+            parts.append(f"{forks_excluded} forks")
+        if archived_excluded:
+            parts.append(f"{archived_excluded} archived")
+        print(f"  Filtered out {skipped} repos ({', '.join(parts) or 'forks/archived'})", file=sys.stderr)
 
     # Clone and analyze
     audits: list[RepoAudit] = []
@@ -246,7 +258,7 @@ def main() -> None:
 
         # Registry reconciliation
         if args.registry:
-            from src.registry_parser import parse_registry, reconcile
+            from src.registry_parser import parse_registry, reconcile, sync_new_repos
             registry = parse_registry(args.registry)
             report.reconciliation = reconcile(registry, audits)
             print(
@@ -254,6 +266,20 @@ def main() -> None:
                 f"{len(report.reconciliation.matched)} matched",
                 file=sys.stderr,
             )
+
+            # Auto-sync untracked repos
+            if args.sync_registry and report.reconciliation.on_github_not_registry:
+                added = sync_new_repos(
+                    args.registry,
+                    report.reconciliation.on_github_not_registry,
+                    audits,
+                )
+                if added:
+                    print(
+                        f"  Synced {len(added)} repos to registry: {', '.join(added[:5])}"
+                        + (f"... (+{len(added)-5})" if len(added) > 5 else ""),
+                        file=sys.stderr,
+                    )
 
         json_path = write_json_report(report, output_dir)
 
@@ -267,10 +293,18 @@ def main() -> None:
         pcc_path = write_pcc_export(report, output_dir)
         raw_path = write_raw_metadata(report, output_dir)
 
-        # Historical diff
-        if args.diff:
-            from src.diff import diff_reports, format_diff_markdown
-            diff = diff_reports(args.diff, json_path)
+        # Auto-archive + auto-diff (historical tracking)
+        from src.history import archive_report, find_previous
+        from src.diff import diff_reports, format_diff_markdown
+
+        # Find previous report before archiving the new one
+        previous = find_previous(json_path.name)
+
+        # If --diff is explicitly set, use that instead
+        diff_source = args.diff or previous
+
+        if diff_source:
+            diff = diff_reports(diff_source, json_path)
             diff_md_path = output_dir / f"audit-diff-{report.username}-{_date_str(report.generated_at)}.md"
             diff_md_path.write_text(format_diff_markdown(diff))
             diff_json_path = output_dir / f"audit-diff-{report.username}-{_date_str(report.generated_at)}.json"
@@ -280,6 +314,9 @@ def main() -> None:
                 f"{len([c for c in diff.score_changes if abs(c['delta']) > 0.05])} significant score changes",
                 file=sys.stderr,
             )
+
+        # Archive the current report
+        archive_report(json_path)
 
         cache_info = ""
         if cache:

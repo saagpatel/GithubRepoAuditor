@@ -1,6 +1,9 @@
 output/*.json
 output/*.md
+output/*.xlsx
+output/~$*
 output/.cache/
+output/history/
 !output/.gitkeep
 __pycache__/
 *.pyc

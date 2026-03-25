@@ -159,3 +159,109 @@ def reconcile(
         registry_total=len(registry),
         github_total=len(audits),
     )
+
+
+# ── Auto-sync ────────────────────────────────────────────────────────
+
+# Section markers in registry file by language/category
+SECTION_MARKERS: dict[str, str] = {
+    "Swift": "## iOS Projects",
+    "GDScript": "## Fun:GamePrjs",
+}
+DEFAULT_SECTION = "## Standalone Projects"
+
+
+def sync_new_repos(
+    registry_path: Path,
+    untracked: list[str],
+    audits: list[RepoAudit],
+) -> list[str]:
+    """Auto-add untracked GitHub repos to the registry file.
+
+    Returns list of repo names that were added.
+    """
+    if not untracked:
+        return []
+
+    content = registry_path.read_text()
+    lines = content.splitlines()
+    audit_map = {a.metadata.name: a for a in audits}
+
+    # Group repos by target section
+    by_section: dict[str, list[str]] = {}
+    for name in untracked:
+        audit = audit_map.get(name)
+        if not audit:
+            continue
+        lang = audit.metadata.language
+        section = SECTION_MARKERS.get(lang, DEFAULT_SECTION)
+        by_section.setdefault(section, []).append(name)
+
+    added: list[str] = []
+
+    for section_header, names in by_section.items():
+        # Find the section in the file — insert before the next "---" separator
+        insert_idx = _find_section_end(lines, section_header)
+        if insert_idx is None:
+            continue
+
+        new_rows: list[str] = []
+        for name in sorted(names):
+            audit = audit_map[name]
+            m = audit.metadata
+            # Determine status from push recency
+            status = _status_from_audit(audit)
+            lang = m.language or "Unknown"
+            desc = (m.description or "—")[:80]
+            score = audit.overall_score
+
+            if section_header == DEFAULT_SECTION:
+                # 8-column Standalone format
+                row = (
+                    f"| {name} | {status} | claude-code | none | {lang} "
+                    f"| — | vanity | {desc} Audit score: {score:.2f} ({audit.completeness_tier}). |"
+                )
+            else:
+                # 5-column simplified format
+                row = (
+                    f"| {name} | {status} | claude-code | none "
+                    f"| {desc} Audit score: {score:.2f} ({audit.completeness_tier}). |"
+                )
+
+            new_rows.append(row)
+            added.append(name)
+
+        # Insert new rows
+        for i, row in enumerate(new_rows):
+            lines.insert(insert_idx + i, row)
+
+    if added:
+        registry_path.write_text("\n".join(lines) + "\n")
+
+    return added
+
+
+def _find_section_end(lines: list[str], section_header: str) -> int | None:
+    """Find the line index just before the '---' that ends a section."""
+    in_section = False
+    for i, line in enumerate(lines):
+        if line.strip().startswith(section_header):
+            in_section = True
+            continue
+        if in_section and line.strip() == "---":
+            return i  # Insert before the separator
+    return None
+
+
+def _status_from_audit(audit: RepoAudit) -> str:
+    """Determine registry status from audit data."""
+    from datetime import datetime, timezone
+
+    if not audit.metadata.pushed_at:
+        return "parked"
+    days = (datetime.now(timezone.utc) - audit.metadata.pushed_at).days
+    if days <= 14:
+        return "active"
+    if days <= 30:
+        return "recent"
+    return "parked"

@@ -8,8 +8,10 @@ from typing import TYPE_CHECKING
 from src.analyzers.activity import ActivityAnalyzer
 from src.analyzers.cicd import CicdAnalyzer
 from src.analyzers.code_quality import CodeQualityAnalyzer
+from src.analyzers.community_profile import CommunityProfileAnalyzer
 from src.analyzers.completeness import BuildReadinessAnalyzer, DocumentationAnalyzer
 from src.analyzers.dependencies import DependenciesAnalyzer
+from src.analyzers.interest import InterestAnalyzer
 from src.analyzers.readme import ReadmeAnalyzer
 from src.analyzers.structure import StructureAnalyzer
 from src.analyzers.testing import TestingAnalyzer
@@ -30,6 +32,8 @@ ALL_ANALYZERS = [
     ActivityAnalyzer(),
     DocumentationAnalyzer(),
     BuildReadinessAnalyzer(),
+    CommunityProfileAnalyzer(),
+    InterestAnalyzer(),
 ]
 
 

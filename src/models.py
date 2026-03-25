@@ -90,6 +90,8 @@ class RepoAudit:
     analyzer_results: list[AnalyzerResult]
     overall_score: float
     completeness_tier: str
+    interest_score: float = 0.0
+    interest_tier: str = "mundane"
     flags: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -97,7 +99,9 @@ class RepoAudit:
             "metadata": self.metadata.to_dict(),
             "analyzer_results": [r.to_dict() for r in self.analyzer_results],
             "overall_score": round(self.overall_score, 3),
+            "interest_score": round(self.interest_score, 3),
             "completeness_tier": self.completeness_tier,
+            "interest_tier": self.interest_tier,
             "flags": self.flags,
         }
 

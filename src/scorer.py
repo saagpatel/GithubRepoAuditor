@@ -4,27 +4,36 @@ from datetime import datetime, timezone
 
 from src.models import AnalyzerResult, RepoAudit, RepoMetadata
 
+# Rebalanced completeness weights (sum = 1.0)
 WEIGHTS: dict[str, float] = {
-    "readme": 0.15,
+    "readme": 0.12,
     "structure": 0.10,
     "code_quality": 0.15,
-    "testing": 0.15,
+    "testing": 0.18,
     "cicd": 0.10,
-    "dependencies": 0.10,
+    "dependencies": 0.08,
     "activity": 0.15,
-    "documentation": 0.05,
-    "build_readiness": 0.05,
+    "documentation": 0.02,
+    "build_readiness": 0.07,
+    "community_profile": 0.03,
 }
 
 # Fork override: reduce activity weight, redistribute to others
 FORK_ACTIVITY_WEIGHT = 0.05
 
-TIERS = [
+COMPLETENESS_TIERS = [
     ("shipped", 0.75),
     ("functional", 0.55),
     ("wip", 0.35),
     ("skeleton", 0.15),
     ("abandoned", 0.0),
+]
+
+INTEREST_TIERS = [
+    ("flagship", 0.70),
+    ("notable", 0.45),
+    ("standard", 0.20),
+    ("mundane", 0.0),
 ]
 
 STALE_THRESHOLD_DAYS = 730  # 2 years
@@ -34,7 +43,7 @@ def score_repo(
     metadata: RepoMetadata,
     results: list[AnalyzerResult],
 ) -> RepoAudit:
-    """Compute weighted score, classify tier, apply overrides."""
+    """Compute dual-axis scores: completeness + interest."""
     weights = dict(WEIGHTS)
     flags: list[str] = []
 
@@ -43,13 +52,12 @@ def score_repo(
         flags.append("forked")
         activity_reduction = weights["activity"] - FORK_ACTIVITY_WEIGHT
         weights["activity"] = FORK_ACTIVITY_WEIGHT
-        # Redistribute proportionally to other dimensions
         other_keys = [k for k in weights if k != "activity"]
         other_total = sum(weights[k] for k in other_keys)
         for k in other_keys:
             weights[k] += activity_reduction * (weights[k] / other_total)
 
-    # Compute weighted score
+    # Compute completeness score (weighted average of all non-interest dimensions)
     score_map = {r.dimension: r.score for r in results}
     weighted_sum = 0.0
     weight_sum = 0.0
@@ -61,11 +69,21 @@ def score_repo(
 
     overall_score = weighted_sum / weight_sum if weight_sum > 0 else 0.0
 
-    # Classify tier
+    # Compute interest score (separate axis, from interest analyzer)
+    interest_score = score_map.get("interest", 0.0)
+
+    # Classify completeness tier
     tier = "abandoned"
-    for tier_name, threshold in TIERS:
+    for tier_name, threshold in COMPLETENESS_TIERS:
         if overall_score >= threshold:
             tier = tier_name
+            break
+
+    # Classify interest tier
+    interest_tier = "mundane"
+    for tier_name, threshold in INTEREST_TIERS:
+        if interest_score >= threshold:
+            interest_tier = tier_name
             break
 
     # Generate flags from analyzer results
@@ -101,19 +119,17 @@ def score_repo(
         metadata=metadata,
         analyzer_results=results,
         overall_score=overall_score,
+        interest_score=interest_score,
         completeness_tier=tier,
+        interest_tier=interest_tier,
         flags=flags,
     )
 
 
 def _count_meaningful_files(results: list[AnalyzerResult]) -> int:
-    """Heuristic: check if the repo has files beyond just a README.
-
-    Uses structure and code_quality analyzer results as signals.
-    """
+    """Heuristic: check if the repo has files beyond just a README."""
     for r in results:
         if r.dimension == "structure":
-            # If it has config files or source dirs, it has real files
             if r.details.get("config_files") or r.details.get("source_dirs"):
                 return 1
         if r.dimension == "code_quality":
