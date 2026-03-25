@@ -55,6 +55,46 @@ def load_history_index(history_dir: Path = HISTORY_DIR) -> list[dict]:
         return []
 
 
+def load_trend_data(history_dir: Path = HISTORY_DIR, max_runs: int = 10) -> list[dict]:
+    """Load trend data from the last N archived reports.
+
+    Returns list of {date, average_score, tier_distribution, top_repos: {name: score}}.
+    """
+    if not history_dir.exists():
+        return []
+
+    reports = sorted(
+        history_dir.glob("audit-report-*.json"),
+        key=lambda f: f.stat().st_mtime,
+        reverse=True,
+    )[:max_runs]
+
+    trends: list[dict] = []
+    for report_path in reversed(reports):  # chronological order
+        try:
+            data = json.loads(report_path.read_text())
+            # Extract per-repo scores for top 20
+            top_repos: dict[str, float] = {}
+            for audit in sorted(
+                data.get("audits", []),
+                key=lambda a: a.get("overall_score", 0),
+                reverse=True,
+            )[:20]:
+                top_repos[audit["metadata"]["name"]] = audit["overall_score"]
+
+            trends.append({
+                "date": data.get("generated_at", "")[:10],
+                "average_score": data.get("average_score", 0),
+                "repos_audited": data.get("repos_audited", 0),
+                "tier_distribution": data.get("tier_distribution", {}),
+                "top_repos": top_repos,
+            })
+        except (json.JSONDecodeError, OSError, KeyError):
+            continue
+
+    return trends
+
+
 def _update_index(report_path: Path, history_dir: Path) -> None:
     """Add an entry to the history index."""
     index_path = history_dir / "index.json"

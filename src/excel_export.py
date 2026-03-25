@@ -468,6 +468,83 @@ def _build_reconciliation(wb: Workbook, data: dict) -> None:
 # ── Main entry point ─────────────────────────────────────────────────
 
 
+def _build_tech_stack(wb: Workbook, data: dict) -> None:
+    """Sheet: Technology Stack — language proficiency view."""
+    tech_stack = data.get("tech_stack", {})
+    if not tech_stack:
+        return
+
+    ws = wb.create_sheet("Tech Stack")
+    ws.sheet_properties.tabColor = "4A148C"
+
+    headers = ["Language", "Repos", "Bytes", "Avg Score", "Proficiency"]
+    for col, h in enumerate(headers, 1):
+        ws.cell(row=1, column=col, value=h)
+    _style_header_row(ws, 1, len(headers))
+
+    for row, (lang, info) in enumerate(tech_stack.items(), 2):
+        ws.cell(row=row, column=1, value=lang).border = THIN_BORDER
+        ws.cell(row=row, column=2, value=info.get("repos", 0)).border = THIN_BORDER
+        ws.cell(row=row, column=3, value=info.get("bytes", 0)).border = THIN_BORDER
+        ws.cell(row=row, column=4, value=info.get("avg_score", 0)).border = THIN_BORDER
+        ws.cell(row=row, column=5, value=info.get("proficiency", 0)).border = THIN_BORDER
+
+    max_row = len(tech_stack) + 1
+    if max_row > 1:
+        # Bar chart for proficiency
+        chart = BarChart()
+        chart.type = "col"
+        chart.title = "Language Proficiency (bytes × quality)"
+        chart.style = 10
+        chart_data = Reference(ws, min_col=5, min_row=1, max_row=max_row)
+        chart_cats = Reference(ws, min_col=1, min_row=2, max_row=max_row)
+        chart.add_data(chart_data, titles_from_data=True)
+        chart.set_categories(chart_cats)
+        chart.width = 20
+        chart.height = 12
+        ws.add_chart(chart, "G1")
+
+    # Best work highlight
+    best_work = data.get("best_work", [])
+    if best_work:
+        best_row = max_row + 3
+        ws.cell(row=best_row, column=1, value="Best Work (Top 5)").font = Font(bold=True, size=12)
+        for i, name in enumerate(best_work, best_row + 1):
+            ws.cell(row=i, column=1, value=f"{i - best_row}. {name}").border = THIN_BORDER
+
+    _auto_width(ws, len(headers), max_row + 10)
+
+
+def _build_trends(wb: Workbook, data: dict, trend_data: list[dict] | None = None) -> None:
+    """Sheet: Trends — score evolution across audit runs."""
+    ws = wb.create_sheet("Trends")
+    ws.sheet_properties.tabColor = "311B92"
+
+    if not trend_data or len(trend_data) < 2:
+        ws.cell(row=1, column=1, value="Run more audits to see trends (need 2+ historical runs)")
+        ws.cell(row=1, column=1).font = Font(size=12, color="666666")
+        return
+
+    # Portfolio score over time
+    ws.cell(row=1, column=1, value="Date").font = SUBHEADER_FONT
+    ws.cell(row=2, column=1, value="Avg Score").font = SUBHEADER_FONT
+    ws.cell(row=3, column=1, value="Repos").font = SUBHEADER_FONT
+    for col, run in enumerate(trend_data, 2):
+        ws.cell(row=1, column=col, value=run["date"]).border = THIN_BORDER
+        ws.cell(row=2, column=col, value=run["average_score"]).border = THIN_BORDER
+        ws.cell(row=3, column=col, value=run["repos_audited"]).border = THIN_BORDER
+
+    # Tier distribution over time
+    row = 5
+    ws.cell(row=row, column=1, value="Tier").font = SUBHEADER_FONT
+    for i, tier in enumerate(["shipped", "functional", "wip", "skeleton", "abandoned"]):
+        ws.cell(row=row + 1 + i, column=1, value=tier.capitalize()).font = Font(bold=True)
+        for col, run in enumerate(trend_data, 2):
+            ws.cell(row=row + 1 + i, column=col, value=run.get("tier_distribution", {}).get(tier, 0)).border = THIN_BORDER
+
+    _auto_width(ws, len(trend_data) + 1, 12)
+
+
 def _build_quick_wins(wb: Workbook, data: dict) -> None:
     """Sheet 7: Quick Wins — repos closest to the next tier."""
     from src.quick_wins import find_quick_wins
@@ -544,7 +621,11 @@ def _build_quick_wins(wb: Workbook, data: dict) -> None:
     _auto_width(ws, len(headers), max_row)
 
 
-def export_excel(report_path: Path, output_path: Path) -> Path:
+def export_excel(
+    report_path: Path,
+    output_path: Path,
+    trend_data: list[dict] | None = None,
+) -> Path:
     """Generate a multi-sheet Excel workbook from an audit report JSON."""
     data = json.loads(report_path.read_text())
 
@@ -553,6 +634,8 @@ def export_excel(report_path: Path, output_path: Path) -> Path:
     _build_all_repos(wb, data)
     _build_dimension_heatmap(wb, data)
     _build_quick_wins(wb, data)
+    _build_tech_stack(wb, data)
+    _build_trends(wb, data, trend_data)
     _build_tier_breakdown(wb, data)
     _build_activity_dashboard(wb, data)
     _build_reconciliation(wb, data)

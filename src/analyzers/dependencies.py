@@ -81,6 +81,19 @@ class DependenciesAnalyzer(BaseAnalyzer):
         else:
             findings.append("Could not determine dependency count")
 
+        # Libyears freshness (optional — requires network for registry queries)
+        if found_manifests:
+            try:
+                from src.libyears import compute_libyears
+                from src.cache import ResponseCache
+                cache = ResponseCache(ttl=86400)  # 24hr for registries
+                libyears_data = compute_libyears(repo_path, found_manifests, cache)
+                details.update(libyears_data)
+                if libyears_data.get("total_libyears") is not None:
+                    findings.append(f"Libyears: {libyears_data['total_libyears']}")
+            except Exception:
+                pass  # Non-fatal — libyears is a bonus signal
+
         return self._result(score, findings, details)
 
 

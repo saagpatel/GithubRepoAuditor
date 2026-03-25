@@ -219,6 +219,32 @@ class GitHubClient:
             logger.warning("Failed to fetch languages for %s/%s: %s", owner, repo, exc)
             return {}
 
+    def get_releases(self, owner: str, repo: str, count: int = 20) -> list[dict]:
+        """Fetch releases for a repo."""
+        try:
+            data = self._fetch_json(
+                f"{API_BASE}/repos/{owner}/{repo}/releases",
+                {"per_page": str(count)},
+            )
+            return data if isinstance(data, list) else []
+        except requests.HTTPError as exc:
+            logger.warning("Failed to fetch releases for %s/%s: %s", owner, repo, exc)
+            return []
+
+    def get_pull_requests(
+        self, owner: str, repo: str, state: str = "all", count: int = 50
+    ) -> list[dict]:
+        """Fetch pull requests for a repo."""
+        try:
+            data = self._fetch_json(
+                f"{API_BASE}/repos/{owner}/{repo}/pulls",
+                {"state": state, "per_page": str(count)},
+            )
+            return data if isinstance(data, list) else []
+        except requests.HTTPError as exc:
+            logger.warning("Failed to fetch PRs for %s/%s: %s", owner, repo, exc)
+            return []
+
     def get_recent_commits(
         self, owner: str, repo: str, count: int = 10
     ) -> list[dict]:

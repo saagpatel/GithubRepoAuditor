@@ -99,6 +99,28 @@ class ActivityAnalyzer(BaseAnalyzer):
             details["bus_factor"] = bus_factor
             if bus_factor > 0:
                 findings.append(f"Bus factor: {bus_factor}")
+
+            # Release frequency
+            releases = github_client.get_releases(owner, metadata.name)
+            details["release_count"] = len(releases)
+            if releases:
+                findings.append(f"Releases: {len(releases)}")
+                # Compute cadence if 2+ releases
+                if len(releases) >= 2:
+                    from datetime import datetime
+                    dates = []
+                    for r in releases:
+                        pub = r.get("published_at") or r.get("created_at")
+                        if pub:
+                            try:
+                                dates.append(datetime.fromisoformat(pub.replace("Z", "+00:00")))
+                            except (ValueError, TypeError):
+                                pass
+                    if len(dates) >= 2:
+                        dates.sort()
+                        gaps = [(dates[i+1] - dates[i]).days for i in range(len(dates)-1)]
+                        avg_cadence = sum(gaps) / len(gaps)
+                        details["release_cadence_days"] = round(avg_cadence)
         else:
             findings.append("Skipped API-based activity checks")
 

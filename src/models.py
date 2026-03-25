@@ -126,6 +126,9 @@ class AuditReport:
     audits: list[RepoAudit]
     errors: list[dict]
     portfolio_grade: str = "F"
+    portfolio_health_score: float = 0.0
+    tech_stack: dict = field(default_factory=dict)
+    best_work: list[str] = field(default_factory=list)
     most_active: list[str] = field(default_factory=list)
     most_neglected: list[str] = field(default_factory=list)
     highest_scored: list[str] = field(default_factory=list)
@@ -175,9 +178,29 @@ class AuditReport:
         most_active = [a.metadata.name for a in sorted_by_activity[:5]]
         most_neglected = [a.metadata.name for a in sorted_by_activity[-5:]]
 
-        # Portfolio grade
-        from src.scorer import letter_grade
-        p_grade = letter_grade(avg)
+        # Portfolio grade (nuanced formula)
+        from src.scorer import compute_portfolio_grade
+        p_grade, p_health = compute_portfolio_grade(audits)
+
+        # Tech stack summary
+        tech_stack: dict[str, dict] = {}
+        for a in audits:
+            for lang, byte_count in a.metadata.languages.items():
+                if lang not in tech_stack:
+                    tech_stack[lang] = {"bytes": 0, "repos": 0, "total_score": 0.0}
+                tech_stack[lang]["bytes"] += byte_count
+                tech_stack[lang]["repos"] += 1
+                tech_stack[lang]["total_score"] += a.overall_score
+        for data in tech_stack.values():
+            data["avg_score"] = round(data["total_score"] / data["repos"], 3) if data["repos"] else 0
+            data["proficiency"] = round(data["bytes"] * data["avg_score"])
+            del data["total_score"]
+        # Sort by proficiency descending
+        tech_stack = dict(sorted(tech_stack.items(), key=lambda x: x[1]["proficiency"], reverse=True))
+
+        # Best work: top 5 by weighted combo
+        best = sorted(audits, key=lambda a: a.overall_score * 0.6 + a.interest_score * 0.4, reverse=True)
+        best_work = [a.metadata.name for a in best[:5]]
 
         return cls(
             username=username,
@@ -188,6 +211,9 @@ class AuditReport:
             average_score=round(avg, 3),
             language_distribution=lang_dist,
             portfolio_grade=p_grade,
+            portfolio_health_score=p_health,
+            tech_stack=tech_stack,
+            best_work=best_work,
             audits=audits,
             errors=errors,
             most_active=most_active,
@@ -204,6 +230,9 @@ class AuditReport:
             "repos_audited": self.repos_audited,
             "average_score": self.average_score,
             "portfolio_grade": self.portfolio_grade,
+            "portfolio_health_score": self.portfolio_health_score,
+            "tech_stack": self.tech_stack,
+            "best_work": self.best_work,
             "tier_distribution": self.tier_distribution,
             "language_distribution": self.language_distribution,
             "summary": {

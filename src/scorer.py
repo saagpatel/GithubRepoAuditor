@@ -145,6 +145,37 @@ def score_repo(
     return audit
 
 
+def compute_portfolio_grade(audits: list[RepoAudit]) -> tuple[str, float]:
+    """Compute nuanced portfolio health grade with diversity/abandonment adjustments."""
+    if not audits:
+        return "F", 0.0
+
+    avg_score = sum(a.overall_score for a in audits) / len(audits)
+
+    # Diversity bonus: more languages = broader skills
+    languages = set(a.metadata.language for a in audits if a.metadata.language)
+    diversity_bonus = min(0.10, max(0, (len(languages) - 3)) * 0.05)
+
+    # Shipped ratio bonus
+    shipped_ratio = sum(1 for a in audits if a.completeness_tier == "shipped") / len(audits)
+    shipped_bonus = 0.10 if shipped_ratio > 0.5 else (0.05 if shipped_ratio > 0.3 else 0)
+
+    # Abandonment penalty
+    abandon_ratio = sum(
+        1 for a in audits if a.completeness_tier in ("skeleton", "abandoned")
+    ) / len(audits)
+    abandon_penalty = -0.10 if abandon_ratio > 0.6 else (-0.05 if abandon_ratio > 0.4 else 0)
+
+    # Badge density bonus
+    avg_badges = sum(len(a.badges) for a in audits) / len(audits)
+    badge_bonus = 0.05 if avg_badges > 3 else 0
+
+    health_score = avg_score + diversity_bonus + shipped_bonus + abandon_penalty + badge_bonus
+    health_score = max(0.0, min(1.0, health_score))
+
+    return letter_grade(health_score), round(health_score, 3)
+
+
 def _count_meaningful_files(results: list[AnalyzerResult]) -> int:
     """Heuristic: check if the repo has files beyond just a README."""
     for r in results:

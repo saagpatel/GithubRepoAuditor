@@ -98,6 +98,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print detailed output",
     )
     parser.add_argument(
+        "--graphql",
+        action="store_true",
+        help="Use GraphQL API for faster bulk metadata fetch",
+    )
+    parser.add_argument(
         "--diff",
         type=Path,
         default=None,
@@ -202,7 +207,25 @@ def main() -> None:
 
     # Fetch metadata from GitHub API
     client = GitHubClient(token=args.token, cache=cache)
-    all_repos, errors = client.get_repo_metadata(args.username)
+
+    if args.graphql and args.token:
+        from src.graphql_client import bulk_fetch_repos
+        print("  Using GraphQL bulk fetch...", file=sys.stderr)
+        raw_repos = bulk_fetch_repos(args.username, args.token)
+        # Build RepoMetadata from GraphQL results (languages included)
+        all_repos = []
+        errors = []
+        for repo_data in raw_repos:
+            try:
+                langs = repo_data.pop("_languages", {})
+                repo_data.pop("_releases", None)
+                meta = RepoMetadata.from_api_response(repo_data, languages=langs)
+                all_repos.append(meta)
+            except Exception as exc:
+                errors.append({"repo": repo_data.get("full_name", "?"), "error": str(exc)})
+        print(f"  GraphQL: {len(all_repos)} repos fetched", file=sys.stderr)
+    else:
+        all_repos, errors = client.get_repo_metadata(args.username)
     total_fetched = len(all_repos)
 
     # Apply filters
@@ -283,11 +306,14 @@ def main() -> None:
 
         json_path = write_json_report(report, output_dir)
 
-        # Excel dashboard
+        # Excel dashboard (with trend data if history exists)
         from src.excel_export import export_excel
+        from src.history import load_trend_data
+        trend_data = load_trend_data()
         excel_path = export_excel(
             json_path,
             output_dir / f"audit-dashboard-{args.username}-{_date_str(report.generated_at)}.xlsx",
+            trend_data=trend_data,
         )
         md_path = write_markdown_report(report, output_dir)
         pcc_path = write_pcc_export(report, output_dir)

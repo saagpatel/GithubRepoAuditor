@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import logging
 import re
+from collections import Counter
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -106,7 +108,7 @@ class CodeQualityAnalyzer(BaseAnalyzer):
         else:
             findings.append(f"Vendored content: {', '.join(vendored)}")
 
-        # Meaningful commit messages (via API)
+        # Meaningful commit messages + conventional commits (via API)
         if github_client:
             owner = metadata.full_name.split("/")[0]
             commits = github_client.get_recent_commits(owner, metadata.name, count=10)
@@ -117,8 +119,33 @@ class CodeQualityAnalyzer(BaseAnalyzer):
                 findings.append("Commit messages are descriptive")
             else:
                 findings.append("Commit messages could be more descriptive")
+
+            # Conventional commit detection
+            messages = [c.get("commit", {}).get("message", "").split("\n")[0] for c in commits]
+            conv = _classify_commits(messages)
+            details.update(conv)
+            if conv["conventional_ratio"] > 0.5:
+                score = min(1.0, score + 0.05)
+                findings.append(f"Conventional commits: {conv['conventional_ratio']:.0%}")
+
+            # PR closure ratio (metadata, not scored)
+            prs = github_client.get_pull_requests(owner, metadata.name)
+            if prs:
+                merged = sum(1 for p in prs if p.get("merged_at"))
+                details["pr_total"] = len(prs)
+                details["pr_merged"] = merged
+                details["pr_merge_ratio"] = round(merged / len(prs), 2) if prs else None
+                findings.append(f"PRs: {merged}/{len(prs)} merged")
         else:
             findings.append("Skipped commit message analysis (no API client)")
+
+        # Radon complexity (Python repos only)
+        if metadata.language == "Python":
+            radon_data = _radon_analysis(repo_path)
+            if radon_data:
+                details.update(radon_data)
+                if radon_data.get("avg_maintainability_index", 0) > 20:
+                    findings.append(f"Maintainability: {radon_data['avg_maintainability_index']:.0f}/100")
 
         return self._result(score, findings, details)
 
@@ -254,3 +281,85 @@ def _score_commit_messages(commits: list[dict]) -> tuple[float, str]:
 
     ratio = good / len(messages)
     return ratio, f"{good}/{len(messages)} descriptive commits"
+
+
+CONVENTIONAL_PATTERN = re.compile(
+    r"^(feat|fix|docs|chore|refactor|test|style|perf|ci|build|revert)(\(.+\))?[!]?:\s"
+)
+
+
+def _classify_commits(messages: list[str]) -> dict:
+    """Classify commit messages for conventional commit adherence."""
+    if not messages:
+        return {"conventional_ratio": 0, "commit_types": {}, "has_issue_refs": 0}
+
+    types: Counter = Counter()
+    conventional_count = 0
+    issue_refs = 0
+
+    for msg in messages:
+        if CONVENTIONAL_PATTERN.match(msg):
+            conventional_count += 1
+            type_ = msg.split(":")[0].split("(")[0].strip()
+            types[type_] += 1
+        if re.search(r"#\d+", msg):
+            issue_refs += 1
+
+    return {
+        "conventional_ratio": round(conventional_count / len(messages), 2),
+        "commit_types": dict(types),
+        "has_issue_refs": round(issue_refs / len(messages), 2),
+    }
+
+
+def _radon_analysis(repo_path: Path, max_files: int = 50) -> dict | None:
+    """Run Radon complexity analysis on Python files."""
+    try:
+        from radon.complexity import cc_visit
+        from radon.metrics import mi_visit
+    except ImportError:
+        return None
+
+    mi_scores: list[float] = []
+    worst_cc = 0
+    worst_fn = ""
+    complex_count = 0
+    files_analyzed = 0
+
+    for py_file in repo_path.rglob("*.py"):
+        if files_analyzed >= max_files:
+            break
+        if any(part.startswith(".") or part in ("node_modules", "vendor", "__pycache__") for part in py_file.parts):
+            continue
+        try:
+            source = py_file.read_text(errors="replace")
+            if not source.strip():
+                continue
+
+            # Maintainability index
+            mi = mi_visit(source, True)
+            if isinstance(mi, (int, float)):
+                mi_scores.append(mi)
+
+            # Cyclomatic complexity
+            for block in cc_visit(source):
+                if block.complexity > worst_cc:
+                    worst_cc = block.complexity
+                    worst_fn = f"{py_file.name}:{block.name}"
+                if block.complexity > 15:
+                    complex_count += 1
+
+            files_analyzed += 1
+        except Exception:
+            continue
+
+    if not mi_scores:
+        return None
+
+    return {
+        "avg_maintainability_index": round(sum(mi_scores) / len(mi_scores), 1),
+        "worst_cc_function": worst_fn,
+        "worst_cc_score": worst_cc,
+        "complex_function_count": complex_count,
+        "python_files_analyzed": files_analyzed,
+    }
