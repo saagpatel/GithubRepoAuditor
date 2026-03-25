@@ -107,7 +107,6 @@ class ActivityAnalyzer(BaseAnalyzer):
                 findings.append(f"Releases: {len(releases)}")
                 # Compute cadence if 2+ releases
                 if len(releases) >= 2:
-                    from datetime import datetime
                     dates = []
                     for r in releases:
                         pub = r.get("published_at") or r.get("created_at")
