@@ -256,6 +256,13 @@ def main() -> None:
             )
 
         json_path = write_json_report(report, output_dir)
+
+        # Excel dashboard
+        from src.excel_export import export_excel
+        excel_path = export_excel(
+            json_path,
+            output_dir / f"audit-dashboard-{args.username}-{_date_str(report.generated_at)}.xlsx",
+        )
         md_path = write_markdown_report(report, output_dir)
         pcc_path = write_pcc_export(report, output_dir)
         raw_path = write_raw_metadata(report, output_dir)
@@ -286,6 +293,7 @@ def main() -> None:
             f"  Reports:\n"
             f"    {json_path}\n"
             f"    {md_path}\n"
+            f"    {excel_path}\n"
             f"    {pcc_path}\n"
             f"    {raw_path}",
         )
