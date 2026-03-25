@@ -8,9 +8,11 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from src.analyzers import run_all_analyzers
 from src.cloner import clone_workspace
 from src.github_client import GitHubClient
-from src.models import RepoMetadata
+from src.models import RepoAudit, RepoMetadata
+from src.scorer import score_repo
 
 
 def _gh_auth_token() -> str | None:
@@ -92,24 +94,63 @@ def _write_json(
     errors: list[dict],
     total_fetched: int,
     output_dir: Path,
+    audits: list[RepoAudit] | None = None,
 ) -> Path:
-    """Write raw_metadata.json and return the file path."""
+    """Write audit results JSON and return the file path."""
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / "raw_metadata.json"
 
-    report = {
-        "username": username,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "total_repos": total_fetched,
-        "repos_included": len(repos),
-        "repos": [r.to_dict() for r in repos],
-        "errors": errors,
-    }
+    if audits:
+        # Compute tier distribution
+        tier_dist: dict[str, int] = {}
+        for a in audits:
+            tier_dist[a.completeness_tier] = tier_dist.get(a.completeness_tier, 0) + 1
+        avg_score = sum(a.overall_score for a in audits) / len(audits) if audits else 0.0
+
+        report = {
+            "username": username,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "total_repos": total_fetched,
+            "repos_audited": len(audits),
+            "average_score": round(avg_score, 3),
+            "tier_distribution": tier_dist,
+            "audits": [a.to_dict() for a in audits],
+            "errors": errors,
+        }
+    else:
+        report = {
+            "username": username,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "total_repos": total_fetched,
+            "repos_included": len(repos),
+            "repos": [r.to_dict() for r in repos],
+            "errors": errors,
+        }
 
     with open(output_path, "w") as f:
         json.dump(report, f, indent=2)
 
     return output_path
+
+
+def _print_verbose(audit: RepoAudit) -> None:
+    """Print per-dimension score breakdown for a repo."""
+    print(f"\n  {'─' * 50}", file=sys.stderr)
+    print(
+        f"  {audit.metadata.name}  "
+        f"score={audit.overall_score:.2f}  "
+        f"tier={audit.completeness_tier}"
+        f"{'  flags=' + ','.join(audit.flags) if audit.flags else ''}",
+        file=sys.stderr,
+    )
+    for r in audit.analyzer_results:
+        bar = "█" * int(r.score * 10) + "░" * (10 - int(r.score * 10))
+        print(
+            f"    {r.dimension:<17} {bar} {r.score:.2f}",
+            file=sys.stderr,
+        )
+        for finding in r.findings[:3]:
+            print(f"      · {finding}", file=sys.stderr)
 
 
 def main() -> None:
@@ -138,22 +179,54 @@ def main() -> None:
     if skipped:
         print(f"  Filtered out {skipped} repos (forks/archived)", file=sys.stderr)
 
-    # Clone repos to prove the mechanism (Phase 0 — no analysis yet)
+    # Clone and analyze
+    audits: list[RepoAudit] = []
+
     if not args.skip_clone:
         with clone_workspace(repos, token=args.token) as cloned:
             print(
-                f"  Successfully cloned {len(cloned)}/{len(repos)} repos",
+                f"  Cloned {len(cloned)}/{len(repos)} repos. Analyzing...",
                 file=sys.stderr,
             )
+            for i, repo_meta in enumerate(repos, 1):
+                repo_path = cloned.get(repo_meta.name)
+                if not repo_path:
+                    continue
+                print(
+                    f"  [{i}/{len(repos)}] Analyzing {repo_meta.name}...",
+                    file=sys.stderr,
+                )
+                results = run_all_analyzers(repo_path, repo_meta, client)
+                audit = score_repo(repo_meta, results)
+                audits.append(audit)
+                if args.verbose:
+                    _print_verbose(audit)
+
         print("  Clones cleaned up", file=sys.stderr)
 
     # Write JSON output
     output_dir = Path(args.output_dir)
-    output_path = _write_json(args.username, repos, errors, total_fetched, output_dir)
+    output_path = _write_json(
+        args.username, repos, errors, total_fetched, output_dir,
+        audits=audits if audits else None,
+    )
 
     # Summary
-    print(
-        f"\n✓ Fetched {total_fetched} repos for {args.username}\n"
-        f"  Included: {len(repos)} | Errors: {len(errors)}\n"
-        f"  Output: {output_path}",
-    )
+    if audits:
+        tier_dist = {}
+        for a in audits:
+            tier_dist[a.completeness_tier] = tier_dist.get(a.completeness_tier, 0) + 1
+        avg = sum(a.overall_score for a in audits) / len(audits)
+        print(
+            f"\n✓ Audited {len(audits)} repos for {args.username}\n"
+            f"  Average score: {avg:.2f}\n"
+            f"  Tiers: {tier_dist}\n"
+            f"  Errors: {len(errors)}\n"
+            f"  Output: {output_path}",
+        )
+    else:
+        print(
+            f"\n✓ Fetched {total_fetched} repos for {args.username}\n"
+            f"  Included: {len(repos)} | Errors: {len(errors)}\n"
+            f"  Output: {output_path}",
+        )

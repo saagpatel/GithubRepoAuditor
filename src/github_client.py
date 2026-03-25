@@ -83,6 +83,29 @@ class GitHubClient:
 
         return results
 
+    def _request_with_202_retry(
+        self,
+        url: str,
+        params: dict | None = None,
+        max_retries: int = 3,
+    ) -> requests.Response:
+        """Request with retry for 202 (stats computing) responses."""
+        backoff = 2
+        for attempt in range(max_retries + 1):
+            response = self.session.get(url, params=params, timeout=30)
+            self._check_rate_limit(response)
+
+            if response.status_code == 202 and attempt < max_retries:
+                sleep_time = backoff * (2 ** attempt)
+                logger.info("Stats computing (202), retrying in %ds...", sleep_time)
+                time.sleep(sleep_time)
+                continue
+
+            response.raise_for_status()
+            return response
+
+        return response  # type: ignore[possibly-undefined]
+
     # ── public API ────────────────────────────────────────────────────
 
     def get_authenticated_user(self) -> str | None:
@@ -120,6 +143,51 @@ class GitHubClient:
         except requests.HTTPError as exc:
             logger.warning("Failed to fetch languages for %s/%s: %s", owner, repo, exc)
             return {}
+
+    def get_recent_commits(
+        self, owner: str, repo: str, count: int = 10
+    ) -> list[dict]:
+        """Fetch the most recent commits for a repo."""
+        try:
+            response = self._request(
+                f"{API_BASE}/repos/{owner}/{repo}/commits",
+                {"per_page": str(count)},
+            )
+            return response.json()
+        except requests.HTTPError as exc:
+            logger.warning("Failed to fetch commits for %s/%s: %s", owner, repo, exc)
+            return []
+
+    def get_commit_activity(self, owner: str, repo: str) -> list[dict]:
+        """Fetch weekly commit counts for the last year (52 weeks).
+
+        Returns list of {total, week, days} objects.
+        Stats endpoints return 202 on first call — retries with backoff.
+        """
+        try:
+            response = self._request_with_202_retry(
+                f"{API_BASE}/repos/{owner}/{repo}/stats/commit_activity"
+            )
+            data = response.json()
+            return data if isinstance(data, list) else []
+        except requests.HTTPError as exc:
+            logger.warning("Failed to fetch commit activity for %s/%s: %s", owner, repo, exc)
+            return []
+
+    def get_contributor_stats(self, owner: str, repo: str) -> list[dict]:
+        """Fetch per-contributor commit counts.
+
+        Stats endpoints return 202 on first call — retries with backoff.
+        """
+        try:
+            response = self._request_with_202_retry(
+                f"{API_BASE}/repos/{owner}/{repo}/stats/contributors"
+            )
+            data = response.json()
+            return data if isinstance(data, list) else []
+        except requests.HTTPError as exc:
+            logger.warning("Failed to fetch contributor stats for %s/%s: %s", owner, repo, exc)
+            return []
 
     def get_repo_metadata(
         self, username: str

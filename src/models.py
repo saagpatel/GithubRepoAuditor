@@ -70,3 +70,33 @@ class RepoMetadata:
             elif val is None:
                 raw[key] = None
         return raw
+
+
+@dataclass
+class AnalyzerResult:
+    dimension: str
+    score: float
+    max_score: float
+    findings: list[str]
+    details: dict = field(default_factory=dict)
+
+    def to_dict(self) -> dict:
+        return dataclasses.asdict(self)
+
+
+@dataclass
+class RepoAudit:
+    metadata: RepoMetadata
+    analyzer_results: list[AnalyzerResult]
+    overall_score: float
+    completeness_tier: str
+    flags: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        return {
+            "metadata": self.metadata.to_dict(),
+            "analyzer_results": [r.to_dict() for r in self.analyzer_results],
+            "overall_score": round(self.overall_score, 3),
+            "completeness_tier": self.completeness_tier,
+            "flags": self.flags,
+        }
