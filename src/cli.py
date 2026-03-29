@@ -93,6 +93,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Bypass API response cache",
     )
     parser.add_argument(
+        "--repos",
+        nargs="+",
+        default=None,
+        metavar="REPO",
+        help="Audit only these specific repos (by name or URL). Merges into the most recent full report.",
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="Print detailed output",
@@ -192,6 +199,163 @@ def _print_verbose(audit: RepoAudit) -> None:
             print(f"      · {finding}", file=sys.stderr)
 
 
+def _resolve_repo_names(repos_arg: list[str]) -> list[str]:
+    """Extract repo names from URLs or bare names."""
+    names = []
+    for r in repos_arg:
+        r = r.strip().rstrip("/")
+        if "/" in r:
+            # URL like https://github.com/user/RepoName
+            names.append(r.split("/")[-1])
+        else:
+            names.append(r)
+    return names
+
+
+def _run_targeted_audit(args, client, output_dir: Path) -> None:
+    """Audit only specific repos and merge into the most recent full report."""
+    import glob as _glob
+
+    target_names = _resolve_repo_names(args.repos)
+    print(f"  Targeted audit: {len(target_names)} repos", file=sys.stderr)
+
+    # Fetch metadata only for targeted repos
+    owner = args.username
+    targeted_repos: list[RepoMetadata] = []
+    errors: list[dict] = []
+
+    for name in target_names:
+        print(f"  Fetching {owner}/{name}...", file=sys.stderr)
+        try:
+            languages = client.get_languages(owner, name)
+            # Fetch single repo metadata via API
+            response = client._request(f"https://api.github.com/repos/{owner}/{name}")
+            repo_data = response.json()
+            meta = RepoMetadata.from_api_response(repo_data, languages=languages)
+            targeted_repos.append(meta)
+        except Exception as exc:
+            errors.append({"repo": f"{owner}/{name}", "error": str(exc)})
+            print(f"  ⚠ Failed to fetch {name}: {exc}", file=sys.stderr)
+
+    if not targeted_repos:
+        print("  No repos to audit.", file=sys.stderr)
+        return
+
+    # Clone and analyze only targeted repos
+    new_audits: list[RepoAudit] = []
+    with clone_workspace(targeted_repos, token=args.token) as cloned:
+        print(f"  Cloned {len(cloned)}/{len(targeted_repos)} repos. Analyzing...", file=sys.stderr)
+        for i, repo_meta in enumerate(targeted_repos, 1):
+            repo_path = cloned.get(repo_meta.name)
+            if not repo_path:
+                continue
+            print(f"  [{i}/{len(targeted_repos)}] Analyzing {repo_meta.name}...", file=sys.stderr)
+            results = run_all_analyzers(repo_path, repo_meta, client)
+            audit = score_repo(repo_meta, results)
+            new_audits.append(audit)
+            if args.verbose:
+                _print_verbose(audit)
+    print("  Clones cleaned up", file=sys.stderr)
+
+    # Load the most recent existing report and merge
+    existing_reports = sorted(output_dir.glob("audit-report-*.json"), key=lambda f: f.stat().st_mtime, reverse=True)
+    existing_audits: list[dict] = []
+    if existing_reports:
+        import json as _json
+        existing_data = _json.loads(existing_reports[0].read_text())
+        existing_audits = existing_data.get("audits", [])
+        print(f"  Merging into {existing_reports[0].name} ({len(existing_audits)} existing repos)", file=sys.stderr)
+
+    # Merge: replace existing entries for targeted repos, add new ones
+    new_audit_names = {a.metadata.name for a in new_audits}
+    # Keep all existing audits that aren't being replaced
+    kept = [a for a in existing_audits if a["metadata"]["name"] not in new_audit_names]
+
+    # Convert new audits to dicts and combine
+    all_audit_dicts = kept + [a.to_dict() for a in new_audits]
+
+    # Reconstruct RepoAudit objects for AuditReport.from_audits
+    # We need the full objects, so rebuild from the new audits + reconstruct from existing dicts
+    from src.models import AnalyzerResult
+    all_audits_obj: list[RepoAudit] = list(new_audits)
+    for ad in kept:
+        m = ad["metadata"]
+        meta = RepoMetadata(
+            name=m["name"], full_name=m["full_name"], description=m.get("description"),
+            language=m.get("language"), languages=m.get("languages", {}),
+            private=m["private"], fork=m["fork"], archived=m["archived"],
+            created_at=datetime.fromisoformat(m["created_at"]) if m.get("created_at") else None,
+            updated_at=datetime.fromisoformat(m["updated_at"]) if m.get("updated_at") else None,
+            pushed_at=datetime.fromisoformat(m["pushed_at"]) if m.get("pushed_at") else None,
+            default_branch=m.get("default_branch", "main"),
+            stars=m.get("stars", 0), forks=m.get("forks", 0),
+            open_issues=m.get("open_issues", 0), size_kb=m.get("size_kb", 0),
+            html_url=m.get("html_url", ""), clone_url=m.get("clone_url", ""),
+            topics=m.get("topics", []),
+        )
+        results_obj = [
+            AnalyzerResult(
+                dimension=r["dimension"], score=r["score"],
+                max_score=r["max_score"], findings=r["findings"],
+                details=r.get("details", {}),
+            )
+            for r in ad.get("analyzer_results", [])
+        ]
+        audit_obj = RepoAudit(
+            metadata=meta, analyzer_results=results_obj,
+            overall_score=ad.get("overall_score", 0),
+            completeness_tier=ad.get("completeness_tier", "abandoned"),
+            interest_score=ad.get("interest_score", 0),
+            interest_tier=ad.get("interest_tier", "mundane"),
+            grade=ad.get("grade", "F"),
+            interest_grade=ad.get("interest_grade", "F"),
+            badges=ad.get("badges", []),
+            next_badges=ad.get("next_badges", []),
+            flags=ad.get("flags", []),
+        )
+        all_audits_obj.append(audit_obj)
+
+    # Build report
+    report = AuditReport.from_audits(
+        args.username, all_audits_obj, errors, len(all_audits_obj),
+    )
+
+    # Registry reconciliation
+    if args.registry:
+        from src.registry_parser import parse_registry, reconcile, sync_new_repos
+        registry = parse_registry(args.registry)
+        report.reconciliation = reconcile(registry, all_audits_obj)
+        if args.sync_registry and report.reconciliation.on_github_not_registry:
+            sync_new_repos(args.registry, report.reconciliation.on_github_not_registry, all_audits_obj)
+
+    # Generate all reports
+    json_path = write_json_report(report, output_dir)
+    from src.excel_export import export_excel
+    from src.history import load_trend_data, archive_report
+    trend_data = load_trend_data()
+    excel_path = export_excel(
+        json_path,
+        output_dir / f"audit-dashboard-{args.username}-{_date_str(report.generated_at)}.xlsx",
+        trend_data=trend_data,
+    )
+    md_path = write_markdown_report(report, output_dir)
+    pcc_path = write_pcc_export(report, output_dir)
+    raw_path = write_raw_metadata(report, output_dir)
+    archive_report(json_path)
+
+    print(
+        f"\n✓ Targeted audit: {len(new_audits)} new/updated + {len(kept)} existing = {len(all_audits_obj)} total\n"
+        f"  Average score: {report.average_score:.2f}\n"
+        f"  Tiers: {report.tier_distribution}\n"
+        f"  Reports:\n"
+        f"    {json_path}\n"
+        f"    {md_path}\n"
+        f"    {excel_path}\n"
+        f"    {pcc_path}\n"
+        f"    {raw_path}",
+    )
+
+
 def main() -> None:
     args = build_parser().parse_args()
 
@@ -207,6 +371,12 @@ def main() -> None:
 
     # Fetch metadata from GitHub API
     client = GitHubClient(token=args.token, cache=cache)
+
+    # Targeted audit: only specific repos
+    output_dir = Path(args.output_dir)
+    if args.repos:
+        _run_targeted_audit(args, client, output_dir)
+        return
 
     if args.graphql and args.token:
         from src.graphql_client import bulk_fetch_repos
