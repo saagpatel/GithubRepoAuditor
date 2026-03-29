@@ -475,3 +475,96 @@ def _chunk_text(text: str, max_len: int = 2000) -> list[str]:
         chunks.append(text[:max_len])
         text = text[max_len:]
     return chunks
+
+
+# ── Audit History Database ──────────────────────────────────────────
+
+
+def create_audit_history_entry(
+    report_data: dict,
+    token: str,
+    config: dict,
+) -> str | None:
+    """Create an audit history row in Notion. Returns page ID or None."""
+    db_id = config.get("audit_history_db_id", "")
+    if not db_id:
+        return None
+
+    version = config.get("notion_version", DEFAULT_NOTION_VERSION)
+    date = report_data.get("generated_at", "")[:10]
+    tiers = report_data.get("tier_distribution", {})
+
+    properties = {
+        "Name": _title_value(f"Audit Run — {date}"),
+        "Repos Audited": {"number": report_data.get("repos_audited", 0)},
+        "Avg Score": {"number": round(report_data.get("average_score", 0), 3)},
+        "Portfolio Grade": _select_value(report_data.get("portfolio_grade", "F")),
+        "Shipped": {"number": tiers.get("shipped", 0)},
+    }
+
+    body = {"parent": {"database_id": db_id}, "properties": properties}
+    resp = _notion_request("POST", "/pages", token, version, body)
+    if resp and resp.status_code == 200:
+        return resp.json().get("id")
+    return None
+
+
+# ── Project Completeness Cards ──────────────────────────────────────
+
+
+def patch_project_completeness_cards(
+    audits: list[dict],
+    project_map: dict[str, dict],
+    token: str,
+    config: dict,
+) -> int:
+    """Append audit summary blocks to mapped project pages. Returns count updated."""
+    version = config.get("notion_version", DEFAULT_NOTION_VERSION)
+    updated = 0
+
+    for audit in audits:
+        name = audit.get("metadata", {}).get("name", "")
+        mapping = project_map.get(name)
+        if not mapping or not mapping.get("localProjectId"):
+            continue
+
+        page_id = mapping["localProjectId"]
+        grade = audit.get("grade", "F")
+        score = audit.get("overall_score", 0)
+        tier = audit.get("completeness_tier", "")
+        date = audit.get("metadata", {}).get("pushed_at", "")[:10] or "?"
+        badges = ", ".join(audit.get("badges", [])[:5])
+
+        dim_scores = {
+            r["dimension"]: f"{r['score']:.1f}"
+            for r in audit.get("analyzer_results", [])
+            if r["dimension"] != "interest"
+        }
+        dims_str = " | ".join(f"{d}: {s}" for d, s in list(dim_scores.items())[:6])
+
+        card_text = (
+            f"Audit: Grade {grade} | Score {score:.2f} | Tier {tier}\n"
+            f"{dims_str}\n"
+            f"Badges: {badges or 'none'}"
+        )
+
+        children = [{
+            "object": "block",
+            "type": "callout",
+            "callout": {
+                "rich_text": [{"type": "text", "text": {"content": card_text[:2000]}}],
+                "icon": {"emoji": "📊"},
+            },
+        }]
+
+        resp = _notion_request(
+            "PATCH", f"/blocks/{page_id}/children", token, version,
+            {"children": children},
+        )
+        if resp and resp.status_code == 200:
+            updated += 1
+        time.sleep(REQUEST_DELAY)
+
+    if updated:
+        print(f"  Completeness cards: {updated} projects updated.", file=sys.stderr)
+    return updated
