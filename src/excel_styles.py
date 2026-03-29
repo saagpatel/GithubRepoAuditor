@@ -130,15 +130,17 @@ def style_data_cell(cell, align: str = "left") -> None:
     cell.alignment = LEFT if align == "left" else (CENTER if align == "center" else RIGHT)
 
 
-def apply_zebra_stripes(ws, start_row: int, end_row: int, max_col: int) -> None:
-    """Apply alternating row shading."""
+def apply_zebra_stripes(ws, start_row: int, end_row: int, max_col: int, skip_cols: set[int] | None = None) -> None:
+    """Apply alternating row shading, optionally skipping columns with semantic coloring."""
+    skip = skip_cols or set()
     for row in range(start_row, end_row + 1):
         if row % 2 == 0:
             for col in range(1, max_col + 1):
-                ws.cell(row=row, column=col).fill = ZEBRA_FILL
+                if col not in skip:
+                    ws.cell(row=row, column=col).fill = ZEBRA_FILL
 
 
-def auto_width(ws, max_col: int, max_row: int, min_width: int = 8) -> None:
+def auto_width(ws, max_col: int, max_row: int, min_width: int = 8, max_width: int = 55) -> None:
     """Auto-size columns based on content."""
     from openpyxl.utils import get_column_letter
     for col in range(1, max_col + 1):
@@ -147,7 +149,7 @@ def auto_width(ws, max_col: int, max_row: int, min_width: int = 8) -> None:
             val = ws.cell(row=row, column=col).value
             if val:
                 max_len = max(max_len, len(str(val)))
-        ws.column_dimensions[get_column_letter(col)].width = max(min_width, min(max_len + 3, 45))
+        ws.column_dimensions[get_column_letter(col)].width = max(min_width, min(max_len + 3, max_width))
 
 
 def write_kpi_card(
