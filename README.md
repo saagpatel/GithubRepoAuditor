@@ -174,8 +174,8 @@ Overrides: archived repos capped at Functional. Stale >2 years capped at WIP. RE
 
 | Grade | Score |
 |-------|-------|
-| A | 0.85+ |
-| B | 0.70–0.84 |
+| A | 0.80+ |
+| B | 0.70–0.79 |
 | C | 0.55–0.69 |
 | D | 0.35–0.54 |
 | F | <0.35 |

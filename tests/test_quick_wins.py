@@ -84,5 +84,5 @@ class TestLetterGrade:
         assert letter_grade(0.20) == "F"
 
     def test_boundary(self):
-        assert letter_grade(0.85) == "A"
-        assert letter_grade(0.849) == "B"
+        assert letter_grade(0.80) == "A"
+        assert letter_grade(0.799) == "B"
