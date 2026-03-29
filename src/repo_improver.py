@@ -87,7 +87,7 @@ def generate_manifest(report_data: dict[str, Any]) -> list[dict[str, Any]]:
             "has_cicd": cicd.get("score", 0) > 0.2,
             "has_license": structure.get("details", {}).get("has_license", False),
             "entry_point": code_quality.get("details", {}).get("entry_point", ""),
-            "badges_earned": audit.get("badges", {}).get("earned", []),
+            "badges_earned": audit.get("badges", []) if isinstance(audit.get("badges"), list) else audit.get("badges", {}).get("earned", []),
             "interest_tier": audit.get("interest_tier", ""),
             "dep_count": deps.get("details", {}).get("dep_count", 0),
         }
