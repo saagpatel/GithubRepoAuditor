@@ -6,7 +6,9 @@ output/.cache/
 output/history/
 output/badges/
 output/.badge-gist-id
+output/PORTFOLIO.md
 !output/.gitkeep
+config/notion-config.json
 __pycache__/
 *.pyc
 .env
