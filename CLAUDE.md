@@ -18,7 +18,7 @@ Automated audit tool that clones all repos from a GitHub user account, analyzes 
 - All output files go to `output/` directory
 
 ## Current State
-Phases 0–13 complete. 167 tests, 11 analyzers, 12-sheet Excel dashboard, Rich CLI, shields.io badges, sparklines, Notion signal integration, portfolio README.
+Phases 0–17 complete. 249 tests, 12 analyzers (10 completeness + interest + security), 22 CLI flags. Full Notion integration, interactive HTML dashboard, shields.io badges, AI narrative, scoring profiles, archive automation, cross-repo similarity detection.
 
 ## Key Decisions
 | Decision | Choice | Why |
