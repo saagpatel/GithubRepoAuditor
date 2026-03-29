@@ -553,7 +553,7 @@ def _build_all_repos(wb: Workbook, data: dict, score_history: dict[str, list[flo
     ws.sheet_properties.tabColor = "1565C0"
 
     headers = [
-        "Repo", "Grade", "Score", "Interest", "Interest Grade", "Tier", "Badges",
+        "Repo", "Grade", "Score", "Interest", "Interest Grade", "Interest Tier", "Tier", "Badges",
         "Next Badge", "Language", "Topics", "Commit Pattern", "Bus Factor",
         "Days Since Push", "Commits", "Releases", "Test Files", "Test Framework",
         "LOC", "TODO Density", "PR Merge %", "Comment Ratio",
@@ -588,6 +588,7 @@ def _build_all_repos(wb: Workbook, data: dict, score_history: dict[str, list[flo
             round(audit.get("overall_score", 0), 3),
             round(audit.get("interest_score", 0), 3),
             audit.get("interest_grade", "—"),
+            audit.get("interest_tier", "—"),
             audit.get("completeness_tier", ""),
             ", ".join(badges[:4]),
             next_badge_str[:50],
@@ -665,11 +666,11 @@ def _build_all_repos(wb: Workbook, data: dict, score_history: dict[str, list[flo
         # Grade coloring
         color_grade_cell(ws.cell(row=row, column=2), audit.get("grade", "F"))
         # Tier coloring
-        color_tier_cell(ws.cell(row=row, column=6), audit.get("completeness_tier", ""))
+        color_tier_cell(ws.cell(row=row, column=7), audit.get("completeness_tier", ""))
         # Pattern coloring
         pattern = act.get("commit_pattern", "")
         if pattern and pattern != "—":
-            color_pattern_cell(ws.cell(row=row, column=11), pattern)
+            color_pattern_cell(ws.cell(row=row, column=12), pattern)
 
         # Sparkline trend (last column)
         if score_history:
@@ -1638,6 +1639,36 @@ def _build_changes(wb: Workbook, data: dict, diff_data: dict | None) -> None:
             cell.font = Font("Calibri", 10, bold=True, color="166534" if delta > 0 else "991B1B")
             row += 1
 
+    # Material changes from the report
+    material = data.get("material_changes", [])
+    if material:
+        row += 2
+        ws.cell(row=row, column=1, value="Material Changes").font = SECTION_FONT
+        row += 1
+        for col, h in enumerate(["Repo", "Type", "Severity", "Title"], 1):
+            ws.cell(row=row, column=col, value=h)
+        style_header_row(ws, row, 4)
+        row += 1
+
+        # Group by type, show up to 30 per type to avoid sheet bloat
+        by_type: dict[str, list] = {}
+        for m in material:
+            by_type.setdefault(m.get("change_type", "other"), []).append(m)
+
+        for change_type in sorted(by_type):
+            items = by_type[change_type]
+            for item in items[:30]:
+                ws.cell(row=row, column=1, value=item.get("repo", ""))
+                ws.cell(row=row, column=2, value=change_type)
+                severity = item.get("severity", "")
+                cell = ws.cell(row=row, column=3, value=severity)
+                if severity == "high":
+                    cell.font = Font("Calibri", 10, bold=True, color="991B1B")
+                elif severity == "medium":
+                    cell.font = Font("Calibri", 10, color="92400E")
+                ws.cell(row=row, column=4, value=item.get("title", ""))
+                row += 1
+
     auto_width(ws, 6, row)
 
 
@@ -2340,7 +2371,7 @@ def _build_campaigns(wb: Workbook, data: dict) -> None:
     ws["A4"] = f"Collection: {summary.get('collection_name') or 'all'}"
     ws["A5"] = f"Actions: {summary.get('action_count', 0)}"
     ws["A6"] = f"Repos: {summary.get('repo_count', 0)}"
-    headers = ["Repo", "Issue", "Topics", "Notion Actions", "Action IDs"]
+    headers = ["Repo", "Issue", "Topics", "Notion Actions", "Action IDs", "Drift", "Sync Mode"]
     start_row = 8
     for col, header in enumerate(headers, 1):
         ws.cell(row=start_row, column=col, value=header)
@@ -2353,6 +2384,8 @@ def _build_campaigns(wb: Workbook, data: dict) -> None:
         ws.cell(row=row, column=3, value=", ".join(item.get("topics", [])))
         ws.cell(row=row, column=4, value=item.get("notion_action_count", 0))
         ws.cell(row=row, column=5, value=", ".join(item.get("action_ids", [])))
+        ws.cell(row=row, column=6, value="yes" if any(drift.get("repo_full_name") == item.get("repo_full_name") for drift in data.get("managed_state_drift", [])) else "no")
+        ws.cell(row=row, column=7, value=data.get("writeback_preview", {}).get("sync_mode", "reconcile"))
 
     max_row = start_row + len(preview_rows)
     if preview_rows:
@@ -2364,7 +2397,7 @@ def _build_campaigns(wb: Workbook, data: dict) -> None:
 def _build_writeback_audit(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Writeback Audit")
     ws.sheet_properties.tabColor = "B91C1C"
-    headers = ["Repo", "Target", "Status", "URL", "Details"]
+    headers = ["Repo", "Target", "Status", "Rollback", "URL", "Details"]
     for col, header in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=header)
     style_header_row(ws, 1, len(headers))
@@ -2374,8 +2407,9 @@ def _build_writeback_audit(wb: Workbook, data: dict) -> None:
         ws.cell(row=row, column=1, value=result.get("repo_full_name", ""))
         ws.cell(row=row, column=2, value=result.get("target", ""))
         ws.cell(row=row, column=3, value=result.get("status", ""))
-        ws.cell(row=row, column=4, value=result.get("url", ""))
-        ws.cell(row=row, column=5, value=json.dumps(result))
+        ws.cell(row=row, column=4, value="yes" if result.get("before") not in ({}, None, []) else "partial")
+        ws.cell(row=row, column=5, value=result.get("url", ""))
+        ws.cell(row=row, column=6, value=json.dumps(result))
 
     max_row = len(results) + 1
     if results:
@@ -2557,23 +2591,28 @@ def _build_trend_summary(
 def _build_review_queue(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Review Queue")
     ws.sheet_properties.tabColor = "2563EB"
-    headers = ["Repo", "Title", "Severity", "Next Step", "Decision Hint", "Safe To Defer"]
+    headers = ["Repo", "Title", "Lane", "Kind", "Priority", "Next Step", "Decision Hint", "Safe To Defer"]
     for col, header in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=header)
     style_header_row(ws, 1, len(headers))
 
-    targets = data.get("review_targets", [])
+    queue = data.get("operator_queue", [])
+    targets = queue or data.get("review_targets", [])
     for row, item in enumerate(targets, 2):
+        next_step = item.get("recommended_action", item.get("next_step", ""))
+        safe_to_defer = item.get("lane") == "deferred" or item.get("safe_to_defer")
         values = [
-            item.get("repo", ""),
+            item.get("repo", item.get("repo_name", "")),
             item.get("title", ""),
-            item.get("severity", 0.0),
-            item.get("next_step", ""),
-            item.get("decision_hint", ""),
-            "yes" if item.get("safe_to_defer") else "no",
+            item.get("lane", ""),
+            item.get("kind", "review"),
+            item.get("priority", item.get("severity", 0.0)),
+            next_step,
+            item.get("decision_hint", item.get("lane", "review")),
+            "yes" if safe_to_defer else "no",
         ]
         for col, value in enumerate(values, 1):
-            style_data_cell(ws.cell(row=row, column=col, value=value), "center" if col in {3, 6} else "left")
+            style_data_cell(ws.cell(row=row, column=col, value=value), "center" if col in {3, 4, 5, 8} else "left")
 
     max_row = len(targets) + 1
     if targets:
@@ -2614,17 +2653,18 @@ def _build_review_history_sheet(wb: Workbook, data: dict) -> None:
 def _build_governance_controls(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Governance Controls")
     ws.sheet_properties.tabColor = "7C3AED"
-    headers = ["Repo", "Action", "Priority", "Expected Lift", "Effort", "Source", "Why"]
+    headers = ["Repo", "Action", "State", "Expected Lift", "Effort", "Source", "Why"]
     for col, header in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=header)
     style_header_row(ws, 1, len(headers))
 
-    preview = data.get("security_governance_preview", [])
+    governance_summary = data.get("governance_summary", {}) or {}
+    preview = governance_summary.get("top_actions") or data.get("security_governance_preview", [])
     for row, item in enumerate(preview, 2):
         values = [
             item.get("repo", ""),
             item.get("title", ""),
-            item.get("priority", "medium"),
+            item.get("operator_state", item.get("priority", "medium")),
             item.get("expected_posture_lift", 0.0),
             item.get("effort", ""),
             item.get("source", ""),
@@ -2648,14 +2688,20 @@ def _build_governance_audit(wb: Workbook, data: dict) -> None:
         ws.cell(row=1, column=col, value=header)
     style_header_row(ws, 1, len(headers))
 
-    preview_count = data.get("governance_preview", {}).get("applyable_count")
+    governance_summary = data.get("governance_summary", {}) or {}
+    preview_count = governance_summary.get("applyable_count")
     if preview_count is None:
         preview_count = len(data.get("security_governance_preview", []) or [])
     rows = [
+        ["Status", governance_summary.get("status", "preview")],
+        ["Headline", governance_summary.get("headline", "Governance state is being tracked.")],
         ["Approved", "yes" if data.get("governance_approval") else "no"],
+        ["Needs Re-Approval", "yes" if governance_summary.get("needs_reapproval") else "no"],
         ["Applyable Count", preview_count],
-        ["Drift Count", len(data.get("governance_drift", []) or [])],
-        ["Result Count", len(data.get("governance_results", {}).get("results", []) or [])],
+        ["Drift Count", governance_summary.get("drift_count", len(data.get("governance_drift", []) or []))],
+        ["Applied Count", governance_summary.get("applied_count", len(data.get("governance_results", {}).get("results", []) or []))],
+        ["Rollback Available", governance_summary.get("rollback_available_count", 0)],
+        ["Selected View", data.get("governance_preview", {}).get("selected_view", "all")],
     ]
     for row_index, row in enumerate(rows, 2):
         for col_index, value in enumerate(row, 1):
@@ -2811,7 +2857,34 @@ def _build_executive_summary(
     ws.cell(row=16, column=2, value=preview.get("projected_average_score_delta", 0.0))
     ws.cell(row=17, column=1, value="Projected Promotions").font = SUBHEADER_FONT
     ws.cell(row=17, column=2, value=preview.get("projected_tier_promotions", 0))
-    auto_width(ws, 6, 20)
+    operator_summary = data.get("operator_summary") or {}
+    if operator_summary:
+        ws.cell(row=19, column=1, value="Operator Control Center").font = SECTION_FONT
+        ws.cell(row=20, column=1, value="Headline").font = SUBHEADER_FONT
+        ws.cell(row=20, column=2, value=operator_summary.get("headline", ""))
+        counts = operator_summary.get("counts", {})
+        ws.cell(row=21, column=1, value="Blocked / Urgent / Ready / Deferred").font = SUBHEADER_FONT
+        ws.cell(
+            row=21,
+            column=2,
+            value=f"{counts.get('blocked', 0)} / {counts.get('urgent', 0)} / {counts.get('ready', 0)} / {counts.get('deferred', 0)}",
+        )
+        ws.cell(row=22, column=1, value="Source Run").font = SUBHEADER_FONT
+        ws.cell(row=22, column=2, value=operator_summary.get("source_run_id", ""))
+    preflight = data.get("preflight_summary") or {}
+    if preflight and (preflight.get("blocking_errors", 0) or preflight.get("warnings", 0)):
+        row_base = 24 if operator_summary else 19
+        ws.cell(row=row_base, column=1, value="Preflight Diagnostics").font = SECTION_FONT
+        ws.cell(row=row_base + 1, column=1, value="Status").font = SUBHEADER_FONT
+        ws.cell(row=row_base + 1, column=2, value=preflight.get("status", "unknown"))
+        ws.cell(row=row_base + 2, column=1, value="Errors").font = SUBHEADER_FONT
+        ws.cell(row=row_base + 2, column=2, value=preflight.get("blocking_errors", 0))
+        ws.cell(row=row_base + 3, column=1, value="Warnings").font = SUBHEADER_FONT
+        ws.cell(row=row_base + 3, column=2, value=preflight.get("warnings", 0))
+        for offset, item in enumerate((preflight.get("checks") or [])[:4], 0):
+            ws.cell(row=row_base + 1 + offset, column=4, value=item.get("category", "setup")).font = SUBHEADER_FONT
+            ws.cell(row=row_base + 1 + offset, column=5, value=item.get("summary", "Issue detected"))
+    auto_width(ws, 6, 28)
 
 
 def _build_print_pack(
@@ -2836,6 +2909,11 @@ def _build_print_pack(
     ws["B7"] = len(data.get("review_targets", []))
     ws["A8"] = "Campaign Actions"
     ws["B8"] = data.get("campaign_summary", {}).get("action_count", 0)
+    operator_summary = data.get("operator_summary") or {}
+    if operator_summary:
+        counts = operator_summary.get("counts", {})
+        ws["A9"] = "Blocked / Urgent / Ready / Deferred"
+        ws["B9"] = f"{counts.get('blocked', 0)} / {counts.get('urgent', 0)} / {counts.get('ready', 0)} / {counts.get('deferred', 0)}"
     ws["A10"] = "Top Material Changes"
     ws["A10"].font = SECTION_FONT
     for offset, item in enumerate((data.get("material_changes") or [])[:8], 1):
@@ -2850,6 +2928,16 @@ def _build_print_pack(
         ws.cell(row=row + 1, column=2, value=diff_data.get("average_score_delta", 0.0))
         ws.cell(row=row + 2, column=1, value="Repo Changes")
         ws.cell(row=row + 2, column=2, value=len(diff_data.get("repo_changes", []) or []))
+    preflight = data.get("preflight_summary") or {}
+    if preflight and (preflight.get("blocking_errors", 0) or preflight.get("warnings", 0)):
+        row = 26
+        ws.cell(row=row, column=1, value="Preflight Diagnostics").font = SECTION_FONT
+        ws.cell(row=row + 1, column=1, value="Status")
+        ws.cell(row=row + 1, column=2, value=preflight.get("status", "unknown"))
+        ws.cell(row=row + 2, column=1, value="Errors")
+        ws.cell(row=row + 2, column=2, value=preflight.get("blocking_errors", 0))
+        ws.cell(row=row + 3, column=1, value="Warnings")
+        ws.cell(row=row + 3, column=2, value=preflight.get("warnings", 0))
     ws.page_setup.orientation = "landscape"
     ws.print_area = "A1:F30"
     auto_width(ws, 6, 30)

@@ -20,6 +20,7 @@ HEALTH_FILES = [
     "security",
     "issue_template",
     "pull_request_template",
+    "changelog",
 ]
 
 
@@ -79,11 +80,35 @@ class CommunityProfileAnalyzer(BaseAnalyzer):
         else:
             missing.append("pull_request_template")
 
+        # Local filesystem fallback for files the API missed
+        _LOCAL_FALLBACK = {
+            "security": ["SECURITY.md", ".github/SECURITY.md"],
+            "code_of_conduct": ["CODE_OF_CONDUCT.md", ".github/CODE_OF_CONDUCT.md"],
+            "issue_template": [".github/ISSUE_TEMPLATE"],
+            "pull_request_template": [".github/PULL_REQUEST_TEMPLATE.md"],
+            "contributing": ["CONTRIBUTING.md", ".github/CONTRIBUTING.md"],
+        }
+        for file_key, paths in _LOCAL_FALLBACK.items():
+            if file_key not in present:
+                for p in paths:
+                    target = repo_path / p
+                    if target.is_file() or target.is_dir():
+                        present.append(file_key)
+                        if file_key in missing:
+                            missing.remove(file_key)
+                        break
+
+        # Also check changelog (not in GitHub's API but valuable for completeness)
+        for changelog_name in ("CHANGELOG.md", "CHANGELOG"):
+            if (repo_path / changelog_name).is_file():
+                present.append("changelog")
+                break
+
         details["present"] = present
         details["missing"] = missing
 
-        # Score: proportion of files present (7 possible)
-        total_checks = 7
+        # Score: proportion of files present (8 possible with changelog)
+        total_checks = 8
         score = len(present) / total_checks
 
         if present:
