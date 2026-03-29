@@ -1339,8 +1339,8 @@ def _build_changes(wb: Workbook, data: dict, diff_data: dict | None) -> None:
     ws.cell(row=3, column=6, value=round(avg_delta, 4))
 
     # Tier changes table
+    row = 5
     if tier_changes:
-        row = 5
         ws.cell(row=row, column=1, value="Tier Changes").font = SECTION_FONT
         row += 1
         for col, h in enumerate(["Repo", "Old Tier", "New Tier", "Old Score", "New Score", "Direction"], 1):
