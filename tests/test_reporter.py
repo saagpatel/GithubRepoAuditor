@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from src.models import AnalyzerResult, AuditReport, RepoAudit, RepoMetadata
-from src.reporter import write_json_report, write_markdown_report, write_pcc_export
+from src.reporter import _sanitize_for_json, write_json_report, write_markdown_report, write_pcc_export
 
 
 def _make_report() -> AuditReport:
@@ -31,6 +31,18 @@ def _make_report() -> AuditReport:
         interest_tier="notable",
     )
     return AuditReport.from_audits("user", [audit], [], 1)
+
+
+class TestSanitizeForJson:
+    def test_sanitize_for_json_strips_control_chars(self):
+        data = {"name": "test\x00repo", "items": ["hello\x0bworld"], "nested": {"key": "val\x0cue"}}
+        result = _sanitize_for_json(data)
+        assert result["name"] == "testrepo"
+        assert result["items"][0] == "helloworld"
+        assert result["nested"]["key"] == "value"
+        # Non-string types pass through
+        assert _sanitize_for_json(42) == 42
+        assert _sanitize_for_json(None) is None
 
 
 class TestJsonReport:

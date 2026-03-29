@@ -314,13 +314,19 @@ class TestAllReposSheet:
 
     def test_headers_include_interest_breakdown(self):
         ws = self._build()
-        header_values = [ws.cell(row=1, column=c).value for c in range(1, 28)]
+        header_values = [ws.cell(row=1, column=c).value for c in range(1, 40)]
         for label in ("Tech Novelty", "Burst", "Ambition", "Storytelling"):
             assert label in header_values, f"Missing header: {label}"
 
-    def test_trend_is_column_27(self):
+    def test_trend_is_last_column(self):
         ws = self._build()
-        assert ws.cell(row=1, column=27).value == "Trend"
+        # Trend is dynamically the last header column (currently 36)
+        trend_col = None
+        for c in range(1, 40):
+            if ws.cell(row=1, column=c).value == "Trend":
+                trend_col = c
+                break
+        assert trend_col is not None, "Trend header not found"
 
     def test_iconset_rule_on_score_column(self):
         wb = Workbook()
@@ -334,9 +340,16 @@ class TestAllReposSheet:
         ]
         assert len(rules) >= 1, "Expected at least one iconSet rule on All Repos sheet"
 
-    def test_sparkline_written_to_column_27(self):
+    def test_sparkline_written_to_trend_column(self):
         score_history = {"RepoA": [0.5, 0.6, 0.7, 0.8, 0.85]}
         ws = self._build(score_history=score_history)
+        # Find the Trend column dynamically
+        trend_col = None
+        for c in range(1, 40):
+            if ws.cell(row=1, column=c).value == "Trend":
+                trend_col = c
+                break
+        assert trend_col is not None, "Trend header not found"
         # Find RepoA row (sorted by score descending, RepoA has highest score)
         repoA_row = None
         for r in range(2, 10):
@@ -344,8 +357,8 @@ class TestAllReposSheet:
                 repoA_row = r
                 break
         assert repoA_row is not None, "RepoA row not found"
-        spark_val = ws.cell(row=repoA_row, column=27).value
-        assert spark_val is not None, "Expected sparkline in column 27"
+        spark_val = ws.cell(row=repoA_row, column=trend_col).value
+        assert spark_val is not None, "Expected sparkline in Trend column"
 
 
 class TestSecurityIconSetRule:
