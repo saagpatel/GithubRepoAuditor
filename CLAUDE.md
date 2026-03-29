@@ -17,9 +17,8 @@ Automated audit tool that clones all repos from a GitHub user account, analyzes 
 - No external analysis frameworks — keep dependencies minimal
 - All output files go to `output/` directory
 
-## Current Phase
-**Phase 0: Foundation**
-See IMPLEMENTATION-ROADMAP.md for full phase details.
+## Current State
+Phases 0–13 complete. 167 tests, 11 analyzers, 12-sheet Excel dashboard, Rich CLI, shields.io badges, sparklines, Notion signal integration, portfolio README.
 
 ## Key Decisions
 | Decision | Choice | Why |
@@ -31,9 +30,7 @@ See IMPLEMENTATION-ROADMAP.md for full phase details.
 | Dependency scanning | Parse lockfiles directly | No need for `pip-audit` or `npm audit` — just detect staleness |
 
 ## Do NOT
-- Do not add a web UI or dashboard — this is a CLI tool that outputs files
 - Do not use PyGithub or octokit — raw requests to keep deps minimal
 - Do not full-clone repos — shallow clone (depth=1) only
-- Do not add features not in the current phase of IMPLEMENTATION-ROADMAP.md
 - Do not hardcode the GitHub username — accept it as a CLI argument
 - Do not skip private repos — use the token if provided
