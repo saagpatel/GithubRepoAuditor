@@ -110,6 +110,7 @@ def _render_html(
         '<div id="tooltip" class="tooltip"></div>',
         '</div>',
         _repo_table(report_data.get("audits", []), score_history),
+        _portfolio_trends_section(trend_data or []),
         _tech_radar_section(report_data, trend_data),
         _distribution_section(report_data),
         _footer(),
@@ -278,6 +279,155 @@ def _distribution_section(data: dict) -> str:
     </div>"""
 
 
+# ── Portfolio trends section ──────────────────────────────────────────
+def _portfolio_trends_section(trend_data: list[dict]) -> str:
+    """Render a section showing portfolio score evolution over time."""
+    if len(trend_data) < 2:
+        return """
+    <div class="section">
+      <h2>Portfolio Trends</h2>
+      <p class="empty-state">Not enough historical data for trends. Run audits over time to see portfolio evolution.</p>
+    </div>"""
+
+    first = trend_data[0]
+    last = trend_data[-1]
+    first_score = first.get("average_score", 0)
+    last_score = last.get("average_score", 0)
+    delta = last_score - first_score
+    delta_sign = "+" if delta >= 0 else ""
+    delta_color = "#166534" if delta >= 0 else "#C2410C"
+
+    delta_html = (
+        f'<p class="trends-delta">Score trend: '
+        f'<strong>{first_score:.3f}</strong> → <strong>{last_score:.3f}</strong> '
+        f'(<span style="color:{delta_color};font-weight:bold">{delta_sign}{delta:.3f}</span>)'
+        f'</p>'
+    )
+
+    # Serialize trend points for the canvas script
+    trend_points = json.dumps([
+        {"date": t.get("date", ""), "score": round(t.get("average_score", 0), 4)}
+        for t in trend_data
+    ])
+
+    # Summary table rows
+    rows = []
+    for t in trend_data:
+        dist = t.get("tier_distribution", {})
+        rows.append(
+            f'<tr>'
+            f'<td>{escape(t.get("date", ""))}</td>'
+            f'<td class="num">{t.get("average_score", 0):.3f}</td>'
+            f'<td class="num">{t.get("repos_audited", 0)}</td>'
+            f'<td class="num" style="color:#166534">{dist.get("shipped", 0)}</td>'
+            f'<td class="num" style="color:#1565C0">{dist.get("functional", 0)}</td>'
+            f'<td class="num" style="color:#D97706">{dist.get("wip", 0)}</td>'
+            f'<td class="num" style="color:#C2410C">{dist.get("skeleton", 0)}</td>'
+            f'</tr>'
+        )
+
+    return f"""
+    <div class="section">
+      <h2>Portfolio Trends</h2>
+      {delta_html}
+      <canvas id="trends-chart" width="800" height="300"></canvas>
+      <div style="margin-top:24px">
+        <table>
+          <thead><tr>
+            <th>Date</th><th>Avg Score</th><th>Repos Audited</th>
+            <th>Shipped</th><th>Functional</th><th>WIP</th><th>Skeleton</th>
+          </tr></thead>
+          <tbody>{''.join(rows)}</tbody>
+        </table>
+      </div>
+    </div>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {{
+      var canvas = document.getElementById('trends-chart');
+      if (!canvas) return;
+      var ctx = canvas.getContext('2d');
+      var W = canvas.width, H = canvas.height;
+      var pad = {{top: 24, right: 24, bottom: 48, left: 56}};
+      var points = {trend_points};
+      if (!points.length) return;
+
+      var scores = points.map(function(p) {{ return p.score; }});
+      var minScore = Math.min.apply(null, scores);
+      var maxScore = Math.max.apply(null, scores);
+      // Give the Y axis a little breathing room
+      var yPad = (maxScore - minScore) * 0.15 || 0.05;
+      var yMin = Math.max(0, minScore - yPad);
+      var yMax = Math.min(1, maxScore + yPad);
+
+      var chartW = W - pad.left - pad.right;
+      var chartH = H - pad.top - pad.bottom;
+
+      function toX(i) {{ return pad.left + (i / (points.length - 1)) * chartW; }}
+      function toY(v) {{ return pad.top + (1 - (v - yMin) / (yMax - yMin)) * chartH; }}
+
+      // Background
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, W, H);
+
+      // Grid lines
+      ctx.strokeStyle = '#E2E8F0'; ctx.lineWidth = 1;
+      var gridSteps = 5;
+      for (var gi = 0; gi <= gridSteps; gi++) {{
+        var gv = yMin + (yMax - yMin) * gi / gridSteps;
+        var gy = toY(gv);
+        ctx.beginPath(); ctx.moveTo(pad.left, gy); ctx.lineTo(W - pad.right, gy); ctx.stroke();
+        ctx.fillStyle = '#94A3B8'; ctx.font = '11px sans-serif'; ctx.textAlign = 'right';
+        ctx.fillText(gv.toFixed(2), pad.left - 8, gy + 4);
+      }}
+
+      // X axis date labels
+      ctx.fillStyle = '#94A3B8'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
+      points.forEach(function(p, i) {{
+        var x = toX(i);
+        ctx.fillText(p.date, x, H - pad.bottom + 16);
+        // Vertical tick
+        ctx.strokeStyle = '#E2E8F0'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, H - pad.bottom); ctx.stroke();
+      }});
+
+      // Area fill under the line
+      ctx.beginPath();
+      ctx.moveTo(toX(0), toY(scores[0]));
+      for (var i = 1; i < points.length; i++) {{
+        ctx.lineTo(toX(i), toY(scores[i]));
+      }}
+      ctx.lineTo(toX(points.length - 1), H - pad.bottom);
+      ctx.lineTo(toX(0), H - pad.bottom);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(14, 165, 233, 0.10)';
+      ctx.fill();
+
+      // Line
+      ctx.beginPath();
+      ctx.moveTo(toX(0), toY(scores[0]));
+      for (var i = 1; i < points.length; i++) {{
+        ctx.lineTo(toX(i), toY(scores[i]));
+      }}
+      ctx.strokeStyle = '#0EA5E9'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+      ctx.stroke();
+
+      // Dots
+      scores.forEach(function(v, i) {{
+        ctx.beginPath(); ctx.arc(toX(i), toY(v), 5, 0, Math.PI * 2);
+        ctx.fillStyle = '#0EA5E9'; ctx.fill();
+        ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.stroke();
+      }});
+
+      // Y axis label
+      ctx.save();
+      ctx.fillStyle = '#64748B'; ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
+      ctx.translate(14, pad.top + chartH / 2); ctx.rotate(-Math.PI / 2);
+      ctx.fillText('Avg Score', 0, 0);
+      ctx.restore();
+    }});
+    </script>"""
+
+
 # ── Footer ────────────────────────────────────────────────────────────
 def _footer() -> str:
     return """
@@ -321,6 +471,8 @@ def _css() -> str:
     .bar-bg { flex: 1; height: 24px; background: #E2E8F0; border-radius: 4px; overflow: hidden; }
     .bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
     .bar-count { width: 40px; text-align: right; font-size: 13px; color: #64748B; margin-left: 8px; }
+    .empty-state { color: #64748B; font-style: italic; padding: 16px 0; }
+    .trends-delta { margin-bottom: 16px; font-size: 14px; color: #1B2A4A; }
     footer { text-align: center; padding: 24px; color: #94A3B8; font-size: 12px; border-top: 1px solid #E2E8F0; margin-top: 32px; }
     @media print {
       .filters { display: none; }

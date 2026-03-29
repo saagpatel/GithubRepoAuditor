@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.web_export import export_html_dashboard, _render_html
+from src.web_export import export_html_dashboard, _render_html, _portfolio_trends_section
 
 
 def _make_report(**overrides) -> dict:
@@ -110,6 +110,31 @@ class TestRenderHtml:
         html = _render_html(_make_report())
         assert '"username": "testuser"' in html
         assert '"audits":' in html
+
+    def test_html_includes_portfolio_trends(self):
+        trend_data = [
+            {"date": "2026-01-01", "average_score": 0.50, "repos_audited": 5,
+             "tier_distribution": {"shipped": 1, "functional": 2, "wip": 1, "skeleton": 1},
+             "top_repos": {}},
+            {"date": "2026-02-01", "average_score": 0.55, "repos_audited": 6,
+             "tier_distribution": {"shipped": 2, "functional": 2, "wip": 1, "skeleton": 1},
+             "top_repos": {}},
+            {"date": "2026-03-01", "average_score": 0.62, "repos_audited": 7,
+             "tier_distribution": {"shipped": 3, "functional": 2, "wip": 1, "skeleton": 1},
+             "top_repos": {}},
+        ]
+        html = _render_html(_make_report(), trend_data=trend_data)
+        assert "Portfolio Trends" in html
+        assert '<canvas id="trends-chart"' in html
+        assert "Score trend:" in html
+        assert "0.500" in html
+        assert "0.620" in html
+
+    def test_html_trends_graceful_empty(self):
+        html = _render_html(_make_report(), trend_data=[])
+        assert "Portfolio Trends" in html
+        assert "Not enough historical data for trends" in html
+        assert '<canvas id="trends-chart"' not in html
 
     def test_escapes_malicious_text_and_safe_json_embedding(self):
         report = _make_report(

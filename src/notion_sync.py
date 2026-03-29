@@ -636,6 +636,44 @@ def check_recommendation_followup(
         for a in report_data.get("audits", [])
     }
 
-    # For now, report that follow-up tracking is active
-    print("  Recommendation follow-up: checking previous suggestions...", file=sys.stderr)
-    return {"checked": len(results), "note": "Follow-up tracking active"}
+    # Fetch block children from the recommendation run page
+    page_id = results[0]["id"]
+    blocks_resp = _notion_request("GET", f"/blocks/{page_id}/children", token, version)
+    if not blocks_resp or blocks_resp.status_code != 200:
+        print("  Recommendation follow-up: could not fetch page blocks.", file=sys.stderr)
+        return {"checked": 0}
+
+    # Extract text content from all blocks
+    block_text_parts: list[str] = []
+    for block in blocks_resp.json().get("results", []):
+        block_type = block.get("type", "")
+        type_content = block.get(block_type, {})
+        rich_text = type_content.get("rich_text", [])
+        for rt in rich_text:
+            text = rt.get("plain_text") or rt.get("text", {}).get("content", "")
+            if text:
+                block_text_parts.append(text)
+
+    combined_text = " ".join(block_text_parts)
+
+    # Match repo names from block text against current_scores
+    improved: list[str] = []
+    still_open: list[str] = []
+    for repo_name, score in current_scores.items():
+        if not repo_name:
+            continue
+        if repo_name.lower() in combined_text.lower():
+            if score > 0:
+                improved.append(repo_name)
+            else:
+                still_open.append(repo_name)
+
+    matched = len(improved) + len(still_open)
+    summary = f"{len(improved)} of {matched} repos tracked in current audit"
+    print(f"  Recommendation follow-up: {summary}", file=sys.stderr)
+    return {
+        "checked": matched,
+        "improved": improved,
+        "still_open": still_open,
+        "summary": summary,
+    }

@@ -6,6 +6,7 @@ from pathlib import Path
 from openpyxl import Workbook
 
 from src.excel_export import (
+    _build_all_repos,
     _build_repo_profiles,
     _build_security,
     _build_changes,
@@ -111,3 +112,62 @@ class TestChangesSheet:
         assert ws.cell(row=3, column=2).value == 1  # 1 promotion
 
 
+class TestAllReposSheet:
+    def _build(self, score_history=None):
+        wb = Workbook()
+        _build_all_repos(wb, _make_report(), score_history)
+        return wb["All Repos"]
+
+    def test_creates_sheet(self):
+        wb = Workbook()
+        _build_all_repos(wb, _make_report())
+        assert "All Repos" in wb.sheetnames
+
+    def test_headers_include_interest_breakdown(self):
+        ws = self._build()
+        header_values = [ws.cell(row=1, column=c).value for c in range(1, 28)]
+        for label in ("Tech Novelty", "Burst", "Ambition", "Storytelling"):
+            assert label in header_values, f"Missing header: {label}"
+
+    def test_trend_is_column_27(self):
+        ws = self._build()
+        assert ws.cell(row=1, column=27).value == "Trend"
+
+    def test_iconset_rule_on_score_column(self):
+        wb = Workbook()
+        _build_all_repos(wb, _make_report())
+        ws = wb["All Repos"]
+        rules = [
+            rule
+            for rule_list in ws.conditional_formatting._cf_rules.values()
+            for rule in rule_list
+            if rule.type == "iconSet"
+        ]
+        assert len(rules) >= 1, "Expected at least one iconSet rule on All Repos sheet"
+
+    def test_sparkline_written_to_column_27(self):
+        score_history = {"RepoA": [0.5, 0.6, 0.7, 0.8, 0.85]}
+        ws = self._build(score_history=score_history)
+        # Find RepoA row (sorted by score descending, RepoA has highest score)
+        repoA_row = None
+        for r in range(2, 10):
+            if ws.cell(row=r, column=1).value == "RepoA":
+                repoA_row = r
+                break
+        assert repoA_row is not None, "RepoA row not found"
+        spark_val = ws.cell(row=repoA_row, column=27).value
+        assert spark_val is not None, "Expected sparkline in column 27"
+
+
+class TestSecurityIconSetRule:
+    def test_iconset_rule_on_security_score_column(self):
+        wb = Workbook()
+        _build_security(wb, _make_report())
+        ws = wb["Security"]
+        rules = [
+            rule
+            for rule_list in ws.conditional_formatting._cf_rules.values()
+            for rule in rule_list
+            if rule.type == "iconSet"
+        ]
+        assert len(rules) >= 1, "Expected at least one iconSet rule on Security sheet"

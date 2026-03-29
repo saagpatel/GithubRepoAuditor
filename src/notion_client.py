@@ -88,3 +88,22 @@ def get_notion_token() -> str:
     """Read NOTION_TOKEN from environment. Returns empty string if unset."""
     import os
     return os.environ.get("NOTION_TOKEN", "").strip()
+
+
+def query_page_by_title(
+    db_id: str,
+    title: str,
+    token: str,
+    title_property: str = "Name",
+    version: str = DEFAULT_NOTION_VERSION,
+) -> str | None:
+    """Query a Notion database for a page by title. Returns page_id or None."""
+    body = {
+        "filter": {"property": title_property, "title": {"equals": title}},
+        "page_size": 1,
+    }
+    resp = notion_request("POST", f"/databases/{db_id}/query", token, version, body)
+    if resp and resp.status_code == 200:
+        results = resp.json().get("results", [])
+        return results[0]["id"] if results else None
+    return None
