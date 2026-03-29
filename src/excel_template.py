@@ -16,6 +16,25 @@ XM_NS = "http://schemas.microsoft.com/office/excel/2006/main"
 SPARKLINE_URI = "{05C60535-1F16-4fd2-B633-F4F36F0B64E0}"
 TREND_HISTORY_WINDOW = 12
 DEFAULT_TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "assets" / "excel" / "analyst-template.xlsx"
+TEMPLATE_INFO_SHEET = "TemplateInfo"
+TEMPLATE_SHEETS = [
+    "Index",
+    "Dashboard",
+    "Portfolio Explorer",
+    "By Lens",
+    "By Collection",
+    "Trend Summary",
+    "Scenario Planner",
+    "Review Queue",
+    "Review History",
+    "Campaigns",
+    "Writeback Audit",
+    "Governance Controls",
+    "Governance Audit",
+    "Executive Summary",
+    "Print Pack",
+    TEMPLATE_INFO_SHEET,
+]
 
 ET.register_namespace("", MAIN_NS)
 ET.register_namespace("r", REL_NS)

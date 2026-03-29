@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import json
+import zipfile
 from pathlib import Path
 
-from openpyxl import Workbook
+import pytest
+from openpyxl import Workbook, load_workbook
 
 from src.excel_export import (
     _build_all_repos,
+    _build_by_collection,
+    _build_trend_summary,
     _build_repo_profiles,
     _build_security,
     _build_changes,
@@ -17,11 +21,18 @@ from src.excel_export import (
     _build_compare_sheet,
     _build_scenario_planner,
     _build_executive_summary,
+    _build_print_pack,
     _build_campaigns,
+    _build_review_history_sheet,
+    _build_review_queue,
+    _build_governance_controls,
+    _build_governance_audit,
     _build_writeback_audit,
+    export_excel,
     RADAR_DIMS,
     RADAR_LABELS,
 )
+from src.excel_template import DEFAULT_TEMPLATE_PATH, TEMPLATE_INFO_SHEET
 
 
 def _make_audit(name: str, score: float, grade: str = "C", tier: str = "functional", **kwargs) -> dict:
@@ -89,9 +100,12 @@ def _make_report(audits=None) -> dict:
             _make_audit("RepoC", 0.40, "D", "wip", security_score=0.3, security_details={"secrets_found": 2, "dangerous_files": [".env"], "has_security_md": False, "has_dependabot": False}),
         ]
     return {
+        "username": "user",
+        "generated_at": "2026-03-29T10:00:00+00:00",
         "audits": audits,
         "repos_audited": len(audits),
         "average_score": 0.62,
+        "portfolio_grade": "B",
         "hotspots": [
             {
                 "repo": "RepoC",
@@ -183,6 +197,38 @@ def _make_report(audits=None) -> dict:
                 }
             ]
         },
+        "review_summary": {"review_id": "review-1", "status": "open"},
+        "review_targets": [
+            {
+                "repo": "RepoC",
+                "title": "Security posture needs attention",
+                "severity": 0.83,
+                "next_step": "Preview governance controls",
+                "decision_hint": "ready-for-governance-approval",
+                "safe_to_defer": False,
+            }
+        ],
+        "review_history": [
+            {
+                "review_id": "review-1",
+                "generated_at": "2026-03-29T10:00:00+00:00",
+                "material_change_count": 2,
+                "status": "open",
+                "decision_state": "needs-review",
+                "sync_state": "local-only",
+                "emitted": True,
+            }
+        ],
+        "material_changes": [
+            {
+                "change_type": "security",
+                "repo": "RepoC",
+                "severity": 0.83,
+                "title": "Security posture needs attention",
+            }
+        ],
+        "governance_preview": {"applyable_count": 1},
+        "governance_drift": [{"repo": "RepoC", "control": "secret_scanning"}],
     }
 
 
@@ -327,6 +373,10 @@ class TestHotspotsAndDataSheets:
         _build_hidden_data_sheets(wb, _make_report(), trend_data=[{"average_score": 0.6}], score_history={"RepoA": [0.5, 0.8]})
         assert "Data_Repos" in wb.sheetnames
         assert "Data_Lenses" in wb.sheetnames
+        assert "Data_TrendMatrix" in wb.sheetnames
+        assert "Data_PortfolioHistory" in wb.sheetnames
+        assert "Data_Rollups" in wb.sheetnames
+        assert "Data_ReviewTargets" in wb.sheetnames
         assert wb["Data_Repos"].sheet_state == "hidden"
 
     def test_hidden_repo_sheet_has_structured_table(self):
@@ -351,6 +401,24 @@ class TestAnalystWorkbookSheets:
         _build_writeback_audit(wb, _make_report())
         assert "Campaigns" in wb.sheetnames
         assert "Writeback Audit" in wb.sheetnames
+
+    def test_creates_collection_trend_review_governance_and_print_sheets(self):
+        wb = Workbook()
+        report = _make_report()
+        _build_by_collection(wb, report, portfolio_profile="default")
+        _build_trend_summary(wb, report, trend_data=[{"date": "2026-03-28", "average_score": 0.6, "repos_audited": 3, "tier_distribution": {"shipped": 1, "functional": 1}}], score_history={"RepoA": [0.5, 0.8]})
+        _build_review_queue(wb, report)
+        _build_review_history_sheet(wb, report)
+        _build_governance_controls(wb, report)
+        _build_governance_audit(wb, report)
+        _build_print_pack(wb, report, None, portfolio_profile="default", collection="showcase")
+        assert "By Collection" in wb.sheetnames
+        assert "Trend Summary" in wb.sheetnames
+        assert "Review Queue" in wb.sheetnames
+        assert "Review History" in wb.sheetnames
+        assert "Governance Controls" in wb.sheetnames
+        assert "Governance Audit" in wb.sheetnames
+        assert "Print Pack" in wb.sheetnames
 
     def test_compare_sheet_only_when_diff_present(self):
         wb = Workbook()
@@ -394,3 +462,60 @@ class TestAnalystWorkbookSheets:
         assert "Security Controls" in wb.sheetnames
         assert "Supply Chain" in wb.sheetnames
         assert "Security Debt" in wb.sheetnames
+
+
+class TestWorkbookModes:
+    def test_template_mode_requires_existing_template(self, tmp_path):
+        report_path = tmp_path / "report.json"
+        report_path.write_text(json.dumps(_make_report()))
+
+        with pytest.raises(FileNotFoundError):
+            export_excel(
+                report_path,
+                tmp_path / "out.xlsx",
+                excel_mode="template",
+                template_path=tmp_path / "missing.xlsx",
+            )
+
+    def test_standard_mode_generates_operator_workbook(self, tmp_path):
+        report_path = tmp_path / "report.json"
+        report_path.write_text(json.dumps(_make_report()))
+
+        output = export_excel(
+            report_path,
+            tmp_path / "out.xlsx",
+            excel_mode="standard",
+        )
+
+        wb = load_workbook(output)
+        assert "Dashboard" in wb.sheetnames
+        assert "By Collection" in wb.sheetnames
+        assert "Trend Summary" in wb.sheetnames
+        assert "Review Queue" in wb.sheetnames
+        assert "Governance Controls" in wb.sheetnames
+        assert "Print Pack" in wb.sheetnames
+
+    def test_template_mode_generates_native_sparkline_xml_and_named_ranges(self, tmp_path):
+        report_path = tmp_path / "report.json"
+        report_path.write_text(json.dumps(_make_report()))
+
+        output = export_excel(
+            report_path,
+            tmp_path / "out.xlsx",
+            trend_data=[{"date": "2026-03-28", "average_score": 0.58, "repos_audited": 3, "tier_distribution": {"shipped": 1, "functional": 1}}],
+            score_history={"RepoA": [0.5, 0.7], "RepoB": [0.4, 0.6]},
+            excel_mode="template",
+            template_path=DEFAULT_TEMPLATE_PATH,
+        )
+
+        wb = load_workbook(output)
+        assert TEMPLATE_INFO_SHEET in wb.sheetnames
+        assert "nrReviewOpenCount" in wb.defined_names
+        assert "nrSelectedProfileLabel" in wb.defined_names
+
+        with zipfile.ZipFile(output) as archive:
+            worksheet_names = [name for name in archive.namelist() if name.startswith("xl/worksheets/sheet")]
+            assert any(
+                "sparkline" in archive.read(name).decode("utf-8", "ignore").lower()
+                for name in worksheet_names
+            )

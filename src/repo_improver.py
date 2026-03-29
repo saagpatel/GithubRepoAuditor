@@ -243,6 +243,41 @@ def apply_readme_updates(
     return results
 
 
+def apply_file_updates(
+    client: "GitHubClient",
+    owner: str,
+    updates: list[dict[str, Any]],
+    *,
+    dry_run: bool = False,
+) -> list[dict[str, Any]]:
+    """Batch-push arbitrary files to repos via the GitHub Contents API.
+
+    Each update dict should have: name (repo name), path (file path), content (str), message (commit msg).
+    Returns a list of result dicts with ok/error status per repo.
+    """
+    results: list[dict[str, Any]] = []
+    for update in updates:
+        repo_name = update.get("name") or update.get("repo", "").split("/")[-1]
+        file_path = update["path"]
+        content = update["content"]
+        message = update.get("message", f"chore: add {file_path}")
+
+        result: dict[str, Any] = {"repo": repo_name, "path": file_path}
+
+        if dry_run:
+            result["dry_run"] = True
+            results.append(result)
+            continue
+
+        sha = client.get_file_sha(owner, repo_name, file_path)
+        content_b64 = base64.b64encode(content.encode("utf-8")).decode("ascii")
+        resp = client.update_repo_file(owner, repo_name, file_path, content_b64, message, sha=sha)
+        result["ok"] = resp.get("ok", False)
+        results.append(result)
+
+    return results
+
+
 def generate_execution_report(results: list[dict[str, Any]], output_dir: Path) -> Path:
     """Write execution results to a JSON file for review."""
     output_dir.mkdir(parents=True, exist_ok=True)

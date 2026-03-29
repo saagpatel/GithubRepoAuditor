@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from src.repo_improver import (
+    apply_file_updates,
     apply_metadata_updates,
     apply_readme_updates,
     generate_execution_report,
@@ -213,6 +214,25 @@ class TestApplyReadmes:
             [{"name": "repo1", "readme": ""}],
         )
         assert len(results) == 0
+
+
+class TestApplyFileUpdates:
+    def test_dry_run_skips_api(self):
+        updates = [{"name": "repo1", "path": "SECURITY.md", "content": "# Security"}]
+        results = apply_file_updates(None, "owner", updates, dry_run=True)
+        assert results[0]["dry_run"] is True
+        assert results[0]["path"] == "SECURITY.md"
+
+    def test_pushes_file(self):
+        class FakeClient:
+            def get_file_sha(self, owner, repo, path):
+                return None
+            def update_repo_file(self, owner, repo, path, content_b64, message, *, sha=None):
+                return {"ok": True}
+
+        updates = [{"name": "repo1", "path": "LICENSE", "content": "MIT License", "message": "chore: add LICENSE"}]
+        results = apply_file_updates(FakeClient(), "owner", updates)
+        assert results[0]["ok"] is True
 
 
 class TestExecutionReport:

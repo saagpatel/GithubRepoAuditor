@@ -33,6 +33,7 @@ def _make_args(**overrides) -> Namespace:
         "readme_suggestions": False,
         "notion_registry": False,
         "html": False,
+        "excel_mode": "template",
         "scoring_profile": None,
         "portfolio_profile": "default",
         "collection": None,
@@ -276,7 +277,13 @@ def test_write_report_outputs_forwards_analyst_view_args(monkeypatch, tmp_path, 
     monkeypatch.setattr("src.history.save_fingerprints", lambda *_: None)
     monkeypatch.setattr("src.history.archive_report", lambda *_: None)
     monkeypatch.setattr("src.warehouse.write_warehouse_snapshot", lambda *a, **k: tmp_path / "warehouse.db")
-    monkeypatch.setattr("src.excel_export.export_excel", lambda *a, **k: tmp_path / "audit.xlsx")
+    excel_calls: dict[str, object] = {}
+
+    def _record_excel(*_args, **kwargs):
+        excel_calls.update(kwargs)
+        return tmp_path / "audit.xlsx"
+
+    monkeypatch.setattr("src.excel_export.export_excel", _record_excel)
 
     html_calls: dict[str, object] = {}
     review_pack_calls: dict[str, object] = {}
@@ -296,6 +303,7 @@ def test_write_report_outputs_forwards_analyst_view_args(monkeypatch, tmp_path, 
 
     assert html_calls["portfolio_profile"] == "shipping"
     assert html_calls["collection"] == "showcase"
+    assert excel_calls["excel_mode"] == "template"
     assert review_pack_calls["portfolio_profile"] == "shipping"
     assert review_pack_calls["collection"] == "showcase"
     assert outputs["review_pack_info"]

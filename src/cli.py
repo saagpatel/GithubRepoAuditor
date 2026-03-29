@@ -183,6 +183,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Generate PDF audit report",
     )
     parser.add_argument(
+        "--excel-mode",
+        choices=["template", "standard"],
+        default="template",
+        help="Generate the native template-backed workbook or the fallback standard workbook",
+    )
+    parser.add_argument(
         "--scoring-profile",
         type=str,
         default=None,
@@ -584,6 +590,11 @@ def _compute_portfolio_lang_freq(repos: list[RepoMetadata]) -> dict[str, float]:
     return {lang: count / len(repos) for lang, count in lang_counts.items()} if repos else {}
 
 
+def _portfolio_lang_freq_for_filtered_baseline(repos: list[RepoMetadata]) -> dict[str, float]:
+    """Compute novelty baseline from the full filtered portfolio, never only the rerun subset."""
+    return _compute_portfolio_lang_freq(repos)
+
+
 def _select_target_repos(target_names: list[str], repos: list[RepoMetadata]) -> tuple[list[RepoMetadata], list[str]]:
     exact = {repo.name: repo for repo in repos}
     lower = {repo.name.lower(): repo for repo in repos}
@@ -843,6 +854,7 @@ def _write_report_outputs(
         score_history=score_history,
         portfolio_profile=args.portfolio_profile,
         collection=args.collection,
+        excel_mode=args.excel_mode,
     )
     md_path = write_markdown_report(report, output_dir, diff_data=diff_dict)
     pcc_path = write_pcc_export(report, output_dir)
@@ -1079,7 +1091,7 @@ def _run_targeted_audit(
         print_warning("No repos to audit.")
         return
 
-    portfolio_lang_freq = _compute_portfolio_lang_freq(filtered_repos)
+    portfolio_lang_freq = _portfolio_lang_freq_for_filtered_baseline(filtered_repos)
     new_audits = _analyze_repos(
         targeted_repos,
         args=args,
@@ -1453,7 +1465,7 @@ def main() -> None:
             repos,
             args=args,
             client=client,
-            portfolio_lang_freq=_compute_portfolio_lang_freq(repos),
+            portfolio_lang_freq=_portfolio_lang_freq_for_filtered_baseline(repos),
             custom_weights=custom_weights,
         )
         all_audits = resumed_audits + audits

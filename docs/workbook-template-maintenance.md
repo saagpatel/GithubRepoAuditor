@@ -1,0 +1,70 @@
+# Workbook Template Maintenance
+
+The Excel workbook now supports two render modes:
+
+- `template` (default): hydrates the committed workbook template in `assets/excel/analyst-template.xlsx`
+- `standard`: uses the fallback code-generated workbook path
+
+## Ownership Boundary
+
+Python owns:
+- report and warehouse facts
+- hidden `Data_*` sheets
+- stable table names and column order
+- workbook named ranges used for operator KPIs and filters
+- template hydration and native sparkline injection
+
+The workbook template owns:
+- workbook shell and sheet organization
+- print layout
+- named-range placeholders
+- any Excel-authored native objects already present in the template
+
+## Template-Stable Tables
+
+These tables are part of the workbook contract:
+- `tblRepos`
+- `tblDimensions`
+- `tblLenses`
+- `tblHistory`
+- `tblTrendMatrix`
+- `tblPortfolioHistory`
+- `tblRollups`
+- `tblReviewTargets`
+- `tblSecurityData`
+- `tblSecurityControls`
+- `tblSecurityProviders`
+- `tblSecurityAlerts`
+- `tblActions`
+- `tblCollections`
+- `tblScenarios`
+- `tblGovernancePreview`
+- `tblCampaigns`
+- `tblWriteback`
+- `tblReviewHistoryData`
+
+If one of these names or its column order changes, update both:
+- the Python workbook builder
+- the committed workbook template
+
+## Safe Update Workflow
+
+1. Update the Python data builder first.
+2. Regenerate or edit the template only after the hidden-table contract is settled.
+3. Re-run workbook tests in both `template` and `standard` modes.
+4. Open the generated workbook in Excel desktop and verify the expected workbook behavior.
+
+## When Python-Only Changes Are Enough
+
+Usually Python-only changes are safe when you:
+- add rows within an existing hidden-table contract
+- change how a KPI is calculated without renaming the binding
+- adjust `standard` mode presentation only
+
+## When Python and Template Changes Are Both Required
+
+Update both when you:
+- add or rename template-bound sheets
+- rename a stable hidden table
+- reorder columns used by workbook bindings
+- add or rename named ranges used by the template
