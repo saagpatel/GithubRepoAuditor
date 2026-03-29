@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import sys
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -246,6 +247,13 @@ def _run_targeted_audit(args, client, output_dir: Path) -> None:
         print("  No repos to audit.", file=sys.stderr)
         return
 
+    # Portfolio language frequency from targeted repos (best available for targeted mode)
+    targeted_lang_counts = Counter(r.language for r in targeted_repos if r.language)
+    targeted_lang_freq = (
+        {lang: count / len(targeted_repos) for lang, count in targeted_lang_counts.items()}
+        if targeted_repos else {}
+    )
+
     # Clone and analyze only targeted repos
     new_audits: list[RepoAudit] = []
     with clone_workspace(targeted_repos, token=args.token) as cloned:
@@ -256,7 +264,7 @@ def _run_targeted_audit(args, client, output_dir: Path) -> None:
                 continue
             print(f"  [{i}/{len(targeted_repos)}] Analyzing {repo_meta.name}...", file=sys.stderr)
             results = run_all_analyzers(repo_path, repo_meta, client)
-            audit = score_repo(repo_meta, results)
+            audit = score_repo(repo_meta, results, portfolio_lang_freq=targeted_lang_freq)
             new_audits.append(audit)
             if args.verbose:
                 _print_verbose(audit)
@@ -488,6 +496,10 @@ def main() -> None:
     # Clone and analyze
     audits: list[RepoAudit] = []
 
+    # Portfolio language frequency for relative novelty scoring
+    lang_counts = Counter(r.language for r in repos if r.language)
+    portfolio_lang_freq = {lang: count / len(repos) for lang, count in lang_counts.items()} if repos else {}
+
     if not args.skip_clone:
         with clone_workspace(repos, token=args.token) as cloned:
             print(
@@ -503,7 +515,7 @@ def main() -> None:
                     file=sys.stderr,
                 )
                 results = run_all_analyzers(repo_path, repo_meta, client)
-                audit = score_repo(repo_meta, results)
+                audit = score_repo(repo_meta, results, portfolio_lang_freq=portfolio_lang_freq)
                 audits.append(audit)
                 if args.verbose:
                     _print_verbose(audit)

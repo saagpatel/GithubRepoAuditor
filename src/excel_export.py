@@ -13,7 +13,8 @@ from pathlib import Path
 from openpyxl import Workbook
 from openpyxl.chart import BarChart, PieChart, Reference, ScatterChart
 from openpyxl.chart.label import DataLabelList
-from openpyxl.chart.series import DataPoint
+from openpyxl.chart.series import DataPoint, Series
+from openpyxl.drawing.line import LineProperties
 from openpyxl.formatting.rule import ColorScaleRule, DataBarRule
 from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
@@ -229,6 +230,120 @@ def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None) ->
         lang_bar.width = 16
         lang_bar.height = 10
         ws.add_chart(lang_bar, "A34")
+
+    # Scatter chart: Completeness vs Interest
+    _build_scatter_on_dashboard(ws, data)
+
+
+def _build_scatter_on_dashboard(ws, data: dict) -> None:
+    """Add completeness vs interest scatter chart with quadrant lines."""
+    audits = data.get("audits", [])
+    if len(audits) < 2:
+        return
+
+    # Write scatter data to cols L-N (12-14) starting at row 10
+    data_start_row = 10
+    col_name = 12  # L: repo name (reference)
+    col_x = 13     # M: completeness
+    col_y = 14     # N: interest
+
+    for i, audit in enumerate(audits):
+        row = data_start_row + i
+        ws.cell(row=row, column=col_name, value=audit["metadata"]["name"])
+        ws.cell(row=row, column=col_x, value=round(audit.get("overall_score", 0), 3))
+        ws.cell(row=row, column=col_y, value=round(audit.get("interest_score", 0), 3))
+
+    data_end_row = data_start_row + len(audits) - 1
+
+    chart = ScatterChart()
+    chart.title = "Completeness vs Interest"
+    chart.x_axis.title = "Completeness"
+    chart.y_axis.title = "Interest"
+    chart.x_axis.scaling.min = 0
+    chart.x_axis.scaling.max = 1
+    chart.y_axis.scaling.min = 0
+    chart.y_axis.scaling.max = 1
+    chart.style = 13
+
+    # Main data series — dots only, no connecting lines
+    xvalues = Reference(ws, min_col=col_x, min_row=data_start_row, max_row=data_end_row)
+    yvalues = Reference(ws, min_col=col_y, min_row=data_start_row, max_row=data_end_row)
+    series = Series(yvalues, xvalues, title="Repos")
+    series.graphicalProperties.line.noFill = True
+    chart.series.append(series)
+
+    # Quadrant lines — vertical at x=0.55, horizontal at y=0.45
+    line_col = 16  # col P for line data
+    # Vertical line (x=0.55 from y=0 to y=1)
+    ws.cell(row=data_start_row, column=line_col, value=0.55)
+    ws.cell(row=data_start_row, column=line_col + 1, value=0.0)
+    ws.cell(row=data_start_row + 1, column=line_col, value=0.55)
+    ws.cell(row=data_start_row + 1, column=line_col + 1, value=1.0)
+
+    vline_x = Reference(ws, min_col=line_col, min_row=data_start_row, max_row=data_start_row + 1)
+    vline_y = Reference(ws, min_col=line_col + 1, min_row=data_start_row, max_row=data_start_row + 1)
+    vline = Series(vline_y, vline_x, title=None)
+    vline.graphicalProperties.line = LineProperties(w=12700, prstDash="dash", solidFill="808080")
+    vline.marker = None
+    chart.series.append(vline)
+
+    # Horizontal line (y=0.45 from x=0 to x=1)
+    ws.cell(row=data_start_row, column=line_col + 2, value=0.0)
+    ws.cell(row=data_start_row, column=line_col + 3, value=0.45)
+    ws.cell(row=data_start_row + 1, column=line_col + 2, value=1.0)
+    ws.cell(row=data_start_row + 1, column=line_col + 3, value=0.45)
+
+    hline_x = Reference(ws, min_col=line_col + 2, min_row=data_start_row, max_row=data_start_row + 1)
+    hline_y = Reference(ws, min_col=line_col + 3, min_row=data_start_row, max_row=data_start_row + 1)
+    hline = Series(hline_y, hline_x, title=None)
+    hline.graphicalProperties.line = LineProperties(w=12700, prstDash="dash", solidFill="808080")
+    hline.marker = None
+    chart.series.append(hline)
+
+    chart.width = 18
+    chart.height = 14
+    ws.add_chart(chart, "G34")
+
+    # Quadrant summary table
+    _write_quadrant_table(ws, audits, legend_row=49)
+
+
+X_MID = 0.55
+Y_MID = 0.45
+
+QUADRANT_NAMES = [
+    ("Flagships", "high completeness + high interest"),
+    ("Hidden Gems", "high interest, incomplete — worth finishing"),
+    ("Workhorses", "solid but routine — bread and butter"),
+    ("Archive Candidates", "low both — consider archiving"),
+]
+
+
+def _write_quadrant_table(ws, audits: list[dict], legend_row: int) -> None:
+    """Write a quadrant summary table below the scatter chart."""
+    buckets: list[list[str]] = [[], [], [], []]
+    for a in audits:
+        x = a.get("overall_score", 0)
+        y = a.get("interest_score", 0)
+        if x >= X_MID and y >= Y_MID:
+            buckets[0].append(a["metadata"]["name"])
+        elif x < X_MID and y >= Y_MID:
+            buckets[1].append(a["metadata"]["name"])
+        elif x >= X_MID and y < Y_MID:
+            buckets[2].append(a["metadata"]["name"])
+        else:
+            buckets[3].append(a["metadata"]["name"])
+
+    ws.cell(row=legend_row, column=7, value="Scatter Quadrants").font = SECTION_FONT
+    headers = ["Quadrant", "Count", "Repos"]
+    for j, h in enumerate(headers):
+        ws.cell(row=legend_row + 1, column=7 + j, value=h).font = SUBHEADER_FONT
+
+    for i, ((name, desc), repos) in enumerate(zip(QUADRANT_NAMES, buckets)):
+        row = legend_row + 2 + i
+        ws.cell(row=row, column=7, value=f"{name}").font = Font("Calibri", 10, bold=True)
+        ws.cell(row=row, column=8, value=len(repos))
+        ws.cell(row=row, column=9, value=", ".join(repos[:8]) + ("..." if len(repos) > 8 else ""))
 
 
 # ═══════════════════════════════════════════════════════════════════════
