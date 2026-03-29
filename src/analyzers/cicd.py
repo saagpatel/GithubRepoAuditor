@@ -99,4 +99,12 @@ def _has_build_scripts(repo_path: Path) -> bool:
     if (repo_path / "justfile").is_file() or (repo_path / "Justfile").is_file():
         return True
 
+    # Swift build systems
+    if (repo_path / "Package.swift").is_file():  # Swift Package Manager
+        return True
+    if (repo_path / "Podfile").is_file():  # CocoaPods
+        return True
+    if (repo_path / "project.yml").is_file() or (repo_path / "project.yaml").is_file():  # XcodeGen
+        return True
+
     return False

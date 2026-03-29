@@ -79,6 +79,17 @@ class TestTestingAnalyzer:
         result = TestingAnalyzer().analyze(empty_repo, sample_metadata)
         assert result.score == 0.0
 
+    def test_xctest_files_are_counted(self, xctest_repo, sample_metadata):
+        """*Tests.swift and *Test.swift files must appear in test_file_count."""
+        result = TestingAnalyzer().analyze(xctest_repo, sample_metadata)
+        assert result.details["test_file_count"] == 2
+        assert result.score == 1.0  # dirs(0.4) + framework(0.3) + files>0(0.3)
+
+    def test_xctest_framework_detected_with_files(self, xctest_repo, sample_metadata):
+        result = TestingAnalyzer().analyze(xctest_repo, sample_metadata)
+        assert result.details["framework"] == "xctest"
+        assert any("Test framework: xctest" in f for f in result.findings)
+
 
 class TestCicdAnalyzer:
     def test_no_ci(self, tmp_repo, sample_metadata):
@@ -92,6 +103,28 @@ class TestCicdAnalyzer:
         (workflows / "ci.yml").write_text("name: CI\non: push\n")
         result = CicdAnalyzer().analyze(tmp_repo, sample_metadata)
         assert result.score >= 0.5
+
+    def test_package_swift_scores_build_scripts(self, tmp_path, sample_metadata):
+        repo = tmp_path / "spm-repo"
+        repo.mkdir()
+        (repo / "Package.swift").write_text("// swift-tools-version:5.9\n")
+        result = CicdAnalyzer().analyze(repo, sample_metadata)
+        assert result.score >= 0.2
+        assert any("build" in f.lower() or "script" in f.lower() for f in result.findings)
+
+    def test_xcodegen_project_yml_scores_build_scripts(self, tmp_path, sample_metadata):
+        repo = tmp_path / "xcodegen-repo"
+        repo.mkdir()
+        (repo / "project.yml").write_text("name: MyApp\n")
+        result = CicdAnalyzer().analyze(repo, sample_metadata)
+        assert result.score >= 0.2
+
+    def test_podfile_scores_build_scripts(self, tmp_path, sample_metadata):
+        repo = tmp_path / "pods-repo"
+        repo.mkdir()
+        (repo / "Podfile").write_text("target 'MyApp' do\nend\n")
+        result = CicdAnalyzer().analyze(repo, sample_metadata)
+        assert result.score >= 0.2
 
 
 class TestDependenciesAnalyzer:
@@ -138,3 +171,13 @@ class TestBuildReadinessAnalyzer:
         (tmp_repo / "Makefile").write_text("build:\n\techo build\n")
         result = BuildReadinessAnalyzer().analyze(tmp_repo, sample_metadata)
         assert result.score >= 0.6
+
+
+class TestCloneWorkspace:
+    def test_workspace_uses_unique_temp_dir(self):
+        """clone_workspace must use TemporaryDirectory, not a hardcoded path."""
+        import inspect
+        from src.cloner import clone_workspace
+        src = inspect.getsource(clone_workspace)
+        assert "TemporaryDirectory" in src
+        assert "/tmp/audit-repos" not in src

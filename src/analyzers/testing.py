@@ -14,6 +14,8 @@ TEST_PATTERNS = (
     "test_*.*",
     "*.test.*",
     "*.spec.*",
+    "*Tests.swift",
+    "*Test.swift",
 )
 
 

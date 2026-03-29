@@ -135,3 +135,25 @@ def swift_repo(tmp_path: Path) -> Path:
     )
 
     return repo
+
+
+@pytest.fixture
+def xctest_repo(tmp_path: Path) -> Path:
+    """Swift repo with XCTest files in SPM-style Tests/ directory."""
+    repo = tmp_path / "xctest-repo"
+    repo.mkdir()
+    (repo / "Package.swift").write_text(
+        "// swift-tools-version:5.9\nimport PackageDescription\n"
+        "let package = Package(name: \"MyLib\")\n"
+    )
+    tests = repo / "Tests" / "MyLibTests"
+    tests.mkdir(parents=True)
+    (tests / "MyLibTests.swift").write_text(
+        "import XCTest\n@testable import MyLib\n\n"
+        "final class MyLibTests: XCTestCase {\n"
+        "    func testExample() { XCTAssertTrue(true) }\n}\n"
+    )
+    (tests / "HelperTest.swift").write_text(
+        "import XCTest\nclass HelperTest: XCTestCase {}\n"
+    )
+    return repo
