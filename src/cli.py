@@ -267,6 +267,28 @@ def build_parser() -> argparse.ArgumentParser:
         default=3600,
         help="Seconds between watch runs (default: 3600)",
     )
+    parser.add_argument(
+        "--create-issues",
+        action="store_true",
+        help="Create GitHub issues for high-priority action items",
+    )
+    parser.add_argument(
+        "--analyzers-dir",
+        type=str,
+        default=None,
+        metavar="DIR",
+        help="Directory containing custom analyzer .py files to load and run",
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume a partial audit run from saved progress",
+    )
+    parser.add_argument(
+        "--vuln-check",
+        action="store_true",
+        help="Query OSV.dev for known vulnerabilities in repo dependencies",
+    )
     return parser
 
 
@@ -555,9 +577,17 @@ def _analyze_repos(
     portfolio_lang_freq: dict[str, float],
     custom_weights: dict[str, float] | None,
 ) -> list[RepoAudit]:
+    from src.analyzers import load_custom_analyzers
+
     if args.skip_clone:
         print_warning("Audit modes that score repos do not support --skip-clone.")
         return []
+
+    extra_analyzers = []
+    if getattr(args, "analyzers_dir", None):
+        extra_analyzers = load_custom_analyzers(Path(args.analyzers_dir))
+        if extra_analyzers:
+            print_info(f"Loaded {len(extra_analyzers)} custom analyzer(s) from {args.analyzers_dir}")
 
     audits: list[RepoAudit] = []
     progress = create_progress()
@@ -577,7 +607,7 @@ def _analyze_repos(
                         progress.advance(task)
                         continue
                     progress.update(task, description=f"Analyzing {repo_meta.name}")
-                    results = run_all_analyzers(repo_path, repo_meta, client)
+                    results = run_all_analyzers(repo_path, repo_meta, client, extra_analyzers=extra_analyzers)
                     audit = score_repo(
                         repo_meta,
                         results,
@@ -597,7 +627,7 @@ def _analyze_repos(
                 if not repo_path:
                     continue
                 print(f"  [{index}/{len(repos)}] Analyzing {repo_meta.name}...", file=sys.stderr)
-                results = run_all_analyzers(repo_path, repo_meta, client)
+                results = run_all_analyzers(repo_path, repo_meta, client, extra_analyzers=extra_analyzers)
                 audit = score_repo(
                     repo_meta,
                     results,
@@ -901,6 +931,16 @@ def _write_report_outputs(
         if candidates:
             archive_result = export_archive_report(candidates, report.username, output_dir)
             print_info(f"Archive candidates: {archive_result['count']} repos → {archive_result['report_path']}")
+
+    if getattr(args, "vuln_check", False):
+        from src.vuln_check import check_vulnerabilities, format_vuln_summary
+
+        vulns = check_vulnerabilities(report_data.get("audits", []), cache=cache)
+        print_info(format_vuln_summary(vulns))
+        if vulns:
+            vuln_path = output_dir / f"vuln-report-{report.username}-{_date_str(report.generated_at)}.json"
+            vuln_path.write_text(json.dumps(vulns, indent=2, default=str))
+            print_info(f"Vulnerability report: {vuln_path}")
 
     if args.narrative:
         from src.narrative import generate_narrative
@@ -1260,6 +1300,25 @@ def main() -> None:
             )
             return
 
+        # Resume: load previously completed audits and skip re-analyzing them
+        resumed_names: set[str] = set()
+        resumed_audits: list[RepoAudit] = []
+        if getattr(args, "resume", False):
+            from src.progress import load_progress
+
+            saved = load_progress(output_dir)
+            if saved:
+                completed_dicts, _run_meta = saved
+                for audit_dict in completed_dicts:
+                    try:
+                        resumed_audits.append(_audit_from_dict(audit_dict))
+                        resumed_names.add(audit_dict.get("metadata", {}).get("name", ""))
+                    except Exception:
+                        pass
+                if resumed_audits:
+                    print_info(f"Resumed {len(resumed_audits)} previously completed repo(s)")
+                    repos = [r for r in repos if r.name not in resumed_names]
+
         audits = _analyze_repos(
             repos,
             args=args,
@@ -1267,9 +1326,11 @@ def main() -> None:
             portfolio_lang_freq=_compute_portfolio_lang_freq(repos),
             custom_weights=custom_weights,
         )
+        all_audits = resumed_audits + audits
 
         # Full audit path: score every repo and write all output formats
-        if audits:
+        if all_audits:
+            audits = all_audits
             report = AuditReport.from_audits(
                 args.username,
                 audits,

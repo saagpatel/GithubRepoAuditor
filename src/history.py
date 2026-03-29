@@ -198,6 +198,46 @@ def load_language_trends(
     return trends
 
 
+def load_complexity_trends(output_dir: Path) -> dict[str, list[dict]]:
+    """Load per-repo complexity metrics across archived reports.
+
+    Returns {repo_name: [{mi: float, worst_cc: int, complex_count: int}]}.
+    """
+    history_dir = output_dir / "history"
+    index = load_history_index(history_dir)
+    if not index:
+        return {}
+
+    trends: dict[str, list[dict]] = {}
+
+    for entry in index:
+        report_path = history_dir / entry["filename"]
+        if not report_path.is_file():
+            continue
+        try:
+            data = json.loads(report_path.read_text())
+        except (json.JSONDecodeError, OSError):
+            continue
+
+        for audit in data.get("audits", []):
+            repo_name = audit.get("metadata", {}).get("name", "")
+            if not repo_name:
+                continue
+            for result in audit.get("analyzer_results", []):
+                if result.get("dimension") != "code_quality":
+                    continue
+                details = result.get("details", {})
+                mi = details.get("avg_maintainability_index")
+                if mi is not None:
+                    trends.setdefault(repo_name, []).append({
+                        "mi": mi,
+                        "worst_cc": details.get("worst_cc_score", 0),
+                        "complex_count": details.get("complex_function_count", 0),
+                    })
+
+    return trends
+
+
 def _update_index(report_path: Path, history_dir: Path) -> None:
     """Add an entry to the history index."""
     index_path = history_dir / "index.json"

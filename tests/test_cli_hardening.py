@@ -49,6 +49,10 @@ def _make_args(**overrides) -> Namespace:
         "config": None,
         "watch": False,
         "watch_interval": 3600,
+        "create_issues": False,
+        "analyzers_dir": None,
+        "resume": False,
+        "vuln_check": False,
     }
     defaults.update(overrides)
     return Namespace(**defaults)

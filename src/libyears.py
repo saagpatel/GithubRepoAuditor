@@ -70,6 +70,7 @@ def compute_libyears(
         "dep_count_checked": checked,
         "freshness_score": max(0.0, freshness_score) if freshness_score is not None else None,
         "dependency_names": [name for name, _, _ in deps],
+        "dep_versions": [(name, version, ecosystem) for name, version, ecosystem in deps],
     }
 
 
