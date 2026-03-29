@@ -40,7 +40,6 @@ def _make_args(**overrides) -> Namespace:
         "scorecard": False,
         "security_offline": False,
         "campaign": None,
-        "campaign_rollback": None,
         "writeback_target": None,
         "writeback_apply": False,
         "max_actions": 20,
@@ -48,18 +47,12 @@ def _make_args(**overrides) -> Namespace:
         "narrative": False,
         "pdf": False,
         "config": None,
-        "governance_approve": None,
-        "governance_apply": None,
-        "governance_scope": "all",
         "watch": False,
-        "watch_strategy": "adaptive",
         "watch_interval": 3600,
-        "review_materiality": "standard",
-        "review_sync": None,
-        "review_from_latest": False,
-        "dry_run": False,
-        "summary": False,
         "create_issues": False,
+        "analyzers_dir": None,
+        "resume": False,
+        "vuln_check": False,
     }
     defaults.update(overrides)
     return Namespace(**defaults)
@@ -115,21 +108,6 @@ def test_main_rejects_writeback_apply_without_target(monkeypatch):
     args = _make_args(
         campaign="security-review",
         writeback_apply=True,
-    )
-
-    monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
-
-    with pytest.raises(SystemExit) as exc:
-        cli.main()
-
-    assert exc.value.code == 2
-
-
-def test_main_rejects_watch_with_campaign_writeback(monkeypatch):
-    args = _make_args(
-        watch=True,
-        campaign="promotion-push",
-        writeback_target="github",
     )
 
     monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
@@ -273,26 +251,6 @@ def test_regenerate_outputs_from_latest_report_uses_existing_json(monkeypatch, t
     assert captured["client"] is None
 
 
-def test_main_review_from_latest_regenerates_outputs(monkeypatch, tmp_path, sample_metadata):
-    args = _make_args(username="testuser", review_from_latest=True)
-    report_path = tmp_path / "audit-report-testuser-2026-03-29.json"
-    report_path.write_text("{}")
-    report_data = _make_report_dict(sample_metadata)
-    captured: dict[str, object] = {}
-
-    monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
-    monkeypatch.setattr(cli, "_load_latest_report", lambda _output_dir: (report_path, report_data))
-    monkeypatch.setattr(
-        cli,
-        "_regenerate_outputs_from_latest_report",
-        lambda *a, **k: captured.update({"args": a, "kwargs": k}),
-    )
-
-    cli.main()
-
-    assert captured["kwargs"]["existing_report_path"] == report_path
-
-
 def test_write_report_outputs_forwards_analyst_view_args(monkeypatch, tmp_path, sample_metadata):
     args = _make_args(
         username="testuser",
@@ -375,30 +333,3 @@ def test_analyze_repos_forwards_security_flags_to_scorer(monkeypatch, sample_met
 
     assert captured[0]["scorecard_enabled"] is True
     assert captured[0]["security_offline"] is True
-
-
-def test_dry_run_exits_before_analysis_and_writes_no_files(monkeypatch, tmp_path, sample_metadata):
-    """--dry-run should print a summary and return without creating any output files."""
-    args = _make_args(username="testuser", dry_run=True, output_dir=str(tmp_path))
-
-    monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
-    monkeypatch.setattr(cli, "_fetch_repo_metadata", lambda *_: ([sample_metadata], []))
-
-    # Ensure _analyze_repos is never called
-    analyze_called = {"called": False}
-
-    def _fail_if_called(*a, **k):
-        analyze_called["called"] = True
-        return []
-
-    monkeypatch.setattr(cli, "_analyze_repos", _fail_if_called)
-
-    # Stub out the rich table printer so output dir stays clean
-    monkeypatch.setattr(cli, "_print_dry_run_summary", lambda repos, args: None)
-
-    cli.main()
-
-    assert not analyze_called["called"], "_analyze_repos should not be called in dry-run mode"
-    # No output files should have been written
-    output_files = list(tmp_path.iterdir())
-    assert output_files == [], f"Unexpected output files: {output_files}"

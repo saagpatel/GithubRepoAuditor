@@ -242,39 +242,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum managed actions to include in a campaign run (default: 20)",
     )
     parser.add_argument(
-        "--campaign-sync-mode",
-        choices=["reconcile", "append-only", "close-missing"],
-        default="reconcile",
-        help="How campaign apply should reconcile missing managed state (default: reconcile)",
-    )
-    parser.add_argument(
-        "--campaign-rollback",
-        type=str,
-        default=None,
-        metavar="RUN_ID",
-        help="Preview or apply rollback for a prior managed campaign run",
-    )
-    parser.add_argument(
-        "--governance-approve",
-        type=str,
-        default=None,
-        metavar="RUN_ID",
-        help="Approve one prior security-review campaign run for governed control activation",
-    )
-    parser.add_argument(
-        "--governance-apply",
-        type=str,
-        default=None,
-        metavar="RUN_ID",
-        help="Apply governed security controls for one previously approved campaign run",
-    )
-    parser.add_argument(
-        "--governance-scope",
-        choices=["all", "codeql", "secret-scanning", "push-protection", "code-security"],
-        default="all",
-        help="Limit governed security activation to one control family (default: all)",
-    )
-    parser.add_argument(
         "--auto-archive",
         action="store_true",
         help="Generate archive candidate report for consistently low-scoring repos",
@@ -295,48 +262,42 @@ def build_parser() -> argparse.ArgumentParser:
         help="Re-run audit on interval (use with --watch-interval)",
     )
     parser.add_argument(
-        "--watch-strategy",
-        choices=["adaptive", "incremental", "full"],
-        default="adaptive",
-        help="Choose how watch mode selects each run shape (default: adaptive)",
-    )
-    parser.add_argument(
         "--watch-interval",
         type=int,
         default=3600,
         help="Seconds between watch runs (default: 3600)",
     )
     parser.add_argument(
-        "--review-materiality",
-        choices=["low", "standard", "high"],
-        default="standard",
-        help="Threshold used for recurring-review alerts (default: standard)",
-    )
-    parser.add_argument(
-        "--review-sync",
-        choices=["local", "mixed"],
-        default=None,
-        help="Mirror recurring review state locally only or into Notion when configured",
-    )
-    parser.add_argument(
-        "--review-from-latest",
+        "--create-issues",
         action="store_true",
-        help="Generate a recurring review bundle from the latest report without running a new audit",
+        help="Create GitHub issues for high-priority action items",
     )
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Show what would be audited without cloning or writing any files",
+        help="Preview repos that would be audited without cloning or analyzing",
     )
     parser.add_argument(
         "--summary",
         action="store_true",
-        help="Print a colored terminal summary of diff changes (requires --diff or a previous report)",
+        help="Print a Rich diff summary to stderr after audit (requires a previous report)",
     )
     parser.add_argument(
-        "--create-issues",
+        "--analyzers-dir",
+        type=str,
+        default=None,
+        metavar="DIR",
+        help="Directory containing custom analyzer .py files to load and run",
+    )
+    parser.add_argument(
+        "--resume",
         action="store_true",
-        help="Create GitHub Issues from quick win actions (requires --token)",
+        help="Resume a partial audit run from saved progress",
+    )
+    parser.add_argument(
+        "--vuln-check",
+        action="store_true",
+        help="Query OSV.dev for known vulnerabilities in repo dependencies",
     )
     return parser
 
@@ -531,7 +492,7 @@ def _report_from_dict(data: dict) -> AuditReport:
         scoring_profile=data.get("scoring_profile", "default"),
         run_mode=data.get("run_mode", "full"),
         portfolio_baseline_size=data.get("portfolio_baseline_size", len(data.get("audits", []))),
-        schema_version=data.get("schema_version", "3.4"),
+        schema_version=data.get("schema_version", "3.2"),
         lenses=data.get("lenses", {}),
         hotspots=data.get("hotspots", []),
         security_posture=data.get("security_posture", {}),
@@ -541,24 +502,8 @@ def _report_from_dict(data: dict) -> AuditReport:
         scenario_summary=data.get("scenario_summary", {}),
         action_backlog=data.get("action_backlog", []),
         campaign_summary=data.get("campaign_summary", {}),
-        campaign_lifecycle_summary=data.get("campaign_lifecycle_summary", {}),
-        rollup_status=data.get("rollup_status", {}),
         writeback_preview=data.get("writeback_preview", {}),
         writeback_results=data.get("writeback_results", {}),
-        rollback_preview=data.get("rollback_preview", {}),
-        managed_state_drift=data.get("managed_state_drift", []),
-        campaign_history=data.get("campaign_history", []),
-        governance_preview=data.get("governance_preview", {}),
-        governance_approval=data.get("governance_approval", {}),
-        governance_results=data.get("governance_results", {}),
-        governance_history=data.get("governance_history", []),
-        governance_drift=data.get("governance_drift", []),
-        review_summary=data.get("review_summary", {}),
-        review_alerts=data.get("review_alerts", []),
-        material_changes=data.get("material_changes", []),
-        review_targets=data.get("review_targets", []),
-        review_history=data.get("review_history", []),
-        watch_state=data.get("watch_state", {}),
         action_runs=data.get("action_runs", []),
         external_refs=data.get("external_refs", {}),
         reconciliation=reconciliation,
@@ -612,46 +557,6 @@ def _print_filter_summary(all_repos: list[RepoMetadata], repos: list[RepoMetadat
         print_info(f"Filtered out {skipped} repos ({', '.join(parts) or 'forks/archived'})")
 
 
-def _print_dry_run_summary(repos: list[RepoMetadata], args) -> None:
-    """Print a rich table of repos that would be audited, then exit."""
-    from datetime import datetime, timezone
-
-    from rich.console import Console
-    from rich.table import Table
-
-    console = Console(stderr=True)
-
-    table = Table(title=f"Dry Run: repos that would be audited for {args.username}", show_lines=False)
-    table.add_column("Name", style="bold")
-    table.add_column("Language")
-    table.add_column("Size (KB)", justify="right")
-    table.add_column("Days Since Push", justify="right")
-    table.add_column("Stars", justify="right")
-
-    now = datetime.now(timezone.utc)
-    total_kb = 0
-    for repo in repos:
-        pushed_at = repo.pushed_at
-        if pushed_at:
-            days_since = (now - pushed_at).days
-        else:
-            days_since = -1
-        total_kb += repo.size_kb
-        table.add_row(
-            repo.name,
-            repo.language or "",
-            str(repo.size_kb),
-            str(days_since) if days_since >= 0 else "?",
-            str(repo.stars),
-        )
-
-    console.print(table)
-    est_mb = total_kb / 1024
-    console.print(
-        f"\n[bold]{len(repos)} repos would be audited, est. {est_mb:.1f} MB to clone[/bold]"
-    )
-
-
 def _compute_portfolio_lang_freq(repos: list[RepoMetadata]) -> dict[str, float]:
     lang_counts = Counter(repo.language for repo in repos if repo.language)
     return {lang: count / len(repos) for lang, count in lang_counts.items()} if repos else {}
@@ -682,9 +587,17 @@ def _analyze_repos(
     portfolio_lang_freq: dict[str, float],
     custom_weights: dict[str, float] | None,
 ) -> list[RepoAudit]:
+    from src.analyzers import load_custom_analyzers
+
     if args.skip_clone:
         print_warning("Audit modes that score repos do not support --skip-clone.")
         return []
+
+    extra_analyzers = []
+    if getattr(args, "analyzers_dir", None):
+        extra_analyzers = load_custom_analyzers(Path(args.analyzers_dir))
+        if extra_analyzers:
+            print_info(f"Loaded {len(extra_analyzers)} custom analyzer(s) from {args.analyzers_dir}")
 
     audits: list[RepoAudit] = []
     progress = create_progress()
@@ -704,7 +617,7 @@ def _analyze_repos(
                         progress.advance(task)
                         continue
                     progress.update(task, description=f"Analyzing {repo_meta.name}")
-                    results = run_all_analyzers(repo_path, repo_meta, client)
+                    results = run_all_analyzers(repo_path, repo_meta, client, extra_analyzers=extra_analyzers)
                     audit = score_repo(
                         repo_meta,
                         results,
@@ -724,7 +637,7 @@ def _analyze_repos(
                 if not repo_path:
                     continue
                 print(f"  [{index}/{len(repos)}] Analyzing {repo_meta.name}...", file=sys.stderr)
-                results = run_all_analyzers(repo_path, repo_meta, client)
+                results = run_all_analyzers(repo_path, repo_meta, client, extra_analyzers=extra_analyzers)
                 audit = score_repo(
                     repo_meta,
                     results,
@@ -778,161 +691,47 @@ def _apply_requested_reconciliation(report: AuditReport, args, audits: list[Repo
             )
 
 
-def _apply_ops_writeback(report: AuditReport, args, client: GitHubClient | None, output_dir: Path) -> None:
-    campaign_type = getattr(args, "campaign", None)
-    campaign_rollback = getattr(args, "campaign_rollback", None)
-    if not campaign_type and not campaign_rollback:
+def _apply_ops_writeback(report: AuditReport, args, client: GitHubClient | None) -> None:
+    if not args.campaign:
         return
 
     from src.ops_writeback import (
-        apply_github_rollback,
         apply_github_writeback,
         build_action_runs,
+        build_campaign_bundle,
         build_campaign_run,
-        build_rollback_preview,
         build_writeback_preview,
-        prepare_campaign_operation,
         summarize_writeback_results,
     )
-    from src.notion_sync import rollback_campaign_actions, sync_campaign_actions
-    from src.warehouse import load_campaign_history, load_campaign_run
+    from src.notion_sync import sync_campaign_actions
 
-    if campaign_rollback:
-        source_run = load_campaign_run(output_dir, campaign_rollback)
-        if not source_run:
-            print_warning(f"Campaign rollback source not found: {campaign_rollback}")
-            return
-        report.campaign_summary = {
-            "campaign_type": source_run.get("campaign_type", ""),
-            "label": source_run.get("label", ""),
-            "collection_name": source_run.get("collection_name"),
-            "portfolio_profile": source_run.get("portfolio_profile", "default"),
-            "sync_mode": "rollback",
-            "action_count": len(source_run.get("action_runs", [])),
-            "repo_count": len({row.get("repo_id", "") for row in source_run.get("action_runs", [])}),
-        }
-        report.campaign_history = load_campaign_history(output_dir, campaign_type=source_run.get("campaign_type"), limit=10)
-        report.rollback_preview = build_rollback_preview(source_run, writeback_target=args.writeback_target)
-        report.rollup_status = {
-            "safe_to_apply": True,
-            "needs_human_review": False,
-            "what_changed": {"rollback_items": report.rollback_preview.get("item_count", 0)},
-        }
-        results: list[dict] = []
-        drift_events: list[dict] = []
-        external_refs: dict[str, dict] = {}
-        if args.writeback_apply and args.writeback_target:
-            if args.writeback_target in {"github", "all"} and client is not None:
-                github_results, github_drifts = apply_github_rollback(client, source_run)
-                results.extend(github_results)
-                drift_events.extend(github_drifts)
-            if args.writeback_target in {"notion", "all"}:
-                notion_results, notion_refs = rollback_campaign_actions(
-                    source_run,
-                    config_dir=Path("config"),
-                    apply=True,
-                )
-                results.extend(notion_results)
-                external_refs.update(notion_refs)
-        report.writeback_results = summarize_writeback_results(
-            results,
-            args.writeback_target or source_run.get("writeback_target"),
-            args.writeback_apply,
-            drift_events=drift_events,
-        )
-        report.writeback_results["rollback_run"] = {
-            "rollback_run_id": f"{report.username}:{report.generated_at.isoformat()}:rollback",
-            "source_run_id": source_run.get("run_id"),
-            "generated_at": report.generated_at.isoformat(),
-            "writeback_target": args.writeback_target or source_run.get("writeback_target", "preview-only"),
-            "mode": "apply" if args.writeback_apply else "preview",
-        }
-        report.action_runs = [
-            {
-                "action_id": row.get("action_id", ""),
-                "repo_full_name": row.get("repo_id", ""),
-                "campaign_type": row.get("campaign_type", source_run.get("campaign_type", "")),
-                "target": row.get("target", args.writeback_target or "preview-only"),
-                "status": "rolled_back" if args.writeback_apply else "preview",
-                "lifecycle_state": "rolled_back" if args.writeback_apply else row.get("lifecycle_state", "planned"),
-                "managed_target_state": "rollback",
-                "rollback_available": False,
-            }
-            for row in source_run.get("action_runs", [])
-        ]
-        report.external_refs = external_refs
-        report.managed_state_drift = drift_events
-        report.campaign_lifecycle_summary = {
-            "open_actions": 0,
-            "closed_this_run": 0,
-            "drift_count": len(drift_events),
-            "rollback_ready": 0,
-            "history_runs": len(report.campaign_history),
-        }
-        return
-
-    campaign_summary, actions, closures, drifts, history = prepare_campaign_operation(
+    campaign_summary, actions = build_campaign_bundle(
         report.to_dict(),
-        output_dir=output_dir,
-        campaign_type=campaign_type,
+        campaign_type=args.campaign,
         portfolio_profile=args.portfolio_profile,
         collection_name=args.collection,
         max_actions=args.max_actions,
         writeback_target=args.writeback_target,
-        sync_mode=args.campaign_sync_mode,
     )
     report.campaign_summary = campaign_summary
-    report.campaign_history = history
-    report.managed_state_drift = drifts
-    report.campaign_lifecycle_summary = {
-        "open_actions": len(actions),
-        "closed_this_run": len(closures),
-        "drift_count": len(drifts),
-        "rollback_ready": sum(1 for action in actions if action.get("rollback_available")),
-        "history_runs": len(history),
-    }
-    report.rollup_status = {
-        "safe_to_apply": len(drifts) == 0,
-        "needs_human_review": len(drifts) > 0,
-        "what_changed": {
-            "opened": len(actions),
-            "closed": len(closures),
-            "drifted": len(drifts),
-        },
-    }
     report.writeback_preview = build_writeback_preview(
         campaign_summary,
         actions,
         writeback_target=args.writeback_target,
         apply=args.writeback_apply,
-        closures=closures,
-        drifts=drifts,
     )
 
     results: list[dict] = []
     external_refs: dict[str, dict] = {}
-    drift_events: list[dict] = list(drifts)
     if args.writeback_apply and args.writeback_target:
         if args.writeback_target in {"github", "all"} and client is not None:
-            from src.warehouse import load_latest_campaign_context
-
-            prior_context = load_latest_campaign_context(output_dir, campaign_type)
-            github_results, github_refs, github_drifts = apply_github_writeback(
-                client,
-                actions,
-                prior_context=prior_context,
-                sync_mode=args.campaign_sync_mode,
-                apply=True,
-            )
+            github_results, github_refs = apply_github_writeback(client, actions)
             results.extend(github_results)
             external_refs.update(github_refs)
-            drift_events.extend(github_drifts)
         if args.writeback_target in {"notion", "all"}:
             notion_results, notion_refs = sync_campaign_actions(
                 actions,
                 campaign_summary,
-                prior_context=load_latest_campaign_context(output_dir, campaign_type),
-                sync_mode=args.campaign_sync_mode,
                 config_dir=Path("config"),
                 apply=True,
             )
@@ -943,7 +742,6 @@ def _apply_ops_writeback(report: AuditReport, args, client: GitHubClient | None,
         results,
         args.writeback_target,
         args.writeback_apply,
-        drift_events=drift_events,
     )
     report.writeback_results["campaign_run"] = build_campaign_run(
         campaign_summary,
@@ -951,174 +749,13 @@ def _apply_ops_writeback(report: AuditReport, args, client: GitHubClient | None,
         writeback_target=args.writeback_target,
         apply=args.writeback_apply,
     )
-    report.rollback_preview = {
-        "available": any(action.get("rollback_available") for action in actions),
-        "closures": closures,
-    }
     report.action_runs = build_action_runs(
         actions,
         results,
         args.writeback_target,
         args.writeback_apply,
-        closures=closures,
     )
     report.external_refs = external_refs
-
-
-def _apply_governance(report: AuditReport, args, client: GitHubClient | None, output_dir: Path) -> None:
-    if not getattr(args, "governance_approve", None) and not getattr(args, "governance_apply", None):
-        if report.campaign_summary.get("campaign_type") == "security-review":
-            from src.governance_activation import build_governance_actions
-            from src.warehouse import load_campaign_run
-
-            source_run = None
-            campaign_run = report.writeback_results.get("campaign_run", {}) if isinstance(report.writeback_results, dict) else {}
-            if campaign_run.get("generated_at"):
-                run_id = f"{report.username}:{report.generated_at.isoformat()}"
-                source_run = load_campaign_run(output_dir, run_id) or {
-                    "run_id": run_id,
-                    "campaign_type": "security-review",
-                    "action_runs": report.action_runs,
-                }
-            if source_run:
-                report.governance_preview = build_governance_actions(report.to_dict(), source_run, scope=args.governance_scope)
-        return
-
-    from src.governance_activation import (
-        apply_governance_actions,
-        build_governance_actions,
-        build_governance_approval,
-        load_report_data_for_run,
-        populate_report_with_governance_context,
-    )
-    from src.warehouse import load_campaign_run
-
-    source_run_id = getattr(args, "governance_approve", None) or getattr(args, "governance_apply", None)
-    if not source_run_id:
-        return
-    source_run = load_campaign_run(output_dir, source_run_id)
-    if not source_run:
-        print_warning(f"Governance source run not found: {source_run_id}")
-        return
-    if source_run.get("campaign_type") != "security-review":
-        print_warning("Governed security activation is only supported for security-review campaign runs.")
-        return
-    source_report_data = load_report_data_for_run(output_dir, source_run_id)
-    if source_report_data is None:
-        print_warning(f"Source report for governance run not found: {source_run_id}")
-        return
-
-    governance_preview = build_governance_actions(source_report_data, source_run, scope=args.governance_scope)
-    report.governance_preview = governance_preview
-    populate_report_with_governance_context(report, output_dir=output_dir, source_run_id=source_run_id)
-
-    if getattr(args, "governance_approve", None):
-        report.governance_approval = build_governance_approval(source_run, governance_preview, scope=args.governance_scope)
-        return
-
-    approval = report.governance_approval
-    if not approval:
-        print_warning("Governance apply requires a prior approval for this source run.")
-        report.governance_results = {
-            "source_run_id": source_run_id,
-            "scope": args.governance_scope,
-            "mode": "apply",
-            "results": [],
-            "counts": {"applied": 0, "skipped": 0, "failed": 1, "drifted": 0},
-            "error": "missing-approval",
-        }
-        return
-    from src.governance_activation import SCOPE_TO_KEYS
-
-    approved_scope = approval.get("scope", "all")
-    approved_keys = SCOPE_TO_KEYS.get(approved_scope, set())
-    requested_keys = SCOPE_TO_KEYS.get(args.governance_scope, set())
-    if not requested_keys.issubset(approved_keys):
-        print_warning("Governance apply scope is broader than the approved scope.")
-        report.governance_results = {
-            "source_run_id": source_run_id,
-            "scope": args.governance_scope,
-            "mode": "apply",
-            "results": [],
-            "counts": {"applied": 0, "skipped": 0, "failed": 1, "drifted": 0},
-            "error": "scope-broader-than-approval",
-        }
-        return
-    if approval.get("fingerprint") != governance_preview.get("fingerprint"):
-        print_warning("Governance apply is blocked because the approved action set no longer matches the current preview.")
-        report.governance_results = {
-            "source_run_id": source_run_id,
-            "scope": args.governance_scope,
-            "mode": "apply",
-            "results": [],
-            "counts": {"applied": 0, "skipped": 0, "failed": 1, "drifted": 0},
-            "error": "approval-fingerprint-mismatch",
-        }
-        return
-    if client is None:
-        print_warning("Governance apply requires a GitHub client with API access.")
-        return
-
-    governance_results, governance_drift = apply_governance_actions(
-        client,
-        governance_preview,
-        approval,
-        scope=args.governance_scope,
-    )
-    governance_results["run_id"] = f"{report.username}:{report.generated_at.isoformat()}:governance"
-    report.governance_results = governance_results
-    report.governance_drift = governance_drift
-
-
-def _resolve_review_sync(args) -> str:
-    if getattr(args, "review_sync", None):
-        return args.review_sync
-    from src.notion_client import load_notion_config
-
-    config_path = Path("config") / "notion-config.json"
-    if not config_path.is_file():
-        return "local"
-    config = load_notion_config(Path("config"))
-    return "mixed" if config else "local"
-
-
-def _apply_recurring_review(
-    report: AuditReport,
-    args,
-    output_dir: Path,
-    *,
-    diff_data: dict | None,
-) -> None:
-    from src.recurring_review import build_review_bundle
-
-    should_build = bool(getattr(args, "watch", False) or getattr(args, "review_pack", False) or getattr(args, "review_from_latest", False))
-    if not should_build:
-        return
-
-    review_sync = _resolve_review_sync(args)
-    watch_state = {
-        "strategy": getattr(args, "watch_strategy", "manual") if getattr(args, "watch", False) else "manual",
-        "planned_mode": report.run_mode,
-        "review_sync": review_sync,
-        "filter_signature": getattr(args, "_watch_filter_signature", ""),
-        "reason": getattr(args, "_watch_reason", "manual-review") if getattr(args, "watch", False) else "manual-review",
-    }
-    bundle = build_review_bundle(
-        report.to_dict(),
-        output_dir=output_dir,
-        diff_data=diff_data,
-        materiality=getattr(args, "review_materiality", "standard"),
-        portfolio_profile=args.portfolio_profile,
-        collection_name=args.collection,
-        watch_state=watch_state,
-        emit_when_quiet=bool(getattr(args, "review_from_latest", False) or getattr(args, "review_pack", False)),
-    )
-    report.review_summary = bundle["review_summary"]
-    report.review_alerts = bundle["review_alerts"]
-    report.material_changes = bundle["material_changes"]
-    report.review_targets = bundle["review_targets"]
-    report.review_history = bundle["review_history"]
-    report.watch_state = bundle["watch_state"]
 
 
 # ── Report output orchestration ───────────────────────────────────────
@@ -1135,7 +772,7 @@ def _write_report_outputs(
     save_fingerprint_data: bool = True,
     diff_source: Path | None = None,
 ) -> dict[str, object]:
-    from src.diff import diff_reports, format_diff_markdown, print_diff_summary
+    from src.diff import diff_reports, format_diff_markdown
     from src.excel_export import export_excel
     from src.history import (
         archive_report,
@@ -1146,8 +783,8 @@ def _write_report_outputs(
     )
     from src.warehouse import write_warehouse_snapshot
 
-    _apply_ops_writeback(report, args, client, output_dir)
-    _apply_governance(report, args, client, output_dir)
+    _apply_ops_writeback(report, args, client)
+    report_data = report.to_dict()
     if write_json:
         json_path = write_json_report(report, output_dir)
     elif json_path is None:
@@ -1173,13 +810,6 @@ def _write_report_outputs(
             f"Diff: {len(diff.tier_changes)} tier changes, "
             f"{len([c for c in diff.score_changes if abs(c['delta']) > 0.05])} significant score changes"
         )
-        if getattr(args, "summary", False):
-            print_diff_summary(diff)
-
-    _apply_recurring_review(report, args, output_dir, diff_data=diff_dict)
-    report_data = report.to_dict()
-    if write_json:
-        json_path = write_json_report(report, output_dir)
 
     trend_data = load_trend_data()
     score_history = load_repo_score_history()
@@ -1224,7 +854,6 @@ def _write_report_outputs(
             create_recommendation_run,
             patch_project_completeness_cards,
             patch_weekly_review,
-            sync_recurring_review,
             sync_notion_events,
         )
 
@@ -1254,18 +883,6 @@ def _write_report_outputs(
                 )
                 check_recommendation_followup(report_data, sync_token, sync_config)
                 create_notion_dashboard(report_data, sync_token, sync_config)
-
-    if report.review_summary and _resolve_review_sync(args) == "mixed":
-        from src.notion_client import get_notion_token, load_notion_config
-        from src.notion_sync import sync_recurring_review
-
-        sync_token = get_notion_token()
-        sync_config = load_notion_config(Path("config"))
-        if sync_token and sync_config:
-            review_sync_result = sync_recurring_review(report_data, config_dir=Path("config"))
-            notion_info += f"\n    recurring-review: {review_sync_result.get('status', 'unknown')}"
-        else:
-            notion_info += "\n    recurring-review: skipped (notion unavailable)"
 
     readme_info = ""
     if args.portfolio_readme:
@@ -1324,6 +941,16 @@ def _write_report_outputs(
         if candidates:
             archive_result = export_archive_report(candidates, report.username, output_dir)
             print_info(f"Archive candidates: {archive_result['count']} repos → {archive_result['report_path']}")
+
+    if getattr(args, "vuln_check", False):
+        from src.vuln_check import check_vulnerabilities, format_vuln_summary
+
+        vulns = check_vulnerabilities(report_data.get("audits", []), cache=cache)
+        print_info(format_vuln_summary(vulns))
+        if vulns:
+            vuln_path = output_dir / f"vuln-report-{report.username}-{_date_str(report.generated_at)}.json"
+            vuln_path.write_text(json.dumps(vulns, indent=2, default=str))
+            print_info(f"Vulnerability report: {vuln_path}")
 
     if args.narrative:
         from src.narrative import generate_narrative
@@ -1492,12 +1119,7 @@ def _regenerate_outputs_from_latest_report(
     existing_report_data: dict,
 ) -> None:
     report = _report_from_dict(existing_report_data)
-    needs_fresh_json = bool(
-        args.campaign
-        or getattr(args, "governance_approve", None)
-        or getattr(args, "governance_apply", None)
-        or getattr(args, "review_from_latest", False)
-    )
+    needs_fresh_json = bool(args.campaign)
     outputs = _write_report_outputs(
         report,
         args,
@@ -1585,22 +1207,18 @@ def _run_incremental_audit(
         )
         return
 
-    original_repos = args.repos
     args.repos = needs_audit
-    try:
-        _run_targeted_audit(
-            args,
-            client,
-            output_dir,
-            all_repos=all_repos,
-            errors=errors,
-            custom_weights=custom_weights,
-            scoring_profile_name=scoring_profile_name,
-            existing_report_path=existing_report_path,
-            existing_report_data=existing_report_data,
-        )
-    finally:
-        args.repos = original_repos
+    _run_targeted_audit(
+        args,
+        client,
+        output_dir,
+        all_repos=all_repos,
+        errors=errors,
+        custom_weights=custom_weights,
+        scoring_profile_name=scoring_profile_name,
+        existing_report_path=existing_report_path,
+        existing_report_data=existing_report_data,
+    )
 
 
 # ── Scoring profile loader ─────────────────────────────────────────────
@@ -1616,6 +1234,51 @@ def _load_scoring_profile(profile_name: str | None) -> tuple[dict[str, float] | 
 
     print_warning(f"Scoring profile not found: {profile_path}")
     return None, normalized
+
+
+# ── Dry-run preview ───────────────────────────────────────────────────
+def _print_dry_run_summary(repos: list[RepoMetadata]) -> None:
+    """Print a Rich table of repos that would be audited, then return."""
+    from datetime import timezone
+
+    try:
+        from rich.console import Console
+        from rich.table import Table
+    except ImportError:
+        print(f"[dry-run] {len(repos)} repos would be audited", file=sys.stderr)
+        for r in repos:
+            print(f"  {r.name}", file=sys.stderr)
+        return
+
+    console = Console(stderr=True)
+    table = Table(title=f"[dry-run] {len(repos)} repos would be audited", show_lines=False)
+    table.add_column("Name")
+    table.add_column("Language")
+    table.add_column("Size (KB)", justify="right")
+    table.add_column("Stars", justify="right")
+    table.add_column("Days Since Push", justify="right")
+
+    now = datetime.now(timezone.utc)
+    total_kb = 0
+    for r in repos:
+        days = ""
+        if r.pushed_at:
+            pushed = r.pushed_at
+            if pushed.tzinfo is None:
+                pushed = pushed.replace(tzinfo=timezone.utc)
+            days = str((now - pushed).days)
+        total_kb += r.size_kb or 0
+        table.add_row(
+            r.name,
+            r.language or "",
+            str(r.size_kb or 0),
+            str(r.stars or 0),
+            days,
+        )
+
+    console.print(table)
+    est_mb = total_kb / 1024
+    console.print(f"[dim]{len(repos)} repos would be audited, est {est_mb:.1f} MB[/dim]")
 
 
 # ── Main entry point ──────────────────────────────────────────────────
@@ -1641,44 +1304,10 @@ def main() -> None:
         args.notion = True
     if args.writeback_apply and not args.writeback_target:
         parser.error("--writeback-apply requires --writeback-target")
-    if args.campaign and getattr(args, "campaign_rollback", None):
-        parser.error("--campaign and --campaign-rollback cannot be used together")
-    if args.writeback_target and not (args.campaign or getattr(args, "campaign_rollback", None)):
-        parser.error("--writeback-target requires --campaign or --campaign-rollback")
-    if getattr(args, "governance_approve", None) and getattr(args, "governance_apply", None):
-        parser.error("--governance-approve and --governance-apply cannot be used together")
-    if (getattr(args, "governance_approve", None) or getattr(args, "governance_apply", None)) and args.campaign:
-        parser.error("--governance-approve/--governance-apply cannot be combined with --campaign")
-    if args.review_from_latest and (args.repos or args.incremental or args.campaign or getattr(args, "campaign_rollback", None)):
-        parser.error("--review-from-latest cannot be combined with repo selection, incremental, or campaign flags")
-    if args.review_from_latest and args.watch:
-        parser.error("--review-from-latest cannot be combined with --watch")
-    if args.watch and (
-        args.campaign
-        or getattr(args, "campaign_rollback", None)
-        or args.writeback_target
-        or args.writeback_apply
-        or getattr(args, "governance_approve", None)
-        or getattr(args, "governance_apply", None)
-    ):
-        parser.error("--watch is recurring-review only and cannot be combined with campaign/governance apply flows")
+    if args.writeback_target and not args.campaign:
+        parser.error("--writeback-target requires --campaign")
 
     custom_weights, scoring_profile_name = _load_scoring_profile(args.scoring_profile)
-
-    if args.review_from_latest:
-        output_dir = Path(args.output_dir)
-        existing_report_path, existing_report_data = _load_latest_report(output_dir)
-        if not existing_report_path or not existing_report_data:
-            print_warning("No previous audit report found. Run an audit first.")
-            return
-        _regenerate_outputs_from_latest_report(
-            args,
-            output_dir,
-            client=None,
-            existing_report_path=existing_report_path,
-            existing_report_data=existing_report_data,
-        )
-        return
 
     def _run_once() -> None:
         if not args.token:
@@ -1701,43 +1330,25 @@ def main() -> None:
         )
         _print_filter_summary(all_repos, repos, args)
 
+        # Dry-run: preview repos and exit early
         if getattr(args, "dry_run", False):
-            _print_dry_run_summary(repos, args)
+            _print_dry_run_summary(repos)
             return
-
-        run_repos = args.repos
-        run_incremental = args.incremental
-        if args.watch:
-            from src.recurring_review import choose_watch_plan
-
-            plan = choose_watch_plan(output_dir, args, scoring_profile=scoring_profile_name)
-            args._watch_reason = plan.reason
-            args._watch_filter_signature = plan.filter_signature
-            args._watch_review_sync = _resolve_review_sync(args)
-            run_incremental = plan.mode == "incremental"
-            if plan.mode == "full":
-                run_repos = None
-            print_info(f"Watch planner: {plan.mode} ({plan.reason})")
 
         # Dispatch to partial run mode if requested
-        if run_repos:
-            original_repos = args.repos
-            args.repos = run_repos
-            try:
-                _run_targeted_audit(
-                    args,
-                    client,
-                    output_dir,
-                    all_repos=all_repos,
-                    errors=errors,
-                    custom_weights=custom_weights,
-                    scoring_profile_name=scoring_profile_name,
-                )
-            finally:
-                args.repos = original_repos
+        if args.repos:
+            _run_targeted_audit(
+                args,
+                client,
+                output_dir,
+                all_repos=all_repos,
+                errors=errors,
+                custom_weights=custom_weights,
+                scoring_profile_name=scoring_profile_name,
+            )
             return
 
-        if run_incremental:
+        if args.incremental:
             _run_incremental_audit(
                 args,
                 client,
@@ -1749,6 +1360,25 @@ def main() -> None:
             )
             return
 
+        # Resume: load previously completed audits and skip re-analyzing them
+        resumed_names: set[str] = set()
+        resumed_audits: list[RepoAudit] = []
+        if getattr(args, "resume", False):
+            from src.progress import load_progress
+
+            saved = load_progress(output_dir)
+            if saved:
+                completed_dicts, _run_meta = saved
+                for audit_dict in completed_dicts:
+                    try:
+                        resumed_audits.append(_audit_from_dict(audit_dict))
+                        resumed_names.add(audit_dict.get("metadata", {}).get("name", ""))
+                    except Exception:
+                        pass
+                if resumed_audits:
+                    print_info(f"Resumed {len(resumed_audits)} previously completed repo(s)")
+                    repos = [r for r in repos if r.name not in resumed_names]
+
         audits = _analyze_repos(
             repos,
             args=args,
@@ -1756,9 +1386,11 @@ def main() -> None:
             portfolio_lang_freq=_compute_portfolio_lang_freq(repos),
             custom_weights=custom_weights,
         )
+        all_audits = resumed_audits + audits
 
         # Full audit path: score every repo and write all output formats
-        if audits:
+        if all_audits:
+            audits = all_audits
             report = AuditReport.from_audits(
                 args.username,
                 audits,
@@ -1771,6 +1403,37 @@ def main() -> None:
             _apply_requested_reconciliation(report, args, audits)
             outputs = _write_report_outputs(report, args, output_dir, client=client, cache=cache)
             _print_output_summary(f"Audited {report.repos_audited} repos for {report.username}", report, outputs)
+
+            if getattr(args, "create_issues", False):
+                from src.issue_creator import create_audit_issues
+                from src.quick_wins import find_quick_wins
+
+                quick_wins = find_quick_wins(audits)
+                issue_result = create_audit_issues(
+                    quick_wins,
+                    args.username,
+                    client,
+                    dry_run=getattr(args, "dry_run", False),
+                )
+                print_info(
+                    f"Issues: {len(issue_result['created'])} created, "
+                    f"{len(issue_result['skipped'])} skipped (already exist)"
+                )
+
+            if getattr(args, "summary", False) and outputs.get("json_path"):
+                from src.history import find_previous
+                from src.diff import diff_reports, print_diff_summary
+
+                prev_path = find_previous(outputs["json_path"].name)
+                if prev_path:
+                    diff = diff_reports(
+                        prev_path,
+                        outputs["json_path"],
+                        portfolio_profile=args.portfolio_profile,
+                        collection_name=args.collection,
+                    )
+                    print_diff_summary(diff)
+
             return
 
         # Fallback: --skip-clone was used, write raw metadata only
