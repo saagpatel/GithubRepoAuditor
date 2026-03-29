@@ -133,6 +133,21 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Upload badge JSON to GitHub Gist for endpoint badges (implies --badges)",
     )
+    parser.add_argument(
+        "--notion",
+        action="store_true",
+        help="Generate Notion audit event JSON (dry-run, no API calls)",
+    )
+    parser.add_argument(
+        "--notion-sync",
+        action="store_true",
+        help="Push audit events to Notion API (implies --notion)",
+    )
+    parser.add_argument(
+        "--portfolio-readme",
+        action="store_true",
+        help="Generate PORTFOLIO.md from audit data",
+    )
     return parser
 
 
@@ -416,6 +431,21 @@ def _run_targeted_audit(args, client, output_dir: Path) -> None:
             if gist_urls:
                 _write_badges_markdown(report.to_dict(), output_dir / "badges", gist_urls)
 
+    notion_info = ""
+    if args.notion:
+        from src.notion_export import export_notion_events
+        notion_result = export_notion_events(report.to_dict(), output_dir)
+        notion_info = f"\n    {notion_result['events_path']} ({notion_result['event_count']} events, {len(notion_result['unmapped'])} unmapped)"
+        if args.notion_sync:
+            from src.notion_sync import sync_notion_events
+            sync_notion_events(notion_result["events_path"], Path("config"))
+
+    readme_info = ""
+    if args.portfolio_readme:
+        from src.portfolio_readme import export_portfolio_readme
+        readme_result = export_portfolio_readme(report.to_dict(), output_dir)
+        readme_info = f"\n    {readme_result['readme_path']}"
+
     print(
         f"\n✓ Targeted audit: {len(new_audits)} new/updated + {len(kept)} existing = {len(all_audits_obj)} total\n"
         f"  Average score: {report.average_score:.2f}\n"
@@ -425,7 +455,7 @@ def _run_targeted_audit(args, client, output_dir: Path) -> None:
         f"    {md_path}\n"
         f"    {excel_path}\n"
         f"    {pcc_path}\n"
-        f"    {raw_path}{badge_info}",
+        f"    {raw_path}{badge_info}{notion_info}{readme_info}",
     )
 
 
@@ -492,6 +522,8 @@ def main() -> None:
 
     if args.upload_badges:
         args.badges = True
+    if args.notion_sync:
+        args.notion = True
 
     if not args.token:
         print_warning(
@@ -680,6 +712,23 @@ def main() -> None:
                 if gist_urls:
                     _write_badges_markdown(report.to_dict(), output_dir / "badges", gist_urls)
 
+        # Notion export
+        notion_info = ""
+        if args.notion:
+            from src.notion_export import export_notion_events
+            notion_result = export_notion_events(report.to_dict(), output_dir)
+            notion_info = f"\n    {notion_result['events_path']} ({notion_result['event_count']} events, {len(notion_result['unmapped'])} unmapped)"
+            if args.notion_sync:
+                from src.notion_sync import sync_notion_events
+                sync_notion_events(notion_result["events_path"], Path("config"))
+
+        # Portfolio README
+        readme_info = ""
+        if args.portfolio_readme:
+            from src.portfolio_readme import export_portfolio_readme
+            readme_result = export_portfolio_readme(report.to_dict(), output_dir)
+            readme_info = f"\n    {readme_result['readme_path']}"
+
         cache_info = ""
         if cache:
             cache_info = f"\n  Cache: {cache.hits} hits, {cache.misses} misses"
@@ -694,7 +743,7 @@ def main() -> None:
             f"    {md_path}\n"
             f"    {excel_path}\n"
             f"    {pcc_path}\n"
-            f"    {raw_path}{badge_info}",
+            f"    {raw_path}{badge_info}{notion_info}{readme_info}",
         )
     else:
         raw_path = _write_json(
