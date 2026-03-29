@@ -15,7 +15,9 @@ from src.notion_client import (
     REQUEST_DELAY,
     get_notion_token,
     load_notion_config,
+    notion_parent_for_collection,
     notion_request,
+    query_notion_collection,
     rich_text_value,
     select_value,
     title_value,
@@ -27,6 +29,8 @@ _rich_text_value = rich_text_value
 _select_value = select_value
 _title_value = title_value
 _load_notion_config = load_notion_config
+_query_notion_collection = query_notion_collection
+_notion_parent_for_collection = notion_parent_for_collection
 
 
 def _extract_audit_data(event: dict) -> dict:
@@ -243,6 +247,151 @@ def sync_notion_events(
         "updated_projects": updated_projects,
         "errors": errors,
     }
+
+
+def _resolve_collection_config(config: dict, stem: str) -> tuple[str | None, bool]:
+    data_source_id = config.get(f"{stem}_data_source_id")
+    if data_source_id:
+        return data_source_id, True
+    database_id = config.get(f"{stem}_db_id")
+    if database_id:
+        return database_id, False
+    return None, False
+
+
+def _query_page_by_rich_text_id(
+    collection_id: str,
+    *,
+    use_data_source: bool,
+    property_name: str,
+    property_value: str,
+    token: str,
+    version: str,
+) -> dict | None:
+    body = {
+        "filter": {
+            "property": property_name,
+            "rich_text": {"equals": property_value},
+        },
+        "page_size": 1,
+    }
+    response = _query_notion_collection(collection_id, token, version, body)
+    if not response or response.status_code != 200:
+        return None
+    results = response.json().get("results", [])
+    return results[0] if results else None
+
+
+def sync_campaign_actions(
+    actions: list[dict],
+    campaign_summary: dict,
+    *,
+    config_dir: Path = Path("config"),
+    apply: bool = False,
+) -> tuple[list[dict], dict[str, dict]]:
+    """Create or update managed Notion action and campaign records."""
+    if not apply:
+        return [], {}
+
+    token = get_notion_token()
+    if not token:
+        return ([{"target": "notion-actions", "status": "skipped", "reason": "no token"}], {})
+
+    config = _load_notion_config(config_dir)
+    if not config:
+        return ([{"target": "notion-actions", "status": "skipped", "reason": "no config"}], {})
+
+    action_collection_id, action_is_data_source = _resolve_collection_config(config, "action_requests")
+    campaign_collection_id, campaign_is_data_source = _resolve_collection_config(config, "campaign_runs")
+    if campaign_collection_id is None:
+        campaign_collection_id, campaign_is_data_source = _resolve_collection_config(config, "recommendation_runs")
+
+    version = config.get("notion_version", DEFAULT_NOTION_VERSION)
+    results: list[dict] = []
+    external_refs: dict[str, dict] = {}
+    project_map = {}
+    try:
+        from src.notion_export import _load_project_map
+
+        project_map = _load_project_map(config_dir)
+    except Exception:
+        project_map = {}
+
+    if action_collection_id:
+        for action in actions:
+            existing = _query_page_by_rich_text_id(
+                action_collection_id,
+                use_data_source=action_is_data_source,
+                property_name="Action ID",
+                property_value=action["action_id"],
+                token=token,
+                version=version,
+            )
+            properties = {
+                "Name": _title_value(action["title"]),
+                "Source Type": _select_value("Audit"),
+                "Status": _select_value("Planned" if apply else "Draft"),
+                "Action ID": _rich_text_value(action["action_id"]),
+                "Campaign": _select_value(action["campaign_type"]),
+            }
+            mapping = project_map.get(action["repo"], {})
+            if mapping.get("localProjectId"):
+                properties["Local Project"] = {"relation": [{"id": mapping["localProjectId"]}]}
+            properties["Summary"] = _rich_text_value(action["body"])
+            body = {"properties": properties}
+
+            if existing:
+                page_id = existing.get("id")
+                response = _notion_request("PATCH", f"/pages/{page_id}", token, version, body)
+                status = "updated" if response and response.status_code == 200 else "failed"
+                url = existing.get("url")
+            else:
+                body["parent"] = _notion_parent_for_collection(action_collection_id, use_data_source=action_is_data_source)
+                response = _notion_request("POST", "/pages", token, version, body)
+                status = "created" if response and response.status_code == 200 else "failed"
+                payload = response.json() if response and response.status_code == 200 else {}
+                page_id = payload.get("id")
+                url = payload.get("url")
+
+            results.append(
+                {
+                    "target": "notion-action",
+                    "action_id": action["action_id"],
+                    "repo_full_name": action["repo_full_name"],
+                    "status": status,
+                    "url": url,
+                }
+            )
+            if url:
+                external_refs[action["action_id"]] = {"notion_action_url": url}
+            time.sleep(REQUEST_DELAY)
+    else:
+        results.append({"target": "notion-action", "status": "skipped", "reason": "no action collection config"})
+
+    if campaign_collection_id:
+        name = f"Campaign Run — {campaign_summary.get('label', campaign_summary.get('campaign_type', 'Campaign'))}"
+        properties = {
+            "Name": _title_value(name),
+            "Run Type": _select_value("Audit"),
+            "Status": _select_value("Succeeded"),
+        }
+        body = {
+            "parent": _notion_parent_for_collection(campaign_collection_id, use_data_source=campaign_is_data_source),
+            "properties": properties,
+        }
+        response = _notion_request("POST", "/pages", token, version, body)
+        payload = response.json() if response and response.status_code == 200 else {}
+        results.append(
+            {
+                "target": "notion-campaign",
+                "status": "created" if response and response.status_code == 200 else "failed",
+                "url": payload.get("url"),
+            }
+        )
+    else:
+        results.append({"target": "notion-campaign", "status": "skipped", "reason": "no campaign collection config"})
+
+    return results, external_refs
 
 
 # ── Recommendation Run ──────────────────────────────────────────────
@@ -636,6 +785,44 @@ def check_recommendation_followup(
         for a in report_data.get("audits", [])
     }
 
-    # For now, report that follow-up tracking is active
-    print("  Recommendation follow-up: checking previous suggestions...", file=sys.stderr)
-    return {"checked": len(results), "note": "Follow-up tracking active"}
+    # Fetch block children from the recommendation run page
+    page_id = results[0]["id"]
+    blocks_resp = _notion_request("GET", f"/blocks/{page_id}/children", token, version)
+    if not blocks_resp or blocks_resp.status_code != 200:
+        print("  Recommendation follow-up: could not fetch page blocks.", file=sys.stderr)
+        return {"checked": 0}
+
+    # Extract text content from all blocks
+    block_text_parts: list[str] = []
+    for block in blocks_resp.json().get("results", []):
+        block_type = block.get("type", "")
+        type_content = block.get(block_type, {})
+        rich_text = type_content.get("rich_text", [])
+        for rt in rich_text:
+            text = rt.get("plain_text") or rt.get("text", {}).get("content", "")
+            if text:
+                block_text_parts.append(text)
+
+    combined_text = " ".join(block_text_parts)
+
+    # Match repo names from block text against current_scores
+    improved: list[str] = []
+    still_open: list[str] = []
+    for repo_name, score in current_scores.items():
+        if not repo_name:
+            continue
+        if repo_name.lower() in combined_text.lower():
+            if score > 0:
+                improved.append(repo_name)
+            else:
+                still_open.append(repo_name)
+
+    matched = len(improved) + len(still_open)
+    summary = f"{len(improved)} of {matched} repos tracked in current audit"
+    print(f"  Recommendation follow-up: {summary}", file=sys.stderr)
+    return {
+        "checked": matched,
+        "improved": improved,
+        "still_open": still_open,
+        "summary": summary,
+    }

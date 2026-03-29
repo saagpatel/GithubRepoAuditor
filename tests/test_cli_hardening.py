@@ -34,6 +34,15 @@ def _make_args(**overrides) -> Namespace:
         "notion_registry": False,
         "html": False,
         "scoring_profile": None,
+        "portfolio_profile": "default",
+        "collection": None,
+        "review_pack": False,
+        "scorecard": False,
+        "security_offline": False,
+        "campaign": None,
+        "writeback_target": None,
+        "writeback_apply": False,
+        "max_actions": 20,
         "auto_archive": False,
         "narrative": False,
     }
@@ -77,6 +86,20 @@ def test_main_rejects_registry_and_notion_registry_together(monkeypatch):
     args = _make_args(
         registry=Path("registry.md"),
         notion_registry=True,
+    )
+
+    monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
+
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+
+    assert exc.value.code == 2
+
+
+def test_main_rejects_writeback_apply_without_target(monkeypatch):
+    args = _make_args(
+        campaign="security-review",
+        writeback_apply=True,
     )
 
     monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
@@ -140,11 +163,12 @@ def test_incremental_noop_regenerates_from_latest_report(monkeypatch, tmp_path, 
 
     calls: list[dict[str, object]] = []
 
-    def _record_regen(args, output_dir, *, existing_report_path, existing_report_data):
+    def _record_regen(args, output_dir, *, client, existing_report_path, existing_report_data):
         calls.append(
             {
                 "args": args,
                 "output_dir": output_dir,
+                "client": client,
                 "existing_report_path": existing_report_path,
                 "existing_report_data": existing_report_data,
             }
@@ -163,6 +187,7 @@ def test_incremental_noop_regenerates_from_latest_report(monkeypatch, tmp_path, 
     )
 
     assert len(calls) == 1
+    assert calls[0]["client"] is not None
     assert calls[0]["existing_report_path"] == report_path
     assert calls[0]["existing_report_data"]["scoring_profile"] == "baseline"
 
@@ -190,11 +215,13 @@ def test_regenerate_outputs_from_latest_report_uses_existing_json(monkeypatch, t
             "excel_path": output_dir / "audit.xlsx",
             "pcc_path": output_dir / "audit-pcc.json",
             "raw_path": output_dir / "raw.json",
+            "warehouse_path": output_dir / "warehouse.db",
             "badge_info": "",
             "notion_info": "",
             "readme_info": "",
             "suggestions_info": "",
             "html_info": "",
+            "review_pack_info": "",
             "cache_info": "",
         }
 
@@ -203,6 +230,7 @@ def test_regenerate_outputs_from_latest_report_uses_existing_json(monkeypatch, t
     cli._regenerate_outputs_from_latest_report(
         args,
         tmp_path / "output",
+        client=None,
         existing_report_path=report_path,
         existing_report_data=report_data,
     )
@@ -212,3 +240,88 @@ def test_regenerate_outputs_from_latest_report_uses_existing_json(monkeypatch, t
     assert captured["save_fingerprint_data"] is False
     assert captured["json_path"] == report_path
     assert captured["report"].scoring_profile == "baseline"
+    assert captured["client"] is None
+
+
+def test_write_report_outputs_forwards_analyst_view_args(monkeypatch, tmp_path, sample_metadata):
+    args = _make_args(
+        username="testuser",
+        html=True,
+        review_pack=True,
+        portfolio_profile="shipping",
+        collection="showcase",
+    )
+    report = cli._report_from_dict(_make_report_dict(sample_metadata))
+    json_path = tmp_path / "audit-report-testuser-2026-03-29.json"
+
+    monkeypatch.setattr(cli, "write_json_report", lambda *_: json_path)
+    monkeypatch.setattr(cli, "write_markdown_report", lambda *a, **k: tmp_path / "audit.md")
+    monkeypatch.setattr(cli, "write_pcc_export", lambda *a, **k: tmp_path / "audit-pcc.json")
+    monkeypatch.setattr(cli, "write_raw_metadata", lambda *a, **k: tmp_path / "raw.json")
+    monkeypatch.setattr("src.history.load_trend_data", lambda: [])
+    monkeypatch.setattr("src.history.load_repo_score_history", lambda: {})
+    monkeypatch.setattr("src.history.find_previous", lambda *_: None)
+    monkeypatch.setattr("src.history.save_fingerprints", lambda *_: None)
+    monkeypatch.setattr("src.history.archive_report", lambda *_: None)
+    monkeypatch.setattr("src.warehouse.write_warehouse_snapshot", lambda *a, **k: tmp_path / "warehouse.db")
+    monkeypatch.setattr("src.excel_export.export_excel", lambda *a, **k: tmp_path / "audit.xlsx")
+
+    html_calls: dict[str, object] = {}
+    review_pack_calls: dict[str, object] = {}
+
+    def _record_html(*_args, **kwargs):
+        html_calls.update(kwargs)
+        return {"html_path": tmp_path / "dashboard.html"}
+
+    def _record_review_pack(*_args, **kwargs):
+        review_pack_calls.update(kwargs)
+        return {"review_pack_path": tmp_path / "review-pack.md"}
+
+    monkeypatch.setattr("src.web_export.export_html_dashboard", _record_html)
+    monkeypatch.setattr("src.review_pack.export_review_pack", _record_review_pack)
+
+    outputs = cli._write_report_outputs(report, args, tmp_path)
+
+    assert html_calls["portfolio_profile"] == "shipping"
+    assert html_calls["collection"] == "showcase"
+    assert review_pack_calls["portfolio_profile"] == "shipping"
+    assert review_pack_calls["collection"] == "showcase"
+    assert outputs["review_pack_info"]
+
+
+def test_analyze_repos_forwards_security_flags_to_scorer(monkeypatch, sample_metadata):
+    args = _make_args(scorecard=True, security_offline=True)
+    captured: list[dict[str, object]] = []
+
+    class _CloneContext:
+        def __enter__(self):
+            return {sample_metadata.name: Path("/tmp/repo")}
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    monkeypatch.setattr(cli, "clone_workspace", lambda *a, **k: _CloneContext())
+    monkeypatch.setattr(cli, "create_progress", lambda: None)
+    monkeypatch.setattr(cli, "run_all_analyzers", lambda *a, **k: [])
+
+    def _record_score_repo(*a, **kwargs):
+        captured.append(kwargs)
+        return RepoAudit(
+            metadata=sample_metadata,
+            analyzer_results=[],
+            overall_score=0.5,
+            completeness_tier="functional",
+        )
+
+    monkeypatch.setattr(cli, "score_repo", _record_score_repo)
+
+    cli._analyze_repos(
+        [sample_metadata],
+        args=args,
+        client=cli.GitHubClient(token=None, cache=None),
+        portfolio_lang_freq={},
+        custom_weights=None,
+    )
+
+    assert captured[0]["scorecard_enabled"] is True
+    assert captured[0]["security_offline"] is True

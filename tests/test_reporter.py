@@ -41,6 +41,10 @@ class TestJsonReport:
         assert data["repos_audited"] == 1
         assert "audits" in data
         assert data["audits"][0]["interest_score"] == 0.45
+        assert data["schema_version"] == "3.2"
+        assert "lenses" in data
+        assert "security_governance_preview" in data
+        assert "campaign_summary" in data
 
     def test_filename_format(self, tmp_path):
         report = _make_report()
@@ -55,6 +59,8 @@ class TestMarkdownReport:
         path = write_markdown_report(report, tmp_path)
         content = path.read_text()
         assert "## Summary" in content
+        assert "### Decision Lenses" in content
+        assert "### Security Overview" in content
         assert "## Functional" in content
         assert "<details>" in content
         assert "Interest" in content  # Interest column in tables
@@ -65,6 +71,54 @@ class TestMarkdownReport:
         content = path.read_text()
         assert "test-repo" in content
         assert "https://github.com/user/test-repo" in content
+
+    def test_includes_compare_summary_when_diff_passed(self, tmp_path):
+        report = _make_report()
+        diff_data = {
+            "average_score_delta": 0.04,
+            "lens_deltas": {"ship_readiness": 0.1},
+            "repo_changes": [{"name": "test-repo", "delta": 0.1, "old_tier": "wip", "new_tier": "functional"}],
+        }
+        path = write_markdown_report(report, tmp_path, diff_data=diff_data)
+        content = path.read_text()
+        assert "Compare Summary" in content
+        assert "ship_readiness" in content
+
+    def test_includes_campaign_and_writeback_sections(self, tmp_path):
+        report = _make_report()
+        report.campaign_summary = {
+            "campaign_type": "promotion-push",
+            "label": "Promotion Push",
+            "action_count": 1,
+            "repo_count": 1,
+        }
+        report.writeback_preview = {
+            "repos": [
+                {
+                    "repo": "test-repo",
+                    "topics": ["ghra-call-promotion-push"],
+                    "issue_title": "[Repo Auditor] Promotion Push",
+                    "notion_action_count": 1,
+                }
+            ]
+        }
+        report.writeback_results = {
+            "mode": "apply",
+            "target": "github",
+            "results": [
+                {
+                    "repo_full_name": "user/test-repo",
+                    "target": "github-issue",
+                    "status": "created",
+                    "url": "https://github.com/user/test-repo/issues/1",
+                }
+            ],
+        }
+        path = write_markdown_report(report, tmp_path)
+        content = path.read_text()
+        assert "Campaign Summary" in content
+        assert "Next Actions" in content
+        assert "Writeback Results" in content
 
 
 class TestPccExport:

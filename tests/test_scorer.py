@@ -151,3 +151,45 @@ class TestPortfolioNovelty:
         audit = score_repo(meta, results, portfolio_lang_freq=freq)
         # Python is not in NOVEL_LANGUAGES — no adjustment
         assert audit.interest_score == 0.40
+
+
+class TestNextPhaseSignals:
+    def test_populates_lenses_actions_hotspots_and_security_posture(self):
+        results = _make_results({dim: 0.55 for dim in WEIGHTS})
+        results.append(
+            AnalyzerResult(
+                dimension="security",
+                score=0.35,
+                max_score=1.0,
+                findings=["No SECURITY.md", "No Dependabot config"],
+                details={
+                    "secrets_found": 1,
+                    "dangerous_files": [".env"],
+                    "has_security_md": False,
+                    "has_dependabot": False,
+                },
+            )
+        )
+        results.append(
+            AnalyzerResult(
+                dimension="interest",
+                score=0.62,
+                max_score=1.0,
+                findings=[],
+                details={"tech_novelty": 0.15},
+            )
+        )
+        audit = score_repo(_make_metadata(stars=7), results)
+
+        assert "ship_readiness" in audit.lenses
+        assert "maintenance_risk" in audit.lenses
+        assert audit.security_posture["secrets_found"] == 1
+        assert "local" in audit.security_posture
+        assert "providers" in audit.security_posture
+        assert audit.action_candidates
+        assert audit.hotspots
+
+    def test_maintenance_risk_uses_risk_orientation(self):
+        results = _make_results({dim: 0.45 for dim in WEIGHTS})
+        audit = score_repo(_make_metadata(), results)
+        assert audit.lenses["maintenance_risk"]["orientation"] == "higher-is-riskier"

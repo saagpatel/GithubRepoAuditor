@@ -79,3 +79,42 @@ def find_similar_repos(
 
     similar.sort(key=lambda s: s["overlap_pct"], reverse=True)
     return similar
+
+
+def classify_similarity(
+    pair: dict,
+    metadata_map: dict[str, dict],
+) -> dict:
+    """Classify a similar repo pair and add actionable suggestion.
+
+    metadata_map: {repo_name: {fork: bool, archived: bool, size_kb: int, language: str}}
+    """
+    result = dict(pair)
+    overlap = pair.get("overlap_pct", 0)
+    repo_a = pair.get("repo_a", "")
+    repo_b = pair.get("repo_b", "")
+    meta_a = metadata_map.get(repo_a, {})
+    meta_b = metadata_map.get(repo_b, {})
+
+    a_fork = meta_a.get("fork", False)
+    b_fork = meta_b.get("fork", False)
+    a_archived = meta_a.get("archived", False)
+    b_archived = meta_b.get("archived", False)
+    a_size = meta_a.get("size_kb", 0)
+    b_size = meta_b.get("size_kb", 0)
+    same_lang = meta_a.get("language") == meta_b.get("language") and meta_a.get("language")
+
+    if overlap > 90 and (a_fork or b_fork):
+        result["classification"] = "fork_candidate"
+        result["suggestion"] = f"Consider archiving the fork — {repo_a if a_fork else repo_b} appears to be a fork"
+    elif overlap > 60 and not a_archived and not b_archived and a_size < 5000 and b_size < 5000:
+        result["classification"] = "merge_candidate"
+        result["suggestion"] = f"Consider merging {repo_a} and {repo_b} into a single repo"
+    elif 50 <= overlap <= 80 and same_lang:
+        result["classification"] = "shared_boilerplate"
+        result["suggestion"] = f"Extract shared boilerplate from {repo_a} and {repo_b} into a template"
+    else:
+        result["classification"] = "similar"
+        result["suggestion"] = f"{repo_a} and {repo_b} share {overlap:.0f}% of files"
+
+    return result

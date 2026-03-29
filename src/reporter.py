@@ -46,6 +46,7 @@ def write_raw_metadata(report: AuditReport, output_dir: Path) -> Path:
     path = output_dir / "raw_metadata.json"
 
     data = {
+        "schema_version": report.schema_version,
         "username": report.username,
         "generated_at": report.generated_at.isoformat(),
         "total_repos": report.total_repos,
@@ -54,6 +55,19 @@ def write_raw_metadata(report: AuditReport, output_dir: Path) -> Path:
         "scoring_profile": report.scoring_profile,
         "run_mode": report.run_mode,
         "portfolio_baseline_size": report.portfolio_baseline_size,
+        "lenses": report.lenses,
+        "hotspots": report.hotspots,
+        "security_posture": report.security_posture,
+        "security_governance_preview": report.security_governance_preview,
+        "collections": report.collections,
+        "profiles": report.profiles,
+        "scenario_summary": report.scenario_summary,
+        "action_backlog": report.action_backlog,
+        "campaign_summary": report.campaign_summary,
+        "writeback_preview": report.writeback_preview,
+        "writeback_results": report.writeback_results,
+        "action_runs": report.action_runs,
+        "external_refs": report.external_refs,
         "tier_distribution": report.tier_distribution,
         "audits": [a.to_dict() for a in report.audits],
         "errors": report.errors,
@@ -99,7 +113,11 @@ def write_pcc_export(report: AuditReport, output_dir: Path) -> Path:
 # ── Markdown Report ──────────────────────────────────────────────────
 
 
-def write_markdown_report(report: AuditReport, output_dir: Path) -> Path:
+def write_markdown_report(
+    report: AuditReport,
+    output_dir: Path,
+    diff_data: dict | None = None,
+) -> Path:
     """Write human-readable Markdown audit report."""
     output_dir.mkdir(parents=True, exist_ok=True)
     path = _file_path(output_dir, "audit-report", report.username, report.generated_at, "md")
@@ -124,7 +142,23 @@ def write_markdown_report(report: AuditReport, output_dir: Path) -> Path:
     _w(f"| Repos audited | {report.repos_audited} |")
     _w(f"| Average score | {report.average_score:.2f} |")
     _w(f"| Errors | {len(report.errors)} |")
+    _w(f"| Schema version | {report.schema_version} |")
     _w("")
+
+    if report.lenses:
+        _w("### Decision Lenses")
+        _w("")
+        _w("| Lens | Avg Score | Leaders | Attention |")
+        _w("|------|-----------|---------|-----------|")
+        for lens_name, lens_data in report.lenses.items():
+            leaders = ", ".join(lens_data.get("leaders", [])) or "—"
+            attention = ", ".join(lens_data.get("attention", [])) or "—"
+            _w(
+                f"| {lens_name.replace('_', ' ').title()} | "
+                f"{lens_data.get('average_score', 0):.2f} | "
+                f"{leaders} | {attention} |"
+            )
+        _w("")
 
     # Tier distribution
     _w("### Tier Distribution")
@@ -158,6 +192,145 @@ def write_markdown_report(report: AuditReport, output_dir: Path) -> Path:
     _w("**Most Active:**")
     _write_ranked_list(lines, report.most_active, report.audits)
     _w("")
+
+    if report.hotspots:
+        _w("### Portfolio Hotspots")
+        _w("")
+        _w("| Repo | Category | Severity | Recommended Action |")
+        _w("|------|----------|----------|--------------------|")
+        for hotspot in report.hotspots[:8]:
+            _w(
+                f"| {hotspot.get('repo', '—')} | {hotspot.get('category', '—')} | "
+                f"{hotspot.get('severity', 0):.2f} | {hotspot.get('recommended_action', '—')} |"
+            )
+        _w("")
+
+    if report.security_posture:
+        _w("### Security Overview")
+        _w("")
+        provider_coverage = report.security_posture.get("provider_coverage", {})
+        open_alerts = report.security_posture.get("open_alerts", {})
+        _w(f"- Average posture score: {report.security_posture.get('average_score', 0):.2f}")
+        _w(f"- Critical repos: {', '.join(report.security_posture.get('critical_repos', [])[:5]) or '—'}")
+        _w(f"- Repos with secrets: {', '.join(report.security_posture.get('repos_with_secrets', [])[:5]) or '—'}")
+        if provider_coverage:
+            _w(
+                f"- GitHub coverage: {provider_coverage.get('github', {}).get('available_repos', 0)}/"
+                f"{provider_coverage.get('github', {}).get('total_repos', 0)} repos | "
+                f"Scorecard coverage: {provider_coverage.get('scorecard', {}).get('available_repos', 0)}/"
+                f"{provider_coverage.get('scorecard', {}).get('total_repos', 0)} repos"
+            )
+        if open_alerts:
+            _w(
+                f"- Open alerts: code scanning {open_alerts.get('code_scanning', 0)}, "
+                f"secret scanning {open_alerts.get('secret_scanning', 0)}"
+            )
+        _w("")
+
+    if report.security_governance_preview:
+        _w("### Security Governance Preview")
+        _w("")
+
+    if report.campaign_summary:
+        _w("### Campaign Summary")
+        _w("")
+        _w(f"- Campaign: {report.campaign_summary.get('label', report.campaign_summary.get('campaign_type', '—'))}")
+        _w(f"- Actions: {report.campaign_summary.get('action_count', 0)}")
+        _w(f"- Repos: {report.campaign_summary.get('repo_count', 0)}")
+        _w(f"- Mode: {report.writeback_results.get('mode', 'preview')}")
+        _w(f"- Target: {report.writeback_results.get('target', 'preview-only')}")
+        _w("")
+
+    if report.writeback_preview.get("repos"):
+        _w("### Next Actions")
+        _w("")
+        _w("| Repo | Topics | Issue | Notion Actions |")
+        _w("|------|--------|-------|----------------|")
+        for item in report.writeback_preview.get("repos", [])[:8]:
+            topics = ", ".join(item.get("topics", [])[:4]) or "—"
+            _w(
+                f"| {item.get('repo', '—')} | {topics} | "
+                f"{item.get('issue_title', '—') or '—'} | {item.get('notion_action_count', 0)} |"
+            )
+        _w("")
+
+    if report.writeback_results.get("results"):
+        _w("### Writeback Results")
+        _w("")
+        _w("| Repo | Target | Status | Details |")
+        _w("|------|--------|--------|---------|")
+        for result in report.writeback_results.get("results", [])[:12]:
+            detail = result.get("url") or result.get("status") or "—"
+            _w(
+                f"| {result.get('repo_full_name', '—')} | {result.get('target', '—')} | "
+                f"{result.get('status', '—')} | {detail} |"
+            )
+        _w("")
+        _w("| Repo | Priority | Action | Expected Lift | Source |")
+        _w("|------|----------|--------|---------------|--------|")
+        for item in report.security_governance_preview[:8]:
+            _w(
+                f"| {item.get('repo', '—')} | {item.get('priority', '—')} | "
+                f"{item.get('title', '—')} | {item.get('expected_posture_lift', 0):.2f} | "
+                f"{item.get('source', '—')} |"
+            )
+        _w("")
+
+    if report.collections:
+        _w("### Collections")
+        _w("")
+        _w("| Collection | Count | Example Repos |")
+        _w("|------------|-------|--------------|")
+        for collection_name, collection_data in report.collections.items():
+            repo_names = [
+                repo_data["name"] if isinstance(repo_data, dict) else str(repo_data)
+                for repo_data in collection_data.get("repos", [])[:4]
+            ]
+            _w(f"| {collection_name} | {len(collection_data.get('repos', []))} | {', '.join(repo_names) or '—'} |")
+        _w("")
+
+    preview = report.scenario_summary.get("portfolio_projection", {})
+    if report.scenario_summary.get("top_levers"):
+        _w("### Scenario Preview")
+        _w("")
+        _w("| Lever | Lens | Repo Count | Avg Lift | Promotions |")
+        _w("|-------|------|------------|----------|------------|")
+        for lever in report.scenario_summary.get("top_levers", [])[:5]:
+            _w(
+                f"| {lever.get('title', '—')} | {lever.get('lens', '—')} | "
+                f"{lever.get('repo_count', 0)} | {lever.get('average_expected_lens_delta', 0):.3f} | "
+                f"{lever.get('projected_tier_promotions', 0)} |"
+            )
+        if preview:
+            _w("")
+            _w(
+                f"*Projected average score delta:* {preview.get('projected_average_score_delta', 0):+.3f}  "
+                f"*Projected promotions:* {preview.get('projected_tier_promotions', 0)}"
+            )
+        _w("")
+
+    if diff_data:
+        _w("### Compare Summary")
+        _w("")
+        _w(f"*Average score delta:* {diff_data.get('average_score_delta', 0):+.3f}")
+        _w("")
+        if diff_data.get("lens_deltas"):
+            _w("| Lens | Delta |")
+            _w("|------|-------|")
+            for lens_name, delta in diff_data.get("lens_deltas", {}).items():
+                _w(f"| {lens_name} | {delta:+.3f} |")
+            _w("")
+        repo_changes = diff_data.get("repo_changes", [])
+        if repo_changes:
+            _w("| Repo | Score Delta | Tier |")
+            _w("|------|-------------|------|")
+            for change in repo_changes[:8]:
+                _w(
+                    f"| {change.get('name', '—')} | {change.get('delta', 0):+.3f} | "
+                    f"{change.get('old_tier', '—')} → {change.get('new_tier', '—')} |"
+                )
+            _w("")
+
     _w("---")
     _w("")
 
@@ -219,6 +392,46 @@ def write_markdown_report(report: AuditReport, output_dir: Path) -> Path:
            f"**Size:** {m.size_kb} KB | "
            f"**Stars:** {m.stars} | "
            f"**Private:** {'Yes' if m.private else 'No'}")
+        if audit.lenses:
+            _w("")
+            _w("**Decision Lenses:**")
+            for lens_name, lens_data in audit.lenses.items():
+                _w(
+                    f"- {lens_name.replace('_', ' ').title()}: "
+                    f"{lens_data.get('score', 0):.2f} — {lens_data.get('summary', '')}"
+                )
+        if audit.action_candidates:
+            _w("")
+            _w("**Top Actions:**")
+            for action in audit.action_candidates[:3]:
+                _w(
+                    f"- {action.get('title', 'Action')}: {action.get('action', '')} "
+                    f"(lens: {action.get('lens', '—')}, confidence: {action.get('confidence', 0):.2f})"
+                )
+        if audit.security_posture:
+            _w("")
+            _w("**Security Posture:**")
+            _w(
+                f"- Label: {audit.security_posture.get('label', 'unknown')} | "
+                f"Score: {audit.security_posture.get('score', 0):.2f} | "
+                f"Secrets: {audit.security_posture.get('secrets_found', 0)}"
+            )
+            github = audit.security_posture.get("github", {})
+            if github:
+                _w(
+                    f"- GitHub controls: code scanning {github.get('code_scanning_status', 'unavailable')}, "
+                    f"secret scanning {github.get('secret_scanning_status', 'unavailable')}, "
+                    f"SBOM {github.get('sbom_status', 'unavailable')}"
+                )
+            recommendations = audit.security_posture.get("recommendations", [])
+            if recommendations:
+                _w("- Governance preview:")
+                for recommendation in recommendations[:3]:
+                    _w(
+                        f"  - {recommendation.get('title', 'Action')} "
+                        f"({recommendation.get('priority', 'medium')}, "
+                        f"lift {recommendation.get('expected_posture_lift', 0):.2f})"
+                    )
         _w("")
         _w("</details>")
         _w("")

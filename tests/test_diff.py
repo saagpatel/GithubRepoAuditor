@@ -17,6 +17,43 @@ def _make_report(audits: list[dict], avg: float = 0.5, date: str = "2026-03-20")
         "repos_audited": len(audits),
         "average_score": avg,
         "tier_distribution": tiers,
+        "lenses": {
+            "ship_readiness": {"average_score": avg, "description": "Ready"},
+            "security_posture": {"average_score": 0.4, "description": "Secure"},
+        },
+        "profiles": {
+            "default": {
+                "description": "Balanced",
+                "lens_weights": {
+                    "ship_readiness": 0.4,
+                    "showcase_value": 0.3,
+                    "security_posture": 0.3,
+                },
+            }
+        },
+        "collections": {
+            "showcase": {
+                "description": "Best examples",
+                "repos": [{"name": audits[0]["metadata"]["name"], "reason": "leader"}] if audits else [],
+            }
+        },
+        "scenario_summary": {
+            "top_levers": [
+                {
+                    "key": "testing",
+                    "title": "Strengthen tests",
+                    "lens": "ship_readiness",
+                    "repo_count": len(audits),
+                    "average_expected_lens_delta": 0.1,
+                    "projected_tier_promotions": 1,
+                }
+            ],
+            "portfolio_projection": {
+                "selected_repo_count": len(audits),
+                "projected_average_score_delta": 0.03,
+                "projected_tier_promotions": 1,
+            },
+        },
         "audits": audits,
     }
 
@@ -26,6 +63,13 @@ def _make_audit(name: str, score: float, tier: str) -> dict:
         "metadata": {"name": name},
         "overall_score": score,
         "completeness_tier": tier,
+        "lenses": {
+            "ship_readiness": {"score": score, "summary": "Ready"},
+            "showcase_value": {"score": score, "summary": "Story"},
+            "security_posture": {"score": 0.5, "summary": "Secure"},
+        },
+        "security_posture": {"label": "healthy", "score": 0.5},
+        "hotspots": [{"title": "Promising but unfinished"}],
     }
 
 
@@ -80,11 +124,41 @@ class TestDiffReports:
         assert len(diff.removed_repos) == 0
         assert len(diff.tier_changes) == 0
 
+    def test_compare_payload_includes_analyst_fields(self, tmp_path):
+        prev = _make_report([_make_audit("Alpha", 0.5, "wip")], avg=0.5)
+        curr_audit = _make_audit("Alpha", 0.8, "shipped")
+        curr_audit["security_posture"] = {"label": "strong", "score": 0.8}
+        curr_audit["hotspots"] = []
+        curr_audit["action_candidates"] = [
+            {
+                "key": "testing",
+                "title": "Strengthen tests",
+                "lens": "ship_readiness",
+                "expected_lens_delta": 0.12,
+                "expected_tier_movement": "Closer to shipped",
+            }
+        ]
+        curr = _make_report([curr_audit], avg=0.8)
+        curr["collections"]["showcase"]["repos"] = [{"name": "Alpha", "reason": "improved"}]
+        curr["lenses"]["ship_readiness"]["average_score"] = 0.8
+        (tmp_path / "prev.json").write_text(json.dumps(prev))
+        (tmp_path / "curr.json").write_text(json.dumps(curr))
+
+        diff = diff_reports(tmp_path / "prev.json", tmp_path / "curr.json")
+
+        assert diff.repo_changes
+        assert "ship_readiness" in diff.lens_deltas
+        assert diff.profile_leaderboards
+        assert diff.scenario_preview["portfolio_projection"]["projected_tier_promotions"] >= 1
+        assert diff.security_changes
+        assert diff.hotspot_changes
+
 
 class TestDiffMarkdown:
     def test_format_produces_markdown(self, tmp_path):
         prev = _make_report([_make_audit("Alpha", 0.5, "wip")])
         curr = _make_report([_make_audit("Alpha", 0.8, "shipped"), _make_audit("Beta", 0.3, "skeleton")])
+        curr["lenses"]["ship_readiness"]["average_score"] = 0.8
         (tmp_path / "prev.json").write_text(json.dumps(prev))
         (tmp_path / "curr.json").write_text(json.dumps(curr))
 
@@ -92,3 +166,5 @@ class TestDiffMarkdown:
         md = format_diff_markdown(diff)
         assert "# Audit Diff Report" in md
         assert "Beta" in md
+        assert "Lens Deltas" in md
+        assert "Scenario Preview" in md

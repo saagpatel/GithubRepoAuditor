@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import requests
+
 from src.github_client import GitHubClient, REST_API_VERSION
 
 
@@ -66,3 +68,49 @@ class TestGitHubClientHardening:
         assert anon_result == [{"name": "public-repo", "private": False}]
         assert any("/list_repos/octocat/owner-private" in call[0] for call in cache.put_calls)
         assert any("/list_repos/octocat/public-anonymous" in call[0] for call in cache.put_calls)
+
+    def test_security_endpoints_return_counts_when_available(self, monkeypatch):
+        client = GitHubClient()
+
+        def _fake_fetch(url, params=None):
+            if url.endswith("/secret-scanning/alerts"):
+                return [{"number": 1}, {"number": 2}]
+            if url.endswith("/code-scanning/alerts"):
+                return [{"number": 1}]
+            if url.endswith("/dependency-graph/sbom"):
+                return {"sbom": {"packages": [{"name": "a"}, {"name": "b"}]}}
+            return {"security_and_analysis": {"secret_scanning": {"status": "enabled"}}}
+
+        monkeypatch.setattr(client, "_fetch_json", _fake_fetch)
+
+        assert client.get_secret_scanning_alert_count("o", "r")["open_alerts"] == 2
+        assert client.get_code_scanning_alert_count("o", "r")["open_alerts"] == 1
+        assert client.get_sbom_exportability("o", "r")["package_count"] == 2
+        assert client.get_repo_security_and_analysis("o", "r")["available"] is True
+
+    def test_security_endpoints_fail_soft_on_http_error(self, monkeypatch):
+        client = GitHubClient()
+        response = requests.Response()
+        response.status_code = 404
+        error = requests.HTTPError(response=response)
+
+        monkeypatch.setattr(client, "_fetch_json", lambda *a, **k: (_ for _ in ()).throw(error))
+
+        assert client.get_secret_scanning_alert_count("o", "r")["available"] is False
+        assert client.get_code_scanning_alert_count("o", "r")["http_status"] == 404
+        assert client.get_sbom_exportability("o", "r")["available"] is False
+
+    def test_get_repo_topics_reads_names_payload(self, monkeypatch):
+        client = GitHubClient()
+        monkeypatch.setattr(client, "_fetch_json", lambda *a, **k: {"names": ["python", "ghra-showcase"]})
+        topics = client.get_repo_topics("o", "r")
+        assert topics["available"] is True
+        assert topics["topics"] == ["python", "ghra-showcase"]
+
+    def test_update_repo_custom_property_values_skips_missing_definitions(self, monkeypatch):
+        client = GitHubClient()
+        monkeypatch.setattr(client, "list_org_custom_properties", lambda owner: {"available": True, "properties": []})
+        monkeypatch.setattr(client, "get_repo_custom_property_values", lambda owner, repo: {"available": True, "values": {"portfolio_call": "old"}})
+        result = client.update_repo_custom_property_values("o", "r", {"portfolio_call": "new"})
+        assert result["status"] == "skipped"
+        assert result["before"] == {"portfolio_call": "old"}

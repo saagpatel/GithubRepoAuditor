@@ -101,6 +101,7 @@ class InterestAnalyzer(BaseAnalyzer):
         ambition_score, ambition_details = _score_ambition(repo_path, metadata)
         score += ambition_score
         details["ambition"] = ambition_details
+        details["ambition_score"] = ambition_score
         if ambition_score >= 0.15:
             findings.append("Ambitious project scope")
         elif ambition_score >= 0.05:

@@ -1,6 +1,6 @@
 # GitHub Repo Auditor
 
-![Grade](https://img.shields.io/badge/grade-A-brightgreen) ![Tier](https://img.shields.io/badge/tier-shipped-brightgreen) ![Python](https://img.shields.io/badge/python-3.11%2B-blue) ![Tests](https://img.shields.io/badge/tests-291%20passing-brightgreen)
+![Grade](https://img.shields.io/badge/grade-A-brightgreen) ![Tier](https://img.shields.io/badge/tier-shipped-brightgreen) ![Python](https://img.shields.io/badge/python-3.11%2B-blue) ![Tests](https://img.shields.io/badge/tests-304%20passing-brightgreen)
 
 **Know the truth about every project you've ever started.**
 
@@ -17,15 +17,15 @@ Built for the developer who ships fast and starts often, and needs a system to k
    - **Interest** (0.0–1.0) — Is this project actually interesting? Novel tech, commit passion, ambitious scope, storytelling README, external validation.
 4. **Assigns letter grades** (A–F) and classifies into tiers (Shipped / Functional / WIP / Skeleton / Abandoned)
 5. **Awards 15 achievement badges** — "Fully Tested", "CI Champion", "Novel Tech", "Zero Debt", "Complete Package", etc.
-6. **Scans for security issues** — exposed secrets, dangerous files, missing SECURITY.md
+6. **Builds security intelligence** — exposed secrets, dangerous files, GitHub-native security controls, SBOM availability, and optional Scorecard enrichment
 7. **Tells you exactly what to do next** — Quick Wins show which repos are closest to the next tier and what specific action gets them there
 8. **Generates multiple dashboards:**
-   - Flagship Excel workbook (12 sheets with charts, heatmaps, sparklines)
-   - Interactive HTML dashboard (scatter chart, filterable table, tech radar)
+   - Flagship Excel workbook with analyst, security, and governance sheets
+   - Interactive HTML dashboard (scatter chart, filterable table, tech radar, security overview)
    - Shields.io badges for GitHub READMEs
    - Portfolio README for your GitHub profile
 9. **Integrates with Notion** — pushes audit signals into your Notion operating system: recommendations, governed issue requests, weekly review enrichment, project completeness cards
-10. **Tracks history** — archives every audit run, auto-diffs, detects regressions, identifies archive candidates
+10. **Tracks history and warehouse snapshots** — archives every audit run, auto-diffs, persists a SQLite warehouse, detects regressions, identifies archive candidates
 11. **AI-powered narrative** — feeds audit data to Claude for a human-readable portfolio analysis
 
 ## Why This Exists
@@ -47,7 +47,7 @@ The tool auto-detects your GitHub token from `$GITHUB_TOKEN` or the `gh` CLI. Fo
 
 ## Output
 
-Every run produces 5 core files, plus optional exports:
+Every run produces 6 core files, plus optional exports:
 
 | File | What It Is |
 |------|-----------|
@@ -56,6 +56,7 @@ Every run produces 5 core files, plus optional exports:
 | `audit-dashboard-{user}-{date}.xlsx` | Flagship 12-sheet Excel workbook (see below) |
 | `pcc-import-{user}-{date}.json` | Flat array for importing into dashboards or project management tools |
 | `raw_metadata.json` | Backwards-compatible raw audit data |
+| `portfolio-warehouse.db` | SQLite warehouse snapshot for downstream analysis, compare flows, and future operations |
 
 ### Optional Exports
 
@@ -64,6 +65,7 @@ Every run produces 5 core files, plus optional exports:
 | `--badges` | `output/badges/` — shields.io badge JSON + `badges.md` with copy-pasteable markdown |
 | `--upload-badges` | Uploads badge JSON to a GitHub Gist for auto-updating endpoint badges |
 | `--html` | `output/dashboard-{user}-{date}.html` — self-contained interactive dashboard |
+| `--review-pack` | `output/review-pack-{user}-{date}.md` — concise analyst/security review artifact |
 | `--portfolio-readme` | `output/PORTFOLIO.md` — GitHub profile-ready readme with badges and tier-grouped repos |
 | `--readme-suggestions` | `output/readme-suggestions-{date}.md` — per-repo actionable README improvements |
 | `--notion` | `output/notion-audit-events-{date}.json` — normalized events for Notion signal pipeline |
@@ -86,6 +88,13 @@ This is the centerpiece. Open it instead of reading JSON.
 | **Trends** | Score and tier evolution across audit runs (after 2+ runs) |
 | **Tier Breakdown** | Per-tier deep dive with grades and descriptions |
 | **Activity** | Commit patterns, bus factor, release cadence, push recency |
+| **Security Controls** | SECURITY.md, Dependabot, dependency graph, SBOM, code scanning, and secret scanning status by repo |
+| **Supply Chain** | Security score, Scorecard coverage, dependency graph/SBOM posture, and top supply-chain recommendation |
+| **Security Debt** | Dry-run governance queue for the highest-value security remediations |
+| **Portfolio Explorer** | Profile-aware ranking, hotspot count, and collection membership |
+| **By Lens** | Repo rankings split by decision lens |
+| **Scenario Planner** | Profile/collection-based lift preview |
+| **Executive Summary** | Analyst-friendly summary view with leaders, movers, and scenario preview |
 | **Registry** | Cross-reference with your local project registry |
 | **Score Explainer** | How scoring, grades, and tiers work |
 | **Action Items** | Prioritized improvements with effort estimates |
@@ -95,8 +104,9 @@ This is the centerpiece. Open it instead of reading JSON.
 A single self-contained HTML file with embedded CSS and JavaScript. No external dependencies — works offline, shareable as a link.
 
 - Canvas2D scatter chart (completeness vs interest, colored by tier, hover tooltips)
-- Filterable and sortable repo table
+- Filterable and sortable repo table with profile- and collection-aware ranking
 - Tech radar showing language adoption trends (Adopt / Trial / Hold / Decline)
+- Security overview cards and dry-run governance preview
 - Tier distribution bar charts
 - Print-friendly CSS — use browser "Print to PDF" for a clean report
 
@@ -124,6 +134,11 @@ python -m src <username> [options]
 | `--diff PATH` | none | Compare against a specific previous report |
 | `--verbose` | off | Print per-dimension score breakdown to stderr |
 | `--scoring-profile NAME` | default | Use custom weights from `config/scoring-profiles/NAME.json` |
+| `--portfolio-profile NAME` | `default` | Apply a ranking overlay for analyst-facing outputs |
+| `--collection NAME` | none | Filter analyst-facing outputs to a named default collection |
+| `--review-pack` | off | Generate a concise analyst/security review pack |
+| `--scorecard` | off | Enrich eligible public repos with OpenSSF Scorecard data |
+| `--security-offline` | off | Use local security analysis only and skip GitHub-native/external security enrichment |
 | `--badges` | off | Generate shields.io badge JSON and markdown |
 | `--upload-badges` | off | Upload badges to GitHub Gist (implies --badges) |
 | `--html` | off | Generate interactive HTML dashboard |
@@ -158,7 +173,17 @@ Custom weight profiles can be created in `config/scoring-profiles/` for differen
 | Dimension | What It Measures |
 |-----------|-----------------|
 | **Interest** | Tech novelty, commit bursts, project ambition, README storytelling, external validation, recency. Portfolio-relative: common "novel" languages get less credit. |
-| **Security** | Exposed secrets (API keys, private keys), dangerous committed files (.env, .pem), SECURITY.md, Dependabot config |
+| **Security** | Exposed secrets, dangerous committed files, SECURITY.md, Dependabot config, GitHub-native security controls, SBOM availability, and optional Scorecard signals |
+
+### Security Intelligence
+
+Security posture now merges multiple providers:
+
+- **Local** — committed secrets, dangerous files, SECURITY.md, Dependabot config
+- **GitHub-native** — dependency graph/SBOM availability, code scanning, secret scanning, control coverage
+- **Scorecard** — optional public-repo enrichment for a curated set of external security hygiene checks
+
+Unavailable providers are treated as **unavailable evidence**, not as an automatic failure. The merged `security_posture` still preserves top-level `score` and `label` for backward compatibility while exposing provider-specific detail for dashboards and future dry-run governance.
 
 ### Tiers
 
