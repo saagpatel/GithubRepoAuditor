@@ -18,7 +18,7 @@ Automated audit tool that clones all repos from a GitHub user account, analyzes 
 - All output files go to `output/` directory
 
 ## Current State
-Phases 0–24 complete. 456 tests, 43 test files, 11 analyzers (extensible via --analyzers-dir plugin API), 51 CLI flags. Outputs: JSON, Markdown, Excel (53 sheets, 36-column All Repos), HTML dashboard, PDF report. GitHub Actions CI + scheduled weekly audit. Config file, watch mode, dry-run, resume, terminal diff summary, GitHub Issues auto-creation, OSV.dev vulnerability checking, code complexity trends. Full Notion two-way sync, shields.io badges, AI narrative, scoring profiles, archive automation. Portfolio improvement campaign: manifest generation, batch metadata/README/governance file updates via Contents API. Phase 24: Excel overhaul — 9 new columns (Topics, Interest Grade, Test Framework, TODO Density, PR Merge %, Comment Ratio, Dep Count, Created, Size), JSON sanitization, ambition fix.
+Phases 0–25 complete. 456 tests, 43 test files, 11 analyzers (extensible via --analyzers-dir plugin API), 51 CLI flags. Outputs: JSON, Markdown, Excel (55 sheets, 36-column All Repos), HTML dashboard, PDF report. GitHub Actions CI + scheduled weekly audit. Config file, watch mode, dry-run, resume, terminal diff summary, GitHub Issues auto-creation, OSV.dev vulnerability checking, code complexity trends. Full Notion two-way sync, shields.io badges, AI narrative, scoring profiles, archive automation. Portfolio improvement campaigns: batch metadata/README/governance/build-readiness updates via Contents API. Phase 25: build readiness campaign — Makefiles (88 repos) + .env.example (70 repos). Portfolio: 66 shipped, avg 0.747, health 0.997.
 
 ## Key Decisions
 | Decision | Choice | Why |
