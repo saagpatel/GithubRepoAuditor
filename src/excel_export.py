@@ -13,7 +13,7 @@ from pathlib import Path
 from openpyxl import Workbook
 from openpyxl.chart import BarChart, PieChart, Reference, ScatterChart
 from openpyxl.chart.label import DataLabelList
-from openpyxl.chart.series import DataPoint, Series
+from openpyxl.chart.series import DataPoint
 from openpyxl.drawing.line import LineProperties
 from openpyxl.formatting.rule import ColorScaleRule, DataBarRule
 from openpyxl.styles import Font
@@ -277,40 +277,39 @@ def _build_scatter_on_dashboard(ws, data: dict) -> None:
     chart.y_axis.scaling.max = 1
     chart.style = 13
 
-    # Main data series — dots only, no connecting lines
+    # Main data series — use add_data + set_categories (openpyxl scatter API)
     xvalues = Reference(ws, min_col=col_x, min_row=data_start_row, max_row=data_end_row)
     yvalues = Reference(ws, min_col=col_y, min_row=data_start_row, max_row=data_end_row)
-    series = Series(yvalues, xvalues, title="Repos")
-    series.graphicalProperties.line.noFill = True
-    chart.series.append(series)
+    chart.add_data(yvalues, titles_from_data=False)
+    chart.set_categories(xvalues)
+    if chart.series:
+        chart.series[0].graphicalProperties.line.noFill = True
 
     # Quadrant lines — vertical at x=0.55, horizontal at y=0.45
     line_col = 16  # col P for line data
-    # Vertical line (x=0.55 from y=0 to y=1)
     ws.cell(row=data_start_row, column=line_col, value=0.55)
     ws.cell(row=data_start_row, column=line_col + 1, value=0.0)
     ws.cell(row=data_start_row + 1, column=line_col, value=0.55)
     ws.cell(row=data_start_row + 1, column=line_col + 1, value=1.0)
 
-    vline_x = Reference(ws, min_col=line_col, min_row=data_start_row, max_row=data_start_row + 1)
     vline_y = Reference(ws, min_col=line_col + 1, min_row=data_start_row, max_row=data_start_row + 1)
-    vline = Series(vline_y, vline_x, title=None)
-    vline.graphicalProperties.line = LineProperties(w=12700, prstDash="dash", solidFill="808080")
-    vline.marker = None
-    chart.series.append(vline)
+    vline_x = Reference(ws, min_col=line_col, min_row=data_start_row, max_row=data_start_row + 1)
+    chart.add_data(vline_y, titles_from_data=False)
+    chart.set_categories(vline_x)
+    if len(chart.series) > 1:
+        chart.series[-1].graphicalProperties.line = LineProperties(w=12700, prstDash="dash", solidFill="808080")
 
-    # Horizontal line (y=0.45 from x=0 to x=1)
     ws.cell(row=data_start_row, column=line_col + 2, value=0.0)
     ws.cell(row=data_start_row, column=line_col + 3, value=0.45)
     ws.cell(row=data_start_row + 1, column=line_col + 2, value=1.0)
     ws.cell(row=data_start_row + 1, column=line_col + 3, value=0.45)
 
-    hline_x = Reference(ws, min_col=line_col + 2, min_row=data_start_row, max_row=data_start_row + 1)
     hline_y = Reference(ws, min_col=line_col + 3, min_row=data_start_row, max_row=data_start_row + 1)
-    hline = Series(hline_y, hline_x, title=None)
-    hline.graphicalProperties.line = LineProperties(w=12700, prstDash="dash", solidFill="808080")
-    hline.marker = None
-    chart.series.append(hline)
+    hline_x = Reference(ws, min_col=line_col + 2, min_row=data_start_row, max_row=data_start_row + 1)
+    chart.add_data(hline_y, titles_from_data=False)
+    chart.set_categories(hline_x)
+    if len(chart.series) > 2:
+        chart.series[-1].graphicalProperties.line = LineProperties(w=12700, prstDash="dash", solidFill="808080")
 
     chart.width = 18
     chart.height = 14
