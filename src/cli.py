@@ -122,6 +122,16 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="PREVIOUS_REPORT",
         help="Compare against a previous audit-report JSON to show changes",
     )
+    parser.add_argument(
+        "--badges",
+        action="store_true",
+        help="Generate Shields.io badge JSON files and badges.md",
+    )
+    parser.add_argument(
+        "--upload-badges",
+        action="store_true",
+        help="Upload badge JSON to GitHub Gist for endpoint badges (implies --badges)",
+    )
     return parser
 
 
@@ -358,6 +368,16 @@ def _run_targeted_audit(args, client, output_dir: Path) -> None:
     from src.history import save_fingerprints
     save_fingerprints([a.to_dict() for a in all_audits_obj])
 
+    badge_info = ""
+    if args.badges:
+        from src.badge_export import export_badges, upload_badge_gist, _write_badges_markdown
+        badge_result = export_badges(report.to_dict(), output_dir)
+        badge_info = f"\n    {badge_result['badges_md']} ({badge_result['files_written']} badge files)"
+        if args.upload_badges:
+            gist_urls = upload_badge_gist(output_dir / "badges", report.username)
+            if gist_urls:
+                _write_badges_markdown(report.to_dict(), output_dir / "badges", gist_urls)
+
     print(
         f"\n✓ Targeted audit: {len(new_audits)} new/updated + {len(kept)} existing = {len(all_audits_obj)} total\n"
         f"  Average score: {report.average_score:.2f}\n"
@@ -367,7 +387,7 @@ def _run_targeted_audit(args, client, output_dir: Path) -> None:
         f"    {md_path}\n"
         f"    {excel_path}\n"
         f"    {pcc_path}\n"
-        f"    {raw_path}",
+        f"    {raw_path}{badge_info}",
     )
 
 
@@ -432,6 +452,9 @@ def _run_incremental_audit(args, client, output_dir: Path) -> None:
 
 def main() -> None:
     args = build_parser().parse_args()
+
+    if args.upload_badges:
+        args.badges = True
 
     if not args.token:
         print(
@@ -595,6 +618,17 @@ def main() -> None:
         archive_report(json_path)
         save_fingerprints(report.to_dict()["audits"])
 
+        # Badge export
+        badge_info = ""
+        if args.badges:
+            from src.badge_export import export_badges, upload_badge_gist, _write_badges_markdown
+            badge_result = export_badges(report.to_dict(), output_dir)
+            badge_info = f"\n    {badge_result['badges_md']} ({badge_result['files_written']} badge files)"
+            if args.upload_badges:
+                gist_urls = upload_badge_gist(output_dir / "badges", report.username)
+                if gist_urls:
+                    _write_badges_markdown(report.to_dict(), output_dir / "badges", gist_urls)
+
         cache_info = ""
         if cache:
             cache_info = f"\n  Cache: {cache.hits} hits, {cache.misses} misses"
@@ -609,7 +643,7 @@ def main() -> None:
             f"    {md_path}\n"
             f"    {excel_path}\n"
             f"    {pcc_path}\n"
-            f"    {raw_path}",
+            f"    {raw_path}{badge_info}",
         )
     else:
         raw_path = _write_json(
