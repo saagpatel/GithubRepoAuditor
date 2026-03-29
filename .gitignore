@@ -1,6 +1,7 @@
 output/*.json
 output/*.md
 output/*.xlsx
+output/*.html
 output/~$*
 output/.cache/
 output/history/
