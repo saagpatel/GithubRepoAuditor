@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
 import sys
 import tempfile
@@ -13,11 +14,42 @@ from src.models import RepoMetadata
 logger = logging.getLogger(__name__)
 
 
-def _auth_url(clone_url: str, token: str | None) -> str:
-    """Inject token into HTTPS clone URL for private repo access."""
-    if token and clone_url.startswith("https://"):
-        return clone_url.replace("https://", f"https://{token}@", 1)
-    return clone_url
+@contextmanager
+def _git_askpass_env(token: str | None) -> Generator[dict[str, str] | None, None, None]:
+    """Create a temporary GIT_ASKPASS environment for authenticated clones."""
+    if not token:
+        yield None
+        return
+
+    fd, script_name = tempfile.mkstemp(prefix="git-askpass-", suffix=".sh")
+    os.close(fd)
+    script_path = Path(script_name)
+    script_path.write_text(
+        "\n".join(
+            [
+                "#!/bin/sh",
+                'case "$1" in',
+                '  *Username*) printf "%s\\n" "x-access-token" ;;',
+                '  *) printf "%s\\n" "$GITHUB_AUDITOR_CLONE_TOKEN" ;;',
+                "esac",
+            ]
+        )
+        + "\n"
+    )
+    script_path.chmod(0o700)
+
+    env = os.environ.copy()
+    env["GIT_ASKPASS"] = str(script_path)
+    env["GITHUB_AUDITOR_CLONE_TOKEN"] = token
+    env["GIT_TERMINAL_PROMPT"] = "0"
+
+    try:
+        yield env
+    finally:
+        try:
+            script_path.unlink()
+        except OSError:
+            pass
 
 
 def clone_repo(clone_url: str, name: str, token: str | None = None, clone_dir: Path | None = None) -> Path:
@@ -28,18 +60,18 @@ def clone_repo(clone_url: str, name: str, token: str | None = None, clone_dir: P
     if clone_dir is None:
         clone_dir = Path(tempfile.mkdtemp(prefix="audit-repos-"))
     dest = clone_dir / name
-    url = _auth_url(clone_url, token)
 
     try:
-        subprocess.run(
-            ["git", "clone", "--depth", "1", "--quiet", url, str(dest)],
-            check=True,
-            capture_output=True,
-            timeout=120,
-        )
+        with _git_askpass_env(token) as env:
+            subprocess.run(
+                ["git", "clone", "--depth", "1", "--quiet", clone_url, str(dest)],
+                check=True,
+                capture_output=True,
+                timeout=120,
+                env=env,
+            )
     except subprocess.CalledProcessError as exc:
-        # Log without the URL to avoid leaking tokens
-        logger.warning("Clone failed for %s: %s", name, exc.stderr.decode().strip())
+        logger.warning("Clone failed for %s (git exited with %s)", name, exc.returncode)
         raise
     except subprocess.TimeoutExpired:
         logger.warning("Clone timed out for %s (120s)", name)

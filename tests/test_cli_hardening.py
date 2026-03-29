@@ -1,0 +1,214 @@
+from __future__ import annotations
+
+from argparse import Namespace
+from pathlib import Path
+
+import pytest
+
+from src import cli
+from src.models import AuditReport, RepoAudit
+
+
+def _make_args(**overrides) -> Namespace:
+    defaults = {
+        "username": "testuser",
+        "token": None,
+        "output_dir": "output",
+        "skip_forks": False,
+        "skip_archived": False,
+        "skip_clone": False,
+        "registry": None,
+        "sync_registry": False,
+        "no_cache": True,
+        "repos": None,
+        "incremental": False,
+        "verbose": False,
+        "graphql": False,
+        "diff": None,
+        "badges": False,
+        "upload_badges": False,
+        "notion": False,
+        "notion_sync": False,
+        "portfolio_readme": False,
+        "readme_suggestions": False,
+        "notion_registry": False,
+        "html": False,
+        "scoring_profile": None,
+        "auto_archive": False,
+        "narrative": False,
+    }
+    defaults.update(overrides)
+    return Namespace(**defaults)
+
+
+class FakeParser:
+    def __init__(self, args: Namespace) -> None:
+        self.args = args
+        self.error_message: str | None = None
+
+    def parse_args(self) -> Namespace:
+        return self.args
+
+    def error(self, message: str) -> None:
+        self.error_message = message
+        raise SystemExit(2)
+
+
+def _make_report_dict(sample_metadata) -> dict:
+    audit = RepoAudit(
+        metadata=sample_metadata,
+        analyzer_results=[],
+        overall_score=0.5,
+        completeness_tier="functional",
+    )
+    report = AuditReport.from_audits(
+        "testuser",
+        [audit],
+        [],
+        1,
+        scoring_profile="baseline",
+        run_mode="full",
+        portfolio_baseline_size=1,
+    )
+    return report.to_dict()
+
+
+def test_main_rejects_registry_and_notion_registry_together(monkeypatch):
+    args = _make_args(
+        registry=Path("registry.md"),
+        notion_registry=True,
+    )
+
+    monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
+
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+
+    assert exc.value.code == 2
+
+
+def test_main_forwards_scoring_profile_to_targeted_audit(monkeypatch, sample_metadata):
+    args = _make_args(
+        repos=["test-repo"],
+        scoring_profile="focus",
+    )
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
+    monkeypatch.setattr(cli, "_load_scoring_profile", lambda name: ({"readme": 1.5}, "focus"))
+    monkeypatch.setattr(cli, "_fetch_repo_metadata", lambda *_: ([sample_metadata], []))
+    monkeypatch.setattr(cli, "_run_targeted_audit", lambda *a, **k: captured.update(k))
+
+    cli.main()
+
+    assert captured["custom_weights"] == {"readme": 1.5}
+    assert captured["scoring_profile_name"] == "focus"
+    assert captured["all_repos"] == [sample_metadata]
+
+
+def test_main_forwards_scoring_profile_to_incremental_audit(monkeypatch, sample_metadata):
+    args = _make_args(
+        incremental=True,
+        scoring_profile="focus",
+    )
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
+    monkeypatch.setattr(cli, "_load_scoring_profile", lambda name: ({"readme": 1.5}, "focus"))
+    monkeypatch.setattr(cli, "_fetch_repo_metadata", lambda *_: ([sample_metadata], []))
+    monkeypatch.setattr(cli, "_run_incremental_audit", lambda *a, **k: captured.update(k))
+
+    cli.main()
+
+    assert captured["custom_weights"] == {"readme": 1.5}
+    assert captured["scoring_profile_name"] == "focus"
+    assert captured["all_repos"] == [sample_metadata]
+
+
+def test_incremental_noop_regenerates_from_latest_report(monkeypatch, tmp_path, sample_metadata):
+    args = _make_args(username="testuser")
+    report_path = tmp_path / "audit-report-testuser-2026-03-29.json"
+    report_path.write_text("{}")
+    report_data = _make_report_dict(sample_metadata)
+    report_data["audits"][0]["metadata"]["name"] = sample_metadata.name
+
+    monkeypatch.setattr(cli, "_load_latest_report", lambda _output_dir: (report_path, report_data))
+    monkeypatch.setattr(
+        "src.history.load_fingerprints",
+        lambda: {sample_metadata.name: {"pushed_at": sample_metadata.pushed_at.isoformat()}},
+    )
+
+    calls: list[dict[str, object]] = []
+
+    def _record_regen(args, output_dir, *, existing_report_path, existing_report_data):
+        calls.append(
+            {
+                "args": args,
+                "output_dir": output_dir,
+                "existing_report_path": existing_report_path,
+                "existing_report_data": existing_report_data,
+            }
+        )
+
+    monkeypatch.setattr(cli, "_regenerate_outputs_from_latest_report", _record_regen)
+
+    cli._run_incremental_audit(
+        args,
+        cli.GitHubClient(token=None, cache=None),
+        tmp_path / "output",
+        all_repos=[sample_metadata],
+        errors=[],
+        custom_weights=None,
+        scoring_profile_name="baseline",
+    )
+
+    assert len(calls) == 1
+    assert calls[0]["existing_report_path"] == report_path
+    assert calls[0]["existing_report_data"]["scoring_profile"] == "baseline"
+
+
+def test_regenerate_outputs_from_latest_report_uses_existing_json(monkeypatch, tmp_path, sample_metadata):
+    args = _make_args(username="testuser")
+    report_path = tmp_path / "audit-report-testuser-2026-03-29.json"
+    report_path.write_text("{}")
+    report_data = _make_report_dict(sample_metadata)
+
+    captured: dict[str, object] = {}
+
+    def _record_write(report, passed_args, output_dir, **kwargs):
+        captured.update(
+            {
+                "report": report,
+                "args": passed_args,
+                "output_dir": output_dir,
+                **kwargs,
+            }
+        )
+        return {
+            "json_path": report_path,
+            "md_path": output_dir / "audit.md",
+            "excel_path": output_dir / "audit.xlsx",
+            "pcc_path": output_dir / "audit-pcc.json",
+            "raw_path": output_dir / "raw.json",
+            "badge_info": "",
+            "notion_info": "",
+            "readme_info": "",
+            "suggestions_info": "",
+            "html_info": "",
+            "cache_info": "",
+        }
+
+    monkeypatch.setattr(cli, "_write_report_outputs", _record_write)
+
+    cli._regenerate_outputs_from_latest_report(
+        args,
+        tmp_path / "output",
+        existing_report_path=report_path,
+        existing_report_data=report_data,
+    )
+
+    assert captured["write_json"] is False
+    assert captured["archive"] is False
+    assert captured["save_fingerprint_data"] is False
+    assert captured["json_path"] == report_path
+    assert captured["report"].scoring_profile == "baseline"

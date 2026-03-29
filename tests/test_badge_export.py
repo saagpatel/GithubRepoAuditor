@@ -182,3 +182,10 @@ class TestGistIdPersistence:
 
     def test_load_returns_none_when_missing(self, tmp_path):
         assert _load_gist_id(tmp_path) is None
+
+    def test_gist_ids_are_scoped_per_username(self, tmp_path):
+        _save_gist_id(tmp_path, "abc123", username="alice")
+        _save_gist_id(tmp_path, "def456", username="bob")
+
+        assert _load_gist_id(tmp_path, username="alice") == "abc123"
+        assert _load_gist_id(tmp_path, username="bob") == "def456"

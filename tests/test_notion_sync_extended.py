@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from src.notion_sync import _extract_audit_data
 from src.notion_sync import (
     _render_quick_wins_markdown,
     _render_audit_highlights,
@@ -97,3 +98,47 @@ class TestFlagMapping:
         assert "shipped" in ELIGIBLE_TIERS
         assert "functional" in ELIGIBLE_TIERS
         assert "wip" not in ELIGIBLE_TIERS
+
+
+class TestExtractAuditData:
+    def test_prefers_typed_machine_data(self):
+        event = {
+            "occurredAt": "2026-03-29",
+            "status": "B",
+            "machineData": {
+                "grade": "A",
+                "overall_score": 0.91,
+                "interest_score": 0.33,
+                "badges": ["fresh"],
+            },
+        }
+        data = _extract_audit_data(event)
+        assert data["grade"] == "A"
+        assert data["overall_score"] == 0.91
+        assert data["interest_score"] == 0.33
+        assert data["badges"] == ["fresh"]
+        assert data["date"] == "2026-03-29"
+
+    def test_falls_back_to_legacy_raw_excerpt(self):
+        event = {
+            "occurredAt": "2026-03-29",
+            "status": "C",
+            "rawExcerpt": "{\"overall_score\": 0.75, \"interest_score\": 0.2, \"badges\": [\"fresh\"]}",
+        }
+        data = _extract_audit_data(event)
+        assert data["grade"] == "C"
+        assert data["overall_score"] == 0.75
+        assert data["interest_score"] == 0.2
+        assert data["badges"] == ["fresh"]
+
+    def test_malformed_legacy_payload_fails_soft(self):
+        event = {
+            "occurredAt": "2026-03-29",
+            "status": "F",
+            "rawExcerpt": "{\"overall_score\": 0.75,",
+        }
+        data = _extract_audit_data(event)
+        assert data["grade"] == "F"
+        assert data["overall_score"] == 0
+        assert data["interest_score"] == 0
+        assert data["badges"] == []

@@ -14,7 +14,7 @@ from src.cache import ResponseCache
 from src.cli_output import create_progress, print_info, print_status, print_warning
 from src.cloner import clone_workspace
 from src.github_client import GitHubClient
-from src.models import AuditReport, RepoAudit, RepoMetadata
+from src.models import AnalyzerResult, AuditReport, RepoAudit, RepoMetadata
 from src.reporter import (
     write_json_report,
     write_markdown_report,
@@ -266,272 +266,626 @@ def _print_verbose(audit: RepoAudit) -> None:
 def _resolve_repo_names(repos_arg: list[str]) -> list[str]:
     """Extract repo names from URLs or bare names."""
     names = []
+    seen: set[str] = set()
     for r in repos_arg:
         r = r.strip().rstrip("/")
         if "/" in r:
             # URL like https://github.com/user/RepoName
-            names.append(r.split("/")[-1])
+            name = r.split("/")[-1]
         else:
-            names.append(r)
+            name = r
+        if name and name not in seen:
+            names.append(name)
+            seen.add(name)
     return names
 
 
-def _run_targeted_audit(args, client, output_dir: Path) -> None:
-    """Audit only specific repos and merge into the most recent full report."""
-    import glob as _glob
+def _normalize_profile_name(profile_name: str | None) -> str:
+    return profile_name or "default"
 
-    target_names = _resolve_repo_names(args.repos)
-    print_status(f"Targeted audit: {len(target_names)} repos")
 
-    # Fetch metadata only for targeted repos
-    owner = args.username
-    targeted_repos: list[RepoMetadata] = []
-    errors: list[dict] = []
+def _parse_iso_dt(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
-    progress = create_progress()
-    if progress:
-        with progress:
-            task = progress.add_task("Fetching metadata", total=len(target_names))
-            for name in target_names:
-                progress.update(task, description=f"Fetching {owner}/{name}")
-                try:
-                    languages = client.get_languages(owner, name)
-                    response = client._request(f"https://api.github.com/repos/{owner}/{name}")
-                    repo_data = response.json()
-                    meta = RepoMetadata.from_api_response(repo_data, languages=languages)
-                    targeted_repos.append(meta)
-                except Exception as exc:
-                    errors.append({"repo": f"{owner}/{name}", "error": str(exc)})
-                    print_warning(f"Failed to fetch {name}: {exc}")
-                progress.advance(task)
-    else:
-        for name in target_names:
-            print(f"  Fetching {owner}/{name}...", file=sys.stderr)
-            try:
-                languages = client.get_languages(owner, name)
-                response = client._request(f"https://api.github.com/repos/{owner}/{name}")
-                repo_data = response.json()
-                meta = RepoMetadata.from_api_response(repo_data, languages=languages)
-                targeted_repos.append(meta)
-            except Exception as exc:
-                errors.append({"repo": f"{owner}/{name}", "error": str(exc)})
-                print_warning(f"Failed to fetch {name}: {exc}")
 
-    if not targeted_repos:
-        print_warning("No repos to audit.")
-        return
-
-    # Portfolio language frequency from targeted repos (best available for targeted mode)
-    targeted_lang_counts = Counter(r.language for r in targeted_repos if r.language)
-    targeted_lang_freq = (
-        {lang: count / len(targeted_repos) for lang, count in targeted_lang_counts.items()}
-        if targeted_repos else {}
+def _audit_from_dict(data: dict) -> RepoAudit:
+    meta_data = data.get("metadata", {})
+    metadata = RepoMetadata(
+        name=meta_data["name"],
+        full_name=meta_data["full_name"],
+        description=meta_data.get("description"),
+        language=meta_data.get("language"),
+        languages=meta_data.get("languages", {}),
+        private=meta_data["private"],
+        fork=meta_data["fork"],
+        archived=meta_data["archived"],
+        created_at=_parse_iso_dt(meta_data.get("created_at")),  # type: ignore[arg-type]
+        updated_at=_parse_iso_dt(meta_data.get("updated_at")),  # type: ignore[arg-type]
+        pushed_at=_parse_iso_dt(meta_data.get("pushed_at")),
+        default_branch=meta_data.get("default_branch", "main"),
+        stars=meta_data.get("stars", 0),
+        forks=meta_data.get("forks", 0),
+        open_issues=meta_data.get("open_issues", 0),
+        size_kb=meta_data.get("size_kb", 0),
+        html_url=meta_data.get("html_url", ""),
+        clone_url=meta_data.get("clone_url", ""),
+        topics=meta_data.get("topics", []),
+    )
+    analyzer_results = [
+        AnalyzerResult(
+            dimension=result["dimension"],
+            score=result["score"],
+            max_score=result["max_score"],
+            findings=result["findings"],
+            details=result.get("details", {}),
+        )
+        for result in data.get("analyzer_results", [])
+    ]
+    return RepoAudit(
+        metadata=metadata,
+        analyzer_results=analyzer_results,
+        overall_score=data.get("overall_score", 0),
+        completeness_tier=data.get("completeness_tier", "abandoned"),
+        interest_score=data.get("interest_score", 0),
+        interest_tier=data.get("interest_tier", "mundane"),
+        grade=data.get("grade", "F"),
+        interest_grade=data.get("interest_grade", "F"),
+        badges=data.get("badges", []),
+        next_badges=data.get("next_badges", []),
+        flags=data.get("flags", []),
     )
 
-    # Clone and analyze only targeted repos
-    new_audits: list[RepoAudit] = []
+
+def _report_from_dict(data: dict) -> AuditReport:
+    from src.registry_parser import RegistryReconciliation
+
+    reconciliation = None
+    if data.get("reconciliation"):
+        reconciliation = RegistryReconciliation(**data["reconciliation"])
+
+    summary = data.get("summary", {})
+    return AuditReport(
+        username=data["username"],
+        generated_at=_parse_iso_dt(data.get("generated_at")) or datetime.now(timezone.utc),
+        total_repos=data.get("total_repos", 0),
+        repos_audited=data.get("repos_audited", 0),
+        tier_distribution=data.get("tier_distribution", {}),
+        average_score=data.get("average_score", 0),
+        language_distribution=data.get("language_distribution", {}),
+        audits=[_audit_from_dict(audit) for audit in data.get("audits", [])],
+        errors=data.get("errors", []),
+        portfolio_grade=data.get("portfolio_grade", "F"),
+        portfolio_health_score=data.get("portfolio_health_score", 0),
+        tech_stack=data.get("tech_stack", {}),
+        best_work=data.get("best_work", []),
+        most_active=summary.get("most_active", []),
+        most_neglected=summary.get("most_neglected", []),
+        highest_scored=summary.get("highest_scored", []),
+        lowest_scored=summary.get("lowest_scored", []),
+        scoring_profile=data.get("scoring_profile", "default"),
+        run_mode=data.get("run_mode", "full"),
+        portfolio_baseline_size=data.get("portfolio_baseline_size", len(data.get("audits", []))),
+        reconciliation=reconciliation,
+    )
+
+
+def _load_latest_report(output_dir: Path) -> tuple[Path | None, dict | None]:
+    reports = sorted(
+        output_dir.glob("audit-report-*.json"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    if not reports:
+        return None, None
+    latest = reports[0]
+    return latest, json.loads(latest.read_text())
+
+
+def _fetch_repo_metadata(args, client: GitHubClient) -> tuple[list[RepoMetadata], list[dict]]:
+    if args.graphql and args.token:
+        from src.graphql_client import bulk_fetch_repos
+
+        print_info("Using GraphQL bulk fetch...")
+        raw_repos = bulk_fetch_repos(args.username, args.token)
+        all_repos: list[RepoMetadata] = []
+        errors: list[dict] = []
+        for repo_data in raw_repos:
+            try:
+                langs = repo_data.pop("_languages", {})
+                repo_data.pop("_releases", None)
+                meta = RepoMetadata.from_api_response(repo_data, languages=langs)
+                all_repos.append(meta)
+            except Exception as exc:
+                errors.append({"repo": repo_data.get("full_name", "?"), "error": str(exc)})
+        print_info(f"GraphQL: {len(all_repos)} repos fetched")
+        return all_repos, errors
+
+    return client.get_repo_metadata(args.username)
+
+
+def _print_filter_summary(all_repos: list[RepoMetadata], repos: list[RepoMetadata], args) -> None:
+    forks_excluded = sum(1 for r in all_repos if r.fork) if args.skip_forks else 0
+    archived_excluded = sum(1 for r in all_repos if r.archived) if args.skip_archived else 0
+    skipped = len(all_repos) - len(repos)
+    if skipped:
+        parts = []
+        if forks_excluded:
+            parts.append(f"{forks_excluded} forks")
+        if archived_excluded:
+            parts.append(f"{archived_excluded} archived")
+        print_info(f"Filtered out {skipped} repos ({', '.join(parts) or 'forks/archived'})")
+
+
+def _compute_portfolio_lang_freq(repos: list[RepoMetadata]) -> dict[str, float]:
+    lang_counts = Counter(repo.language for repo in repos if repo.language)
+    return {lang: count / len(repos) for lang, count in lang_counts.items()} if repos else {}
+
+
+def _select_target_repos(target_names: list[str], repos: list[RepoMetadata]) -> tuple[list[RepoMetadata], list[str]]:
+    exact = {repo.name: repo for repo in repos}
+    lower = {repo.name.lower(): repo for repo in repos}
+    selected: list[RepoMetadata] = []
+    missing: list[str] = []
+
+    for name in target_names:
+        repo = exact.get(name) or lower.get(name.lower())
+        if repo:
+            selected.append(repo)
+        else:
+            missing.append(name)
+
+    return selected, missing
+
+
+def _analyze_repos(
+    repos: list[RepoMetadata],
+    *,
+    args,
+    client: GitHubClient,
+    portfolio_lang_freq: dict[str, float],
+    custom_weights: dict[str, float] | None,
+) -> list[RepoAudit]:
+    if args.skip_clone:
+        print_warning("Audit modes that score repos do not support --skip-clone.")
+        return []
+
+    audits: list[RepoAudit] = []
     progress = create_progress()
-    with clone_workspace(targeted_repos, token=args.token,
-                         on_progress=lambda i, t, n: None,
-                         on_error=lambda n, m: print_warning(f"Failed to clone {n}")) as cloned:
-        print_info(f"Cloned {len(cloned)}/{len(targeted_repos)} repos. Analyzing...")
+    with clone_workspace(
+        repos,
+        token=args.token,
+        on_progress=lambda i, t, n: None,
+        on_error=lambda n, m: print_warning(f"Failed to clone {n}"),
+    ) as cloned:
+        print_info(f"Cloned {len(cloned)}/{len(repos)} repos. Analyzing...")
         if progress:
             with progress:
-                task = progress.add_task("Analyzing", total=len(targeted_repos))
-                for i, repo_meta in enumerate(targeted_repos, 1):
+                task = progress.add_task("Analyzing", total=len(repos))
+                for repo_meta in repos:
                     repo_path = cloned.get(repo_meta.name)
                     if not repo_path:
                         progress.advance(task)
                         continue
                     progress.update(task, description=f"Analyzing {repo_meta.name}")
                     results = run_all_analyzers(repo_path, repo_meta, client)
-                    audit = score_repo(repo_meta, results, portfolio_lang_freq=targeted_lang_freq)
-                    new_audits.append(audit)
+                    audit = score_repo(
+                        repo_meta,
+                        results,
+                        portfolio_lang_freq=portfolio_lang_freq,
+                        custom_weights=custom_weights,
+                    )
+                    audits.append(audit)
                     if args.verbose:
                         _print_verbose(audit)
                     progress.advance(task)
         else:
-            for i, repo_meta in enumerate(targeted_repos, 1):
+            for index, repo_meta in enumerate(repos, 1):
                 repo_path = cloned.get(repo_meta.name)
                 if not repo_path:
                     continue
-                print(f"  [{i}/{len(targeted_repos)}] Analyzing {repo_meta.name}...", file=sys.stderr)
+                print(f"  [{index}/{len(repos)}] Analyzing {repo_meta.name}...", file=sys.stderr)
                 results = run_all_analyzers(repo_path, repo_meta, client)
-                audit = score_repo(repo_meta, results, portfolio_lang_freq=targeted_lang_freq)
-                new_audits.append(audit)
+                audit = score_repo(
+                    repo_meta,
+                    results,
+                    portfolio_lang_freq=portfolio_lang_freq,
+                    custom_weights=custom_weights,
+                )
+                audits.append(audit)
                 if args.verbose:
                     _print_verbose(audit)
+
     print_info("Clones cleaned up")
+    return audits
 
-    # Load the most recent existing report and merge
-    existing_reports = sorted(output_dir.glob("audit-report-*.json"), key=lambda f: f.stat().st_mtime, reverse=True)
-    existing_audits: list[dict] = []
-    if existing_reports:
-        import json as _json
-        existing_data = _json.loads(existing_reports[0].read_text())
-        existing_audits = existing_data.get("audits", [])
-        print_info(f"Merging into {existing_reports[0].name} ({len(existing_audits)} existing repos)")
 
-    # Merge: replace existing entries for targeted repos, add new ones
-    new_audit_names = {a.metadata.name for a in new_audits}
-    # Keep all existing audits that aren't being replaced
-    kept = [a for a in existing_audits if a["metadata"]["name"] not in new_audit_names]
-
-    # Convert new audits to dicts and combine
-    all_audit_dicts = kept + [a.to_dict() for a in new_audits]
-
-    # Reconstruct RepoAudit objects for AuditReport.from_audits
-    # We need the full objects, so rebuild from the new audits + reconstruct from existing dicts
-    from src.models import AnalyzerResult
-    all_audits_obj: list[RepoAudit] = list(new_audits)
-    for ad in kept:
-        m = ad["metadata"]
-        meta = RepoMetadata(
-            name=m["name"], full_name=m["full_name"], description=m.get("description"),
-            language=m.get("language"), languages=m.get("languages", {}),
-            private=m["private"], fork=m["fork"], archived=m["archived"],
-            created_at=datetime.fromisoformat(m["created_at"]) if m.get("created_at") else None,
-            updated_at=datetime.fromisoformat(m["updated_at"]) if m.get("updated_at") else None,
-            pushed_at=datetime.fromisoformat(m["pushed_at"]) if m.get("pushed_at") else None,
-            default_branch=m.get("default_branch", "main"),
-            stars=m.get("stars", 0), forks=m.get("forks", 0),
-            open_issues=m.get("open_issues", 0), size_kb=m.get("size_kb", 0),
-            html_url=m.get("html_url", ""), clone_url=m.get("clone_url", ""),
-            topics=m.get("topics", []),
-        )
-        results_obj = [
-            AnalyzerResult(
-                dimension=r["dimension"], score=r["score"],
-                max_score=r["max_score"], findings=r["findings"],
-                details=r.get("details", {}),
-            )
-            for r in ad.get("analyzer_results", [])
-        ]
-        audit_obj = RepoAudit(
-            metadata=meta, analyzer_results=results_obj,
-            overall_score=ad.get("overall_score", 0),
-            completeness_tier=ad.get("completeness_tier", "abandoned"),
-            interest_score=ad.get("interest_score", 0),
-            interest_tier=ad.get("interest_tier", "mundane"),
-            grade=ad.get("grade", "F"),
-            interest_grade=ad.get("interest_grade", "F"),
-            badges=ad.get("badges", []),
-            next_badges=ad.get("next_badges", []),
-            flags=ad.get("flags", []),
-        )
-        all_audits_obj.append(audit_obj)
-
-    # Build report
-    report = AuditReport.from_audits(
-        args.username, all_audits_obj, errors, len(all_audits_obj),
-    )
-
-    # Registry reconciliation
+def _apply_requested_reconciliation(report: AuditReport, args, audits: list[RepoAudit]) -> None:
     if args.registry:
         from src.registry_parser import parse_registry, reconcile, sync_new_repos
-        registry = parse_registry(args.registry)
-        report.reconciliation = reconcile(registry, all_audits_obj)
-        if args.sync_registry and report.reconciliation.on_github_not_registry:
-            sync_new_repos(args.registry, report.reconciliation.on_github_not_registry, all_audits_obj)
 
-    # Generate all reports
-    json_path = write_json_report(report, output_dir)
+        registry = parse_registry(args.registry)
+        report.reconciliation = reconcile(registry, audits)
+        print_info(
+            f"Registry: {report.reconciliation.registry_total} projects, "
+            f"{len(report.reconciliation.matched)} matched"
+        )
+        if args.sync_registry and report.reconciliation.on_github_not_registry:
+            added = sync_new_repos(
+                args.registry,
+                report.reconciliation.on_github_not_registry,
+                audits,
+            )
+            if added:
+                print_info(
+                    f"Synced {len(added)} repos to registry: {', '.join(added[:5])}"
+                    + (f"... (+{len(added) - 5})" if len(added) > 5 else "")
+                )
+        return
+
+    if args.notion_registry:
+        from src.notion_registry import load_notion_registry
+        from src.registry_parser import reconcile
+
+        notion_projects = load_notion_registry(Path("config"))
+        if notion_projects:
+            report.reconciliation = reconcile(notion_projects, audits)
+            print_info(
+                f"Notion registry: {len(notion_projects)} projects, "
+                f"{len(report.reconciliation.matched)} matched"
+            )
+
+
+def _write_report_outputs(
+    report: AuditReport,
+    args,
+    output_dir: Path,
+    *,
+    cache: ResponseCache | None = None,
+    json_path: Path | None = None,
+    write_json: bool = True,
+    archive: bool = True,
+    save_fingerprint_data: bool = True,
+    diff_source: Path | None = None,
+) -> dict[str, object]:
+    from src.diff import diff_reports, format_diff_markdown
     from src.excel_export import export_excel
-    from src.history import load_trend_data, archive_report, load_repo_score_history
+    from src.history import (
+        archive_report,
+        find_previous,
+        load_repo_score_history,
+        load_trend_data,
+        save_fingerprints,
+    )
+
+    report_data = report.to_dict()
+    if write_json:
+        json_path = write_json_report(report, output_dir)
+    elif json_path is None:
+        raise ValueError("json_path is required when write_json is False")
+
+    if diff_source is None and write_json:
+        diff_source = find_previous(json_path.name)
+
+    diff_dict = None
+    if diff_source:
+        diff = diff_reports(diff_source, json_path)
+        diff_dict = diff.to_dict()
+        diff_md_path = output_dir / f"audit-diff-{report.username}-{_date_str(report.generated_at)}.md"
+        diff_md_path.write_text(format_diff_markdown(diff))
+        diff_json_path = output_dir / f"audit-diff-{report.username}-{_date_str(report.generated_at)}.json"
+        diff_json_path.write_text(json.dumps(diff_dict, indent=2))
+        print_info(
+            f"Diff: {len(diff.tier_changes)} tier changes, "
+            f"{len([c for c in diff.score_changes if abs(c['delta']) > 0.05])} significant score changes"
+        )
+
     trend_data = load_trend_data()
     score_history = load_repo_score_history()
     excel_path = export_excel(
         json_path,
-        output_dir / f"audit-dashboard-{args.username}-{_date_str(report.generated_at)}.xlsx",
+        output_dir / f"audit-dashboard-{report.username}-{_date_str(report.generated_at)}.xlsx",
         trend_data=trend_data,
+        diff_data=diff_dict,
         score_history=score_history,
     )
     md_path = write_markdown_report(report, output_dir)
     pcc_path = write_pcc_export(report, output_dir)
     raw_path = write_raw_metadata(report, output_dir)
-    archive_report(json_path)
-    from src.history import save_fingerprints
-    save_fingerprints([a.to_dict() for a in all_audits_obj])
+
+    if archive and write_json:
+        archive_report(json_path)
+    if save_fingerprint_data:
+        save_fingerprints(report_data["audits"])
 
     badge_info = ""
     if args.badges:
         from src.badge_export import export_badges, upload_badge_gist, _write_badges_markdown
-        badge_result = export_badges(report.to_dict(), output_dir)
+
+        badge_result = export_badges(report_data, output_dir)
         badge_info = f"\n    {badge_result['badges_md']} ({badge_result['files_written']} badge files)"
         if args.upload_badges:
             gist_urls = upload_badge_gist(output_dir / "badges", report.username)
             if gist_urls:
-                _write_badges_markdown(report.to_dict(), output_dir / "badges", gist_urls)
+                _write_badges_markdown(report_data, output_dir / "badges", gist_urls)
 
     notion_info = ""
     if args.notion:
         from src.notion_export import export_notion_events, _load_project_map
-        notion_result = export_notion_events(report.to_dict(), output_dir)
-        notion_info = f"\n    {notion_result['events_path']} ({notion_result['event_count']} events, {len(notion_result['unmapped'])} unmapped)"
+        from src.notion_client import get_notion_token, load_notion_config
+        from src.notion_sync import (
+            check_recommendation_followup,
+            create_audit_action_requests,
+            create_audit_history_entry,
+            create_recommendation_run,
+            patch_project_completeness_cards,
+            patch_weekly_review,
+            sync_notion_events,
+        )
+
+        notion_result = export_notion_events(report_data, output_dir)
+        notion_info = (
+            f"\n    {notion_result['events_path']} "
+            f"({notion_result['event_count']} events, {len(notion_result['unmapped'])} unmapped)"
+        )
         if args.notion_sync:
-            from src.notion_client import get_notion_token, load_notion_config
-            from src.notion_sync import (
-                sync_notion_events,
-                create_recommendation_run,
-                create_audit_action_requests,
-                patch_weekly_review,
-            )
             sync_notion_events(notion_result["events_path"], Path("config"))
             sync_token = get_notion_token()
             sync_config = load_notion_config(Path("config"))
             if sync_token and sync_config:
-                from src.quick_wins import find_quick_wins as _find_qw
-                qw = _find_qw(new_audits)
+                from src.notion_dashboard import create_notion_dashboard
+                from src.quick_wins import find_quick_wins
+
+                quick_wins = find_quick_wins(report.audits)
                 project_map = _load_project_map(Path("config"))
-                create_recommendation_run(report.to_dict(), qw, sync_token, sync_config)
+                create_recommendation_run(report_data, quick_wins, sync_token, sync_config)
                 create_audit_action_requests(
-                    report.to_dict().get("audits", []), project_map, sync_token, sync_config,
+                    report_data.get("audits", []), project_map, sync_token, sync_config,
                 )
-                patch_weekly_review(report.to_dict(), None, qw, sync_token, sync_config)
+                patch_weekly_review(report_data, diff_dict, quick_wins, sync_token, sync_config)
+                create_audit_history_entry(report_data, sync_token, sync_config)
+                patch_project_completeness_cards(
+                    report_data.get("audits", []), project_map, sync_token, sync_config,
+                )
+                check_recommendation_followup(report_data, sync_token, sync_config)
+                create_notion_dashboard(report_data, sync_token, sync_config)
 
     readme_info = ""
     if args.portfolio_readme:
         from src.portfolio_readme import export_portfolio_readme
-        readme_result = export_portfolio_readme(report.to_dict(), output_dir)
+
+        readme_result = export_portfolio_readme(report_data, output_dir)
         readme_info = f"\n    {readme_result['readme_path']}"
 
     suggestions_info = ""
     if args.readme_suggestions:
         from src.readme_suggestions import generate_readme_suggestions
-        sug_result = generate_readme_suggestions(report.to_dict(), output_dir)
+
+        sug_result = generate_readme_suggestions(report_data, output_dir)
         suggestions_info = f"\n    {sug_result['suggestions_path']} ({sug_result['total_suggestions']} suggestions)"
 
     html_info = ""
     if args.html:
         from src.web_export import export_html_dashboard
-        html_result = export_html_dashboard(report.to_dict(), output_dir)
+
+        html_result = export_html_dashboard(report_data, output_dir, trend_data, score_history)
         html_info = f"\n    {html_result['html_path']}"
 
+    if args.auto_archive:
+        from src.archive_candidates import export_archive_report, find_archive_candidates
+
+        candidates = find_archive_candidates(score_history)
+        if candidates:
+            archive_result = export_archive_report(candidates, report.username, output_dir)
+            print_info(f"Archive candidates: {archive_result['count']} repos → {archive_result['report_path']}")
+
+    if args.narrative:
+        from src.narrative import generate_narrative
+
+        generate_narrative(report_data, output_dir)
+
+    cache_info = ""
+    if cache:
+        cache_info = f"\n  Cache: {cache.hits} hits, {cache.misses} misses"
+
+    return {
+        "json_path": json_path,
+        "md_path": md_path,
+        "excel_path": excel_path,
+        "pcc_path": pcc_path,
+        "raw_path": raw_path,
+        "badge_info": badge_info,
+        "notion_info": notion_info,
+        "readme_info": readme_info,
+        "suggestions_info": suggestions_info,
+        "html_info": html_info,
+        "cache_info": cache_info,
+    }
+
+
+def _ensure_partial_run_profile_compatible(existing_report_data: dict | None, profile_name: str) -> bool:
+    if not existing_report_data:
+        return True
+    existing_profile = _normalize_profile_name(existing_report_data.get("scoring_profile"))
+    if existing_profile == profile_name:
+        return True
+    print_warning(
+        "Latest report was generated with a different scoring profile.\n"
+        f"  Existing: {existing_profile} | Requested: {profile_name}\n"
+        "  Run a full audit with the desired scoring profile before doing a partial rerun."
+    )
+    return False
+
+
+def _print_output_summary(
+    headline: str,
+    report: AuditReport,
+    outputs: dict[str, object],
+) -> None:
     print(
-        f"\n✓ Targeted audit: {len(new_audits)} new/updated + {len(kept)} existing = {len(all_audits_obj)} total\n"
+        f"\n✓ {headline}\n"
         f"  Average score: {report.average_score:.2f}\n"
-        f"  Tiers: {report.tier_distribution}\n"
+        f"  Tiers: {report.tier_distribution}"
+        f"{outputs['cache_info']}\n"
         f"  Reports:\n"
-        f"    {json_path}\n"
-        f"    {md_path}\n"
-        f"    {excel_path}\n"
-        f"    {pcc_path}\n"
-        f"    {raw_path}{badge_info}{notion_info}{readme_info}{suggestions_info}{html_info}",
+        f"    {outputs['json_path']}\n"
+        f"    {outputs['md_path']}\n"
+        f"    {outputs['excel_path']}\n"
+        f"    {outputs['pcc_path']}\n"
+        f"    {outputs['raw_path']}"
+        f"{outputs['badge_info']}"
+        f"{outputs['notion_info']}"
+        f"{outputs['readme_info']}"
+        f"{outputs['suggestions_info']}"
+        f"{outputs['html_info']}",
     )
 
 
-def _run_incremental_audit(args, client, output_dir: Path) -> None:
+def _run_targeted_audit(
+    args,
+    client: GitHubClient,
+    output_dir: Path,
+    *,
+    all_repos: list[RepoMetadata],
+    errors: list[dict],
+    custom_weights: dict[str, float] | None,
+    scoring_profile_name: str,
+    existing_report_path: Path | None = None,
+    existing_report_data: dict | None = None,
+) -> None:
+    """Audit only specific repos and merge into the most recent full report."""
+    target_names = _resolve_repo_names(args.repos)
+    print_status(f"Targeted audit: {len(target_names)} repos")
+
+    if existing_report_path is None and existing_report_data is None:
+        existing_report_path, existing_report_data = _load_latest_report(output_dir)
+    if not _ensure_partial_run_profile_compatible(existing_report_data, scoring_profile_name):
+        return
+
+    filtered_repos = _filter_repos(
+        all_repos,
+        skip_forks=args.skip_forks,
+        skip_archived=args.skip_archived,
+    )
+    targeted_repos, missing = _select_target_repos(target_names, filtered_repos)
+    run_errors = list(errors)
+    for name in missing:
+        run_errors.append({"repo": f"{args.username}/{name}", "error": "Repo not found in fetched metadata"})
+        print_warning(f"Repo not found: {name}")
+
+    if not targeted_repos:
+        print_warning("No repos to audit.")
+        return
+
+    portfolio_lang_freq = _compute_portfolio_lang_freq(filtered_repos)
+    new_audits = _analyze_repos(
+        targeted_repos,
+        args=args,
+        client=client,
+        portfolio_lang_freq=portfolio_lang_freq,
+        custom_weights=custom_weights,
+    )
+    if not new_audits:
+        return
+
+    existing_audits = existing_report_data.get("audits", []) if existing_report_data else []
+    if existing_report_path:
+        print_info(f"Merging into {existing_report_path.name} ({len(existing_audits)} existing repos)")
+
+    new_names = {audit.metadata.name for audit in new_audits}
+    kept_audits = [
+        _audit_from_dict(audit_data)
+        for audit_data in existing_audits
+        if audit_data["metadata"]["name"] not in new_names
+    ]
+    merged_audits = list(new_audits) + kept_audits
+    total_repos = existing_report_data.get("total_repos", len(filtered_repos)) if existing_report_data else len(filtered_repos)
+
+    report = AuditReport.from_audits(
+        args.username,
+        merged_audits,
+        run_errors,
+        total_repos,
+        scoring_profile=scoring_profile_name,
+        run_mode="targeted",
+        portfolio_baseline_size=len(filtered_repos),
+    )
+    _apply_requested_reconciliation(report, args, merged_audits)
+
+    outputs = _write_report_outputs(
+        report,
+        args,
+        output_dir,
+        cache=None,
+        diff_source=args.diff or existing_report_path,
+    )
+    _print_output_summary(
+        f"Targeted audit: {len(new_audits)} new/updated + {len(kept_audits)} existing = {len(merged_audits)} total",
+        report,
+        outputs,
+    )
+
+
+def _regenerate_outputs_from_latest_report(
+    args,
+    output_dir: Path,
+    *,
+    existing_report_path: Path,
+    existing_report_data: dict,
+) -> None:
+    report = _report_from_dict(existing_report_data)
+    outputs = _write_report_outputs(
+        report,
+        args,
+        output_dir,
+        json_path=existing_report_path,
+        write_json=False,
+        archive=False,
+        save_fingerprint_data=False,
+    )
+    print(
+        f"\n✓ Regenerated outputs from latest audit for {report.username}\n"
+        f"  Source report: {existing_report_path}\n"
+        f"  Reports:\n"
+        f"    {outputs['md_path']}\n"
+        f"    {outputs['excel_path']}\n"
+        f"    {outputs['pcc_path']}\n"
+        f"    {outputs['raw_path']}"
+        f"{outputs['badge_info']}"
+        f"{outputs['notion_info']}"
+        f"{outputs['readme_info']}"
+        f"{outputs['suggestions_info']}"
+        f"{outputs['html_info']}",
+    )
+
+
+def _run_incremental_audit(
+    args,
+    client: GitHubClient,
+    output_dir: Path,
+    *,
+    all_repos: list[RepoMetadata],
+    errors: list[dict],
+    custom_weights: dict[str, float] | None,
+    scoring_profile_name: str,
+) -> None:
     """Only re-audit repos whose pushed_at changed since last run."""
-    from src.history import load_fingerprints, save_fingerprints
+    from src.history import load_fingerprints
+
+    existing_report_path, existing_report_data = _load_latest_report(output_dir)
+    if not existing_report_path or not existing_report_data:
+        print_warning("No previous audit report found. Run a full audit first.")
+        return
+    if not _ensure_partial_run_profile_compatible(existing_report_data, scoring_profile_name):
+        return
 
     fingerprints = load_fingerprints()
     if not fingerprints:
         print_warning("No fingerprints found. Run a full audit first.")
-        print_info("Usage: python -m src saagpatel")
+        print_info(f"Usage: python -m src {args.username}")
         return
 
-    # Fetch metadata (fast, uses cache for list + languages)
-    all_repos, errors = client.get_repo_metadata(args.username)
     repos = _filter_repos(all_repos, skip_forks=args.skip_forks, skip_archived=args.skip_archived)
 
     changed: list[str] = []
@@ -546,55 +900,62 @@ def _run_incremental_audit(args, client, output_dir: Path) -> None:
 
     needs_audit = changed + new
     unchanged = len(repos) - len(needs_audit)
-
     print_info(
         f"Incremental: {len(needs_audit)} need audit "
         f"({len(changed)} changed, {len(new)} new), {unchanged} unchanged"
     )
 
     if not needs_audit:
-        print_info("No changes. Regenerating reports from last audit.")
-        existing = sorted(output_dir.glob("audit-report-*.json"), key=lambda f: f.stat().st_mtime, reverse=True)
-        if existing:
-            from src.excel_export import export_excel
-            from src.history import load_trend_data
-            excel_path = export_excel(
-                existing[0],
-                output_dir / f"audit-dashboard-{args.username}-{_date_str(datetime.now(timezone.utc))}.xlsx",
-                trend_data=load_trend_data(),
-            )
-            print_info(f"Regenerated: {excel_path}")
+        print_info("No changes. Regenerating outputs from latest report.")
+        _regenerate_outputs_from_latest_report(
+            args,
+            output_dir,
+            existing_report_path=existing_report_path,
+            existing_report_data=existing_report_data,
+        )
         return
 
-    # Use targeted audit machinery
     args.repos = needs_audit
-    _run_targeted_audit(args, client, output_dir)
+    _run_targeted_audit(
+        args,
+        client,
+        output_dir,
+        all_repos=all_repos,
+        errors=errors,
+        custom_weights=custom_weights,
+        scoring_profile_name=scoring_profile_name,
+        existing_report_path=existing_report_path,
+        existing_report_data=existing_report_data,
+    )
 
-    # Save updated fingerprints
-    latest = sorted(output_dir.glob("audit-report-*.json"), key=lambda f: f.stat().st_mtime, reverse=True)
-    if latest:
-        report_data = json.loads(latest[0].read_text())
-        save_fingerprints(report_data.get("audits", []))
-        print_info(f"Fingerprints updated for {len(report_data.get('audits', []))} repos")
+
+def _load_scoring_profile(profile_name: str | None) -> tuple[dict[str, float] | None, str]:
+    normalized = _normalize_profile_name(profile_name)
+    if not profile_name:
+        return None, normalized
+
+    profile_path = Path(f"config/scoring-profiles/{profile_name}.json")
+    if profile_path.is_file():
+        print_info(f"Using scoring profile: {profile_name}")
+        return json.loads(profile_path.read_text()), normalized
+
+    print_warning(f"Scoring profile not found: {profile_path}")
+    return None, normalized
 
 
 def main() -> None:
-    args = build_parser().parse_args()
+    parser = build_parser()
+    args = parser.parse_args()
+
+    if args.registry and args.notion_registry:
+        parser.error("--registry and --notion-registry cannot be used together")
 
     if args.upload_badges:
         args.badges = True
     if args.notion_sync:
         args.notion = True
 
-    # Load custom scoring profile
-    custom_weights = None
-    if args.scoring_profile:
-        profile_path = Path(f"config/scoring-profiles/{args.scoring_profile}.json")
-        if profile_path.is_file():
-            custom_weights = json.loads(profile_path.read_text())
-            print_info(f"Using scoring profile: {args.scoring_profile}")
-        else:
-            print_warning(f"Scoring profile not found: {profile_path}")
+    custom_weights, scoring_profile_name = _load_scoring_profile(args.scoring_profile)
 
     if not args.token:
         print_warning(
@@ -602,295 +963,71 @@ def main() -> None:
             "  Set GITHUB_TOKEN or pass --token for private repo access."
         )
 
-    # Set up cache
     cache = None if args.no_cache else ResponseCache()
-
-    # Fetch metadata from GitHub API
     client = GitHubClient(token=args.token, cache=cache)
-
-    # Targeted or incremental audit
     output_dir = Path(args.output_dir)
-    if args.repos:
-        _run_targeted_audit(args, client, output_dir)
-        return
-    if args.incremental:
-        _run_incremental_audit(args, client, output_dir)
-        return
 
-    if args.graphql and args.token:
-        from src.graphql_client import bulk_fetch_repos
-        print_info("Using GraphQL bulk fetch...")
-        raw_repos = bulk_fetch_repos(args.username, args.token)
-        all_repos = []
-        errors = []
-        for repo_data in raw_repos:
-            try:
-                langs = repo_data.pop("_languages", {})
-                repo_data.pop("_releases", None)
-                meta = RepoMetadata.from_api_response(repo_data, languages=langs)
-                all_repos.append(meta)
-            except Exception as exc:
-                errors.append({"repo": repo_data.get("full_name", "?"), "error": str(exc)})
-        print_info(f"GraphQL: {len(all_repos)} repos fetched")
-    else:
-        all_repos, errors = client.get_repo_metadata(args.username)
+    all_repos, errors = _fetch_repo_metadata(args, client)
     total_fetched = len(all_repos)
-
-    # Apply filters
     repos = _filter_repos(
         all_repos,
         skip_forks=args.skip_forks,
         skip_archived=args.skip_archived,
     )
+    _print_filter_summary(all_repos, repos, args)
 
-    forks_excluded = sum(1 for r in all_repos if r.fork) if args.skip_forks else 0
-    archived_excluded = sum(1 for r in all_repos if r.archived) if args.skip_archived else 0
-    skipped = total_fetched - len(repos)
-    if skipped:
-        parts = []
-        if forks_excluded:
-            parts.append(f"{forks_excluded} forks")
-        if archived_excluded:
-            parts.append(f"{archived_excluded} archived")
-        print_info(f"Filtered out {skipped} repos ({', '.join(parts) or 'forks/archived'})")
+    if args.repos:
+        _run_targeted_audit(
+            args,
+            client,
+            output_dir,
+            all_repos=all_repos,
+            errors=errors,
+            custom_weights=custom_weights,
+            scoring_profile_name=scoring_profile_name,
+        )
+        return
 
-    # Clone and analyze
-    audits: list[RepoAudit] = []
+    if args.incremental:
+        _run_incremental_audit(
+            args,
+            client,
+            output_dir,
+            all_repos=all_repos,
+            errors=errors,
+            custom_weights=custom_weights,
+            scoring_profile_name=scoring_profile_name,
+        )
+        return
 
-    # Portfolio language frequency for relative novelty scoring
-    lang_counts = Counter(r.language for r in repos if r.language)
-    portfolio_lang_freq = {lang: count / len(repos) for lang, count in lang_counts.items()} if repos else {}
-
-    if not args.skip_clone:
-        progress = create_progress()
-        with clone_workspace(repos, token=args.token,
-                             on_progress=lambda i, t, n: None,
-                             on_error=lambda n, m: print_warning(f"Failed to clone {n}")) as cloned:
-            print_info(f"Cloned {len(cloned)}/{len(repos)} repos. Analyzing...")
-            if progress:
-                with progress:
-                    task = progress.add_task("Analyzing", total=len(repos))
-                    for i, repo_meta in enumerate(repos, 1):
-                        repo_path = cloned.get(repo_meta.name)
-                        if not repo_path:
-                            progress.advance(task)
-                            continue
-                        progress.update(task, description=f"Analyzing {repo_meta.name}")
-                        results = run_all_analyzers(repo_path, repo_meta, client)
-                        audit = score_repo(repo_meta, results, portfolio_lang_freq=portfolio_lang_freq, custom_weights=custom_weights)
-                        audits.append(audit)
-                        if args.verbose:
-                            _print_verbose(audit)
-                        progress.advance(task)
-            else:
-                for i, repo_meta in enumerate(repos, 1):
-                    repo_path = cloned.get(repo_meta.name)
-                    if not repo_path:
-                        continue
-                    print(
-                        f"  [{i}/{len(repos)}] Analyzing {repo_meta.name}...",
-                        file=sys.stderr,
-                    )
-                    results = run_all_analyzers(repo_path, repo_meta, client)
-                    audit = score_repo(repo_meta, results, portfolio_lang_freq=portfolio_lang_freq, custom_weights=custom_weights)
-                    audits.append(audit)
-                    if args.verbose:
-                        _print_verbose(audit)
-
-        print_info("Clones cleaned up")
-
-    # Generate reports
-    output_dir = Path(args.output_dir)
+    audits = _analyze_repos(
+        repos,
+        args=args,
+        client=client,
+        portfolio_lang_freq=_compute_portfolio_lang_freq(repos),
+        custom_weights=custom_weights,
+    )
 
     if audits:
         report = AuditReport.from_audits(
-            args.username, audits, errors, total_fetched,
+            args.username,
+            audits,
+            errors,
+            total_fetched,
+            scoring_profile=scoring_profile_name,
+            run_mode="full",
+            portfolio_baseline_size=len(repos),
         )
+        _apply_requested_reconciliation(report, args, audits)
+        outputs = _write_report_outputs(report, args, output_dir, cache=cache)
+        _print_output_summary(f"Audited {report.repos_audited} repos for {report.username}", report, outputs)
+        return
 
-        # Registry reconciliation
-        if args.registry:
-            from src.registry_parser import parse_registry, reconcile, sync_new_repos
-            registry = parse_registry(args.registry)
-            report.reconciliation = reconcile(registry, audits)
-            print_info(
-                f"Registry: {report.reconciliation.registry_total} projects, "
-                f"{len(report.reconciliation.matched)} matched"
-            )
-
-            # Auto-sync untracked repos
-            if args.sync_registry and report.reconciliation.on_github_not_registry:
-                added = sync_new_repos(
-                    args.registry,
-                    report.reconciliation.on_github_not_registry,
-                    audits,
-                )
-                if added:
-                    print_info(
-                        f"Synced {len(added)} repos to registry: {', '.join(added[:5])}"
-                        + (f"... (+{len(added)-5})" if len(added) > 5 else "")
-                    )
-
-        json_path = write_json_report(report, output_dir)
-
-        # Compute diff BEFORE Excel so narrative can use it
-        from src.history import archive_report, find_previous, load_trend_data, save_fingerprints
-        from src.diff import diff_reports, format_diff_markdown
-
-        previous = find_previous(json_path.name)
-        diff_source = args.diff or previous
-        diff_dict = None
-
-        if diff_source:
-            diff = diff_reports(diff_source, json_path)
-            diff_dict = diff.to_dict()
-            diff_md_path = output_dir / f"audit-diff-{report.username}-{_date_str(report.generated_at)}.md"
-            diff_md_path.write_text(format_diff_markdown(diff))
-            diff_json_path = output_dir / f"audit-diff-{report.username}-{_date_str(report.generated_at)}.json"
-            diff_json_path.write_text(json.dumps(diff_dict, indent=2))
-            print_info(
-                f"Diff: {len(diff.tier_changes)} tier changes, "
-                f"{len([c for c in diff.score_changes if abs(c['delta']) > 0.05])} significant score changes"
-            )
-
-        # Excel dashboard (with trend + diff + sparkline data)
-        from src.excel_export import export_excel
-        from src.history import load_repo_score_history
-        trend_data = load_trend_data()
-        score_history = load_repo_score_history()
-        excel_path = export_excel(
-            json_path,
-            output_dir / f"audit-dashboard-{args.username}-{_date_str(report.generated_at)}.xlsx",
-            trend_data=trend_data,
-            diff_data=diff_dict,
-            score_history=score_history,
-        )
-        md_path = write_markdown_report(report, output_dir)
-        pcc_path = write_pcc_export(report, output_dir)
-        raw_path = write_raw_metadata(report, output_dir)
-
-        # Archive + fingerprints
-        archive_report(json_path)
-        save_fingerprints(report.to_dict()["audits"])
-
-        # Badge export
-        badge_info = ""
-        if args.badges:
-            from src.badge_export import export_badges, upload_badge_gist, _write_badges_markdown
-            badge_result = export_badges(report.to_dict(), output_dir)
-            badge_info = f"\n    {badge_result['badges_md']} ({badge_result['files_written']} badge files)"
-            if args.upload_badges:
-                gist_urls = upload_badge_gist(output_dir / "badges", report.username)
-                if gist_urls:
-                    _write_badges_markdown(report.to_dict(), output_dir / "badges", gist_urls)
-
-        # Notion export
-        notion_info = ""
-        if args.notion:
-            from src.notion_export import export_notion_events, _load_project_map
-            notion_result = export_notion_events(report.to_dict(), output_dir)
-            notion_info = f"\n    {notion_result['events_path']} ({notion_result['event_count']} events, {len(notion_result['unmapped'])} unmapped)"
-            if args.notion_sync:
-                from src.notion_client import get_notion_token, load_notion_config
-                from src.notion_sync import (
-                    sync_notion_events,
-                    create_recommendation_run,
-                    create_audit_action_requests,
-                    patch_weekly_review,
-                    create_audit_history_entry,
-                    patch_project_completeness_cards,
-                    check_recommendation_followup,
-                )
-                sync_notion_events(notion_result["events_path"], Path("config"))
-                sync_token = get_notion_token()
-                sync_config = load_notion_config(Path("config"))
-                if sync_token and sync_config:
-                    from src.quick_wins import find_quick_wins as _find_qw
-                    qw = _find_qw(audits)
-                    project_map = _load_project_map(Path("config"))
-                    create_recommendation_run(report.to_dict(), qw, sync_token, sync_config)
-                    create_audit_action_requests(
-                        report.to_dict().get("audits", []), project_map, sync_token, sync_config,
-                    )
-                    patch_weekly_review(report.to_dict(), diff_dict, qw, sync_token, sync_config)
-                    create_audit_history_entry(report.to_dict(), sync_token, sync_config)
-                    patch_project_completeness_cards(
-                        report.to_dict().get("audits", []), project_map, sync_token, sync_config,
-                    )
-                    check_recommendation_followup(report.to_dict(), sync_token, sync_config)
-                    # Notion dashboard
-                    from src.notion_dashboard import create_notion_dashboard
-                    create_notion_dashboard(report.to_dict(), sync_token, sync_config)
-
-        # Notion registry reconciliation
-        if args.notion_registry:
-            from src.notion_registry import load_notion_registry
-            from src.registry_parser import reconcile
-            notion_projects = load_notion_registry(Path("config"))
-            if notion_projects:
-                report.reconciliation = reconcile(notion_projects, audits)
-                print_info(
-                    f"Notion registry: {len(notion_projects)} projects, "
-                    f"{len(report.reconciliation.matched)} matched"
-                )
-
-        # Portfolio README
-        readme_info = ""
-        if args.portfolio_readme:
-            from src.portfolio_readme import export_portfolio_readme
-            readme_result = export_portfolio_readme(report.to_dict(), output_dir)
-            readme_info = f"\n    {readme_result['readme_path']}"
-
-        # README suggestions
-        suggestions_info = ""
-        if args.readme_suggestions:
-            from src.readme_suggestions import generate_readme_suggestions
-            sug_result = generate_readme_suggestions(report.to_dict(), output_dir)
-            suggestions_info = f"\n    {sug_result['suggestions_path']} ({sug_result['total_suggestions']} suggestions)"
-
-        # HTML dashboard
-        html_info = ""
-        if args.html:
-            from src.web_export import export_html_dashboard
-            html_result = export_html_dashboard(
-                report.to_dict(), output_dir, trend_data, score_history,
-            )
-            html_info = f"\n    {html_result['html_path']}"
-
-        # Archive candidates
-        if args.auto_archive:
-            from src.archive_candidates import find_archive_candidates, export_archive_report
-            candidates = find_archive_candidates(score_history)
-            if candidates:
-                archive_result = export_archive_report(candidates, report.username, output_dir)
-                print_info(f"Archive candidates: {archive_result['count']} repos → {archive_result['report_path']}")
-
-        # AI narrative
-        if args.narrative:
-            from src.narrative import generate_narrative
-            generate_narrative(report.to_dict(), output_dir)
-
-        cache_info = ""
-        if cache:
-            cache_info = f"\n  Cache: {cache.hits} hits, {cache.misses} misses"
-
-        print(
-            f"\n✓ Audited {report.repos_audited} repos for {report.username}\n"
-            f"  Average score: {report.average_score:.2f}\n"
-            f"  Tiers: {report.tier_distribution}\n"
-            f"  Errors: {len(report.errors)}{cache_info}\n"
-            f"  Reports:\n"
-            f"    {json_path}\n"
-            f"    {md_path}\n"
-            f"    {excel_path}\n"
-            f"    {pcc_path}\n"
-            f"    {raw_path}{badge_info}{notion_info}{readme_info}{suggestions_info}{html_info}",
-        )
-    else:
-        raw_path = _write_json(
-            args.username, repos, errors, total_fetched, output_dir,
-        )
-        print(
-            f"\n✓ Fetched {total_fetched} repos for {args.username}\n"
-            f"  Included: {len(repos)} | Errors: {len(errors)}\n"
-            f"  Output: {raw_path}",
-        )
+    raw_path = _write_json(
+        args.username, repos, errors, total_fetched, output_dir,
+    )
+    print(
+        f"\n✓ Fetched {total_fetched} repos for {args.username}\n"
+        f"  Included: {len(repos)} | Errors: {len(errors)}\n"
+        f"  Output: {raw_path}",
+    )

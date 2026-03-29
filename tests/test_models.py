@@ -92,14 +92,25 @@ class TestAuditReport:
                 AnalyzerResult("activity", 0.6, 1.0, []),
             ],
             overall_score=0.7,
-            completeness_tier="functional",
-            flags=[],
+                completeness_tier="functional",
+                flags=[],
+            )
+        report = AuditReport.from_audits(
+            "user",
+            [audit],
+            [],
+            1,
+            scoring_profile="custom",
+            run_mode="targeted",
+            portfolio_baseline_size=7,
         )
-        report = AuditReport.from_audits("user", [audit], [], 1)
         assert report.repos_audited == 1
         assert report.average_score == 0.7
         assert "test-repo" in report.highest_scored
         assert report.language_distribution == {"Python": 1}
+        assert report.scoring_profile == "custom"
+        assert report.run_mode == "targeted"
+        assert report.portfolio_baseline_size == 7
 
     def test_to_dict_includes_reconciliation(self, sample_metadata):
         audit = RepoAudit(
@@ -108,6 +119,17 @@ class TestAuditReport:
             overall_score=0.5,
             completeness_tier="wip",
         )
-        report = AuditReport.from_audits("user", [audit], [], 1)
+        report = AuditReport.from_audits(
+            "user",
+            [audit],
+            [],
+            1,
+            scoring_profile="profile-a",
+            run_mode="incremental",
+            portfolio_baseline_size=3,
+        )
         d = report.to_dict()
         assert d["reconciliation"] is None  # No registry used
+        assert d["scoring_profile"] == "profile-a"
+        assert d["run_mode"] == "incremental"
+        assert d["portfolio_baseline_size"] == 3

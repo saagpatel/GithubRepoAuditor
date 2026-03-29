@@ -29,6 +29,36 @@ _title_value = title_value
 _load_notion_config = load_notion_config
 
 
+def _extract_audit_data(event: dict) -> dict:
+    """Extract audit fields from a typed event payload, with legacy fallback."""
+    machine = event.get("machineData")
+    if isinstance(machine, dict):
+        return {
+            "grade": machine.get("grade", event.get("status", "F")),
+            "overall_score": machine.get("overall_score", 0),
+            "interest_score": machine.get("interest_score", 0),
+            "badges": machine.get("badges", []),
+            "date": event.get("occurredAt", ""),
+        }
+
+    raw_excerpt = event.get("rawExcerpt", "")
+    if isinstance(raw_excerpt, str):
+        try:
+            raw = json.loads(raw_excerpt)
+        except json.JSONDecodeError:
+            raw = {}
+    else:
+        raw = {}
+
+    return {
+        "grade": event.get("status", "F"),
+        "overall_score": raw.get("overall_score", 0),
+        "interest_score": raw.get("interest_score", 0),
+        "badges": raw.get("badges", []),
+        "date": event.get("occurredAt", ""),
+    }
+
+
 def _query_existing_event_keys(
     events_db_id: str,
     token: str,
@@ -194,14 +224,7 @@ def sync_notion_events(
     for event in events:
         pid = event.get("localProjectId")
         if pid and event["eventKey"] not in existing_keys:
-            raw = json.loads(event.get("rawExcerpt", "{}"))
-            project_audits[pid] = {
-                "grade": event["status"],
-                "overall_score": raw.get("dimensions", {}).get("code_quality", 0),
-                "interest_score": raw.get("interest_score", 0),
-                "badges": raw.get("badges", []),
-                "date": event["occurredAt"],
-            }
+            project_audits[pid] = _extract_audit_data(event)
 
     for project_id, audit_data in project_audits.items():
         if _update_project_fields(project_id, audit_data, token, version):
