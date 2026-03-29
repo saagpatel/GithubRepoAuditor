@@ -55,6 +55,10 @@ def _make_args(**overrides) -> Namespace:
         "analyzers_dir": None,
         "resume": False,
         "vuln_check": False,
+        "generate_manifest": False,
+        "apply_metadata": False,
+        "apply_readmes": False,
+        "improvements_file": None,
     }
     defaults.update(overrides)
     return Namespace(**defaults)

@@ -305,6 +305,28 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Query OSV.dev for known vulnerabilities in repo dependencies",
     )
+    parser.add_argument(
+        "--generate-manifest",
+        action="store_true",
+        help="Generate an improvement manifest from the latest audit report",
+    )
+    parser.add_argument(
+        "--apply-metadata",
+        action="store_true",
+        help="Apply description and topics updates from an improvements file",
+    )
+    parser.add_argument(
+        "--apply-readmes",
+        action="store_true",
+        help="Push README updates from an improvements file via the Contents API",
+    )
+    parser.add_argument(
+        "--improvements-file",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help="Path to a JSON file with generated improvements (descriptions, topics, READMEs)",
+    )
     return parser
 
 
@@ -1315,6 +1337,54 @@ def main() -> None:
         parser.error("--writeback-target requires --campaign")
 
     custom_weights, scoring_profile_name = _load_scoring_profile(args.scoring_profile)
+
+    # ── Improvement campaign workflow (standalone, no audit needed) ────
+    if getattr(args, "generate_manifest", False):
+        from src.repo_improver import generate_manifest, write_manifest
+
+        output_dir = Path(args.output_dir)
+        report_path, report_data = _load_latest_report(output_dir)
+        if not report_data:
+            parser.error("No existing audit report found in output directory")
+        manifest = generate_manifest(report_data)
+        manifest_path = write_manifest(manifest, output_dir)
+        print_info(f"Improvement manifest: {manifest_path} ({len(manifest)} repos)")
+        return
+
+    if getattr(args, "apply_metadata", False) or getattr(args, "apply_readmes", False):
+        from src.repo_improver import (
+            apply_metadata_updates,
+            apply_readme_updates,
+            generate_execution_report,
+            load_improvements,
+        )
+
+        improvements_file = getattr(args, "improvements_file", None)
+        if not improvements_file:
+            parser.error("--apply-metadata / --apply-readmes requires --improvements-file")
+        improvements = load_improvements(improvements_file)
+        cache = None if args.no_cache else ResponseCache()
+        client = GitHubClient(token=args.token, cache=cache)
+        output_dir = Path(args.output_dir)
+        dry_run = getattr(args, "dry_run", False)
+        updates = list(improvements.values())
+
+        all_results: list[dict] = []
+        if getattr(args, "apply_metadata", False):
+            results = apply_metadata_updates(client, args.username, updates, dry_run=dry_run)
+            all_results.extend(results)
+            ok_count = sum(1 for r in results for a in r.get("actions", []) if a.get("ok") or a.get("dry_run"))
+            print_info(f"Metadata updates: {ok_count} actions {'previewed' if dry_run else 'applied'}")
+
+        if getattr(args, "apply_readmes", False):
+            results = apply_readme_updates(client, args.username, updates, dry_run=dry_run)
+            all_results.extend(results)
+            ok_count = sum(1 for r in results if r.get("ok") or r.get("dry_run"))
+            print_info(f"README updates: {ok_count} repos {'previewed' if dry_run else 'pushed'}")
+
+        report_path = generate_execution_report(all_results, output_dir)
+        print_info(f"Execution report: {report_path}")
+        return
 
     def _run_once() -> None:
         if not args.token:
