@@ -796,6 +796,9 @@ def main() -> None:
                     create_recommendation_run,
                     create_audit_action_requests,
                     patch_weekly_review,
+                    create_audit_history_entry,
+                    patch_project_completeness_cards,
+                    check_recommendation_followup,
                 )
                 sync_notion_events(notion_result["events_path"], Path("config"))
                 sync_token = get_notion_token()
@@ -809,6 +812,14 @@ def main() -> None:
                         report.to_dict().get("audits", []), project_map, sync_token, sync_config,
                     )
                     patch_weekly_review(report.to_dict(), diff_dict, qw, sync_token, sync_config)
+                    create_audit_history_entry(report.to_dict(), sync_token, sync_config)
+                    patch_project_completeness_cards(
+                        report.to_dict().get("audits", []), project_map, sync_token, sync_config,
+                    )
+                    check_recommendation_followup(report.to_dict(), sync_token, sync_config)
+                    # Notion dashboard
+                    from src.notion_dashboard import create_notion_dashboard
+                    create_notion_dashboard(report.to_dict(), sync_token, sync_config)
 
         # Notion registry reconciliation
         if args.notion_registry:

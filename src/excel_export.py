@@ -11,11 +11,12 @@ from collections import Counter
 from pathlib import Path
 
 from openpyxl import Workbook
-from openpyxl.chart import BarChart, PieChart, Reference, ScatterChart
+from openpyxl.chart import BarChart, BubbleChart, PieChart, RadarChart, Reference, ScatterChart
+from openpyxl.chart.series import Series as BubbleSeries
 from openpyxl.chart.label import DataLabelList
 from openpyxl.chart.series import DataPoint
 from openpyxl.drawing.line import LineProperties
-from openpyxl.formatting.rule import ColorScaleRule, DataBarRule
+from openpyxl.formatting.rule import ColorScaleRule, DataBarRule, IconSetRule
 from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
@@ -1201,6 +1202,235 @@ def _build_navigation(wb: Workbook, data: dict) -> None:
     auto_width(ws, 2, 6 + len(sheets))
 
 
+# ═══════════════════════════════════════════════════════════════════════
+# Repo Profiles (Radar Charts)
+# ═══════════════════════════════════════════════════════════════════════
+
+
+RADAR_DIMS = ["readme", "structure", "code_quality", "testing", "cicd",
+              "dependencies", "activity", "documentation", "build_readiness", "community_profile"]
+RADAR_LABELS = ["README", "Structure", "Code Quality", "Testing", "CI/CD",
+                "Deps", "Activity", "Docs", "Build Ready", "Community"]
+
+
+def _build_repo_profiles(wb: Workbook, data: dict) -> None:
+    ws = wb.create_sheet("Repo Profiles")
+    ws.sheet_properties.tabColor = "7C3AED"
+
+    audits = sorted(data.get("audits", []), key=lambda a: a.get("overall_score", 0), reverse=True)[:20]
+    if len(audits) < 2:
+        return
+
+    # Write dimension labels in column A
+    for i, label in enumerate(RADAR_LABELS):
+        ws.cell(row=i + 2, column=1, value=label)
+
+    # Write scores for each repo
+    for col_idx, audit in enumerate(audits):
+        dim_scores = {r["dimension"]: r["score"] for r in audit.get("analyzer_results", [])}
+        ws.cell(row=1, column=col_idx + 2, value=audit["metadata"]["name"])
+        for row_idx, dim in enumerate(RADAR_DIMS):
+            ws.cell(row=row_idx + 2, column=col_idx + 2, value=round(dim_scores.get(dim, 0), 2))
+
+    # Create radar charts (4 repos per chart)
+    labels = Reference(ws, min_col=1, min_row=2, max_row=len(RADAR_DIMS) + 1)
+    chart_row = len(RADAR_DIMS) + 4
+
+    for batch_start in range(0, min(len(audits), 20), 4):
+        batch_end = min(batch_start + 4, len(audits))
+        chart = RadarChart()
+        chart.type = "filled"
+        chart.style = 26
+        chart.title = f"Repos {batch_start + 1}-{batch_end}"
+        chart.y_axis.delete = True
+
+        chart_data = Reference(ws, min_col=batch_start + 2, max_col=batch_end + 1,
+                               min_row=1, max_row=len(RADAR_DIMS) + 1)
+        chart.add_data(chart_data, titles_from_data=True)
+        chart.set_categories(labels)
+        chart.width = 18
+        chart.height = 14
+
+        col_letter = "A" if (batch_start // 4) % 2 == 0 else "K"
+        ws.add_chart(chart, f"{col_letter}{chart_row}")
+        if (batch_start // 4) % 2 == 1:
+            chart_row += 18
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Security Sheet
+# ═══════════════════════════════════════════════════════════════════════
+
+
+def _build_security(wb: Workbook, data: dict) -> None:
+    ws = wb.create_sheet("Security")
+    ws.sheet_properties.tabColor = "991B1B"
+
+    headers = ["Repo", "Score", "Secrets", "Dangerous Files", "SECURITY.md", "Dependabot", "Findings"]
+    for col, h in enumerate(headers, 1):
+        ws.cell(row=1, column=col, value=h)
+    style_header_row(ws, 1, len(headers))
+
+    audits = sorted(data.get("audits", []), key=lambda a: next(
+        (r["score"] for r in a.get("analyzer_results", []) if r["dimension"] == "security"), 1.0
+    ))
+
+    for row, audit in enumerate(audits, 2):
+        sec = next((r for r in audit.get("analyzer_results", []) if r["dimension"] == "security"), None)
+        if not sec:
+            continue
+        details = sec.get("details", {})
+        m = audit.get("metadata", {})
+
+        values = [
+            m.get("name", ""),
+            round(sec["score"], 2),
+            details.get("secrets_found", 0),
+            ", ".join(str(f) for f in details.get("dangerous_files", [])[:3]),
+            "Yes" if details.get("has_security_md") else "No",
+            "Yes" if details.get("has_dependabot") else "No",
+            "; ".join(sec.get("findings", [])[:3]),
+        ]
+        for col, val in enumerate(values, 1):
+            cell = ws.cell(row=row, column=col, value=val)
+            style_data_cell(cell)
+
+    max_row = len(audits) + 1
+    if max_row > 1:
+        ws.conditional_formatting.add(
+            f"B2:B{max_row}",
+            ColorScaleRule(start_type='num', start_value=0, start_color=HEATMAP_RED,
+                           mid_type='num', mid_value=0.5, mid_color=HEATMAP_AMBER,
+                           end_type='num', end_value=1, end_color=HEATMAP_GREEN),
+        )
+
+    apply_zebra_stripes(ws, 2, max_row, len(headers))
+    auto_width(ws, len(headers), max_row)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Changes Since Last Audit (Diff Sheet)
+# ═══════════════════════════════════════════════════════════════════════
+
+
+def _build_changes(wb: Workbook, data: dict, diff_data: dict | None) -> None:
+    if not diff_data:
+        return
+
+    ws = wb.create_sheet("Changes")
+    ws.sheet_properties.tabColor = "0891B2"
+
+    # Title
+    ws.merge_cells("A1:F1")
+    ws["A1"].value = "Changes Since Last Audit"
+    ws["A1"].font = TITLE_FONT
+
+    # KPI summary
+    tier_changes = diff_data.get("tier_changes", [])
+    promos = [c for c in tier_changes if c.get("direction") == "promotion"]
+    demos = [c for c in tier_changes if c.get("direction") == "demotion"]
+    avg_delta = diff_data.get("average_score_delta", 0)
+
+    ws.cell(row=3, column=1, value="Promotions").font = SUBHEADER_FONT
+    ws.cell(row=3, column=2, value=len(promos))
+    ws.cell(row=3, column=3, value="Demotions").font = SUBHEADER_FONT
+    ws.cell(row=3, column=4, value=len(demos))
+    ws.cell(row=3, column=5, value="Avg Score Delta").font = SUBHEADER_FONT
+    ws.cell(row=3, column=6, value=round(avg_delta, 4))
+
+    # Tier changes table
+    if tier_changes:
+        row = 5
+        ws.cell(row=row, column=1, value="Tier Changes").font = SECTION_FONT
+        row += 1
+        for col, h in enumerate(["Repo", "Old Tier", "New Tier", "Old Score", "New Score", "Direction"], 1):
+            ws.cell(row=row, column=col, value=h)
+        style_header_row(ws, row, 6)
+        row += 1
+
+        for change in tier_changes:
+            ws.cell(row=row, column=1, value=change.get("name", ""))
+            ws.cell(row=row, column=2, value=change.get("old_tier", ""))
+            ws.cell(row=row, column=3, value=change.get("new_tier", ""))
+            ws.cell(row=row, column=4, value=round(change.get("old_score", 0), 3))
+            ws.cell(row=row, column=5, value=round(change.get("new_score", 0), 3))
+            direction = change.get("direction", "")
+            cell = ws.cell(row=row, column=6, value=direction)
+            if direction == "promotion":
+                cell.font = Font("Calibri", 10, bold=True, color="166534")
+            elif direction == "demotion":
+                cell.font = Font("Calibri", 10, bold=True, color="991B1B")
+            row += 1
+
+    # Significant score changes
+    score_changes = [c for c in diff_data.get("score_changes", []) if abs(c.get("delta", 0)) > 0.05]
+    if score_changes:
+        row += 2
+        ws.cell(row=row, column=1, value="Significant Score Changes").font = SECTION_FONT
+        row += 1
+        for col, h in enumerate(["Repo", "Old Score", "New Score", "Delta"], 1):
+            ws.cell(row=row, column=col, value=h)
+        style_header_row(ws, row, 4)
+        row += 1
+
+        for change in sorted(score_changes, key=lambda c: c.get("delta", 0), reverse=True):
+            ws.cell(row=row, column=1, value=change.get("name", ""))
+            ws.cell(row=row, column=2, value=round(change.get("old_score", 0), 3))
+            ws.cell(row=row, column=3, value=round(change.get("new_score", 0), 3))
+            delta = change.get("delta", 0)
+            cell = ws.cell(row=row, column=4, value=round(delta, 4))
+            cell.font = Font("Calibri", 10, bold=True, color="166534" if delta > 0 else "991B1B")
+            row += 1
+
+    auto_width(ws, 6, row)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Bubble Chart helper for Dashboard
+# ═══════════════════════════════════════════════════════════════════════
+
+
+def _build_bubble_on_dashboard(ws, data: dict) -> None:
+    """Add a bubble chart: x=completeness, y=interest, size=LOC."""
+    audits = data.get("audits", [])
+    if len(audits) < 2:
+        return
+
+    # Write bubble data to spare columns (cols 20-22)
+    bcol_x, bcol_y, bcol_z = 20, 21, 22
+    data_start = 10
+
+    for i, audit in enumerate(audits):
+        row = data_start + i
+        cq = next((r.get("details", {}) for r in audit.get("analyzer_results", []) if r["dimension"] == "code_quality"), {})
+        loc = cq.get("total_loc", 100)
+        ws.cell(row=row, column=bcol_x, value=round(audit.get("overall_score", 0), 3))
+        ws.cell(row=row, column=bcol_y, value=round(audit.get("interest_score", 0), 3))
+        ws.cell(row=row, column=bcol_z, value=max(loc, 10))  # Min size to be visible
+
+    data_end = data_start + len(audits) - 1
+
+    chart = BubbleChart()
+    chart.title = "Portfolio Map (size = LOC)"
+    chart.x_axis.title = "Completeness"
+    chart.y_axis.title = "Interest"
+    chart.x_axis.scaling.min = 0
+    chart.x_axis.scaling.max = 1
+    chart.y_axis.scaling.min = 0
+    chart.y_axis.scaling.max = 1
+    chart.style = 18
+
+    xvalues = Reference(ws, min_col=bcol_x, min_row=data_start, max_row=data_end)
+    yvalues = Reference(ws, min_col=bcol_y, min_row=data_start, max_row=data_end)
+    sizes = Reference(ws, min_col=bcol_z, min_row=data_start, max_row=data_end)
+    series = BubbleSeries(values=yvalues, xvalues=xvalues, zvalues=sizes, title="Repos")
+    chart.series.append(series)
+
+    chart.width = 16
+    chart.height = 12
+    ws.add_chart(chart, "A50")
+
+
 def export_excel(
     report_path: Path,
     output_path: Path,
@@ -1221,6 +1451,9 @@ def export_excel(
     _build_trends(wb, data, trend_data)
     _build_tier_breakdown(wb, data)
     _build_activity(wb, data)
+    _build_repo_profiles(wb, data)
+    _build_security(wb, data)
+    _build_changes(wb, data, diff_data)
     _build_reconciliation(wb, data)
     _build_score_explainer(wb)
     _build_action_items(wb, data)
