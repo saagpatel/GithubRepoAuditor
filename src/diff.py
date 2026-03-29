@@ -353,3 +353,47 @@ def format_diff_markdown(diff: AuditDiff) -> str:
         _w("")
 
     return "\n".join(lines)
+
+
+def print_diff_summary(diff: AuditDiff) -> None:
+    """Print colored diff summary to stderr using Rich."""
+    try:
+        from rich.console import Console
+        from rich.table import Table
+    except ImportError:
+        return
+
+    console = Console(stderr=True)
+
+    delta = diff.average_score_delta
+    color = "green" if delta >= 0 else "red"
+    sign = "+" if delta >= 0 else ""
+    console.print(f"\n[bold]Portfolio Score Delta:[/bold] [{color}]{sign}{delta:.3f}[/{color}]")
+
+    if diff.tier_changes:
+        table = Table(title="Tier Changes", show_lines=False)
+        table.add_column("Repo")
+        table.add_column("Old Tier")
+        table.add_column("New Tier")
+        table.add_column("Direction")
+        for tc in diff.tier_changes[:10]:
+            old_t = tc.get("old_tier", "")
+            new_t = tc.get("new_tier", "")
+            promoted = tc.get("promoted", False)
+            direction = "[green]↑ Promoted[/green]" if promoted else "[red]↓ Demoted[/red]"
+            table.add_row(tc.get("name", ""), old_t, new_t, direction)
+        console.print(table)
+
+    improvements = [s for s in diff.score_changes if s.get("delta", 0) > 0][:5]
+    regressions = [s for s in diff.score_changes if s.get("delta", 0) < 0][:5]
+
+    if improvements:
+        console.print("\n[bold green]Top Improvements:[/bold green]")
+        for s in improvements:
+            console.print(f"  [green]↑ {s['name']}: +{s['delta']:.3f}[/green]")
+    if regressions:
+        console.print("\n[bold red]Top Regressions:[/bold red]")
+        for s in regressions:
+            console.print(f"  [red]↓ {s['name']}: {s['delta']:.3f}[/red]")
+
+    console.print(f"\n[dim]New repos: {len(diff.new_repos)} | Removed: {len(diff.removed_repos)}[/dim]")

@@ -273,6 +273,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Create GitHub issues for high-priority action items",
     )
     parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview repos that would be audited without cloning or analyzing",
+    )
+    parser.add_argument(
+        "--summary",
+        action="store_true",
+        help="Print a Rich diff summary to stderr after audit (requires a previous report)",
+    )
+    parser.add_argument(
         "--analyzers-dir",
         type=str,
         default=None,
@@ -1226,6 +1236,51 @@ def _load_scoring_profile(profile_name: str | None) -> tuple[dict[str, float] | 
     return None, normalized
 
 
+# ── Dry-run preview ───────────────────────────────────────────────────
+def _print_dry_run_summary(repos: list[RepoMetadata]) -> None:
+    """Print a Rich table of repos that would be audited, then return."""
+    from datetime import timezone
+
+    try:
+        from rich.console import Console
+        from rich.table import Table
+    except ImportError:
+        print(f"[dry-run] {len(repos)} repos would be audited", file=sys.stderr)
+        for r in repos:
+            print(f"  {r.name}", file=sys.stderr)
+        return
+
+    console = Console(stderr=True)
+    table = Table(title=f"[dry-run] {len(repos)} repos would be audited", show_lines=False)
+    table.add_column("Name")
+    table.add_column("Language")
+    table.add_column("Size (KB)", justify="right")
+    table.add_column("Stars", justify="right")
+    table.add_column("Days Since Push", justify="right")
+
+    now = datetime.now(timezone.utc)
+    total_kb = 0
+    for r in repos:
+        days = ""
+        if r.pushed_at:
+            pushed = r.pushed_at
+            if pushed.tzinfo is None:
+                pushed = pushed.replace(tzinfo=timezone.utc)
+            days = str((now - pushed).days)
+        total_kb += r.size_kb or 0
+        table.add_row(
+            r.name,
+            r.language or "",
+            str(r.size_kb or 0),
+            str(r.stars or 0),
+            days,
+        )
+
+    console.print(table)
+    est_mb = total_kb / 1024
+    console.print(f"[dim]{len(repos)} repos would be audited, est {est_mb:.1f} MB[/dim]")
+
+
 # ── Main entry point ──────────────────────────────────────────────────
 def main() -> None:
     parser = build_parser()
@@ -1274,6 +1329,11 @@ def main() -> None:
             skip_archived=args.skip_archived,
         )
         _print_filter_summary(all_repos, repos, args)
+
+        # Dry-run: preview repos and exit early
+        if getattr(args, "dry_run", False):
+            _print_dry_run_summary(repos)
+            return
 
         # Dispatch to partial run mode if requested
         if args.repos:
@@ -1343,6 +1403,37 @@ def main() -> None:
             _apply_requested_reconciliation(report, args, audits)
             outputs = _write_report_outputs(report, args, output_dir, client=client, cache=cache)
             _print_output_summary(f"Audited {report.repos_audited} repos for {report.username}", report, outputs)
+
+            if getattr(args, "create_issues", False):
+                from src.issue_creator import create_audit_issues
+                from src.quick_wins import find_quick_wins
+
+                quick_wins = find_quick_wins(audits)
+                issue_result = create_audit_issues(
+                    quick_wins,
+                    args.username,
+                    client,
+                    dry_run=getattr(args, "dry_run", False),
+                )
+                print_info(
+                    f"Issues: {len(issue_result['created'])} created, "
+                    f"{len(issue_result['skipped'])} skipped (already exist)"
+                )
+
+            if getattr(args, "summary", False) and outputs.get("json_path"):
+                from src.history import find_previous
+                from src.diff import diff_reports, print_diff_summary
+
+                prev_path = find_previous(outputs["json_path"].name)
+                if prev_path:
+                    diff = diff_reports(
+                        prev_path,
+                        outputs["json_path"],
+                        portfolio_profile=args.portfolio_profile,
+                        collection_name=args.collection,
+                    )
+                    print_diff_summary(diff)
+
             return
 
         # Fallback: --skip-clone was used, write raw metadata only
