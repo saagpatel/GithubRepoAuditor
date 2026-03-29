@@ -178,6 +178,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Generate interactive HTML dashboard",
     )
     parser.add_argument(
+        "--pdf",
+        action="store_true",
+        help="Generate PDF audit report",
+    )
+    parser.add_argument(
         "--scoring-profile",
         type=str,
         default=None,
@@ -245,6 +250,22 @@ def build_parser() -> argparse.ArgumentParser:
         "--narrative",
         action="store_true",
         help="Generate AI portfolio narrative (requires ANTHROPIC_API_KEY)",
+    )
+    parser.add_argument(
+        "--config",
+        default=None,
+        help="Path to audit-config.yaml (default: ./audit-config.yaml if exists)",
+    )
+    parser.add_argument(
+        "--watch",
+        action="store_true",
+        help="Re-run audit on interval (use with --watch-interval)",
+    )
+    parser.add_argument(
+        "--watch-interval",
+        type=int,
+        default=3600,
+        help="Seconds between watch runs (default: 3600)",
     )
     return parser
 
@@ -852,6 +873,14 @@ def _write_report_outputs(
         )
         html_info = f"\n    {html_result['html_path']}"
 
+    pdf_info = ""
+    if args.pdf:
+        from src.pdf_export import export_pdf_report
+
+        pdf_path = export_pdf_report(report_data, output_dir)
+        if pdf_path:
+            pdf_info = f"\n    {pdf_path}"
+
     review_pack_info = ""
     if args.review_pack:
         from src.review_pack import export_review_pack
@@ -894,6 +923,7 @@ def _write_report_outputs(
         "readme_info": readme_info,
         "suggestions_info": suggestions_info,
         "html_info": html_info,
+        "pdf_info": pdf_info,
         "review_pack_info": review_pack_info,
         "cache_info": cache_info,
     }
@@ -935,6 +965,7 @@ def _print_output_summary(
         f"{outputs['readme_info']}"
         f"{outputs['suggestions_info']}"
         f"{outputs['html_info']}"
+        f"{outputs['pdf_info']}"
         f"{outputs['review_pack_info']}",
     )
 
@@ -1160,6 +1191,13 @@ def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
 
+    # Load config file and merge into args (CLI flags take precedence)
+    from src.config import load_config, merge_config_with_args
+
+    config = load_config(Path(args.config) if args.config else None)
+    if config:
+        merge_config_with_args(args, config)
+
     # Validate mutually exclusive registry flags
     if args.registry and args.notion_registry:
         parser.error("--registry and --notion-registry cannot be used together")
@@ -1176,81 +1214,91 @@ def main() -> None:
 
     custom_weights, scoring_profile_name = _load_scoring_profile(args.scoring_profile)
 
-    if not args.token:
-        print_warning(
-            "No token provided. Only public repos will be fetched.\n"
-            "  Set GITHUB_TOKEN or pass --token for private repo access."
+    def _run_once() -> None:
+        if not args.token:
+            print_warning(
+                "No token provided. Only public repos will be fetched.\n"
+                "  Set GITHUB_TOKEN or pass --token for private repo access."
+            )
+
+        cache = None if args.no_cache else ResponseCache()
+        client = GitHubClient(token=args.token, cache=cache)
+        output_dir = Path(args.output_dir)
+
+        # Fetch all repo metadata from GitHub API (REST or GraphQL depending on flag)
+        all_repos, errors = _fetch_repo_metadata(args, client)
+        total_fetched = len(all_repos)
+        repos = _filter_repos(
+            all_repos,
+            skip_forks=args.skip_forks,
+            skip_archived=args.skip_archived,
         )
+        _print_filter_summary(all_repos, repos, args)
 
-    cache = None if args.no_cache else ResponseCache()
-    client = GitHubClient(token=args.token, cache=cache)
-    output_dir = Path(args.output_dir)
+        # Dispatch to partial run mode if requested
+        if args.repos:
+            _run_targeted_audit(
+                args,
+                client,
+                output_dir,
+                all_repos=all_repos,
+                errors=errors,
+                custom_weights=custom_weights,
+                scoring_profile_name=scoring_profile_name,
+            )
+            return
 
-    # Fetch all repo metadata from GitHub API (REST or GraphQL depending on flag)
-    all_repos, errors = _fetch_repo_metadata(args, client)
-    total_fetched = len(all_repos)
-    repos = _filter_repos(
-        all_repos,
-        skip_forks=args.skip_forks,
-        skip_archived=args.skip_archived,
-    )
-    _print_filter_summary(all_repos, repos, args)
+        if args.incremental:
+            _run_incremental_audit(
+                args,
+                client,
+                output_dir,
+                all_repos=all_repos,
+                errors=errors,
+                custom_weights=custom_weights,
+                scoring_profile_name=scoring_profile_name,
+            )
+            return
 
-    # Dispatch to partial run mode if requested
-    if args.repos:
-        _run_targeted_audit(
-            args,
-            client,
-            output_dir,
-            all_repos=all_repos,
-            errors=errors,
+        audits = _analyze_repos(
+            repos,
+            args=args,
+            client=client,
+            portfolio_lang_freq=_compute_portfolio_lang_freq(repos),
             custom_weights=custom_weights,
-            scoring_profile_name=scoring_profile_name,
         )
+
+        # Full audit path: score every repo and write all output formats
+        if audits:
+            report = AuditReport.from_audits(
+                args.username,
+                audits,
+                errors,
+                total_fetched,
+                scoring_profile=scoring_profile_name,
+                run_mode="full",
+                portfolio_baseline_size=len(repos),
+            )
+            _apply_requested_reconciliation(report, args, audits)
+            outputs = _write_report_outputs(report, args, output_dir, client=client, cache=cache)
+            _print_output_summary(f"Audited {report.repos_audited} repos for {report.username}", report, outputs)
+            return
+
+        # Fallback: --skip-clone was used, write raw metadata only
+        raw_path = _write_json(
+            args.username, repos, errors, total_fetched, output_dir,
+        )
+        print(
+            f"\n✓ Fetched {total_fetched} repos for {args.username}\n"
+            f"  Included: {len(repos)} | Errors: {len(errors)}\n"
+            f"  Output: {raw_path}",
+        )
+
+    if args.watch:
+        from src.watch import run_watch_loop
+
+        args.incremental = True
+        run_watch_loop(_run_once, interval=args.watch_interval)
         return
 
-    if args.incremental:
-        _run_incremental_audit(
-            args,
-            client,
-            output_dir,
-            all_repos=all_repos,
-            errors=errors,
-            custom_weights=custom_weights,
-            scoring_profile_name=scoring_profile_name,
-        )
-        return
-
-    audits = _analyze_repos(
-        repos,
-        args=args,
-        client=client,
-        portfolio_lang_freq=_compute_portfolio_lang_freq(repos),
-        custom_weights=custom_weights,
-    )
-
-    # Full audit path: score every repo and write all output formats
-    if audits:
-        report = AuditReport.from_audits(
-            args.username,
-            audits,
-            errors,
-            total_fetched,
-            scoring_profile=scoring_profile_name,
-            run_mode="full",
-            portfolio_baseline_size=len(repos),
-        )
-        _apply_requested_reconciliation(report, args, audits)
-        outputs = _write_report_outputs(report, args, output_dir, client=client, cache=cache)
-        _print_output_summary(f"Audited {report.repos_audited} repos for {report.username}", report, outputs)
-        return
-
-    # Fallback: --skip-clone was used, write raw metadata only
-    raw_path = _write_json(
-        args.username, repos, errors, total_fetched, output_dir,
-    )
-    print(
-        f"\n✓ Fetched {total_fetched} repos for {args.username}\n"
-        f"  Included: {len(repos)} | Errors: {len(errors)}\n"
-        f"  Output: {raw_path}",
-    )
+    _run_once()
