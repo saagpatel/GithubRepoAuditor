@@ -133,6 +133,9 @@ class AuditReport:
     most_neglected: list[str] = field(default_factory=list)
     highest_scored: list[str] = field(default_factory=list)
     lowest_scored: list[str] = field(default_factory=list)
+    scoring_profile: str = "default"
+    run_mode: str = "full"
+    portfolio_baseline_size: int = 0
     reconciliation: object | None = None  # RegistryReconciliation when --registry used
 
     @classmethod
@@ -142,6 +145,10 @@ class AuditReport:
         audits: list[RepoAudit],
         errors: list[dict],
         total_repos: int,
+        *,
+        scoring_profile: str = "default",
+        run_mode: str = "full",
+        portfolio_baseline_size: int | None = None,
     ) -> AuditReport:
         """Construct an AuditReport with all derived statistics."""
         now = datetime.now(tz=__import__("datetime").timezone.utc)
@@ -220,6 +227,9 @@ class AuditReport:
             most_neglected=most_neglected,
             highest_scored=highest,
             lowest_scored=lowest,
+            scoring_profile=scoring_profile,
+            run_mode=run_mode,
+            portfolio_baseline_size=portfolio_baseline_size if portfolio_baseline_size is not None else len(audits),
         )
 
     def to_dict(self) -> dict:
@@ -231,6 +241,9 @@ class AuditReport:
             "average_score": self.average_score,
             "portfolio_grade": self.portfolio_grade,
             "portfolio_health_score": self.portfolio_health_score,
+            "scoring_profile": self.scoring_profile,
+            "run_mode": self.run_mode,
+            "portfolio_baseline_size": self.portfolio_baseline_size,
             "tech_stack": self.tech_stack,
             "best_work": self.best_work,
             "tier_distribution": self.tier_distribution,

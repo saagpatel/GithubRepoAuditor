@@ -6,6 +6,8 @@ import sys
 import time
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
 
 from src.cache import ResponseCache
 from src.models import RepoMetadata
@@ -13,6 +15,7 @@ from src.models import RepoMetadata
 logger = logging.getLogger(__name__)
 
 API_BASE = "https://api.github.com"
+REST_API_VERSION = "2026-03-10"
 
 
 class GitHubClientError(Exception):
@@ -33,9 +36,26 @@ class GitHubClient:
         self.session.headers.update({
             "Accept": "application/vnd.github.v3+json",
             "User-Agent": "github-repo-auditor/0.1",
+            "X-GitHub-Api-Version": REST_API_VERSION,
         })
         if token:
             self.session.headers["Authorization"] = f"token {token}"
+        self._authenticated_user: str | None = None
+        self._authenticated_user_loaded = False
+        retry = Retry(
+            total=3,
+            connect=3,
+            read=3,
+            status=3,
+            other=0,
+            allowed_methods=frozenset({"GET", "HEAD", "OPTIONS"}),
+            status_forcelist={429, 500, 502, 503, 504},
+            backoff_factor=1,
+            respect_retry_after_header=True,
+        )
+        adapter = HTTPAdapter(max_retries=retry)
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
 
     # ── internal helpers ──────────────────────────────────────────────
 
@@ -173,32 +193,44 @@ class GitHubClient:
 
     def get_authenticated_user(self) -> str | None:
         """Return the login of the authenticated user, or None."""
+        if self._authenticated_user_loaded:
+            return self._authenticated_user
+        self._authenticated_user_loaded = True
         if not self.token:
             return None
         try:
             response = self._request(f"{API_BASE}/user")
-            return response.json().get("login")
+            self._authenticated_user = response.json().get("login")
         except requests.HTTPError:
-            return None
+            self._authenticated_user = None
+        return self._authenticated_user
+
+    def _repo_list_cache_scope(self, username: str) -> str:
+        """Return the effective visibility scope for a repo list request."""
+        if not self.token:
+            return "public-anonymous"
+        authed_user = self.get_authenticated_user()
+        if authed_user and authed_user.lower() == username.lower():
+            return "owner-private"
+        return "public-authenticated"
 
     def list_repos(self, username: str) -> list[dict]:
         """Fetch all repos for a user. Uses /user/repos for the authenticated user."""
         # Check cache for the complete repo list
-        cache_key = f"{API_BASE}/list_repos/{username}"
+        cache_key = f"{API_BASE}/list_repos/{username}/{self._repo_list_cache_scope(username)}"
         if self.cache:
             cached = self.cache.get(cache_key)
             if cached is not None:
                 return cached
 
         repos: list[dict] = []
-        if self.token:
-            authed_user = self.get_authenticated_user()
-            if authed_user and authed_user.lower() == username.lower():
-                # Authenticated as this user — get private repos too
-                repos = self._paginate(
-                    f"{API_BASE}/user/repos",
-                    {"per_page": "100", "type": "owner"},
-                )
+        authed_user = self.get_authenticated_user()
+        if authed_user and authed_user.lower() == username.lower():
+            # Authenticated as this user — get private repos too
+            repos = self._paginate(
+                f"{API_BASE}/user/repos",
+                {"per_page": "100", "type": "owner"},
+            )
 
         if not repos:
             # Public-only or token belongs to a different user

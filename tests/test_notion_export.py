@@ -96,6 +96,29 @@ class TestNormalizeEvent:
         assert event["signalType"] == "Audit Report"
         assert event["localProjectId"] == "uuid-123"
         assert "Grade B" in event["title"]
+        assert event["machineData"]["overall_score"] == 0.8
+        assert event["machineData"]["interest_score"] == 0.5
+        assert event["machineData"]["completeness_tier"] == "shipped"
+        assert event["machineData"]["grade"] == "B"
+        assert event["machineData"]["badges"] == ["fresh", "fully-tested"]
+        assert event["machineData"]["flags"] == []
+        assert "Dimensions:" in event["rawExcerpt"]
+        assert not event["rawExcerpt"].lstrip().startswith("{")
+
+    def test_raw_excerpt_truncates_safely(self):
+        audit = _make_report()["audits"][0]
+        audit["badges"] = [f"badge-{i}" for i in range(400)]
+        audit["flags"] = [f"flag-{i}" for i in range(400)]
+        audit["analyzer_results"] = [
+            {"dimension": f"dim-{i}", "score": 0.5, "max_score": 1.0, "findings": [], "details": {}}
+            for i in range(400)
+        ]
+        mapping = {"MappedRepo": {"localProjectId": "uuid-123"}}
+        event = _normalize_audit_event(audit, "2026-03-28", mapping)
+        assert event is not None
+        assert len(event["rawExcerpt"]) <= 2000
+        assert event["rawExcerpt"].endswith("...")
+        assert event["machineData"]["dimension_scores"]["dim-0"] == 0.5
 
     def test_unmapped_repo_returns_none(self):
         audit = _make_report()["audits"][1]
@@ -137,6 +160,16 @@ class TestExportNotionEvents:
         assert "stats" in data
         assert data["stats"]["mapped_repos"] == 1
         assert data["stats"]["unmapped_repos"] == 1
+
+    def test_exported_events_include_machine_data(self, tmp_path):
+        config_dir = _write_map(tmp_path, {"MappedRepo": {"localProjectId": "uuid-123"}})
+        result = export_notion_events(_make_report(), tmp_path / "output", config_dir)
+        data = json.loads(result["events_path"].read_text())
+        event = data["events"][0]
+        assert event["machineData"]["overall_score"] == 0.8
+        assert event["machineData"]["interest_score"] == 0.5
+        assert event["machineData"]["grade"] == "B"
+        assert event["machineData"]["badges"] == ["fresh", "fully-tested"]
 
     def test_empty_map_produces_zero_events(self, tmp_path):
         config_dir = _write_map(tmp_path, {})

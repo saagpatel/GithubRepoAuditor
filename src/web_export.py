@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
+from html import escape
 from pathlib import Path
+from urllib.parse import urlparse
 
 from src.sparkline import sparkline as render_sparkline
 
@@ -94,7 +96,7 @@ def _render_html(
         "<html lang='en'>",
         "<head>",
         "<meta charset='utf-8'>",
-        f"<title>Portfolio Dashboard: {username}</title>",
+        f"<title>Portfolio Dashboard: {escape(username)}</title>",
         "<meta name='viewport' content='width=device-width, initial-scale=1'>",
         f"<style>{_css()}</style>",
         "</head>",
@@ -109,7 +111,7 @@ def _render_html(
         _tech_radar_section(report_data, trend_data),
         _distribution_section(report_data),
         _footer(),
-        f"<script>const DATA = {json.dumps(js_data)};</script>",
+        f'<script id="dashboard-data" type="application/json">{_json_script_data(js_data)}</script>',
         f"<script>{_js()}</script>",
         "</body>",
         "</html>",
@@ -121,8 +123,8 @@ def _header_section(username: str, date: str, repos: int, grade: str) -> str:
     color = GRADE_COLORS_CSS.get(grade, "#6B7280")
     return f"""
     <header>
-      <h1>Portfolio Dashboard: {username}</h1>
-      <p>Generated {date} | {repos} repos audited | Grade <span style="color:{color};font-weight:bold">{grade}</span></p>
+      <h1>Portfolio Dashboard: {escape(username)}</h1>
+      <p>Generated {escape(date)} | {repos} repos audited | Grade <span style="color:{color};font-weight:bold">{escape(grade)}</span></p>
     </header>"""
 
 
@@ -162,17 +164,22 @@ def _repo_table(audits: list[dict], score_history: dict[str, list[float]] | None
             scores = score_history.get(name, [])
             spark = render_sparkline(scores)
 
-        link = f'<a href="{url}" target="_blank">{name}</a>' if url else name
+        safe_name = escape(name)
+        safe_lang = escape(lang)
+        safe_desc = escape(desc)
+        safe_tier = escape(tier)
+        safe_url = _safe_href(url)
+        link = f'<a href="{safe_url}" target="_blank" rel="noopener noreferrer">{safe_name}</a>' if safe_url else safe_name
         rows.append(
-            f'<tr data-tier="{tier}" data-grade="{grade}" data-name="{name}">'
+            f'<tr data-tier="{escape(tier, quote=True)}" data-grade="{escape(grade, quote=True)}" data-name="{escape(name, quote=True)}">'
             f'<td>{link}</td>'
-            f'<td style="color:{gc};font-weight:bold;text-align:center">{grade}</td>'
+            f'<td style="color:{gc};font-weight:bold;text-align:center">{escape(grade)}</td>'
             f'<td class="num">{score:.3f}</td>'
             f'<td class="num">{interest:.3f}</td>'
-            f'<td style="color:{tc};font-weight:bold">{tier}</td>'
-            f'<td>{lang}</td>'
-            f'<td class="sparkline">{spark}</td>'
-            f'<td class="desc">{desc}</td>'
+            f'<td style="color:{tc};font-weight:bold">{safe_tier}</td>'
+            f'<td>{safe_lang}</td>'
+            f'<td class="sparkline">{escape(spark)}</td>'
+            f'<td class="desc">{safe_desc}</td>'
             f'</tr>'
         )
 
@@ -226,9 +233,9 @@ def _tech_radar_section(data: dict, trend_data: list[dict] | None) -> str:
         cat = t.get("category", "Hold")
         color = RADAR_COLORS.get(cat, "#6B7280")
         rows.append(
-            f'<tr><td>{t["language"]}</td><td class="num">{t["current_count"]}</td>'
-            f'<td class="sparkline">{spark}</td>'
-            f'<td style="color:{color};font-weight:bold">{cat}</td></tr>'
+            f'<tr><td>{escape(t["language"])}</td><td class="num">{t["current_count"]}</td>'
+            f'<td class="sparkline">{escape(spark)}</td>'
+            f'<td style="color:{color};font-weight:bold">{escape(cat)}</td></tr>'
         )
 
     return f"""
@@ -319,8 +326,22 @@ def _css() -> str:
     """
 
 
+def _json_script_data(data: dict) -> str:
+    """Serialize JSON safely for embedding inside a non-executable script tag."""
+    return json.dumps(data).replace("</", "<\\/")
+
+
+def _safe_href(url: str) -> str:
+    """Allow only absolute http(s) URLs in generated anchor tags."""
+    parsed = urlparse(url)
+    if parsed.scheme in {"http", "https"} and parsed.netloc:
+        return escape(url, quote=True)
+    return ""
+
+
 def _js() -> str:
     return """
+    const DATA = JSON.parse(document.getElementById('dashboard-data').textContent);
     // Tier colors for scatter chart
     const TIER_COLORS = {shipped:'#166534',functional:'#1565C0',wip:'#D97706',skeleton:'#C2410C',abandoned:'#6B7280'};
 

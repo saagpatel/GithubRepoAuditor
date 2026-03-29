@@ -224,9 +224,14 @@ def export_badges(report_data: dict, output_dir: Path) -> dict:
 # ── Gist upload ─────────────────────────────────────────────────────
 
 
-def _load_gist_id(output_dir: Path) -> str | None:
+def _gist_id_path(output_dir: Path, username: str) -> Path:
+    safe_username = username.replace("/", "-")
+    return output_dir / f".badge-gist-id-{safe_username}"
+
+
+def _load_gist_id(output_dir: Path, username: str = "default") -> str | None:
     """Load previously saved gist ID."""
-    path = output_dir / ".badge-gist-id"
+    path = _gist_id_path(output_dir, username)
     if not path.is_file():
         return None
     try:
@@ -235,9 +240,9 @@ def _load_gist_id(output_dir: Path) -> str | None:
         return None
 
 
-def _save_gist_id(output_dir: Path, gist_id: str) -> None:
+def _save_gist_id(output_dir: Path, gist_id: str, username: str = "default") -> None:
     """Save gist ID for future updates."""
-    path = output_dir / ".badge-gist-id"
+    path = _gist_id_path(output_dir, username)
     path.write_text(json.dumps({"gist_id": gist_id}))
 
 
@@ -269,7 +274,7 @@ def upload_badge_gist(
         "files": gist_files,
     })
 
-    gist_id = _load_gist_id(output_dir)
+    gist_id = _load_gist_id(output_dir, username)
 
     try:
         if gist_id:
@@ -299,7 +304,7 @@ def upload_badge_gist(
             print("  Gist upload: no ID in response.", file=sys.stderr)
             return None
 
-        _save_gist_id(output_dir, new_gist_id)
+        _save_gist_id(output_dir, new_gist_id, username)
 
         # Build raw URLs (unversioned for auto-updating)
         owner = response.get("owner", {}).get("login", username)

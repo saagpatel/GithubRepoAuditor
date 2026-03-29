@@ -9,6 +9,8 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+RAW_EXCERPT_LIMIT = 2000
+
 
 def _severity_from_grade(grade: str) -> str:
     """Map letter grade to Notion signal severity."""
@@ -55,23 +57,26 @@ def _normalize_audit_event(
     grade = audit.get("grade", "F")
     tier = audit.get("completeness_tier", "abandoned")
     score = audit.get("overall_score", 0)
+    interest_score = audit.get("interest_score", 0)
     badges = audit.get("badges", [])
+    flags = audit.get("flags", [])
     drag_dim, drag_score = _find_biggest_drag(audit)
 
-    # Build raw excerpt with dimension scores
     dim_scores = {
         r["dimension"]: round(r["score"], 2)
         for r in audit.get("analyzer_results", [])
     }
-    raw = json.dumps({
-        "dimensions": dim_scores,
+    machine_data = {
+        "schema_version": 2,
+        "overall_score": round(score, 3),
+        "interest_score": round(interest_score, 3),
+        "completeness_tier": tier,
+        "grade": grade,
         "badges": badges,
-        "flags": audit.get("flags", []),
-        "interest_score": audit.get("interest_score", 0),
-    })
-    # Notion rich_text limit is 2000 chars
-    if len(raw) > 2000:
-        raw = raw[:1997] + "..."
+        "flags": flags,
+        "dimension_scores": dim_scores,
+    }
+    raw = _build_raw_excerpt(dim_scores, badges, flags)
 
     return {
         "title": f"Audit: {name} — Grade {grade}, Tier {tier}",
@@ -91,7 +96,29 @@ def _normalize_audit_event(
             f"Drag: {drag_dim} ({drag_score:.1f})"
         ),
         "rawExcerpt": raw,
+        "machineData": machine_data,
     }
+
+
+def _build_raw_excerpt(
+    dim_scores: dict[str, float],
+    badges: list[str],
+    flags: list[str],
+) -> str:
+    """Build a human-readable raw excerpt that fits Notion size limits."""
+    dim_text = ", ".join(
+        f"{dimension}={score:.2f}" for dimension, score in sorted(dim_scores.items())
+    ) or "none"
+    badges_text = ", ".join(badges[:10]) if badges else "none"
+    flags_text = ", ".join(flags[:10]) if flags else "none"
+    excerpt = (
+        f"Dimensions: {dim_text}. "
+        f"Badges: {badges_text}. "
+        f"Flags: {flags_text}."
+    )
+    if len(excerpt) > RAW_EXCERPT_LIMIT:
+        return excerpt[: RAW_EXCERPT_LIMIT - 3] + "..."
+    return excerpt
 
 
 def _load_project_map(config_dir: Path) -> dict[str, dict]:

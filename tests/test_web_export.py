@@ -55,7 +55,9 @@ class TestExportHtmlDashboard:
         assert "<!DOCTYPE html>" in content
         assert "<style>" in content
         assert "<script>" in content
-        assert "const DATA =" in content
+        assert 'id="dashboard-data"' in content
+        assert 'type="application/json"' in content
+        assert "const DATA = JSON.parse" in content
 
 
 class TestRenderHtml:
@@ -108,3 +110,29 @@ class TestRenderHtml:
         html = _render_html(_make_report())
         assert '"username": "testuser"' in html
         assert '"audits":' in html
+
+    def test_escapes_malicious_text_and_safe_json_embedding(self):
+        report = _make_report(
+            audits=[
+                {
+                    "metadata": {
+                        "name": '</script><script>alert("xss")</script>',
+                        "html_url": "https://github.com/user/repo",
+                        "description": '</script><script>alert("xss")</script>',
+                        "language": "Python",
+                    },
+                    "overall_score": 0.85,
+                    "interest_score": 0.6,
+                    "grade": "A",
+                    "completeness_tier": "shipped",
+                    "badges": [],
+                    "flags": [],
+                    "analyzer_results": [],
+                }
+            ]
+        )
+        html = _render_html(report)
+        assert '&lt;/script&gt;&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;' in html
+        assert '</script><script>alert("xss")</script>' not in html
+        assert '<script id="dashboard-data" type="application/json">' in html
+        assert '<\\/script>' in html
