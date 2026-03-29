@@ -163,6 +163,23 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Generate interactive HTML dashboard",
     )
+    parser.add_argument(
+        "--scoring-profile",
+        type=str,
+        default=None,
+        metavar="NAME",
+        help="Use a custom scoring profile from config/scoring-profiles/NAME.json",
+    )
+    parser.add_argument(
+        "--auto-archive",
+        action="store_true",
+        help="Generate archive candidate report for consistently low-scoring repos",
+    )
+    parser.add_argument(
+        "--narrative",
+        action="store_true",
+        help="Generate AI portfolio narrative (requires ANTHROPIC_API_KEY)",
+    )
     return parser
 
 
@@ -569,6 +586,16 @@ def main() -> None:
     if args.notion_sync:
         args.notion = True
 
+    # Load custom scoring profile
+    custom_weights = None
+    if args.scoring_profile:
+        profile_path = Path(f"config/scoring-profiles/{args.scoring_profile}.json")
+        if profile_path.is_file():
+            custom_weights = json.loads(profile_path.read_text())
+            print_info(f"Using scoring profile: {args.scoring_profile}")
+        else:
+            print_warning(f"Scoring profile not found: {profile_path}")
+
     if not args.token:
         print_warning(
             "No token provided. Only public repos will be fetched.\n"
@@ -650,7 +677,7 @@ def main() -> None:
                             continue
                         progress.update(task, description=f"Analyzing {repo_meta.name}")
                         results = run_all_analyzers(repo_path, repo_meta, client)
-                        audit = score_repo(repo_meta, results, portfolio_lang_freq=portfolio_lang_freq)
+                        audit = score_repo(repo_meta, results, portfolio_lang_freq=portfolio_lang_freq, custom_weights=custom_weights)
                         audits.append(audit)
                         if args.verbose:
                             _print_verbose(audit)
@@ -665,7 +692,7 @@ def main() -> None:
                         file=sys.stderr,
                     )
                     results = run_all_analyzers(repo_path, repo_meta, client)
-                    audit = score_repo(repo_meta, results, portfolio_lang_freq=portfolio_lang_freq)
+                    audit = score_repo(repo_meta, results, portfolio_lang_freq=portfolio_lang_freq, custom_weights=custom_weights)
                     audits.append(audit)
                     if args.verbose:
                         _print_verbose(audit)
@@ -817,6 +844,19 @@ def main() -> None:
                 report.to_dict(), output_dir, trend_data, score_history,
             )
             html_info = f"\n    {html_result['html_path']}"
+
+        # Archive candidates
+        if args.auto_archive:
+            from src.archive_candidates import find_archive_candidates, export_archive_report
+            candidates = find_archive_candidates(score_history)
+            if candidates:
+                archive_result = export_archive_report(candidates, report.username, output_dir)
+                print_info(f"Archive candidates: {archive_result['count']} repos → {archive_result['report_path']}")
+
+        # AI narrative
+        if args.narrative:
+            from src.narrative import generate_narrative
+            generate_narrative(report.to_dict(), output_dir)
 
         cache_info = ""
         if cache:

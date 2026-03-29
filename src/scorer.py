@@ -54,9 +54,10 @@ def score_repo(
     metadata: RepoMetadata,
     results: list[AnalyzerResult],
     portfolio_lang_freq: dict[str, float] | None = None,
+    custom_weights: dict[str, float] | None = None,
 ) -> RepoAudit:
     """Compute dual-axis scores: completeness + interest."""
-    weights = dict(WEIGHTS)
+    weights = dict(custom_weights) if custom_weights else dict(WEIGHTS)
     flags: list[str] = []
 
     # Fork override: reduce activity weight
