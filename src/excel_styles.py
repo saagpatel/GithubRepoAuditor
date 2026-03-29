@@ -84,6 +84,7 @@ TIER_FONT = Font("Calibri", 10, bold=True, color=WHITE)
 SECTION_FONT = Font("Calibri", 14, bold=True, color=NAVY)
 HIGHLIGHT_FONT = Font("Calibri", 11, bold=True, color=TEAL)
 NARRATIVE_FONT = Font("Calibri", 11, italic=True, color=SLATE)
+SPARKLINE_FONT = Font("Courier New", 11, color=TEAL)
 
 # ── Borders ──────────────────────────────────────────────────────────
 

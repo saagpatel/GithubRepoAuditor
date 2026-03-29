@@ -43,10 +43,15 @@ query($login: String!, $cursor: String) {
 """
 
 
-def bulk_fetch_repos(username: str, token: str) -> list[dict]:
+def bulk_fetch_repos(
+    username: str,
+    token: str,
+    on_progress: "Callable[[int, int], None] | None" = None,
+) -> list[dict]:
     """Fetch all repos via GraphQL, returning dicts compatible with REST API format.
 
     Replaces list_repos + get_languages in a single paginated query.
+    on_progress(page, repos_so_far) — called per page.
     """
     session = requests.Session()
     session.headers.update({
@@ -75,7 +80,10 @@ def bulk_fetch_repos(username: str, token: str) -> list[dict]:
 
         repos_data = data["data"]["user"]["repositories"]
         nodes = repos_data["nodes"]
-        print(f"  GraphQL page {page}: {len(nodes)} repos", file=sys.stderr)
+        if on_progress:
+            on_progress(page, len(all_repos) + len(nodes))
+        else:
+            print(f"  GraphQL page {page}: {len(nodes)} repos", file=sys.stderr)
 
         for node in nodes:
             all_repos.append(_map_to_rest_format(node))

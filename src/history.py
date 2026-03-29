@@ -95,6 +95,37 @@ def load_trend_data(history_dir: Path = HISTORY_DIR, max_runs: int = 10) -> list
     return trends
 
 
+def load_repo_score_history(
+    history_dir: Path = HISTORY_DIR,
+    max_runs: int = 10,
+) -> dict[str, list[float]]:
+    """Load per-repo score history across archived reports.
+
+    Returns {repo_name: [score_run1, score_run2, ...]} in chronological order.
+    """
+    if not history_dir.exists():
+        return {}
+
+    reports = sorted(
+        history_dir.glob("audit-report-*.json"),
+        key=lambda f: f.stat().st_mtime,
+        reverse=True,
+    )[:max_runs]
+
+    history: dict[str, list[float]] = {}
+    for report_path in reversed(reports):  # chronological order
+        try:
+            data = json.loads(report_path.read_text())
+            for audit in data.get("audits", []):
+                name = audit.get("metadata", {}).get("name", "")
+                if name:
+                    history.setdefault(name, []).append(audit.get("overall_score", 0))
+        except (json.JSONDecodeError, OSError, KeyError):
+            continue
+
+    return history
+
+
 def _update_index(report_path: Path, history_dir: Path) -> None:
     """Add an entry to the history index."""
     index_path = history_dir / "index.json"

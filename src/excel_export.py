@@ -20,6 +20,8 @@ from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
+from src.sparkline import sparkline as render_sparkline
+
 from src.excel_styles import (
     CENTER,
     GRADE_COLORS,
@@ -40,6 +42,7 @@ from src.excel_styles import (
     WRAP,
     WHITE,
     NARRATIVE_FONT,
+    SPARKLINE_FONT,
     apply_zebra_stripes,
     auto_width,
     color_grade_cell,
@@ -100,7 +103,7 @@ def _generate_narrative(data: dict, diff_data: dict | None) -> str:
     return " | ".join(parts)
 
 
-def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None) -> None:
+def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None, score_history: dict[str, list[float]] | None = None) -> None:
     ws = wb.active
     ws.title = "Dashboard"
     ws.sheet_properties.tabColor = NAVY
@@ -141,6 +144,15 @@ def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None) ->
     # Row height
     ws.row_dimensions[5].height = 20
     ws.row_dimensions[6].height = 40
+
+    # Portfolio score sparkline (row 7, next to KPI cards)
+    if score_history:
+        from src.history import load_trend_data as _load_trends
+        avg_scores = [t.get("average_score", 0) for t in (_load_trends() or [])]
+        spark = render_sparkline(avg_scores)
+        if spark:
+            cell = ws.cell(row=7, column=3, value=f"Trend: {spark}")
+            cell.font = SPARKLINE_FONT
 
     # Portfolio DNA row (row 8) — one colored cell per repo
     dna_row = 8
@@ -351,7 +363,7 @@ def _write_quadrant_table(ws, audits: list[dict], legend_row: int) -> None:
 # ═══════════════════════════════════════════════════════════════════════
 
 
-def _build_all_repos(wb: Workbook, data: dict) -> None:
+def _build_all_repos(wb: Workbook, data: dict, score_history: dict[str, list[float]] | None = None) -> None:
     ws = wb.create_sheet("All Repos")
     ws.sheet_properties.tabColor = "1565C0"
 
@@ -360,7 +372,7 @@ def _build_all_repos(wb: Workbook, data: dict) -> None:
         "Next Badge", "Language", "Commit Pattern", "Bus Factor",
         "Days Since Push", "Commits", "Releases", "Test Files",
         "LOC", "Libyears", "Stars", "Private", "Flags", "Description",
-        "Biggest Drag", "Why This Grade",
+        "Biggest Drag", "Why This Grade", "Trend",
     ]
     for col, h in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=h)
@@ -448,6 +460,15 @@ def _build_all_repos(wb: Workbook, data: dict) -> None:
         pattern = act.get("commit_pattern", "")
         if pattern and pattern != "—":
             color_pattern_cell(ws.cell(row=row, column=9), pattern)
+
+        # Sparkline trend (column 23)
+        if score_history:
+            repo_name = m.get("name", "")
+            scores = score_history.get(repo_name, [])
+            spark = render_sparkline(scores)
+            if spark:
+                cell = ws.cell(row=row, column=23, value=spark)
+                cell.font = SPARKLINE_FONT
 
     max_row = len(audits) + 1
     apply_zebra_stripes(ws, 2, max_row, len(headers))
@@ -1186,13 +1207,14 @@ def export_excel(
     output_path: Path,
     trend_data: list[dict] | None = None,
     diff_data: dict | None = None,
+    score_history: dict[str, list[float]] | None = None,
 ) -> Path:
     """Generate the flagship Excel dashboard."""
     data = json.loads(report_path.read_text())
 
     wb = Workbook()
-    _build_dashboard(wb, data, diff_data)
-    _build_all_repos(wb, data)
+    _build_dashboard(wb, data, diff_data, score_history)
+    _build_all_repos(wb, data, score_history)
     _build_heatmap(wb, data)
     _build_quick_wins(wb, data)
     _build_badges(wb, data)
