@@ -431,6 +431,102 @@ class GitHubClient:
                 "topics": topics,
             }
 
+    def update_repo_metadata(
+        self,
+        owner: str,
+        repo: str,
+        *,
+        description: str | None = None,
+        homepage: str | None = None,
+    ) -> dict:
+        """Update repository description and/or homepage via PATCH /repos/{owner}/{repo}."""
+        body: dict = {}
+        if description is not None:
+            body["description"] = description
+        if homepage is not None:
+            body["homepage"] = homepage
+        try:
+            response = self._request_method(
+                "PATCH",
+                f"{API_BASE}/repos/{owner}/{repo}",
+                json_body=body,
+            )
+            data = response.json()
+            return {
+                "ok": True,
+                "http_status": response.status_code,
+                "description": data.get("description", ""),
+                "homepage": data.get("homepage", ""),
+            }
+        except requests.HTTPError as exc:
+            status = self._http_error_status(exc)
+            logger.warning("Failed to update metadata for %s/%s: %s", owner, repo, exc)
+            return {
+                "ok": False,
+                "http_status": status,
+                "description": description or "",
+                "homepage": homepage or "",
+            }
+
+    def get_file_sha(
+        self,
+        owner: str,
+        repo: str,
+        path: str,
+        *,
+        ref: str | None = None,
+    ) -> str | None:
+        """Get the SHA of a file in a repo, or None if the file doesn't exist."""
+        params: dict = {}
+        if ref is not None:
+            params["ref"] = ref
+        try:
+            response = self._request(
+                f"{API_BASE}/repos/{owner}/{repo}/contents/{path}",
+                params=params,
+            )
+            data = response.json()
+            return data.get("sha")
+        except requests.HTTPError as exc:
+            if self._http_error_status(exc) == 404:
+                return None
+            raise
+
+    def update_repo_file(
+        self,
+        owner: str,
+        repo: str,
+        path: str,
+        content_b64: str,
+        message: str,
+        *,
+        sha: str | None = None,
+    ) -> dict:
+        """Create or update a file via PUT /repos/{owner}/{repo}/contents/{path}."""
+        body: dict = {"message": message, "content": content_b64}
+        if sha is not None:
+            body["sha"] = sha
+        try:
+            response = self._request_method(
+                "PUT",
+                f"{API_BASE}/repos/{owner}/{repo}/contents/{path}",
+                json_body=body,
+            )
+            data = response.json()
+            return {
+                "ok": True,
+                "http_status": response.status_code,
+                "sha": data.get("content", {}).get("sha", ""),
+            }
+        except requests.HTTPError as exc:
+            status = self._http_error_status(exc)
+            logger.warning("Failed to update file %s in %s/%s: %s", path, owner, repo, exc)
+            return {
+                "ok": False,
+                "http_status": status,
+                "sha": "",
+            }
+
     def list_repo_issues(self, owner: str, repo: str, state: str = "open") -> list[dict]:
         """List repository issues for managed issue reconciliation."""
         try:
