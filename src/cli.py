@@ -100,6 +100,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Audit only these specific repos (by name or URL). Merges into the most recent full report.",
     )
     parser.add_argument(
+        "--incremental",
+        action="store_true",
+        help="Only re-audit repos that changed since last run (compares pushed_at timestamps)",
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="Print detailed output",
@@ -342,6 +347,8 @@ def _run_targeted_audit(args, client, output_dir: Path) -> None:
     pcc_path = write_pcc_export(report, output_dir)
     raw_path = write_raw_metadata(report, output_dir)
     archive_report(json_path)
+    from src.history import save_fingerprints
+    save_fingerprints([a.to_dict() for a in all_audits_obj])
 
     print(
         f"\n✓ Targeted audit: {len(new_audits)} new/updated + {len(kept)} existing = {len(all_audits_obj)} total\n"
@@ -354,6 +361,65 @@ def _run_targeted_audit(args, client, output_dir: Path) -> None:
         f"    {pcc_path}\n"
         f"    {raw_path}",
     )
+
+
+def _run_incremental_audit(args, client, output_dir: Path) -> None:
+    """Only re-audit repos whose pushed_at changed since last run."""
+    from src.history import load_fingerprints, save_fingerprints
+
+    fingerprints = load_fingerprints()
+    if not fingerprints:
+        print("  No fingerprints found. Run a full audit first.", file=sys.stderr)
+        print("  Usage: python -m src saagpatel", file=sys.stderr)
+        return
+
+    # Fetch metadata (fast, uses cache for list + languages)
+    all_repos, errors = client.get_repo_metadata(args.username)
+    repos = _filter_repos(all_repos, skip_forks=args.skip_forks, skip_archived=args.skip_archived)
+
+    changed: list[str] = []
+    new: list[str] = []
+    for repo in repos:
+        prev = fingerprints.get(repo.name)
+        curr_pushed = repo.pushed_at.isoformat() if repo.pushed_at else None
+        if prev is None:
+            new.append(repo.name)
+        elif prev.get("pushed_at") != curr_pushed:
+            changed.append(repo.name)
+
+    needs_audit = changed + new
+    unchanged = len(repos) - len(needs_audit)
+
+    print(
+        f"  Incremental: {len(needs_audit)} need audit "
+        f"({len(changed)} changed, {len(new)} new), {unchanged} unchanged",
+        file=sys.stderr,
+    )
+
+    if not needs_audit:
+        print("  No changes. Regenerating reports from last audit.", file=sys.stderr)
+        existing = sorted(output_dir.glob("audit-report-*.json"), key=lambda f: f.stat().st_mtime, reverse=True)
+        if existing:
+            from src.excel_export import export_excel
+            from src.history import load_trend_data
+            excel_path = export_excel(
+                existing[0],
+                output_dir / f"audit-dashboard-{args.username}-{_date_str(datetime.now(timezone.utc))}.xlsx",
+                trend_data=load_trend_data(),
+            )
+            print(f"  Regenerated: {excel_path}", file=sys.stderr)
+        return
+
+    # Use targeted audit machinery
+    args.repos = needs_audit
+    _run_targeted_audit(args, client, output_dir)
+
+    # Save updated fingerprints
+    latest = sorted(output_dir.glob("audit-report-*.json"), key=lambda f: f.stat().st_mtime, reverse=True)
+    if latest:
+        report_data = json.loads(latest[0].read_text())
+        save_fingerprints(report_data.get("audits", []))
+        print(f"  Fingerprints updated for {len(report_data.get('audits', []))} repos", file=sys.stderr)
 
 
 def main() -> None:
@@ -372,10 +438,13 @@ def main() -> None:
     # Fetch metadata from GitHub API
     client = GitHubClient(token=args.token, cache=cache)
 
-    # Targeted audit: only specific repos
+    # Targeted or incremental audit
     output_dir = Path(args.output_dir)
     if args.repos:
         _run_targeted_audit(args, client, output_dir)
+        return
+    if args.incremental:
+        _run_incremental_audit(args, client, output_dir)
         return
 
     if args.graphql and args.token:
@@ -476,43 +545,43 @@ def main() -> None:
 
         json_path = write_json_report(report, output_dir)
 
-        # Excel dashboard (with trend data if history exists)
-        from src.excel_export import export_excel
-        from src.history import load_trend_data
-        trend_data = load_trend_data()
-        excel_path = export_excel(
-            json_path,
-            output_dir / f"audit-dashboard-{args.username}-{_date_str(report.generated_at)}.xlsx",
-            trend_data=trend_data,
-        )
-        md_path = write_markdown_report(report, output_dir)
-        pcc_path = write_pcc_export(report, output_dir)
-        raw_path = write_raw_metadata(report, output_dir)
-
-        # Auto-archive + auto-diff (historical tracking)
-        from src.history import archive_report, find_previous
+        # Compute diff BEFORE Excel so narrative can use it
+        from src.history import archive_report, find_previous, load_trend_data, save_fingerprints
         from src.diff import diff_reports, format_diff_markdown
 
-        # Find previous report before archiving the new one
         previous = find_previous(json_path.name)
-
-        # If --diff is explicitly set, use that instead
         diff_source = args.diff or previous
+        diff_dict = None
 
         if diff_source:
             diff = diff_reports(diff_source, json_path)
+            diff_dict = diff.to_dict()
             diff_md_path = output_dir / f"audit-diff-{report.username}-{_date_str(report.generated_at)}.md"
             diff_md_path.write_text(format_diff_markdown(diff))
             diff_json_path = output_dir / f"audit-diff-{report.username}-{_date_str(report.generated_at)}.json"
-            diff_json_path.write_text(__import__("json").dumps(diff.to_dict(), indent=2))
+            diff_json_path.write_text(json.dumps(diff_dict, indent=2))
             print(
                 f"  Diff: {len(diff.tier_changes)} tier changes, "
                 f"{len([c for c in diff.score_changes if abs(c['delta']) > 0.05])} significant score changes",
                 file=sys.stderr,
             )
 
-        # Archive the current report
+        # Excel dashboard (with trend + diff data for narrative)
+        from src.excel_export import export_excel
+        trend_data = load_trend_data()
+        excel_path = export_excel(
+            json_path,
+            output_dir / f"audit-dashboard-{args.username}-{_date_str(report.generated_at)}.xlsx",
+            trend_data=trend_data,
+            diff_data=diff_dict,
+        )
+        md_path = write_markdown_report(report, output_dir)
+        pcc_path = write_pcc_export(report, output_dir)
+        raw_path = write_raw_metadata(report, output_dir)
+
+        # Archive + fingerprints
         archive_report(json_path)
+        save_fingerprints(report.to_dict()["audits"])
 
         cache_info = ""
         if cache:

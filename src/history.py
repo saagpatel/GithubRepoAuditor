@@ -123,3 +123,38 @@ def _update_index(report_path: Path, history_dir: Path) -> None:
     index.sort(key=lambda e: e.get("generated_at", ""), reverse=True)
 
     index_path.write_text(json.dumps(index, indent=2))
+
+
+# ── Fingerprints for incremental audits ──────────────────────────────
+
+FINGERPRINT_PATH = Path("output/.audit-fingerprints.json")
+
+
+def save_fingerprints(
+    audits: list[dict],
+    path: Path = FINGERPRINT_PATH,
+) -> Path:
+    """Save per-repo fingerprints for incremental audit detection."""
+    fingerprints: dict[str, dict] = {}
+    for audit in audits:
+        meta = audit.get("metadata", {})
+        name = meta.get("name", "")
+        if name:
+            fingerprints[name] = {
+                "pushed_at": meta.get("pushed_at"),
+                "overall_score": audit.get("overall_score", 0),
+                "completeness_tier": audit.get("completeness_tier", ""),
+            }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(fingerprints, indent=2))
+    return path
+
+
+def load_fingerprints(path: Path = FINGERPRINT_PATH) -> dict[str, dict]:
+    """Load previously saved fingerprints."""
+    if not path.is_file():
+        return {}
+    try:
+        return json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return {}
