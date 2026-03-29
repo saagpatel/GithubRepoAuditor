@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -23,6 +24,22 @@ def _file_path(output_dir: Path, prefix: str, username: str, dt: datetime, ext: 
     return output_dir / f"{prefix}-{username}-{_date_str(dt)}.{ext}"
 
 
+# ── JSON sanitization ───────────────────────────────────────────────
+
+_CONTROL_CHAR_RE = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
+
+
+def _sanitize_for_json(obj: object) -> object:
+    """Recursively strip control characters from strings to prevent JSON corruption."""
+    if isinstance(obj, str):
+        return _CONTROL_CHAR_RE.sub('', obj)
+    if isinstance(obj, dict):
+        return {k: _sanitize_for_json(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize_for_json(v) for v in obj]
+    return obj
+
+
 # ── JSON Report ──────────────────────────────────────────────────────
 
 
@@ -32,7 +49,7 @@ def write_json_report(report: AuditReport, output_dir: Path) -> Path:
     path = _file_path(output_dir, "audit-report", report.username, report.generated_at, "json")
 
     with open(path, "w") as f:
-        json.dump(report.to_dict(), f, indent=2)
+        json.dump(_sanitize_for_json(report.to_dict()), f, indent=2)
 
     return path
 
