@@ -153,6 +153,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Generate per-repo README improvement suggestions",
     )
+    parser.add_argument(
+        "--notion-registry",
+        action="store_true",
+        help="Use Notion Local Portfolio Projects as registry source (requires NOTION_TOKEN)",
+    )
     return parser
 
 
@@ -438,12 +443,29 @@ def _run_targeted_audit(args, client, output_dir: Path) -> None:
 
     notion_info = ""
     if args.notion:
-        from src.notion_export import export_notion_events
+        from src.notion_export import export_notion_events, _load_project_map
         notion_result = export_notion_events(report.to_dict(), output_dir)
         notion_info = f"\n    {notion_result['events_path']} ({notion_result['event_count']} events, {len(notion_result['unmapped'])} unmapped)"
         if args.notion_sync:
-            from src.notion_sync import sync_notion_events
+            from src.notion_client import get_notion_token, load_notion_config
+            from src.notion_sync import (
+                sync_notion_events,
+                create_recommendation_run,
+                create_audit_action_requests,
+                patch_weekly_review,
+            )
             sync_notion_events(notion_result["events_path"], Path("config"))
+            sync_token = get_notion_token()
+            sync_config = load_notion_config(Path("config"))
+            if sync_token and sync_config:
+                from src.quick_wins import find_quick_wins as _find_qw
+                qw = _find_qw(new_audits)
+                project_map = _load_project_map(Path("config"))
+                create_recommendation_run(report.to_dict(), qw, sync_token, sync_config)
+                create_audit_action_requests(
+                    report.to_dict().get("audits", []), project_map, sync_token, sync_config,
+                )
+                patch_weekly_review(report.to_dict(), None, qw, sync_token, sync_config)
 
     readme_info = ""
     if args.portfolio_readme:
@@ -726,12 +748,41 @@ def main() -> None:
         # Notion export
         notion_info = ""
         if args.notion:
-            from src.notion_export import export_notion_events
+            from src.notion_export import export_notion_events, _load_project_map
             notion_result = export_notion_events(report.to_dict(), output_dir)
             notion_info = f"\n    {notion_result['events_path']} ({notion_result['event_count']} events, {len(notion_result['unmapped'])} unmapped)"
             if args.notion_sync:
-                from src.notion_sync import sync_notion_events
+                from src.notion_client import get_notion_token, load_notion_config
+                from src.notion_sync import (
+                    sync_notion_events,
+                    create_recommendation_run,
+                    create_audit_action_requests,
+                    patch_weekly_review,
+                )
                 sync_notion_events(notion_result["events_path"], Path("config"))
+                sync_token = get_notion_token()
+                sync_config = load_notion_config(Path("config"))
+                if sync_token and sync_config:
+                    from src.quick_wins import find_quick_wins as _find_qw
+                    qw = _find_qw(audits)
+                    project_map = _load_project_map(Path("config"))
+                    create_recommendation_run(report.to_dict(), qw, sync_token, sync_config)
+                    create_audit_action_requests(
+                        report.to_dict().get("audits", []), project_map, sync_token, sync_config,
+                    )
+                    patch_weekly_review(report.to_dict(), diff_dict, qw, sync_token, sync_config)
+
+        # Notion registry reconciliation
+        if args.notion_registry:
+            from src.notion_registry import load_notion_registry
+            from src.registry_parser import reconcile
+            notion_projects = load_notion_registry(Path("config"))
+            if notion_projects:
+                report.reconciliation = reconcile(notion_projects, audits)
+                print_info(
+                    f"Notion registry: {len(notion_projects)} projects, "
+                    f"{len(report.reconciliation.matched)} matched"
+                )
 
         # Portfolio README
         readme_info = ""

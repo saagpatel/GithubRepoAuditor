@@ -6,83 +6,27 @@ Requires NOTION_TOKEN environment variable and config/notion-config.json.
 from __future__ import annotations
 
 import json
-import os
 import sys
 import time
 from pathlib import Path
 
-import requests
+from src.notion_client import (
+    DEFAULT_NOTION_VERSION,
+    REQUEST_DELAY,
+    get_notion_token,
+    load_notion_config,
+    notion_request,
+    rich_text_value,
+    select_value,
+    title_value,
+)
 
-NOTION_API_BASE = "https://api.notion.com/v1"
-DEFAULT_NOTION_VERSION = "2022-06-28"
-REQUEST_DELAY = 0.3  # seconds between API calls (rate limit ~3 req/s)
-MAX_RETRIES = 3
-
-
-def _load_notion_config(config_dir: Path) -> dict | None:
-    """Load Notion database IDs from config."""
-    path = config_dir / "notion-config.json"
-    if not path.is_file():
-        print("  Notion config not found at config/notion-config.json", file=sys.stderr)
-        return None
-    try:
-        return json.loads(path.read_text())
-    except (json.JSONDecodeError, OSError) as exc:
-        print(f"  Failed to read Notion config: {exc}", file=sys.stderr)
-        return None
-
-
-def _notion_request(
-    method: str,
-    path: str,
-    token: str,
-    version: str = DEFAULT_NOTION_VERSION,
-    body: dict | None = None,
-) -> requests.Response | None:
-    """Make a Notion API request with retry on 429/5xx."""
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Notion-Version": version,
-        "Content-Type": "application/json",
-    }
-    url = f"{NOTION_API_BASE}{path}"
-
-    for attempt in range(MAX_RETRIES):
-        try:
-            response = requests.request(
-                method, url, headers=headers,
-                json=body, timeout=30,
-            )
-            if response.status_code == 429:
-                retry_after = int(response.headers.get("Retry-After", 2))
-                print(f"  Rate limited, waiting {retry_after}s...", file=sys.stderr)
-                time.sleep(retry_after)
-                continue
-            if response.status_code >= 500:
-                time.sleep(2 ** attempt)
-                continue
-            return response
-        except requests.RequestException as exc:
-            if attempt == MAX_RETRIES - 1:
-                print(f"  Notion API error: {exc}", file=sys.stderr)
-                return None
-            time.sleep(2 ** attempt)
-    return None
-
-
-def _rich_text_value(text: str) -> dict:
-    """Build a Notion rich_text property value."""
-    return {"rich_text": [{"text": {"content": text[:2000]}}]}
-
-
-def _select_value(name: str) -> dict:
-    """Build a Notion select property value."""
-    return {"select": {"name": name}}
-
-
-def _title_value(text: str) -> dict:
-    """Build a Notion title property value."""
-    return {"title": [{"text": {"content": text}}]}
+# Keep private aliases for backward compat within this module
+_notion_request = notion_request
+_rich_text_value = rich_text_value
+_select_value = select_value
+_title_value = title_value
+_load_notion_config = load_notion_config
 
 
 def _query_existing_event_keys(
@@ -193,7 +137,7 @@ def sync_notion_events(
     config_dir: Path = Path("config"),
 ) -> dict:
     """Push audit events to Notion. Returns {created, deduped, updated_projects, errors}."""
-    token = os.environ.get("NOTION_TOKEN", "").strip()
+    token = get_notion_token()
     if not token:
         print("  NOTION_TOKEN not set. Skipping Notion sync.", file=sys.stderr)
         return {"skipped": True, "reason": "no token"}
@@ -276,3 +220,258 @@ def sync_notion_events(
         "updated_projects": updated_projects,
         "errors": errors,
     }
+
+
+# ── Recommendation Run ──────────────────────────────────────────────
+
+
+ELIGIBLE_TIERS = {"shipped", "functional"}
+
+FLAG_TO_ACTION = {
+    "no-tests": ("Add test framework and initial tests", "testing"),
+    "no-ci": ("Add GitHub Actions CI workflow", "cicd"),
+    "no-readme": ("Create comprehensive README", "readme"),
+}
+
+
+def _render_quick_wins_markdown(quick_wins: list[dict], date: str) -> str:
+    """Render quick wins as markdown for a Notion recommendation page."""
+    lines = [
+        f"## Audit Quick Wins ({date})",
+        "",
+    ]
+    if not quick_wins:
+        lines.append("No repos within striking distance of tier promotion.")
+        return "\n".join(lines)
+
+    for win in quick_wins[:10]:
+        lines.append(
+            f"**{win['name']}** — {win['current_tier']} → {win['next_tier']} "
+            f"(gap: {win['gap']:.3f})"
+        )
+        for action in win.get("actions", []):
+            lines.append(f"  - {action}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def create_recommendation_run(
+    report_data: dict,
+    quick_wins: list[dict],
+    token: str,
+    config: dict,
+) -> str | None:
+    """Create an Audit Recommendation Run page in Notion."""
+    db_id = config.get("recommendation_runs_db_id", "")
+    if not db_id:
+        print("  recommendation_runs_db_id not set, skipping.", file=sys.stderr)
+        return None
+
+    version = config.get("notion_version", DEFAULT_NOTION_VERSION)
+    date = report_data.get("generated_at", "")[:10]
+
+    properties = {
+        "Name": _title_value(f"Audit Recommendation Run — {date}"),
+        "Run Type": _select_value("Audit"),
+        "Status": _select_value("Succeeded"),
+    }
+
+    # Build markdown content as children blocks
+    md = _render_quick_wins_markdown(quick_wins, date)
+    children = [
+        {
+            "object": "block",
+            "type": "paragraph",
+            "paragraph": {
+                "rich_text": [{"type": "text", "text": {"content": chunk}}]
+            },
+        }
+        for chunk in _chunk_text(md, 2000)
+    ]
+
+    body = {
+        "parent": {"database_id": db_id},
+        "properties": properties,
+        "children": children,
+    }
+
+    resp = _notion_request("POST", "/pages", token, version, body)
+    if resp and resp.status_code == 200:
+        page_id = resp.json().get("id", "")
+        print(f"  Recommendation run created: {page_id}", file=sys.stderr)
+        return page_id
+    if resp:
+        print(f"  Failed to create recommendation run: {resp.status_code}", file=sys.stderr)
+    return None
+
+
+# ── Action Requests ─────────────────────────────────────────────────
+
+
+def create_audit_action_requests(
+    audits: list[dict],
+    project_map: dict[str, dict],
+    token: str,
+    config: dict,
+) -> int:
+    """Create draft GitHub issue action requests for critical audit gaps."""
+    db_id = config.get("action_requests_db_id", "")
+    if not db_id:
+        print("  action_requests_db_id not set, skipping.", file=sys.stderr)
+        return 0
+
+    version = config.get("notion_version", DEFAULT_NOTION_VERSION)
+    created = 0
+
+    for audit in audits:
+        tier = audit.get("completeness_tier", "")
+        if tier not in ELIGIBLE_TIERS:
+            continue
+
+        name = audit.get("metadata", {}).get("name", "")
+        mapping = project_map.get(name)
+        if not mapping:
+            continue
+
+        flags = set(audit.get("flags", []))
+        for flag, (action_desc, dimension) in FLAG_TO_ACTION.items():
+            if flag not in flags:
+                continue
+
+            title = f"Audit: {action_desc} for {name}"
+            properties = {
+                "Name": _title_value(title),
+                "Source Type": _select_value("Audit"),
+                "Status": _select_value("Draft"),
+            }
+
+            if mapping.get("localProjectId"):
+                properties["Local Project"] = {"relation": [{"id": mapping["localProjectId"]}]}
+
+            body = {
+                "parent": {"database_id": db_id},
+                "properties": properties,
+            }
+
+            resp = _notion_request("POST", "/pages", token, version, body)
+            if resp and resp.status_code == 200:
+                created += 1
+            time.sleep(REQUEST_DELAY)
+
+    if created:
+        print(f"  Action requests: {created} draft requests created.", file=sys.stderr)
+    return created
+
+
+# ── Weekly Review Patch ─────────────────────────────────────────────
+
+
+def _render_audit_highlights(
+    report_data: dict,
+    diff_data: dict | None,
+    quick_wins: list[dict],
+) -> str:
+    """Render audit highlights markdown for weekly review."""
+    date = report_data.get("generated_at", "")[:10]
+    grade = report_data.get("portfolio_grade", "?")
+    avg = report_data.get("average_score", 0)
+    tiers = report_data.get("tier_distribution", {})
+    shipped = tiers.get("shipped", 0)
+    functional = tiers.get("functional", 0)
+
+    lines = [
+        f"### Audit Highlights ({date})",
+        "",
+        f"**Portfolio:** Grade {grade} | Avg {avg:.2f} | {shipped} shipped, {functional} functional",
+        "",
+    ]
+
+    # Tier changes from diff
+    if diff_data:
+        changes = diff_data.get("tier_changes", [])
+        if changes:
+            promos = [c for c in changes if c.get("direction") == "promotion"]
+            demos = [c for c in changes if c.get("direction") == "demotion"]
+            lines.append(f"**Tier Changes:** {len(promos)} promotions, {len(demos)} demotions")
+            for c in changes[:5]:
+                icon = "+" if c.get("direction") == "promotion" else "-"
+                lines.append(f"  {icon} {c['name']}: {c.get('old_tier', '?')} -> {c.get('new_tier', '?')}")
+            lines.append("")
+
+    # Quick wins
+    if quick_wins:
+        lines.append("**Top Quick Wins:**")
+        for w in quick_wins[:3]:
+            lines.append(f"  - {w['name']} needs {w['gap']:.3f} to reach {w['next_tier']}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def patch_weekly_review(
+    report_data: dict,
+    diff_data: dict | None,
+    quick_wins: list[dict],
+    token: str,
+    config: dict,
+) -> bool:
+    """Append audit highlights to the most recent weekly review page."""
+    db_id = config.get("weekly_reviews_db_id", "")
+    if not db_id:
+        print("  weekly_reviews_db_id not set, skipping.", file=sys.stderr)
+        return False
+
+    version = config.get("notion_version", DEFAULT_NOTION_VERSION)
+
+    # Find most recent weekly review
+    query_body = {
+        "sorts": [{"timestamp": "created_time", "direction": "descending"}],
+        "page_size": 1,
+    }
+    resp = _notion_request("POST", f"/databases/{db_id}/query", token, version, query_body)
+    if not resp or resp.status_code != 200:
+        print("  Failed to query weekly reviews.", file=sys.stderr)
+        return False
+
+    results = resp.json().get("results", [])
+    if not results:
+        print("  No weekly review pages found.", file=sys.stderr)
+        return False
+
+    page_id = results[0]["id"]
+    highlights = _render_audit_highlights(report_data, diff_data, quick_wins)
+
+    # Append as a new block to the page
+    children = [
+        {
+            "object": "block",
+            "type": "paragraph",
+            "paragraph": {
+                "rich_text": [{"type": "text", "text": {"content": chunk}}]
+            },
+        }
+        for chunk in _chunk_text(highlights, 2000)
+    ]
+
+    resp = _notion_request(
+        "PATCH", f"/blocks/{page_id}/children", token, version,
+        {"children": children},
+    )
+    if resp and resp.status_code == 200:
+        print(f"  Weekly review patched with audit highlights.", file=sys.stderr)
+        return True
+    if resp:
+        print(f"  Failed to patch weekly review: {resp.status_code}", file=sys.stderr)
+    return False
+
+
+def _chunk_text(text: str, max_len: int = 2000) -> list[str]:
+    """Split text into chunks respecting Notion's 2000-char limit."""
+    if len(text) <= max_len:
+        return [text]
+    chunks = []
+    while text:
+        chunks.append(text[:max_len])
+        text = text[max_len:]
+    return chunks
