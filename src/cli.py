@@ -148,6 +148,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Generate PORTFOLIO.md from audit data",
     )
+    parser.add_argument(
+        "--readme-suggestions",
+        action="store_true",
+        help="Generate per-repo README improvement suggestions",
+    )
     return parser
 
 
@@ -446,6 +451,12 @@ def _run_targeted_audit(args, client, output_dir: Path) -> None:
         readme_result = export_portfolio_readme(report.to_dict(), output_dir)
         readme_info = f"\n    {readme_result['readme_path']}"
 
+    suggestions_info = ""
+    if args.readme_suggestions:
+        from src.readme_suggestions import generate_readme_suggestions
+        sug_result = generate_readme_suggestions(report.to_dict(), output_dir)
+        suggestions_info = f"\n    {sug_result['suggestions_path']} ({sug_result['total_suggestions']} suggestions)"
+
     print(
         f"\n✓ Targeted audit: {len(new_audits)} new/updated + {len(kept)} existing = {len(all_audits_obj)} total\n"
         f"  Average score: {report.average_score:.2f}\n"
@@ -455,7 +466,7 @@ def _run_targeted_audit(args, client, output_dir: Path) -> None:
         f"    {md_path}\n"
         f"    {excel_path}\n"
         f"    {pcc_path}\n"
-        f"    {raw_path}{badge_info}{notion_info}{readme_info}",
+        f"    {raw_path}{badge_info}{notion_info}{readme_info}{suggestions_info}",
     )
 
 
@@ -729,6 +740,13 @@ def main() -> None:
             readme_result = export_portfolio_readme(report.to_dict(), output_dir)
             readme_info = f"\n    {readme_result['readme_path']}"
 
+        # README suggestions
+        suggestions_info = ""
+        if args.readme_suggestions:
+            from src.readme_suggestions import generate_readme_suggestions
+            sug_result = generate_readme_suggestions(report.to_dict(), output_dir)
+            suggestions_info = f"\n    {sug_result['suggestions_path']} ({sug_result['total_suggestions']} suggestions)"
+
         cache_info = ""
         if cache:
             cache_info = f"\n  Cache: {cache.hits} hits, {cache.misses} misses"
@@ -743,7 +761,7 @@ def main() -> None:
             f"    {md_path}\n"
             f"    {excel_path}\n"
             f"    {pcc_path}\n"
-            f"    {raw_path}{badge_info}{notion_info}{readme_info}",
+            f"    {raw_path}{badge_info}{notion_info}{readme_info}{suggestions_info}",
         )
     else:
         raw_path = _write_json(

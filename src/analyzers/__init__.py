@@ -13,6 +13,7 @@ from src.analyzers.completeness import BuildReadinessAnalyzer, DocumentationAnal
 from src.analyzers.dependencies import DependenciesAnalyzer
 from src.analyzers.interest import InterestAnalyzer
 from src.analyzers.readme import ReadmeAnalyzer
+from src.analyzers.security import SecurityAnalyzer
 from src.analyzers.structure import StructureAnalyzer
 from src.analyzers.testing import TestingAnalyzer
 from src.models import AnalyzerResult, RepoMetadata
@@ -34,6 +35,7 @@ ALL_ANALYZERS = [
     BuildReadinessAnalyzer(),
     CommunityProfileAnalyzer(),
     InterestAnalyzer(),
+    SecurityAnalyzer(),
 ]
 
 
