@@ -39,7 +39,7 @@ INTEREST_TIERS = [
 
 STALE_THRESHOLD_DAYS = 730  # 2 years
 
-GRADE_THRESHOLDS = [(0.85, "A"), (0.70, "B"), (0.55, "C"), (0.35, "D"), (0.0, "F")]
+GRADE_THRESHOLDS = [(0.80, "A"), (0.70, "B"), (0.55, "C"), (0.35, "D"), (0.0, "F")]
 
 
 def letter_grade(score: float) -> str:
