@@ -1,0 +1,27 @@
+# GitHub Repo Auditor — example configuration
+# Copy to ./audit-config.yaml and customize.
+# CLI flags always override these values.
+
+# username: saagpatel
+
+# Output settings
+output_dir: output
+html: true
+badges: true
+diff: true
+
+# Filtering
+skip_forks: true
+skip_archived: true
+incremental: true
+
+# Scoring
+# scoring_profile: config/scoring-profiles/default.json
+
+# Notion integration (requires NOTION_TOKEN env var)
+# notion_sync: true
+# notion_registry: true
+
+# Advanced
+# narrative: true
+# auto_archive: true
