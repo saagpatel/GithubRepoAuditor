@@ -2,7 +2,7 @@
 
 **Know the truth about every project you've ever started.**
 
-If you're a developer with 50, 80, 100+ repositories — some shipped, some half-built, some you forgot existed — this tool gives you the ground truth. It clones every repo, runs 11 analyzers, scores across two axes, assigns letter grades and achievement badges, and generates a flagship Excel dashboard you can actually use to decide what to work on next.
+If you're a developer with 50, 80, 100+ repositories — some shipped, some half-built, some you forgot existed — this tool gives you the ground truth. It clones every repo, runs 12 analyzers, scores across two axes, assigns letter grades and achievement badges, and generates an interactive dashboard you can actually use to decide what to work on next.
 
 Built for the developer who ships fast and starts often, and needs a system to keep track of it all.
 
@@ -15,10 +15,16 @@ Built for the developer who ships fast and starts often, and needs a system to k
    - **Interest** (0.0–1.0) — Is this project actually interesting? Novel tech, commit passion, ambitious scope, storytelling README, external validation.
 4. **Assigns letter grades** (A–F) and classifies into tiers (Shipped / Functional / WIP / Skeleton / Abandoned)
 5. **Awards 15 achievement badges** — "Fully Tested", "CI Champion", "Novel Tech", "Zero Debt", "Complete Package", etc.
-6. **Tells you exactly what to do next** — Quick Wins show which repos are closest to the next tier and what specific action gets them there
-7. **Generates a flagship Excel dashboard** — 10 sheets with KPI cards, heatmaps, badge boards, tech stack proficiency, and more
-8. **Cross-references against your project registry** — finds repos not tracked locally and projects without matching repos
-9. **Tracks history** — archives every audit run and auto-diffs against the previous to surface regressions and improvements
+6. **Scans for security issues** — exposed secrets, dangerous files, missing SECURITY.md
+7. **Tells you exactly what to do next** — Quick Wins show which repos are closest to the next tier and what specific action gets them there
+8. **Generates multiple dashboards:**
+   - Flagship Excel workbook (12 sheets with charts, heatmaps, sparklines)
+   - Interactive HTML dashboard (scatter chart, filterable table, tech radar)
+   - Shields.io badges for GitHub READMEs
+   - Portfolio README for your GitHub profile
+9. **Integrates with Notion** — pushes audit signals into your Notion operating system: recommendations, governed issue requests, weekly review enrichment, project completeness cards
+10. **Tracks history** — archives every audit run, auto-diffs, detects regressions, identifies archive candidates
+11. **AI-powered narrative** — feeds audit data to Claude for a human-readable portfolio analysis
 
 ## Why This Exists
 
@@ -39,15 +45,29 @@ The tool auto-detects your GitHub token from `$GITHUB_TOKEN` or the `gh` CLI. Fo
 
 ## Output
 
-Every run produces 5 files:
+Every run produces 5 core files, plus optional exports:
 
 | File | What It Is |
 |------|-----------|
 | `audit-report-{user}-{date}.json` | Full structured audit — every score, badge, finding, and dimension detail |
 | `audit-report-{user}-{date}.md` | Human-readable Markdown with tier tables, quick wins, and collapsible per-repo breakdowns |
-| `audit-dashboard-{user}-{date}.xlsx` | **The flagship** — 10-sheet Excel workbook (see below) |
+| `audit-dashboard-{user}-{date}.xlsx` | Flagship 12-sheet Excel workbook (see below) |
 | `pcc-import-{user}-{date}.json` | Flat array for importing into dashboards or project management tools |
 | `raw_metadata.json` | Backwards-compatible raw audit data |
+
+### Optional Exports
+
+| Flag | Output |
+|------|--------|
+| `--badges` | `output/badges/` — shields.io badge JSON + `badges.md` with copy-pasteable markdown |
+| `--upload-badges` | Uploads badge JSON to a GitHub Gist for auto-updating endpoint badges |
+| `--html` | `output/dashboard-{user}-{date}.html` — self-contained interactive dashboard |
+| `--portfolio-readme` | `output/PORTFOLIO.md` — GitHub profile-ready readme with badges and tier-grouped repos |
+| `--readme-suggestions` | `output/readme-suggestions-{date}.md` — per-repo actionable README improvements |
+| `--notion` | `output/notion-audit-events-{date}.json` — normalized events for Notion signal pipeline |
+| `--notion-sync` | Pushes events + recommendations + action requests to Notion API |
+| `--narrative` | `output/narrative-{date}.md` — AI-generated portfolio analysis (requires `ANTHROPIC_API_KEY`) |
+| `--auto-archive` | `output/archive-candidates-{date}.md` — repos below 0.15 for 3+ consecutive runs |
 
 ### The Excel Dashboard
 
@@ -55,9 +75,9 @@ This is the centerpiece. Open it instead of reading JSON.
 
 | Sheet | What You See |
 |-------|-------------|
-| **Dashboard** | Portfolio grade, 6 KPI cards, tier pie chart, grade distribution, language breakdown, best work highlights |
-| **All Repos** | Sortable 20-column master table with inline score bars, grade coloring, badge counts, next-badge suggestions, commit patterns |
-| **Scoring Heatmap** | Every repo × every dimension, color-coded red→amber→green. Spot weaknesses at a glance. |
+| **Dashboard** | Portfolio grade, 6 KPI cards, tier pie chart, grade distribution, language breakdown, completeness vs interest scatter chart, portfolio sparkline |
+| **All Repos** | Sortable 23-column master table with inline score bars, grade coloring, badge counts, commit patterns, trend sparklines |
+| **Scoring Heatmap** | Every repo x every dimension, color-coded red-amber-green. Spot weaknesses at a glance. |
 | **Quick Wins** | Repos within striking distance of the next tier, with the exact actions to get there |
 | **Badges** | Portfolio-wide badge distribution chart + achievement leaderboard |
 | **Tech Stack** | Language proficiency weighted by project quality, best work top 5 |
@@ -65,6 +85,18 @@ This is the centerpiece. Open it instead of reading JSON.
 | **Tier Breakdown** | Per-tier deep dive with grades and descriptions |
 | **Activity** | Commit patterns, bus factor, release cadence, push recency |
 | **Registry** | Cross-reference with your local project registry |
+| **Score Explainer** | How scoring, grades, and tiers work |
+| **Action Items** | Prioritized improvements with effort estimates |
+
+### The HTML Dashboard
+
+A single self-contained HTML file with embedded CSS and JavaScript. No external dependencies — works offline, shareable as a link.
+
+- Canvas2D scatter chart (completeness vs interest, colored by tier, hover tooltips)
+- Filterable and sortable repo table
+- Tech radar showing language adoption trends (Adopt / Trial / Hold / Decline)
+- Tier distribution bar charts
+- Print-friendly CSS — use browser "Print to PDF" for a clean report
 
 ## CLI
 
@@ -78,7 +110,10 @@ python -m src <username> [options]
 | `--token` | `$GITHUB_TOKEN` / `gh auth token` | Personal access token |
 | `--output-dir` | `output/` | Where reports go |
 | `--graphql` | off | Use GraphQL for faster bulk fetch (1-2 queries vs 100+ REST calls) |
+| `--repos REPO [...]` | all | Audit only specific repos by name or URL |
+| `--incremental` | off | Only re-audit repos that changed since last run |
 | `--registry PATH` | none | Cross-reference against a project-registry.md |
+| `--notion-registry` | off | Use Notion Local Portfolio Projects as registry source |
 | `--sync-registry` | off | Auto-add untracked repos to the registry |
 | `--skip-forks` | off | Exclude forked repos |
 | `--skip-archived` | off | Exclude archived repos |
@@ -86,6 +121,16 @@ python -m src <username> [options]
 | `--no-cache` | off | Bypass the 1-hour API response cache |
 | `--diff PATH` | none | Compare against a specific previous report |
 | `--verbose` | off | Print per-dimension score breakdown to stderr |
+| `--scoring-profile NAME` | default | Use custom weights from `config/scoring-profiles/NAME.json` |
+| `--badges` | off | Generate shields.io badge JSON and markdown |
+| `--upload-badges` | off | Upload badges to GitHub Gist (implies --badges) |
+| `--html` | off | Generate interactive HTML dashboard |
+| `--portfolio-readme` | off | Generate PORTFOLIO.md for GitHub profile |
+| `--readme-suggestions` | off | Generate per-repo README improvement suggestions |
+| `--notion` | off | Generate Notion event JSON (dry-run) |
+| `--notion-sync` | off | Push audit events to Notion API (implies --notion) |
+| `--narrative` | off | Generate AI portfolio narrative (requires ANTHROPIC_API_KEY) |
+| `--auto-archive` | off | Generate archive candidate report |
 
 ## Scoring
 
@@ -104,17 +149,14 @@ python -m src <username> [options]
 | Community Profile | 3% | GitHub health files via `/community/profile` API |
 | Documentation | 2% | docs/ dir, CHANGELOG, CONTRIBUTING, comment density |
 
-### Interest Score (separate axis, 7 signals)
+Custom weight profiles can be created in `config/scoring-profiles/` for different contexts (job search, shipping focus, etc.).
 
-| Signal | What It Detects |
-|--------|----------------|
-| Description quality | Specific, detailed project descriptions |
-| Topic tags | Repos with curated topic metadata |
-| Tech novelty | Uncommon languages (Rust, Swift, GDScript), multi-language repos |
-| Commit bursts | High-variance commit patterns indicating passionate development |
-| Project ambition | Multi-module structure, real dependencies, significant LOC, creative assets |
-| External validation | Stars, forks |
-| README storytelling | Long READMEs with images or diagrams |
+### Additional Dimensions (advisory, not part of completeness)
+
+| Dimension | What It Measures |
+|-----------|-----------------|
+| **Interest** | Tech novelty, commit bursts, project ambition, README storytelling, external validation, recency. Portfolio-relative: common "novel" languages get less credit. |
+| **Security** | Exposed secrets (API keys, private keys), dangerous committed files (.env, .pem), SECURITY.md, Dependabot config |
 
 ### Tiers
 
@@ -148,30 +190,52 @@ Not just a simple average — accounts for language diversity (+bonus), shipped 
 
 | Badge | How to Earn |
 |-------|------------|
-| `fully-tested` | Testing score ≥ 0.8 |
-| `well-documented` | README ≥ 0.8 AND docs ≥ 0.5 |
-| `ci-champion` | CI/CD score ≥ 0.8 |
-| `dependency-disciplined` | Dependencies score ≥ 0.8 |
+| `fully-tested` | Testing score >= 0.8 |
+| `well-documented` | README >= 0.8 AND docs >= 0.5 |
+| `ci-champion` | CI/CD score >= 0.8 |
+| `dependency-disciplined` | Dependencies score >= 0.8 |
 | `fresh` | Pushed within 30 days |
-| `battle-tested` | Testing ≥ 0.8 AND 10+ test files |
-| `complete-package` | All dimensions ≥ 0.5 |
+| `battle-tested` | Testing >= 0.8 AND 10+ test files |
+| `complete-package` | All dimensions >= 0.5 |
 | `novel-tech` | Uncommon language or 3+ language repo |
 | `storyteller` | README >1000 chars with images/diagrams |
-| `community-ready` | Community profile ≥ 0.6 |
+| `community-ready` | Community profile >= 0.6 |
 | `zero-debt` | TODO density < 1 per 1000 LOC |
-| `actively-maintained` | Activity score ≥ 0.8 |
-| `built-to-ship` | Build readiness ≥ 0.6 |
+| `actively-maintained` | Activity score >= 0.8 |
+| `built-to-ship` | Build readiness >= 0.6 |
 | `polyglot` | 3+ languages in repo |
 | `has-fans` | Stars > 0 or forks > 0 |
 
 The tool also suggests which badge is closest to being earned and what action would unlock it.
+
+## Notion Integration
+
+Integrates with the [Notion Operating System](https://github.com/saagpatel/notion-operating-system) to push audit intelligence into your portfolio management workflow:
+
+- **Signal Events** — audit results flow into Notion's External Signal Events database as `provider: "Audit"` events
+- **Derived Fields** — updates control tower projects with Audit Grade, Score, Interest, Badge Count, Date
+- **Recommendations** — quick wins pushed to the Recommendation Runs database
+- **Governed Actions** — critical gaps (no-tests, no-ci, no-readme) on shipped/functional repos create draft GitHub issue requests in Notion's approval pipeline
+- **Weekly Review** — appends audit highlights to the most recent weekly review page
+- **Completeness Cards** — appends dimension score summaries to individual project pages
+- **Audit History** — tracks per-run metrics for Notion-native trend visualization
+- **Registry Source** — `--notion-registry` queries Local Portfolio Projects for reconciliation instead of a markdown file
+
+Requires `NOTION_TOKEN` environment variable and `config/notion-config.json` with database IDs.
+
+## Cross-Repo Analysis
+
+- **Similarity Detection** — hashes source files (SHA-256, first 4KB) across repos to find duplicates sharing >50% code
+- **Tech Radar** — tracks language adoption trends across audit history (Adopt / Trial / Hold / Decline)
+- **Archive Candidates** — identifies repos scoring below 0.15 for 3+ consecutive runs
 
 ## Caching & Performance
 
 - API responses cached to `output/.cache/` with 1-hour TTL
 - Registry lookups cached at 24-hour TTL
 - `--graphql` mode fetches all repos in 1-2 queries instead of 100+ REST calls
-- Repeat runs with cache hit skip API entirely — only cloning and analysis
+- `--incremental` mode only re-audits repos whose `pushed_at` changed
+- Rich progress bars with spinners and time elapsed (graceful fallback if `rich` not installed)
 
 ## History & Diffs
 
@@ -180,30 +244,13 @@ Every audit run is archived to `output/history/`. On subsequent runs, the tool a
 - Tier transitions (promoted or demoted)
 - Score improvements and regressions
 - Average score delta
-
-The CI workflow creates a GitHub Issue if any regressions are detected.
-
-## Registry Reconciliation
-
-With `--registry ~/Projects/project-registry.md`:
-- Fuzzy-matches GitHub repos to registry entries (handles name variations)
-- Shows repos on GitHub not tracked in the registry
-- Shows registry entries with no matching repo
-- Generates a **status alignment matrix** comparing registry status vs audit tier
-
-With `--sync-registry`, untracked repos are auto-added to the correct section based on language.
+- Unicode sparklines showing per-repo score trends across runs
 
 ## Tech Stack
 
 - **Python 3.11+** — type hints, pathlib, f-strings throughout
-- **Dependencies:** `requests`, `python-dateutil`, `openpyxl`, `radon` — deliberately minimal
+- **Dependencies:** `requests`, `python-dateutil`, `openpyxl`, `radon`, `rich`, `anthropic` — deliberately minimal
 - **GitHub API:** REST v3 + optional GraphQL v4
 - **Analysis:** Pure Python + pathlib for file inspection, radon for Python complexity
-- **30 source files**, 5,767 lines of code
-- **102 tests** across 11 test files
-
-## CI/CD
-
-Two GitHub Actions workflows:
-- **CI** (`ci.yml`) — runs tests on every push to main
-- **Scheduled Audit** (`audit.yml`) — weekly Monday 6am UTC, archives results, creates Issues on regressions
+- **~50 source files**, 249 tests
+- **Zero JS framework dependencies** — HTML dashboard uses vanilla JS + Canvas2D
