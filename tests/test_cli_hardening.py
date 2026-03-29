@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 from argparse import Namespace
 from pathlib import Path
 
@@ -37,6 +38,7 @@ def _make_args(**overrides) -> Namespace:
         "portfolio_profile": "default",
         "collection": None,
         "review_pack": False,
+        "excel_mode": "template",
         "scorecard": False,
         "security_offline": False,
         "campaign": None,
@@ -272,7 +274,13 @@ def test_write_report_outputs_forwards_analyst_view_args(monkeypatch, tmp_path, 
     monkeypatch.setattr("src.history.save_fingerprints", lambda *_: None)
     monkeypatch.setattr("src.history.archive_report", lambda *_: None)
     monkeypatch.setattr("src.warehouse.write_warehouse_snapshot", lambda *a, **k: tmp_path / "warehouse.db")
-    monkeypatch.setattr("src.excel_export.export_excel", lambda *a, **k: tmp_path / "audit.xlsx")
+    excel_calls: dict[str, object] = {}
+
+    def _record_excel(*_args, **kwargs):
+        excel_calls.update(kwargs)
+        return tmp_path / "audit.xlsx"
+
+    monkeypatch.setattr("src.excel_export.export_excel", _record_excel)
 
     html_calls: dict[str, object] = {}
     review_pack_calls: dict[str, object] = {}
@@ -294,6 +302,7 @@ def test_write_report_outputs_forwards_analyst_view_args(monkeypatch, tmp_path, 
     assert html_calls["collection"] == "showcase"
     assert review_pack_calls["portfolio_profile"] == "shipping"
     assert review_pack_calls["collection"] == "showcase"
+    assert excel_calls["excel_mode"] == "template"
     assert outputs["review_pack_info"]
 
 
@@ -333,3 +342,78 @@ def test_analyze_repos_forwards_security_flags_to_scorer(monkeypatch, sample_met
 
     assert captured[0]["scorecard_enabled"] is True
     assert captured[0]["security_offline"] is True
+
+
+def test_targeted_audit_uses_full_filtered_portfolio_baseline(monkeypatch, tmp_path, sample_metadata):
+    args = _make_args(username="testuser", repos=["RepoB"])
+    other_repo = dataclasses.replace(
+        sample_metadata,
+        name="RepoB",
+        full_name="testuser/RepoB",
+        html_url="https://github.com/testuser/RepoB",
+        clone_url="https://github.com/testuser/RepoB.git",
+        language="TypeScript",
+    )
+    all_repos = [sample_metadata, other_repo]
+    existing_report = _make_report_dict(sample_metadata)
+    existing_report["audits"].append(
+        {
+            "metadata": other_repo.to_dict(),
+            "analyzer_results": [],
+            "overall_score": 0.4,
+            "interest_score": 0.2,
+            "completeness_tier": "wip",
+        }
+    )
+    captured: dict[str, object] = {}
+
+    def _record_analyze(repos, **kwargs):
+        captured["repos"] = [repo.name for repo in repos]
+        captured["portfolio_lang_freq"] = kwargs["portfolio_lang_freq"]
+        return [
+            RepoAudit(
+                metadata=other_repo,
+                analyzer_results=[],
+                overall_score=0.5,
+                completeness_tier="functional",
+                interest_score=0.3,
+            )
+        ]
+
+    monkeypatch.setattr(cli, "_analyze_repos", _record_analyze)
+    monkeypatch.setattr(cli, "_apply_requested_reconciliation", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        cli,
+        "_write_report_outputs",
+        lambda *a, **k: {
+            "md_path": tmp_path / "audit.md",
+            "excel_path": tmp_path / "audit.xlsx",
+            "pcc_path": tmp_path / "audit-pcc.json",
+            "raw_path": tmp_path / "raw.json",
+            "warehouse_path": tmp_path / "warehouse.db",
+            "badge_info": "",
+            "notion_info": "",
+            "readme_info": "",
+            "suggestions_info": "",
+            "html_info": "",
+            "pdf_info": "",
+            "review_pack_info": "",
+            "cache_info": "",
+        },
+    )
+    monkeypatch.setattr(cli, "_print_output_summary", lambda *_args, **_kwargs: None)
+
+    cli._run_targeted_audit(
+        args,
+        client=cli.GitHubClient(token=None, cache=None),
+        output_dir=tmp_path,
+        all_repos=all_repos,
+        errors=[],
+        custom_weights=None,
+        scoring_profile_name="baseline",
+        existing_report_path=tmp_path / "audit-report.json",
+        existing_report_data=existing_report,
+    )
+
+    assert captured["repos"] == ["RepoB"]
+    assert captured["portfolio_lang_freq"] == {"Python": 0.5, "TypeScript": 0.5}
