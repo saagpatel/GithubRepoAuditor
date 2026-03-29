@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
-import shutil
 import subprocess
 import sys
+import tempfile
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Callable, Generator
@@ -11,8 +11,6 @@ from typing import Callable, Generator
 from src.models import RepoMetadata
 
 logger = logging.getLogger(__name__)
-
-CLONE_DIR = Path("/tmp/audit-repos")
 
 
 def _auth_url(clone_url: str, token: str | None) -> str:
@@ -22,12 +20,14 @@ def _auth_url(clone_url: str, token: str | None) -> str:
     return clone_url
 
 
-def clone_repo(clone_url: str, name: str, token: str | None = None) -> Path:
-    """Shallow-clone a single repo into CLONE_DIR/name.
+def clone_repo(clone_url: str, name: str, token: str | None = None, clone_dir: Path | None = None) -> Path:
+    """Shallow-clone a single repo into clone_dir/name.
 
     Returns the path to the cloned repo directory.
     """
-    dest = CLONE_DIR / name
+    if clone_dir is None:
+        clone_dir = Path(tempfile.mkdtemp(prefix="audit-repos-"))
+    dest = clone_dir / name
     url = _auth_url(clone_url, token)
 
     try:
@@ -48,12 +48,6 @@ def clone_repo(clone_url: str, name: str, token: str | None = None) -> Path:
     return dest
 
 
-def cleanup() -> None:
-    """Remove all cloned repos."""
-    if CLONE_DIR.exists():
-        shutil.rmtree(CLONE_DIR, ignore_errors=True)
-
-
 @contextmanager
 def clone_workspace(
     repos: list[RepoMetadata],
@@ -61,7 +55,7 @@ def clone_workspace(
     on_progress: Callable[[int, int, str], None] | None = None,
     on_error: Callable[[str, str], None] | None = None,
 ) -> Generator[dict[str, Path], None, None]:
-    """Context manager that clones repos and ensures cleanup.
+    """Context manager that clones repos into a session-unique temp dir.
 
     Yields a dict mapping repo name -> cloned path.
     Failed clones are skipped with a warning.
@@ -69,11 +63,11 @@ def clone_workspace(
     on_progress(current, total, repo_name) — called per repo.
     on_error(repo_name, message) — called on clone failure.
     """
-    CLONE_DIR.mkdir(parents=True, exist_ok=True)
-    cloned: dict[str, Path] = {}
-    total = len(repos)
+    with tempfile.TemporaryDirectory(prefix="audit-repos-") as tmpdir:
+        clone_dir = Path(tmpdir)
+        cloned: dict[str, Path] = {}
+        total = len(repos)
 
-    try:
         for i, repo in enumerate(repos, 1):
             if on_progress:
                 on_progress(i, total, repo.name)
@@ -83,7 +77,7 @@ def clone_workspace(
                     file=sys.stderr,
                 )
             try:
-                path = clone_repo(repo.clone_url, repo.name, token)
+                path = clone_repo(repo.clone_url, repo.name, token, clone_dir)
                 cloned[repo.name] = path
             except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
                 if on_error:
@@ -94,5 +88,3 @@ def clone_workspace(
                         file=sys.stderr,
                     )
         yield cloned
-    finally:
-        cleanup()
