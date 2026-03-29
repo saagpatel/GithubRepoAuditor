@@ -185,6 +185,58 @@ def build_parser() -> argparse.ArgumentParser:
         help="Use a custom scoring profile from config/scoring-profiles/NAME.json",
     )
     parser.add_argument(
+        "--portfolio-profile",
+        type=str,
+        default="default",
+        metavar="NAME",
+        help="Apply a ranking overlay profile for analyst-facing outputs (default: default)",
+    )
+    parser.add_argument(
+        "--collection",
+        type=str,
+        default=None,
+        metavar="NAME",
+        help="Filter analyst-facing outputs to a named collection (does not affect audited repos)",
+    )
+    parser.add_argument(
+        "--review-pack",
+        action="store_true",
+        help="Generate a concise analyst review pack from the current run and compare context",
+    )
+    parser.add_argument(
+        "--scorecard",
+        action="store_true",
+        help="Enrich public repos with OpenSSF Scorecard data",
+    )
+    parser.add_argument(
+        "--security-offline",
+        action="store_true",
+        help="Use local security analysis only and skip GitHub-native or external security enrichment",
+    )
+    parser.add_argument(
+        "--campaign",
+        choices=["security-review", "promotion-push", "archive-sweep", "showcase-publish", "maintenance-cleanup"],
+        default=None,
+        help="Build a managed campaign view from the current report facts",
+    )
+    parser.add_argument(
+        "--writeback-target",
+        choices=["github", "notion", "all"],
+        default=None,
+        help="Select which external system should receive writeback actions",
+    )
+    parser.add_argument(
+        "--writeback-apply",
+        action="store_true",
+        help="Execute live writeback instead of preview-only planning",
+    )
+    parser.add_argument(
+        "--max-actions",
+        type=int,
+        default=20,
+        help="Maximum managed actions to include in a campaign run (default: 20)",
+    )
+    parser.add_argument(
         "--auto-archive",
         action="store_true",
         help="Generate archive candidate report for consistently low-scoring repos",
@@ -351,6 +403,10 @@ def _audit_from_dict(data: dict) -> RepoAudit:
         badges=data.get("badges", []),
         next_badges=data.get("next_badges", []),
         flags=data.get("flags", []),
+        lenses=data.get("lenses", {}),
+        hotspots=data.get("hotspots", []),
+        action_candidates=data.get("action_candidates", []),
+        security_posture=data.get("security_posture", {}),
     )
 
 
@@ -383,6 +439,20 @@ def _report_from_dict(data: dict) -> AuditReport:
         scoring_profile=data.get("scoring_profile", "default"),
         run_mode=data.get("run_mode", "full"),
         portfolio_baseline_size=data.get("portfolio_baseline_size", len(data.get("audits", []))),
+        schema_version=data.get("schema_version", "3.2"),
+        lenses=data.get("lenses", {}),
+        hotspots=data.get("hotspots", []),
+        security_posture=data.get("security_posture", {}),
+        security_governance_preview=data.get("security_governance_preview", []),
+        collections=data.get("collections", {}),
+        profiles=data.get("profiles", {}),
+        scenario_summary=data.get("scenario_summary", {}),
+        action_backlog=data.get("action_backlog", []),
+        campaign_summary=data.get("campaign_summary", {}),
+        writeback_preview=data.get("writeback_preview", {}),
+        writeback_results=data.get("writeback_results", {}),
+        action_runs=data.get("action_runs", []),
+        external_refs=data.get("external_refs", {}),
         reconciliation=reconciliation,
     )
 
@@ -492,6 +562,9 @@ def _analyze_repos(
                         results,
                         portfolio_lang_freq=portfolio_lang_freq,
                         custom_weights=custom_weights,
+                        github_client=client,
+                        scorecard_enabled=args.scorecard,
+                        security_offline=args.security_offline,
                     )
                     audits.append(audit)
                     if args.verbose:
@@ -509,6 +582,9 @@ def _analyze_repos(
                     results,
                     portfolio_lang_freq=portfolio_lang_freq,
                     custom_weights=custom_weights,
+                    github_client=client,
+                    scorecard_enabled=args.scorecard,
+                    security_offline=args.security_offline,
                 )
                 audits.append(audit)
                 if args.verbose:
@@ -554,12 +630,80 @@ def _apply_requested_reconciliation(report: AuditReport, args, audits: list[Repo
             )
 
 
+def _apply_ops_writeback(report: AuditReport, args, client: GitHubClient | None) -> None:
+    if not args.campaign:
+        return
+
+    from src.ops_writeback import (
+        apply_github_writeback,
+        build_action_runs,
+        build_campaign_bundle,
+        build_campaign_run,
+        build_writeback_preview,
+        summarize_writeback_results,
+    )
+    from src.notion_sync import sync_campaign_actions
+
+    campaign_summary, actions = build_campaign_bundle(
+        report.to_dict(),
+        campaign_type=args.campaign,
+        portfolio_profile=args.portfolio_profile,
+        collection_name=args.collection,
+        max_actions=args.max_actions,
+        writeback_target=args.writeback_target,
+    )
+    report.campaign_summary = campaign_summary
+    report.writeback_preview = build_writeback_preview(
+        campaign_summary,
+        actions,
+        writeback_target=args.writeback_target,
+        apply=args.writeback_apply,
+    )
+
+    results: list[dict] = []
+    external_refs: dict[str, dict] = {}
+    if args.writeback_apply and args.writeback_target:
+        if args.writeback_target in {"github", "all"} and client is not None:
+            github_results, github_refs = apply_github_writeback(client, actions)
+            results.extend(github_results)
+            external_refs.update(github_refs)
+        if args.writeback_target in {"notion", "all"}:
+            notion_results, notion_refs = sync_campaign_actions(
+                actions,
+                campaign_summary,
+                config_dir=Path("config"),
+                apply=True,
+            )
+            results.extend(notion_results)
+            external_refs.update(notion_refs)
+
+    report.writeback_results = summarize_writeback_results(
+        results,
+        args.writeback_target,
+        args.writeback_apply,
+    )
+    report.writeback_results["campaign_run"] = build_campaign_run(
+        campaign_summary,
+        actions,
+        writeback_target=args.writeback_target,
+        apply=args.writeback_apply,
+    )
+    report.action_runs = build_action_runs(
+        actions,
+        results,
+        args.writeback_target,
+        args.writeback_apply,
+    )
+    report.external_refs = external_refs
+
+
 # ── Report output orchestration ───────────────────────────────────────
 def _write_report_outputs(
     report: AuditReport,
     args,
     output_dir: Path,
     *,
+    client: GitHubClient | None = None,
     cache: ResponseCache | None = None,
     json_path: Path | None = None,
     write_json: bool = True,
@@ -576,7 +720,9 @@ def _write_report_outputs(
         load_trend_data,
         save_fingerprints,
     )
+    from src.warehouse import write_warehouse_snapshot
 
+    _apply_ops_writeback(report, args, client)
     report_data = report.to_dict()
     if write_json:
         json_path = write_json_report(report, output_dir)
@@ -588,7 +734,12 @@ def _write_report_outputs(
 
     diff_dict = None
     if diff_source:
-        diff = diff_reports(diff_source, json_path)
+        diff = diff_reports(
+            diff_source,
+            json_path,
+            portfolio_profile=args.portfolio_profile,
+            collection_name=args.collection,
+        )
         diff_dict = diff.to_dict()
         diff_md_path = output_dir / f"audit-diff-{report.username}-{_date_str(report.generated_at)}.md"
         diff_md_path.write_text(format_diff_markdown(diff))
@@ -607,10 +758,13 @@ def _write_report_outputs(
         trend_data=trend_data,
         diff_data=diff_dict,
         score_history=score_history,
+        portfolio_profile=args.portfolio_profile,
+        collection=args.collection,
     )
-    md_path = write_markdown_report(report, output_dir)
+    md_path = write_markdown_report(report, output_dir, diff_data=diff_dict)
     pcc_path = write_pcc_export(report, output_dir)
     raw_path = write_raw_metadata(report, output_dir)
+    warehouse_path = write_warehouse_snapshot(report, output_dir, json_path)
 
     if archive and write_json:
         archive_report(json_path)
@@ -687,8 +841,29 @@ def _write_report_outputs(
     if args.html:
         from src.web_export import export_html_dashboard
 
-        html_result = export_html_dashboard(report_data, output_dir, trend_data, score_history)
+        html_result = export_html_dashboard(
+            report_data,
+            output_dir,
+            trend_data,
+            score_history,
+            diff_data=diff_dict,
+            portfolio_profile=args.portfolio_profile,
+            collection=args.collection,
+        )
         html_info = f"\n    {html_result['html_path']}"
+
+    review_pack_info = ""
+    if args.review_pack:
+        from src.review_pack import export_review_pack
+
+        review_pack_result = export_review_pack(
+            report_data,
+            output_dir,
+            diff_data=diff_dict,
+            portfolio_profile=args.portfolio_profile,
+            collection=args.collection,
+        )
+        review_pack_info = f"\n    {review_pack_result['review_pack_path']}"
 
     if args.auto_archive:
         from src.archive_candidates import export_archive_report, find_archive_candidates
@@ -713,11 +888,13 @@ def _write_report_outputs(
         "excel_path": excel_path,
         "pcc_path": pcc_path,
         "raw_path": raw_path,
+        "warehouse_path": warehouse_path,
         "badge_info": badge_info,
         "notion_info": notion_info,
         "readme_info": readme_info,
         "suggestions_info": suggestions_info,
         "html_info": html_info,
+        "review_pack_info": review_pack_info,
         "cache_info": cache_info,
     }
 
@@ -751,12 +928,14 @@ def _print_output_summary(
         f"    {outputs['md_path']}\n"
         f"    {outputs['excel_path']}\n"
         f"    {outputs['pcc_path']}\n"
-        f"    {outputs['raw_path']}"
+        f"    {outputs['raw_path']}\n"
+        f"    {outputs['warehouse_path']}"
         f"{outputs['badge_info']}"
         f"{outputs['notion_info']}"
         f"{outputs['readme_info']}"
         f"{outputs['suggestions_info']}"
-        f"{outputs['html_info']}",
+        f"{outputs['html_info']}"
+        f"{outputs['review_pack_info']}",
     )
 
 
@@ -839,6 +1018,7 @@ def _run_targeted_audit(
         report,
         args,
         output_dir,
+        client=client,
         cache=None,
         diff_source=args.diff or existing_report_path,
     )
@@ -853,17 +1033,20 @@ def _regenerate_outputs_from_latest_report(
     args,
     output_dir: Path,
     *,
+    client: GitHubClient | None,
     existing_report_path: Path,
     existing_report_data: dict,
 ) -> None:
     report = _report_from_dict(existing_report_data)
+    needs_fresh_json = bool(args.campaign)
     outputs = _write_report_outputs(
         report,
         args,
         output_dir,
-        json_path=existing_report_path,
-        write_json=False,
-        archive=False,
+        client=client,
+        json_path=None if needs_fresh_json else existing_report_path,
+        write_json=needs_fresh_json,
+        archive=needs_fresh_json,
         save_fingerprint_data=False,
     )
     print(
@@ -873,12 +1056,14 @@ def _regenerate_outputs_from_latest_report(
         f"    {outputs['md_path']}\n"
         f"    {outputs['excel_path']}\n"
         f"    {outputs['pcc_path']}\n"
-        f"    {outputs['raw_path']}"
+        f"    {outputs['raw_path']}\n"
+        f"    {outputs['warehouse_path']}"
         f"{outputs['badge_info']}"
         f"{outputs['notion_info']}"
         f"{outputs['readme_info']}"
         f"{outputs['suggestions_info']}"
-        f"{outputs['html_info']}",
+        f"{outputs['html_info']}"
+        f"{outputs['review_pack_info']}",
     )
 
 
@@ -935,6 +1120,7 @@ def _run_incremental_audit(
         _regenerate_outputs_from_latest_report(
             args,
             output_dir,
+            client=client,
             existing_report_path=existing_report_path,
             existing_report_data=existing_report_data,
         )
@@ -983,6 +1169,10 @@ def main() -> None:
         args.badges = True
     if args.notion_sync:
         args.notion = True
+    if args.writeback_apply and not args.writeback_target:
+        parser.error("--writeback-apply requires --writeback-target")
+    if args.writeback_target and not args.campaign:
+        parser.error("--writeback-target requires --campaign")
 
     custom_weights, scoring_profile_name = _load_scoring_profile(args.scoring_profile)
 
@@ -1051,7 +1241,7 @@ def main() -> None:
             portfolio_baseline_size=len(repos),
         )
         _apply_requested_reconciliation(report, args, audits)
-        outputs = _write_report_outputs(report, args, output_dir, cache=cache)
+        outputs = _write_report_outputs(report, args, output_dir, client=client, cache=cache)
         _print_output_summary(f"Audited {report.repos_audited} repos for {report.username}", report, outputs)
         return
 

@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 from src.badges import compute_badges, suggest_next_badges
 from src.models import AnalyzerResult, RepoAudit, RepoMetadata
+
+if TYPE_CHECKING:
+    from src.github_client import GitHubClient
 
 # Rebalanced completeness weights (sum = 1.0)
 WEIGHTS: dict[str, float] = {
@@ -55,6 +59,10 @@ def score_repo(
     results: list[AnalyzerResult],
     portfolio_lang_freq: dict[str, float] | None = None,
     custom_weights: dict[str, float] | None = None,
+    github_client: GitHubClient | None = None,
+    *,
+    scorecard_enabled: bool = False,
+    security_offline: bool = False,
 ) -> RepoAudit:
     """Compute dual-axis scores: completeness + interest."""
     weights = dict(custom_weights) if custom_weights else dict(WEIGHTS)
@@ -157,6 +165,29 @@ def score_repo(
     # Compute badges and suggestions
     audit.badges = compute_badges(audit)
     audit.next_badges = suggest_next_badges(audit)
+    from src.portfolio_intelligence import (
+        build_action_candidates,
+        build_hotspots,
+        compute_lens_scores,
+    )
+    from src.security_intelligence import build_security_posture
+
+    audit.security_posture = build_security_posture(
+        metadata,
+        results,
+        github_client,
+        scorecard_enabled=scorecard_enabled,
+        security_offline=security_offline,
+    )
+    audit.lenses = compute_lens_scores(
+        metadata,
+        results,
+        overall_score=overall_score,
+        interest_score=interest_score,
+        security_posture=audit.security_posture,
+    )
+    audit.action_candidates = build_action_candidates(audit)
+    audit.hotspots = build_hotspots(audit)
 
     return audit
 

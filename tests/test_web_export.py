@@ -13,24 +13,101 @@ def _make_report(**overrides) -> dict:
         "portfolio_health_score": 0.65,
         "tier_distribution": {"shipped": 1, "functional": 1, "wip": 1},
         "language_distribution": {"Python": 2, "Rust": 1},
+        "lenses": {
+            "ship_readiness": {"average_score": 0.72, "description": "Delivery readiness"},
+            "showcase_value": {"average_score": 0.63, "description": "Story and polish"},
+        },
+        "collections": {
+            "showcase": {
+                "description": "Best examples",
+                "repos": [{"name": "RepoA", "reason": "Strong showcase"}],
+            }
+        },
+        "profiles": {
+            "default": {
+                "description": "Balanced",
+                "lens_weights": {
+                    "ship_readiness": 0.4,
+                    "showcase_value": 0.3,
+                    "security_posture": 0.3,
+                },
+            }
+        },
+        "scenario_summary": {
+            "top_levers": [
+                {
+                    "key": "testing",
+                    "title": "Strengthen tests",
+                    "lens": "ship_readiness",
+                    "repo_count": 2,
+                    "average_expected_lens_delta": 0.11,
+                    "projected_tier_promotions": 1,
+                }
+            ],
+            "portfolio_projection": {
+                "selected_repo_count": 3,
+                "projected_average_score_delta": 0.04,
+                "projected_tier_promotions": 1,
+            },
+        },
+        "security_posture": {
+            "average_score": 0.61,
+            "critical_repos": ["RepoC"],
+            "repos_with_secrets": [],
+            "provider_coverage": {
+                "github": {"available_repos": 2, "total_repos": 3},
+                "scorecard": {"available_repos": 1, "total_repos": 3},
+            },
+            "open_alerts": {"code_scanning": 2, "secret_scanning": 1},
+        },
+        "security_governance_preview": [
+            {
+                "repo": "RepoC",
+                "priority": "high",
+                "title": "Enable CodeQL default setup",
+                "expected_posture_lift": 0.12,
+                "source": "github",
+            }
+        ],
         "audits": [
             {
                 "metadata": {"name": "RepoA", "html_url": "https://github.com/user/RepoA",
                              "description": "A cool project", "language": "Python"},
                 "overall_score": 0.85, "interest_score": 0.60, "grade": "A",
                 "completeness_tier": "shipped", "badges": ["fresh"], "flags": [],
+                "lenses": {
+                    "ship_readiness": {"score": 0.85, "summary": "Ready"},
+                    "showcase_value": {"score": 0.9, "summary": "Strong story"},
+                    "security_posture": {"score": 0.8, "summary": "Healthy"},
+                },
+                "security_posture": {"label": "healthy", "score": 0.8},
+                "hotspots": [{"title": "Keep momentum"}],
                 "analyzer_results": [],
             },
             {
                 "metadata": {"name": "RepoB", "html_url": "", "description": None, "language": "Rust"},
                 "overall_score": 0.55, "interest_score": 0.30, "grade": "C",
                 "completeness_tier": "functional", "badges": [], "flags": [],
+                "lenses": {
+                    "ship_readiness": {"score": 0.55, "summary": "Needs work"},
+                    "showcase_value": {"score": 0.5, "summary": "Average"},
+                    "security_posture": {"score": 0.6, "summary": "Okay"},
+                },
+                "security_posture": {"label": "watch", "score": 0.6},
+                "hotspots": [{"title": "Finish testing"}],
                 "analyzer_results": [],
             },
             {
                 "metadata": {"name": "RepoC", "html_url": "", "description": "WIP", "language": "Python"},
                 "overall_score": 0.40, "interest_score": 0.10, "grade": "D",
                 "completeness_tier": "wip", "badges": [], "flags": ["no-tests"],
+                "lenses": {
+                    "ship_readiness": {"score": 0.4, "summary": "Thin"},
+                    "showcase_value": {"score": 0.25, "summary": "Weak"},
+                    "security_posture": {"score": 0.3, "summary": "Risky"},
+                },
+                "security_posture": {"label": "critical", "score": 0.3},
+                "hotspots": [{"title": "Security debt"}],
                 "analyzer_results": [],
             },
         ],
@@ -80,11 +157,15 @@ class TestRenderHtml:
         assert "RepoA" in html
         assert "RepoB" in html
         assert "RepoC" in html
+        assert "Profile" in html
+        assert "Collections" in html
 
     def test_has_filter_controls(self):
         html = _render_html(_make_report())
         assert 'id="filter-tier"' in html
         assert 'id="filter-grade"' in html
+        assert 'id="filter-collection"' in html
+        assert 'id="sort-mode"' in html
         assert 'id="search"' in html
 
     def test_has_tier_distribution(self):
@@ -110,6 +191,7 @@ class TestRenderHtml:
         html = _render_html(_make_report())
         assert '"username": "testuser"' in html
         assert '"audits":' in html
+        assert '"selected_profile": "default"' in html
 
     def test_html_includes_portfolio_trends(self):
         trend_data = [
@@ -161,3 +243,18 @@ class TestRenderHtml:
         assert '</script><script>alert("xss")</script>' not in html
         assert '<script id="dashboard-data" type="application/json">' in html
         assert '<\\/script>' in html
+
+    def test_renders_analyst_sections(self):
+        diff_data = {
+            "average_score_delta": 0.04,
+            "lens_deltas": {"ship_readiness": 0.1},
+            "repo_changes": [{"name": "RepoA", "delta": 0.1, "old_tier": "functional", "new_tier": "shipped"}],
+        }
+        html = _render_html(_make_report(), diff_data=diff_data, portfolio_profile="default", collection="showcase")
+        assert "Analyst View" in html
+        assert "Decision Lenses" in html
+        assert "Security Overview" in html
+        assert "Dry-Run Governance" in html
+        assert "Compare" in html
+        assert "Scenario Preview" in html
+        assert "showcase" in html

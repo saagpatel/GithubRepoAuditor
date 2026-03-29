@@ -87,6 +87,20 @@ class GitHubClient:
         response.raise_for_status()
         return response
 
+    def _request_method(
+        self,
+        method: str,
+        url: str,
+        *,
+        params: dict | None = None,
+        json_body: dict | list | None = None,
+    ) -> requests.Response:
+        """Make a non-GET request with the same rate-limit handling."""
+        response = self.session.request(method, url, params=params, json=json_body, timeout=30)
+        self._check_rate_limit(response)
+        response.raise_for_status()
+        return response
+
     def _paginate(self, url: str, params: dict | None = None) -> list[dict]:
         """Follow pagination via Link headers, collecting all results."""
         results: list[dict] = []
@@ -290,6 +304,289 @@ class GitHubClient:
         except requests.HTTPError as exc:
             logger.warning("Failed to fetch commits for %s/%s: %s", owner, repo, exc)
             return []
+
+    def _http_error_status(self, exc: requests.HTTPError) -> int | None:
+        response = getattr(exc, "response", None)
+        return response.status_code if response is not None else None
+
+    def get_repo_security_and_analysis(self, owner: str, repo: str) -> dict:
+        """Fetch repo-level security_and_analysis metadata when available."""
+        try:
+            data = self._fetch_json(f"{API_BASE}/repos/{owner}/{repo}")
+            return {
+                "available": True,
+                "http_status": 200,
+                "data": data if isinstance(data, dict) else {},
+            }
+        except requests.HTTPError as exc:
+            status = self._http_error_status(exc)
+            logger.warning("Failed to fetch repo security metadata for %s/%s: %s", owner, repo, exc)
+            return {
+                "available": False,
+                "http_status": status,
+                "data": {},
+            }
+
+    def get_secret_scanning_alert_count(self, owner: str, repo: str) -> dict:
+        """Fetch count of open secret scanning alerts when accessible."""
+        try:
+            data = self._fetch_json(
+                f"{API_BASE}/repos/{owner}/{repo}/secret-scanning/alerts",
+                {"state": "open", "per_page": "100"},
+            )
+            alerts = data if isinstance(data, list) else []
+            return {
+                "available": True,
+                "http_status": 200,
+                "open_alerts": len(alerts),
+            }
+        except requests.HTTPError as exc:
+            status = self._http_error_status(exc)
+            logger.warning("Failed to fetch secret scanning alerts for %s/%s: %s", owner, repo, exc)
+            return {
+                "available": False,
+                "http_status": status,
+                "open_alerts": None,
+            }
+
+    def get_code_scanning_alert_count(self, owner: str, repo: str) -> dict:
+        """Fetch count of open code scanning alerts when accessible."""
+        try:
+            data = self._fetch_json(
+                f"{API_BASE}/repos/{owner}/{repo}/code-scanning/alerts",
+                {"state": "open", "per_page": "100"},
+            )
+            alerts = data if isinstance(data, list) else []
+            return {
+                "available": True,
+                "http_status": 200,
+                "open_alerts": len(alerts),
+            }
+        except requests.HTTPError as exc:
+            status = self._http_error_status(exc)
+            logger.warning("Failed to fetch code scanning alerts for %s/%s: %s", owner, repo, exc)
+            return {
+                "available": False,
+                "http_status": status,
+                "open_alerts": None,
+            }
+
+    def get_sbom_exportability(self, owner: str, repo: str) -> dict:
+        """Check whether the SBOM export endpoint is available for a repo."""
+        try:
+            data = self._fetch_json(f"{API_BASE}/repos/{owner}/{repo}/dependency-graph/sbom")
+            payload = data if isinstance(data, dict) else {}
+            packages = payload.get("sbom", {}).get("packages", [])
+            return {
+                "available": True,
+                "http_status": 200,
+                "package_count": len(packages) if isinstance(packages, list) else 0,
+            }
+        except requests.HTTPError as exc:
+            status = self._http_error_status(exc)
+            logger.warning("Failed to fetch SBOM exportability for %s/%s: %s", owner, repo, exc)
+            return {
+                "available": False,
+                "http_status": status,
+                "package_count": None,
+            }
+
+    def get_repo_topics(self, owner: str, repo: str) -> dict:
+        """Fetch the current topic set for a repository."""
+        try:
+            data = self._fetch_json(f"{API_BASE}/repos/{owner}/{repo}/topics")
+            return {
+                "available": True,
+                "topics": list(data.get("names", [])) if isinstance(data, dict) else [],
+            }
+        except requests.HTTPError as exc:
+            status = self._http_error_status(exc)
+            logger.warning("Failed to fetch topics for %s/%s: %s", owner, repo, exc)
+            return {
+                "available": False,
+                "http_status": status,
+                "topics": [],
+            }
+
+    def replace_repo_topics(self, owner: str, repo: str, topics: list[str]) -> dict:
+        """Replace repository topics with a caller-managed list."""
+        try:
+            response = self._request_method(
+                "PUT",
+                f"{API_BASE}/repos/{owner}/{repo}/topics",
+                json_body={"names": topics},
+            )
+            data = response.json()
+            return {
+                "ok": True,
+                "http_status": response.status_code,
+                "topics": list(data.get("names", [])),
+            }
+        except requests.HTTPError as exc:
+            status = self._http_error_status(exc)
+            logger.warning("Failed to replace topics for %s/%s: %s", owner, repo, exc)
+            return {
+                "ok": False,
+                "http_status": status,
+                "topics": topics,
+            }
+
+    def list_repo_issues(self, owner: str, repo: str, state: str = "open") -> list[dict]:
+        """List repository issues for managed issue reconciliation."""
+        try:
+            return self._paginate(
+                f"{API_BASE}/repos/{owner}/{repo}/issues",
+                {"state": state, "per_page": "100"},
+            )
+        except requests.HTTPError as exc:
+            logger.warning("Failed to list issues for %s/%s: %s", owner, repo, exc)
+            return []
+
+    def create_issue(self, owner: str, repo: str, payload: dict) -> dict:
+        """Create a managed tracking issue."""
+        try:
+            response = self._request_method(
+                "POST",
+                f"{API_BASE}/repos/{owner}/{repo}/issues",
+                json_body=payload,
+            )
+            data = response.json()
+            return {
+                "ok": True,
+                "number": data.get("number"),
+                "html_url": data.get("html_url"),
+                "http_status": response.status_code,
+            }
+        except requests.HTTPError as exc:
+            status = self._http_error_status(exc)
+            logger.warning("Failed to create issue for %s/%s: %s", owner, repo, exc)
+            return {
+                "ok": False,
+                "http_status": status,
+            }
+
+    def update_issue(self, owner: str, repo: str, issue_number: int, payload: dict) -> dict:
+        """Update an existing managed issue."""
+        try:
+            response = self._request_method(
+                "PATCH",
+                f"{API_BASE}/repos/{owner}/{repo}/issues/{issue_number}",
+                json_body=payload,
+            )
+            data = response.json()
+            return {
+                "ok": True,
+                "number": data.get("number", issue_number),
+                "html_url": data.get("html_url"),
+                "http_status": response.status_code,
+            }
+        except requests.HTTPError as exc:
+            status = self._http_error_status(exc)
+            logger.warning("Failed to update issue %s for %s/%s: %s", issue_number, owner, repo, exc)
+            return {
+                "ok": False,
+                "number": issue_number,
+                "http_status": status,
+            }
+
+    def get_repo_custom_property_values(self, owner: str, repo: str) -> dict:
+        """Get current repository custom property values when available."""
+        try:
+            data = self._fetch_json(f"{API_BASE}/repos/{owner}/{repo}/properties/values")
+            values = {}
+            if isinstance(data, list):
+                for item in data:
+                    values[item.get("property_name", "")] = item.get("value")
+            return {
+                "available": True,
+                "values": values,
+            }
+        except requests.HTTPError as exc:
+            status = self._http_error_status(exc)
+            logger.warning("Failed to fetch custom properties for %s/%s: %s", owner, repo, exc)
+            return {
+                "available": False,
+                "http_status": status,
+                "values": {},
+            }
+
+    def list_org_custom_properties(self, owner: str) -> dict:
+        """List organization custom property definitions when accessible."""
+        try:
+            data = self._fetch_json(f"{API_BASE}/orgs/{owner}/properties/schema")
+            return {
+                "available": True,
+                "properties": data if isinstance(data, list) else [],
+            }
+        except requests.HTTPError as exc:
+            status = self._http_error_status(exc)
+            logger.warning("Failed to list custom property schema for %s: %s", owner, exc)
+            return {
+                "available": False,
+                "http_status": status,
+                "properties": [],
+            }
+
+    def update_repo_custom_property_values(self, owner: str, repo: str, properties: dict[str, str]) -> dict:
+        """Set org custom property values only when definitions already exist."""
+        schema = self.list_org_custom_properties(owner)
+        if not schema.get("available"):
+            return {
+                "ok": False,
+                "status": "unavailable",
+                "before": {},
+                "after": {},
+                "updated": {},
+            }
+
+        allowed = {
+            item.get("property_name")
+            for item in schema.get("properties", [])
+            if item.get("property_name")
+        }
+        to_update = {name: value for name, value in properties.items() if name in allowed}
+        before = self.get_repo_custom_property_values(owner, repo)
+        if not to_update:
+            return {
+                "ok": False,
+                "status": "skipped",
+                "before": before.get("values", {}),
+                "after": before.get("values", {}),
+                "updated": {},
+            }
+
+        payload = {
+            "properties": [
+                {"property_name": name, "value": value}
+                for name, value in to_update.items()
+            ]
+        }
+        try:
+            response = self._request_method(
+                "PATCH",
+                f"{API_BASE}/repos/{owner}/{repo}/properties/values",
+                json_body=payload,
+            )
+            after = self.get_repo_custom_property_values(owner, repo)
+            return {
+                "ok": True,
+                "status": "updated",
+                "http_status": response.status_code,
+                "before": before.get("values", {}),
+                "after": after.get("values", {}),
+                "updated": to_update,
+            }
+        except requests.HTTPError as exc:
+            status = self._http_error_status(exc)
+            logger.warning("Failed to update custom properties for %s/%s: %s", owner, repo, exc)
+            return {
+                "ok": False,
+                "status": "failed",
+                "http_status": status,
+                "before": before.get("values", {}),
+                "after": before.get("values", {}),
+                "updated": to_update,
+            }
 
     def get_commit_activity(self, owner: str, repo: str) -> list[dict]:
         """Fetch weekly commit counts for the last year (52 weeks).

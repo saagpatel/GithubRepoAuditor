@@ -10,6 +10,7 @@ from src.notion_sync import (
     check_recommendation_followup,
     FLAG_TO_ACTION,
     ELIGIBLE_TIERS,
+    sync_campaign_actions,
 )
 
 
@@ -145,6 +146,14 @@ class TestExtractAuditData:
         assert data["overall_score"] == 0
         assert data["interest_score"] == 0
         assert data["badges"] == []
+
+
+class TestCampaignActionSync:
+    def test_fails_soft_without_token(self, monkeypatch):
+        monkeypatch.setattr("src.notion_sync.get_notion_token", lambda: "")
+        results, refs = sync_campaign_actions([], {"campaign_type": "security-review"}, apply=True)
+        assert results[0]["status"] == "skipped"
+        assert refs == {}
 
 
 class TestCheckRecommendationFollowup:

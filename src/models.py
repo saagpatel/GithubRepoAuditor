@@ -97,6 +97,10 @@ class RepoAudit:
     badges: list[str] = field(default_factory=list)
     next_badges: list[dict] = field(default_factory=list)
     flags: list[str] = field(default_factory=list)
+    lenses: dict[str, dict] = field(default_factory=dict)
+    hotspots: list[dict] = field(default_factory=list)
+    action_candidates: list[dict] = field(default_factory=list)
+    security_posture: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
@@ -111,6 +115,10 @@ class RepoAudit:
             "badges": self.badges,
             "next_badges": self.next_badges,
             "flags": self.flags,
+            "lenses": self.lenses,
+            "hotspots": self.hotspots,
+            "action_candidates": self.action_candidates,
+            "security_posture": self.security_posture,
         }
 
 
@@ -136,6 +144,20 @@ class AuditReport:
     scoring_profile: str = "default"
     run_mode: str = "full"
     portfolio_baseline_size: int = 0
+    schema_version: str = "3.2"
+    lenses: dict[str, dict] = field(default_factory=dict)
+    hotspots: list[dict] = field(default_factory=list)
+    security_posture: dict = field(default_factory=dict)
+    security_governance_preview: list[dict] = field(default_factory=list)
+    collections: dict[str, dict] = field(default_factory=dict)
+    profiles: dict[str, dict] = field(default_factory=dict)
+    scenario_summary: dict = field(default_factory=dict)
+    action_backlog: list[dict] = field(default_factory=list)
+    campaign_summary: dict = field(default_factory=dict)
+    writeback_preview: dict = field(default_factory=dict)
+    writeback_results: dict = field(default_factory=dict)
+    action_runs: list[dict] = field(default_factory=list)
+    external_refs: dict[str, dict] = field(default_factory=dict)
     reconciliation: object | None = None  # RegistryReconciliation when --registry used
 
     @classmethod
@@ -152,6 +174,16 @@ class AuditReport:
     ) -> AuditReport:
         """Construct an AuditReport with all derived statistics."""
         now = datetime.now(tz=__import__("datetime").timezone.utc)
+        from src.portfolio_intelligence import (
+            DEFAULT_PROFILES,
+            REPORT_SCHEMA_VERSION,
+            build_default_collections,
+            build_portfolio_hotspots,
+            build_portfolio_lens_summary,
+            build_portfolio_security_governance_preview,
+            build_portfolio_security_posture,
+            build_scenario_summary,
+        )
 
         # Tier distribution
         tier_dist: dict[str, int] = {}
@@ -208,6 +240,24 @@ class AuditReport:
         # Best work: top 5 by weighted combo
         best = sorted(audits, key=lambda a: a.overall_score * 0.6 + a.interest_score * 0.4, reverse=True)
         best_work = [a.metadata.name for a in best[:5]]
+        portfolio_lenses = build_portfolio_lens_summary(audits)
+        portfolio_hotspots = build_portfolio_hotspots(audits)
+        portfolio_security = build_portfolio_security_posture(audits)
+        security_governance_preview = build_portfolio_security_governance_preview(audits)
+        collections = build_default_collections(audits)
+        scenario_summary = build_scenario_summary(audits)
+        action_backlog = sorted(
+            [
+                {
+                    "repo": audit.metadata.name,
+                    **action,
+                }
+                for audit in audits
+                for action in audit.action_candidates
+            ],
+            key=lambda action: (action["confidence"], action["expected_lens_delta"]),
+            reverse=True,
+        )[:20]
 
         return cls(
             username=username,
@@ -230,10 +280,25 @@ class AuditReport:
             scoring_profile=scoring_profile,
             run_mode=run_mode,
             portfolio_baseline_size=portfolio_baseline_size if portfolio_baseline_size is not None else len(audits),
+            schema_version=REPORT_SCHEMA_VERSION,
+            lenses=portfolio_lenses,
+            hotspots=portfolio_hotspots,
+            security_posture=portfolio_security,
+            security_governance_preview=security_governance_preview,
+            collections=collections,
+            profiles=DEFAULT_PROFILES,
+            scenario_summary=scenario_summary,
+            action_backlog=action_backlog,
+            campaign_summary={},
+            writeback_preview={},
+            writeback_results={},
+            action_runs=[],
+            external_refs={},
         )
 
     def to_dict(self) -> dict:
         return {
+            "schema_version": self.schema_version,
             "username": self.username,
             "generated_at": self.generated_at.isoformat(),
             "total_repos": self.total_repos,
@@ -244,6 +309,19 @@ class AuditReport:
             "scoring_profile": self.scoring_profile,
             "run_mode": self.run_mode,
             "portfolio_baseline_size": self.portfolio_baseline_size,
+            "lenses": self.lenses,
+            "hotspots": self.hotspots,
+            "security_posture": self.security_posture,
+            "security_governance_preview": self.security_governance_preview,
+            "collections": self.collections,
+            "profiles": self.profiles,
+            "scenario_summary": self.scenario_summary,
+            "action_backlog": self.action_backlog,
+            "campaign_summary": self.campaign_summary,
+            "writeback_preview": self.writeback_preview,
+            "writeback_results": self.writeback_results,
+            "action_runs": self.action_runs,
+            "external_refs": self.external_refs,
             "tech_stack": self.tech_stack,
             "best_work": self.best_work,
             "tier_distribution": self.tier_distribution,

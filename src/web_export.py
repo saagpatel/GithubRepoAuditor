@@ -11,6 +11,7 @@ from html import escape
 from pathlib import Path
 from urllib.parse import urlparse
 
+from src.analyst_views import build_analyst_context
 from src.sparkline import sparkline as render_sparkline
 
 
@@ -46,9 +47,19 @@ def export_html_dashboard(
     output_dir: Path,
     trend_data: list[dict] | None = None,
     score_history: dict[str, list[float]] | None = None,
+    diff_data: dict | None = None,
+    portfolio_profile: str = "default",
+    collection: str | None = None,
 ) -> dict:
     """Generate interactive HTML dashboard. Returns {html_path}."""
-    html = _render_html(report_data, trend_data, score_history)
+    html = _render_html(
+        report_data,
+        trend_data,
+        score_history,
+        diff_data=diff_data,
+        portfolio_profile=portfolio_profile,
+        collection=collection,
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
     date = report_data.get("generated_at", "")[:10] or datetime.now(timezone.utc).strftime("%Y-%m-%d")
     username = report_data.get("username", "unknown")
@@ -62,12 +73,21 @@ def _render_html(
     report_data: dict,
     trend_data: list[dict] | None = None,
     score_history: dict[str, list[float]] | None = None,
+    diff_data: dict | None = None,
+    portfolio_profile: str = "default",
+    collection: str | None = None,
 ) -> str:
     """Build the complete HTML string."""
     username = report_data.get("username", "unknown")
     date = report_data.get("generated_at", "")[:10]
     repos_audited = report_data.get("repos_audited", 0)
     grade = report_data.get("portfolio_grade", "F")
+    analyst_context = build_analyst_context(
+        report_data,
+        profile_name=portfolio_profile,
+        collection_name=collection,
+    )
+    collection_names = sorted(report_data.get("collections", {}).keys())
 
     # Prepare minimal data payload for JS
     js_data = {
@@ -77,9 +97,13 @@ def _render_html(
         "average_score": report_data.get("average_score", 0),
         "repos_audited": repos_audited,
         "tier_distribution": report_data.get("tier_distribution", {}),
+        "selected_profile": analyst_context["profile_name"],
+        "selected_collection": analyst_context["collection_name"],
+        "profile_leaders": analyst_context["profile_leaderboard"].get("leaders", []),
+        "collection_names": collection_names,
         "audits": [
             {
-                "name": a.get("metadata", {}).get("name", ""),
+                "name": entry["name"],
                 "grade": a.get("grade", "F"),
                 "score": round(a.get("overall_score", 0), 3),
                 "interest": round(a.get("interest_score", 0), 3),
@@ -88,8 +112,13 @@ def _render_html(
                 "description": (a.get("metadata", {}).get("description") or "")[:80],
                 "url": a.get("metadata", {}).get("html_url", ""),
                 "badges": len(a.get("badges", [])),
+                "profile_score": round(entry["profile_score"], 3),
+                "collections": entry["collections"],
+                "security_label": entry["security_label"],
+                "hotspot_count": entry["hotspot_count"],
             }
-            for a in report_data.get("audits", [])
+            for entry in analyst_context["ranked_audits"]
+            for a in [entry["audit"]]
         ],
     }
 
@@ -105,12 +134,20 @@ def _render_html(
         "<body>",
         _header_section(username, date, repos_audited, grade),
         _kpi_section(report_data),
+        _analyst_summary_section(analyst_context),
+        _lens_summary_section(report_data),
+        _security_overview_section(report_data),
         '<div class="section"><h2>Completeness vs Interest</h2>',
         '<canvas id="scatter" width="800" height="500"></canvas>',
         '<div id="tooltip" class="tooltip"></div>',
         '</div>',
-        _repo_table(report_data.get("audits", []), score_history),
+        _repo_table(analyst_context, score_history),
         _portfolio_trends_section(trend_data or []),
+        _compare_section(diff_data),
+        _scenario_section(analyst_context),
+        _governance_section(report_data),
+        _campaign_section(report_data),
+        _writeback_results_section(report_data),
         _tech_radar_section(report_data, trend_data),
         _distribution_section(report_data),
         _footer(),
@@ -147,20 +184,108 @@ def _kpi_section(data: dict) -> str:
     </div>"""
 
 
-# ── Repo table (sorted by score, with sparklines) ─────────────────────
-def _repo_table(audits: list[dict], score_history: dict[str, list[float]] | None = None) -> str:
+def _analyst_summary_section(context: dict) -> str:
+    leaders = context["profile_leaderboard"].get("leaders", [])
     rows = []
-    sorted_audits = sorted(audits, key=lambda a: a.get("overall_score", 0), reverse=True)
-    for a in sorted_audits:
+    for entry in leaders[:5]:
+        rows.append(
+            f"<tr><td>{escape(entry['name'])}</td><td class=\"num\">{entry['profile_score']:.3f}</td>"
+            f"<td>{escape(entry['tier'])}</td></tr>"
+        )
+    collection_bits = [
+        f"<span class='pill'>{escape(item['name'])}: {item['count']}</span>"
+        for item in context["collection_summary"]
+    ]
+    return f"""
+    <div class="section">
+      <h2>Analyst View</h2>
+      <div class="analyst-grid">
+        <div class="panel">
+          <div class="meta-line"><strong>Profile:</strong> {escape(context['profile_name'])}</div>
+          <div class="meta-line"><strong>Collection:</strong> {escape(context['collection_name'] or 'all')}</div>
+          <div class="pill-row">{''.join(collection_bits) or "<span class='pill'>No collections</span>"}</div>
+        </div>
+        <div class="panel">
+          <h3>Profile Leaders</h3>
+          <table class="compact-table">
+            <thead><tr><th>Repo</th><th>Profile Score</th><th>Tier</th></tr></thead>
+            <tbody>{''.join(rows)}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>"""
+
+
+def _lens_summary_section(report_data: dict) -> str:
+    cards = []
+    for lens_name, lens_data in report_data.get("lenses", {}).items():
+        avg_score = lens_data.get("average_score", 0.0)
+        cards.append(
+            f"<div class='lens-card'>"
+            f"<div class='kpi-label'>{escape(lens_name.replace('_', ' '))}</div>"
+            f"<div class='lens-score'>{avg_score:.2f}</div>"
+            f"<div class='lens-text'>{escape(lens_data.get('description', ''))}</div>"
+            f"</div>"
+        )
+    if not cards:
+        return ""
+    return f"""
+    <div class="section">
+      <h2>Decision Lenses</h2>
+      <div class="lens-grid">{''.join(cards)}</div>
+    </div>"""
+
+
+def _security_overview_section(report_data: dict) -> str:
+    posture = report_data.get("security_posture", {})
+    coverage = posture.get("provider_coverage", {})
+    alerts = posture.get("open_alerts", {})
+    if not posture:
+        return ""
+    return f"""
+    <div class="section">
+      <h2>Security Overview</h2>
+      <div class="lens-grid">
+        <div class="lens-card">
+          <div class="kpi-label">Avg Security Score</div>
+          <div class="lens-score">{posture.get('average_score', 0):.2f}</div>
+          <div class="lens-text">Portfolio-wide merged security posture.</div>
+        </div>
+        <div class="lens-card">
+          <div class="kpi-label">GitHub Coverage</div>
+          <div class="lens-score">{coverage.get('github', {}).get('available_repos', 0)}</div>
+          <div class="lens-text">Repos with GitHub-native security evidence available.</div>
+        </div>
+        <div class="lens-card">
+          <div class="kpi-label">Scorecard Coverage</div>
+          <div class="lens-score">{coverage.get('scorecard', {}).get('available_repos', 0)}</div>
+          <div class="lens-text">Repos with external Scorecard evidence loaded.</div>
+        </div>
+        <div class="lens-card">
+          <div class="kpi-label">Open Alerts</div>
+          <div class="lens-score">{alerts.get('code_scanning', 0) + alerts.get('secret_scanning', 0)}</div>
+          <div class="lens-text">Combined code and secret scanning alerts.</div>
+        </div>
+      </div>
+    </div>"""
+
+
+# ── Repo table (sorted by score, with sparklines) ─────────────────────
+def _repo_table(analyst_context: dict, score_history: dict[str, list[float]] | None = None) -> str:
+    rows = []
+    for entry in analyst_context["ranked_audits"]:
+        a = entry["audit"]
         m = a.get("metadata", {})
         name = m.get("name", "")
         url = m.get("html_url", "")
         grade = a.get("grade", "F")
         score = a.get("overall_score", 0)
         interest = a.get("interest_score", 0)
+        profile_score = entry["profile_score"]
         tier = a.get("completeness_tier", "")
         lang = m.get("language") or ""
         desc = (m.get("description") or "")[:60]
+        collections = ", ".join(entry["collections"])
         gc = GRADE_COLORS_CSS.get(grade, "#6B7280")
         tc = TIER_COLORS_CSS.get(tier, "#6B7280")
 
@@ -173,25 +298,44 @@ def _repo_table(audits: list[dict], score_history: dict[str, list[float]] | None
         safe_lang = escape(lang)
         safe_desc = escape(desc)
         safe_tier = escape(tier)
+        safe_collections = escape(collections)
         safe_url = _safe_href(url)
         link = f'<a href="{safe_url}" target="_blank" rel="noopener noreferrer">{safe_name}</a>' if safe_url else safe_name
         rows.append(
-            f'<tr data-tier="{escape(tier, quote=True)}" data-grade="{escape(grade, quote=True)}" data-name="{escape(name, quote=True)}">'
+            f'<tr data-tier="{escape(tier, quote=True)}" '
+            f'data-grade="{escape(grade, quote=True)}" '
+            f'data-name="{escape(name, quote=True)}" '
+            f'data-collections="{escape(collections.lower(), quote=True)}" '
+            f'data-overall="{score:.3f}" '
+            f'data-profile="{profile_score:.3f}">'
             f'<td>{link}</td>'
+            f'<td class="num">{profile_score:.3f}</td>'
             f'<td style="color:{gc};font-weight:bold;text-align:center">{escape(grade)}</td>'
             f'<td class="num">{score:.3f}</td>'
             f'<td class="num">{interest:.3f}</td>'
             f'<td style="color:{tc};font-weight:bold">{safe_tier}</td>'
             f'<td>{safe_lang}</td>'
+            f'<td>{safe_collections or "—"}</td>'
             f'<td class="sparkline">{escape(spark)}</td>'
             f'<td class="desc">{safe_desc}</td>'
             f'</tr>'
+        )
+
+    collection_options = ['<option value="all">All Collections</option>']
+    for item in analyst_context["collection_summary"]:
+        selected = " selected" if analyst_context["collection_name"] == item["name"] else ""
+        collection_options.append(
+            f'<option value="{escape(item["name"], quote=True)}"{selected}>{escape(item["name"])}</option>'
         )
 
     return f"""
     <div class="section">
       <h2>All Repos</h2>
       <div class="filters">
+        <select id="sort-mode" onchange="sortTable()">
+          <option value="profile">Profile Rank</option>
+          <option value="overall">Overall Score</option>
+        </select>
         <select id="filter-tier" onchange="filterTable()">
           <option value="all">All Tiers</option>
           <option value="shipped">Shipped</option>
@@ -206,13 +350,164 @@ def _repo_table(audits: list[dict], score_history: dict[str, list[float]] | None
           <option value="C">C</option><option value="D">D</option>
           <option value="F">F</option>
         </select>
+        <select id="filter-collection" onchange="filterTable()">
+          {''.join(collection_options)}
+        </select>
         <input id="search" type="text" placeholder="Search repos..." oninput="filterTable()">
       </div>
       <table id="repo-table">
         <thead><tr>
-          <th>Repo</th><th>Grade</th><th>Score</th><th>Interest</th>
-          <th>Tier</th><th>Language</th><th>Trend</th><th>Description</th>
+          <th>Repo</th><th>Profile</th><th>Grade</th><th>Score</th><th>Interest</th>
+          <th>Tier</th><th>Language</th><th>Collections</th><th>Trend</th><th>Description</th>
         </tr></thead>
+        <tbody>{''.join(rows)}</tbody>
+      </table>
+    </div>"""
+
+
+def _compare_section(diff_data: dict | None) -> str:
+    if not diff_data:
+        return ""
+
+    lens_rows = []
+    for lens_name, delta in diff_data.get("lens_deltas", {}).items():
+        lens_rows.append(f"<tr><td>{escape(lens_name)}</td><td class='num'>{delta:+.3f}</td></tr>")
+    mover_rows = []
+    for change in diff_data.get("repo_changes", [])[:8]:
+        mover_rows.append(
+            f"<tr><td>{escape(change.get('name', ''))}</td>"
+            f"<td class='num'>{change.get('delta', 0):+.3f}</td>"
+            f"<td>{escape(change.get('old_tier', '—'))} → {escape(change.get('new_tier', '—'))}</td></tr>"
+        )
+    return f"""
+    <div class="section">
+      <h2>Compare</h2>
+      <div class="analyst-grid">
+        <div class="panel">
+          <div class="meta-line"><strong>Average score delta:</strong> {diff_data.get('average_score_delta', 0):+.3f}</div>
+          <table class="compact-table">
+            <thead><tr><th>Lens</th><th>Delta</th></tr></thead>
+            <tbody>{''.join(lens_rows) or "<tr><td colspan='2'>No lens changes</td></tr>"}</tbody>
+          </table>
+        </div>
+        <div class="panel">
+          <h3>Top Movers</h3>
+          <table class="compact-table">
+            <thead><tr><th>Repo</th><th>Score Delta</th><th>Tier</th></tr></thead>
+            <tbody>{''.join(mover_rows) or "<tr><td colspan='3'>No significant changes</td></tr>"}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>"""
+
+
+def _campaign_section(report_data: dict) -> str:
+    summary = report_data.get("campaign_summary", {})
+    if not summary:
+        return ""
+    rows = []
+    for item in report_data.get("writeback_preview", {}).get("repos", [])[:10]:
+        topic_count = len(item.get("topics", []))
+        rows.append(
+            f"<tr><td>{escape(item.get('repo', '—'))}</td>"
+            f"<td>{escape(item.get('issue_title', '—') or '—')}</td>"
+            f"<td class=\"num\">{topic_count}</td>"
+            f"<td class=\"num\">{item.get('notion_action_count', 0)}</td></tr>"
+        )
+    return f"""
+    <div class="section">
+      <h2>Campaign</h2>
+      <div class="analyst-grid">
+        <div class="panel">
+          <div class="meta-line"><strong>Campaign:</strong> {escape(summary.get('label', summary.get('campaign_type', '—')))}</div>
+          <div class="meta-line"><strong>Actions:</strong> {summary.get('action_count', 0)}</div>
+          <div class="meta-line"><strong>Repos:</strong> {summary.get('repo_count', 0)}</div>
+        </div>
+        <div class="panel">
+          <table class="compact-table">
+            <thead><tr><th>Repo</th><th>Managed Issue</th><th>Topics</th><th>Notion</th></tr></thead>
+            <tbody>{''.join(rows)}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>"""
+
+
+def _writeback_results_section(report_data: dict) -> str:
+    writeback = report_data.get("writeback_results", {})
+    if not writeback.get("results"):
+        return ""
+    rows = []
+    for result in writeback.get("results", [])[:12]:
+        detail = result.get("url") or result.get("status") or "—"
+        rows.append(
+            f"<tr><td>{escape(result.get('repo_full_name', '—'))}</td>"
+            f"<td>{escape(result.get('target', '—'))}</td>"
+            f"<td>{escape(result.get('status', '—'))}</td>"
+            f"<td>{escape(str(detail))}</td></tr>"
+        )
+    return f"""
+    <div class="section">
+      <h2>Writeback Results</h2>
+      <div class="meta-line"><strong>Mode:</strong> {escape(writeback.get('mode', 'preview'))} |
+      <strong>Target:</strong> {escape(writeback.get('target', 'preview-only'))}</div>
+      <table class="compact-table">
+        <thead><tr><th>Repo</th><th>Target</th><th>Status</th><th>Details</th></tr></thead>
+        <tbody>{''.join(rows)}</tbody>
+      </table>
+    </div>"""
+
+
+def _scenario_section(analyst_context: dict) -> str:
+    preview = analyst_context["scenario_preview"]
+    levers = preview.get("top_levers", [])
+    projection = preview.get("portfolio_projection", {})
+    lever_rows = []
+    for lever in levers[:5]:
+        lever_rows.append(
+            f"<tr><td>{escape(lever.get('title', ''))}</td>"
+            f"<td>{escape(lever.get('lens', ''))}</td>"
+            f"<td class='num'>{lever.get('repo_count', 0)}</td>"
+            f"<td class='num'>{lever.get('average_expected_lens_delta', 0):+.3f}</td></tr>"
+        )
+    return f"""
+    <div class="section">
+      <h2>Scenario Preview</h2>
+      <div class="analyst-grid">
+        <div class="panel">
+          <div class="meta-line"><strong>Projected average score delta:</strong> {projection.get('projected_average_score_delta', 0):+.3f}</div>
+          <div class="meta-line"><strong>Projected promotions:</strong> {projection.get('projected_tier_promotions', 0)}</div>
+          <div class="meta-line"><strong>Selected repos:</strong> {projection.get('selected_repo_count', 0)}</div>
+        </div>
+        <div class="panel">
+          <table class="compact-table">
+            <thead><tr><th>Lever</th><th>Lens</th><th>Repos</th><th>Avg Lift</th></tr></thead>
+            <tbody>{''.join(lever_rows) or "<tr><td colspan='4'>No scenario data</td></tr>"}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>"""
+
+
+def _governance_section(report_data: dict) -> str:
+    preview = report_data.get("security_governance_preview", [])
+    if not preview:
+        return ""
+
+    rows = []
+    for item in preview[:8]:
+        rows.append(
+            f"<tr><td>{escape(item.get('repo', ''))}</td>"
+            f"<td>{escape(item.get('priority', 'medium'))}</td>"
+            f"<td>{escape(item.get('title', ''))}</td>"
+            f"<td class='num'>{item.get('expected_posture_lift', 0):.2f}</td>"
+            f"<td>{escape(item.get('source', ''))}</td></tr>"
+        )
+    return f"""
+    <div class="section">
+      <h2>Dry-Run Governance</h2>
+      <table class="compact-table">
+        <thead><tr><th>Repo</th><th>Priority</th><th>Action</th><th>Expected Lift</th><th>Source</th></tr></thead>
         <tbody>{''.join(rows)}</tbody>
       </table>
     </div>"""
@@ -448,6 +743,16 @@ def _css() -> str:
     .kpi-card { flex: 1; background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; text-align: center; }
     .kpi-label { font-size: 12px; color: #64748B; text-transform: uppercase; letter-spacing: 1px; }
     .kpi-value { font-size: 32px; font-weight: 700; color: #1B2A4A; }
+    .lens-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+    .lens-card, .panel { background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; }
+    .lens-score { font-size: 28px; font-weight: 700; color: #1D4ED8; margin: 8px 0; }
+    .lens-text { color: #64748B; font-size: 13px; }
+    .analyst-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+    .meta-line { margin-bottom: 8px; color: #334155; }
+    .pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .pill { display: inline-block; padding: 4px 10px; border-radius: 999px; background: #E0F2FE; color: #075985; font-size: 12px; }
+    .compact-table { font-size: 12px; }
+    .compact-table th, .compact-table td { padding: 6px 8px; }
     .section { padding: 24px 32px; }
     .section h2 { font-size: 18px; color: #1B2A4A; margin-bottom: 16px; border-bottom: 2px solid #E2E8F0; padding-bottom: 8px; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -587,13 +892,23 @@ def _js() -> str:
     function filterTable() {
       const tier = document.getElementById('filter-tier').value;
       const grade = document.getElementById('filter-grade').value;
+      const collection = document.getElementById('filter-collection').value;
       const search = document.getElementById('search').value.toLowerCase();
       document.querySelectorAll('#repo-table tbody tr').forEach(row => {
         const show = (tier === 'all' || row.dataset.tier === tier)
           && (grade === 'all' || row.dataset.grade === grade)
+          && (collection === 'all' || row.dataset.collections.includes(collection.toLowerCase()))
           && row.dataset.name.toLowerCase().includes(search);
         row.style.display = show ? '' : 'none';
       });
+    }
+
+    function sortTable() {
+      const mode = document.getElementById('sort-mode').value;
+      const tbody = document.querySelector('#repo-table tbody');
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      rows.sort((a, b) => parseFloat(b.dataset[mode]) - parseFloat(a.dataset[mode]));
+      rows.forEach(row => tbody.appendChild(row));
     }
 
     // Sortable columns
@@ -613,4 +928,6 @@ def _js() -> str:
         rows.forEach(r => tbody.appendChild(r));
       });
     });
+
+    sortTable();
     """

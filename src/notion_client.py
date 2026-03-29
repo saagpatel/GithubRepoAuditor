@@ -13,7 +13,7 @@ from pathlib import Path
 import requests
 
 NOTION_API_BASE = "https://api.notion.com/v1"
-DEFAULT_NOTION_VERSION = "2022-06-28"
+DEFAULT_NOTION_VERSION = "2026-03-11"
 REQUEST_DELAY = 0.3  # seconds between API calls (rate limit ~3 req/s)
 MAX_RETRIES = 3
 
@@ -67,6 +67,25 @@ def notion_request(
                 return None
             time.sleep(2 ** attempt)
     return None
+
+
+def query_notion_collection(
+    collection_id: str,
+    token: str,
+    version: str = DEFAULT_NOTION_VERSION,
+    body: dict | None = None,
+) -> requests.Response | None:
+    """Query a Notion database or data source with compatibility fallback."""
+    body = body or {}
+    response = notion_request("POST", f"/data-sources/{collection_id}/query", token, version, body)
+    if response is not None and response.status_code != 404:
+        return response
+    return notion_request("POST", f"/databases/{collection_id}/query", token, version, body)
+
+
+def notion_parent_for_collection(collection_id: str, *, use_data_source: bool = False) -> dict:
+    """Build a Notion parent object for either a database or data source."""
+    return {"data_source_id": collection_id} if use_data_source else {"database_id": collection_id}
 
 
 def rich_text_value(text: str) -> dict:
