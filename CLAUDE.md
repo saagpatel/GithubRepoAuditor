@@ -18,7 +18,7 @@ Automated audit tool that clones all repos from a GitHub user account, analyzes 
 - All output files go to `output/` directory
 
 ## Current State
-Phases 0–21 complete. 426+ tests, 42 test files, 12+ analyzers (extensible via --analyzers-dir plugin API), 43 CLI flags. Outputs: JSON, Markdown, Excel (22+ sheets), HTML dashboard, PDF report. GitHub Actions CI + scheduled weekly audit. Config file, watch mode, dry-run, resume, terminal diff summary, GitHub Issues auto-creation, OSV.dev vulnerability checking, code complexity trends. Full Notion two-way sync, shields.io badges, AI narrative, scoring profiles, archive automation.
+Phases 0–22 complete. 444+ tests, 44 test files, 12+ analyzers (extensible via --analyzers-dir plugin API), 47 CLI flags. Outputs: JSON, Markdown, Excel (22+ sheets), HTML dashboard, PDF report. GitHub Actions CI + scheduled weekly audit. Config file, watch mode, dry-run, resume, terminal diff summary, GitHub Issues auto-creation, OSV.dev vulnerability checking, code complexity trends. Full Notion two-way sync, shields.io badges, AI narrative, scoring profiles, archive automation. Portfolio improvement campaign: manifest generation, batch metadata/README updates via Contents API.
 
 ## Key Decisions
 | Decision | Choice | Why |
