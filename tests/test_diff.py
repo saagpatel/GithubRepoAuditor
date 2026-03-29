@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from src.diff import diff_reports, format_diff_markdown
+from src.diff import diff_reports, format_diff_markdown, print_diff_summary
 
 
 def _make_report(audits: list[dict], avg: float = 0.5, date: str = "2026-03-20") -> dict:
@@ -168,3 +168,20 @@ class TestDiffMarkdown:
         assert "Beta" in md
         assert "Lens Deltas" in md
         assert "Scenario Preview" in md
+
+
+class TestPrintDiffSummary:
+    def test_prints_score_delta(self, capsys):
+        from dataclasses import dataclass, field
+
+        @dataclass
+        class FakeDiff:
+            average_score_delta: float = 0.05
+            tier_changes: list = field(default_factory=list)
+            score_changes: list = field(default_factory=list)
+            new_repos: list = field(default_factory=list)
+            removed_repos: list = field(default_factory=list)
+
+        print_diff_summary(FakeDiff())
+        captured = capsys.readouterr()
+        assert "0.05" in captured.err or "0.050" in captured.err

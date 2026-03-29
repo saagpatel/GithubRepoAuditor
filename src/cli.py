@@ -267,6 +267,38 @@ def build_parser() -> argparse.ArgumentParser:
         default=3600,
         help="Seconds between watch runs (default: 3600)",
     )
+    parser.add_argument(
+        "--create-issues",
+        action="store_true",
+        help="Create GitHub issues for high-priority action items",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview repos that would be audited without cloning or analyzing",
+    )
+    parser.add_argument(
+        "--summary",
+        action="store_true",
+        help="Print a Rich diff summary to stderr after audit (requires a previous report)",
+    )
+    parser.add_argument(
+        "--analyzers-dir",
+        type=str,
+        default=None,
+        metavar="DIR",
+        help="Directory containing custom analyzer .py files to load and run",
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume a partial audit run from saved progress",
+    )
+    parser.add_argument(
+        "--vuln-check",
+        action="store_true",
+        help="Query OSV.dev for known vulnerabilities in repo dependencies",
+    )
     return parser
 
 
@@ -555,9 +587,17 @@ def _analyze_repos(
     portfolio_lang_freq: dict[str, float],
     custom_weights: dict[str, float] | None,
 ) -> list[RepoAudit]:
+    from src.analyzers import load_custom_analyzers
+
     if args.skip_clone:
         print_warning("Audit modes that score repos do not support --skip-clone.")
         return []
+
+    extra_analyzers = []
+    if getattr(args, "analyzers_dir", None):
+        extra_analyzers = load_custom_analyzers(Path(args.analyzers_dir))
+        if extra_analyzers:
+            print_info(f"Loaded {len(extra_analyzers)} custom analyzer(s) from {args.analyzers_dir}")
 
     audits: list[RepoAudit] = []
     progress = create_progress()
@@ -577,7 +617,7 @@ def _analyze_repos(
                         progress.advance(task)
                         continue
                     progress.update(task, description=f"Analyzing {repo_meta.name}")
-                    results = run_all_analyzers(repo_path, repo_meta, client)
+                    results = run_all_analyzers(repo_path, repo_meta, client, extra_analyzers=extra_analyzers)
                     audit = score_repo(
                         repo_meta,
                         results,
@@ -597,7 +637,7 @@ def _analyze_repos(
                 if not repo_path:
                     continue
                 print(f"  [{index}/{len(repos)}] Analyzing {repo_meta.name}...", file=sys.stderr)
-                results = run_all_analyzers(repo_path, repo_meta, client)
+                results = run_all_analyzers(repo_path, repo_meta, client, extra_analyzers=extra_analyzers)
                 audit = score_repo(
                     repo_meta,
                     results,
@@ -902,6 +942,16 @@ def _write_report_outputs(
             archive_result = export_archive_report(candidates, report.username, output_dir)
             print_info(f"Archive candidates: {archive_result['count']} repos → {archive_result['report_path']}")
 
+    if getattr(args, "vuln_check", False):
+        from src.vuln_check import check_vulnerabilities, format_vuln_summary
+
+        vulns = check_vulnerabilities(report_data.get("audits", []), cache=cache)
+        print_info(format_vuln_summary(vulns))
+        if vulns:
+            vuln_path = output_dir / f"vuln-report-{report.username}-{_date_str(report.generated_at)}.json"
+            vuln_path.write_text(json.dumps(vulns, indent=2, default=str))
+            print_info(f"Vulnerability report: {vuln_path}")
+
     if args.narrative:
         from src.narrative import generate_narrative
 
@@ -1186,6 +1236,51 @@ def _load_scoring_profile(profile_name: str | None) -> tuple[dict[str, float] | 
     return None, normalized
 
 
+# ── Dry-run preview ───────────────────────────────────────────────────
+def _print_dry_run_summary(repos: list[RepoMetadata]) -> None:
+    """Print a Rich table of repos that would be audited, then return."""
+    from datetime import timezone
+
+    try:
+        from rich.console import Console
+        from rich.table import Table
+    except ImportError:
+        print(f"[dry-run] {len(repos)} repos would be audited", file=sys.stderr)
+        for r in repos:
+            print(f"  {r.name}", file=sys.stderr)
+        return
+
+    console = Console(stderr=True)
+    table = Table(title=f"[dry-run] {len(repos)} repos would be audited", show_lines=False)
+    table.add_column("Name")
+    table.add_column("Language")
+    table.add_column("Size (KB)", justify="right")
+    table.add_column("Stars", justify="right")
+    table.add_column("Days Since Push", justify="right")
+
+    now = datetime.now(timezone.utc)
+    total_kb = 0
+    for r in repos:
+        days = ""
+        if r.pushed_at:
+            pushed = r.pushed_at
+            if pushed.tzinfo is None:
+                pushed = pushed.replace(tzinfo=timezone.utc)
+            days = str((now - pushed).days)
+        total_kb += r.size_kb or 0
+        table.add_row(
+            r.name,
+            r.language or "",
+            str(r.size_kb or 0),
+            str(r.stars or 0),
+            days,
+        )
+
+    console.print(table)
+    est_mb = total_kb / 1024
+    console.print(f"[dim]{len(repos)} repos would be audited, est {est_mb:.1f} MB[/dim]")
+
+
 # ── Main entry point ──────────────────────────────────────────────────
 def main() -> None:
     parser = build_parser()
@@ -1235,6 +1330,11 @@ def main() -> None:
         )
         _print_filter_summary(all_repos, repos, args)
 
+        # Dry-run: preview repos and exit early
+        if getattr(args, "dry_run", False):
+            _print_dry_run_summary(repos)
+            return
+
         # Dispatch to partial run mode if requested
         if args.repos:
             _run_targeted_audit(
@@ -1260,6 +1360,25 @@ def main() -> None:
             )
             return
 
+        # Resume: load previously completed audits and skip re-analyzing them
+        resumed_names: set[str] = set()
+        resumed_audits: list[RepoAudit] = []
+        if getattr(args, "resume", False):
+            from src.progress import load_progress
+
+            saved = load_progress(output_dir)
+            if saved:
+                completed_dicts, _run_meta = saved
+                for audit_dict in completed_dicts:
+                    try:
+                        resumed_audits.append(_audit_from_dict(audit_dict))
+                        resumed_names.add(audit_dict.get("metadata", {}).get("name", ""))
+                    except Exception:
+                        pass
+                if resumed_audits:
+                    print_info(f"Resumed {len(resumed_audits)} previously completed repo(s)")
+                    repos = [r for r in repos if r.name not in resumed_names]
+
         audits = _analyze_repos(
             repos,
             args=args,
@@ -1267,9 +1386,11 @@ def main() -> None:
             portfolio_lang_freq=_compute_portfolio_lang_freq(repos),
             custom_weights=custom_weights,
         )
+        all_audits = resumed_audits + audits
 
         # Full audit path: score every repo and write all output formats
-        if audits:
+        if all_audits:
+            audits = all_audits
             report = AuditReport.from_audits(
                 args.username,
                 audits,
@@ -1282,6 +1403,37 @@ def main() -> None:
             _apply_requested_reconciliation(report, args, audits)
             outputs = _write_report_outputs(report, args, output_dir, client=client, cache=cache)
             _print_output_summary(f"Audited {report.repos_audited} repos for {report.username}", report, outputs)
+
+            if getattr(args, "create_issues", False):
+                from src.issue_creator import create_audit_issues
+                from src.quick_wins import find_quick_wins
+
+                quick_wins = find_quick_wins(audits)
+                issue_result = create_audit_issues(
+                    quick_wins,
+                    args.username,
+                    client,
+                    dry_run=getattr(args, "dry_run", False),
+                )
+                print_info(
+                    f"Issues: {len(issue_result['created'])} created, "
+                    f"{len(issue_result['skipped'])} skipped (already exist)"
+                )
+
+            if getattr(args, "summary", False) and outputs.get("json_path"):
+                from src.history import find_previous
+                from src.diff import diff_reports, print_diff_summary
+
+                prev_path = find_previous(outputs["json_path"].name)
+                if prev_path:
+                    diff = diff_reports(
+                        prev_path,
+                        outputs["json_path"],
+                        portfolio_profile=args.portfolio_profile,
+                        collection_name=args.collection,
+                    )
+                    print_diff_summary(diff)
+
             return
 
         # Fallback: --skip-clone was used, write raw metadata only
