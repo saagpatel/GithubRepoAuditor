@@ -45,6 +45,10 @@ def _make_args(**overrides) -> Namespace:
         "max_actions": 20,
         "auto_archive": False,
         "narrative": False,
+        "pdf": False,
+        "config": None,
+        "watch": False,
+        "watch_interval": 3600,
     }
     defaults.update(overrides)
     return Namespace(**defaults)

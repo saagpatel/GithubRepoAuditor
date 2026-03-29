@@ -16,10 +16,12 @@ dependencies = [
     "radon>=6.0.0",
     "rich>=13.0",
     "anthropic>=0.40.0",
+    "fpdf2>=2.7.0",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.4"]
+config = ["pyyaml>=6.0"]
 
 [project.scripts]
 audit = "src.cli:main"
