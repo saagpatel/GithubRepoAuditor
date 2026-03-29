@@ -158,6 +158,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Use Notion Local Portfolio Projects as registry source (requires NOTION_TOKEN)",
     )
+    parser.add_argument(
+        "--html",
+        action="store_true",
+        help="Generate interactive HTML dashboard",
+    )
     return parser
 
 
@@ -479,6 +484,12 @@ def _run_targeted_audit(args, client, output_dir: Path) -> None:
         sug_result = generate_readme_suggestions(report.to_dict(), output_dir)
         suggestions_info = f"\n    {sug_result['suggestions_path']} ({sug_result['total_suggestions']} suggestions)"
 
+    html_info = ""
+    if args.html:
+        from src.web_export import export_html_dashboard
+        html_result = export_html_dashboard(report.to_dict(), output_dir)
+        html_info = f"\n    {html_result['html_path']}"
+
     print(
         f"\n✓ Targeted audit: {len(new_audits)} new/updated + {len(kept)} existing = {len(all_audits_obj)} total\n"
         f"  Average score: {report.average_score:.2f}\n"
@@ -488,7 +499,7 @@ def _run_targeted_audit(args, client, output_dir: Path) -> None:
         f"    {md_path}\n"
         f"    {excel_path}\n"
         f"    {pcc_path}\n"
-        f"    {raw_path}{badge_info}{notion_info}{readme_info}{suggestions_info}",
+        f"    {raw_path}{badge_info}{notion_info}{readme_info}{suggestions_info}{html_info}",
     )
 
 
@@ -798,6 +809,15 @@ def main() -> None:
             sug_result = generate_readme_suggestions(report.to_dict(), output_dir)
             suggestions_info = f"\n    {sug_result['suggestions_path']} ({sug_result['total_suggestions']} suggestions)"
 
+        # HTML dashboard
+        html_info = ""
+        if args.html:
+            from src.web_export import export_html_dashboard
+            html_result = export_html_dashboard(
+                report.to_dict(), output_dir, trend_data, score_history,
+            )
+            html_info = f"\n    {html_result['html_path']}"
+
         cache_info = ""
         if cache:
             cache_info = f"\n  Cache: {cache.hits} hits, {cache.misses} misses"
@@ -812,7 +832,7 @@ def main() -> None:
             f"    {md_path}\n"
             f"    {excel_path}\n"
             f"    {pcc_path}\n"
-            f"    {raw_path}{badge_info}{notion_info}{readme_info}{suggestions_info}",
+            f"    {raw_path}{badge_info}{notion_info}{readme_info}{suggestions_info}{html_info}",
         )
     else:
         raw_path = _write_json(

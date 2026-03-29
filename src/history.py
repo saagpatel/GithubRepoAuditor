@@ -126,6 +126,78 @@ def load_repo_score_history(
     return history
 
 
+def load_language_trends(
+    history_dir: Path = HISTORY_DIR,
+    max_runs: int = 10,
+) -> list[dict]:
+    """Compute per-language adoption trends across audit history.
+
+    Returns [{language, repos_per_run: [int], current_count, category}]
+    sorted by current_count descending.
+    Category: "Adopt" (growing >20%), "Trial" (new), "Hold" (stable), "Decline" (shrinking >20%).
+    """
+    if not history_dir.exists():
+        return []
+
+    reports = sorted(
+        history_dir.glob("audit-report-*.json"),
+        key=lambda f: f.stat().st_mtime,
+        reverse=True,
+    )[:max_runs]
+
+    # Collect language counts per run (chronological)
+    all_languages: set[str] = set()
+    runs: list[dict[str, int]] = []
+    for report_path in reversed(reports):
+        try:
+            data = json.loads(report_path.read_text())
+            lang_counts: dict[str, int] = {}
+            for audit in data.get("audits", []):
+                lang = audit.get("metadata", {}).get("language")
+                if lang:
+                    lang_counts[lang] = lang_counts.get(lang, 0) + 1
+                    all_languages.add(lang)
+            runs.append(lang_counts)
+        except (json.JSONDecodeError, OSError, KeyError):
+            continue
+
+    if not runs:
+        return []
+
+    # Build per-language trend
+    trends: list[dict] = []
+    for lang in all_languages:
+        repos_per_run = [run.get(lang, 0) for run in runs]
+        current = repos_per_run[-1] if repos_per_run else 0
+
+        # Categorize
+        if len(repos_per_run) < 2:
+            category = "Hold"
+        elif repos_per_run[0] == 0 and current > 0:
+            category = "Trial"
+        elif current == 0:
+            category = "Decline"
+        else:
+            first_nonzero = next((v for v in repos_per_run if v > 0), current)
+            change = (current - first_nonzero) / first_nonzero if first_nonzero else 0
+            if change > 0.2:
+                category = "Adopt"
+            elif change < -0.2:
+                category = "Decline"
+            else:
+                category = "Hold"
+
+        trends.append({
+            "language": lang,
+            "repos_per_run": repos_per_run,
+            "current_count": current,
+            "category": category,
+        })
+
+    trends.sort(key=lambda t: t["current_count"], reverse=True)
+    return trends
+
+
 def _update_index(report_path: Path, history_dir: Path) -> None:
     """Add an entry to the history index."""
     index_path = history_dir / "index.json"
