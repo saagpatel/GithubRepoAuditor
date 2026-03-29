@@ -1,5 +1,7 @@
 # GitHub Repo Auditor
 
+![Grade](https://img.shields.io/badge/grade-A-brightgreen) ![Tier](https://img.shields.io/badge/tier-shipped-brightgreen) ![Python](https://img.shields.io/badge/python-3.11%2B-blue) ![Tests](https://img.shields.io/badge/tests-291%20passing-brightgreen)
+
 **Know the truth about every project you've ever started.**
 
 If you're a developer with 50, 80, 100+ repositories — some shipped, some half-built, some you forgot existed — this tool gives you the ground truth. It clones every repo, runs 12 analyzers, scores across two axes, assigns letter grades and achievement badges, and generates an interactive dashboard you can actually use to decide what to work on next.
