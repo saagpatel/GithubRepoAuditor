@@ -1448,6 +1448,51 @@ def _build_bubble_on_dashboard(ws, data: dict) -> None:
     ws.add_chart(chart, "A50")
 
 
+# ═══════════════════════════════════════════════════════════════════════
+# Dependency Graph Sheet
+# ═══════════════════════════════════════════════════════════════════════
+
+
+def _build_dependency_graph(wb: Workbook, data: dict) -> None:
+    from src.dep_graph import build_dependency_graph
+
+    ws = wb.create_sheet("Dep Graph")
+    ws.sheet_properties.tabColor = "0277BD"
+
+    graph = build_dependency_graph(data.get("audits", []))
+    shared = graph.get("shared_deps", [])
+
+    ws.merge_cells("A1:C1")
+    ws["A1"].value = f"Shared Dependencies ({len(shared)} across 2+ repos)"
+    ws["A1"].font = SECTION_FONT
+
+    headers = ["Dependency", "Repo Count", "Repos Using It"]
+    for col, h in enumerate(headers, 1):
+        ws.cell(row=2, column=col, value=h)
+    style_header_row(ws, 2, len(headers))
+    ws.freeze_panes = "A3"
+
+    for row, dep in enumerate(shared, 3):
+        ws.cell(row=row, column=1, value=dep["name"])
+        ws.cell(row=row, column=2, value=dep["count"])
+        ws.cell(row=row, column=3, value=", ".join(dep["repos"]))
+        for col in range(1, 4):
+            style_data_cell(ws.cell(row=row, column=col))
+
+    max_row = len(shared) + 2
+    if max_row > 2:
+        ws.conditional_formatting.add(
+            f"B3:B{max_row}",
+            ColorScaleRule(
+                start_type="min", start_color=HEATMAP_AMBER,
+                end_type="max", end_color=HEATMAP_GREEN,
+            ),
+        )
+
+    apply_zebra_stripes(ws, 3, max_row, len(headers))
+    auto_width(ws, len(headers), max_row)
+
+
 def export_excel(
     report_path: Path,
     output_path: Path,
@@ -1472,6 +1517,7 @@ def export_excel(
     _build_security(wb, data)
     _build_changes(wb, data, diff_data)
     _build_reconciliation(wb, data)
+    _build_dependency_graph(wb, data)
     _build_score_explainer(wb)
     _build_action_items(wb, data)
     _build_navigation(wb, data)
