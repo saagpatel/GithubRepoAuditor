@@ -553,11 +553,13 @@ def _build_all_repos(wb: Workbook, data: dict, score_history: dict[str, list[flo
     ws.sheet_properties.tabColor = "1565C0"
 
     headers = [
-        "Repo", "Grade", "Score", "Interest", "Tier", "Badges",
-        "Next Badge", "Language", "Commit Pattern", "Bus Factor",
-        "Days Since Push", "Commits", "Releases", "Test Files",
-        "LOC", "Libyears", "Stars", "Private", "Flags", "Description",
-        "Biggest Drag", "Why This Grade", "Tech Novelty", "Burst", "Ambition", "Storytelling", "Trend",
+        "Repo", "Grade", "Score", "Interest", "Interest Grade", "Tier", "Badges",
+        "Next Badge", "Language", "Topics", "Commit Pattern", "Bus Factor",
+        "Days Since Push", "Commits", "Releases", "Test Files", "Test Framework",
+        "LOC", "TODO Density", "PR Merge %", "Comment Ratio",
+        "Dep Count", "Libyears", "Stars", "Private", "Flags", "Description",
+        "Biggest Drag", "Why This Grade", "Tech Novelty", "Burst", "Ambition", "Storytelling",
+        "Created", "Size (KB)", "Trend",
     ]
     for col, h in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=h)
@@ -579,27 +581,35 @@ def _build_all_repos(wb: Workbook, data: dict, score_history: dict[str, list[flo
         next_badges = audit.get("next_badges", [])
         next_badge_str = next_badges[0]["action"] if next_badges else ""
 
+        doc = details.get("documentation", {})
         values = [
             m.get("name", ""),
             audit.get("grade", "F"),
             round(audit.get("overall_score", 0), 3),
             round(audit.get("interest_score", 0), 3),
+            audit.get("interest_grade", "—"),
             audit.get("completeness_tier", ""),
             ", ".join(badges[:4]),
             next_badge_str[:50],
             m.get("language") or "—",
+            ", ".join(m.get("topics", [])[:8]) or "—",
             act.get("commit_pattern", "—"),
             act.get("bus_factor", "—"),
             act.get("days_since_push", "—"),
             act.get("total_commits", "—"),
             act.get("release_count", "—"),
             test.get("test_file_count", 0),
+            test.get("framework", "—"),
             cq.get("total_loc", 0),
+            round(cq.get("todo_density_per_1k", 0) or 0, 1),
+            round((cq.get("pr_merge_ratio", 0) or 0) * 100, 0),
+            round(doc.get("comment_ratio", 0) or 0, 2),
+            dep.get("dep_count", "—") if dep.get("dep_count") is not None else "—",
             dep.get("total_libyears", "—"),
             m.get("stars", 0),
             "Yes" if m.get("private") else "No",
             ", ".join(audit.get("flags", [])),
-            (m.get("description") or "")[:60],
+            m.get("description") or "",
         ]
 
         # Biggest Drag: lowest-scoring completeness dimension
@@ -631,9 +641,15 @@ def _build_all_repos(wb: Workbook, data: dict, score_history: dict[str, list[flo
         values.extend([
             round(interest_d.get("tech_novelty", 0), 2),
             round(interest_d.get("burst_coefficient", 0), 2),
-            round(interest_d.get("ambition_score", 0), 2),
+            round(interest_d.get("ambition_score") or 0, 2),
             round(interest_d.get("readme_storytelling", 0), 2),
         ])
+
+        # Created date and repo size
+        created = m.get("created_at", "")
+        if created and len(created) >= 10:
+            created = created[:10]  # Just the date part
+        values.extend([created, m.get("size_kb", 0)])
 
         for col, val in enumerate(values, 1):
             cell = ws.cell(row=row, column=col, value=val)
@@ -649,19 +665,19 @@ def _build_all_repos(wb: Workbook, data: dict, score_history: dict[str, list[flo
         # Grade coloring
         color_grade_cell(ws.cell(row=row, column=2), audit.get("grade", "F"))
         # Tier coloring
-        color_tier_cell(ws.cell(row=row, column=5), audit.get("completeness_tier", ""))
+        color_tier_cell(ws.cell(row=row, column=6), audit.get("completeness_tier", ""))
         # Pattern coloring
         pattern = act.get("commit_pattern", "")
         if pattern and pattern != "—":
-            color_pattern_cell(ws.cell(row=row, column=9), pattern)
+            color_pattern_cell(ws.cell(row=row, column=11), pattern)
 
-        # Sparkline trend (column 27)
+        # Sparkline trend (last column)
         if score_history:
             repo_name = m.get("name", "")
             scores = score_history.get(repo_name, [])
             spark = render_sparkline(scores)
             if spark:
-                cell = ws.cell(row=row, column=27, value=spark)
+                cell = ws.cell(row=row, column=len(headers), value=spark)
                 cell.font = SPARKLINE_FONT
 
     max_row = len(audits) + 1
