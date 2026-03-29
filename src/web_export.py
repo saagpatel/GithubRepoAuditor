@@ -40,6 +40,7 @@ RADAR_COLORS = {
 }
 
 
+# ── Public API ────────────────────────────────────────────────────────
 def export_html_dashboard(
     report_data: dict,
     output_dir: Path,
@@ -56,6 +57,7 @@ def export_html_dashboard(
     return {"html_path": html_path}
 
 
+# ── HTML rendering ────────────────────────────────────────────────────
 def _render_html(
     report_data: dict,
     trend_data: list[dict] | None = None,
@@ -119,6 +121,7 @@ def _render_html(
     return "\n".join(parts)
 
 
+# ── KPI and header sections ───────────────────────────────────────────
 def _header_section(username: str, date: str, repos: int, grade: str) -> str:
     color = GRADE_COLORS_CSS.get(grade, "#6B7280")
     return f"""
@@ -143,6 +146,7 @@ def _kpi_section(data: dict) -> str:
     </div>"""
 
 
+# ── Repo table (sorted by score, with sparklines) ─────────────────────
 def _repo_table(audits: list[dict], score_history: dict[str, list[float]] | None = None) -> str:
     rows = []
     sorted_audits = sorted(audits, key=lambda a: a.get("overall_score", 0), reverse=True)
@@ -213,6 +217,7 @@ def _repo_table(audits: list[dict], score_history: dict[str, list[float]] | None
     </div>"""
 
 
+# ── HTML section builders ─────────────────────────────────────────────
 def _tech_radar_section(data: dict, trend_data: list[dict] | None) -> str:
     from src.history import load_language_trends
     trends = load_language_trends()
@@ -248,6 +253,7 @@ def _tech_radar_section(data: dict, trend_data: list[dict] | None) -> str:
     </div>"""
 
 
+# ── Tier distribution bar chart ───────────────────────────────────────
 def _distribution_section(data: dict) -> str:
     tiers = data.get("tier_distribution", {})
     total = sum(tiers.values()) or 1
@@ -272,6 +278,7 @@ def _distribution_section(data: dict) -> str:
     </div>"""
 
 
+# ── Footer ────────────────────────────────────────────────────────────
 def _footer() -> str:
     return """
     <footer>
@@ -279,6 +286,7 @@ def _footer() -> str:
     </footer>"""
 
 
+# ── Static assets (CSS + JS) ──────────────────────────────────────────
 def _css() -> str:
     return """
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -326,6 +334,7 @@ def _css() -> str:
     """
 
 
+# ── Data embedding helpers ────────────────────────────────────────────
 def _json_script_data(data: dict) -> str:
     """Serialize JSON safely for embedding inside a non-executable script tag."""
     return json.dumps(data).replace("</", "<\\/")
@@ -339,6 +348,7 @@ def _safe_href(url: str) -> str:
     return ""
 
 
+# ── Embedded JavaScript ───────────────────────────────────────────────
 def _js() -> str:
     return """
     const DATA = JSON.parse(document.getElementById('dashboard-data').textContent);

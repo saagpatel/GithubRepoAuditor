@@ -1,3 +1,16 @@
+# GitHub Repo Auditor — CLI entry point
+#
+# Orchestrates the full audit pipeline:
+#   1. Fetch repo metadata from GitHub REST API (or GraphQL bulk fetch)
+#   2. Shallow-clone each repo to a temp workspace
+#   3. Run all 12 analyzers (completeness, interest, security, cicd, …)
+#   4. Score and tier each repo via the configured scoring profile
+#   5. Write JSON / Markdown / Excel / HTML reports to the output directory
+#
+# Three run modes:
+#   full        — re-analyze every repo for the given username
+#   targeted    — re-analyze specific repos (--repos) and merge into latest report
+#   incremental — re-analyze only repos with new pushes since last run
 from __future__ import annotations
 
 import argparse
@@ -44,6 +57,7 @@ def _gh_auth_token() -> str | None:
     return None
 
 
+# ── Argument parser ──────────────────────────────────────────────────
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="github-repo-auditor",
@@ -183,6 +197,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+# ── Repo filtering and selection helpers ─────────────────────────────
 def _filter_repos(
     repos: list[RepoMetadata],
     *,
@@ -290,6 +305,7 @@ def _parse_iso_dt(value: str | None) -> datetime | None:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
+# ── JSON deserialization helpers ──────────────────────────────────────
 def _audit_from_dict(data: dict) -> RepoAudit:
     meta_data = data.get("metadata", {})
     metadata = RepoMetadata(
@@ -439,6 +455,7 @@ def _select_target_repos(target_names: list[str], repos: list[RepoMetadata]) -> 
     return selected, missing
 
 
+# ── Core analysis pipeline ────────────────────────────────────────────
 def _analyze_repos(
     repos: list[RepoMetadata],
     *,
@@ -537,6 +554,7 @@ def _apply_requested_reconciliation(report: AuditReport, args, audits: list[Repo
             )
 
 
+# ── Report output orchestration ───────────────────────────────────────
 def _write_report_outputs(
     report: AuditReport,
     args,
@@ -742,6 +760,7 @@ def _print_output_summary(
     )
 
 
+# ── Partial run modes ─────────────────────────────────────────────────
 def _run_targeted_audit(
     args,
     client: GitHubClient,
@@ -789,16 +808,19 @@ def _run_targeted_audit(
     if not new_audits:
         return
 
+    # Load existing audits from the latest report so we can merge into them
     existing_audits = existing_report_data.get("audits", []) if existing_report_data else []
     if existing_report_path:
         print_info(f"Merging into {existing_report_path.name} ({len(existing_audits)} existing repos)")
 
+    # Replace any existing audit entries for the re-analyzed repos
     new_names = {audit.metadata.name for audit in new_audits}
     kept_audits = [
         _audit_from_dict(audit_data)
         for audit_data in existing_audits
         if audit_data["metadata"]["name"] not in new_names
     ]
+    # new_audits first so they appear at the top of the report
     merged_audits = list(new_audits) + kept_audits
     total_repos = existing_report_data.get("total_repos", len(filtered_repos)) if existing_report_data else len(filtered_repos)
 
@@ -888,14 +910,17 @@ def _run_incremental_audit(
 
     repos = _filter_repos(all_repos, skip_forks=args.skip_forks, skip_archived=args.skip_archived)
 
+    # Compare current pushed_at timestamps against stored fingerprints
     changed: list[str] = []
     new: list[str] = []
     for repo in repos:
         prev = fingerprints.get(repo.name)
         curr_pushed = repo.pushed_at.isoformat() if repo.pushed_at else None
         if prev is None:
+            # Repo not seen before — add to audit queue
             new.append(repo.name)
         elif prev.get("pushed_at") != curr_pushed:
+            # pushed_at changed — new commits since last run
             changed.append(repo.name)
 
     needs_audit = changed + new
@@ -929,6 +954,7 @@ def _run_incremental_audit(
     )
 
 
+# ── Scoring profile loader ─────────────────────────────────────────────
 def _load_scoring_profile(profile_name: str | None) -> tuple[dict[str, float] | None, str]:
     normalized = _normalize_profile_name(profile_name)
     if not profile_name:
@@ -943,13 +969,16 @@ def _load_scoring_profile(profile_name: str | None) -> tuple[dict[str, float] | 
     return None, normalized
 
 
+# ── Main entry point ──────────────────────────────────────────────────
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
 
+    # Validate mutually exclusive registry flags
     if args.registry and args.notion_registry:
         parser.error("--registry and --notion-registry cannot be used together")
 
+    # Implied flag dependencies
     if args.upload_badges:
         args.badges = True
     if args.notion_sync:
@@ -967,6 +996,7 @@ def main() -> None:
     client = GitHubClient(token=args.token, cache=cache)
     output_dir = Path(args.output_dir)
 
+    # Fetch all repo metadata from GitHub API (REST or GraphQL depending on flag)
     all_repos, errors = _fetch_repo_metadata(args, client)
     total_fetched = len(all_repos)
     repos = _filter_repos(
@@ -976,6 +1006,7 @@ def main() -> None:
     )
     _print_filter_summary(all_repos, repos, args)
 
+    # Dispatch to partial run mode if requested
     if args.repos:
         _run_targeted_audit(
             args,
@@ -1008,6 +1039,7 @@ def main() -> None:
         custom_weights=custom_weights,
     )
 
+    # Full audit path: score every repo and write all output formats
     if audits:
         report = AuditReport.from_audits(
             args.username,
@@ -1023,6 +1055,7 @@ def main() -> None:
         _print_output_summary(f"Audited {report.repos_audited} repos for {report.username}", report, outputs)
         return
 
+    # Fallback: --skip-clone was used, write raw metadata only
     raw_path = _write_json(
         args.username, repos, errors, total_fetched, output_dir,
     )
