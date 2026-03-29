@@ -13,11 +13,14 @@ from pathlib import Path
 from openpyxl import Workbook
 from openpyxl.chart import BarChart, PieChart, Reference, ScatterChart
 from openpyxl.chart.label import DataLabelList
-from openpyxl.chart.series import DataPoint
+from openpyxl.chart.series import DataPoint, Series
+from openpyxl.drawing.line import LineProperties
 from openpyxl.formatting.rule import ColorScaleRule, DataBarRule
 from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
+
+from src.sparkline import sparkline as render_sparkline
 
 from src.excel_styles import (
     CENTER,
@@ -39,6 +42,7 @@ from src.excel_styles import (
     WRAP,
     WHITE,
     NARRATIVE_FONT,
+    SPARKLINE_FONT,
     apply_zebra_stripes,
     auto_width,
     color_grade_cell,
@@ -99,7 +103,7 @@ def _generate_narrative(data: dict, diff_data: dict | None) -> str:
     return " | ".join(parts)
 
 
-def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None) -> None:
+def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None, score_history: dict[str, list[float]] | None = None) -> None:
     ws = wb.active
     ws.title = "Dashboard"
     ws.sheet_properties.tabColor = NAVY
@@ -140,6 +144,15 @@ def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None) ->
     # Row height
     ws.row_dimensions[5].height = 20
     ws.row_dimensions[6].height = 40
+
+    # Portfolio score sparkline (row 7, next to KPI cards)
+    if score_history:
+        from src.history import load_trend_data as _load_trends
+        avg_scores = [t.get("average_score", 0) for t in (_load_trends() or [])]
+        spark = render_sparkline(avg_scores)
+        if spark:
+            cell = ws.cell(row=7, column=3, value=f"Trend: {spark}")
+            cell.font = SPARKLINE_FONT
 
     # Portfolio DNA row (row 8) — one colored cell per repo
     dna_row = 8
@@ -230,13 +243,127 @@ def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None) ->
         lang_bar.height = 10
         ws.add_chart(lang_bar, "A34")
 
+    # Scatter chart: Completeness vs Interest
+    _build_scatter_on_dashboard(ws, data)
+
+
+def _build_scatter_on_dashboard(ws, data: dict) -> None:
+    """Add completeness vs interest scatter chart with quadrant lines."""
+    audits = data.get("audits", [])
+    if len(audits) < 2:
+        return
+
+    # Write scatter data to cols L-N (12-14) starting at row 10
+    data_start_row = 10
+    col_name = 12  # L: repo name (reference)
+    col_x = 13     # M: completeness
+    col_y = 14     # N: interest
+
+    for i, audit in enumerate(audits):
+        row = data_start_row + i
+        ws.cell(row=row, column=col_name, value=audit["metadata"]["name"])
+        ws.cell(row=row, column=col_x, value=round(audit.get("overall_score", 0), 3))
+        ws.cell(row=row, column=col_y, value=round(audit.get("interest_score", 0), 3))
+
+    data_end_row = data_start_row + len(audits) - 1
+
+    chart = ScatterChart()
+    chart.title = "Completeness vs Interest"
+    chart.x_axis.title = "Completeness"
+    chart.y_axis.title = "Interest"
+    chart.x_axis.scaling.min = 0
+    chart.x_axis.scaling.max = 1
+    chart.y_axis.scaling.min = 0
+    chart.y_axis.scaling.max = 1
+    chart.style = 13
+
+    # Main data series — dots only, no connecting lines
+    xvalues = Reference(ws, min_col=col_x, min_row=data_start_row, max_row=data_end_row)
+    yvalues = Reference(ws, min_col=col_y, min_row=data_start_row, max_row=data_end_row)
+    series = Series(yvalues, xvalues, title="Repos")
+    series.graphicalProperties.line.noFill = True
+    chart.series.append(series)
+
+    # Quadrant lines — vertical at x=0.55, horizontal at y=0.45
+    line_col = 16  # col P for line data
+    # Vertical line (x=0.55 from y=0 to y=1)
+    ws.cell(row=data_start_row, column=line_col, value=0.55)
+    ws.cell(row=data_start_row, column=line_col + 1, value=0.0)
+    ws.cell(row=data_start_row + 1, column=line_col, value=0.55)
+    ws.cell(row=data_start_row + 1, column=line_col + 1, value=1.0)
+
+    vline_x = Reference(ws, min_col=line_col, min_row=data_start_row, max_row=data_start_row + 1)
+    vline_y = Reference(ws, min_col=line_col + 1, min_row=data_start_row, max_row=data_start_row + 1)
+    vline = Series(vline_y, vline_x, title=None)
+    vline.graphicalProperties.line = LineProperties(w=12700, prstDash="dash", solidFill="808080")
+    vline.marker = None
+    chart.series.append(vline)
+
+    # Horizontal line (y=0.45 from x=0 to x=1)
+    ws.cell(row=data_start_row, column=line_col + 2, value=0.0)
+    ws.cell(row=data_start_row, column=line_col + 3, value=0.45)
+    ws.cell(row=data_start_row + 1, column=line_col + 2, value=1.0)
+    ws.cell(row=data_start_row + 1, column=line_col + 3, value=0.45)
+
+    hline_x = Reference(ws, min_col=line_col + 2, min_row=data_start_row, max_row=data_start_row + 1)
+    hline_y = Reference(ws, min_col=line_col + 3, min_row=data_start_row, max_row=data_start_row + 1)
+    hline = Series(hline_y, hline_x, title=None)
+    hline.graphicalProperties.line = LineProperties(w=12700, prstDash="dash", solidFill="808080")
+    hline.marker = None
+    chart.series.append(hline)
+
+    chart.width = 18
+    chart.height = 14
+    ws.add_chart(chart, "G34")
+
+    # Quadrant summary table
+    _write_quadrant_table(ws, audits, legend_row=49)
+
+
+X_MID = 0.55
+Y_MID = 0.45
+
+QUADRANT_NAMES = [
+    ("Flagships", "high completeness + high interest"),
+    ("Hidden Gems", "high interest, incomplete — worth finishing"),
+    ("Workhorses", "solid but routine — bread and butter"),
+    ("Archive Candidates", "low both — consider archiving"),
+]
+
+
+def _write_quadrant_table(ws, audits: list[dict], legend_row: int) -> None:
+    """Write a quadrant summary table below the scatter chart."""
+    buckets: list[list[str]] = [[], [], [], []]
+    for a in audits:
+        x = a.get("overall_score", 0)
+        y = a.get("interest_score", 0)
+        if x >= X_MID and y >= Y_MID:
+            buckets[0].append(a["metadata"]["name"])
+        elif x < X_MID and y >= Y_MID:
+            buckets[1].append(a["metadata"]["name"])
+        elif x >= X_MID and y < Y_MID:
+            buckets[2].append(a["metadata"]["name"])
+        else:
+            buckets[3].append(a["metadata"]["name"])
+
+    ws.cell(row=legend_row, column=7, value="Scatter Quadrants").font = SECTION_FONT
+    headers = ["Quadrant", "Count", "Repos"]
+    for j, h in enumerate(headers):
+        ws.cell(row=legend_row + 1, column=7 + j, value=h).font = SUBHEADER_FONT
+
+    for i, ((name, desc), repos) in enumerate(zip(QUADRANT_NAMES, buckets)):
+        row = legend_row + 2 + i
+        ws.cell(row=row, column=7, value=f"{name}").font = Font("Calibri", 10, bold=True)
+        ws.cell(row=row, column=8, value=len(repos))
+        ws.cell(row=row, column=9, value=", ".join(repos[:8]) + ("..." if len(repos) > 8 else ""))
+
 
 # ═══════════════════════════════════════════════════════════════════════
 # Sheet 2: All Repos (Master Table)
 # ═══════════════════════════════════════════════════════════════════════
 
 
-def _build_all_repos(wb: Workbook, data: dict) -> None:
+def _build_all_repos(wb: Workbook, data: dict, score_history: dict[str, list[float]] | None = None) -> None:
     ws = wb.create_sheet("All Repos")
     ws.sheet_properties.tabColor = "1565C0"
 
@@ -245,7 +372,7 @@ def _build_all_repos(wb: Workbook, data: dict) -> None:
         "Next Badge", "Language", "Commit Pattern", "Bus Factor",
         "Days Since Push", "Commits", "Releases", "Test Files",
         "LOC", "Libyears", "Stars", "Private", "Flags", "Description",
-        "Biggest Drag", "Why This Grade",
+        "Biggest Drag", "Why This Grade", "Trend",
     ]
     for col, h in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=h)
@@ -333,6 +460,15 @@ def _build_all_repos(wb: Workbook, data: dict) -> None:
         pattern = act.get("commit_pattern", "")
         if pattern and pattern != "—":
             color_pattern_cell(ws.cell(row=row, column=9), pattern)
+
+        # Sparkline trend (column 23)
+        if score_history:
+            repo_name = m.get("name", "")
+            scores = score_history.get(repo_name, [])
+            spark = render_sparkline(scores)
+            if spark:
+                cell = ws.cell(row=row, column=23, value=spark)
+                cell.font = SPARKLINE_FONT
 
     max_row = len(audits) + 1
     apply_zebra_stripes(ws, 2, max_row, len(headers))
@@ -1071,13 +1207,14 @@ def export_excel(
     output_path: Path,
     trend_data: list[dict] | None = None,
     diff_data: dict | None = None,
+    score_history: dict[str, list[float]] | None = None,
 ) -> Path:
     """Generate the flagship Excel dashboard."""
     data = json.loads(report_path.read_text())
 
     wb = Workbook()
-    _build_dashboard(wb, data, diff_data)
-    _build_all_repos(wb, data)
+    _build_dashboard(wb, data, diff_data, score_history)
+    _build_all_repos(wb, data, score_history)
     _build_heatmap(wb, data)
     _build_quick_wins(wb, data)
     _build_badges(wb, data)

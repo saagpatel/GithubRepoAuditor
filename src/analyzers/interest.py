@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import statistics
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -122,6 +123,13 @@ class InterestAnalyzer(BaseAnalyzer):
         if storytelling > 0:
             findings.append("README tells a story (images/diagrams, detailed)")
 
+        # 8. Recency bonus (0–0.05)
+        recency_bonus = _score_recency(metadata)
+        score += recency_bonus
+        details["recency_bonus"] = recency_bonus
+        if recency_bonus > 0:
+            findings.append(f"Recently active (+{recency_bonus:.2f})")
+
         return self._result(score, findings, details)
 
 
@@ -154,11 +162,11 @@ def _score_commit_bursts(owner_weeks: list[int]) -> float:
     stdev = statistics.stdev(active_weeks)
     cv = stdev / mean  # coefficient of variation
     # CV > 1.0 means high burst pattern
-    if cv > 1.5:
-        return 0.15
     if cv > 1.0:
+        return 0.15
+    if cv > 0.7:
         return 0.10
-    if cv > 0.5:
+    if cv > 0.4:
         return 0.05
     return 0.0
 
@@ -243,6 +251,20 @@ def _count_assets(repo_path: Path, max_scan: int = 500) -> int:
         if path.is_file() and path.suffix.lower() in ASSET_EXTENSIONS:
             count += 1
     return count
+
+
+def _score_recency(metadata: RepoMetadata) -> float:
+    """Bonus for recently active projects."""
+    if not metadata.pushed_at:
+        return 0.0
+    days = (datetime.now(timezone.utc) - metadata.pushed_at).days
+    if days <= 90:
+        return 0.05
+    if days <= 180:
+        return 0.03
+    if days <= 365:
+        return 0.01
+    return 0.0
 
 
 def _score_readme_storytelling(repo_path: Path) -> float:

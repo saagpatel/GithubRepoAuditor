@@ -5,11 +5,13 @@ import json
 import os
 import subprocess
 import sys
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
 from src.analyzers import run_all_analyzers
 from src.cache import ResponseCache
+from src.cli_output import create_progress, print_info, print_status, print_warning
 from src.cloner import clone_workspace
 from src.github_client import GitHubClient
 from src.models import AuditReport, RepoAudit, RepoMetadata
@@ -121,6 +123,16 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="PREVIOUS_REPORT",
         help="Compare against a previous audit-report JSON to show changes",
     )
+    parser.add_argument(
+        "--badges",
+        action="store_true",
+        help="Generate Shields.io badge JSON files and badges.md",
+    )
+    parser.add_argument(
+        "--upload-badges",
+        action="store_true",
+        help="Upload badge JSON to GitHub Gist for endpoint badges (implies --badges)",
+    )
     return parser
 
 
@@ -222,45 +234,87 @@ def _run_targeted_audit(args, client, output_dir: Path) -> None:
     import glob as _glob
 
     target_names = _resolve_repo_names(args.repos)
-    print(f"  Targeted audit: {len(target_names)} repos", file=sys.stderr)
+    print_status(f"Targeted audit: {len(target_names)} repos")
 
     # Fetch metadata only for targeted repos
     owner = args.username
     targeted_repos: list[RepoMetadata] = []
     errors: list[dict] = []
 
-    for name in target_names:
-        print(f"  Fetching {owner}/{name}...", file=sys.stderr)
-        try:
-            languages = client.get_languages(owner, name)
-            # Fetch single repo metadata via API
-            response = client._request(f"https://api.github.com/repos/{owner}/{name}")
-            repo_data = response.json()
-            meta = RepoMetadata.from_api_response(repo_data, languages=languages)
-            targeted_repos.append(meta)
-        except Exception as exc:
-            errors.append({"repo": f"{owner}/{name}", "error": str(exc)})
-            print(f"  ⚠ Failed to fetch {name}: {exc}", file=sys.stderr)
+    progress = create_progress()
+    if progress:
+        with progress:
+            task = progress.add_task("Fetching metadata", total=len(target_names))
+            for name in target_names:
+                progress.update(task, description=f"Fetching {owner}/{name}")
+                try:
+                    languages = client.get_languages(owner, name)
+                    response = client._request(f"https://api.github.com/repos/{owner}/{name}")
+                    repo_data = response.json()
+                    meta = RepoMetadata.from_api_response(repo_data, languages=languages)
+                    targeted_repos.append(meta)
+                except Exception as exc:
+                    errors.append({"repo": f"{owner}/{name}", "error": str(exc)})
+                    print_warning(f"Failed to fetch {name}: {exc}")
+                progress.advance(task)
+    else:
+        for name in target_names:
+            print(f"  Fetching {owner}/{name}...", file=sys.stderr)
+            try:
+                languages = client.get_languages(owner, name)
+                response = client._request(f"https://api.github.com/repos/{owner}/{name}")
+                repo_data = response.json()
+                meta = RepoMetadata.from_api_response(repo_data, languages=languages)
+                targeted_repos.append(meta)
+            except Exception as exc:
+                errors.append({"repo": f"{owner}/{name}", "error": str(exc)})
+                print_warning(f"Failed to fetch {name}: {exc}")
 
     if not targeted_repos:
-        print("  No repos to audit.", file=sys.stderr)
+        print_warning("No repos to audit.")
         return
+
+    # Portfolio language frequency from targeted repos (best available for targeted mode)
+    targeted_lang_counts = Counter(r.language for r in targeted_repos if r.language)
+    targeted_lang_freq = (
+        {lang: count / len(targeted_repos) for lang, count in targeted_lang_counts.items()}
+        if targeted_repos else {}
+    )
 
     # Clone and analyze only targeted repos
     new_audits: list[RepoAudit] = []
-    with clone_workspace(targeted_repos, token=args.token) as cloned:
-        print(f"  Cloned {len(cloned)}/{len(targeted_repos)} repos. Analyzing...", file=sys.stderr)
-        for i, repo_meta in enumerate(targeted_repos, 1):
-            repo_path = cloned.get(repo_meta.name)
-            if not repo_path:
-                continue
-            print(f"  [{i}/{len(targeted_repos)}] Analyzing {repo_meta.name}...", file=sys.stderr)
-            results = run_all_analyzers(repo_path, repo_meta, client)
-            audit = score_repo(repo_meta, results)
-            new_audits.append(audit)
-            if args.verbose:
-                _print_verbose(audit)
-    print("  Clones cleaned up", file=sys.stderr)
+    progress = create_progress()
+    with clone_workspace(targeted_repos, token=args.token,
+                         on_progress=lambda i, t, n: None,
+                         on_error=lambda n, m: print_warning(f"Failed to clone {n}")) as cloned:
+        print_info(f"Cloned {len(cloned)}/{len(targeted_repos)} repos. Analyzing...")
+        if progress:
+            with progress:
+                task = progress.add_task("Analyzing", total=len(targeted_repos))
+                for i, repo_meta in enumerate(targeted_repos, 1):
+                    repo_path = cloned.get(repo_meta.name)
+                    if not repo_path:
+                        progress.advance(task)
+                        continue
+                    progress.update(task, description=f"Analyzing {repo_meta.name}")
+                    results = run_all_analyzers(repo_path, repo_meta, client)
+                    audit = score_repo(repo_meta, results, portfolio_lang_freq=targeted_lang_freq)
+                    new_audits.append(audit)
+                    if args.verbose:
+                        _print_verbose(audit)
+                    progress.advance(task)
+        else:
+            for i, repo_meta in enumerate(targeted_repos, 1):
+                repo_path = cloned.get(repo_meta.name)
+                if not repo_path:
+                    continue
+                print(f"  [{i}/{len(targeted_repos)}] Analyzing {repo_meta.name}...", file=sys.stderr)
+                results = run_all_analyzers(repo_path, repo_meta, client)
+                audit = score_repo(repo_meta, results, portfolio_lang_freq=targeted_lang_freq)
+                new_audits.append(audit)
+                if args.verbose:
+                    _print_verbose(audit)
+    print_info("Clones cleaned up")
 
     # Load the most recent existing report and merge
     existing_reports = sorted(output_dir.glob("audit-report-*.json"), key=lambda f: f.stat().st_mtime, reverse=True)
@@ -269,7 +323,7 @@ def _run_targeted_audit(args, client, output_dir: Path) -> None:
         import json as _json
         existing_data = _json.loads(existing_reports[0].read_text())
         existing_audits = existing_data.get("audits", [])
-        print(f"  Merging into {existing_reports[0].name} ({len(existing_audits)} existing repos)", file=sys.stderr)
+        print_info(f"Merging into {existing_reports[0].name} ({len(existing_audits)} existing repos)")
 
     # Merge: replace existing entries for targeted repos, add new ones
     new_audit_names = {a.metadata.name for a in new_audits}
@@ -336,12 +390,14 @@ def _run_targeted_audit(args, client, output_dir: Path) -> None:
     # Generate all reports
     json_path = write_json_report(report, output_dir)
     from src.excel_export import export_excel
-    from src.history import load_trend_data, archive_report
+    from src.history import load_trend_data, archive_report, load_repo_score_history
     trend_data = load_trend_data()
+    score_history = load_repo_score_history()
     excel_path = export_excel(
         json_path,
         output_dir / f"audit-dashboard-{args.username}-{_date_str(report.generated_at)}.xlsx",
         trend_data=trend_data,
+        score_history=score_history,
     )
     md_path = write_markdown_report(report, output_dir)
     pcc_path = write_pcc_export(report, output_dir)
@@ -349,6 +405,16 @@ def _run_targeted_audit(args, client, output_dir: Path) -> None:
     archive_report(json_path)
     from src.history import save_fingerprints
     save_fingerprints([a.to_dict() for a in all_audits_obj])
+
+    badge_info = ""
+    if args.badges:
+        from src.badge_export import export_badges, upload_badge_gist, _write_badges_markdown
+        badge_result = export_badges(report.to_dict(), output_dir)
+        badge_info = f"\n    {badge_result['badges_md']} ({badge_result['files_written']} badge files)"
+        if args.upload_badges:
+            gist_urls = upload_badge_gist(output_dir / "badges", report.username)
+            if gist_urls:
+                _write_badges_markdown(report.to_dict(), output_dir / "badges", gist_urls)
 
     print(
         f"\n✓ Targeted audit: {len(new_audits)} new/updated + {len(kept)} existing = {len(all_audits_obj)} total\n"
@@ -359,7 +425,7 @@ def _run_targeted_audit(args, client, output_dir: Path) -> None:
         f"    {md_path}\n"
         f"    {excel_path}\n"
         f"    {pcc_path}\n"
-        f"    {raw_path}",
+        f"    {raw_path}{badge_info}",
     )
 
 
@@ -369,8 +435,8 @@ def _run_incremental_audit(args, client, output_dir: Path) -> None:
 
     fingerprints = load_fingerprints()
     if not fingerprints:
-        print("  No fingerprints found. Run a full audit first.", file=sys.stderr)
-        print("  Usage: python -m src saagpatel", file=sys.stderr)
+        print_warning("No fingerprints found. Run a full audit first.")
+        print_info("Usage: python -m src saagpatel")
         return
 
     # Fetch metadata (fast, uses cache for list + languages)
@@ -390,14 +456,13 @@ def _run_incremental_audit(args, client, output_dir: Path) -> None:
     needs_audit = changed + new
     unchanged = len(repos) - len(needs_audit)
 
-    print(
-        f"  Incremental: {len(needs_audit)} need audit "
-        f"({len(changed)} changed, {len(new)} new), {unchanged} unchanged",
-        file=sys.stderr,
+    print_info(
+        f"Incremental: {len(needs_audit)} need audit "
+        f"({len(changed)} changed, {len(new)} new), {unchanged} unchanged"
     )
 
     if not needs_audit:
-        print("  No changes. Regenerating reports from last audit.", file=sys.stderr)
+        print_info("No changes. Regenerating reports from last audit.")
         existing = sorted(output_dir.glob("audit-report-*.json"), key=lambda f: f.stat().st_mtime, reverse=True)
         if existing:
             from src.excel_export import export_excel
@@ -407,7 +472,7 @@ def _run_incremental_audit(args, client, output_dir: Path) -> None:
                 output_dir / f"audit-dashboard-{args.username}-{_date_str(datetime.now(timezone.utc))}.xlsx",
                 trend_data=load_trend_data(),
             )
-            print(f"  Regenerated: {excel_path}", file=sys.stderr)
+            print_info(f"Regenerated: {excel_path}")
         return
 
     # Use targeted audit machinery
@@ -419,17 +484,19 @@ def _run_incremental_audit(args, client, output_dir: Path) -> None:
     if latest:
         report_data = json.loads(latest[0].read_text())
         save_fingerprints(report_data.get("audits", []))
-        print(f"  Fingerprints updated for {len(report_data.get('audits', []))} repos", file=sys.stderr)
+        print_info(f"Fingerprints updated for {len(report_data.get('audits', []))} repos")
 
 
 def main() -> None:
     args = build_parser().parse_args()
 
+    if args.upload_badges:
+        args.badges = True
+
     if not args.token:
-        print(
-            "⚠ No token provided. Only public repos will be fetched.\n"
-            "  Set GITHUB_TOKEN or pass --token for private repo access.",
-            file=sys.stderr,
+        print_warning(
+            "No token provided. Only public repos will be fetched.\n"
+            "  Set GITHUB_TOKEN or pass --token for private repo access."
         )
 
     # Set up cache
@@ -449,9 +516,8 @@ def main() -> None:
 
     if args.graphql and args.token:
         from src.graphql_client import bulk_fetch_repos
-        print("  Using GraphQL bulk fetch...", file=sys.stderr)
+        print_info("Using GraphQL bulk fetch...")
         raw_repos = bulk_fetch_repos(args.username, args.token)
-        # Build RepoMetadata from GraphQL results (languages included)
         all_repos = []
         errors = []
         for repo_data in raw_repos:
@@ -462,7 +528,7 @@ def main() -> None:
                 all_repos.append(meta)
             except Exception as exc:
                 errors.append({"repo": repo_data.get("full_name", "?"), "error": str(exc)})
-        print(f"  GraphQL: {len(all_repos)} repos fetched", file=sys.stderr)
+        print_info(f"GraphQL: {len(all_repos)} repos fetched")
     else:
         all_repos, errors = client.get_repo_metadata(args.username)
     total_fetched = len(all_repos)
@@ -483,32 +549,52 @@ def main() -> None:
             parts.append(f"{forks_excluded} forks")
         if archived_excluded:
             parts.append(f"{archived_excluded} archived")
-        print(f"  Filtered out {skipped} repos ({', '.join(parts) or 'forks/archived'})", file=sys.stderr)
+        print_info(f"Filtered out {skipped} repos ({', '.join(parts) or 'forks/archived'})")
 
     # Clone and analyze
     audits: list[RepoAudit] = []
 
-    if not args.skip_clone:
-        with clone_workspace(repos, token=args.token) as cloned:
-            print(
-                f"  Cloned {len(cloned)}/{len(repos)} repos. Analyzing...",
-                file=sys.stderr,
-            )
-            for i, repo_meta in enumerate(repos, 1):
-                repo_path = cloned.get(repo_meta.name)
-                if not repo_path:
-                    continue
-                print(
-                    f"  [{i}/{len(repos)}] Analyzing {repo_meta.name}...",
-                    file=sys.stderr,
-                )
-                results = run_all_analyzers(repo_path, repo_meta, client)
-                audit = score_repo(repo_meta, results)
-                audits.append(audit)
-                if args.verbose:
-                    _print_verbose(audit)
+    # Portfolio language frequency for relative novelty scoring
+    lang_counts = Counter(r.language for r in repos if r.language)
+    portfolio_lang_freq = {lang: count / len(repos) for lang, count in lang_counts.items()} if repos else {}
 
-        print("  Clones cleaned up", file=sys.stderr)
+    if not args.skip_clone:
+        progress = create_progress()
+        with clone_workspace(repos, token=args.token,
+                             on_progress=lambda i, t, n: None,
+                             on_error=lambda n, m: print_warning(f"Failed to clone {n}")) as cloned:
+            print_info(f"Cloned {len(cloned)}/{len(repos)} repos. Analyzing...")
+            if progress:
+                with progress:
+                    task = progress.add_task("Analyzing", total=len(repos))
+                    for i, repo_meta in enumerate(repos, 1):
+                        repo_path = cloned.get(repo_meta.name)
+                        if not repo_path:
+                            progress.advance(task)
+                            continue
+                        progress.update(task, description=f"Analyzing {repo_meta.name}")
+                        results = run_all_analyzers(repo_path, repo_meta, client)
+                        audit = score_repo(repo_meta, results, portfolio_lang_freq=portfolio_lang_freq)
+                        audits.append(audit)
+                        if args.verbose:
+                            _print_verbose(audit)
+                        progress.advance(task)
+            else:
+                for i, repo_meta in enumerate(repos, 1):
+                    repo_path = cloned.get(repo_meta.name)
+                    if not repo_path:
+                        continue
+                    print(
+                        f"  [{i}/{len(repos)}] Analyzing {repo_meta.name}...",
+                        file=sys.stderr,
+                    )
+                    results = run_all_analyzers(repo_path, repo_meta, client)
+                    audit = score_repo(repo_meta, results, portfolio_lang_freq=portfolio_lang_freq)
+                    audits.append(audit)
+                    if args.verbose:
+                        _print_verbose(audit)
+
+        print_info("Clones cleaned up")
 
     # Generate reports
     output_dir = Path(args.output_dir)
@@ -523,10 +609,9 @@ def main() -> None:
             from src.registry_parser import parse_registry, reconcile, sync_new_repos
             registry = parse_registry(args.registry)
             report.reconciliation = reconcile(registry, audits)
-            print(
-                f"  Registry: {report.reconciliation.registry_total} projects, "
-                f"{len(report.reconciliation.matched)} matched",
-                file=sys.stderr,
+            print_info(
+                f"Registry: {report.reconciliation.registry_total} projects, "
+                f"{len(report.reconciliation.matched)} matched"
             )
 
             # Auto-sync untracked repos
@@ -537,10 +622,9 @@ def main() -> None:
                     audits,
                 )
                 if added:
-                    print(
-                        f"  Synced {len(added)} repos to registry: {', '.join(added[:5])}"
-                        + (f"... (+{len(added)-5})" if len(added) > 5 else ""),
-                        file=sys.stderr,
+                    print_info(
+                        f"Synced {len(added)} repos to registry: {', '.join(added[:5])}"
+                        + (f"... (+{len(added)-5})" if len(added) > 5 else "")
                     )
 
         json_path = write_json_report(report, output_dir)
@@ -560,20 +644,22 @@ def main() -> None:
             diff_md_path.write_text(format_diff_markdown(diff))
             diff_json_path = output_dir / f"audit-diff-{report.username}-{_date_str(report.generated_at)}.json"
             diff_json_path.write_text(json.dumps(diff_dict, indent=2))
-            print(
-                f"  Diff: {len(diff.tier_changes)} tier changes, "
-                f"{len([c for c in diff.score_changes if abs(c['delta']) > 0.05])} significant score changes",
-                file=sys.stderr,
+            print_info(
+                f"Diff: {len(diff.tier_changes)} tier changes, "
+                f"{len([c for c in diff.score_changes if abs(c['delta']) > 0.05])} significant score changes"
             )
 
-        # Excel dashboard (with trend + diff data for narrative)
+        # Excel dashboard (with trend + diff + sparkline data)
         from src.excel_export import export_excel
+        from src.history import load_repo_score_history
         trend_data = load_trend_data()
+        score_history = load_repo_score_history()
         excel_path = export_excel(
             json_path,
             output_dir / f"audit-dashboard-{args.username}-{_date_str(report.generated_at)}.xlsx",
             trend_data=trend_data,
             diff_data=diff_dict,
+            score_history=score_history,
         )
         md_path = write_markdown_report(report, output_dir)
         pcc_path = write_pcc_export(report, output_dir)
@@ -582,6 +668,17 @@ def main() -> None:
         # Archive + fingerprints
         archive_report(json_path)
         save_fingerprints(report.to_dict()["audits"])
+
+        # Badge export
+        badge_info = ""
+        if args.badges:
+            from src.badge_export import export_badges, upload_badge_gist, _write_badges_markdown
+            badge_result = export_badges(report.to_dict(), output_dir)
+            badge_info = f"\n    {badge_result['badges_md']} ({badge_result['files_written']} badge files)"
+            if args.upload_badges:
+                gist_urls = upload_badge_gist(output_dir / "badges", report.username)
+                if gist_urls:
+                    _write_badges_markdown(report.to_dict(), output_dir / "badges", gist_urls)
 
         cache_info = ""
         if cache:
@@ -597,7 +694,7 @@ def main() -> None:
             f"    {md_path}\n"
             f"    {excel_path}\n"
             f"    {pcc_path}\n"
-            f"    {raw_path}",
+            f"    {raw_path}{badge_info}",
         )
     else:
         raw_path = _write_json(

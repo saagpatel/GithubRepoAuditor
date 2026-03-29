@@ -289,15 +289,19 @@ class GitHubClient:
             return []
 
     def get_repo_metadata(
-        self, username: str
+        self,
+        username: str,
+        on_progress: "Callable[[int, int, str], None] | None" = None,
     ) -> tuple[list[RepoMetadata], list[dict]]:
         """Fetch metadata for all repos, including per-repo language breakdowns.
 
         Returns (metadata_list, errors_list).
+        on_progress(current, total, repo_name) — called per repo.
         """
         raw_repos = self.list_repos(username)
         total = len(raw_repos)
-        print(f"Found {total} repos for {username}", file=sys.stderr)
+        if not on_progress:
+            print(f"Found {total} repos for {username}", file=sys.stderr)
 
         metadata: list[RepoMetadata] = []
         errors: list[dict] = []
@@ -305,10 +309,13 @@ class GitHubClient:
         for i, repo_data in enumerate(raw_repos, 1):
             repo_name = repo_data["name"]
             full_name = repo_data["full_name"]
-            print(
-                f"  [{i}/{total}] Fetching {full_name}...",
-                file=sys.stderr,
-            )
+            if on_progress:
+                on_progress(i, total, repo_name)
+            else:
+                print(
+                    f"  [{i}/{total}] Fetching {full_name}...",
+                    file=sys.stderr,
+                )
 
             try:
                 owner = repo_data["owner"]["login"]

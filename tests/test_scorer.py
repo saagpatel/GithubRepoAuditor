@@ -109,3 +109,45 @@ class TestFlags:
         results = _make_results(scores)
         audit = score_repo(_make_metadata(), results)
         assert "no-ci" in audit.flags
+
+
+class TestPortfolioNovelty:
+    """Portfolio-relative novelty reduces interest for dominant 'novel' languages."""
+
+    def _results_with_interest(self, novelty: float = 0.10, total_interest: float = 0.50):
+        results = _make_results({dim: 0.5 for dim in WEIGHTS})
+        results.append(AnalyzerResult(
+            dimension="interest", score=total_interest, max_score=1.0,
+            findings=[], details={"tech_novelty": novelty},
+        ))
+        return results
+
+    def test_dominant_novel_language_reduced(self):
+        results = self._results_with_interest(novelty=0.10, total_interest=0.50)
+        meta = _make_metadata(language="Rust")
+        freq = {"Rust": 0.60, "Python": 0.40}
+        audit = score_repo(meta, results, portfolio_lang_freq=freq)
+        # 0.10 * max(0, 1.0 - 0.60) = 0.04, delta = 0.06
+        assert abs(audit.interest_score - 0.44) < 0.01
+
+    def test_rare_novel_language_unchanged(self):
+        results = self._results_with_interest(novelty=0.10, total_interest=0.50)
+        meta = _make_metadata(language="Rust")
+        freq = {"Rust": 0.10, "Python": 0.60, "JavaScript": 0.30}
+        audit = score_repo(meta, results, portfolio_lang_freq=freq)
+        # Below 30% threshold — no adjustment
+        assert audit.interest_score == 0.50
+
+    def test_no_freq_data_unchanged(self):
+        results = self._results_with_interest(novelty=0.10, total_interest=0.50)
+        meta = _make_metadata(language="Rust")
+        audit = score_repo(meta, results)
+        assert audit.interest_score == 0.50
+
+    def test_common_language_not_affected(self):
+        results = self._results_with_interest(novelty=0.0, total_interest=0.40)
+        meta = _make_metadata(language="Python")
+        freq = {"Python": 0.80}
+        audit = score_repo(meta, results, portfolio_lang_freq=freq)
+        # Python is not in NOVEL_LANGUAGES — no adjustment
+        assert audit.interest_score == 0.40

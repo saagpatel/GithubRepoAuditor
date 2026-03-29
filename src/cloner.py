@@ -6,7 +6,7 @@ import subprocess
 import sys
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Generator
+from typing import Callable, Generator
 
 from src.models import RepoMetadata
 
@@ -58,11 +58,16 @@ def cleanup() -> None:
 def clone_workspace(
     repos: list[RepoMetadata],
     token: str | None = None,
+    on_progress: Callable[[int, int, str], None] | None = None,
+    on_error: Callable[[str, str], None] | None = None,
 ) -> Generator[dict[str, Path], None, None]:
     """Context manager that clones repos and ensures cleanup.
 
     Yields a dict mapping repo name -> cloned path.
     Failed clones are skipped with a warning.
+
+    on_progress(current, total, repo_name) — called per repo.
+    on_error(repo_name, message) — called on clone failure.
     """
     CLONE_DIR.mkdir(parents=True, exist_ok=True)
     cloned: dict[str, Path] = {}
@@ -70,18 +75,24 @@ def clone_workspace(
 
     try:
         for i, repo in enumerate(repos, 1):
-            print(
-                f"  [{i}/{total}] Cloning {repo.full_name}...",
-                file=sys.stderr,
-            )
+            if on_progress:
+                on_progress(i, total, repo.name)
+            else:
+                print(
+                    f"  [{i}/{total}] Cloning {repo.full_name}...",
+                    file=sys.stderr,
+                )
             try:
                 path = clone_repo(repo.clone_url, repo.name, token)
                 cloned[repo.name] = path
             except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
-                print(
-                    f"  ⚠ Failed to clone {repo.name}, skipping",
-                    file=sys.stderr,
-                )
+                if on_error:
+                    on_error(repo.name, "clone failed")
+                else:
+                    print(
+                        f"  ⚠ Failed to clone {repo.name}, skipping",
+                        file=sys.stderr,
+                    )
         yield cloned
     finally:
         cleanup()

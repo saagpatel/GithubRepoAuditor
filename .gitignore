@@ -4,6 +4,8 @@ output/*.xlsx
 output/~$*
 output/.cache/
 output/history/
+output/badges/
+output/.badge-gist-id
 !output/.gitkeep
 __pycache__/
 *.pyc

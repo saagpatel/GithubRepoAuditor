@@ -53,6 +53,7 @@ def letter_grade(score: float) -> str:
 def score_repo(
     metadata: RepoMetadata,
     results: list[AnalyzerResult],
+    portfolio_lang_freq: dict[str, float] | None = None,
 ) -> RepoAudit:
     """Compute dual-axis scores: completeness + interest."""
     weights = dict(WEIGHTS)
@@ -82,6 +83,20 @@ def score_repo(
 
     # Compute interest score (separate axis, from interest analyzer)
     interest_score = score_map.get("interest", 0.0)
+
+    # Portfolio-relative novelty adjustment: reduce novelty for dominant languages
+    if portfolio_lang_freq and metadata.language:
+        from src.analyzers.interest import NOVEL_LANGUAGES
+        if metadata.language in NOVEL_LANGUAGES:
+            freq = portfolio_lang_freq.get(metadata.language, 0.0)
+            if freq >= 0.30:
+                interest_result = next(
+                    (r for r in results if r.dimension == "interest"), None,
+                )
+                if interest_result:
+                    raw_novelty = interest_result.details.get("tech_novelty", 0.0)
+                    adjusted_novelty = raw_novelty * max(0.0, 1.0 - freq)
+                    interest_score = max(0.0, interest_score - (raw_novelty - adjusted_novelty))
 
     # Classify completeness tier
     tier = "abandoned"

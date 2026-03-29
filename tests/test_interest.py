@@ -6,6 +6,7 @@ from src.analyzers.interest import (
     InterestAnalyzer,
     _score_commit_bursts,
     _score_description,
+    _score_recency,
     _burst_coefficient,
     _count_assets,
     _estimate_loc,
@@ -52,9 +53,9 @@ class TestCommitBursts:
         assert _score_commit_bursts([]) == 0.0
 
     def test_steady_commits(self):
-        # Steady = low variance = low score
+        # Steady = low variance = low score (CV ≈ 0)
         weeks = [5, 5, 5, 5, 5, 5, 5, 5]
-        assert _score_commit_bursts(weeks) <= 0.05
+        assert _score_commit_bursts(weeks) == 0.0
 
     def test_bursty_commits(self):
         # High variance in active weeks = burst pattern
@@ -63,6 +64,32 @@ class TestCommitBursts:
 
     def test_single_week(self):
         assert _score_commit_bursts([10]) == 0.0
+
+
+class TestRecencyBonus:
+    def test_recent_push_gets_max(self):
+        from datetime import datetime, timedelta, timezone
+        meta = _meta(pushed_at=datetime.now(timezone.utc) - timedelta(days=30))
+        assert _score_recency(meta) == 0.05
+
+    def test_medium_age_gets_partial(self):
+        from datetime import datetime, timedelta, timezone
+        meta = _meta(pushed_at=datetime.now(timezone.utc) - timedelta(days=150))
+        assert _score_recency(meta) == 0.03
+
+    def test_within_year_gets_small(self):
+        from datetime import datetime, timedelta, timezone
+        meta = _meta(pushed_at=datetime.now(timezone.utc) - timedelta(days=300))
+        assert _score_recency(meta) == 0.01
+
+    def test_old_push_no_bonus(self):
+        from datetime import datetime, timedelta, timezone
+        meta = _meta(pushed_at=datetime.now(timezone.utc) - timedelta(days=500))
+        assert _score_recency(meta) == 0.0
+
+    def test_no_pushed_at(self):
+        meta = _meta(pushed_at=None)
+        assert _score_recency(meta) == 0.0
 
 
 class TestTechNovelty:
