@@ -42,7 +42,7 @@ def compute_libyears(
         deps.extend(_parse_pyproject_deps(repo_path / "pyproject.toml"))
 
     if not deps:
-        return {"total_libyears": None, "dep_count": 0, "freshness_score": None}
+        return {"total_libyears": None, "dep_count": 0, "freshness_score": None, "dependency_names": []}
 
     total_libyears = 0.0
     checked = 0
@@ -69,6 +69,7 @@ def compute_libyears(
         "total_libyears": round(total_libyears, 1),
         "dep_count_checked": checked,
         "freshness_score": max(0.0, freshness_score) if freshness_score is not None else None,
+        "dependency_names": [name for name, _, _ in deps],
     }
 
 

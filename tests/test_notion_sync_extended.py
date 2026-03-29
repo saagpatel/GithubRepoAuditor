@@ -1,10 +1,13 @@
 from __future__ import annotations
+from unittest.mock import MagicMock, patch
 
+from src.notion_client import query_page_by_title
 from src.notion_sync import _extract_audit_data
 from src.notion_sync import (
     _render_quick_wins_markdown,
     _render_audit_highlights,
     _chunk_text,
+    check_recommendation_followup,
     FLAG_TO_ACTION,
     ELIGIBLE_TIERS,
 )
@@ -142,3 +145,133 @@ class TestExtractAuditData:
         assert data["overall_score"] == 0
         assert data["interest_score"] == 0
         assert data["badges"] == []
+
+
+class TestCheckRecommendationFollowup:
+    def _report(self, repo_names: list[str], scores: list[float]) -> dict:
+        return {
+            "audits": [
+                {"metadata": {"name": name}, "overall_score": score}
+                for name, score in zip(repo_names, scores)
+            ]
+        }
+
+    def test_returns_zero_when_no_db_id(self):
+        result = check_recommendation_followup(
+            self._report(["RepoA"], [0.5]), "token", {}
+        )
+        assert result == {"checked": 0}
+
+    def test_returns_zero_when_api_fails(self):
+        with patch("src.notion_sync._notion_request", return_value=None):
+            result = check_recommendation_followup(
+                self._report(["RepoA"], [0.5]),
+                "token",
+                {"recommendation_runs_db_id": "db123"},
+            )
+        assert result == {"checked": 0}
+
+    def test_returns_zero_when_no_previous_runs(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"results": []}
+
+        with patch("src.notion_sync._notion_request", return_value=mock_resp):
+            result = check_recommendation_followup(
+                self._report(["RepoA"], [0.5]),
+                "token",
+                {"recommendation_runs_db_id": "db123"},
+            )
+        assert result == {"checked": 0}
+
+    def test_returns_proper_structure_when_blocks_fetched(self):
+        # First call: query returns one result; second call: block children
+        query_resp = MagicMock()
+        query_resp.status_code = 200
+        query_resp.json.return_value = {"results": [{"id": "page-abc"}]}
+
+        blocks_resp = MagicMock()
+        blocks_resp.status_code = 200
+        blocks_resp.json.return_value = {
+            "results": [
+                {
+                    "type": "paragraph",
+                    "paragraph": {
+                        "rich_text": [{"plain_text": "RepoA needs improvement, RepoB also listed"}]
+                    },
+                }
+            ]
+        }
+
+        with patch("src.notion_sync._notion_request", side_effect=[query_resp, blocks_resp]):
+            result = check_recommendation_followup(
+                self._report(["RepoA", "RepoB", "RepoC"], [0.6, 0.4, 0.0]),
+                "token",
+                {"recommendation_runs_db_id": "db123"},
+            )
+
+        assert "checked" in result
+        assert "improved" in result
+        assert "still_open" in result
+        assert "summary" in result
+        assert result["checked"] == len(result["improved"]) + len(result["still_open"])
+
+    def test_blocks_api_failure_returns_zero(self):
+        query_resp = MagicMock()
+        query_resp.status_code = 200
+        query_resp.json.return_value = {"results": [{"id": "page-abc"}]}
+
+        with patch("src.notion_sync._notion_request", side_effect=[query_resp, None]):
+            result = check_recommendation_followup(
+                self._report(["RepoA"], [0.5]),
+                "token",
+                {"recommendation_runs_db_id": "db123"},
+            )
+        assert result == {"checked": 0}
+
+
+class TestQueryPageByTitle:
+    def test_returns_page_id_when_found(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"results": [{"id": "page-xyz"}]}
+
+        with patch("src.notion_client.notion_request", return_value=mock_resp):
+            result = query_page_by_title("db123", "My Project", "token")
+
+        assert result == "page-xyz"
+
+    def test_returns_none_when_no_results(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"results": []}
+
+        with patch("src.notion_client.notion_request", return_value=mock_resp):
+            result = query_page_by_title("db123", "Nonexistent", "token")
+
+        assert result is None
+
+    def test_returns_none_when_api_fails(self):
+        with patch("src.notion_client.notion_request", return_value=None):
+            result = query_page_by_title("db123", "Any Title", "token")
+
+        assert result is None
+
+    def test_returns_none_on_non_200_status(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 404
+
+        with patch("src.notion_client.notion_request", return_value=mock_resp):
+            result = query_page_by_title("db123", "Any Title", "token")
+
+        assert result is None
+
+    def test_uses_custom_title_property(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"results": [{"id": "page-abc"}]}
+
+        with patch("src.notion_client.notion_request", return_value=mock_resp) as mock_req:
+            query_page_by_title("db123", "My Title", "token", title_property="Title")
+            call_body = mock_req.call_args[0][4]  # body is 5th positional arg
+            assert call_body["filter"]["property"] == "Title"

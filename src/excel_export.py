@@ -372,7 +372,7 @@ def _build_all_repos(wb: Workbook, data: dict, score_history: dict[str, list[flo
         "Next Badge", "Language", "Commit Pattern", "Bus Factor",
         "Days Since Push", "Commits", "Releases", "Test Files",
         "LOC", "Libyears", "Stars", "Private", "Flags", "Description",
-        "Biggest Drag", "Why This Grade", "Trend",
+        "Biggest Drag", "Why This Grade", "Tech Novelty", "Burst", "Ambition", "Storytelling", "Trend",
     ]
     for col, h in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=h)
@@ -441,6 +441,15 @@ def _build_all_repos(wb: Workbook, data: dict, score_history: dict[str, list[flo
         else:
             values.append(audit.get("grade", "F"))
 
+        # Interest breakdown
+        interest_d = details.get("interest", {})
+        values.extend([
+            round(interest_d.get("tech_novelty", 0), 2),
+            round(interest_d.get("burst_coefficient", 0), 2),
+            round(interest_d.get("ambition_score", 0), 2),
+            round(interest_d.get("readme_storytelling", 0), 2),
+        ])
+
         for col, val in enumerate(values, 1):
             cell = ws.cell(row=row, column=col, value=val)
             style_data_cell(cell)
@@ -461,13 +470,13 @@ def _build_all_repos(wb: Workbook, data: dict, score_history: dict[str, list[flo
         if pattern and pattern != "—":
             color_pattern_cell(ws.cell(row=row, column=9), pattern)
 
-        # Sparkline trend (column 23)
+        # Sparkline trend (column 27)
         if score_history:
             repo_name = m.get("name", "")
             scores = score_history.get(repo_name, [])
             spark = render_sparkline(scores)
             if spark:
-                cell = ws.cell(row=row, column=23, value=spark)
+                cell = ws.cell(row=row, column=27, value=spark)
                 cell.font = SPARKLINE_FONT
 
     max_row = len(audits) + 1
@@ -482,6 +491,10 @@ def _build_all_repos(wb: Workbook, data: dict, score_history: dict[str, list[flo
         ws.conditional_formatting.add(
             f"D2:D{max_row}",
             DataBarRule(start_type='num', start_value=0, end_type='num', end_value=1, color='0EA5E9'),
+        )
+        ws.conditional_formatting.add(
+            f"C2:C{max_row}",
+            IconSetRule('3TrafficLights1', 'num', [0, 0.55, 0.7]),
         )
 
     # Tooltips on key columns
@@ -1303,6 +1316,10 @@ def _build_security(wb: Workbook, data: dict) -> None:
                            mid_type='num', mid_value=0.5, mid_color=HEATMAP_AMBER,
                            end_type='num', end_value=1, end_color=HEATMAP_GREEN),
         )
+        ws.conditional_formatting.add(
+            f"B2:B{max_row}",
+            IconSetRule('3TrafficLights1', 'num', [0, 0.4, 0.7]),
+        )
 
     apply_zebra_stripes(ws, 2, max_row, len(headers))
     auto_width(ws, len(headers), max_row)
@@ -1431,6 +1448,51 @@ def _build_bubble_on_dashboard(ws, data: dict) -> None:
     ws.add_chart(chart, "A50")
 
 
+# ═══════════════════════════════════════════════════════════════════════
+# Dependency Graph Sheet
+# ═══════════════════════════════════════════════════════════════════════
+
+
+def _build_dependency_graph(wb: Workbook, data: dict) -> None:
+    from src.dep_graph import build_dependency_graph
+
+    ws = wb.create_sheet("Dep Graph")
+    ws.sheet_properties.tabColor = "0277BD"
+
+    graph = build_dependency_graph(data.get("audits", []))
+    shared = graph.get("shared_deps", [])
+
+    ws.merge_cells("A1:C1")
+    ws["A1"].value = f"Shared Dependencies ({len(shared)} across 2+ repos)"
+    ws["A1"].font = SECTION_FONT
+
+    headers = ["Dependency", "Repo Count", "Repos Using It"]
+    for col, h in enumerate(headers, 1):
+        ws.cell(row=2, column=col, value=h)
+    style_header_row(ws, 2, len(headers))
+    ws.freeze_panes = "A3"
+
+    for row, dep in enumerate(shared, 3):
+        ws.cell(row=row, column=1, value=dep["name"])
+        ws.cell(row=row, column=2, value=dep["count"])
+        ws.cell(row=row, column=3, value=", ".join(dep["repos"]))
+        for col in range(1, 4):
+            style_data_cell(ws.cell(row=row, column=col))
+
+    max_row = len(shared) + 2
+    if max_row > 2:
+        ws.conditional_formatting.add(
+            f"B3:B{max_row}",
+            ColorScaleRule(
+                start_type="min", start_color=HEATMAP_AMBER,
+                end_type="max", end_color=HEATMAP_GREEN,
+            ),
+        )
+
+    apply_zebra_stripes(ws, 3, max_row, len(headers))
+    auto_width(ws, len(headers), max_row)
+
+
 def export_excel(
     report_path: Path,
     output_path: Path,
@@ -1455,6 +1517,7 @@ def export_excel(
     _build_security(wb, data)
     _build_changes(wb, data, diff_data)
     _build_reconciliation(wb, data)
+    _build_dependency_graph(wb, data)
     _build_score_explainer(wb)
     _build_action_items(wb, data)
     _build_navigation(wb, data)
