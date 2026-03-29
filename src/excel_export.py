@@ -682,7 +682,12 @@ def _build_all_repos(wb: Workbook, data: dict, score_history: dict[str, list[flo
                 cell.font = SPARKLINE_FONT
 
     max_row = len(audits) + 1
-    apply_zebra_stripes(ws, 2, max_row, len(headers))
+    apply_zebra_stripes(ws, 2, max_row, len(headers), skip_cols={2, 7})
+
+    # Consistent number formatting
+    for row in range(2, max_row + 1):
+        ws.cell(row=row, column=3).number_format = '0.000'  # Score
+        ws.cell(row=row, column=4).number_format = '0.000'  # Interest
 
     # DataBar on Score and Interest columns
     if max_row > 1:
@@ -710,14 +715,28 @@ def _build_all_repos(wb: Workbook, data: dict, score_history: dict[str, list[flo
     grade_dv.sqref = f"B2:B{max_row}"
     ws.add_data_validation(grade_dv)
 
-    # Summary row
-    sr = max_row + 2
+    # Summary row (immediately after data, no gap)
+    sr = max_row + 1
     ws.cell(row=sr, column=1, value="SUMMARY").font = SUBHEADER_FONT
     ws.cell(row=sr, column=3, value=f"=AVERAGE(C2:C{max_row})").font = SUBHEADER_FONT
     ws.cell(row=sr, column=4, value=f"=AVERAGE(D2:D{max_row})").font = SUBHEADER_FONT
 
     _add_table(ws, "tblAllRepos", len(headers), max_row)
     auto_width(ws, len(headers), max_row + 2)
+
+    # Compact numeric columns that auto_width made too wide
+    ws.column_dimensions[get_column_letter(3)].width = 10  # Score
+    ws.column_dimensions[get_column_letter(4)].width = 10  # Interest
+
+    # Wrap text on long-content columns and set appropriate widths
+    from openpyxl.styles import Alignment
+    desc_col_idx = headers.index("Description") + 1
+    topics_col_idx = headers.index("Topics") + 1
+    badges_col_idx = headers.index("Badges") + 1
+    for col_idx in (desc_col_idx, topics_col_idx, badges_col_idx):
+        ws.column_dimensions[get_column_letter(col_idx)].width = 60
+        for row in range(2, max_row + 1):
+            ws.cell(row=row, column=col_idx).alignment = Alignment(wrap_text=True, vertical='top')
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -836,6 +855,7 @@ def _build_quick_wins(wb: Workbook, data: dict) -> None:
     for col, h in enumerate(headers, 1):
         ws.cell(row=3, column=col, value=h)
     style_header_row(ws, 3, len(headers))
+    ws.freeze_panes = "B2"
 
     for row, win in enumerate(wins, 4):
         ws.cell(row=row, column=1, value=win["name"])
@@ -898,6 +918,7 @@ def _build_badges(wb: Workbook, data: dict) -> None:
     for col, h in enumerate(headers, 1):
         ws.cell(row=4, column=col, value=h)
     style_header_row(ws, 4, len(headers))
+    ws.freeze_panes = "B2"
 
     for row, (badge, count) in enumerate(badge_counts.most_common(), 5):
         ws.cell(row=row, column=1, value=badge)
@@ -960,6 +981,7 @@ def _build_tech_stack(wb: Workbook, data: dict) -> None:
     for col, h in enumerate(headers, 1):
         ws.cell(row=3, column=col, value=h)
     style_header_row(ws, 3, len(headers))
+    ws.freeze_panes = "B2"
 
     for row, (lang, info) in enumerate(tech_stack.items(), 4):
         ws.cell(row=row, column=1, value=lang)
@@ -1039,6 +1061,7 @@ def _build_trends(wb: Workbook, data: dict, trend_data: list[dict] | None = None
 def _build_tier_breakdown(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Tier Breakdown")
     ws.sheet_properties.tabColor = "166534"
+    ws.freeze_panes = "B2"
 
     from openpyxl.styles import Font as XFont
 
@@ -1444,6 +1467,8 @@ def _build_navigation(wb: Workbook, data: dict, *, excel_mode: str = "standard")
     row = 6
     for section, sheets in groups:
         for name, desc in sheets:
+            if name not in wb.sheetnames:
+                continue
             ws.cell(row=row, column=1, value=section)
             cell = ws.cell(row=row, column=2, value=name)
             cell.hyperlink = f"#{name}!A1"
@@ -1524,6 +1549,7 @@ def _build_security(wb: Workbook, data: dict) -> None:
     for col, h in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=h)
     style_header_row(ws, 1, len(headers))
+    ws.freeze_panes = "B2"
 
     audits = sorted(data.get("audits", []), key=lambda a: a.get("security_posture", {}).get("score", 1.0))
 
@@ -2276,6 +2302,7 @@ def _build_security_controls(wb: Workbook, data: dict) -> None:
     for col, header in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=header)
     style_header_row(ws, 1, len(headers))
+    ws.freeze_panes = "B2"
 
     audits = sorted(data.get("audits", []), key=lambda audit: audit.get("security_posture", {}).get("score", 0.0))
     for row, audit in enumerate(audits, 2):
@@ -2307,6 +2334,7 @@ def _build_supply_chain(wb: Workbook, data: dict) -> None:
     for col, header in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=header)
     style_header_row(ws, 1, len(headers))
+    ws.freeze_panes = "B2"
 
     audits = sorted(data.get("audits", []), key=lambda audit: audit.get("security_posture", {}).get("score", 0.0))
     for row, audit in enumerate(audits, 2):
@@ -2437,6 +2465,7 @@ def _build_portfolio_explorer(
     for col, header in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=header)
     style_header_row(ws, 1, len(headers))
+    ws.freeze_panes = "B2"
 
     for row, entry in enumerate(context["ranked_audits"], 2):
         audit = entry["audit"]
@@ -2480,6 +2509,7 @@ def _build_by_lens(
     for col, header in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=header)
     style_header_row(ws, 1, len(headers))
+    ws.freeze_panes = "B2"
 
     for row, entry in enumerate(context["ranked_audits"], 2):
         lenses = entry["audit"].get("lenses", {})
