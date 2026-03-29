@@ -18,7 +18,7 @@ Automated audit tool that clones all repos from a GitHub user account, analyzes 
 - All output files go to `output/` directory
 
 ## Current State
-Phases 0–19 complete. 327+ tests, 35 test files, 12 analyzers (10 completeness + interest + security), 25+ CLI flags, 22+ Excel sheets (radar charts, security, dependency graph, changes, trends), interactive HTML dashboard with portfolio trends, full Notion two-way sync with recommendation follow-up, shields.io badges, AI narrative, scoring profiles, archive automation, cross-repo similarity detection with classifications, cross-repo dependency graph.
+Phases 0–20 complete. 379+ tests, 38 test files, 12 analyzers, 36+ CLI flags. Outputs: JSON, Markdown, Excel (22+ sheets), HTML dashboard, PDF report. GitHub Actions CI (matrix 3.11–3.13) + scheduled weekly audit. Config file support (audit-config.yaml). Watch mode (--watch). Full Notion two-way sync, shields.io badges, AI narrative, scoring profiles, archive automation, similarity detection, dependency graph.
 
 ## Key Decisions
 | Decision | Choice | Why |
