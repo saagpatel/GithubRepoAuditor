@@ -278,6 +278,59 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             projected_tier_promotions INTEGER NOT NULL,
             PRIMARY KEY (run_id, lever_key)
         );
+
+        CREATE TABLE IF NOT EXISTS review_runs (
+            review_id TEXT PRIMARY KEY,
+            username TEXT NOT NULL,
+            source_run_id TEXT NOT NULL,
+            generated_at TEXT NOT NULL,
+            materiality TEXT NOT NULL,
+            emitted INTEGER NOT NULL,
+            safe_to_defer INTEGER NOT NULL,
+            material_change_count INTEGER NOT NULL,
+            material_fingerprint TEXT NOT NULL,
+            decisions_json TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS review_material_changes (
+            review_id TEXT NOT NULL,
+            change_key TEXT NOT NULL,
+            change_type TEXT NOT NULL,
+            repo_name TEXT NOT NULL,
+            severity REAL NOT NULL,
+            title TEXT NOT NULL,
+            summary TEXT NOT NULL,
+            recommended_next_step TEXT NOT NULL,
+            PRIMARY KEY (review_id, change_key)
+        );
+
+        CREATE TABLE IF NOT EXISTS watch_checkpoints (
+            username TEXT PRIMARY KEY,
+            last_run_id TEXT NOT NULL,
+            last_full_run_id TEXT,
+            last_review_id TEXT,
+            filter_signature TEXT NOT NULL,
+            last_material_fingerprint TEXT NOT NULL,
+            review_sync TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS governance_approvals (
+            source_run_id TEXT PRIMARY KEY,
+            scope TEXT NOT NULL,
+            fingerprint TEXT NOT NULL,
+            approved_at TEXT NOT NULL,
+            approval_json TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS governance_runs (
+            run_id TEXT PRIMARY KEY,
+            source_run_id TEXT NOT NULL,
+            applied_at TEXT NOT NULL,
+            scope TEXT NOT NULL,
+            results_json TEXT NOT NULL,
+            drift_json TEXT NOT NULL
+        );
         """
     )
     conn.execute(
@@ -766,3 +819,297 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
                     str(ref_value),
                 ),
             )
+
+    review_summary = getattr(report, "review_summary", {}) or {}
+    review_id = review_summary.get("review_id")
+    if review_id:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO review_runs (
+                review_id, username, source_run_id, generated_at, materiality, emitted,
+                safe_to_defer, material_change_count, material_fingerprint, decisions_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                review_id,
+                report.username,
+                review_summary.get("source_run_id", run_id),
+                review_summary.get("generated_at", report.generated_at.isoformat()),
+                review_summary.get("materiality", "standard"),
+                int(bool(review_summary.get("emitted", False))),
+                int(bool(review_summary.get("safe_to_defer", False))),
+                int(review_summary.get("material_change_count", 0)),
+                review_summary.get("material_fingerprint", ""),
+                json.dumps(review_summary.get("decisions", [])),
+            ),
+        )
+        for change in getattr(report, "material_changes", []):
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO review_material_changes (
+                    review_id, change_key, change_type, repo_name, severity, title, summary, recommended_next_step
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    review_id,
+                    change.get("change_key", ""),
+                    change.get("change_type", ""),
+                    change.get("repo_name", ""),
+                    float(change.get("severity", 0.0)),
+                    change.get("title", ""),
+                    change.get("summary", ""),
+                    change.get("recommended_next_step", ""),
+                ),
+            )
+
+    watch_state = getattr(report, "watch_state", {}) or {}
+    if watch_state:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO watch_checkpoints (
+                username, last_run_id, last_full_run_id, last_review_id,
+                filter_signature, last_material_fingerprint, review_sync, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                report.username,
+                run_id,
+                run_id if report.run_mode == "full" else None,
+                review_id,
+                watch_state.get("filter_signature", ""),
+                review_summary.get("material_fingerprint", ""),
+                watch_state.get("review_sync", review_summary.get("review_sync", "local")),
+                review_summary.get("generated_at", report.generated_at.isoformat()),
+            ),
+        )
+
+
+def _db_path(output_dir: Path) -> Path:
+    return output_dir / WAREHOUSE_FILENAME
+
+
+def _connect_if_exists(output_dir: Path) -> sqlite3.Connection | None:
+    db_path = _db_path(output_dir)
+    if not db_path.is_file():
+        return None
+    return sqlite3.connect(db_path)
+
+
+def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> list[dict]:
+    conn = _connect_if_exists(output_dir)
+    if conn is None:
+        return []
+    try:
+        rows = conn.execute(
+            """
+            SELECT run_id, generated_at, run_mode, scoring_profile, report_path
+            FROM audit_runs
+            WHERE username = ?
+            ORDER BY generated_at DESC
+            LIMIT ?
+            """,
+            (username, limit),
+        ).fetchall()
+    finally:
+        conn.close()
+    return [
+        {
+            "run_id": row[0],
+            "generated_at": row[1],
+            "run_mode": row[2],
+            "scoring_profile": row[3],
+            "report_path": row[4],
+        }
+        for row in rows
+    ]
+
+
+def load_review_history(output_dir: Path, username: str, limit: int = 10) -> list[dict]:
+    conn = _connect_if_exists(output_dir)
+    if conn is None:
+        return []
+    try:
+        rows = conn.execute(
+            """
+            SELECT review_id, source_run_id, generated_at, materiality, emitted, safe_to_defer, material_change_count
+            FROM review_runs
+            WHERE username = ?
+            ORDER BY generated_at DESC
+            LIMIT ?
+            """,
+            (username, limit),
+        ).fetchall()
+    finally:
+        conn.close()
+    return [
+        {
+            "review_id": row[0],
+            "source_run_id": row[1],
+            "generated_at": row[2],
+            "materiality": row[3],
+            "emitted": bool(row[4]),
+            "safe_to_defer": bool(row[5]),
+            "material_change_count": row[6],
+        }
+        for row in rows
+    ]
+
+
+def load_watch_checkpoint(output_dir: Path, username: str) -> dict | None:
+    conn = _connect_if_exists(output_dir)
+    if conn is None:
+        return None
+    try:
+        row = conn.execute(
+            """
+            SELECT username, last_run_id, last_full_run_id, last_review_id, filter_signature,
+                   last_material_fingerprint, review_sync, updated_at
+            FROM watch_checkpoints
+            WHERE username = ?
+            """,
+            (username,),
+        ).fetchone()
+    finally:
+        conn.close()
+    if row is None:
+        return None
+    return {
+        "username": row[0],
+        "last_run_id": row[1],
+        "last_full_run_id": row[2],
+        "last_review_id": row[3],
+        "filter_signature": row[4],
+        "last_material_fingerprint": row[5],
+        "review_sync": row[6],
+        "updated_at": row[7],
+    }
+
+
+def load_audit_report_path(output_dir: Path, run_id: str) -> Path | None:
+    conn = _connect_if_exists(output_dir)
+    if conn is None:
+        return None
+    try:
+        row = conn.execute(
+            "SELECT report_path FROM audit_runs WHERE run_id = ?",
+            (run_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+    if row is None or not row[0]:
+        return None
+    return Path(row[0])
+
+
+def load_campaign_run(output_dir: Path, run_id: str) -> dict | None:
+    conn = _connect_if_exists(output_dir)
+    if conn is None:
+        return None
+    try:
+        row = conn.execute(
+            """
+            SELECT run_id, campaign_type, label, portfolio_profile, collection_name,
+                   writeback_target, mode, generated_at, generated_action_ids_json
+            FROM campaign_runs
+            WHERE run_id = ?
+            """,
+            (run_id,),
+        ).fetchone()
+        action_rows = conn.execute(
+            """
+            SELECT action_id, repo_id, campaign_type, target, status
+            FROM action_runs
+            WHERE run_id = ?
+            """,
+            (run_id,),
+        ).fetchall()
+    finally:
+        conn.close()
+    if row is None:
+        return None
+    return {
+        "run_id": row[0],
+        "campaign_type": row[1],
+        "label": row[2],
+        "portfolio_profile": row[3],
+        "collection_name": row[4],
+        "writeback_target": row[5],
+        "mode": row[6],
+        "generated_at": row[7],
+        "generated_action_ids": json.loads(row[8] or "[]"),
+        "action_runs": [
+            {
+                "action_id": action_row[0],
+                "repo_id": action_row[1],
+                "campaign_type": action_row[2],
+                "target": action_row[3],
+                "status": action_row[4],
+            }
+            for action_row in action_rows
+        ],
+    }
+
+
+def load_governance_approval(output_dir: Path, source_run_id: str) -> dict | None:
+    conn = _connect_if_exists(output_dir)
+    if conn is None:
+        return None
+    try:
+        row = conn.execute(
+            """
+            SELECT scope, fingerprint, approved_at, approval_json
+            FROM governance_approvals
+            WHERE source_run_id = ?
+            """,
+            (source_run_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+    if row is None:
+        return None
+    payload = json.loads(row[3] or "{}")
+    payload.setdefault("scope", row[0])
+    payload.setdefault("fingerprint", row[1])
+    payload.setdefault("approved_at", row[2])
+    return payload
+
+
+def load_governance_history(output_dir: Path, source_run_id: str | None = None, limit: int = 10) -> list[dict]:
+    conn = _connect_if_exists(output_dir)
+    if conn is None:
+        return []
+    try:
+        if source_run_id:
+            rows = conn.execute(
+                """
+                SELECT run_id, source_run_id, applied_at, scope, results_json, drift_json
+                FROM governance_runs
+                WHERE source_run_id = ?
+                ORDER BY applied_at DESC
+                LIMIT ?
+                """,
+                (source_run_id, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT run_id, source_run_id, applied_at, scope, results_json, drift_json
+                FROM governance_runs
+                ORDER BY applied_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+    finally:
+        conn.close()
+    return [
+        {
+            "run_id": row[0],
+            "source_run_id": row[1],
+            "applied_at": row[2],
+            "scope": row[3],
+            "results": json.loads(row[4] or "{}"),
+            "drift": json.loads(row[5] or "[]"),
+        }
+        for row in rows
+    ]

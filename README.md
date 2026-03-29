@@ -53,7 +53,7 @@ Every run produces 6 core files, plus optional exports:
 |------|-----------|
 | `audit-report-{user}-{date}.json` | Full structured audit — every score, badge, finding, and dimension detail |
 | `audit-report-{user}-{date}.md` | Human-readable Markdown with tier tables, quick wins, and collapsible per-repo breakdowns |
-| `audit-dashboard-{user}-{date}.xlsx` | Flagship 12-sheet Excel workbook (see below) |
+| `audit-dashboard-{user}-{date}.xlsx` | Flagship Excel workbook with `template` and `standard` render modes |
 | `pcc-import-{user}-{date}.json` | Flat array for importing into dashboards or project management tools |
 | `raw_metadata.json` | Backwards-compatible raw audit data |
 | `portfolio-warehouse.db` | SQLite warehouse snapshot for downstream analysis, compare flows, and future operations |
@@ -77,10 +77,12 @@ Every run produces 6 core files, plus optional exports:
 
 This is the centerpiece. Open it instead of reading JSON.
 
+By default the workbook now renders in `template` mode, which hydrates a committed analyst workbook template and preserves native Excel-style trend views. `standard` mode keeps the older fully code-generated workbook path for fallback and CI/debugging.
+
 | Sheet | What You See |
 |-------|-------------|
-| **Dashboard** | Portfolio grade, 6 KPI cards, tier pie chart, grade distribution, language breakdown, completeness vs interest scatter chart, portfolio sparkline |
-| **All Repos** | Sortable 23-column master table with inline score bars, grade coloring, badge counts, commit patterns, trend sparklines |
+| **Dashboard** | Portfolio grade, KPI cards, tier charts, language breakdown, completeness vs interest scatter chart, and native workbook trend view in `template` mode |
+| **All Repos** | Sortable master table with inline score bars, grade coloring, badge counts, commit patterns, and native trend cells in `template` mode |
 | **Scoring Heatmap** | Every repo x every dimension, color-coded red-amber-green. Spot weaknesses at a glance. |
 | **Quick Wins** | Repos within striking distance of the next tier, with the exact actions to get there |
 | **Badges** | Portfolio-wide badge distribution chart + achievement leaderboard |
@@ -93,8 +95,11 @@ This is the centerpiece. Open it instead of reading JSON.
 | **Security Debt** | Dry-run governance queue for the highest-value security remediations |
 | **Portfolio Explorer** | Profile-aware ranking, hotspot count, and collection membership |
 | **By Lens** | Repo rankings split by decision lens |
+| **By Collection** | Collection-level summaries with top repos and average profile score |
+| **Trend Summary** | Portfolio history rollup plus repo trend strip view |
 | **Scenario Planner** | Profile/collection-based lift preview |
 | **Executive Summary** | Analyst-friendly summary view with leaders, movers, and scenario preview |
+| **Print Pack** | Condensed summary page for analyst/executive review |
 | **Registry** | Cross-reference with your local project registry |
 | **Score Explainer** | How scoring, grades, and tiers work |
 | **Action Items** | Prioritized improvements with effort estimates |
@@ -137,6 +142,7 @@ python -m src <username> [options]
 | `--portfolio-profile NAME` | `default` | Apply a ranking overlay for analyst-facing outputs |
 | `--collection NAME` | none | Filter analyst-facing outputs to a named default collection |
 | `--review-pack` | off | Generate a concise analyst/security review pack |
+| `--excel-mode {template,standard}` | `template` | Use the native analyst workbook template or the fallback code-generated workbook |
 | `--scorecard` | off | Enrich eligible public repos with OpenSSF Scorecard data |
 | `--security-offline` | off | Use local security analysis only and skip GitHub-native/external security enrichment |
 | `--badges` | off | Generate shields.io badge JSON and markdown |
@@ -271,7 +277,7 @@ Every audit run is archived to `output/history/`. On subsequent runs, the tool a
 - Tier transitions (promoted or demoted)
 - Score improvements and regressions
 - Average score delta
-- Unicode sparklines showing per-repo score trends across runs
+- Native workbook trend views in `template` mode, with the older text-sparkline style retained only for non-Excel surfaces
 
 ## Tech Stack
 

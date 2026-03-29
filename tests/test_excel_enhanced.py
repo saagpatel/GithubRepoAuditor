@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import json
+import zipfile
 from pathlib import Path
 
-from openpyxl import Workbook
+import pytest
+from openpyxl import Workbook, load_workbook
 
 from src.excel_export import (
     _build_all_repos,
+    _build_by_collection,
+    _build_trend_summary,
     _build_repo_profiles,
     _build_security,
     _build_changes,
@@ -17,11 +21,14 @@ from src.excel_export import (
     _build_compare_sheet,
     _build_scenario_planner,
     _build_executive_summary,
+    _build_print_pack,
     _build_campaigns,
     _build_writeback_audit,
+    export_excel,
     RADAR_DIMS,
     RADAR_LABELS,
 )
+from src.excel_template import DEFAULT_TEMPLATE_PATH
 
 
 def _make_audit(name: str, score: float, grade: str = "C", tier: str = "functional", **kwargs) -> dict:
@@ -89,8 +96,12 @@ def _make_report(audits=None) -> dict:
             _make_audit("RepoC", 0.40, "D", "wip", security_score=0.3, security_details={"secrets_found": 2, "dangerous_files": [".env"], "has_security_md": False, "has_dependabot": False}),
         ]
     return {
+        "username": "user",
+        "generated_at": "2026-03-29T10:00:00+00:00",
         "audits": audits,
         "repos_audited": len(audits),
+        "tier_distribution": {"shipped": 1, "functional": 1, "wip": 1},
+        "portfolio_grade": "B",
         "average_score": 0.62,
         "hotspots": [
             {
@@ -327,6 +338,10 @@ class TestHotspotsAndDataSheets:
         _build_hidden_data_sheets(wb, _make_report(), trend_data=[{"average_score": 0.6}], score_history={"RepoA": [0.5, 0.8]})
         assert "Data_Repos" in wb.sheetnames
         assert "Data_Lenses" in wb.sheetnames
+        assert "Data_TrendMatrix" in wb.sheetnames
+        assert "Data_PortfolioHistory" in wb.sheetnames
+        assert "Data_Rollups" in wb.sheetnames
+        assert "Data_ReviewTargets" in wb.sheetnames
         assert wb["Data_Repos"].sheet_state == "hidden"
 
     def test_hidden_repo_sheet_has_structured_table(self):
@@ -344,6 +359,15 @@ class TestAnalystWorkbookSheets:
         _build_by_lens(wb, _make_report(), portfolio_profile="default", collection="showcase")
         assert "Portfolio Explorer" in wb.sheetnames
         assert "By Lens" in wb.sheetnames
+
+    def test_creates_collection_trend_and_print_pack_sheets(self):
+        wb = Workbook()
+        _build_by_collection(wb, _make_report(), portfolio_profile="default")
+        _build_trend_summary(wb, _make_report(), trend_data=[{"date": "2026-03-28", "average_score": 0.6, "repos_audited": 3, "tier_distribution": {"shipped": 1, "functional": 1}}], score_history={"RepoA": [0.5, 0.85]})
+        _build_print_pack(wb, _make_report(), None, portfolio_profile="default", collection="showcase")
+        assert "By Collection" in wb.sheetnames
+        assert "Trend Summary" in wb.sheetnames
+        assert "Print Pack" in wb.sheetnames
 
     def test_creates_campaign_and_writeback_sheets(self):
         wb = Workbook()
@@ -394,3 +418,53 @@ class TestAnalystWorkbookSheets:
         assert "Security Controls" in wb.sheetnames
         assert "Supply Chain" in wb.sheetnames
         assert "Security Debt" in wb.sheetnames
+
+
+class TestWorkbookModes:
+    def test_template_mode_requires_existing_template(self, tmp_path):
+        report_path = tmp_path / "report.json"
+        report_path.write_text(json.dumps(_make_report()))
+
+        with pytest.raises(FileNotFoundError):
+            export_excel(
+                report_path,
+                tmp_path / "out.xlsx",
+                excel_mode="template",
+                template_path=tmp_path / "missing.xlsx",
+            )
+
+    def test_standard_mode_generates_workbook(self, tmp_path):
+        report_path = tmp_path / "report.json"
+        report_path.write_text(json.dumps(_make_report()))
+
+        output = export_excel(
+            report_path,
+            tmp_path / "out.xlsx",
+            excel_mode="standard",
+        )
+
+        wb = load_workbook(output)
+        assert "Dashboard" in wb.sheetnames
+        assert "Index" in wb.sheetnames
+
+    def test_template_mode_generates_native_sparkline_xml(self, tmp_path):
+        report_path = tmp_path / "report.json"
+        report_path.write_text(json.dumps(_make_report()))
+
+        output = export_excel(
+            report_path,
+            tmp_path / "out.xlsx",
+            trend_data=[{"date": "2026-03-28", "average_score": 0.58, "repos_audited": 3, "tier_distribution": {"shipped": 1, "functional": 1}}],
+            score_history={"RepoA": [0.5, 0.7], "RepoB": [0.4, 0.6]},
+            excel_mode="template",
+            template_path=DEFAULT_TEMPLATE_PATH,
+        )
+
+        with zipfile.ZipFile(output) as archive:
+            workbook_xml = archive.read("xl/workbook.xml").decode("utf-8", "ignore")
+            assert "Trend Summary" in workbook_xml
+            worksheet_names = [name for name in archive.namelist() if name.startswith("xl/worksheets/sheet")]
+            assert any(
+                "sparkline" in archive.read(name).decode("utf-8", "ignore").lower()
+                for name in worksheet_names
+            )

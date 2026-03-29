@@ -209,6 +209,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Generate a concise analyst review pack from the current run and compare context",
     )
     parser.add_argument(
+        "--excel-mode",
+        choices=["template", "standard"],
+        default="template",
+        help="Choose the Excel workbook renderer (default: template)",
+    )
+    parser.add_argument(
         "--scorecard",
         action="store_true",
         help="Enrich public repos with OpenSSF Scorecard data",
@@ -821,6 +827,7 @@ def _write_report_outputs(
         score_history=score_history,
         portfolio_profile=args.portfolio_profile,
         collection=args.collection,
+        excel_mode=args.excel_mode,
     )
     md_path = write_markdown_report(report, output_dir, diff_data=diff_dict)
     pcc_path = write_pcc_export(report, output_dir)
