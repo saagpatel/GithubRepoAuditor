@@ -15,7 +15,9 @@ from openpyxl.chart import BarChart, PieChart, Reference, ScatterChart
 from openpyxl.chart.label import DataLabelList
 from openpyxl.chart.series import DataPoint
 from openpyxl.formatting.rule import ColorScaleRule, DataBarRule
+from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.datavalidation import DataValidation
 
 from src.excel_styles import (
     CENTER,
@@ -32,8 +34,11 @@ from src.excel_styles import (
     SUBTITLE_FONT,
     TEAL,
     THIN_BORDER,
+    TIER_FILLS,
     TITLE_FONT,
+    WRAP,
     WHITE,
+    NARRATIVE_FONT,
     apply_zebra_stripes,
     auto_width,
     color_grade_cell,
@@ -54,7 +59,47 @@ PIE_COLORS = ["166534", "1565C0", "D97706", "C2410C", "6B7280"]
 # ═══════════════════════════════════════════════════════════════════════
 
 
-def _build_dashboard(wb: Workbook, data: dict) -> None:
+def _generate_narrative(data: dict, diff_data: dict | None) -> str:
+    """Auto-generate a one-line dashboard narrative."""
+    if not diff_data:
+        tiers = data.get("tier_distribution", {})
+        return (
+            f"Portfolio: {data['repos_audited']} repos analyzed. "
+            f"{tiers.get('shipped', 0)} shipped, avg score {data['average_score']:.2f}."
+        )
+
+    parts = [f"Since last audit ({diff_data.get('previous_date', '')[:10]}):"]
+    shipped_d = diff_data.get("tier_distribution_delta", {}).get("shipped", 0)
+    avg_d = diff_data.get("average_score_delta", 0)
+    promos = len(diff_data.get("tier_changes", []))
+    new_count = len(diff_data.get("new_repos", []))
+
+    if shipped_d:
+        parts.append(f"{shipped_d:+d} shipped")
+    if abs(avg_d) > 0.005:
+        parts.append(f"avg score {avg_d:+.3f}")
+    if promos:
+        parts.append(f"{promos} tier changes")
+    if new_count:
+        parts.append(f"{new_count} new repos")
+
+    # Find closest promotion
+    tier_next = {"functional": 0.75, "wip": 0.55, "skeleton": 0.35}
+    closest_name, closest_gap = None, 1.0
+    for a in data.get("audits", []):
+        tier = a.get("completeness_tier", "")
+        if tier in tier_next:
+            gap = tier_next[tier] - a.get("overall_score", 0)
+            if 0 < gap < closest_gap:
+                closest_gap = gap
+                closest_name = a["metadata"]["name"]
+    if closest_name:
+        parts.append(f"Priority: {closest_name} needs {closest_gap:.3f} to promote")
+
+    return " | ".join(parts)
+
+
+def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None) -> None:
     ws = wb.active
     ws.title = "Dashboard"
     ws.sheet_properties.tabColor = NAVY
@@ -72,24 +117,42 @@ def _build_dashboard(wb: Workbook, data: dict) -> None:
     c.font = SUBTITLE_FONT
     c.alignment = CENTER
 
-    # KPI Cards (row 4-5)
+    # Narrative row
+    ws.merge_cells("A3:L3")
+    c = ws["A3"]
+    c.value = _generate_narrative(data, diff_data)
+    c.font = NARRATIVE_FONT
+    c.alignment = WRAP
+    ws.row_dimensions[3].height = 30
+
+    # KPI Cards (row 5-6)
     grade = data.get("portfolio_grade", "?")
     grade_color = GRADE_COLORS.get(grade, NAVY)
-    write_kpi_card(ws, 4, 1, "Portfolio Grade", grade, grade_color)
-    write_kpi_card(ws, 4, 3, "Avg Score", f"{data['average_score']:.2f}")
+    write_kpi_card(ws, 5, 1, "Portfolio Grade", grade, grade_color)
+    write_kpi_card(ws, 5, 3, "Avg Score", f"{data['average_score']:.2f}")
     tiers = data.get("tier_distribution", {})
-    write_kpi_card(ws, 4, 5, "Shipped", tiers.get("shipped", 0), "166534")
-    write_kpi_card(ws, 4, 7, "Functional", tiers.get("functional", 0), "1565C0")
-    write_kpi_card(ws, 4, 9, "WIP", tiers.get("wip", 0), "D97706")
+    write_kpi_card(ws, 5, 5, "Shipped", tiers.get("shipped", 0), "166534", "#Tier Breakdown!A1")
+    write_kpi_card(ws, 5, 7, "Functional", tiers.get("functional", 0), "1565C0", "#Tier Breakdown!A1")
+    write_kpi_card(ws, 5, 9, "WIP", tiers.get("wip", 0), "D97706", "#Quick Wins!A1")
     skel_aband = tiers.get("skeleton", 0) + tiers.get("abandoned", 0)
-    write_kpi_card(ws, 4, 11, "Needs Work", skel_aband, "C2410C")
+    write_kpi_card(ws, 5, 11, "Needs Work", skel_aband, "C2410C")
 
     # Row height
-    ws.row_dimensions[4].height = 20
-    ws.row_dimensions[5].height = 40
+    ws.row_dimensions[5].height = 20
+    ws.row_dimensions[6].height = 40
+
+    # Portfolio DNA row (row 8) — one colored cell per repo
+    dna_row = 8
+    ws.cell(row=dna_row, column=1, value="Portfolio DNA").font = SUBHEADER_FONT
+    audits_sorted = sorted(data.get("audits", []), key=lambda a: a.get("overall_score", 0), reverse=True)
+    for i, audit in enumerate(audits_sorted[:120]):
+        cell = ws.cell(row=dna_row, column=2 + i, value="")
+        tier = audit.get("completeness_tier", "abandoned")
+        if tier in TIER_FILLS:
+            cell.fill = TIER_FILLS[tier]
 
     # Tier Pie Chart
-    pie_start = 7
+    pie_start = 10
     for i, tier in enumerate(TIER_ORDER):
         ws.cell(row=pie_start + i, column=1, value=tier.capitalize())
         ws.cell(row=pie_start + i, column=2, value=tiers.get(tier, 0))
@@ -110,11 +173,11 @@ def _build_dashboard(wb: Workbook, data: dict) -> None:
         pie.series[0].data_points.append(pt)
     pie.width = 16
     pie.height = 12
-    ws.add_chart(pie, "A13")
+    ws.add_chart(pie, "A16")
 
     # Grade Distribution Bar Chart
     grade_dist = Counter(a.get("grade", "F") for a in data.get("audits", []))
-    grade_row = 7
+    grade_row = 10
     for i, g in enumerate(["A", "B", "C", "D", "F"]):
         ws.cell(row=grade_row + i, column=5, value=g)
         ws.cell(row=grade_row + i, column=6, value=grade_dist.get(g, 0))
@@ -129,10 +192,10 @@ def _build_dashboard(wb: Workbook, data: dict) -> None:
     bar.set_categories(bar_cats)
     bar.width = 16
     bar.height = 12
-    ws.add_chart(bar, "G13")
+    ws.add_chart(bar, "G16")
 
     # Highlights section
-    highlight_row = 28
+    highlight_row = 30
     ws.cell(row=highlight_row, column=1, value="Highlights").font = SECTION_FONT
 
     best_work = data.get("best_work") or data.get("summary", {}).get("highest_scored", [])
@@ -149,7 +212,7 @@ def _build_dashboard(wb: Workbook, data: dict) -> None:
 
     # Language distribution
     lang_dist = data.get("language_distribution", {})
-    lang_row = 7
+    lang_row = 10
     for i, (lang, count) in enumerate(list(lang_dist.items())[:8]):
         ws.cell(row=lang_row + i, column=9, value=lang)
         ws.cell(row=lang_row + i, column=10, value=count)
@@ -165,7 +228,7 @@ def _build_dashboard(wb: Workbook, data: dict) -> None:
         lang_bar.set_categories(lang_cats)
         lang_bar.width = 16
         lang_bar.height = 10
-        ws.add_chart(lang_bar, "A32")
+        ws.add_chart(lang_bar, "A34")
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -182,6 +245,7 @@ def _build_all_repos(wb: Workbook, data: dict) -> None:
         "Next Badge", "Language", "Commit Pattern", "Bus Factor",
         "Days Since Push", "Commits", "Releases", "Test Files",
         "LOC", "Libyears", "Stars", "Private", "Flags", "Description",
+        "Biggest Drag", "Why This Grade",
     ]
     for col, h in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=h)
@@ -226,9 +290,40 @@ def _build_all_repos(wb: Workbook, data: dict) -> None:
             (m.get("description") or "")[:60],
         ]
 
+        # Biggest Drag: lowest-scoring completeness dimension
+        dim_scores = {
+            r["dimension"]: r["score"]
+            for r in audit.get("analyzer_results", [])
+            if r["dimension"] != "interest"
+        }
+        if dim_scores:
+            worst = min(dim_scores, key=dim_scores.get)
+            values.append(f"{worst} ({dim_scores[worst]:.1f})")
+        else:
+            values.append("—")
+
+        # Why This Grade
+        from src.scorer import WEIGHTS as _W
+        if dim_scores:
+            sorted_dims = sorted(dim_scores.items(), key=lambda x: x[1])[:2]
+            g = audit.get("grade", "F")
+            if len(sorted_dims) >= 2:
+                values.append(f"{g}: {sorted_dims[0][0]}={sorted_dims[0][1]:.1f}, {sorted_dims[1][0]}={sorted_dims[1][1]:.1f}")
+            else:
+                values.append(g)
+        else:
+            values.append(audit.get("grade", "F"))
+
         for col, val in enumerate(values, 1):
             cell = ws.cell(row=row, column=col, value=val)
             style_data_cell(cell)
+
+        # Repo name hyperlink to GitHub
+        name_cell = ws.cell(row=row, column=1)
+        html_url = m.get("html_url", "")
+        if html_url:
+            name_cell.hyperlink = html_url
+            name_cell.font = Font("Calibri", 10, color=TEAL, underline="single")
 
         # Grade coloring
         color_grade_cell(ws.cell(row=row, column=2), audit.get("grade", "F"))
@@ -252,6 +347,17 @@ def _build_all_repos(wb: Workbook, data: dict) -> None:
             f"D2:D{max_row}",
             DataBarRule(start_type='num', start_value=0, end_type='num', end_value=1, color='0EA5E9'),
         )
+
+    # Tooltips on key columns
+    score_dv = DataValidation(allow_blank=True, prompt="Weighted average of 10 dimensions. See Score Explainer sheet.", promptTitle="Overall Score")
+    score_dv.sqref = f"C2:C{max_row}"
+    ws.add_data_validation(score_dv)
+    interest_dv = DataValidation(allow_blank=True, prompt="How interesting/ambitious (separate from completeness). Based on tech novelty, commit patterns, scope.", promptTitle="Interest Score")
+    interest_dv.sqref = f"D2:D{max_row}"
+    ws.add_data_validation(interest_dv)
+    grade_dv = DataValidation(allow_blank=True, prompt="A (>=85%) B (>=70%) C (>=55%) D (>=35%) F (<35%)", promptTitle="Letter Grade")
+    grade_dv.sqref = f"B2:B{max_row}"
+    ws.add_data_validation(grade_dv)
 
     # Summary row
     sr = max_row + 2
@@ -749,16 +855,228 @@ def _build_reconciliation(wb: Workbook, data: dict) -> None:
 # ═══════════════════════════════════════════════════════════════════════
 
 
+def _build_score_explainer(wb: Workbook) -> None:
+    """Static reference sheet explaining the scoring system."""
+    from src.scorer import WEIGHTS, GRADE_THRESHOLDS, COMPLETENESS_TIERS, INTEREST_TIERS
+
+    ws = wb.create_sheet("Score Explainer")
+    ws.sheet_properties.tabColor = "37474F"
+
+    ws.merge_cells("A1:D1")
+    ws["A1"].value = "Scoring System Reference"
+    ws["A1"].font = TITLE_FONT
+
+    DIMENSION_INFO = {
+        "testing": ("Test directories, framework, test file count", "Add test/ with pytest/jest/vitest configured"),
+        "code_quality": ("Entry points, TODO density, types, commit quality", "Add main entry point, reduce TODOs"),
+        "activity": ("Push recency, commit count, releases, bus factor", "Push regularly, tag releases"),
+        "readme": ("Exists, description, install instructions, examples", "Add usage section with code blocks"),
+        "structure": (".gitignore, source dirs, config files, LICENSE", "Add .gitignore + LICENSE + package manifest"),
+        "cicd": ("GitHub Actions, CI configs, build scripts", "Add .github/workflows/ci.yml"),
+        "dependencies": ("Manifest + lockfile, dep count, libyears", "Add lockfile alongside manifest"),
+        "build_readiness": ("Docker, Makefile, .env.example, deploy configs", "Add Dockerfile or Makefile"),
+        "community_profile": ("LICENSE, CONTRIBUTING, CODE_OF_CONDUCT", "Add CONTRIBUTING.md"),
+        "documentation": ("docs/ dir, CHANGELOG, comment density", "Add docs/ folder or CHANGELOG.md"),
+    }
+
+    ws.cell(row=3, column=1, value="Dimension Weights").font = SECTION_FONT
+    for col, h in enumerate(["Dimension", "Weight", "What It Measures", "How to Improve"], 1):
+        ws.cell(row=4, column=col, value=h)
+    style_header_row(ws, 4, 4)
+
+    row = 5
+    for dim, weight in sorted(WEIGHTS.items(), key=lambda x: x[1], reverse=True):
+        desc, improve = DIMENSION_INFO.get(dim, ("", ""))
+        ws.cell(row=row, column=1, value=dim)
+        ws.cell(row=row, column=2, value=f"{weight:.0%}")
+        ws.cell(row=row, column=3, value=desc)
+        ws.cell(row=row, column=4, value=improve)
+        for c in range(1, 5):
+            style_data_cell(ws.cell(row=row, column=c))
+        row += 1
+
+    row += 1
+    ws.cell(row=row, column=1, value="Grade Thresholds").font = SECTION_FONT
+    row += 1
+    for threshold, g in GRADE_THRESHOLDS:
+        ws.cell(row=row, column=1, value=g)
+        ws.cell(row=row, column=2, value=f">= {threshold:.0%}")
+        color_grade_cell(ws.cell(row=row, column=1), g)
+        row += 1
+
+    row += 1
+    ws.cell(row=row, column=1, value="Tier Thresholds").font = SECTION_FONT
+    row += 1
+    for tier_name, threshold in COMPLETENESS_TIERS:
+        ws.cell(row=row, column=1, value=tier_name.capitalize())
+        ws.cell(row=row, column=2, value=f">= {threshold:.0%}")
+        color_tier_cell(ws.cell(row=row, column=1), tier_name)
+        row += 1
+
+    auto_width(ws, 4, row)
+
+
+# ── Effort map for action items
+EFFORT_MAP = {
+    "readme": "Low", "structure": "Low", "cicd": "Low",
+    "documentation": "Low", "community_profile": "Low",
+    "dependencies": "Low", "build_readiness": "Med",
+    "testing": "Med", "code_quality": "Med", "activity": "High",
+}
+
+TIER_NEXT = {
+    "abandoned": ("skeleton", 0.15),
+    "skeleton": ("wip", 0.35),
+    "wip": ("functional", 0.55),
+    "functional": ("shipped", 0.75),
+}
+
+
+def _collect_all_actions(data: dict) -> list[dict]:
+    """Collect and prioritize actions from audit data."""
+    actions: list[dict] = []
+    for audit in data.get("audits", []):
+        tier = audit.get("completeness_tier", "")
+        if tier not in TIER_NEXT:
+            continue
+        next_tier, threshold = TIER_NEXT[tier]
+        gap = threshold - audit.get("overall_score", 0)
+        if gap <= 0:
+            continue
+
+        dim_scores = {
+            r["dimension"]: r["score"]
+            for r in audit.get("analyzer_results", [])
+            if r["dimension"] != "interest"
+        }
+        for dim, score in sorted(dim_scores.items(), key=lambda x: x[1])[:2]:
+            actions.append({
+                "repo": audit["metadata"]["name"],
+                "action": f"Improve {dim} (currently {score:.1f})",
+                "impact": f"Close {gap:.3f} gap to {next_tier}",
+                "effort": EFFORT_MAP.get(dim, "Med"),
+                "dimension": dim,
+                "gap": gap,
+            })
+
+        for badge_s in audit.get("next_badges", [])[:1]:
+            actions.append({
+                "repo": audit["metadata"]["name"],
+                "action": badge_s.get("action", ""),
+                "impact": f"Earn '{badge_s.get('badge', '')}' badge",
+                "effort": "Low" if badge_s.get("gap", 1) < 0.3 else "Med",
+                "dimension": "badges",
+                "gap": badge_s.get("gap", 1.0),
+            })
+
+    effort_order = {"Low": 0, "Med": 1, "High": 2}
+    actions.sort(key=lambda a: (effort_order.get(a["effort"], 1), a["gap"]))
+
+    seen: set[tuple[str, str]] = set()
+    unique: list[dict] = []
+    for a in actions:
+        key = (a["repo"], a["dimension"])
+        if key not in seen:
+            seen.add(key)
+            unique.append(a)
+    return unique
+
+
+def _build_action_items(wb: Workbook, data: dict) -> None:
+    """Prioritized action item list with weekly sprint."""
+    ws = wb.create_sheet("Action Items")
+    ws.sheet_properties.tabColor = "E65100"
+
+    actions = _collect_all_actions(data)
+
+    ws.merge_cells("A1:F1")
+    ws["A1"].value = f"Action Items — {len(actions)} prioritized improvements"
+    ws["A1"].font = SECTION_FONT
+
+    sprint = [a for a in actions if a["effort"] == "Low"][:5]
+    headers = ["#", "Repo", "Action", "Impact", "Effort", "Dimension"]
+
+    if sprint:
+        ws.cell(row=3, column=1, value="Weekly Sprint (Top 5 Low-Effort)").font = SECTION_FONT
+        for col, h in enumerate(headers, 1):
+            ws.cell(row=4, column=col, value=h)
+        style_header_row(ws, 4, len(headers))
+        for i, item in enumerate(sprint, 5):
+            for col, val in enumerate([i - 4, item["repo"], item["action"], item["impact"], item["effort"], item["dimension"]], 1):
+                cell = ws.cell(row=i, column=col, value=val)
+                style_data_cell(cell)
+
+    full_start = len(sprint) + 7
+    ws.cell(row=full_start, column=1, value="All Actions (Prioritized)").font = SECTION_FONT
+    full_start += 1
+    for col, h in enumerate(headers, 1):
+        ws.cell(row=full_start, column=col, value=h)
+    style_header_row(ws, full_start, len(headers))
+
+    for i, item in enumerate(actions[:100], full_start + 1):
+        for col, val in enumerate([i - full_start, item["repo"], item["action"], item["impact"], item["effort"], item["dimension"]], 1):
+            cell = ws.cell(row=i, column=col, value=val)
+            style_data_cell(cell)
+
+    apply_zebra_stripes(ws, full_start + 1, full_start + min(len(actions), 100), len(headers))
+    auto_width(ws, len(headers), full_start + min(len(actions), 100) + 1)
+
+
+def _build_navigation(wb: Workbook, data: dict) -> None:
+    """Navigation index as the first sheet."""
+    ws = wb.create_sheet("Index", 0)
+    ws.sheet_properties.tabColor = "263238"
+
+    ws.merge_cells("A1:D1")
+    ws["A1"].value = f"GitHub Portfolio Audit: {data['username']}"
+    ws["A1"].font = TITLE_FONT
+
+    ws.merge_cells("A2:D2")
+    ws["A2"].value = f"Last updated: {data['generated_at'][:10]} | {data['repos_audited']} repos | Grade: {data.get('portfolio_grade', '?')}"
+    ws["A2"].font = SUBTITLE_FONT
+
+    ws.cell(row=4, column=1, value="Sheet Directory").font = SECTION_FONT
+
+    sheets = [
+        ("Dashboard", "Executive overview — KPI cards, charts, narrative"),
+        ("All Repos", "Master table with scores, grades, badges, and explanations"),
+        ("Scoring Heatmap", "Color-coded matrix of per-dimension scores"),
+        ("Quick Wins", "Repos closest to the next tier promotion"),
+        ("Badges", "Achievement badges earned and portfolio leaderboard"),
+        ("Tech Stack", "Language proficiency weighted by project quality"),
+        ("Trends", "Historical score and tier trends across audit runs"),
+        ("Tier Breakdown", "Repos grouped by completeness tier"),
+        ("Activity", "Commit patterns, bus factor, release cadence"),
+        ("Registry", "Cross-reference with project registry"),
+        ("Score Explainer", "How scoring, grades, and tiers work"),
+        ("Action Items", "Prioritized improvements with effort estimates"),
+    ]
+
+    for col, h in enumerate(["Sheet", "Description"], 1):
+        ws.cell(row=5, column=col, value=h)
+    style_header_row(ws, 5, 2)
+
+    for i, (name, desc) in enumerate(sheets, 6):
+        cell = ws.cell(row=i, column=1, value=name)
+        cell.hyperlink = f"#{name}!A1"
+        cell.font = Font("Calibri", 11, bold=True, color=TEAL, underline="single")
+        ws.cell(row=i, column=2, value=desc)
+        style_data_cell(ws.cell(row=i, column=2))
+
+    auto_width(ws, 2, 6 + len(sheets))
+
+
 def export_excel(
     report_path: Path,
     output_path: Path,
     trend_data: list[dict] | None = None,
+    diff_data: dict | None = None,
 ) -> Path:
-    """Generate the flagship 10-sheet Excel dashboard."""
+    """Generate the flagship Excel dashboard."""
     data = json.loads(report_path.read_text())
 
     wb = Workbook()
-    _build_dashboard(wb, data)
+    _build_dashboard(wb, data, diff_data)
     _build_all_repos(wb, data)
     _build_heatmap(wb, data)
     _build_quick_wins(wb, data)
@@ -768,6 +1086,9 @@ def export_excel(
     _build_tier_breakdown(wb, data)
     _build_activity(wb, data)
     _build_reconciliation(wb, data)
+    _build_score_explainer(wb)
+    _build_action_items(wb, data)
+    _build_navigation(wb, data)
 
     wb.save(str(output_path))
     return output_path

@@ -83,6 +83,7 @@ DATA_BOLD_FONT = Font("Calibri", 10, bold=True)
 TIER_FONT = Font("Calibri", 10, bold=True, color=WHITE)
 SECTION_FONT = Font("Calibri", 14, bold=True, color=NAVY)
 HIGHLIGHT_FONT = Font("Calibri", 11, bold=True, color=TEAL)
+NARRATIVE_FONT = Font("Calibri", 11, italic=True, color=SLATE)
 
 # ── Borders ──────────────────────────────────────────────────────────
 
@@ -155,6 +156,7 @@ def write_kpi_card(
     label: str,
     value: str | int | float,
     color: str | None = None,
+    hyperlink: str | None = None,
 ) -> None:
     """Write a 2-row KPI card at the given position."""
     # Label cell
@@ -170,6 +172,9 @@ def write_kpi_card(
     value_cell.fill = KPI_CARD_FILL
     value_cell.border = CARD_BORDER
     value_cell.alignment = CENTER
+
+    if hyperlink:
+        value_cell.hyperlink = hyperlink
 
     # Merge 2 cols wide for each card
     ws.merge_cells(start_row=row, start_column=col, end_row=row, end_column=col + 1)
