@@ -303,6 +303,15 @@ def _make_report(audits=None) -> dict:
             "retired_exception_hotspots": [],
             "sticky_exception_hotspots": [],
             "exception_retirement_window_runs": 4,
+            "primary_target_policy_debt_status": "watch",
+            "primary_target_policy_debt_reason": "This class has enough recent exception activity to watch for lingering caution, but it is not yet clearly sticky or clearly normalization-friendly.",
+            "primary_target_class_normalization_status": "candidate",
+            "primary_target_class_normalization_reason": "This class is trending healthier, but the current target has not earned class-level normalization yet.",
+            "policy_debt_summary": "RepoC: Security posture needs attention sits in a class with mixed recent caution behavior, so watch for policy debt before normalizing further.",
+            "trust_normalization_summary": "RepoC: Security posture needs attention belongs to a healthier class trend, but it has not earned class-level normalization yet.",
+            "policy_debt_hotspots": [],
+            "normalized_class_hotspots": [],
+            "class_normalization_window_runs": 4,
             "recommendation_drift_status": "stable",
             "recommendation_drift_summary": "Recent trust-policy behavior is stable enough that no meaningful recommendation drift is recorded.",
             "policy_flip_hotspots": [],
@@ -605,7 +614,7 @@ class TestAnalystWorkbookSheets:
         print_ws = wb["Print Pack"]
         dashboard_values = [
             cell
-            for row in dashboard_ws.iter_rows(min_row=1, max_row=40, min_col=1, max_col=25, values_only=True)
+            for row in dashboard_ws.iter_rows(min_row=1, max_row=50, min_col=1, max_col=25, values_only=True)
             for cell in row
             if cell is not None
         ]
@@ -629,9 +638,11 @@ class TestAnalystWorkbookSheets:
         assert review_ws["A27"].value == "Recovery Confidence"
         assert review_ws["A28"].value == "Exception Retirement"
         assert review_ws["A29"].value == "Retirement Summary"
-        assert review_ws["A30"].value == "Exception Learning"
-        assert review_ws["A31"].value == "Recommendation Drift"
-        assert review_ws["A32"].value == "Adaptive Confidence"
+        assert review_ws["A30"].value == "Policy Debt"
+        assert review_ws["A31"].value == "Class Normalization"
+        assert review_ws["A32"].value == "Exception Learning"
+        assert review_ws["A33"].value == "Recommendation Drift"
+        assert review_ws["A34"].value == "Adaptive Confidence"
         assert executive_ws["D29"].value == "Trend"
         assert executive_ws["D32"].value == "Why Top Target"
         assert executive_ws["D33"].value == "Closure Guidance"
@@ -647,11 +658,13 @@ class TestAnalystWorkbookSheets:
         assert executive_ws["D45"].value == "Recovery Confidence"
         assert executive_ws["D46"].value == "Exception Retirement"
         assert executive_ws["D47"].value == "Retirement Summary"
-        assert executive_ws["D48"].value == "Exception Learning"
-        assert executive_ws["D49"].value == "Recommendation Drift"
-        assert executive_ws["D50"].value == "Adaptive Confidence"
-        assert executive_ws["D51"].value == "Recommendation Quality"
-        assert executive_ws["D52"].value == "Confidence Validation"
+        assert executive_ws["D48"].value == "Policy Debt"
+        assert executive_ws["D49"].value == "Class Normalization"
+        assert executive_ws["D50"].value == "Exception Learning"
+        assert executive_ws["D51"].value == "Recommendation Drift"
+        assert executive_ws["D52"].value == "Adaptive Confidence"
+        assert executive_ws["D53"].value == "Recommendation Quality"
+        assert executive_ws["D54"].value == "Confidence Validation"
         assert print_ws["A17"].value == "Primary Target"
         assert print_ws["A18"].value == "Why Top Target"
         assert print_ws["A19"].value == "What We Tried"
@@ -667,9 +680,11 @@ class TestAnalystWorkbookSheets:
         assert print_ws["A30"].value == "Recovery Confidence"
         assert print_ws["A31"].value == "Exception Retirement"
         assert print_ws["A32"].value == "Retirement Summary"
-        assert print_ws["A33"].value == "Exception Learning"
-        assert print_ws["A34"].value == "Recommendation Drift"
-        assert print_ws["A35"].value == "Adaptive Confidence"
+        assert print_ws["A33"].value == "Policy Debt"
+        assert print_ws["A34"].value == "Class Normalization"
+        assert print_ws["A35"].value == "Exception Learning"
+        assert print_ws["A36"].value == "Recommendation Drift"
+        assert print_ws["A37"].value == "Adaptive Confidence"
         assert "Why Top Target" in dashboard_values
         assert "Closure Guidance" in dashboard_values
         assert "What We Tried" in dashboard_values
@@ -679,6 +694,8 @@ class TestAnalystWorkbookSheets:
         assert "Trust Recovery" in dashboard_values
         assert "Recovery Confidence" in dashboard_values
         assert "Exception Retirement" in dashboard_values
+        assert "Policy Debt" in dashboard_values
+        assert "Class Normalization" in dashboard_values
         assert "Exception Learning" in dashboard_values
         assert "Recommendation Drift" in dashboard_values
 
@@ -906,7 +923,7 @@ class TestWorkbookModes:
 
         wb = load_workbook(output)
         ws = wb["Review Queue"]
-        header_row = next(row for row in range(20, 45) if ws.cell(row=row, column=1).value == "Repo")
+        header_row = next(row for row in range(20, 60) if ws.cell(row=row, column=1).value == "Repo")
         assert ws.auto_filter.ref == f"A{header_row}:H{header_row + 1}"
         assert not ws.tables
 

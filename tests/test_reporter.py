@@ -221,6 +221,15 @@ class TestMarkdownReport:
             "retired_exception_hotspots": [],
             "sticky_exception_hotspots": [],
             "exception_retirement_window_runs": 4,
+            "primary_target_policy_debt_status": "watch",
+            "primary_target_policy_debt_reason": "This class has enough recent exception activity to watch for lingering caution, but it is not yet clearly sticky or clearly normalization-friendly.",
+            "primary_target_class_normalization_status": "candidate",
+            "primary_target_class_normalization_reason": "This class is trending healthier, but the current target has not earned class-level normalization yet.",
+            "policy_debt_summary": "Missing template asset sits in a class with mixed recent caution behavior, so watch for policy debt before normalizing further.",
+            "trust_normalization_summary": "Missing template asset belongs to a healthier class trend, but it has not earned class-level normalization yet.",
+            "policy_debt_hotspots": [],
+            "normalized_class_hotspots": [],
+            "class_normalization_window_runs": 4,
             "recommendation_drift_status": "stable",
             "recommendation_drift_summary": "Recent trust-policy behavior is stable enough that no meaningful recommendation drift is recorded.",
             "policy_flip_hotspots": [],
@@ -269,6 +278,8 @@ class TestMarkdownReport:
         assert "Trust Recovery:" in content
         assert "Recovery Confidence:" in content
         assert "Exception Retirement:" in content
+        assert "Policy Debt Cleanup:" in content
+        assert "Class-Level Trust Normalization:" in content
         assert "Next Recommended Run" in content
         assert "Watch Strategy" in content
         assert "What Changed" in content
@@ -287,6 +298,8 @@ class TestMarkdownReport:
         assert "Trust Policy" in content
         assert "Why This Confidence Is Actionable" in content
         assert "Recommendation Quality" in content
+        assert "Policy Debt Summary" in content
+        assert "Trust Normalization Summary" in content
         assert "Confidence Validation" in content
         assert "Recent Confidence Outcomes" in content
 

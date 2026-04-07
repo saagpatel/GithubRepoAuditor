@@ -28,6 +28,7 @@ CALIBRATION_WINDOW_RUNS = 20
 VALIDATION_WINDOW_RUNS = 2
 TRUST_RECOVERY_WINDOW_RUNS = 3
 EXCEPTION_RETIREMENT_WINDOW_RUNS = 4
+CLASS_NORMALIZATION_WINDOW_RUNS = 4
 GENERIC_RECOMMENDATION_PHRASES = (
     "continue the normal audit/control-center loop",
     "continue the normal operator loop",
@@ -405,6 +406,15 @@ def build_operator_snapshot(
         "retired_exception_hotspots": resolution_trend["retired_exception_hotspots"],
         "sticky_exception_hotspots": resolution_trend["sticky_exception_hotspots"],
         "exception_retirement_window_runs": resolution_trend["exception_retirement_window_runs"],
+        "primary_target_policy_debt_status": resolution_trend["primary_target_policy_debt_status"],
+        "primary_target_policy_debt_reason": resolution_trend["primary_target_policy_debt_reason"],
+        "primary_target_class_normalization_status": resolution_trend["primary_target_class_normalization_status"],
+        "primary_target_class_normalization_reason": resolution_trend["primary_target_class_normalization_reason"],
+        "policy_debt_summary": resolution_trend["policy_debt_summary"],
+        "trust_normalization_summary": resolution_trend["trust_normalization_summary"],
+        "policy_debt_hotspots": resolution_trend["policy_debt_hotspots"],
+        "normalized_class_hotspots": resolution_trend["normalized_class_hotspots"],
+        "class_normalization_window_runs": resolution_trend["class_normalization_window_runs"],
         "decision_memory_status": resolution_trend["decision_memory_status"],
         "primary_target_last_seen_at": resolution_trend["primary_target_last_seen_at"],
         "primary_target_last_intervention": resolution_trend["primary_target_last_intervention"],
@@ -544,6 +554,16 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
             f"*Exception Retirement:* {summary.get('primary_target_exception_retirement_status')} — "
             f"{summary.get('primary_target_exception_retirement_reason', 'No exception-retirement reason is recorded yet.')}"
         )
+    if summary.get("primary_target_policy_debt_status") and summary.get("primary_target_policy_debt_status") != "none":
+        lines.append(
+            f"*Policy Debt Cleanup:* {summary.get('primary_target_policy_debt_status')} — "
+            f"{summary.get('primary_target_policy_debt_reason', 'No policy-debt reason is recorded yet.')}"
+        )
+    if summary.get("primary_target_class_normalization_status") and summary.get("primary_target_class_normalization_status") != "none":
+        lines.append(
+            f"*Class-Level Trust Normalization:* {summary.get('primary_target_class_normalization_status')} — "
+            f"{summary.get('primary_target_class_normalization_reason', 'No class-normalization reason is recorded yet.')}"
+        )
     if summary.get("recommendation_drift_status"):
         lines.append(
             f"*Recommendation Drift:* {summary.get('recommendation_drift_status')} — "
@@ -553,6 +573,10 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
         lines.append(f"*Exception Pattern Summary:* {summary['exception_pattern_summary']}")
     if summary.get("exception_retirement_summary"):
         lines.append(f"*Exception Retirement Summary:* {summary['exception_retirement_summary']}")
+    if summary.get("policy_debt_summary"):
+        lines.append(f"*Policy Debt Summary:* {summary['policy_debt_summary']}")
+    if summary.get("trust_normalization_summary"):
+        lines.append(f"*Trust Normalization Summary:* {summary['trust_normalization_summary']}")
     if summary.get("recommendation_quality_summary"):
         lines.append(f"*Recommendation Quality:* {summary['recommendation_quality_summary']}")
     if summary.get("confidence_validation_status"):
@@ -729,6 +753,8 @@ def _build_operator_handoff(
         resolution_trend.get("primary_target_exception_status", "none"),
         resolution_trend.get("primary_target_trust_recovery_status", "none"),
         resolution_trend.get("primary_target_exception_retirement_status", "none"),
+        resolution_trend.get("primary_target_policy_debt_status", "none"),
+        resolution_trend.get("primary_target_class_normalization_status", "none"),
     )
     escalation_reason = _escalation_reason(queue, setup_health, watch_guidance)
     urgency = _handoff_urgency(queue, setup_health)
@@ -757,6 +783,8 @@ def _build_operator_handoff(
         f"{_trust_recovery_note(resolution_trend)} "
         f"{_recovery_confidence_note(resolution_trend)} "
         f"{_exception_retirement_note(resolution_trend)} "
+        f"{_policy_debt_note(resolution_trend)} "
+        f"{_class_normalization_note(resolution_trend)} "
         f"{_recommendation_drift_note(resolution_trend)} "
         f"{confidence_calibration.get('confidence_calibration_summary', '')} "
         f"{confidence.get('adaptive_confidence_summary', '')} "
@@ -1083,6 +1111,12 @@ def _build_resolution_trend(
         current_generated_at=current_generated_at,
         confidence_calibration=confidence_calibration,
     )
+    class_normalization = _apply_class_trust_normalization(
+        resolution_targets,
+        history,
+        current_generated_at=current_generated_at,
+        confidence_calibration=confidence_calibration,
+    )
     new_attention_keys = current_attention_keys - previous_attention_keys
     resolved_attention_count = len(previous_attention_keys - current_attention_keys)
     persisting_attention_count = len(current_attention_keys & previous_attention_keys)
@@ -1185,6 +1219,15 @@ def _build_resolution_trend(
         "retired_exception_hotspots": exception_retirement["retired_exception_hotspots"],
         "sticky_exception_hotspots": exception_retirement["sticky_exception_hotspots"],
         "exception_retirement_window_runs": exception_retirement["exception_retirement_window_runs"],
+        "primary_target_policy_debt_status": class_normalization["primary_target_policy_debt_status"],
+        "primary_target_policy_debt_reason": class_normalization["primary_target_policy_debt_reason"],
+        "primary_target_class_normalization_status": class_normalization["primary_target_class_normalization_status"],
+        "primary_target_class_normalization_reason": class_normalization["primary_target_class_normalization_reason"],
+        "policy_debt_summary": class_normalization["policy_debt_summary"],
+        "trust_normalization_summary": class_normalization["trust_normalization_summary"],
+        "policy_debt_hotspots": class_normalization["policy_debt_hotspots"],
+        "normalized_class_hotspots": class_normalization["normalized_class_hotspots"],
+        "class_normalization_window_runs": class_normalization["class_normalization_window_runs"],
         "decision_memory_status": decision_memory["decision_memory_status"],
         "primary_target_last_seen_at": decision_memory["primary_target_last_seen_at"],
         "primary_target_last_intervention": decision_memory["primary_target_last_intervention"],
@@ -1617,6 +1660,114 @@ def _apply_exception_retirement(
     }
 
 
+def _apply_class_trust_normalization(
+    resolution_targets: list[dict],
+    history: list[dict],
+    *,
+    current_generated_at: str,
+    confidence_calibration: dict,
+) -> dict:
+    if not resolution_targets:
+        return {
+            "primary_target_policy_debt_status": "none",
+            "primary_target_policy_debt_reason": "",
+            "primary_target_class_normalization_status": "none",
+            "primary_target_class_normalization_reason": "",
+            "policy_debt_summary": "No class-level policy debt is recorded because there is no active target.",
+            "trust_normalization_summary": "No class-level trust normalization is recorded because there is no active target.",
+            "policy_debt_hotspots": [],
+            "normalized_class_hotspots": [],
+            "class_normalization_window_runs": CLASS_NORMALIZATION_WINDOW_RUNS,
+        }
+
+    current_primary_target = resolution_targets[0]
+    current_bucket = _recommendation_bucket(current_primary_target)
+    class_events = _class_normalization_events(
+        history,
+        current_primary_target=current_primary_target,
+        current_generated_at=current_generated_at,
+    )
+    historical_cases = _historical_exception_cases(history)
+
+    updated_targets: list[dict] = []
+    for target in resolution_targets:
+        policy_debt_status = "none"
+        policy_debt_reason = ""
+        class_normalization_status = "none"
+        class_normalization_reason = ""
+        class_retirement_rate = 0.0
+        class_sticky_rate = 0.0
+        recent_class_policy_path = ""
+        final_policy = target.get("trust_policy", "monitor")
+        final_reason = target.get("trust_policy_reason", "No trust-policy reason is recorded yet.")
+
+        if _recommendation_bucket(target) == current_bucket:
+            history_meta = _target_class_normalization_history(target, class_events, historical_cases)
+            class_retirement_rate = history_meta["class_retirement_rate"]
+            class_sticky_rate = history_meta["class_sticky_rate"]
+            recent_class_policy_path = history_meta["recent_class_policy_path"]
+            policy_debt_status, policy_debt_reason = _policy_debt_for_target(
+                target,
+                history_meta,
+            )
+            (
+                class_normalization_status,
+                class_normalization_reason,
+                final_policy,
+                final_reason,
+            ) = _class_normalization_for_target(
+                target,
+                history_meta,
+                confidence_calibration,
+                policy_debt_status=policy_debt_status,
+                trust_policy=final_policy,
+                trust_policy_reason=final_reason,
+            )
+
+        updated_targets.append(
+            {
+                **target,
+                "policy_debt_status": policy_debt_status,
+                "policy_debt_reason": policy_debt_reason,
+                "class_normalization_status": class_normalization_status,
+                "class_normalization_reason": class_normalization_reason,
+                "class_retirement_rate": class_retirement_rate,
+                "class_sticky_rate": class_sticky_rate,
+                "recent_class_policy_path": recent_class_policy_path,
+                "trust_policy": final_policy,
+                "trust_policy_reason": final_reason,
+            }
+        )
+
+    resolution_targets[:] = updated_targets
+    primary_target = resolution_targets[0]
+    policy_debt_hotspots = _class_normalization_hotspots(
+        historical_cases,
+        resolution_targets,
+        mode="policy-debt",
+    )
+    normalized_class_hotspots = _class_normalization_hotspots(
+        historical_cases,
+        resolution_targets,
+        mode="normalized",
+    )
+    return {
+        "primary_target_policy_debt_status": primary_target.get("policy_debt_status", "none"),
+        "primary_target_policy_debt_reason": primary_target.get("policy_debt_reason", ""),
+        "primary_target_class_normalization_status": primary_target.get("class_normalization_status", "none"),
+        "primary_target_class_normalization_reason": primary_target.get("class_normalization_reason", ""),
+        "policy_debt_summary": _policy_debt_summary(primary_target, policy_debt_hotspots),
+        "trust_normalization_summary": _trust_normalization_summary(
+            primary_target,
+            normalized_class_hotspots,
+            policy_debt_hotspots,
+        ),
+        "policy_debt_hotspots": policy_debt_hotspots,
+        "normalized_class_hotspots": normalized_class_hotspots,
+        "class_normalization_window_runs": CLASS_NORMALIZATION_WINDOW_RUNS,
+    }
+
+
 def _retirement_policy_events(
     history: list[dict],
     *,
@@ -1922,6 +2073,55 @@ def _exception_retirement_summary(
     return "Recent exception retirement behavior does not yet show a strong retire-or-stay pattern."
 
 
+def _policy_debt_summary(primary_target: dict, policy_debt_hotspots: list[dict]) -> str:
+    label = _target_label(primary_target) or "The current target"
+    debt_status = primary_target.get("policy_debt_status", "none")
+    if debt_status == "class-debt":
+        return f"{label} belongs to a class that keeps carrying sticky caution, so class-level normalization should stay conservative for now."
+    if debt_status == "one-off-noise":
+        return f"{label} looks noisier than its broader class, so the softer caution remains target-specific instead of class-wide."
+    if debt_status == "watch":
+        return f"{label} sits in a class with mixed recent caution behavior, so watch for policy debt before normalizing further."
+    if policy_debt_hotspots:
+        hotspot = policy_debt_hotspots[0]
+        return (
+            f"Sticky caution is lingering most around {hotspot.get('label', 'recent hotspots')}, "
+            "so verify-first should not be normalized there without stronger evidence."
+        )
+    return "Recent class behavior does not yet show meaningful policy debt."
+
+
+def _trust_normalization_summary(
+    primary_target: dict,
+    normalized_class_hotspots: list[dict],
+    policy_debt_hotspots: list[dict],
+) -> str:
+    label = _target_label(primary_target) or "The current target"
+    normalization_status = primary_target.get("class_normalization_status", "none")
+    if normalization_status == "applied":
+        return f"{label} inherits a stronger trust posture because its class has repeatedly earned clean retirement."
+    if normalization_status == "candidate":
+        return f"{label} belongs to a healthier class trend, but it has not earned class-level normalization yet."
+    if normalization_status == "blocked":
+        return primary_target.get(
+            "class_normalization_reason",
+            f"{label} is blocked from class-level normalization by local reopen, flip, or calibration noise.",
+        )
+    if normalized_class_hotspots:
+        hotspot = normalized_class_hotspots[0]
+        return (
+            f"Recent soft caution has normalized most cleanly around {hotspot.get('label', 'recent hotspots')}, "
+            "so verify-first should not linger there longer than the evidence supports."
+        )
+    if policy_debt_hotspots:
+        hotspot = policy_debt_hotspots[0]
+        return (
+            f"Class-level normalization still looks constrained around {hotspot.get('label', 'recent hotspots')}, "
+            "so broader trust relaxation should stay conservative there."
+        )
+    return "Recent class behavior does not yet show a strong normalization pattern."
+
+
 def _retirement_hotspots(
     historical_cases: list[dict],
     resolution_targets: list[dict],
@@ -1962,6 +2162,311 @@ def _retirement_hotspots(
     hotspots.sort(
         key=lambda item: (
             -item.get(count_key, 0),
+            -item.get("exception_count", 0),
+            item.get("label", ""),
+        )
+    )
+    return hotspots[:5]
+
+
+def _class_normalization_events(
+    history: list[dict],
+    *,
+    current_primary_target: dict,
+    current_generated_at: str,
+) -> list[dict]:
+    events: list[dict] = []
+    if current_primary_target and current_primary_target.get("trust_policy"):
+        events.append(
+            {
+                "key": _queue_identity(current_primary_target),
+                "class_key": _target_class_key(current_primary_target),
+                "label": _target_label(current_primary_target),
+                "trust_policy": current_primary_target.get("trust_policy", "monitor"),
+                "generated_at": current_generated_at or "",
+                "lane": current_primary_target.get("lane", ""),
+                "kind": current_primary_target.get("kind", ""),
+                "decision_memory_status": current_primary_target.get("decision_memory_status", ""),
+                "last_outcome": current_primary_target.get("last_outcome", ""),
+                "trust_exception_status": current_primary_target.get("trust_exception_status", "none"),
+                "trust_recovery_status": current_primary_target.get("trust_recovery_status", "none"),
+                "exception_retirement_status": current_primary_target.get("exception_retirement_status", "none"),
+                "confidence_validation_status": current_primary_target.get("confidence_validation_status", ""),
+                "exception_pattern_status": current_primary_target.get("exception_pattern_status", "none"),
+            }
+        )
+    for entry in history[: HISTORY_WINDOW_RUNS - 1]:
+        summary = entry.get("operator_summary") or {}
+        primary_target = summary.get("primary_target") or {}
+        trust_policy = summary.get("primary_target_trust_policy", "")
+        if not primary_target or not trust_policy:
+            continue
+        events.append(
+            {
+                "key": _queue_identity(primary_target),
+                "class_key": _target_class_key(primary_target),
+                "label": _target_label(primary_target),
+                "trust_policy": trust_policy,
+                "generated_at": entry.get("generated_at", ""),
+                "lane": primary_target.get("lane", ""),
+                "kind": primary_target.get("kind", ""),
+                "decision_memory_status": summary.get("decision_memory_status", ""),
+                "last_outcome": summary.get("primary_target_last_outcome", ""),
+                "trust_exception_status": summary.get("primary_target_exception_status", "none"),
+                "trust_recovery_status": summary.get("primary_target_trust_recovery_status", "none"),
+                "exception_retirement_status": summary.get("primary_target_exception_retirement_status", "none"),
+                "confidence_validation_status": summary.get("confidence_validation_status", ""),
+                "exception_pattern_status": summary.get("primary_target_exception_pattern_status", "none"),
+            }
+        )
+    return sorted(events, key=lambda item: item.get("generated_at", ""), reverse=True)
+
+
+def _target_class_normalization_history(
+    target: dict,
+    class_events: list[dict],
+    historical_cases: list[dict],
+) -> dict:
+    key = _queue_identity(target)
+    class_key = _target_class_key(target)
+    target_events = [event for event in class_events if event.get("key") == key]
+    matching_class_events = [event for event in class_events if event.get("class_key") == class_key]
+    target_policies = [event.get("trust_policy", "monitor") for event in target_events[:CLASS_NORMALIZATION_WINDOW_RUNS]]
+    class_policies = [event.get("trust_policy", "monitor") for event in matching_class_events[:CLASS_NORMALIZATION_WINDOW_RUNS]]
+    target_lanes = [event.get("lane", "") for event in target_events[:CLASS_NORMALIZATION_WINDOW_RUNS]]
+    class_exception_events = [
+        event
+        for event in matching_class_events
+        if event.get("trust_exception_status") not in {None, "", "none"}
+        or event.get("exception_retirement_status") not in {None, "", "none"}
+    ]
+    target_cases = [case for case in historical_cases if case.get("key") == key]
+    class_cases = [case for case in historical_cases if case.get("class_key") == class_key]
+    exception_count = len(class_exception_events)
+    retired_count = sum(1 for event in class_exception_events if event.get("exception_retirement_status") == "retired")
+    sticky_count = sum(1 for event in class_exception_events if event.get("exception_retirement_status") == "blocked")
+    overcautious_count = sum(1 for case in class_cases if case.get("case_outcome") == "overcautious")
+    useful_caution_count = sum(1 for case in class_cases if case.get("case_outcome") == "useful-caution")
+    verify_first_count = sum(1 for event in matching_class_events if event.get("trust_policy") == "verify-first")
+    if target.get("trust_exception_status") not in {None, "", "none"} or target.get("exception_retirement_status") not in {None, "", "none"}:
+        exception_count += 1
+    if target.get("exception_retirement_status") == "retired":
+        retired_count += 1
+    if target.get("exception_retirement_status") == "blocked":
+        sticky_count += 1
+    if target.get("exception_pattern_status") == "overcautious":
+        overcautious_count += 1
+    if target.get("exception_pattern_status") == "useful-caution":
+        useful_caution_count += 1
+    if target.get("trust_policy") == "verify-first":
+        verify_first_count += 1
+    class_retirement_rate = retired_count / max(exception_count, 1)
+    class_sticky_rate = sticky_count / max(exception_count, 1)
+    return {
+        "exception_count": exception_count,
+        "retired_count": retired_count,
+        "sticky_count": sticky_count,
+        "overcautious_count": overcautious_count,
+        "useful_caution_count": useful_caution_count,
+        "verify_first_count": verify_first_count,
+        "class_retirement_rate": class_retirement_rate,
+        "class_sticky_rate": class_sticky_rate,
+        "stable_after_exception_runs": target.get("stable_after_exception_runs", _stable_policy_run_count(target_policies)),
+        "recent_class_policy_path": " -> ".join(class_policies[:CLASS_NORMALIZATION_WINDOW_RUNS]),
+        "recent_policy_flip_count": _policy_flip_count(target_policies),
+        "recent_class_policy_flip_count": _policy_flip_count(class_policies),
+        "same_or_lower_pressure_path": _same_or_lower_pressure_path(target_lanes),
+        "recent_reopened": any(
+            event.get("decision_memory_status") == "reopened" or event.get("last_outcome") == "reopened"
+            for event in target_events[:CLASS_NORMALIZATION_WINDOW_RUNS]
+        ),
+        "latest_case_outcome": _latest_case_outcome(target_cases, class_cases),
+    }
+
+
+def _class_normalization_friendly(history_meta: dict) -> bool:
+    return history_meta.get("exception_count", 0) >= 3 and (
+        history_meta.get("retired_count", 0) >= history_meta.get("sticky_count", 0) + 2
+        or history_meta.get("class_retirement_rate", 0.0) >= 0.60
+    )
+
+
+def _class_normalization_candidate(history_meta: dict) -> bool:
+    return history_meta.get("exception_count", 0) >= 2 and history_meta.get("class_retirement_rate", 0.0) >= 0.50
+
+
+def _target_specific_normalization_noise(target: dict, history_meta: dict) -> bool:
+    return (
+        history_meta.get("recent_reopened", False)
+        or history_meta.get("recent_policy_flip_count", 0) > 0
+        or target.get("trust_recovery_status") == "blocked"
+        or target.get("exception_retirement_status") == "blocked"
+    )
+
+
+def _policy_debt_for_target(target: dict, history_meta: dict) -> tuple[str, str]:
+    exception_count = history_meta.get("exception_count", 0)
+    retired_count = history_meta.get("retired_count", 0)
+    sticky_count = history_meta.get("sticky_count", 0)
+    class_sticky_rate = history_meta.get("class_sticky_rate", 0.0)
+    if _class_normalization_friendly(history_meta) and _target_specific_normalization_noise(target, history_meta):
+        return (
+            "one-off-noise",
+            "This class has been earning clean retirement more often, but this target still has local reopen, flip, or blocked-recovery noise keeping the softer posture target-specific.",
+        )
+    if exception_count >= 3 and (
+        sticky_count >= retired_count + 2 or class_sticky_rate >= 0.60
+    ):
+        return (
+            "class-debt",
+            "This class keeps carrying sticky caution across recent runs, so class-level normalization would be premature.",
+        )
+    if exception_count >= 2:
+        return (
+            "watch",
+            "This class has enough recent exception activity to watch for lingering caution, but it is not yet clearly sticky or clearly normalization-friendly.",
+        )
+    return "none", ""
+
+
+def _class_normalization_for_target(
+    target: dict,
+    history_meta: dict,
+    confidence_calibration: dict,
+    *,
+    policy_debt_status: str,
+    trust_policy: str,
+    trust_policy_reason: str,
+) -> tuple[str, str, str, str]:
+    exception_affected = (
+        target.get("trust_exception_status") not in {None, "", "none"}
+        or target.get("exception_retirement_status") not in {None, "", "none"}
+        or target.get("trust_recovery_status") in {"candidate", "earned", "blocked"}
+    )
+    if not exception_affected or trust_policy != "verify-first":
+        return "none", "", trust_policy, trust_policy_reason
+
+    local_noise = _target_specific_normalization_noise(target, history_meta)
+    if (
+        local_noise
+        or confidence_calibration.get("confidence_validation_status") != "healthy"
+        or policy_debt_status == "class-debt"
+    ):
+        return (
+            "blocked",
+            "Class-level normalization is blocked by local reopen, flip, blocked-recovery, or calibration noise.",
+            trust_policy,
+            trust_policy_reason,
+        )
+
+    if (
+        _class_normalization_friendly(history_meta)
+        and (
+            target.get("trust_recovery_status") in {"candidate", "earned"}
+            or target.get("exception_retirement_status") == "candidate"
+        )
+    ):
+        normalized_policy = "act-with-review"
+        normalized_reason = (
+            "This class has repeatedly earned clean retirement, so the current target can inherit a stronger act-with-review posture."
+        )
+        if target.get("lane") == "blocked" and target.get("kind") == "setup":
+            normalized_reason = (
+                "This blocked setup class has repeatedly earned clean retirement, but setup blockers still should not skip review."
+            )
+        return "applied", normalized_reason, normalized_policy, normalized_reason
+
+    if _class_normalization_candidate(history_meta):
+        return (
+            "candidate",
+            "This class is trending healthier, but the current target has not earned class-level normalization yet.",
+            trust_policy,
+            trust_policy_reason,
+        )
+    return "none", "", trust_policy, trust_policy_reason
+
+
+def _class_normalization_hotspots(
+    historical_cases: list[dict],
+    resolution_targets: list[dict],
+    *,
+    mode: str,
+) -> list[dict]:
+    grouped: dict[str, dict[str, int]] = {}
+    for case in historical_cases:
+        class_key = case.get("class_key", "")
+        if not class_key:
+            continue
+        group = grouped.setdefault(
+            class_key,
+            {
+                "exception_count": 0,
+                "match_count": 0,
+                "retired_count": 0,
+                "sticky_count": 0,
+                "overcautious_count": 0,
+                "useful_caution_count": 0,
+            },
+        )
+        group["exception_count"] += 1
+        if case.get("case_outcome") == "overcautious":
+            group["overcautious_count"] += 1
+        if case.get("case_outcome") == "useful-caution":
+            group["useful_caution_count"] += 1
+
+    for target in resolution_targets:
+        class_key = _target_class_key(target)
+        if not class_key:
+            continue
+        group = grouped.setdefault(
+            class_key,
+            {
+                "exception_count": 0,
+                "match_count": 0,
+                "retired_count": 0,
+                "sticky_count": 0,
+                "overcautious_count": 0,
+                "useful_caution_count": 0,
+            },
+        )
+        if target.get("trust_exception_status") not in {None, "", "none"} or target.get("exception_retirement_status") not in {None, "", "none"}:
+            group["exception_count"] += 1
+        if target.get("exception_retirement_status") == "retired":
+            group["retired_count"] += 1
+        if target.get("exception_retirement_status") == "blocked":
+            group["sticky_count"] += 1
+        if target.get("exception_pattern_status") == "overcautious":
+            group["overcautious_count"] += 1
+        if target.get("exception_pattern_status") == "useful-caution":
+            group["useful_caution_count"] += 1
+        if mode == "policy-debt" and target.get("policy_debt_status") == "class-debt":
+            group["sticky_count"] += 1
+        if mode == "normalized" and target.get("class_normalization_status") == "applied":
+            group["retired_count"] += 1
+
+    hotspots: list[dict] = []
+    for class_key, group in grouped.items():
+        if mode == "policy-debt":
+            match_count = group["sticky_count"] + group["useful_caution_count"]
+        else:
+            match_count = group["retired_count"] + group["overcautious_count"]
+        if match_count <= 0:
+            continue
+        hotspots.append(
+            {
+                "scope": "class",
+                "label": class_key,
+                "match_count": match_count,
+                "exception_count": group["exception_count"],
+                "retired_count": group["retired_count"],
+                "sticky_count": group["sticky_count"],
+                "overcautious_count": group["overcautious_count"],
+                "useful_caution_count": group["useful_caution_count"],
+            }
+        )
+    hotspots.sort(
+        key=lambda item: (
+            -item.get("match_count", 0),
             -item.get("exception_count", 0),
             item.get("label", ""),
         )
@@ -3194,6 +3699,7 @@ def _operator_confidence_summary(
     )
     if (
         primary_target.get("trust_exception_status") not in {None, "", "none"}
+        and primary_target.get("class_normalization_status") != "applied"
         and primary_target.get("trust_recovery_status") != "earned"
     ):
         next_trust_policy, next_trust_policy_reason = _soften_next_action_policy(
@@ -3312,8 +3818,20 @@ def _adaptive_confidence_summary(
     exception_pattern_status = primary_target.get("exception_pattern_status", "none")
     trust_recovery_status = primary_target.get("trust_recovery_status", "none")
     exception_retirement_status = primary_target.get("exception_retirement_status", "none")
+    policy_debt_status = primary_target.get("policy_debt_status", "none")
+    class_normalization_status = primary_target.get("class_normalization_status", "none")
     recovery_confidence_label = primary_target.get("recovery_confidence_label", "low")
     drift_status = primary_target.get("recommendation_drift_status", "")
+    if class_normalization_status == "applied":
+        return "This class has repeatedly earned clean retirement, so the current target inherits a stronger act-with-review posture without changing lane priority."
+    if class_normalization_status == "candidate":
+        return "This class is trending healthier, but the current target still needs a little more local stability before class-level normalization can apply."
+    if class_normalization_status == "blocked":
+        return "Class-level normalization is blocked by local reopen, flip, or calibration noise, so the softer caution should stay target-specific."
+    if policy_debt_status == "class-debt":
+        return "This class keeps carrying sticky caution, so class-level trust relaxation should stay conservative for now."
+    if policy_debt_status == "one-off-noise":
+        return "The broader class looks healthier than this target, so the softer caution remains target-specific instead of class-wide."
     if exception_retirement_status == "retired":
         return "Recovery confidence is high enough that the earlier soft caution has been formally retired, so the stronger trust policy is back in place."
     if exception_retirement_status == "candidate":
@@ -3606,6 +4124,10 @@ def _why_it_matters(
         resolution_trend.get("primary_target_exception_retirement_status", "none"),
         resolution_trend.get("primary_target_exception_retirement_reason", ""),
         resolution_trend.get("primary_target_recovery_confidence_label", "low"),
+        resolution_trend.get("primary_target_policy_debt_status", "none"),
+        resolution_trend.get("primary_target_policy_debt_reason", ""),
+        resolution_trend.get("primary_target_class_normalization_status", "none"),
+        resolution_trend.get("primary_target_class_normalization_reason", ""),
     )
     if urgency == "blocked":
         return f"A trustworthy next step is blocked until this is cleared. {trust_sentence} {calibration_sentence}".strip()
@@ -3696,7 +4218,24 @@ def _trust_policy_sentence(
     exception_retirement_status: str,
     exception_retirement_reason: str,
     recovery_confidence_label: str,
+    policy_debt_status: str,
+    policy_debt_reason: str,
+    class_normalization_status: str,
+    class_normalization_reason: str,
 ) -> str:
+    if class_normalization_status == "applied":
+        return "Trust policy: act with review because this class has repeatedly earned clean retirement and the current target can inherit a stronger posture."
+    if class_normalization_status == "candidate":
+        return "Trust policy: verify first for now because the class is improving, but the current target has not earned class-level normalization yet."
+    if class_normalization_status == "blocked":
+        detail = class_normalization_reason or policy_debt_reason or exception_retirement_reason or trust_recovery_reason or exception_reason or reason
+        return f"Trust policy: verify first because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: verify first because class-level normalization is still blocked."
+    if policy_debt_status == "class-debt":
+        detail = policy_debt_reason or reason
+        return f"Trust policy: verify first because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: verify first because this class still carries sticky caution."
+    if policy_debt_status == "one-off-noise":
+        detail = policy_debt_reason or reason
+        return f"Trust policy: verify first because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: verify first because this target is noisier than its broader class."
     if exception_retirement_status == "retired":
         return "Trust policy: the earlier soft caution has now been formally retired, so the stronger live policy is back in place."
     if exception_retirement_status == "candidate":
@@ -3741,9 +4280,21 @@ def _with_trust_policy_brief(
     exception_status: str,
     trust_recovery_status: str,
     exception_retirement_status: str,
+    policy_debt_status: str,
+    class_normalization_status: str,
 ) -> str:
     if not summary:
         return summary
+    if class_normalization_status == "applied":
+        return f"{summary} Trust policy: class-level normalization applied."
+    if class_normalization_status == "candidate":
+        return f"{summary} Trust policy: class-level normalization is trending, but not earned yet."
+    if class_normalization_status == "blocked":
+        return f"{summary} Trust policy: class-level normalization is blocked."
+    if policy_debt_status == "class-debt":
+        return f"{summary} Trust policy: class-level caution still looks sticky."
+    if policy_debt_status == "one-off-noise":
+        return f"{summary} Trust policy: this target still looks noisier than its broader class."
     if exception_retirement_status == "retired":
         return f"{summary} Trust policy: earlier caution retired."
     if exception_retirement_status == "candidate":
@@ -3810,6 +4361,22 @@ def _exception_retirement_note(resolution_trend: dict) -> str:
     if status in {None, "", "none"}:
         return ""
     return f"Exception retirement: {status} — {reason}".strip()
+
+
+def _policy_debt_note(resolution_trend: dict) -> str:
+    status = resolution_trend.get("primary_target_policy_debt_status", "none")
+    reason = resolution_trend.get("primary_target_policy_debt_reason", "")
+    if status in {None, "", "none"}:
+        return ""
+    return f"Policy debt cleanup: {status} — {reason}".strip()
+
+
+def _class_normalization_note(resolution_trend: dict) -> str:
+    status = resolution_trend.get("primary_target_class_normalization_status", "none")
+    reason = resolution_trend.get("primary_target_class_normalization_reason", "")
+    if status in {None, "", "none"}:
+        return ""
+    return f"Class-level trust normalization: {status} — {reason}".strip()
 
 
 def _recommendation_drift_note(resolution_trend: dict) -> str:

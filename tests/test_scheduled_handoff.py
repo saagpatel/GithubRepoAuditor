@@ -88,6 +88,15 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
             "retired_exception_hotspots": [],
             "sticky_exception_hotspots": [],
             "exception_retirement_window_runs": 4,
+            "primary_target_policy_debt_status": "watch",
+            "primary_target_policy_debt_reason": "This class has enough recent exception activity to watch for lingering caution, but it is not yet clearly sticky or clearly normalization-friendly.",
+            "primary_target_class_normalization_status": "candidate",
+            "primary_target_class_normalization_reason": "This class is trending healthier, but the current target has not earned class-level normalization yet.",
+            "policy_debt_summary": "RepoC: RepoC drift needs review sits in a class with mixed recent caution behavior, so watch for policy debt before normalizing further.",
+            "trust_normalization_summary": "RepoC: RepoC drift needs review belongs to a healthier class trend, but it has not earned class-level normalization yet.",
+            "policy_debt_hotspots": [],
+            "normalized_class_hotspots": [],
+            "class_normalization_window_runs": 4,
             "recommendation_drift_status": "stable",
             "recommendation_drift_summary": "Recent trust-policy behavior is stable enough that no meaningful recommendation drift is recorded.",
             "policy_flip_hotspots": [],
@@ -137,6 +146,8 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
                 "trust_recovery_reason": "This target is stabilizing under healthy calibration, but it has not held steady long enough to earn stronger trust yet.",
                 "exception_pattern_status": "recovering",
                 "exception_pattern_reason": "This target is stabilizing under healthy calibration, but it has not held steady long enough to earn stronger trust yet.",
+                "class_retirement_rate": 0.50,
+                "class_sticky_rate": 0.25,
             },
             "next_recommended_run_mode": "incremental",
             "watch_strategy": "adaptive",
@@ -188,6 +199,8 @@ def test_build_scheduled_handoff_writes_artifacts_and_issue_candidate(tmp_path):
     assert "Trust Recovery" in markdown
     assert "Recovery Confidence" in markdown
     assert "Exception Retirement" in markdown
+    assert "Policy Debt Cleanup" in markdown
+    assert "Class-Level Trust Normalization" in markdown
     assert "Recommendation Drift" in markdown
     assert "Confidence Validation" in markdown
     assert "75%" in markdown

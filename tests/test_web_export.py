@@ -152,6 +152,17 @@ def _make_report(**overrides) -> dict:
                 {"scope": "class", "label": "urgent:campaign", "sticky_count": 2, "exception_count": 2}
             ],
             "exception_retirement_window_runs": 4,
+            "primary_target_policy_debt_status": "class-debt",
+            "primary_target_policy_debt_reason": "This class keeps carrying sticky caution across recent runs, so class-level normalization would be premature.",
+            "primary_target_class_normalization_status": "blocked",
+            "primary_target_class_normalization_reason": "Class-level normalization is blocked by local reopen, flip, blocked-recovery, or calibration noise.",
+            "policy_debt_summary": "RepoC: RepoC drift needs review belongs to a class that keeps carrying sticky caution, so class-level normalization should stay conservative for now.",
+            "trust_normalization_summary": "RepoC: RepoC drift needs review is blocked from class-level normalization by local reopen, flip, or calibration noise.",
+            "policy_debt_hotspots": [
+                {"scope": "class", "label": "urgent:campaign", "match_count": 3, "exception_count": 3}
+            ],
+            "normalized_class_hotspots": [],
+            "class_normalization_window_runs": 4,
             "recommendation_drift_status": "watch",
             "recommendation_drift_summary": "RepoC: RepoC drift needs review has started to wobble between trust policies in the recent window: act-with-review -> verify-first.",
             "policy_flip_hotspots": [
@@ -315,7 +326,11 @@ class TestRenderHtml:
         assert "Trust Recovery:" in html
         assert "Recovery Confidence:" in html
         assert "Exception Retirement:" in html
+        assert "Policy Debt Cleanup:" in html
+        assert "Class-Level Trust Normalization:" in html
         assert "Recommendation Drift:" in html
+        assert "Policy Debt Summary:" in html
+        assert "Trust Normalization Summary:" in html
         assert "Why This Confidence Is Actionable:" in html
         assert "Recent Confidence Outcomes:" in html
         assert "RepoC: RepoC drift needs review" in html
