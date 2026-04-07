@@ -520,11 +520,13 @@ def _operator_transition_closure_values(data: dict) -> tuple[str, str, str, str,
     closure_forecast_freshness = (
         summary.get("primary_target_closure_forecast_freshness_status", "") or "insufficient-data"
     ).replace("-", " ").title()
-    closure_forecast_decay = (
-        summary.get("primary_target_closure_forecast_decay_status", "") or "none"
+    closure_forecast_recovery = (
+        summary.get("primary_target_closure_forecast_refresh_recovery_status", "") or "none"
     ).replace("-", " ").title()
     closure_summary = (
-        summary.get("closure_forecast_decay_summary")
+        summary.get("closure_forecast_reacquisition_summary")
+        or summary.get("closure_forecast_refresh_recovery_summary")
+        or summary.get("closure_forecast_decay_summary")
         or summary.get("closure_forecast_freshness_summary")
         or summary.get("closure_forecast_hysteresis_summary")
         or summary.get("closure_forecast_momentum_summary")
@@ -540,7 +542,7 @@ def _operator_transition_closure_values(data: dict) -> tuple[str, str, str, str,
         pending_debt_freshness,
         closure_forecast_direction,
         closure_forecast_freshness,
-        closure_forecast_decay,
+        closure_forecast_recovery,
         closure_summary,
     )
 
@@ -1023,7 +1025,7 @@ def _build_dashboard(
         pending_debt_freshness,
         closure_forecast_direction,
         closure_forecast_freshness,
-        closure_forecast_decay,
+        closure_forecast_recovery,
         transition_closure_summary,
     ) = _operator_transition_closure_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
@@ -1096,7 +1098,7 @@ def _build_dashboard(
                 ("Pending Debt Freshness", pending_debt_freshness),
                 ("Closure Forecast", closure_forecast_direction),
                 ("Forecast Freshness", closure_forecast_freshness),
-                ("Forecast Decay", closure_forecast_decay),
+                ("Forecast Recovery", closure_forecast_recovery),
                 ("Closure Forecast Summary", transition_closure_summary),
                 ("Momentum Summary", class_momentum_summary),
                 ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}"),
@@ -3769,7 +3771,7 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
         pending_debt_freshness,
         closure_forecast_direction,
         closure_forecast_freshness,
-        closure_forecast_decay,
+        closure_forecast_recovery,
         transition_closure_summary,
     ) = _operator_transition_closure_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
@@ -3822,7 +3824,7 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
                 ("Pending Debt Freshness", pending_debt_freshness),
                 ("Closure Forecast", closure_forecast_direction),
                 ("Forecast Freshness", closure_forecast_freshness),
-                ("Forecast Decay", closure_forecast_decay),
+                ("Forecast Recovery", closure_forecast_recovery),
                 ("Closure Forecast Summary", transition_closure_summary),
                 ("Momentum Summary", class_momentum_summary),
                 ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}"),
@@ -4235,7 +4237,7 @@ def _build_executive_summary(
         pending_debt_freshness,
         closure_forecast_direction,
         closure_forecast_freshness,
-        closure_forecast_decay,
+        closure_forecast_recovery,
         transition_closure_summary,
     ) = _operator_transition_closure_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
@@ -4300,7 +4302,7 @@ def _build_executive_summary(
         narrative_rows.insert(32, ("Pending Debt Freshness", pending_debt_freshness))
         narrative_rows.insert(33, ("Closure Forecast", closure_forecast_direction))
         narrative_rows.insert(34, ("Forecast Freshness", closure_forecast_freshness))
-        narrative_rows.insert(35, ("Forecast Decay", closure_forecast_decay))
+        narrative_rows.insert(35, ("Forecast Recovery", closure_forecast_recovery))
         narrative_rows.insert(36, ("Closure Forecast Summary", transition_closure_summary))
         narrative_rows.insert(37, ("Momentum Summary", class_momentum_summary))
         narrative_rows.insert(38, ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}"))
@@ -4420,8 +4422,8 @@ def _build_executive_summary(
             ws.cell(row=62, column=5, value=closure_forecast_direction)
             ws.cell(row=63, column=4, value="Forecast Freshness").font = SUBHEADER_FONT
             ws.cell(row=63, column=5, value=closure_forecast_freshness)
-            ws.cell(row=64, column=4, value="Forecast Decay").font = SUBHEADER_FONT
-            ws.cell(row=64, column=5, value=closure_forecast_decay)
+            ws.cell(row=64, column=4, value="Forecast Recovery").font = SUBHEADER_FONT
+            ws.cell(row=64, column=5, value=closure_forecast_recovery)
             ws.cell(row=65, column=4, value="Closure Forecast Summary").font = SUBHEADER_FONT
             ws.cell(row=65, column=5, value=transition_closure_summary)
             ws.cell(row=66, column=4, value="Momentum Summary").font = SUBHEADER_FONT
@@ -4500,7 +4502,7 @@ def _build_print_pack(
         pending_debt_freshness,
         closure_forecast_direction,
         closure_forecast_freshness,
-        closure_forecast_decay,
+        closure_forecast_recovery,
         transition_closure_summary,
     ) = _operator_transition_closure_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
@@ -4593,8 +4595,8 @@ def _build_print_pack(
         ws["B47"] = closure_forecast_direction
         ws["A48"] = "Forecast Freshness"
         ws["B48"] = closure_forecast_freshness
-        ws["A49"] = "Forecast Decay"
-        ws["B49"] = closure_forecast_decay
+        ws["A49"] = "Forecast Recovery"
+        ws["B49"] = closure_forecast_recovery
         ws["A50"] = "Closure Forecast Summary"
         ws["B50"] = transition_closure_summary
         ws["A51"] = "Momentum Summary"

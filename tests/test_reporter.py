@@ -311,13 +311,22 @@ class TestMarkdownReport:
             "primary_target_closure_forecast_decay_reason": "",
             "closure_forecast_freshness_summary": "Missing template asset still has useful closure-forecast memory, but some of that signal is aging and should be weighted more cautiously.",
             "closure_forecast_decay_summary": "Recent closure-forecast evidence is still fresh enough that no forecast carry-forward needs to decay yet.",
+            "primary_target_closure_forecast_refresh_recovery_score": 0.16,
+            "primary_target_closure_forecast_refresh_recovery_status": "recovering-confirmation",
+            "primary_target_closure_forecast_reacquisition_status": "pending-confirmation-reacquisition",
+            "primary_target_closure_forecast_reacquisition_reason": "Fresh confirmation-side forecast evidence is returning, but it has not fully re-earned stronger carry-forward yet.",
+            "closure_forecast_refresh_recovery_summary": "Fresh confirmation-side forecast evidence is returning for Missing template asset, but it has not fully re-earned stronger carry-forward yet (0.16).",
+            "closure_forecast_reacquisition_summary": "Fresh confirmation-side forecast evidence is returning, but it has not fully re-earned stronger carry-forward yet.",
             "stale_closure_forecast_hotspots": [],
             "fresh_closure_forecast_signal_hotspots": [],
             "closure_forecast_decay_window_runs": 4,
+            "closure_forecast_refresh_window_runs": 4,
             "closure_forecast_transition_window_runs": 4,
             "sustained_confirmation_hotspots": [],
             "sustained_clearance_hotspots": [],
             "oscillating_closure_forecast_hotspots": [],
+            "recovering_confirmation_hotspots": [],
+            "recovering_clearance_hotspots": [],
             "supporting_pending_resolution_hotspots": [],
             "caution_pending_debt_hotspots": [],
             "stalled_transition_hotspots": [],
@@ -393,6 +402,8 @@ class TestMarkdownReport:
         assert "Closure Forecast Hysteresis:" in content
         assert "Closure Forecast Freshness:" in content
         assert "Hysteresis Decay Controls:" in content
+        assert "Closure Forecast Refresh Recovery:" in content
+        assert "Reacquisition Controls:" in content
         assert "Next Recommended Run" in content
         assert "Watch Strategy" in content
         assert "What Changed" in content
@@ -425,6 +436,8 @@ class TestMarkdownReport:
         assert "Closure Forecast Hysteresis Summary" in content
         assert "Closure Forecast Freshness Summary" in content
         assert "Closure Forecast Decay Summary" in content
+        assert "Closure Forecast Refresh Recovery Summary" in content
+        assert "Closure Forecast Reacquisition Summary" in content
         assert "Class Pending Debt Summary" in content
         assert "Confidence Validation" in content
         assert "Recent Confidence Outcomes" in content

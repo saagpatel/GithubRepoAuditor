@@ -395,13 +395,22 @@ def _make_report(audits=None) -> dict:
             "primary_target_closure_forecast_decay_reason": "",
             "closure_forecast_freshness_summary": "RepoC: Security posture needs attention still has useful closure-forecast memory, but some of that signal is aging and should be weighted more cautiously.",
             "closure_forecast_decay_summary": "Recent closure-forecast evidence is still fresh enough that no forecast carry-forward needs to decay yet.",
+            "primary_target_closure_forecast_refresh_recovery_score": 0.16,
+            "primary_target_closure_forecast_refresh_recovery_status": "recovering-confirmation",
+            "primary_target_closure_forecast_reacquisition_status": "pending-confirmation-reacquisition",
+            "primary_target_closure_forecast_reacquisition_reason": "Fresh confirmation-side forecast evidence is returning, but it has not fully re-earned stronger carry-forward yet.",
+            "closure_forecast_refresh_recovery_summary": "Fresh confirmation-side forecast evidence is returning for RepoC: Security posture needs attention, but it has not fully re-earned stronger carry-forward yet (0.16).",
+            "closure_forecast_reacquisition_summary": "Fresh confirmation-side forecast evidence is returning, but it has not fully re-earned stronger carry-forward yet.",
             "stale_closure_forecast_hotspots": [],
             "fresh_closure_forecast_signal_hotspots": [],
             "closure_forecast_decay_window_runs": 4,
+            "closure_forecast_refresh_window_runs": 4,
             "closure_forecast_transition_window_runs": 4,
             "sustained_confirmation_hotspots": [],
             "sustained_clearance_hotspots": [],
             "oscillating_closure_forecast_hotspots": [],
+            "recovering_confirmation_hotspots": [],
+            "recovering_clearance_hotspots": [],
             "supporting_pending_resolution_hotspots": [],
             "caution_pending_debt_hotspots": [],
             "stalled_transition_hotspots": [],
@@ -755,7 +764,7 @@ class TestAnalystWorkbookSheets:
         assert review_ws["A43"].value == "Pending Debt Freshness"
         assert review_ws["A44"].value == "Closure Forecast"
         assert review_ws["A45"].value == "Forecast Freshness"
-        assert review_ws["A46"].value == "Forecast Decay"
+        assert review_ws["A46"].value == "Forecast Recovery"
         assert review_ws["A47"].value == "Closure Forecast Summary"
         assert review_ws["A48"].value == "Momentum Summary"
         assert review_ws["A49"].value == "Exception Learning"
@@ -792,7 +801,7 @@ class TestAnalystWorkbookSheets:
         assert executive_ws["D61"].value == "Pending Debt Freshness"
         assert executive_ws["D62"].value == "Closure Forecast"
         assert executive_ws["D63"].value == "Forecast Freshness"
-        assert executive_ws["D64"].value == "Forecast Decay"
+        assert executive_ws["D64"].value == "Forecast Recovery"
         assert executive_ws["D65"].value == "Closure Forecast Summary"
         assert executive_ws["D66"].value == "Momentum Summary"
         assert executive_ws["D67"].value == "Exception Learning"
@@ -831,7 +840,7 @@ class TestAnalystWorkbookSheets:
         assert print_ws["A46"].value == "Pending Debt Freshness"
         assert print_ws["A47"].value == "Closure Forecast"
         assert print_ws["A48"].value == "Forecast Freshness"
-        assert print_ws["A49"].value == "Forecast Decay"
+        assert print_ws["A49"].value == "Forecast Recovery"
         assert print_ws["A50"].value == "Closure Forecast Summary"
         assert print_ws["A51"].value == "Momentum Summary"
         assert print_ws["A52"].value == "Exception Learning"
@@ -860,7 +869,7 @@ class TestAnalystWorkbookSheets:
         assert "Pending Debt Freshness" in dashboard_values
         assert "Closure Forecast" in dashboard_values
         assert "Forecast Freshness" in dashboard_values
-        assert "Forecast Decay" in dashboard_values
+        assert "Forecast Recovery" in dashboard_values
         assert "Exception Learning" in dashboard_values
         assert "Recommendation Drift" in dashboard_values
 
