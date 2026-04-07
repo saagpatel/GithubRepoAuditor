@@ -201,6 +201,11 @@ class TestMarkdownReport:
             "primary_target_trust_policy_reason": "Blocked work with tuned high confidence should be cleared before new work.",
             "next_action_trust_policy": "act-now",
             "next_action_trust_policy_reason": "Blocked work with tuned high confidence should be cleared before new work.",
+            "primary_target_exception_status": "none",
+            "primary_target_exception_reason": "",
+            "recommendation_drift_status": "stable",
+            "recommendation_drift_summary": "Recent trust-policy behavior is stable enough that no meaningful recommendation drift is recorded.",
+            "policy_flip_hotspots": [],
             "adaptive_confidence_summary": "Calibration is validating well, so the live recommendation was strengthened and is ready for immediate action.",
             "recommendation_quality_summary": "Strong recommendation because the next step is tied directly to the current top target.",
             "confidence_validation_status": "healthy",
@@ -238,6 +243,7 @@ class TestMarkdownReport:
         content = path.read_text()
         assert "Operator Control Center" in content
         assert "Missing template asset" in content
+        assert "Recommendation Drift:" in content
         assert "Next Recommended Run" in content
         assert "Watch Strategy" in content
         assert "What Changed" in content

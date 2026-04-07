@@ -193,3 +193,11 @@ Phase 31 turns that calibration into live operator guidance:
 - `act-with-review`: the recommendation is strong, but a quick operator review is still healthy
 - `verify-first`: the target still matters, but noisy or reopened evidence means you should confirm the latest state before committing
 - `monitor`: the queue is calm enough, or the current signal is light enough, that no forceful closure move is justified yet
+
+Phase 32 adds soft trust-policy exceptions and recommendation-drift auditing on top of that:
+
+- soft exceptions can reduce the live trust policy by one step when the same target keeps reopening, underperforming, or flipping between trust policies
+- those exceptions stay bounded inside the existing lane buckets; they do not promote lower-priority work above higher-priority work
+- `stable`: recent trust-policy behavior is calm enough that no extra caution is needed
+- `watch`: the current target has started to wobble between trust policies and deserves a lighter touch
+- `drifting`: the current target or recent hotspots have flipped often enough that the recommendation should be treated as less settled

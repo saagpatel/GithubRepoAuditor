@@ -12,6 +12,8 @@ Watch mode now uses that same baseline contract in live execution. `--watch-stra
 
 The operator summary now also carries confidence calibration derived from recent warehouse history, and Phase 31 uses that signal in live recommendation tuning. Calibration can now slightly strengthen blocked or urgent targets when recent high-confidence guidance has been validating, or soften recommendations when recent high-confidence guidance has turned noisy. That live tuning stays bounded: it only affects confidence inside the existing precedence buckets, and it adds a soft trust-policy layer (`act-now`, `act-with-review`, `verify-first`, or `monitor`) instead of rewriting lane semantics.
 
+Phase 32 adds one more bounded layer on top of that live trust policy: soft trust-policy exceptions plus recommendation-drift auditing. Those exceptions can soften the final trust policy for the current target when the same target keeps reopening, when earlier strong recommendations keep ending unresolved, or when the recent trust-policy path keeps flipping back and forth. The drift audit is explanatory first and centered on policy flips, not generic churn, and it stays artifact-first across control-center, scheduled handoff, Markdown, HTML, and the `standard` workbook callouts.
+
 The documented primary command is now `audit`, exposed through the package console script. `python -m src` remains a supported fallback for environments that prefer module execution.
 
 ## Typical Invocation

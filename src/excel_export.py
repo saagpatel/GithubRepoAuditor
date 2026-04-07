@@ -349,6 +349,25 @@ def _operator_trust_values(data: dict) -> tuple[str, str, str]:
     return trust_policy, trust_reason, adaptive_summary
 
 
+def _operator_exception_values(data: dict) -> tuple[str, str, str, str]:
+    summary = data.get("operator_summary") or {}
+    exception_status = (
+        summary.get("primary_target_exception_status", "") or "none"
+    ).replace("-", " ").title()
+    exception_reason = (
+        summary.get("primary_target_exception_reason")
+        or "No trust-policy exception reason is recorded yet."
+    )
+    drift_status = (
+        summary.get("recommendation_drift_status", "") or "stable"
+    ).replace("-", " ").title()
+    drift_summary = (
+        summary.get("recommendation_drift_summary")
+        or "No recommendation-drift summary is recorded yet."
+    )
+    return exception_status, exception_reason, drift_status, drift_summary
+
+
 def _operator_calibration_values(data: dict) -> tuple[str, str, str, str]:
     summary = data.get("operator_summary") or {}
     validation_status = summary.get("confidence_validation_status", "") or "insufficient-data"
@@ -813,6 +832,7 @@ def _build_dashboard(
     last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
     primary_confidence, confidence_reason, next_action_confidence, recommendation_quality = _operator_confidence_values(data)
     trust_policy, trust_policy_reason, adaptive_confidence_summary = _operator_trust_values(data)
+    exception_status, exception_reason, drift_status, drift_summary = _operator_exception_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
 
     operator_rows = [
@@ -862,6 +882,8 @@ def _build_dashboard(
                 ("Next Action Confidence", next_action_confidence),
                 ("Trust Policy", trust_policy),
                 ("Trust Rationale", trust_policy_reason),
+                ("Trust Exception", f"{exception_status} — {exception_reason}"),
+                ("Recommendation Drift", f"{drift_status} — {drift_summary}"),
                 ("Adaptive Confidence", adaptive_confidence_summary),
                 ("Recommendation Quality", recommendation_quality),
                 ("Confidence Validation", f"{calibration_status} — {calibration_summary}"),
@@ -3516,6 +3538,7 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
     last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
     primary_confidence, confidence_reason, next_action_confidence, recommendation_quality = _operator_confidence_values(data)
     trust_policy, trust_policy_reason, adaptive_confidence_summary = _operator_trust_values(data)
+    exception_status, exception_reason, drift_status, drift_summary = _operator_exception_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
     summary_rows = [
         ("Headline", (data.get("operator_summary") or {}).get("headline", "Review activity is available below.")),
@@ -3545,6 +3568,8 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
                 ("Next Action Confidence", next_action_confidence),
                 ("Trust Policy", trust_policy),
                 ("Trust Rationale", trust_policy_reason),
+                ("Trust Exception", f"{exception_status} — {exception_reason}"),
+                ("Recommendation Drift", f"{drift_status} — {drift_summary}"),
                 ("Adaptive Confidence", adaptive_confidence_summary),
                 ("Recommendation Quality", recommendation_quality),
                 ("Confidence Validation", f"{calibration_status} — {calibration_summary}"),
@@ -3939,6 +3964,7 @@ def _build_executive_summary(
     last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
     primary_confidence, confidence_reason, next_action_confidence, recommendation_quality = _operator_confidence_values(data)
     trust_policy, trust_policy_reason, adaptive_confidence_summary = _operator_trust_values(data)
+    exception_status, exception_reason, drift_status, drift_summary = _operator_exception_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
     recommended_focus = ""
     if data.get("operator_queue"):
@@ -3980,8 +4006,10 @@ def _build_executive_summary(
         narrative_rows.insert(11, ("Confidence Rationale", confidence_reason))
         narrative_rows.insert(12, ("Trust Policy", trust_policy))
         narrative_rows.insert(13, ("Trust Rationale", trust_policy_reason))
-        narrative_rows.insert(14, ("Adaptive Confidence", adaptive_confidence_summary))
-        narrative_rows.insert(15, ("Confidence Validation", f"{calibration_status} — {calibration_summary}"))
+        narrative_rows.insert(14, ("Trust Exception", f"{exception_status} — {exception_reason}"))
+        narrative_rows.insert(15, ("Recommendation Drift", f"{drift_status} — {drift_summary}"))
+        narrative_rows.insert(16, ("Adaptive Confidence", adaptive_confidence_summary))
+        narrative_rows.insert(17, ("Confidence Validation", f"{calibration_status} — {calibration_summary}"))
     _write_key_value_block(ws, 4, 1, narrative_rows, title="Leadership Brief")
 
     write_kpi_card(ws, 10, 1, "Portfolio Grade", data.get("portfolio_grade", "F"))
@@ -4111,6 +4139,7 @@ def _build_print_pack(
     last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
     primary_confidence, confidence_reason, next_action_confidence, recommendation_quality = _operator_confidence_values(data)
     trust_policy, trust_policy_reason, adaptive_confidence_summary = _operator_trust_values(data)
+    exception_status, exception_reason, drift_status, drift_summary = _operator_exception_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
     ws["A7"] = "This Week"
     ws["B7"] = operator_summary.get("headline", "Review the latest workbook surfaces for change and drift.")
@@ -4159,19 +4188,23 @@ def _build_print_pack(
         ws["B26"] = trust_policy
         ws["A27"] = "Trust Rationale"
         ws["B27"] = trust_policy_reason
-        ws["A28"] = "Adaptive Confidence"
-        ws["B28"] = adaptive_confidence_summary
-        ws["A29"] = "Recommendation Quality"
-        ws["B29"] = recommendation_quality
-        ws["A30"] = "Confidence Validation"
-        ws["B30"] = f"{calibration_status} — {calibration_summary}"
-        ws["A31"] = "Calibration Snapshot"
-        ws["B31"] = f"High-confidence hit rate {high_hit_rate} | {reopened_recommendations}"
-        ws["A32"] = "Top Risks"
-        ws["A32"].font = SECTION_FONT
-        risk_start_row = 32
-        opportunity_header_row = 32
-        page2_row = 41
+        ws["A28"] = "Trust Exception"
+        ws["B28"] = f"{exception_status} — {exception_reason}"
+        ws["A29"] = "Recommendation Drift"
+        ws["B29"] = f"{drift_status} — {drift_summary}"
+        ws["A30"] = "Adaptive Confidence"
+        ws["B30"] = adaptive_confidence_summary
+        ws["A31"] = "Recommendation Quality"
+        ws["B31"] = recommendation_quality
+        ws["A32"] = "Confidence Validation"
+        ws["B32"] = f"{calibration_status} — {calibration_summary}"
+        ws["A33"] = "Calibration Snapshot"
+        ws["B33"] = f"High-confidence hit rate {high_hit_rate} | {reopened_recommendations}"
+        ws["A34"] = "Top Risks"
+        ws["A34"].font = SECTION_FONT
+        risk_start_row = 34
+        opportunity_header_row = 34
+        page2_row = 43
     else:
         ws["A17"] = "Top Risks"
         ws["A17"].font = SECTION_FONT

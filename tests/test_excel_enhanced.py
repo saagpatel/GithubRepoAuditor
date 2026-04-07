@@ -284,6 +284,11 @@ def _make_report(audits=None) -> dict:
             "primary_target_trust_policy_reason": "Urgent work has enough tuned confidence to act, with a quick operator review.",
             "next_action_trust_policy": "act-with-review",
             "next_action_trust_policy_reason": "Healthy calibration supports a confident next step, with light operator judgment.",
+            "primary_target_exception_status": "none",
+            "primary_target_exception_reason": "",
+            "recommendation_drift_status": "stable",
+            "recommendation_drift_summary": "Recent trust-policy behavior is stable enough that no meaningful recommendation drift is recorded.",
+            "policy_flip_hotspots": [],
             "adaptive_confidence_summary": "Calibration is validating well, so the recommendation can be acted on with light operator review.",
             "recommendation_quality_summary": "Strong recommendation because the next step is tied directly to the current top target.",
             "confidence_validation_status": "healthy",
@@ -595,7 +600,9 @@ class TestAnalystWorkbookSheets:
         assert review_ws["A22"].value == "Next Action Confidence"
         assert review_ws["A23"].value == "Trust Policy"
         assert review_ws["A24"].value == "Trust Rationale"
-        assert review_ws["A25"].value == "Adaptive Confidence"
+        assert review_ws["A25"].value == "Trust Exception"
+        assert review_ws["A26"].value == "Recommendation Drift"
+        assert review_ws["A27"].value == "Adaptive Confidence"
         assert executive_ws["D29"].value == "Trend"
         assert executive_ws["D32"].value == "Why Top Target"
         assert executive_ws["D33"].value == "Closure Guidance"
@@ -608,6 +615,8 @@ class TestAnalystWorkbookSheets:
         assert executive_ws["D42"].value == "Trust Policy"
         assert executive_ws["D43"].value == "Trust Rationale"
         assert executive_ws["D44"].value == "Adaptive Confidence"
+        assert executive_ws["D45"].value == "Recommendation Quality"
+        assert executive_ws["D46"].value == "Confidence Validation"
         assert print_ws["A17"].value == "Primary Target"
         assert print_ws["A18"].value == "Why Top Target"
         assert print_ws["A19"].value == "What We Tried"
@@ -618,12 +627,16 @@ class TestAnalystWorkbookSheets:
         assert print_ws["A25"].value == "Next Action Confidence"
         assert print_ws["A26"].value == "Trust Policy"
         assert print_ws["A27"].value == "Trust Rationale"
-        assert print_ws["A28"].value == "Adaptive Confidence"
+        assert print_ws["A28"].value == "Trust Exception"
+        assert print_ws["A29"].value == "Recommendation Drift"
+        assert print_ws["A30"].value == "Adaptive Confidence"
         assert "Why Top Target" in dashboard_values
         assert "Closure Guidance" in dashboard_values
         assert "What We Tried" in dashboard_values
         assert "Recommendation Confidence" in dashboard_values
         assert "Trust Policy" in dashboard_values
+        assert "Trust Exception" in dashboard_values
+        assert "Recommendation Drift" in dashboard_values
 
     def test_campaigns_show_empty_state_when_no_preview_rows(self):
         wb = Workbook()

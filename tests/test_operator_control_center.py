@@ -139,6 +139,8 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
     assert summary["next_action_confidence_label"] == "high"
     assert summary["primary_target_trust_policy"] == "act-now"
     assert "blocked" in summary["primary_target_trust_policy_reason"].lower()
+    assert summary["primary_target_exception_status"] == "none"
+    assert summary["recommendation_drift_status"] == "stable"
     assert "guidance" in summary["adaptive_confidence_summary"].lower() or "immediate action" in summary["adaptive_confidence_summary"].lower()
     assert summary["recommendation_quality_summary"].startswith("Strong recommendation because")
 
@@ -890,6 +892,183 @@ def test_operator_snapshot_uses_verify_first_for_noisy_reopened_targets(tmp_path
     assert summary["primary_target_trust_policy"] == "verify-first"
     assert summary["next_action_trust_policy"] == "verify-first"
     assert summary["what_to_do_next"].startswith("Verify before acting:")
+
+
+def test_operator_snapshot_softens_for_policy_flip_churn(tmp_path: Path, monkeypatch):
+    report = _make_report(
+        preflight_summary={},
+        material_changes=[
+            {
+                "change_key": "high-1",
+                "change_type": "security-change",
+                "repo_name": "RepoC",
+                "severity": 0.9,
+                "title": "RepoC security posture changed",
+                "summary": "critical -> watch",
+                "recommended_next_step": "Review RepoC security posture changed now.",
+            }
+        ],
+        managed_state_drift=[],
+        governance_drift=[],
+        governance_preview={},
+        rollback_preview={},
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history",
+        lambda *_args, **_kwargs: [
+            {
+                "generated_at": "2026-04-06T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {
+                        "item_id": "review-change:high-1",
+                        "repo": "RepoC",
+                        "title": "RepoC security posture changed",
+                        "lane": "urgent",
+                        "kind": "review",
+                    },
+                    "primary_target_trust_policy": "act-with-review",
+                    "decision_memory_status": "new",
+                    "primary_target_last_outcome": "improved",
+                },
+                "operator_queue": [],
+            },
+            {
+                "generated_at": "2026-04-05T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {
+                        "item_id": "review-change:high-1",
+                        "repo": "RepoC",
+                        "title": "RepoC security posture changed",
+                        "lane": "urgent",
+                        "kind": "review",
+                    },
+                    "primary_target_trust_policy": "verify-first",
+                    "decision_memory_status": "new",
+                    "primary_target_last_outcome": "improved",
+                },
+                "operator_queue": [],
+            },
+            {
+                "generated_at": "2026-04-04T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {
+                        "item_id": "review-change:high-1",
+                        "repo": "RepoC",
+                        "title": "RepoC security posture changed",
+                        "lane": "urgent",
+                        "kind": "review",
+                    },
+                    "primary_target_trust_policy": "act-with-review",
+                    "decision_memory_status": "new",
+                    "primary_target_last_outcome": "improved",
+                },
+                "operator_queue": [],
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center._build_confidence_calibration",
+        lambda _history: {
+            "confidence_validation_status": "healthy",
+            "confidence_window_runs": 8,
+            "validated_recommendation_count": 4,
+            "partially_validated_recommendation_count": 1,
+            "unresolved_recommendation_count": 1,
+            "reopened_recommendation_count": 0,
+            "insufficient_future_runs_count": 2,
+            "high_confidence_hit_rate": 0.75,
+            "medium_confidence_hit_rate": 0.5,
+            "low_confidence_caution_rate": 1.0,
+            "recent_validation_outcomes": [],
+            "confidence_calibration_summary": "Recent high-confidence recommendations are validating well.",
+        },
+    )
+
+    snapshot = build_operator_snapshot(report, output_dir=tmp_path)
+    summary = snapshot["operator_summary"]
+
+    assert summary["primary_target_exception_status"] == "softened-for-flip-churn"
+    assert summary["recommendation_drift_status"] == "drifting"
+    assert summary["primary_target_trust_policy"] == "verify-first"
+    assert summary["primary_target"].get("policy_flip_count", 0) >= 2
+
+
+def test_operator_snapshot_never_softens_blocked_setup_below_act_with_review(tmp_path: Path, monkeypatch):
+    report = _make_report()
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history",
+        lambda *_args, **_kwargs: [
+            {
+                "generated_at": "2026-04-06T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {
+                        "item_id": "setup:github-token",
+                        "title": "GitHub authentication is required.",
+                        "lane": "blocked",
+                        "kind": "setup",
+                    },
+                    "primary_target_trust_policy": "act-now",
+                    "decision_memory_status": "reopened",
+                    "primary_target_last_outcome": "reopened",
+                },
+                "operator_queue": [],
+            },
+            {
+                "generated_at": "2026-04-05T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {
+                        "item_id": "setup:github-token",
+                        "title": "GitHub authentication is required.",
+                        "lane": "blocked",
+                        "kind": "setup",
+                    },
+                    "primary_target_trust_policy": "verify-first",
+                    "decision_memory_status": "reopened",
+                    "primary_target_last_outcome": "reopened",
+                },
+                "operator_queue": [],
+            },
+            {
+                "generated_at": "2026-04-04T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {
+                        "item_id": "setup:github-token",
+                        "title": "GitHub authentication is required.",
+                        "lane": "blocked",
+                        "kind": "setup",
+                    },
+                    "primary_target_trust_policy": "act-now",
+                    "decision_memory_status": "reopened",
+                    "primary_target_last_outcome": "reopened",
+                },
+                "operator_queue": [],
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center._build_confidence_calibration",
+        lambda _history: {
+            "confidence_validation_status": "noisy",
+            "confidence_window_runs": 8,
+            "validated_recommendation_count": 1,
+            "partially_validated_recommendation_count": 1,
+            "unresolved_recommendation_count": 2,
+            "reopened_recommendation_count": 2,
+            "insufficient_future_runs_count": 1,
+            "high_confidence_hit_rate": 0.4,
+            "medium_confidence_hit_rate": 0.5,
+            "low_confidence_caution_rate": 1.0,
+            "recent_validation_outcomes": [],
+            "confidence_calibration_summary": "Recent high-confidence guidance has missed often enough that operators should verify before overcommitting.",
+        },
+    )
+    monkeypatch.setattr("src.operator_control_center._was_resolved_then_reopened", lambda *_args, **_kwargs: True)
+
+    snapshot = build_operator_snapshot(report, output_dir=tmp_path)
+    summary = snapshot["operator_summary"]
+
+    assert summary["primary_target_exception_status"] in {"softened-for-noise", "softened-for-flip-churn", "softened-for-reopen-risk"}
+    assert summary["primary_target_trust_policy"] == "act-with-review"
 
 
 def test_normalize_review_state_backfills_missing_fields(tmp_path: Path):

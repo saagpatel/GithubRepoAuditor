@@ -69,6 +69,11 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
             "primary_target_trust_policy_reason": "Urgent work has enough tuned confidence to act, with a quick operator review.",
             "next_action_trust_policy": "act-with-review",
             "next_action_trust_policy_reason": "Healthy calibration supports a confident next step, with light operator judgment.",
+            "primary_target_exception_status": "none",
+            "primary_target_exception_reason": "",
+            "recommendation_drift_status": "stable",
+            "recommendation_drift_summary": "Recent trust-policy behavior is stable enough that no meaningful recommendation drift is recorded.",
+            "policy_flip_hotspots": [],
             "adaptive_confidence_summary": "Calibration is validating well, so the recommendation can be acted on with light operator review.",
             "recommendation_quality_summary": "Strong recommendation because the next step is tied directly to the current top target.",
             "confidence_validation_status": "healthy",
@@ -106,6 +111,8 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
                 "repo": "RepoC",
                 "title": "RepoC drift needs review",
                 "recommended_action": "Inspect the managed issue before closing the campaign.",
+                "policy_flip_count": 0,
+                "recent_policy_path": "",
             },
             "next_recommended_run_mode": "incremental",
             "watch_strategy": "adaptive",
@@ -152,6 +159,8 @@ def test_build_scheduled_handoff_writes_artifacts_and_issue_candidate(tmp_path):
     assert "Primary target confidence: medium (0.70)" in markdown
     assert "Operator Trust Policy" in markdown
     assert "act-with-review" in markdown
+    assert "Trust Policy Exception" in markdown
+    assert "Recommendation Drift" in markdown
     assert "Confidence Validation" in markdown
     assert "75%" in markdown
     assert "Aging Pressure" in markdown
