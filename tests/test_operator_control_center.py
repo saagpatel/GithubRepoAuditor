@@ -127,6 +127,10 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
     assert summary["urgency"] == "blocked"
     assert summary["trend_status"] == "stable"
     assert summary["primary_target"]["title"] == "GitHub authentication is required."
+    assert summary["aging_status"] == "stale"
+    assert "setup blocker" in summary["primary_target_reason"].lower()
+    assert "rerun the relevant command" in summary["primary_target_done_criteria"].lower()
+    assert "Set GITHUB_TOKEN" in summary["closure_guidance"]
 
 
 def test_operator_snapshot_adds_follow_through_from_recent_history(tmp_path: Path, monkeypatch):
@@ -255,6 +259,82 @@ def test_operator_snapshot_tracks_reopened_attention_items(tmp_path: Path, monke
     assert summary["trend_status"] == "worsening"
     assert summary["reopened_attention_count"] >= 1
     assert summary["primary_target"]["title"] == "RepoD drift needs review"
+
+
+def test_operator_snapshot_marks_chronic_targets_and_longest_persisting_item(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history",
+        lambda *_args, **_kwargs: [
+            {
+                "operator_summary": {"counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}},
+                "operator_queue": [
+                    {
+                        "item_id": "campaign-drift:campaign-1:github-issue",
+                        "lane": "urgent",
+                        "age_days": 22,
+                        "repo": "RepoD",
+                        "title": "RepoD drift needs review",
+                    }
+                ],
+            },
+            {
+                "operator_summary": {"counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}},
+                "operator_queue": [
+                    {
+                        "item_id": "campaign-drift:campaign-1:github-issue",
+                        "lane": "urgent",
+                        "age_days": 23,
+                        "repo": "RepoD",
+                        "title": "RepoD drift needs review",
+                    }
+                ],
+            },
+            {
+                "operator_summary": {"counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}},
+                "operator_queue": [
+                    {
+                        "item_id": "campaign-drift:campaign-1:github-issue",
+                        "lane": "urgent",
+                        "age_days": 24,
+                        "repo": "RepoD",
+                        "title": "RepoD drift needs review",
+                    }
+                ],
+            },
+            {
+                "operator_summary": {"counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}},
+                "operator_queue": [
+                    {
+                        "item_id": "campaign-drift:campaign-1:github-issue",
+                        "lane": "urgent",
+                        "age_days": 25,
+                        "repo": "RepoD",
+                        "title": "RepoD drift needs review",
+                    }
+                ],
+            },
+        ],
+    )
+
+    snapshot = build_operator_snapshot(
+        _make_report(
+            preflight_summary={},
+            governance_drift=[],
+            governance_preview={},
+            rollback_preview={},
+            review_targets=[],
+            material_changes=[],
+        ),
+        output_dir=tmp_path,
+    )
+    summary = snapshot["operator_summary"]
+
+    assert summary["aging_status"] == "chronic"
+    assert summary["chronic_item_count"] >= 1
+    assert summary["longest_persisting_item"]["title"] == "RepoD drift needs review"
+    assert "multiple cycles" in summary["primary_target_reason"]
+    assert "reconcile the drift" in summary["primary_target_done_criteria"].lower()
+    assert "aging pressure" in summary["accountability_summary"].lower()
 
 
 def test_normalize_review_state_backfills_missing_fields(tmp_path: Path):

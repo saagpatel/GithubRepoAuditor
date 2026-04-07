@@ -105,6 +105,10 @@ def _make_report(**overrides) -> dict:
             "what_to_do_next": "Inspect the managed issue before closing the campaign.",
             "trend_summary": "The queue is stable but still sticky: 1 attention item is persisting from the last run.",
             "follow_through_summary": "1 urgent item repeated in the recent window.",
+            "accountability_summary": "The top target is still open because the same urgent drift item keeps surviving recent cycles.",
+            "primary_target_reason": "This stays on top because urgent drift has persisted and should be cleared before lower-pressure work.",
+            "primary_target_done_criteria": "Inspect the drift, reconcile it, and confirm the item no longer returns as urgent on the next run.",
+            "closure_guidance": "Review the managed issue, reconcile the drift, and confirm the urgent queue shrinks on the next run.",
             "primary_target": {"repo": "RepoC", "title": "RepoC drift needs review"},
         },
         "operator_queue": [
@@ -216,7 +220,11 @@ class TestRenderHtml:
     def test_operator_section_includes_trend_and_primary_target(self):
         html = _render_html(_make_report())
         assert "Trend:" in html
+        assert "Accountability:" in html
         assert "Primary Target:" in html
+        assert "Why This Is The Top Target:" in html
+        assert "What Counts As Done:" in html
+        assert "Closure Guidance:" in html
         assert "RepoC: RepoC drift needs review" in html
 
     def test_has_filter_controls(self):

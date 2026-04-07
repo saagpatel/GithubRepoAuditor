@@ -243,6 +243,21 @@ def _make_report(audits=None) -> dict:
             "persisting_attention_count": 1,
             "reopened_attention_count": 0,
             "quiet_streak_runs": 0,
+            "aging_status": "watch",
+            "primary_target_reason": "This remains the top target because urgent review work should be closed before lower-pressure ready items.",
+            "primary_target_done_criteria": "Complete the recommended review action and confirm the item exits urgent state on the next run.",
+            "closure_guidance": "Preview the governance controls and confirm this urgent review target clears on the next run.",
+            "attention_age_bands": {"0-1 days": 1, "2-7 days": 0, "8-21 days": 0, "22+ days": 0},
+            "chronic_item_count": 0,
+            "newly_stale_count": 0,
+            "longest_persisting_item": {
+                "repo": "RepoC",
+                "title": "Security posture needs attention",
+                "lane": "urgent",
+                "age_days": 0,
+                "aging_status": "watch",
+            },
+            "accountability_summary": "The urgent queue is still active, but no items have crossed into chronic aging pressure yet.",
             "primary_target": {
                 "item_id": "review-target:RepoC",
                 "repo": "RepoC",
@@ -261,6 +276,8 @@ def _make_report(audits=None) -> dict:
                 "recommended_action": "Preview governance controls",
                 "source_run_id": "user:2026-03-29T10:00:00+00:00",
                 "age_days": 0,
+                "aging_status": "watch",
+                "newly_stale": False,
                 "links": [],
             }
         ],
@@ -486,17 +503,36 @@ class TestAnalystWorkbookSheets:
         wb = Workbook()
         report = _make_report()
         _build_review_queue(wb, report, excel_mode="standard")
+        _build_dashboard(wb, report, excel_mode="standard")
         _build_executive_summary(wb, report, None, portfolio_profile="default", collection="showcase", excel_mode="standard")
         _build_print_pack(wb, report, None, portfolio_profile="default", collection="showcase", excel_mode="standard")
 
+        dashboard_ws = wb["Dashboard"]
         review_ws = wb["Review Queue"]
         executive_ws = wb["Executive Summary"]
         print_ws = wb["Print Pack"]
+        dashboard_values = [
+            cell
+            for row in dashboard_ws.iter_rows(min_row=1, max_row=40, min_col=1, max_col=25, values_only=True)
+            for cell in row
+            if cell is not None
+        ]
 
         assert review_ws["A10"].value == "Trend"
         assert "stable" in str(review_ws["B10"].value).lower()
+        assert review_ws["A13"].value == "Why Top Target"
+        assert "urgent review work" in str(review_ws["B13"].value).lower()
+        assert review_ws["A14"].value == "Closure Guidance"
+        assert review_ws["A15"].value == "Aging Pressure"
         assert executive_ws["D29"].value == "Trend"
+        assert executive_ws["D32"].value == "Why Top Target"
+        assert executive_ws["D33"].value == "Closure Guidance"
         assert print_ws["A17"].value == "Primary Target"
+        assert print_ws["A18"].value == "Why Top Target"
+        assert print_ws["A19"].value == "What Counts As Done"
+        assert print_ws["A20"].value == "Aging Pressure"
+        assert "Why Top Target" in dashboard_values
+        assert "Closure Guidance" in dashboard_values
 
     def test_campaigns_show_empty_state_when_no_preview_rows(self):
         wb = Workbook()

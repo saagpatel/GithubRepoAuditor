@@ -101,6 +101,12 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     )
     resolved_count = summary.get("resolved_attention_count", 0)
     persisting_count = summary.get("persisting_attention_count", 0)
+    longest_persisting = summary.get("longest_persisting_item") or {}
+    longest_label = (
+        f"{longest_persisting.get('repo')}: {longest_persisting.get('title')}"
+        if longest_persisting.get("repo")
+        else longest_persisting.get("title", "")
+    )
     lines = [
         f"# Scheduled Audit Handoff: {payload.get('username', 'unknown')}",
         "",
@@ -112,8 +118,10 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Why it matters: {summary.get('why_it_matters', 'No additional operator impact is recorded.')}",
         f"- What to do next: {summary.get('what_to_do_next', 'Continue the normal operator loop.')}",
         f"- Trend: `{summary.get('trend_status', 'stable')}` — {summary.get('trend_summary', 'No trend summary is recorded yet.')}",
+        f"- Aging status: `{summary.get('aging_status', 'fresh')}`",
         f"- Attention counts: new={summary.get('new_attention_count', 0)}, resolved={resolved_count}, persisting={persisting_count}, reopened={summary.get('reopened_attention_count', 0)}",
         f"- Primary target: {primary_target_label or 'No active target'}",
+        f"- Accountability: {summary.get('accountability_summary', 'No accountability summary is recorded yet.')}",
         f"- Next recommended run: `{summary.get('next_recommended_run_mode', 'n/a')}`",
         f"- Watch strategy: `{summary.get('watch_strategy', 'manual')}`",
         f"- Watch decision: {summary.get('watch_decision_summary', 'No watch guidance is recorded.')}",
@@ -156,6 +164,37 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         lines.append(f"- {summary.get('follow_through_summary')}")
     if not persisting_count and not summary.get("follow_through_summary"):
         lines.append("- Nothing currently looks sticky across the recent run window.")
+    lines.append("")
+    lines.append("## Why This Is Still Open")
+    lines.append("")
+    if summary.get("primary_target_reason"):
+        lines.append(f"- {summary.get('primary_target_reason')}")
+    else:
+        lines.append("- No active top-target rationale is recorded.")
+    lines.append("")
+    lines.append("## What Counts As Done")
+    lines.append("")
+    if summary.get("primary_target_done_criteria"):
+        lines.append(f"- {summary.get('primary_target_done_criteria')}")
+    if summary.get("closure_guidance"):
+        lines.append(f"- {summary.get('closure_guidance')}")
+    if not summary.get("primary_target_done_criteria") and not summary.get("closure_guidance"):
+        lines.append("- No active done-state guidance is recorded.")
+    lines.append("")
+    lines.append("## Aging Pressure")
+    lines.append("")
+    lines.append(
+        f"- Chronic items: {summary.get('chronic_item_count', 0)} | Newly stale items: {summary.get('newly_stale_count', 0)}"
+    )
+    lines.append(
+        f"- Attention age bands: {summary.get('attention_age_bands', {}) or {'0-1 days': 0, '2-7 days': 0, '8-21 days': 0, '22+ days': 0}}"
+    )
+    if longest_label:
+        lines.append(
+            f"- Longest persisting item: {longest_label} ({longest_persisting.get('age_days', 0)} day(s), {longest_persisting.get('aging_status', 'fresh')})"
+        )
+    else:
+        lines.append("- No persisting item is currently recorded.")
     lines.append("")
     if queue:
         lines.append("## Top Queue Items")
