@@ -267,6 +267,16 @@ def write_markdown_report(
             )
         if report.operator_summary.get("adaptive_confidence_summary"):
             _w(f"- Why This Confidence Is Actionable: {report.operator_summary.get('adaptive_confidence_summary')}")
+        if report.operator_summary.get("primary_target_exception_status") not in {None, "", "none"}:
+            _w(
+                f"- Trust Policy Exception: {report.operator_summary.get('primary_target_exception_status')} "
+                f"({report.operator_summary.get('primary_target_exception_reason', 'No trust-policy exception reason is recorded yet.')})"
+            )
+        if report.operator_summary.get("recommendation_drift_status"):
+            _w(
+                f"- Recommendation Drift: {report.operator_summary.get('recommendation_drift_status')} "
+                f"({report.operator_summary.get('recommendation_drift_summary', 'No recommendation-drift summary is recorded yet.')})"
+            )
         if report.operator_summary.get("recommendation_quality_summary"):
             _w(f"- Recommendation Quality: {report.operator_summary.get('recommendation_quality_summary')}")
         if report.operator_summary.get("confidence_validation_status"):

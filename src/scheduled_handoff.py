@@ -127,6 +127,8 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Recommendation confidence: `{summary.get('primary_target_confidence_label', 'low')}` ({summary.get('primary_target_confidence_score', 0.0):.2f})",
         f"- Next action confidence: `{summary.get('next_action_confidence_label', 'low')}` ({summary.get('next_action_confidence_score', 0.0):.2f})",
         f"- Trust policy: `{summary.get('primary_target_trust_policy', 'monitor')}` — {summary.get('primary_target_trust_policy_reason', 'No trust-policy reason is recorded yet.')}",
+        f"- Trust policy exception: `{summary.get('primary_target_exception_status', 'none')}` — {summary.get('primary_target_exception_reason', 'No trust-policy exception reason is recorded yet.')}",
+        f"- Recommendation drift: `{summary.get('recommendation_drift_status', 'stable')}` — {summary.get('recommendation_drift_summary', 'No recommendation-drift summary is recorded yet.')}",
         f"- Confidence validation: `{summary.get('confidence_validation_status', 'insufficient-data')}` — {summary.get('confidence_calibration_summary', 'No confidence-calibration summary is recorded yet.')}",
         f"- Next recommended run: `{summary.get('next_recommended_run_mode', 'n/a')}`",
         f"- Watch strategy: `{summary.get('watch_strategy', 'manual')}`",
@@ -195,6 +197,36 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     lines.append(
         f"- {summary.get('adaptive_confidence_summary', 'No adaptive confidence summary is recorded yet.')}"
     )
+    lines.append("")
+    lines.append("## Trust Policy Exception")
+    lines.append("")
+    lines.append(
+        f"- Exception status: {summary.get('primary_target_exception_status', 'none')} "
+        f"({summary.get('primary_target_exception_reason', 'No trust-policy exception reason is recorded yet.')})"
+    )
+    if primary_target.get("recent_policy_path"):
+        lines.append(
+            f"- Recent policy path: {primary_target.get('recent_policy_path')} "
+            f"({primary_target.get('policy_flip_count', 0)} flip(s))"
+        )
+    else:
+        lines.append("- Recent policy path: No recent trust-policy flip path is recorded for the current target.")
+    lines.append("")
+    lines.append("## Recommendation Drift")
+    lines.append("")
+    lines.append(
+        f"- Drift status: {summary.get('recommendation_drift_status', 'stable')} "
+        f"({summary.get('recommendation_drift_summary', 'No recommendation-drift summary is recorded yet.')})"
+    )
+    hotspots = summary.get("policy_flip_hotspots") or []
+    if hotspots:
+        for hotspot in hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Recent hotspot')} [{hotspot.get('scope', 'target')}] -> "
+                f"{hotspot.get('flip_count', 0)} flip(s) across {hotspot.get('recent_policy_path', '')}"
+            )
+    else:
+        lines.append("- No policy-flip hotspots are recorded in the recent window.")
     lines.append("")
     lines.append("## What Got Better")
     lines.append("")

@@ -707,6 +707,18 @@ def _print_control_center_summary(snapshot: dict) -> None:
         )
     if summary.get("adaptive_confidence_summary"):
         print(f"  Why this confidence is actionable: {summary['adaptive_confidence_summary']}")
+    if summary.get("primary_target_exception_status") not in {None, "", "none"}:
+        print(
+            "  Trust policy exception: "
+            f"{summary.get('primary_target_exception_status', 'none')} "
+            f"({summary.get('primary_target_exception_reason', 'No trust-policy exception reason is recorded yet.')})"
+        )
+    if summary.get("recommendation_drift_status"):
+        print(
+            "  Recommendation drift: "
+            f"{summary.get('recommendation_drift_status', 'stable')} "
+            f"({summary.get('recommendation_drift_summary', 'No recommendation-drift summary is recorded yet.')})"
+        )
     if summary.get("recommendation_quality_summary"):
         print(f"  Recommendation quality: {summary['recommendation_quality_summary']}")
     if summary.get("confidence_validation_status"):

@@ -130,6 +130,18 @@ def _make_report(**overrides) -> dict:
             "primary_target_trust_policy_reason": "Recent calibration is noisy enough that this recommendation should be verified before acting on it.",
             "next_action_trust_policy": "verify-first",
             "next_action_trust_policy_reason": "Recent calibration is noisy enough that this recommendation should be verified before acting on it.",
+            "primary_target_exception_status": "softened-for-noise",
+            "primary_target_exception_reason": "Recent trust noise plus a reopened target warrants a softer verification-first posture.",
+            "recommendation_drift_status": "watch",
+            "recommendation_drift_summary": "RepoC: RepoC drift needs review has started to wobble between trust policies in the recent window: act-with-review -> verify-first.",
+            "policy_flip_hotspots": [
+                {
+                    "scope": "target",
+                    "label": "RepoC: RepoC drift needs review",
+                    "flip_count": 1,
+                    "recent_policy_path": "verify-first -> act-with-review",
+                }
+            ],
             "adaptive_confidence_summary": "Calibration is noisy, so the recommendation was softened and should be verified before acting.",
             "recommendation_quality_summary": "Strong recommendation because the next step is tied directly to the current top target.",
             "confidence_validation_status": "mixed",
@@ -275,6 +287,8 @@ class TestRenderHtml:
         assert "Recommendation Quality:" in html
         assert "Confidence Validation:" in html
         assert "Trust Policy:" in html
+        assert "Trust Policy Exception:" in html
+        assert "Recommendation Drift:" in html
         assert "Why This Confidence Is Actionable:" in html
         assert "Recent Confidence Outcomes:" in html
         assert "RepoC: RepoC drift needs review" in html

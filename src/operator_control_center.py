@@ -381,6 +381,11 @@ def build_operator_snapshot(
         "primary_target": resolution_trend["primary_target"],
         "resolution_targets": resolution_trend["resolution_targets"],
         "trend_summary": resolution_trend["trend_summary"],
+        "primary_target_exception_status": resolution_trend["primary_target_exception_status"],
+        "primary_target_exception_reason": resolution_trend["primary_target_exception_reason"],
+        "recommendation_drift_status": resolution_trend["recommendation_drift_status"],
+        "recommendation_drift_summary": resolution_trend["recommendation_drift_summary"],
+        "policy_flip_hotspots": resolution_trend["policy_flip_hotspots"],
         "decision_memory_status": resolution_trend["decision_memory_status"],
         "primary_target_last_seen_at": resolution_trend["primary_target_last_seen_at"],
         "primary_target_last_intervention": resolution_trend["primary_target_last_intervention"],
@@ -494,6 +499,16 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
         )
     if summary.get("adaptive_confidence_summary"):
         lines.append(f"*Why This Confidence Is Actionable:* {summary['adaptive_confidence_summary']}")
+    if summary.get("primary_target_exception_status") and summary.get("primary_target_exception_status") != "none":
+        lines.append(
+            f"*Trust Policy Exception:* {summary.get('primary_target_exception_status')} — "
+            f"{summary.get('primary_target_exception_reason', 'No trust-policy exception reason is recorded yet.')}"
+        )
+    if summary.get("recommendation_drift_status"):
+        lines.append(
+            f"*Recommendation Drift:* {summary.get('recommendation_drift_status')} — "
+            f"{summary.get('recommendation_drift_summary', 'No recommendation-drift summary is recorded yet.')}"
+        )
     if summary.get("recommendation_quality_summary"):
         lines.append(f"*Recommendation Quality:* {summary['recommendation_quality_summary']}")
     if summary.get("confidence_validation_status"):
@@ -664,7 +679,11 @@ def _build_operator_handoff(
     top_summary = _summarize_operator_change(top_item, recent_changes, resolution_trend)
     trust_policy = confidence.get("primary_target_trust_policy", "monitor")
     trust_policy_reason = confidence.get("primary_target_trust_policy_reason", "")
-    what_changed = _with_trust_policy_brief(top_summary, trust_policy)
+    what_changed = _with_trust_policy_brief(
+        top_summary,
+        trust_policy,
+        resolution_trend.get("primary_target_exception_status", "none"),
+    )
     escalation_reason = _escalation_reason(queue, setup_health, watch_guidance)
     urgency = _handoff_urgency(queue, setup_health)
     why_it_matters = _why_it_matters(
@@ -687,6 +706,8 @@ def _build_operator_handoff(
         f"{what_changed} {why_it_matters} "
         f"{resolution_trend.get('trend_summary', '')} "
         f"{resolution_trend.get('resolution_evidence_summary', '')} "
+        f"{_trust_exception_note(resolution_trend)} "
+        f"{_recommendation_drift_note(resolution_trend)} "
         f"{confidence_calibration.get('confidence_calibration_summary', '')} "
         f"{confidence.get('adaptive_confidence_summary', '')} "
         f"{follow_through.get('follow_through_summary', '')} "
@@ -994,6 +1015,12 @@ def _build_resolution_trend(
         decision_memory_map,
         confidence_calibration,
     )
+    recommendation_drift = _apply_trust_policy_exceptions(
+        resolution_targets,
+        history,
+        current_generated_at=current_generated_at,
+        confidence_calibration=confidence_calibration,
+    )
     new_attention_keys = current_attention_keys - previous_attention_keys
     resolved_attention_count = len(previous_attention_keys - current_attention_keys)
     persisting_attention_count = len(current_attention_keys & previous_attention_keys)
@@ -1042,6 +1069,7 @@ def _build_resolution_trend(
             "reason": primary_target_reason,
             "done_criteria": primary_target_done_criteria,
             "closure_guidance": closure_guidance,
+            "recommendation_drift_status": recommendation_drift["recommendation_drift_status"],
         }
     decision_memory = _summary_decision_memory(primary_target, decision_memory_map, recent_runs)
     trend_summary = _trend_summary(
@@ -1073,6 +1101,11 @@ def _build_resolution_trend(
         "primary_target": primary_target,
         "resolution_targets": resolution_targets[:5],
         "trend_summary": trend_summary,
+        "primary_target_exception_status": recommendation_drift["primary_target_exception_status"],
+        "primary_target_exception_reason": recommendation_drift["primary_target_exception_reason"],
+        "recommendation_drift_status": recommendation_drift["recommendation_drift_status"],
+        "recommendation_drift_summary": recommendation_drift["recommendation_drift_summary"],
+        "policy_flip_hotspots": recommendation_drift["policy_flip_hotspots"],
         "decision_memory_status": decision_memory["decision_memory_status"],
         "primary_target_last_seen_at": decision_memory["primary_target_last_seen_at"],
         "primary_target_last_intervention": decision_memory["primary_target_last_intervention"],
@@ -1216,6 +1249,328 @@ def _with_confidence(item: dict, confidence_calibration: dict) -> dict:
         "trust_policy": trust_policy,
         "trust_policy_reason": trust_policy_reason,
     }
+
+
+def _apply_trust_policy_exceptions(
+    resolution_targets: list[dict],
+    history: list[dict],
+    *,
+    current_generated_at: str,
+    confidence_calibration: dict,
+) -> dict:
+    if not resolution_targets:
+        return {
+            "primary_target_exception_status": "none",
+            "primary_target_exception_reason": "",
+            "recommendation_drift_status": "stable",
+            "recommendation_drift_summary": "No active trust-policy drift is recorded because there is no active target.",
+            "policy_flip_hotspots": [],
+        }
+
+    primary_target = resolution_targets[0]
+    current_bucket = _recommendation_bucket(primary_target)
+    policy_events = _trust_policy_events(
+        history,
+        current_primary_target=primary_target,
+        current_generated_at=current_generated_at,
+    )
+    policy_flip_hotspots = _policy_flip_hotspots(policy_events)
+
+    updated_targets: list[dict] = []
+    for target in resolution_targets:
+        history_meta = _target_policy_history(target, policy_events)
+        exception_status = "none"
+        exception_reason = ""
+        final_policy = target.get("trust_policy", "monitor")
+        final_reason = target.get("trust_policy_reason", "No trust-policy reason is recorded yet.")
+
+        if _recommendation_bucket(target) == current_bucket:
+            (
+                exception_status,
+                exception_reason,
+                final_policy,
+                final_reason,
+            ) = _trust_policy_exception_for_target(
+                target,
+                history_meta,
+                confidence_calibration,
+                current_bucket=current_bucket,
+            )
+
+        updated_targets.append(
+            {
+                **target,
+                "policy_flip_count": history_meta["policy_flip_count"],
+                "recent_policy_path": history_meta["recent_policy_path"],
+                "trust_exception_status": exception_status,
+                "trust_exception_reason": exception_reason,
+                "trust_policy": final_policy,
+                "trust_policy_reason": final_reason,
+            }
+        )
+
+    resolution_targets[:] = updated_targets
+    primary_target = resolution_targets[0]
+    return {
+        "primary_target_exception_status": primary_target.get("trust_exception_status", "none"),
+        "primary_target_exception_reason": primary_target.get("trust_exception_reason", ""),
+        "recommendation_drift_status": _recommendation_drift_status(
+            primary_target.get("policy_flip_count", 0),
+            primary_target.get("recent_policy_path", ""),
+            policy_flip_hotspots,
+        ),
+        "recommendation_drift_summary": _recommendation_drift_summary(
+            primary_target,
+            policy_flip_hotspots,
+        ),
+        "policy_flip_hotspots": policy_flip_hotspots,
+    }
+
+
+def _trust_policy_events(
+    history: list[dict],
+    *,
+    current_primary_target: dict,
+    current_generated_at: str,
+) -> list[dict]:
+    events: list[dict] = []
+    if current_primary_target and current_primary_target.get("trust_policy"):
+        events.append(
+            {
+                "key": _queue_identity(current_primary_target),
+                "class_key": _target_class_key(current_primary_target),
+                "label": _target_label(current_primary_target),
+                "trust_policy": current_primary_target.get("trust_policy", "monitor"),
+                "generated_at": current_generated_at or "",
+                "decision_memory_status": current_primary_target.get("decision_memory_status", ""),
+                "last_outcome": current_primary_target.get("last_outcome", ""),
+            }
+        )
+    for entry in history[: HISTORY_WINDOW_RUNS - 1]:
+        summary = entry.get("operator_summary") or {}
+        primary_target = summary.get("primary_target") or {}
+        trust_policy = summary.get("primary_target_trust_policy", "")
+        if not primary_target or not trust_policy:
+            continue
+        events.append(
+            {
+                "key": _queue_identity(primary_target),
+                "class_key": _target_class_key(primary_target),
+                "label": _target_label(primary_target),
+                "trust_policy": trust_policy,
+                "generated_at": entry.get("generated_at", ""),
+                "decision_memory_status": summary.get("decision_memory_status", ""),
+                "last_outcome": summary.get("primary_target_last_outcome", ""),
+            }
+        )
+    return sorted(events, key=lambda item: item.get("generated_at", ""), reverse=True)
+
+
+def _target_policy_history(target: dict, policy_events: list[dict]) -> dict:
+    key = _queue_identity(target)
+    class_key = _target_class_key(target)
+    target_events = [event for event in policy_events if event.get("key") == key]
+    class_events = [event for event in policy_events if event.get("class_key") == class_key]
+    target_policies = [event.get("trust_policy", "monitor") for event in target_events]
+    class_policies = [event.get("trust_policy", "monitor") for event in class_events]
+    recent_policy_path = " -> ".join(target_policies[:4]) if target_policies else ""
+    class_policy_path = " -> ".join(class_policies[:4]) if class_policies else ""
+    return {
+        "policy_flip_count": _policy_flip_count(target_policies),
+        "recent_policy_path": recent_policy_path or class_policy_path,
+        "class_policy_flip_count": _policy_flip_count(class_policies),
+        "class_policy_path": class_policy_path,
+        "strong_policy_failure_count": _strong_policy_failure_count(target, policy_events),
+    }
+
+
+def _policy_flip_hotspots(policy_events: list[dict]) -> list[dict]:
+    target_hotspots = _group_policy_hotspots(policy_events, key_name="key", label_name="label", scope="target")
+    class_hotspots = _group_policy_hotspots(policy_events, key_name="class_key", label_name="class_key", scope="class")
+    hotspots = target_hotspots + [item for item in class_hotspots if item.get("flip_count", 0) >= 2]
+    hotspots.sort(key=lambda item: (-item.get("flip_count", 0), item.get("label", ""), item.get("scope", "")))
+    return hotspots[:5]
+
+
+def _group_policy_hotspots(
+    policy_events: list[dict],
+    *,
+    key_name: str,
+    label_name: str,
+    scope: str,
+) -> list[dict]:
+    grouped: dict[str, list[dict]] = {}
+    for event in policy_events:
+        key = event.get(key_name, "")
+        if not key:
+            continue
+        grouped.setdefault(key, []).append(event)
+
+    hotspots: list[dict] = []
+    for events in grouped.values():
+        policies = [event.get("trust_policy", "monitor") for event in events]
+        flip_count = _policy_flip_count(policies)
+        if flip_count <= 0:
+            continue
+        label = events[0].get(label_name, "")
+        hotspots.append(
+            {
+                "scope": scope,
+                "label": label,
+                "flip_count": flip_count,
+                "recent_policy_path": " -> ".join(policies[:4]),
+            }
+        )
+    return hotspots
+
+
+def _policy_flip_count(policies: list[str]) -> int:
+    if len(policies) < 2:
+        return 0
+    flips = 0
+    for previous, current in zip(policies, policies[1:]):
+        if previous != current:
+            flips += 1
+    return flips
+
+
+def _strong_policy_failure_count(target: dict, policy_events: list[dict]) -> int:
+    strong_policies = {"act-now", "act-with-review"}
+    key = _queue_identity(target)
+    statuses = {"reopened", "persisting", "attempted"}
+    count = 0
+    for event in policy_events:
+        if event.get("key") != key or event.get("trust_policy") not in strong_policies:
+            continue
+        history_status = event.get("decision_memory_status", "")
+        last_outcome = event.get("last_outcome", "")
+        if history_status in statuses or last_outcome in {"reopened", "no-change"}:
+            count += 1
+    return count
+
+
+def _trust_policy_exception_for_target(
+    target: dict,
+    history_meta: dict,
+    confidence_calibration: dict,
+    *,
+    current_bucket: int,
+) -> tuple[str, str, str, str]:
+    status = confidence_calibration.get("confidence_validation_status", "insufficient-data")
+    policy = target.get("trust_policy", "monitor")
+    floor = "act-with-review" if target.get("lane") == "blocked" and target.get("kind") == "setup" else "verify-first"
+
+    if (
+        status == "noisy"
+        and target.get("decision_memory_status") == "reopened"
+        and current_bucket == _recommendation_bucket(target)
+    ):
+        softened = _soften_trust_policy(policy, floor=floor)
+        if softened == policy:
+            return (
+                "none",
+                "",
+                policy,
+                target.get("trust_policy_reason", "No trust-policy reason is recorded yet."),
+            )
+        return (
+            "softened-for-noise",
+            "Recent trust noise plus a reopened target warrants a softer verification-first posture.",
+            softened,
+            "Recent trust noise warrants verifying the latest state before treating this recommendation as fully stable.",
+        )
+
+    if history_meta.get("strong_policy_failure_count", 0) >= 2 and current_bucket == _recommendation_bucket(target):
+        softened = _soften_trust_policy(policy, floor=floor)
+        if softened == policy:
+            return (
+                "none",
+                "",
+                policy,
+                target.get("trust_policy_reason", "No trust-policy reason is recorded yet."),
+            )
+        return (
+            "softened-for-reopen-risk",
+            "Repeated reopen or unresolved behavior after earlier strong recommendations warrants a softer trust posture.",
+            softened,
+            "Recent reopen or unresolved behavior means closure evidence should be re-verified before overcommitting.",
+        )
+
+    if max(history_meta.get("policy_flip_count", 0), history_meta.get("class_policy_flip_count", 0)) >= 2 and current_bucket == _recommendation_bucket(target):
+        softened = _soften_trust_policy(policy, floor=floor)
+        if softened == policy:
+            return (
+                "none",
+                "",
+                policy,
+                target.get("trust_policy_reason", "No trust-policy reason is recorded yet."),
+            )
+        return (
+            "softened-for-flip-churn",
+            "Recent trust-policy flips have been bouncing enough that this recommendation should not be treated as fully stable yet.",
+            softened,
+            "Recent trust-policy churn means this target should be handled with a softer, verification-aware posture.",
+        )
+
+    return (
+        "none",
+        "",
+        policy,
+        target.get("trust_policy_reason", "No trust-policy reason is recorded yet."),
+    )
+
+
+def _soften_trust_policy(policy: str, *, floor: str) -> str:
+    order = ["act-now", "act-with-review", "verify-first", "monitor"]
+    if floor not in order:
+        floor = "verify-first"
+    if policy not in order:
+        return floor
+    softened_index = min(order.index(policy) + 1, len(order) - 1)
+    floor_index = order.index(floor)
+    if softened_index > floor_index:
+        softened_index = floor_index
+    return order[softened_index]
+
+
+def _recommendation_drift_status(
+    primary_target_flip_count: int,
+    primary_recent_policy_path: str,
+    policy_flip_hotspots: list[dict],
+) -> str:
+    _ = primary_recent_policy_path
+    repeated_hotspots = sum(1 for hotspot in policy_flip_hotspots if hotspot.get("flip_count", 0) >= 2)
+    if primary_target_flip_count >= 2 or repeated_hotspots >= 2:
+        return "drifting"
+    if primary_target_flip_count == 1 or repeated_hotspots == 1:
+        return "watch"
+    return "stable"
+
+
+def _recommendation_drift_summary(primary_target: dict, policy_flip_hotspots: list[dict]) -> str:
+    flip_count = primary_target.get("policy_flip_count", 0)
+    path = primary_target.get("recent_policy_path", "")
+    label = _target_label(primary_target) or "The current target"
+    if flip_count >= 2 and path:
+        return f"{label} has flipped trust policy {flip_count} time(s) in the recent window: {path}."
+    if flip_count == 1 and path:
+        return f"{label} has started to wobble between trust policies in the recent window: {path}."
+    if policy_flip_hotspots:
+        hotspot = policy_flip_hotspots[0]
+        return (
+            f"Trust-policy drift is currently led by {hotspot.get('label', 'recent hotspots')} "
+            f"with {hotspot.get('flip_count', 0)} flip(s) across {hotspot.get('recent_policy_path', '')}."
+        )
+    return "Recent trust-policy behavior is stable enough that no meaningful recommendation drift is recorded."
+
+
+def _target_class_key(item: dict) -> str:
+    return f"{item.get('lane', '')}:{item.get('kind', '') or 'unknown'}"
+
+
+def _target_label(item: dict) -> str:
+    repo = f"{item.get('repo')}: " if item.get("repo") else ""
+    return f"{repo}{item.get('title', '')}".strip(": ")
 
 
 def _recommendation_confidence(item: dict) -> tuple[float, str, list[str]]:
@@ -1876,6 +2231,13 @@ def _operator_confidence_summary(
         next_action,
         watch_guidance=watch_guidance,
     )
+    if primary_target.get("trust_exception_status") not in {None, "", "none"}:
+        next_trust_policy, next_trust_policy_reason = _soften_next_action_policy(
+            next_trust_policy,
+            next_trust_policy_reason,
+            target_policy=primary_trust_policy,
+            exception_reason=primary_target.get("trust_exception_reason", ""),
+        )
     return {
         "primary_target_confidence_score": primary_score,
         "primary_target_confidence_label": primary_label,
@@ -1922,6 +2284,22 @@ def _next_action_confidence(primary_target: dict, next_action: str, watch_guidan
     return score, label, reasons[:3]
 
 
+def _soften_next_action_policy(
+    next_policy: str,
+    next_reason: str,
+    *,
+    target_policy: str,
+    exception_reason: str,
+) -> tuple[str, str]:
+    order = {"act-now": 0, "act-with-review": 1, "verify-first": 2, "monitor": 3}
+    if order.get(next_policy, 99) < order.get(target_policy, 99):
+        return (
+            target_policy,
+            exception_reason or next_reason or "The current target warrants a softer trust posture before acting.",
+        )
+    return next_policy, next_reason
+
+
 def _is_item_specific_action(primary_target: dict, next_action: str) -> bool:
     if not primary_target or not next_action:
         return False
@@ -1966,6 +2344,16 @@ def _adaptive_confidence_summary(
     next_trust_policy: str,
 ) -> str:
     lane = primary_target.get("lane", "")
+    exception_status = primary_target.get("trust_exception_status", "none")
+    drift_status = primary_target.get("recommendation_drift_status", "")
+    if exception_status == "softened-for-noise":
+        return "Recent trust noise softened the recommendation, so verify the latest state before treating it as fully stable."
+    if exception_status == "softened-for-flip-churn":
+        return "Recent trust-policy flip churn softened the recommendation, so use it with extra verification instead of treating it as fully settled."
+    if exception_status == "softened-for-reopen-risk":
+        return "Recent reopen or unresolved behavior softened the recommendation, so confirm closure evidence before overcommitting."
+    if drift_status == "drifting":
+        return "Trust-policy behavior has been unstable recently, so keep the recommendation visible but verify before leaning too hard on it."
     if primary_trust_policy == "monitor":
         return "The current signal stays light-touch, so keep monitoring instead of forcing action."
     if calibration_status == "healthy" and primary_trust_policy == "act-now" and lane in {"blocked", "urgent"}:
@@ -2219,7 +2607,13 @@ def _why_it_matters(
 ) -> str:
     calibration_status = confidence_calibration.get("confidence_validation_status", "insufficient-data")
     calibration_sentence = _confidence_validation_sentence(calibration_status)
-    trust_sentence = _trust_policy_sentence(trust_policy, trust_policy_reason)
+    trust_sentence = _trust_policy_sentence(
+        trust_policy,
+        trust_policy_reason,
+        resolution_trend.get("primary_target_exception_status", "none"),
+        resolution_trend.get("primary_target_exception_reason", ""),
+        resolution_trend.get("recommendation_drift_status", "stable"),
+    )
     if urgency == "blocked":
         return f"A trustworthy next step is blocked until this is cleared. {trust_sentence} {calibration_sentence}".strip()
     if escalation_reason == "stale-baseline":
@@ -2296,19 +2690,40 @@ def _confidence_validation_sentence(status: str) -> str:
     return "The confidence model is still too lightly exercised to judge whether the current signal is earning trust."
 
 
-def _trust_policy_sentence(policy: str, reason: str) -> str:
+def _trust_policy_sentence(
+    policy: str,
+    reason: str,
+    exception_status: str,
+    exception_reason: str,
+    drift_status: str,
+) -> str:
+    if exception_status == "softened-for-noise":
+        return "Trust policy: verify first because the target still matters, but recent trust noise warrants a verification step."
+    if exception_status == "softened-for-flip-churn":
+        return "Trust policy: verify first because recent recommendation flips mean the signal is still bouncing."
+    if exception_status == "softened-for-reopen-risk":
+        return "Trust policy: verify first because recent reopen behavior means closure evidence should be confirmed before overcommitting."
+    if drift_status == "drifting":
+        return "Trust policy: verify first because recent trust-policy behavior has been unstable."
     if policy == "act-now":
         return "Trust policy: act now because the current signal is strong and high-pressure."
     if policy == "act-with-review":
         return "Trust policy: act with review because the signal is strong enough to move, with light operator judgment."
     if policy == "verify-first":
-        return f"Trust policy: verify first because {reason[0].lower() + reason[1:]}" if reason else "Trust policy: verify first because recent signal quality is softer."
+        detail = exception_reason or reason
+        return f"Trust policy: verify first because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: verify first because recent signal quality is softer."
     return f"Trust policy: monitor because {reason[0].lower() + reason[1:]}" if reason else "Trust policy: monitor because no strong closure move is supported yet."
 
 
-def _with_trust_policy_brief(summary: str, policy: str) -> str:
+def _with_trust_policy_brief(summary: str, policy: str, exception_status: str) -> str:
     if not summary:
         return summary
+    if exception_status == "softened-for-noise":
+        return f"{summary} Trust policy: verify first because recent trust noise softened the recommendation."
+    if exception_status == "softened-for-flip-churn":
+        return f"{summary} Trust policy: verify first because recent recommendation flips softened the recommendation."
+    if exception_status == "softened-for-reopen-risk":
+        return f"{summary} Trust policy: verify first because recent reopen risk softened the recommendation."
     if policy == "act-now":
         return f"{summary} Trust policy: act now."
     if policy == "act-with-review":
@@ -2316,6 +2731,22 @@ def _with_trust_policy_brief(summary: str, policy: str) -> str:
     if policy == "verify-first":
         return f"{summary} Trust policy: verify first."
     return f"{summary} Trust policy: monitor."
+
+
+def _trust_exception_note(resolution_trend: dict) -> str:
+    status = resolution_trend.get("primary_target_exception_status", "none")
+    reason = resolution_trend.get("primary_target_exception_reason", "")
+    if status in {None, "", "none"}:
+        return ""
+    return f"Trust policy exception: {status} — {reason}"
+
+
+def _recommendation_drift_note(resolution_trend: dict) -> str:
+    status = resolution_trend.get("recommendation_drift_status", "stable")
+    summary = resolution_trend.get("recommendation_drift_summary", "")
+    if status == "stable" and not summary:
+        return ""
+    return f"Recommendation drift: {status} — {summary}".strip()
 
 
 def _lane_reason(lane: str, kind: str) -> str:
