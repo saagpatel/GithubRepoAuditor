@@ -282,6 +282,18 @@ def write_markdown_report(
                 f"- Trust Recovery: {report.operator_summary.get('primary_target_trust_recovery_status')} "
                 f"({report.operator_summary.get('primary_target_trust_recovery_reason', 'No trust-recovery reason is recorded yet.')})"
             )
+        if report.operator_summary.get("primary_target_recovery_confidence_label"):
+            _w(
+                f"- Recovery Confidence: {report.operator_summary.get('primary_target_recovery_confidence_label')} "
+                f"({report.operator_summary.get('primary_target_recovery_confidence_score', 0.0):.2f})"
+            )
+        if report.operator_summary.get("recovery_confidence_summary"):
+            _w(f"- Recovery Confidence Summary: {report.operator_summary.get('recovery_confidence_summary')}")
+        if report.operator_summary.get("primary_target_exception_retirement_status") not in {None, "", "none"}:
+            _w(
+                f"- Exception Retirement: {report.operator_summary.get('primary_target_exception_retirement_status')} "
+                f"({report.operator_summary.get('primary_target_exception_retirement_reason', 'No exception-retirement reason is recorded yet.')})"
+            )
         if report.operator_summary.get("recommendation_drift_status"):
             _w(
                 f"- Recommendation Drift: {report.operator_summary.get('recommendation_drift_status')} "
@@ -289,6 +301,8 @@ def write_markdown_report(
             )
         if report.operator_summary.get("exception_pattern_summary"):
             _w(f"- Exception Pattern Summary: {report.operator_summary.get('exception_pattern_summary')}")
+        if report.operator_summary.get("exception_retirement_summary"):
+            _w(f"- Exception Retirement Summary: {report.operator_summary.get('exception_retirement_summary')}")
         if report.operator_summary.get("recommendation_quality_summary"):
             _w(f"- Recommendation Quality: {report.operator_summary.get('recommendation_quality_summary')}")
         if report.operator_summary.get("confidence_validation_status"):

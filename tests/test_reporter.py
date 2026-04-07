@@ -207,6 +207,20 @@ class TestMarkdownReport:
             "primary_target_exception_pattern_reason": "Recent soft caution was followed by stable recovery without renewed pressure, so the softer posture may now be more cautious than the evidence supports.",
             "primary_target_trust_recovery_status": "earned",
             "primary_target_trust_recovery_reason": "Recent stability has earned this target back from verify-first to act-with-review.",
+            "primary_target_recovery_confidence_score": 0.9,
+            "primary_target_recovery_confidence_label": "high",
+            "primary_target_recovery_confidence_reasons": [
+                "Healthy calibration supports relaxing the earlier soft caution.",
+                "Recent runs stayed stable after the exception without new pressure spikes.",
+                "Recent exception history looks overcautious, so relaxing the softer posture is safer.",
+            ],
+            "recovery_confidence_summary": "Missing template asset has high recovery confidence (0.90), so the earlier caution can now retire.",
+            "primary_target_exception_retirement_status": "retired",
+            "primary_target_exception_retirement_reason": "Recent evidence is stable enough that the earlier soft caution has been formally retired.",
+            "exception_retirement_summary": "Missing template asset has formally retired the earlier soft caution and returned to act-now.",
+            "retired_exception_hotspots": [],
+            "sticky_exception_hotspots": [],
+            "exception_retirement_window_runs": 4,
             "recommendation_drift_status": "stable",
             "recommendation_drift_summary": "Recent trust-policy behavior is stable enough that no meaningful recommendation drift is recorded.",
             "policy_flip_hotspots": [],
@@ -253,6 +267,8 @@ class TestMarkdownReport:
         assert "Recommendation Drift:" in content
         assert "Exception Pattern Learning:" in content
         assert "Trust Recovery:" in content
+        assert "Recovery Confidence:" in content
+        assert "Exception Retirement:" in content
         assert "Next Recommended Run" in content
         assert "Watch Strategy" in content
         assert "What Changed" in content

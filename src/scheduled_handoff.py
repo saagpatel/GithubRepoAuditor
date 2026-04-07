@@ -130,8 +130,11 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Trust policy exception: `{summary.get('primary_target_exception_status', 'none')}` — {summary.get('primary_target_exception_reason', 'No trust-policy exception reason is recorded yet.')}",
         f"- Exception pattern learning: `{summary.get('primary_target_exception_pattern_status', 'none')}` — {summary.get('primary_target_exception_pattern_reason', 'No exception-pattern reason is recorded yet.')}",
         f"- Trust recovery: `{summary.get('primary_target_trust_recovery_status', 'none')}` — {summary.get('primary_target_trust_recovery_reason', 'No trust-recovery reason is recorded yet.')}",
+        f"- Recovery confidence: `{summary.get('primary_target_recovery_confidence_label', 'low')}` ({summary.get('primary_target_recovery_confidence_score', 0.0):.2f}) — {summary.get('recovery_confidence_summary', 'No recovery-confidence summary is recorded yet.')}",
+        f"- Exception retirement: `{summary.get('primary_target_exception_retirement_status', 'none')}` — {summary.get('primary_target_exception_retirement_reason', 'No exception-retirement reason is recorded yet.')}",
         f"- Recommendation drift: `{summary.get('recommendation_drift_status', 'stable')}` — {summary.get('recommendation_drift_summary', 'No recommendation-drift summary is recorded yet.')}",
         f"- Exception pattern summary: {summary.get('exception_pattern_summary', 'No exception-pattern summary is recorded yet.')}",
+        f"- Exception retirement summary: {summary.get('exception_retirement_summary', 'No exception-retirement summary is recorded yet.')}",
         f"- Confidence validation: `{summary.get('confidence_validation_status', 'insufficient-data')}` — {summary.get('confidence_calibration_summary', 'No confidence-calibration summary is recorded yet.')}",
         f"- Next recommended run: `{summary.get('next_recommended_run_mode', 'n/a')}`",
         f"- Watch strategy: `{summary.get('watch_strategy', 'manual')}`",
@@ -247,6 +250,51 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     lines.append(
         f"- Recovery window: {summary.get('trust_recovery_window_runs', 3)} run(s)"
     )
+    lines.append("")
+    lines.append("## Recovery Confidence")
+    lines.append("")
+    lines.append(
+        f"- Recovery confidence: {summary.get('primary_target_recovery_confidence_label', 'low')} "
+        f"({summary.get('primary_target_recovery_confidence_score', 0.0):.2f})"
+    )
+    if summary.get("primary_target_recovery_confidence_reasons"):
+        lines.append(
+            f"- Recovery confidence reasons: {', '.join(summary.get('primary_target_recovery_confidence_reasons') or [])}"
+        )
+    lines.append(
+        f"- {summary.get('recovery_confidence_summary', 'No recovery-confidence summary is recorded yet.')}"
+    )
+    lines.append("")
+    lines.append("## Exception Retirement")
+    lines.append("")
+    lines.append(
+        f"- Retirement status: {summary.get('primary_target_exception_retirement_status', 'none')} "
+        f"({summary.get('primary_target_exception_retirement_reason', 'No exception-retirement reason is recorded yet.')})"
+    )
+    lines.append(
+        f"- Final trust policy after retirement: {summary.get('primary_target_trust_policy', 'monitor')} "
+        f"({summary.get('primary_target_trust_policy_reason', 'No trust-policy reason is recorded yet.')})"
+    )
+    lines.append(
+        f"- Retirement window: {summary.get('exception_retirement_window_runs', 4)} run(s)"
+    )
+    lines.append(
+        f"- {summary.get('exception_retirement_summary', 'No exception-retirement summary is recorded yet.')}"
+    )
+    retired_hotspots = summary.get("retired_exception_hotspots") or []
+    if retired_hotspots:
+        for hotspot in retired_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Recent retirement hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('retired_count', 0)} retired case(s) across {hotspot.get('exception_count', 0)} exception case(s)"
+            )
+    sticky_hotspots = summary.get("sticky_exception_hotspots") or []
+    if sticky_hotspots:
+        for hotspot in sticky_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Recent sticky hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('sticky_count', 0)} sticky case(s) across {hotspot.get('exception_count', 0)} exception case(s)"
+            )
     lines.append("")
     lines.append("## Recommendation Drift")
     lines.append("")

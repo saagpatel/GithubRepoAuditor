@@ -290,6 +290,19 @@ def _make_report(audits=None) -> dict:
             "primary_target_exception_pattern_reason": "This target is stabilizing under healthy calibration, but it has not held steady long enough to earn stronger trust yet.",
             "primary_target_trust_recovery_status": "candidate",
             "primary_target_trust_recovery_reason": "This target is stabilizing under healthy calibration, but it has not held steady long enough to earn stronger trust yet.",
+            "primary_target_recovery_confidence_score": 0.72,
+            "primary_target_recovery_confidence_label": "medium",
+            "primary_target_recovery_confidence_reasons": [
+                "Healthy calibration supports relaxing the earlier soft caution.",
+                "Recent runs are stabilizing, but the retirement window is still short.",
+            ],
+            "recovery_confidence_summary": "RepoC: Security posture needs attention is building recovery confidence (medium, 0.72), but the earlier caution has not retired yet.",
+            "primary_target_exception_retirement_status": "candidate",
+            "primary_target_exception_retirement_reason": "This target is trending toward retirement, but it has not earned it yet.",
+            "exception_retirement_summary": "RepoC: Security posture needs attention is trending toward exception retirement, but the evidence is not strong enough to retire it yet.",
+            "retired_exception_hotspots": [],
+            "sticky_exception_hotspots": [],
+            "exception_retirement_window_runs": 4,
             "recommendation_drift_status": "stable",
             "recommendation_drift_summary": "Recent trust-policy behavior is stable enough that no meaningful recommendation drift is recorded.",
             "policy_flip_hotspots": [],
@@ -613,9 +626,12 @@ class TestAnalystWorkbookSheets:
         assert review_ws["A24"].value == "Trust Rationale"
         assert review_ws["A25"].value == "Trust Exception"
         assert review_ws["A26"].value == "Trust Recovery"
-        assert review_ws["A27"].value == "Exception Learning"
-        assert review_ws["A28"].value == "Recommendation Drift"
-        assert review_ws["A29"].value == "Adaptive Confidence"
+        assert review_ws["A27"].value == "Recovery Confidence"
+        assert review_ws["A28"].value == "Exception Retirement"
+        assert review_ws["A29"].value == "Retirement Summary"
+        assert review_ws["A30"].value == "Exception Learning"
+        assert review_ws["A31"].value == "Recommendation Drift"
+        assert review_ws["A32"].value == "Adaptive Confidence"
         assert executive_ws["D29"].value == "Trend"
         assert executive_ws["D32"].value == "Why Top Target"
         assert executive_ws["D33"].value == "Closure Guidance"
@@ -628,10 +644,14 @@ class TestAnalystWorkbookSheets:
         assert executive_ws["D42"].value == "Trust Policy"
         assert executive_ws["D43"].value == "Trust Rationale"
         assert executive_ws["D44"].value == "Trust Recovery"
-        assert executive_ws["D45"].value == "Exception Learning"
-        assert executive_ws["D46"].value == "Adaptive Confidence"
-        assert executive_ws["D47"].value == "Recommendation Quality"
-        assert executive_ws["D48"].value == "Confidence Validation"
+        assert executive_ws["D45"].value == "Recovery Confidence"
+        assert executive_ws["D46"].value == "Exception Retirement"
+        assert executive_ws["D47"].value == "Retirement Summary"
+        assert executive_ws["D48"].value == "Exception Learning"
+        assert executive_ws["D49"].value == "Recommendation Drift"
+        assert executive_ws["D50"].value == "Adaptive Confidence"
+        assert executive_ws["D51"].value == "Recommendation Quality"
+        assert executive_ws["D52"].value == "Confidence Validation"
         assert print_ws["A17"].value == "Primary Target"
         assert print_ws["A18"].value == "Why Top Target"
         assert print_ws["A19"].value == "What We Tried"
@@ -644,9 +664,12 @@ class TestAnalystWorkbookSheets:
         assert print_ws["A27"].value == "Trust Rationale"
         assert print_ws["A28"].value == "Trust Exception"
         assert print_ws["A29"].value == "Trust Recovery"
-        assert print_ws["A30"].value == "Exception Learning"
-        assert print_ws["A31"].value == "Recommendation Drift"
-        assert print_ws["A32"].value == "Adaptive Confidence"
+        assert print_ws["A30"].value == "Recovery Confidence"
+        assert print_ws["A31"].value == "Exception Retirement"
+        assert print_ws["A32"].value == "Retirement Summary"
+        assert print_ws["A33"].value == "Exception Learning"
+        assert print_ws["A34"].value == "Recommendation Drift"
+        assert print_ws["A35"].value == "Adaptive Confidence"
         assert "Why Top Target" in dashboard_values
         assert "Closure Guidance" in dashboard_values
         assert "What We Tried" in dashboard_values
@@ -654,6 +677,8 @@ class TestAnalystWorkbookSheets:
         assert "Trust Policy" in dashboard_values
         assert "Trust Exception" in dashboard_values
         assert "Trust Recovery" in dashboard_values
+        assert "Recovery Confidence" in dashboard_values
+        assert "Exception Retirement" in dashboard_values
         assert "Exception Learning" in dashboard_values
         assert "Recommendation Drift" in dashboard_values
 

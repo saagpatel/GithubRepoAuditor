@@ -27,6 +27,7 @@ HISTORY_WINDOW_RUNS = 10
 CALIBRATION_WINDOW_RUNS = 20
 VALIDATION_WINDOW_RUNS = 2
 TRUST_RECOVERY_WINDOW_RUNS = 3
+EXCEPTION_RETIREMENT_WINDOW_RUNS = 4
 GENERIC_RECOMMENDATION_PHRASES = (
     "continue the normal audit/control-center loop",
     "continue the normal operator loop",
@@ -394,6 +395,16 @@ def build_operator_snapshot(
         "exception_pattern_summary": resolution_trend["exception_pattern_summary"],
         "false_positive_exception_hotspots": resolution_trend["false_positive_exception_hotspots"],
         "trust_recovery_window_runs": resolution_trend["trust_recovery_window_runs"],
+        "primary_target_recovery_confidence_score": resolution_trend["primary_target_recovery_confidence_score"],
+        "primary_target_recovery_confidence_label": resolution_trend["primary_target_recovery_confidence_label"],
+        "primary_target_recovery_confidence_reasons": resolution_trend["primary_target_recovery_confidence_reasons"],
+        "recovery_confidence_summary": resolution_trend["recovery_confidence_summary"],
+        "primary_target_exception_retirement_status": resolution_trend["primary_target_exception_retirement_status"],
+        "primary_target_exception_retirement_reason": resolution_trend["primary_target_exception_retirement_reason"],
+        "exception_retirement_summary": resolution_trend["exception_retirement_summary"],
+        "retired_exception_hotspots": resolution_trend["retired_exception_hotspots"],
+        "sticky_exception_hotspots": resolution_trend["sticky_exception_hotspots"],
+        "exception_retirement_window_runs": resolution_trend["exception_retirement_window_runs"],
         "decision_memory_status": resolution_trend["decision_memory_status"],
         "primary_target_last_seen_at": resolution_trend["primary_target_last_seen_at"],
         "primary_target_last_intervention": resolution_trend["primary_target_last_intervention"],
@@ -522,6 +533,17 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
             f"*Trust Recovery:* {summary.get('primary_target_trust_recovery_status')} — "
             f"{summary.get('primary_target_trust_recovery_reason', 'No trust-recovery reason is recorded yet.')}"
         )
+    if summary.get("primary_target_recovery_confidence_label"):
+        lines.append(
+            f"*Recovery Confidence:* {summary.get('primary_target_recovery_confidence_label')} "
+            f"({summary.get('primary_target_recovery_confidence_score', 0.0):.2f}) — "
+            f"{summary.get('recovery_confidence_summary', 'No recovery-confidence summary is recorded yet.')}"
+        )
+    if summary.get("primary_target_exception_retirement_status") and summary.get("primary_target_exception_retirement_status") != "none":
+        lines.append(
+            f"*Exception Retirement:* {summary.get('primary_target_exception_retirement_status')} — "
+            f"{summary.get('primary_target_exception_retirement_reason', 'No exception-retirement reason is recorded yet.')}"
+        )
     if summary.get("recommendation_drift_status"):
         lines.append(
             f"*Recommendation Drift:* {summary.get('recommendation_drift_status')} — "
@@ -529,6 +551,8 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
         )
     if summary.get("exception_pattern_summary"):
         lines.append(f"*Exception Pattern Summary:* {summary['exception_pattern_summary']}")
+    if summary.get("exception_retirement_summary"):
+        lines.append(f"*Exception Retirement Summary:* {summary['exception_retirement_summary']}")
     if summary.get("recommendation_quality_summary"):
         lines.append(f"*Recommendation Quality:* {summary['recommendation_quality_summary']}")
     if summary.get("confidence_validation_status"):
@@ -704,6 +728,7 @@ def _build_operator_handoff(
         trust_policy,
         resolution_trend.get("primary_target_exception_status", "none"),
         resolution_trend.get("primary_target_trust_recovery_status", "none"),
+        resolution_trend.get("primary_target_exception_retirement_status", "none"),
     )
     escalation_reason = _escalation_reason(queue, setup_health, watch_guidance)
     urgency = _handoff_urgency(queue, setup_health)
@@ -730,6 +755,8 @@ def _build_operator_handoff(
         f"{_trust_exception_note(resolution_trend)} "
         f"{_exception_pattern_note(resolution_trend)} "
         f"{_trust_recovery_note(resolution_trend)} "
+        f"{_recovery_confidence_note(resolution_trend)} "
+        f"{_exception_retirement_note(resolution_trend)} "
         f"{_recommendation_drift_note(resolution_trend)} "
         f"{confidence_calibration.get('confidence_calibration_summary', '')} "
         f"{confidence.get('adaptive_confidence_summary', '')} "
@@ -1050,6 +1077,12 @@ def _build_resolution_trend(
         current_generated_at=current_generated_at,
         confidence_calibration=confidence_calibration,
     )
+    exception_retirement = _apply_exception_retirement(
+        resolution_targets,
+        history,
+        current_generated_at=current_generated_at,
+        confidence_calibration=confidence_calibration,
+    )
     new_attention_keys = current_attention_keys - previous_attention_keys
     resolved_attention_count = len(previous_attention_keys - current_attention_keys)
     persisting_attention_count = len(current_attention_keys & previous_attention_keys)
@@ -1142,6 +1175,16 @@ def _build_resolution_trend(
         "exception_pattern_summary": exception_learning["exception_pattern_summary"],
         "false_positive_exception_hotspots": exception_learning["false_positive_exception_hotspots"],
         "trust_recovery_window_runs": exception_learning["trust_recovery_window_runs"],
+        "primary_target_recovery_confidence_score": exception_retirement["primary_target_recovery_confidence_score"],
+        "primary_target_recovery_confidence_label": exception_retirement["primary_target_recovery_confidence_label"],
+        "primary_target_recovery_confidence_reasons": exception_retirement["primary_target_recovery_confidence_reasons"],
+        "recovery_confidence_summary": exception_retirement["recovery_confidence_summary"],
+        "primary_target_exception_retirement_status": exception_retirement["primary_target_exception_retirement_status"],
+        "primary_target_exception_retirement_reason": exception_retirement["primary_target_exception_retirement_reason"],
+        "exception_retirement_summary": exception_retirement["exception_retirement_summary"],
+        "retired_exception_hotspots": exception_retirement["retired_exception_hotspots"],
+        "sticky_exception_hotspots": exception_retirement["sticky_exception_hotspots"],
+        "exception_retirement_window_runs": exception_retirement["exception_retirement_window_runs"],
         "decision_memory_status": decision_memory["decision_memory_status"],
         "primary_target_last_seen_at": decision_memory["primary_target_last_seen_at"],
         "primary_target_last_intervention": decision_memory["primary_target_last_intervention"],
@@ -1282,6 +1325,8 @@ def _with_confidence(item: dict, confidence_calibration: dict) -> dict:
         "confidence_reasons": reasons,
         "calibration_adjustment": calibration_adjustment,
         "calibration_adjustment_reason": calibration_adjustment_reason,
+        "base_trust_policy": trust_policy,
+        "base_trust_policy_reason": trust_policy_reason,
         "trust_policy": trust_policy,
         "trust_policy_reason": trust_policy_reason,
     }
@@ -1401,12 +1446,16 @@ def _apply_exception_pattern_learning(
         recent_exception_path = ""
         final_policy = target.get("trust_policy", "monitor")
         final_reason = target.get("trust_policy_reason", "No trust-policy reason is recorded yet.")
+        pre_retirement_policy = final_policy
+        pre_retirement_reason = final_reason
 
         if _recommendation_bucket(target) == current_bucket:
             history_meta = _target_exception_history(target, exception_events, historical_cases)
             stable_policy_run_count = history_meta["stable_policy_run_count"]
             recent_exception_path = history_meta["recent_exception_path"]
             pattern_status, pattern_reason = _exception_pattern_for_target(target, history_meta)
+            pre_retirement_policy = final_policy
+            pre_retirement_reason = final_reason
             (
                 recovery_status,
                 recovery_reason,
@@ -1435,6 +1484,8 @@ def _apply_exception_pattern_learning(
                 "trust_recovery_reason": recovery_reason,
                 "stable_policy_run_count": stable_policy_run_count,
                 "recent_exception_path": recent_exception_path,
+                "pre_retirement_trust_policy": pre_retirement_policy,
+                "pre_retirement_trust_policy_reason": pre_retirement_reason,
                 "trust_policy": final_policy,
                 "trust_policy_reason": final_reason,
             }
@@ -1451,6 +1502,471 @@ def _apply_exception_pattern_learning(
         "false_positive_exception_hotspots": false_positive_hotspots,
         "trust_recovery_window_runs": TRUST_RECOVERY_WINDOW_RUNS,
     }
+
+
+def _apply_exception_retirement(
+    resolution_targets: list[dict],
+    history: list[dict],
+    *,
+    current_generated_at: str,
+    confidence_calibration: dict,
+) -> dict:
+    if not resolution_targets:
+        return {
+            "primary_target_recovery_confidence_score": 0.05,
+            "primary_target_recovery_confidence_label": "low",
+            "primary_target_recovery_confidence_reasons": [],
+            "recovery_confidence_summary": "No recovery-confidence signal is recorded because there is no active target.",
+            "primary_target_exception_retirement_status": "none",
+            "primary_target_exception_retirement_reason": "",
+            "exception_retirement_summary": "No exception retirement is recorded because there is no active target.",
+            "retired_exception_hotspots": [],
+            "sticky_exception_hotspots": [],
+            "exception_retirement_window_runs": EXCEPTION_RETIREMENT_WINDOW_RUNS,
+        }
+
+    current_primary_target = resolution_targets[0]
+    current_bucket = _recommendation_bucket(current_primary_target)
+    retirement_events = _retirement_policy_events(
+        history,
+        current_primary_target=current_primary_target,
+        current_generated_at=current_generated_at,
+    )
+    historical_cases = _historical_exception_cases(history)
+
+    updated_targets: list[dict] = []
+    for target in resolution_targets:
+        recovery_score = 0.05
+        recovery_label = "low"
+        recovery_reasons: list[str] = []
+        stable_after_exception_runs = 0
+        recent_retirement_path = ""
+        retirement_status = "none"
+        retirement_reason = ""
+        final_policy = target.get("trust_policy", "monitor")
+        final_reason = target.get("trust_policy_reason", "No trust-policy reason is recorded yet.")
+
+        if _recommendation_bucket(target) == current_bucket:
+            history_meta = _target_retirement_history(target, retirement_events, historical_cases)
+            stable_after_exception_runs = history_meta["stable_after_exception_runs"]
+            recent_retirement_path = history_meta["recent_retirement_path"]
+            recovery_score, recovery_label, recovery_reasons = _recovery_confidence_for_target(
+                target,
+                history_meta,
+                confidence_calibration,
+            )
+            (
+                retirement_status,
+                retirement_reason,
+                final_policy,
+                final_reason,
+            ) = _exception_retirement_for_target(
+                target,
+                history_meta,
+                confidence_calibration,
+                recovery_confidence_label=recovery_label,
+                trust_policy=final_policy,
+                trust_policy_reason=final_reason,
+            )
+
+        updated_targets.append(
+            {
+                **target,
+                "recovery_confidence_score": recovery_score,
+                "recovery_confidence_label": recovery_label,
+                "recovery_confidence_reasons": recovery_reasons,
+                "stable_after_exception_runs": stable_after_exception_runs,
+                "recent_retirement_path": recent_retirement_path,
+                "exception_retirement_status": retirement_status,
+                "exception_retirement_reason": retirement_reason,
+                "trust_policy": final_policy,
+                "trust_policy_reason": final_reason,
+            }
+        )
+
+    resolution_targets[:] = updated_targets
+    primary_target = resolution_targets[0]
+    retired_exception_hotspots = _retirement_hotspots(
+        historical_cases,
+        resolution_targets,
+        mode="retired",
+    )
+    sticky_exception_hotspots = _retirement_hotspots(
+        historical_cases,
+        resolution_targets,
+        mode="sticky",
+    )
+    return {
+        "primary_target_recovery_confidence_score": primary_target.get("recovery_confidence_score", 0.05),
+        "primary_target_recovery_confidence_label": primary_target.get("recovery_confidence_label", "low"),
+        "primary_target_recovery_confidence_reasons": primary_target.get("recovery_confidence_reasons", []),
+        "recovery_confidence_summary": _recovery_confidence_summary(
+            primary_target,
+            sticky_exception_hotspots,
+        ),
+        "primary_target_exception_retirement_status": primary_target.get("exception_retirement_status", "none"),
+        "primary_target_exception_retirement_reason": primary_target.get("exception_retirement_reason", ""),
+        "exception_retirement_summary": _exception_retirement_summary(
+            primary_target,
+            retired_exception_hotspots,
+            sticky_exception_hotspots,
+        ),
+        "retired_exception_hotspots": retired_exception_hotspots,
+        "sticky_exception_hotspots": sticky_exception_hotspots,
+        "exception_retirement_window_runs": EXCEPTION_RETIREMENT_WINDOW_RUNS,
+    }
+
+
+def _retirement_policy_events(
+    history: list[dict],
+    *,
+    current_primary_target: dict,
+    current_generated_at: str,
+) -> list[dict]:
+    events: list[dict] = []
+    if current_primary_target and current_primary_target.get("trust_policy"):
+        events.append(
+            {
+                "key": _queue_identity(current_primary_target),
+                "class_key": _target_class_key(current_primary_target),
+                "label": _target_label(current_primary_target),
+                "trust_policy": _retirement_source_policy(current_primary_target),
+                "generated_at": current_generated_at or "",
+                "lane": current_primary_target.get("lane", ""),
+                "kind": current_primary_target.get("kind", ""),
+                "decision_memory_status": current_primary_target.get("decision_memory_status", ""),
+                "last_outcome": current_primary_target.get("last_outcome", ""),
+                "trust_exception_status": current_primary_target.get("trust_exception_status", "none"),
+                "trust_recovery_status": current_primary_target.get("trust_recovery_status", "none"),
+            }
+        )
+    for entry in history[: HISTORY_WINDOW_RUNS - 1]:
+        summary = entry.get("operator_summary") or {}
+        primary_target = summary.get("primary_target") or {}
+        trust_policy = summary.get("primary_target_trust_policy", "")
+        if not primary_target or not trust_policy:
+            continue
+        events.append(
+            {
+                "key": _queue_identity(primary_target),
+                "class_key": _target_class_key(primary_target),
+                "label": _target_label(primary_target),
+                "trust_policy": trust_policy,
+                "generated_at": entry.get("generated_at", ""),
+                "lane": primary_target.get("lane", ""),
+                "kind": primary_target.get("kind", ""),
+                "decision_memory_status": summary.get("decision_memory_status", ""),
+                "last_outcome": summary.get("primary_target_last_outcome", ""),
+                "trust_exception_status": summary.get("primary_target_exception_status", "none"),
+                "trust_recovery_status": summary.get("primary_target_trust_recovery_status", "none"),
+            }
+        )
+    return sorted(events, key=lambda item: item.get("generated_at", ""), reverse=True)
+
+
+def _retirement_source_policy(target: dict) -> str:
+    return (
+        target.get("pre_retirement_trust_policy")
+        or target.get("trust_policy")
+        or target.get("base_trust_policy")
+        or "monitor"
+    )
+
+
+def _target_retirement_history(
+    target: dict,
+    retirement_events: list[dict],
+    historical_cases: list[dict],
+) -> dict:
+    key = _queue_identity(target)
+    class_key = _target_class_key(target)
+    target_events = [event for event in retirement_events if event.get("key") == key]
+    class_events = [event for event in retirement_events if event.get("class_key") == class_key]
+    target_cases = [case for case in historical_cases if case.get("key") == key]
+    class_cases = [case for case in historical_cases if case.get("class_key") == class_key]
+    target_policies = [event.get("trust_policy", "monitor") for event in target_events[:EXCEPTION_RETIREMENT_WINDOW_RUNS]]
+    class_policies = [event.get("trust_policy", "monitor") for event in class_events[:EXCEPTION_RETIREMENT_WINDOW_RUNS]]
+    target_lanes = [event.get("lane", "") for event in target_events[:EXCEPTION_RETIREMENT_WINDOW_RUNS]]
+    return {
+        "stable_after_exception_runs": _stable_policy_run_count(target_policies),
+        "recent_retirement_path": " -> ".join(target_policies[:EXCEPTION_RETIREMENT_WINDOW_RUNS])
+        or " -> ".join(class_policies[:EXCEPTION_RETIREMENT_WINDOW_RUNS]),
+        "recent_policy_flip_count": _policy_flip_count(target_policies),
+        "same_or_lower_pressure_path": _same_or_lower_pressure_path(target_lanes),
+        "recent_reopened": any(
+            event.get("decision_memory_status") == "reopened" or event.get("last_outcome") == "reopened"
+            for event in target_events[:EXCEPTION_RETIREMENT_WINDOW_RUNS]
+        ),
+        "latest_case_outcome": _latest_case_outcome(target_cases, class_cases),
+        "target_cases": target_cases,
+        "class_cases": class_cases,
+    }
+
+
+def _recovery_confidence_for_target(
+    target: dict,
+    history_meta: dict,
+    confidence_calibration: dict,
+) -> tuple[float, str, list[str]]:
+    score = 0.20
+    calibration_status = confidence_calibration.get("confidence_validation_status", "insufficient-data")
+    calibration_reason = ""
+    stability_reason = ""
+    exception_reason = ""
+    blockers: list[tuple[float, str]] = []
+
+    if calibration_status == "healthy":
+        score += 0.20
+        calibration_reason = "Healthy calibration supports relaxing the earlier soft caution."
+    elif calibration_status == "noisy":
+        score -= 0.10
+        calibration_reason = "Noisy calibration still argues for keeping caution in place."
+        blockers.append((-0.10, "Calibration is still noisy, so retiring the softer posture would be premature."))
+    elif calibration_status == "insufficient-data":
+        score -= 0.05
+        calibration_reason = "Calibration is still lightly exercised, so retirement confidence stays softer."
+        blockers.append((-0.05, "Calibration history is still too light to prove the softer posture can retire."))
+    else:
+        calibration_reason = "Mixed calibration keeps retirement confidence in the middle for now."
+
+    recent_reopened = history_meta.get("recent_reopened", False)
+    recent_policy_flip_count = history_meta.get("recent_policy_flip_count", 0)
+    same_or_lower_pressure_path = history_meta.get("same_or_lower_pressure_path", True)
+    stable_after_exception_runs = history_meta.get("stable_after_exception_runs", 0)
+    latest_case_outcome = history_meta.get("latest_case_outcome")
+
+    if not recent_reopened:
+        score += 0.15
+    else:
+        score -= 0.15
+        blockers.append((-0.15, "The target reopened inside the retirement window, so caution still needs to stay in place."))
+
+    if recent_policy_flip_count == 0:
+        score += 0.15
+    else:
+        score -= 0.10
+        blockers.append((-0.10, "Trust policy is still flipping inside the retirement window, so the softer posture has not settled yet."))
+
+    if same_or_lower_pressure_path:
+        score += 0.10
+    if stable_after_exception_runs >= 3:
+        score += 0.10
+        stability_reason = "Recent runs stayed stable after the exception without new pressure spikes."
+    elif stable_after_exception_runs >= 2 or same_or_lower_pressure_path:
+        stability_reason = "Recent runs are stabilizing, but the retirement window is still short."
+
+    if latest_case_outcome == "overcautious":
+        score += 0.10
+        exception_reason = "Recent exception history looks overcautious, so relaxing the softer posture is safer."
+    elif latest_case_outcome == "useful-caution":
+        score -= 0.15
+        exception_reason = "Recent exception history still shows useful caution, so the softer posture remains justified."
+        blockers.append((-0.15, "Recent exception history still looks useful-caution rather than ready for retirement."))
+    elif latest_case_outcome == "insufficient-data":
+        exception_reason = "Recent exception history is still too light to prove the softer posture can retire."
+
+    if target.get("trust_recovery_status") == "earned":
+        score += 0.05
+
+    score = max(0.05, min(0.95, round(score, 2)))
+    reasons = [reason for reason in (calibration_reason, stability_reason, exception_reason) if reason]
+    if blockers:
+        strongest_blocker = sorted(blockers, key=lambda item: item[0])[0][1]
+        if strongest_blocker not in reasons:
+            reasons.append(strongest_blocker)
+    return score, _confidence_label(score), reasons[:4]
+
+
+def _exception_retirement_for_target(
+    target: dict,
+    history_meta: dict,
+    confidence_calibration: dict,
+    *,
+    recovery_confidence_label: str,
+    trust_policy: str,
+    trust_policy_reason: str,
+) -> tuple[str, str, str, str]:
+    if not _is_exception_affected_target(target):
+        return "none", "", trust_policy, trust_policy_reason
+
+    calibration_status = confidence_calibration.get("confidence_validation_status", "insufficient-data")
+    stable_after_exception_runs = history_meta.get("stable_after_exception_runs", 0)
+    recent_reopened = history_meta.get("recent_reopened", False)
+    recent_policy_flip_count = history_meta.get("recent_policy_flip_count", 0)
+    recovery_status = target.get("trust_recovery_status", "none")
+
+    if (
+        recovery_status == "blocked"
+        or recent_reopened
+        or recent_policy_flip_count > 0
+        or calibration_status != "healthy"
+    ):
+        if recovery_status == "blocked":
+            reason = target.get(
+                "trust_recovery_reason",
+                "Exception retirement is blocked because trust recovery has not cleared yet.",
+            )
+        elif recent_reopened:
+            reason = "Exception retirement is blocked because the target reopened inside the retirement window."
+        elif recent_policy_flip_count > 0:
+            reason = "Exception retirement is blocked because trust policy is still flipping inside the retirement window."
+        else:
+            reason = "Exception retirement is blocked because calibration is not healthy enough yet."
+        return "blocked", reason, trust_policy, trust_policy_reason
+
+    if (
+        recovery_status in {"candidate", "earned"}
+        and stable_after_exception_runs >= 2
+        and recovery_confidence_label in {"medium", "high"}
+    ):
+        if (
+            recovery_status == "earned"
+            and recovery_confidence_label == "high"
+            and stable_after_exception_runs >= EXCEPTION_RETIREMENT_WINDOW_RUNS
+            and not recent_reopened
+            and recent_policy_flip_count == 0
+            and calibration_status == "healthy"
+        ):
+            retired_policy, retired_reason = _restore_retired_trust_policy(target)
+            return (
+                "retired",
+                "Recent evidence is stable enough that the earlier soft caution has been formally retired.",
+                retired_policy,
+                retired_reason,
+            )
+        return (
+            "candidate",
+            "This target is trending toward retirement, but it has not earned it yet.",
+            trust_policy,
+            trust_policy_reason,
+        )
+
+    return "none", "", trust_policy, trust_policy_reason
+
+
+def _is_exception_affected_target(target: dict) -> bool:
+    return (
+        target.get("trust_exception_status") not in {None, "", "none"}
+        or target.get("trust_recovery_status") in {"candidate", "earned", "blocked"}
+    )
+
+
+def _restore_retired_trust_policy(target: dict) -> tuple[str, str]:
+    restored_policy = target.get("base_trust_policy", target.get("trust_policy", "monitor"))
+    if target.get("lane") == "blocked" and target.get("kind") == "setup" and restored_policy == "act-now":
+        restored_policy = "act-with-review"
+    if restored_policy == "act-now":
+        return restored_policy, "Recent evidence is stable enough to retire the earlier caution and return this target to act-now."
+    if restored_policy == "act-with-review":
+        return restored_policy, "Recent evidence is stable enough to retire the earlier caution and return this target to act-with-review."
+    if restored_policy == "verify-first":
+        return restored_policy, "The earlier soft caution can retire, but the strongest supported policy is still verify-first."
+    return restored_policy, "The earlier soft caution can retire, but the current signal still only supports monitoring."
+
+
+def _recovery_confidence_summary(primary_target: dict, sticky_exception_hotspots: list[dict]) -> str:
+    label = _target_label(primary_target) or "The current target"
+    retirement_status = primary_target.get("exception_retirement_status", "none")
+    confidence_label = primary_target.get("recovery_confidence_label", "low")
+    confidence_score = primary_target.get("recovery_confidence_score", 0.05)
+    if retirement_status == "retired":
+        return f"{label} has high recovery confidence ({confidence_score:.2f}), so the earlier caution can now retire."
+    if retirement_status == "candidate":
+        return f"{label} is building recovery confidence ({confidence_label}, {confidence_score:.2f}), but the earlier caution has not retired yet."
+    if retirement_status == "blocked":
+        return primary_target.get(
+            "exception_retirement_reason",
+            f"{label} still has reopen, flip, or calibration noise blocking exception retirement.",
+        )
+    if confidence_label == "high":
+        return f"{label} has high recovery confidence ({confidence_score:.2f}), so caution can start relaxing when the retirement rules are met."
+    if confidence_label == "medium":
+        return f"{label} has medium recovery confidence ({confidence_score:.2f}), so caution may relax soon but still needs more proof."
+    if sticky_exception_hotspots:
+        hotspot = sticky_exception_hotspots[0]
+        return (
+            f"Recent soft exceptions are still sticking around {hotspot.get('label', 'recent hotspots')}, "
+            "so caution still needs stronger proof before it can retire."
+        )
+    return f"{label} still has low recovery confidence ({confidence_score:.2f}), so the softer caution should stay in place."
+
+
+def _exception_retirement_summary(
+    primary_target: dict,
+    retired_exception_hotspots: list[dict],
+    sticky_exception_hotspots: list[dict],
+) -> str:
+    label = _target_label(primary_target) or "The current target"
+    retirement_status = primary_target.get("exception_retirement_status", "none")
+    if retirement_status == "retired":
+        return f"{label} has formally retired the earlier soft caution and returned to {primary_target.get('trust_policy', 'monitor')}."
+    if retirement_status == "candidate":
+        return f"{label} is trending toward exception retirement, but the evidence is not strong enough to retire it yet."
+    if retirement_status == "blocked":
+        return primary_target.get(
+            "exception_retirement_reason",
+            f"{label} still has reopen, flip, or calibration noise blocking exception retirement.",
+        )
+    if retired_exception_hotspots:
+        hotspot = retired_exception_hotspots[0]
+        return (
+            f"Recent soft exceptions have retired most often around {hotspot.get('label', 'recent hotspots')}, "
+            "so verify-first should not linger there longer than the evidence supports."
+        )
+    if sticky_exception_hotspots:
+        hotspot = sticky_exception_hotspots[0]
+        return (
+            f"Recent soft exceptions are still sticky around {hotspot.get('label', 'recent hotspots')}, "
+            "so caution still looks justified there."
+        )
+    return "Recent exception retirement behavior does not yet show a strong retire-or-stay pattern."
+
+
+def _retirement_hotspots(
+    historical_cases: list[dict],
+    resolution_targets: list[dict],
+    *,
+    mode: str,
+) -> list[dict]:
+    grouped: dict[str, list[str]] = {}
+    for case in historical_cases:
+        class_key = case.get("class_key", "")
+        if not class_key:
+            continue
+        grouped.setdefault(class_key, []).append(case.get("case_outcome", ""))
+
+    for target in resolution_targets:
+        class_key = _target_class_key(target)
+        if not class_key:
+            continue
+        if mode == "retired" and target.get("exception_retirement_status") == "retired":
+            grouped.setdefault(class_key, []).append("retired")
+        if mode == "sticky" and target.get("exception_retirement_status") == "blocked":
+            grouped.setdefault(class_key, []).append("blocked")
+
+    hotspots: list[dict] = []
+    target_outcomes = {"overcautious", "retired"} if mode == "retired" else {"useful-caution", "blocked"}
+    count_key = "retired_count" if mode == "retired" else "sticky_count"
+    for label, outcomes in grouped.items():
+        match_count = sum(1 for outcome in outcomes if outcome in target_outcomes)
+        if match_count <= 0:
+            continue
+        hotspots.append(
+            {
+                "scope": "class",
+                "label": label,
+                count_key: match_count,
+                "exception_count": len(outcomes),
+            }
+        )
+    hotspots.sort(
+        key=lambda item: (
+            -item.get(count_key, 0),
+            -item.get("exception_count", 0),
+            item.get("label", ""),
+        )
+    )
+    return hotspots[:5]
 
 
 def _trust_exception_events(
@@ -2795,7 +3311,15 @@ def _adaptive_confidence_summary(
     exception_status = primary_target.get("trust_exception_status", "none")
     exception_pattern_status = primary_target.get("exception_pattern_status", "none")
     trust_recovery_status = primary_target.get("trust_recovery_status", "none")
+    exception_retirement_status = primary_target.get("exception_retirement_status", "none")
+    recovery_confidence_label = primary_target.get("recovery_confidence_label", "low")
     drift_status = primary_target.get("recommendation_drift_status", "")
+    if exception_retirement_status == "retired":
+        return "Recovery confidence is high enough that the earlier soft caution has been formally retired, so the stronger trust policy is back in place."
+    if exception_retirement_status == "candidate":
+        return "Recovery confidence is building, but the target has not earned exception retirement yet, so keep the current caution in place."
+    if exception_retirement_status == "blocked":
+        return "Exception retirement is still blocked by reopen, flip, or calibration noise, so the softer caution should stay in place."
     if trust_recovery_status == "earned":
         return "Recent stability has earned this recommendation back from verify-first to act-with-review, so the softer caution can start relaxing."
     if trust_recovery_status == "candidate":
@@ -2805,6 +3329,8 @@ def _adaptive_confidence_summary(
     if exception_pattern_status == "useful-caution":
         return "Recent soft caution has been justified, so the verification-aware posture still looks appropriate."
     if exception_pattern_status == "overcautious":
+        if recovery_confidence_label == "high":
+            return "Recent soft caution may now be more cautious than the evidence supports, and recovery confidence is high enough that retirement is coming into view."
         return "Recent soft caution may now be more cautious than the evidence supports, so watch for trust recovery instead of leaving verify-first in place by default."
     if exception_status == "softened-for-noise":
         return "Recent trust noise softened the recommendation, so verify the latest state before treating it as fully stable."
@@ -3077,6 +3603,9 @@ def _why_it_matters(
         resolution_trend.get("primary_target_exception_pattern_reason", ""),
         resolution_trend.get("primary_target_trust_recovery_status", "none"),
         resolution_trend.get("primary_target_trust_recovery_reason", ""),
+        resolution_trend.get("primary_target_exception_retirement_status", "none"),
+        resolution_trend.get("primary_target_exception_retirement_reason", ""),
+        resolution_trend.get("primary_target_recovery_confidence_label", "low"),
     )
     if urgency == "blocked":
         return f"A trustworthy next step is blocked until this is cleared. {trust_sentence} {calibration_sentence}".strip()
@@ -3164,7 +3693,17 @@ def _trust_policy_sentence(
     exception_pattern_reason: str,
     trust_recovery_status: str,
     trust_recovery_reason: str,
+    exception_retirement_status: str,
+    exception_retirement_reason: str,
+    recovery_confidence_label: str,
 ) -> str:
+    if exception_retirement_status == "retired":
+        return "Trust policy: the earlier soft caution has now been formally retired, so the stronger live policy is back in place."
+    if exception_retirement_status == "candidate":
+        return "Trust policy: keep the current posture for now because the target is trending toward retirement, but it has not earned it yet."
+    if exception_retirement_status == "blocked":
+        detail = exception_retirement_reason or trust_recovery_reason or exception_reason or reason
+        return f"Trust policy: keep caution in place because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: keep caution in place because exception retirement is still blocked."
     if trust_recovery_status == "earned":
         return "Trust policy: act with review because recent stability has earned this target back from verify-first."
     if trust_recovery_status == "candidate":
@@ -3175,6 +3714,8 @@ def _trust_policy_sentence(
     if exception_pattern_status == "useful-caution":
         return "Trust policy: verify first because recent soft caution has been justified and still looks appropriate."
     if exception_pattern_status == "overcautious":
+        if recovery_confidence_label == "high":
+            return "Trust policy: verify first for now, but recovery confidence is high enough that the softer posture may soon retire."
         return "Trust policy: verify first for now, but recent evidence suggests the softer posture may be more cautious than necessary."
     if exception_status == "softened-for-noise":
         return "Trust policy: verify first because the target still matters, but recent trust noise warrants a verification step."
@@ -3194,9 +3735,21 @@ def _trust_policy_sentence(
     return f"Trust policy: monitor because {reason[0].lower() + reason[1:]}" if reason else "Trust policy: monitor because no strong closure move is supported yet."
 
 
-def _with_trust_policy_brief(summary: str, policy: str, exception_status: str, trust_recovery_status: str) -> str:
+def _with_trust_policy_brief(
+    summary: str,
+    policy: str,
+    exception_status: str,
+    trust_recovery_status: str,
+    exception_retirement_status: str,
+) -> str:
     if not summary:
         return summary
+    if exception_retirement_status == "retired":
+        return f"{summary} Trust policy: earlier caution retired."
+    if exception_retirement_status == "candidate":
+        return f"{summary} Trust policy: exception retirement is in progress, but not earned yet."
+    if exception_retirement_status == "blocked":
+        return f"{summary} Trust policy: exception retirement is blocked."
     if trust_recovery_status == "earned":
         return f"{summary} Trust policy: act with review because recent stability has earned stronger trust again."
     if trust_recovery_status == "candidate":
@@ -3240,6 +3793,23 @@ def _trust_recovery_note(resolution_trend: dict) -> str:
     if status in {None, "", "none"}:
         return ""
     return f"Trust recovery: {status} — {reason}".strip()
+
+
+def _recovery_confidence_note(resolution_trend: dict) -> str:
+    label = resolution_trend.get("primary_target_recovery_confidence_label", "")
+    if not label:
+        return ""
+    score = resolution_trend.get("primary_target_recovery_confidence_score", 0.0)
+    summary = resolution_trend.get("recovery_confidence_summary", "")
+    return f"Recovery confidence: {label} ({score:.2f}) — {summary}".strip()
+
+
+def _exception_retirement_note(resolution_trend: dict) -> str:
+    status = resolution_trend.get("primary_target_exception_retirement_status", "none")
+    reason = resolution_trend.get("primary_target_exception_retirement_reason", "")
+    if status in {None, "", "none"}:
+        return ""
+    return f"Exception retirement: {status} — {reason}".strip()
 
 
 def _recommendation_drift_note(resolution_trend: dict) -> str:

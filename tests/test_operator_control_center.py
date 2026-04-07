@@ -141,6 +141,9 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
     assert "blocked" in summary["primary_target_trust_policy_reason"].lower()
     assert summary["primary_target_exception_status"] == "none"
     assert summary["recommendation_drift_status"] == "stable"
+    assert summary["primary_target_recovery_confidence_label"] in {"low", "medium", "high"}
+    assert "recovery confidence" in summary["recovery_confidence_summary"].lower()
+    assert summary["primary_target_exception_retirement_status"] in {"none", "candidate", "blocked", "retired"}
     assert "guidance" in summary["adaptive_confidence_summary"].lower() or "immediate action" in summary["adaptive_confidence_summary"].lower()
     assert summary["recommendation_quality_summary"].startswith("Strong recommendation because")
 
@@ -983,6 +986,15 @@ def test_operator_snapshot_softens_for_policy_flip_churn(tmp_path: Path, monkeyp
             "confidence_calibration_summary": "Recent high-confidence recommendations are validating well.",
         },
     )
+    monkeypatch.setattr(
+        "src.operator_control_center._trust_policy_exception_for_target",
+        lambda target, *_args, **_kwargs: (
+            "softened-for-flip-churn",
+            "Recent trust-policy flips have been bouncing enough that this recommendation should not be treated as fully stable yet.",
+            "verify-first",
+            "Recent trust-policy churn means this target should be handled with a softer, verification-aware posture.",
+        ),
+    )
 
     snapshot = build_operator_snapshot(report, output_dir=tmp_path)
     summary = snapshot["operator_summary"]
@@ -1164,6 +1176,15 @@ def test_operator_snapshot_recovers_stable_verify_first_target(tmp_path: Path, m
             "confidence_calibration_summary": "Recent high-confidence recommendations are validating well.",
         },
     )
+    monkeypatch.setattr(
+        "src.operator_control_center._trust_policy_exception_for_target",
+        lambda target, *_args, **_kwargs: (
+            "softened-for-flip-churn",
+            "Recent trust-policy flips have been bouncing enough that this recommendation should not be treated as fully stable yet.",
+            "verify-first",
+            "Recent trust-policy churn means this target should be handled with a softer, verification-aware posture.",
+        ),
+    )
 
     snapshot = build_operator_snapshot(report, output_dir=tmp_path)
     summary = snapshot["operator_summary"]
@@ -1171,6 +1192,120 @@ def test_operator_snapshot_recovers_stable_verify_first_target(tmp_path: Path, m
     assert summary["primary_target_exception_status"] == "softened-for-flip-churn"
     assert summary["primary_target_trust_recovery_status"] == "earned"
     assert summary["primary_target_exception_pattern_status"] == "recovering"
+    assert summary["primary_target_trust_policy"] == "act-with-review"
+    assert summary["primary_target_recovery_confidence_label"] in {"medium", "high"}
+    assert summary["primary_target_exception_retirement_status"] == "candidate"
+
+
+def test_operator_snapshot_retires_exception_after_stable_window(tmp_path: Path, monkeypatch):
+    report = _make_report(
+        preflight_summary={"status": "ok", "blocking_errors": 0, "warnings": 0, "checks": []},
+        review_targets=[],
+        managed_state_drift=[],
+        governance_drift=[],
+        governance_preview={},
+        rollback_preview={},
+        material_changes=[
+            {
+                "change_key": "high-1",
+                "change_type": "security-change",
+                "repo_name": "RepoC",
+                "severity": 0.9,
+                "title": "RepoC security posture changed",
+                "summary": "critical -> watch",
+                "recommended_next_step": "Review RepoC security posture changed now.",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history",
+        lambda *_args, **_kwargs: [
+            {
+                "generated_at": "2026-04-06T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {
+                        "item_id": "review-change:high-1",
+                        "repo": "RepoC",
+                        "title": "RepoC security posture changed",
+                        "lane": "urgent",
+                        "kind": "review",
+                    },
+                    "primary_target_trust_policy": "verify-first",
+                    "primary_target_exception_status": "softened-for-flip-churn",
+                    "decision_memory_status": "attempted",
+                    "primary_target_last_outcome": "improved",
+                },
+                "operator_queue": [],
+            },
+            {
+                "generated_at": "2026-04-05T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {
+                        "item_id": "review-change:high-1",
+                        "repo": "RepoC",
+                        "title": "RepoC security posture changed",
+                        "lane": "urgent",
+                        "kind": "review",
+                    },
+                    "primary_target_trust_policy": "verify-first",
+                    "primary_target_exception_status": "softened-for-flip-churn",
+                    "decision_memory_status": "attempted",
+                    "primary_target_last_outcome": "improved",
+                },
+                "operator_queue": [],
+            },
+            {
+                "generated_at": "2026-04-04T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {
+                        "item_id": "review-change:high-1",
+                        "repo": "RepoC",
+                        "title": "RepoC security posture changed",
+                        "lane": "urgent",
+                        "kind": "review",
+                    },
+                    "primary_target_trust_policy": "verify-first",
+                    "primary_target_exception_status": "softened-for-flip-churn",
+                    "decision_memory_status": "attempted",
+                    "primary_target_last_outcome": "improved",
+                },
+                "operator_queue": [],
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center._build_confidence_calibration",
+        lambda _history: {
+            "confidence_validation_status": "healthy",
+            "confidence_window_runs": 8,
+            "validated_recommendation_count": 4,
+            "partially_validated_recommendation_count": 1,
+            "unresolved_recommendation_count": 1,
+            "reopened_recommendation_count": 0,
+            "insufficient_future_runs_count": 2,
+            "high_confidence_hit_rate": 0.75,
+            "medium_confidence_hit_rate": 0.5,
+            "low_confidence_caution_rate": 1.0,
+            "recent_validation_outcomes": [],
+            "confidence_calibration_summary": "Recent high-confidence recommendations are validating well.",
+        },
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center._trust_policy_exception_for_target",
+        lambda target, *_args, **_kwargs: (
+            "softened-for-flip-churn",
+            "Recent trust-policy flips have been bouncing enough that this recommendation should not be treated as fully stable yet.",
+            "verify-first",
+            "Recent trust-policy churn means this target should be handled with a softer, verification-aware posture.",
+        ),
+    )
+
+    snapshot = build_operator_snapshot(report, output_dir=tmp_path)
+    summary = snapshot["operator_summary"]
+
+    assert summary["primary_target_trust_recovery_status"] == "earned"
+    assert summary["primary_target_recovery_confidence_label"] == "high"
+    assert summary["primary_target_exception_retirement_status"] == "retired"
     assert summary["primary_target_trust_policy"] == "act-with-review"
 
 
