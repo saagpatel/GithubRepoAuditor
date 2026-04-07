@@ -129,7 +129,7 @@ The intended operator loop is:
 1. `audit <github-username> --doctor`
 2. `audit <github-username>` or `audit <github-username> --watch --watch-strategy adaptive`
 3. `audit <github-username> --control-center`
-4. Read the control-center handoff fields before drilling into the queue, especially the trend summary and primary target
+4. Read the control-center handoff fields before drilling into the queue, especially the trend summary, primary target, why it is still the top target, and what counts as done
 5. Handle `Blocked`, then `Needs Attention Now`, then `Ready for Manual Action`
 6. Leave `Safe to Defer` items alone unless priorities changed
 7. Run `make workbook-gate` only when workbook-facing changes are part of the release
@@ -171,3 +171,9 @@ The scheduled handoff also now makes the recent direction explicit:
 - `improving`: attention pressure fell or previously noisy work cleared
 - `stable`: the queue is still sticky and needs the same primary target closed next
 - `quiet`: the blocked/urgent queue stayed clear long enough to count as a quiet streak
+
+It also now explains the accountability story for the current top target:
+
+- why this item is still the top target
+- what would count as done on the next run
+- whether the queue is carrying newly stale or chronic follow-through pressure

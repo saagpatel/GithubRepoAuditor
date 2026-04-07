@@ -25,6 +25,20 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
             "persisting_attention_count": 1,
             "reopened_attention_count": 0,
             "quiet_streak_runs": 0,
+            "aging_status": "watch",
+            "primary_target_reason": "This urgent item is already being watched across recent runs, so it stays ahead of ready work until it clears.",
+            "primary_target_done_criteria": "Inspect and reconcile the drift, then confirm this item no longer reappears on the next run.",
+            "closure_guidance": "Inspect the managed issue before closing the campaign. Treat this as done only when inspect and reconcile the drift, then confirm this item no longer reappears on the next run.",
+            "chronic_item_count": 0,
+            "newly_stale_count": 0,
+            "longest_persisting_item": {
+                "repo": "RepoC",
+                "title": "RepoC drift needs review",
+                "age_days": 4,
+                "aging_status": "watch",
+            },
+            "attention_age_bands": {"0-1 days": 0, "2-7 days": 1, "8-21 days": 0, "22+ days": 0},
+            "accountability_summary": "This urgent item is already being watched across recent runs, so it stays ahead of ready work until it clears. Aging pressure: 0 chronic item(s) and 0 newly stale item(s).",
             "primary_target": {
                 "item_id": "campaign-drift:repo-c",
                 "repo": "RepoC",
@@ -68,6 +82,9 @@ def test_build_scheduled_handoff_writes_artifacts_and_issue_candidate(tmp_path):
     assert "What Got Better" in markdown
     assert "What Needs Attention Now" in markdown
     assert "Primary target: RepoC: RepoC drift needs review" in markdown
+    assert "Why This Is Still Open" in markdown
+    assert "What Counts As Done" in markdown
+    assert "Aging Pressure" in markdown
 
 
 def test_build_scheduled_handoff_stays_quiet_for_quiet_runs(tmp_path):

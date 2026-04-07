@@ -176,6 +176,10 @@ class TestMarkdownReport:
             "what_to_do_next": "Restore the workbook template before exporting.",
             "trend_summary": "The operator picture is worsening: 1 new attention item appeared and the top blocker should be cleared first.",
             "follow_through_summary": "1 urgent item repeated in the recent window.",
+            "accountability_summary": "The current top target is fresh and should be closed before taking on newly ready work.",
+            "primary_target_reason": "This outranks the rest of the queue because a setup blocker stops the next trustworthy export path.",
+            "primary_target_done_criteria": "Clear the failing prerequisite and rerun the relevant export command so the blocker exits the queue.",
+            "closure_guidance": "Restore the workbook template, rerun the export, and confirm this blocker disappears on the next run.",
             "primary_target": {"title": "Missing template asset"},
         }
         report.operator_queue = [
@@ -197,7 +201,11 @@ class TestMarkdownReport:
         assert "What To Do Next" in content
         assert "Trend" in content
         assert "Follow-Through" in content
+        assert "Accountability" in content
         assert "Primary Target" in content
+        assert "Why This Is The Top Target" in content
+        assert "What Counts As Done" in content
+        assert "Closure Guidance" in content
 
     def test_includes_governance_operator_summary_when_present(self, tmp_path):
         report = _make_report()

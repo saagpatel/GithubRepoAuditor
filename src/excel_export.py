@@ -279,6 +279,24 @@ def _operator_trend_values(data: dict) -> tuple[str, str, str, str]:
     return trend_status.replace("_", " ").title(), trend_summary, primary_target_label, counts_summary
 
 
+def _operator_accountability_values(data: dict) -> tuple[str, str, str]:
+    summary = data.get("operator_summary") or {}
+    primary_target_reason = summary.get("primary_target_reason", "") or "No top-target rationale is recorded yet."
+    closure_guidance = summary.get("closure_guidance", "") or "No closure guidance is recorded yet."
+    longest_item = summary.get("longest_persisting_item") or {}
+    longest_label = (
+        f"{longest_item.get('repo')}: {longest_item.get('title')}"
+        if longest_item.get("repo")
+        else longest_item.get("title", "")
+    ) or "No persisting item"
+    aging_pressure = (
+        f"Chronic {summary.get('chronic_item_count', 0)} | "
+        f"Newly stale {summary.get('newly_stale_count', 0)} | "
+        f"Longest {longest_label}"
+    )
+    return primary_target_reason, closure_guidance, aging_pressure
+
+
 def _apply_workbook_named_ranges(
     wb: Workbook,
     data: dict,
@@ -727,6 +745,7 @@ def _build_dashboard(
     what_changed, why_it_matters, next_action = _operator_handoff_values(data)
     follow_through = _operator_follow_through_value(data)
     trend_status, trend_summary, primary_target, resolution_counts = _operator_trend_values(data)
+    primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
 
     operator_rows = [
         ("Setup Health", _display_operator_state(setup_health.get("status", "ok"))),
@@ -760,7 +779,15 @@ def _build_dashboard(
             ("Source Run", operator_summary.get("source_run_id", "")),
         ]
     )
-    _write_key_value_block(ws, 5, 15, operator_rows, title="Operator Snapshot")
+    if excel_mode == "standard":
+        operator_rows.extend(
+            [
+                ("Why Top Target", primary_target_reason),
+                ("Closure Guidance", closure_guidance),
+                ("Aging Pressure", aging_pressure),
+            ]
+        )
+    operator_block_end = _write_key_value_block(ws, 5, 15, operator_rows, title="Operator Snapshot")
 
     repo_rollups = _build_workbook_rollups(data)[1]
     top_attention_rows = []
@@ -775,9 +802,10 @@ def _build_dashboard(
         )
     if not top_attention_rows:
         top_attention_rows.append(["Portfolio", "No open items", "Nothing is currently queued.", "Monitor future audits"])
+    top_attention_start = max(19, operator_block_end + 2)
     _write_ranked_list(
         ws,
-        19,
+        top_attention_start,
         15,
         "Top Attention Items",
         ["Repo", "Counts", "Why Now", "Next Step"],
@@ -804,7 +832,7 @@ def _build_dashboard(
             break
     _write_ranked_list(
         ws,
-        27,
+        top_attention_start + 8,
         15,
         "Top Opportunities",
         ["Repo", "Score", "Tier", "Best Next Move"],
@@ -823,7 +851,7 @@ def _build_dashboard(
     ]
     _write_ranked_list(
         ws,
-        35,
+        top_attention_start + 16,
         15,
         "Top Laggards",
         ["Repo", "Score", "Tier", "What Is Dragging It Down"],
@@ -3402,6 +3430,7 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
     repo_rollups = _build_workbook_rollups(data)[1]
     top_issue_families = _summarize_top_issue_families(material_changes)
     trend_status, trend_summary, primary_target, resolution_counts = _operator_trend_values(data)
+    primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
     summary_rows = [
         ("Headline", (data.get("operator_summary") or {}).get("headline", "Review activity is available below.")),
         ("Queue Counts", _format_lane_counts(counts)),
@@ -3418,6 +3447,9 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
                 ("Trend", f"{trend_status} — {trend_summary}"),
                 ("Primary Target", primary_target),
                 ("Resolution Counts", resolution_counts),
+                ("Why Top Target", primary_target_reason),
+                ("Closure Guidance", closure_guidance),
+                ("Aging Pressure", aging_pressure),
             ]
         )
     summary_rows.append(("Source Run", (data.get("operator_summary") or {}).get("source_run_id", "")))
@@ -3802,6 +3834,7 @@ def _build_executive_summary(
     what_changed, why_it_matters, next_action = _operator_handoff_values(data)
     follow_through = _operator_follow_through_value(data)
     trend_status, trend_summary, primary_target, resolution_counts = _operator_trend_values(data)
+    primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
     recommended_focus = ""
     if data.get("operator_queue"):
         recommended_focus = data["operator_queue"][0].get("recommended_action", "")
@@ -3834,6 +3867,8 @@ def _build_executive_summary(
     ]
     if excel_mode == "standard":
         narrative_rows.insert(5, ("Trend", f"{trend_status} — {trend_summary}"))
+        narrative_rows.insert(6, ("Why Top Target", primary_target_reason))
+        narrative_rows.insert(7, ("Closure Guidance", closure_guidance))
     _write_key_value_block(ws, 4, 1, narrative_rows, title="Leadership Brief")
 
     write_kpi_card(ws, 10, 1, "Portfolio Grade", data.get("portfolio_grade", "F"))
@@ -3883,9 +3918,15 @@ def _build_executive_summary(
             ws.cell(row=30, column=5, value=primary_target)
             ws.cell(row=31, column=4, value="Resolution Counts").font = SUBHEADER_FONT
             ws.cell(row=31, column=5, value=resolution_counts)
+            ws.cell(row=32, column=4, value="Why Top Target").font = SUBHEADER_FONT
+            ws.cell(row=32, column=5, value=primary_target_reason)
+            ws.cell(row=33, column=4, value="Closure Guidance").font = SUBHEADER_FONT
+            ws.cell(row=33, column=5, value=closure_guidance)
+            ws.cell(row=34, column=4, value="Aging Pressure").font = SUBHEADER_FONT
+            ws.cell(row=34, column=5, value=aging_pressure)
     preflight = data.get("preflight_summary") or {}
     if preflight and (preflight.get("blocking_errors", 0) or preflight.get("warnings", 0)):
-        row_base = 35 if excel_mode == "standard" else 33
+        row_base = 37 if excel_mode == "standard" else 33
         ws.cell(row=row_base, column=1, value="Preflight Diagnostics").font = SECTION_FONT
         ws.cell(row=row_base + 1, column=1, value="Status").font = SUBHEADER_FONT
         ws.cell(row=row_base + 1, column=2, value=preflight.get("status", "unknown"))
@@ -3893,7 +3934,7 @@ def _build_executive_summary(
         ws.cell(row=row_base + 2, column=2, value=preflight.get("blocking_errors", 0))
         ws.cell(row=row_base + 3, column=1, value="Warnings").font = SUBHEADER_FONT
         ws.cell(row=row_base + 3, column=2, value=preflight.get("warnings", 0))
-    auto_width(ws, 6, 37 if excel_mode == "standard" else 35)
+    auto_width(ws, 6, 39 if excel_mode == "standard" else 35)
 
 
 def _build_print_pack(
@@ -3927,6 +3968,7 @@ def _build_print_pack(
     what_changed, why_it_matters, next_action = _operator_handoff_values(data)
     follow_through = _operator_follow_through_value(data)
     trend_status, trend_summary, primary_target, resolution_counts = _operator_trend_values(data)
+    primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
     ws["A7"] = "This Week"
     ws["B7"] = operator_summary.get("headline", "Review the latest workbook surfaces for change and drift.")
     ws["A8"] = "Operator Queue"
@@ -3954,13 +3996,17 @@ def _build_print_pack(
     if excel_mode == "standard":
         ws["A17"] = "Primary Target"
         ws["B17"] = primary_target
-        ws["A18"] = "Resolution Counts"
-        ws["B18"] = resolution_counts
-        ws["A19"] = "Top Risks"
-        ws["A19"].font = SECTION_FONT
-        risk_start_row = 19
-        opportunity_header_row = 19
-        page2_row = 28
+        ws["A18"] = "Why Top Target"
+        ws["B18"] = primary_target_reason
+        ws["A19"] = "What Counts As Done"
+        ws["B19"] = closure_guidance
+        ws["A20"] = "Aging Pressure"
+        ws["B20"] = aging_pressure
+        ws["A21"] = "Top Risks"
+        ws["A21"].font = SECTION_FONT
+        risk_start_row = 21
+        opportunity_header_row = 21
+        page2_row = 30
     else:
         ws["A17"] = "Top Risks"
         ws["A17"].font = SECTION_FONT

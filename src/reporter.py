@@ -221,12 +221,20 @@ def write_markdown_report(
             _w(f"- What To Do Next: {report.operator_summary.get('what_to_do_next')}")
         if report.operator_summary.get("trend_summary"):
             _w(f"- Trend: {report.operator_summary.get('trend_summary')}")
+        if report.operator_summary.get("accountability_summary"):
+            _w(f"- Accountability: {report.operator_summary.get('accountability_summary')}")
         if report.operator_summary.get("follow_through_summary"):
             _w(f"- Follow-Through: {report.operator_summary.get('follow_through_summary')}")
         primary_target = report.operator_summary.get("primary_target") or {}
         if primary_target:
             repo = f"{primary_target.get('repo')}: " if primary_target.get("repo") else ""
             _w(f"- Primary Target: {repo}{primary_target.get('title', 'Operator target')}")
+        if report.operator_summary.get("primary_target_reason"):
+            _w(f"- Why This Is The Top Target: {report.operator_summary.get('primary_target_reason')}")
+        if report.operator_summary.get("primary_target_done_criteria"):
+            _w(f"- What Counts As Done: {report.operator_summary.get('primary_target_done_criteria')}")
+        if report.operator_summary.get("closure_guidance"):
+            _w(f"- Closure Guidance: {report.operator_summary.get('closure_guidance')}")
         if report.operator_summary.get("control_center_reference"):
             _w(f"- Control Center Artifact: `{report.operator_summary.get('control_center_reference')}`")
         counts = report.operator_summary.get("counts", {})

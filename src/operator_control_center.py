@@ -311,6 +311,15 @@ def build_operator_snapshot(
         "persisting_attention_count": resolution_trend["persisting_attention_count"],
         "reopened_attention_count": resolution_trend["reopened_attention_count"],
         "history_window_runs": resolution_trend["history_window_runs"],
+        "aging_status": resolution_trend["aging_status"],
+        "primary_target_reason": resolution_trend["primary_target_reason"],
+        "primary_target_done_criteria": resolution_trend["primary_target_done_criteria"],
+        "closure_guidance": resolution_trend["closure_guidance"],
+        "attention_age_bands": resolution_trend["attention_age_bands"],
+        "chronic_item_count": resolution_trend["chronic_item_count"],
+        "newly_stale_count": resolution_trend["newly_stale_count"],
+        "longest_persisting_item": resolution_trend["longest_persisting_item"],
+        "accountability_summary": resolution_trend["accountability_summary"],
         "primary_target": resolution_trend["primary_target"],
         "resolution_targets": resolution_trend["resolution_targets"],
         "trend_summary": resolution_trend["trend_summary"],
@@ -351,12 +360,20 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
         lines.append(f"*What To Do Next:* {summary['what_to_do_next']}")
     if summary.get("trend_summary"):
         lines.append(f"*Trend:* {summary['trend_summary']}")
+    if summary.get("accountability_summary"):
+        lines.append(f"*Accountability:* {summary['accountability_summary']}")
     if summary.get("follow_through_summary"):
         lines.append(f"*Follow-Through:* {summary['follow_through_summary']}")
     if summary.get("primary_target"):
         target = summary["primary_target"]
         repo = f"{target.get('repo')}: " if target.get("repo") else ""
         lines.append(f"*Primary Target:* {repo}{target.get('title', 'Operator target')}")
+    if summary.get("primary_target_reason"):
+        lines.append(f"*Why This Is The Top Target:* {summary['primary_target_reason']}")
+    if summary.get("primary_target_done_criteria"):
+        lines.append(f"*What Counts As Done:* {summary['primary_target_done_criteria']}")
+    if summary.get("closure_guidance"):
+        lines.append(f"*Closure Guidance:* {summary['closure_guidance']}")
     if summary.get("control_center_reference"):
         lines.append(f"*Control Center Artifact:* `{summary['control_center_reference']}`")
     lines.append(
@@ -599,6 +616,24 @@ def _build_resolution_trend(queue: list[dict], history: list[dict]) -> dict:
         has_previous=previous_snapshot is not None,
     )
     primary_target = _primary_target(resolution_targets)
+    primary_target_reason = _primary_target_reason(primary_target)
+    primary_target_done_criteria = _primary_target_done_criteria(primary_target)
+    closure_guidance = _closure_guidance(primary_target, primary_target_done_criteria)
+    accountability_summary = _accountability_summary(
+        primary_target=primary_target,
+        primary_target_reason=primary_target_reason,
+        closure_guidance=closure_guidance,
+        chronic_item_count=sum(1 for item in resolution_targets if item.get("aging_status") == "chronic"),
+        newly_stale_count=sum(1 for item in resolution_targets if item.get("newly_stale")),
+        quiet_streak_runs=quiet_streak_runs,
+    )
+    if primary_target:
+        primary_target = {
+            **primary_target,
+            "reason": primary_target_reason,
+            "done_criteria": primary_target_done_criteria,
+            "closure_guidance": closure_guidance,
+        }
     trend_summary = _trend_summary(
         trend_status=trend_status,
         quiet_streak_runs=quiet_streak_runs,
@@ -616,6 +651,15 @@ def _build_resolution_trend(queue: list[dict], history: list[dict]) -> dict:
         "reopened_attention_count": reopened_attention_count,
         "history_window_runs": len(recent_runs),
         "quiet_streak_runs": quiet_streak_runs,
+        "aging_status": primary_target.get("aging_status", "fresh") if primary_target else "fresh",
+        "primary_target_reason": primary_target_reason,
+        "primary_target_done_criteria": primary_target_done_criteria,
+        "closure_guidance": closure_guidance,
+        "attention_age_bands": _attention_age_bands(current_attention),
+        "chronic_item_count": sum(1 for item in resolution_targets if item.get("aging_status") == "chronic"),
+        "newly_stale_count": sum(1 for item in resolution_targets if item.get("newly_stale")),
+        "longest_persisting_item": _longest_persisting_item(resolution_targets),
+        "accountability_summary": accountability_summary,
         "primary_target": primary_target,
         "resolution_targets": resolution_targets[:5],
         "trend_summary": trend_summary,
@@ -672,12 +716,28 @@ def _resolution_targets(queue: list[dict], recent_runs: list[dict]) -> list[dict
             if match.get("lane") in ATTENTION_LANES:
                 repeat_attention_appearances += 1
         is_stale = non_deferred_appearances >= 3 or earliest_days > 7
+        previous_earliest_days = max(
+            (
+                match.get("age_days", 0)
+                for snapshot in recent_runs[1:]
+                if (match := snapshot["items"].get(key)) and match.get("lane") != "deferred"
+            ),
+            default=0,
+        )
+        previous_non_deferred_appearances = sum(
+            1
+            for snapshot in recent_runs[1:]
+            if (match := snapshot["items"].get(key)) and match.get("lane") != "deferred"
+        )
         is_repeat_urgent = item.get("lane") in ATTENTION_LANES and repeat_attention_appearances >= 2
         is_reopened = (
             item.get("lane") in ATTENTION_LANES
             and key not in previous_attention_keys
             and key in earlier_attention_keys
         )
+        current_aging_status = _aging_status(non_deferred_appearances, earliest_days)
+        previous_aging_status = _aging_status(previous_non_deferred_appearances, previous_earliest_days)
+        newly_stale = current_aging_status in {"stale", "chronic"} and previous_aging_status in {"fresh", "watch"}
         targets.append(
             {
                 "item_id": item.get("item_id", key),
@@ -690,13 +750,62 @@ def _resolution_targets(queue: list[dict], recent_runs: list[dict]) -> list[dict
                 "recommended_action": item.get("recommended_action", ""),
                 "summary": item.get("summary", ""),
                 "age_days": earliest_days,
+                "aging_status": current_aging_status,
                 "stale": is_stale,
                 "reopened": is_reopened,
                 "repeat_urgent": is_repeat_urgent,
+                "newly_stale": newly_stale,
             }
         )
     targets.sort(key=_resolution_target_sort_key)
     return targets
+
+
+def _aging_status(appearances: int, age_days: int) -> str:
+    if appearances >= 5 or age_days > 21:
+        return "chronic"
+    if appearances >= 3 or age_days > 7:
+        return "stale"
+    if appearances >= 2:
+        return "watch"
+    return "fresh"
+
+
+def _attention_age_bands(current_attention: dict[str, dict]) -> dict[str, int]:
+    bands = {"0-1 days": 0, "2-7 days": 0, "8-21 days": 0, "22+ days": 0}
+    for item in current_attention.values():
+        age_days = item.get("age_days", 0)
+        if age_days <= 1:
+            bands["0-1 days"] += 1
+        elif age_days <= 7:
+            bands["2-7 days"] += 1
+        elif age_days <= 21:
+            bands["8-21 days"] += 1
+        else:
+            bands["22+ days"] += 1
+    return bands
+
+
+def _longest_persisting_item(resolution_targets: list[dict]) -> dict:
+    if not resolution_targets:
+        return {}
+    item = max(
+        resolution_targets,
+        key=lambda target: (
+            target.get("age_days", 0),
+            target.get("priority", 0),
+            target.get("repo", ""),
+            target.get("title", ""),
+        ),
+    )
+    return {
+        "item_id": item.get("item_id", ""),
+        "repo": item.get("repo", ""),
+        "title": item.get("title", ""),
+        "lane": item.get("lane", ""),
+        "age_days": item.get("age_days", 0),
+        "aging_status": item.get("aging_status", "fresh"),
+    }
 
 
 def _resolution_target_sort_key(item: dict) -> tuple:
@@ -747,6 +856,70 @@ def _primary_target(resolution_targets: list[dict]) -> dict:
         or _pick(lambda item: item.get("lane") == "ready")
         or {}
     )
+
+
+def _primary_target_reason(primary_target: dict) -> str:
+    if not primary_target:
+        return ""
+    if primary_target.get("lane") == "blocked" and primary_target.get("kind") == "setup":
+        return "This is a setup blocker, so nothing trustworthy can proceed until the prerequisite is cleared."
+    if primary_target.get("lane") == "blocked":
+        return "This is the highest blocked item, so it outranks urgent and ready work."
+    if primary_target.get("lane") == "urgent" and primary_target.get("aging_status") == "chronic":
+        return "This urgent item has survived multiple cycles, so follow-through debt now outweighs newer ready work."
+    if primary_target.get("lane") == "urgent" and primary_target.get("newly_stale"):
+        return "This urgent item has just crossed into follow-through debt, so it should be closed before it turns chronic."
+    if primary_target.get("lane") == "urgent" and primary_target.get("stale"):
+        return "This urgent item is already stale, so it outranks fresher urgent items and ready work."
+    if primary_target.get("lane") == "urgent" and primary_target.get("reopened"):
+        return "This urgent item reappeared after disappearing, so it should be closed before it churns again."
+    if primary_target.get("lane") == "urgent":
+        return "This is the live urgent item with the highest current pressure, so it outranks ready work."
+    if primary_target.get("lane") == "ready":
+        return "Nothing is blocked or urgent, so this is the highest-value ready item to close next."
+    return "This remains the highest-value target in the current queue."
+
+
+def _primary_target_done_criteria(primary_target: dict) -> str:
+    if not primary_target:
+        return ""
+    if primary_target.get("lane") == "blocked" and primary_target.get("kind") == "setup":
+        return "Clear the failing prerequisite, rerun the relevant command, and confirm the blocker no longer appears on the next run."
+    if primary_target.get("kind") in {"campaign", "governance"} and primary_target.get("lane") in {"blocked", "urgent"}:
+        return "Inspect and reconcile the drift, then confirm this item no longer reappears on the next run."
+    if primary_target.get("lane") in {"blocked", "urgent"}:
+        return "Complete the recommended action and confirm the item exits the blocked or urgent queue on the next run."
+    if primary_target.get("lane") == "ready":
+        return "Make the manual decision and confirm the item either clears or moves into a lower-pressure lane on the next run."
+    return "Confirm this item no longer requires blocked, urgent, or ready attention on the next run."
+
+
+def _closure_guidance(primary_target: dict, done_criteria: str) -> str:
+    if not primary_target:
+        return "No active closure target is open right now."
+    action = primary_target.get("recommended_action", "")
+    if action:
+        return f"{action} Treat this as done only when {done_criteria[0].lower() + done_criteria[1:]}"
+    return f"Treat this as done only when {done_criteria[0].lower() + done_criteria[1:]}"
+
+
+def _accountability_summary(
+    *,
+    primary_target: dict,
+    primary_target_reason: str,
+    closure_guidance: str,
+    chronic_item_count: int,
+    newly_stale_count: int,
+    quiet_streak_runs: int,
+) -> str:
+    if not primary_target:
+        if quiet_streak_runs >= 2:
+            return f"No active accountability target is open, and the queue has stayed quiet for {quiet_streak_runs} consecutive run(s)."
+        return "No active accountability target is open right now."
+    return (
+        f"{primary_target_reason} {closure_guidance} "
+        f"Aging pressure: {chronic_item_count} chronic item(s) and {newly_stale_count} newly stale item(s)."
+    ).strip()
 
 
 def _trend_status(
@@ -851,6 +1024,12 @@ def _summarize_operator_change(top_item: dict, recent_changes: list[dict], resol
     trend_status = resolution_trend.get("trend_status", "stable")
     if trend_status == "quiet":
         return f"No new blocking or urgent drift is surfaced, and the queue has stayed quiet for {resolution_trend.get('quiet_streak_runs', 0)} consecutive run(s)."
+    if top_item and top_item.get("aging_status") == "chronic":
+        subject = f"{top_item.get('repo')}: " if top_item.get("repo") else ""
+        return f"{subject}{top_item.get('title', 'Operator change')} has survived multiple cycles and remains the top target."
+    if top_item and top_item.get("newly_stale"):
+        subject = f"{top_item.get('repo')}: " if top_item.get("repo") else ""
+        return f"{subject}{top_item.get('title', 'Operator change')} has crossed into follow-through debt and is now the main target."
     if top_item and trend_status == "worsening":
         subject = f"{top_item.get('repo')}: " if top_item.get("repo") else ""
         return f"{subject}{top_item.get('title', 'Operator change')} is the new top priority."
@@ -882,6 +1061,10 @@ def _next_operator_action(top_item: dict, watch_guidance: dict, follow_through: 
         return top_item["recommended_action"]
     if resolution_trend.get("trend_status") == "quiet":
         return f"Keep the operator loop light and only escalate if the next run breaks the {resolution_trend.get('quiet_streak_runs', 0)}-run quiet streak."
+    if top_item.get("aging_status") == "chronic" and top_item.get("closure_guidance"):
+        return top_item["closure_guidance"]
+    if top_item.get("newly_stale") and top_item.get("closure_guidance"):
+        return top_item["closure_guidance"]
     if resolution_trend.get("trend_status") == "worsening" and top_item.get("recommended_action"):
         return top_item["recommended_action"]
     if resolution_trend.get("trend_status") == "improving" and top_item.get("recommended_action"):
@@ -930,6 +1113,10 @@ def _why_it_matters(
     if escalation_reason == "scheduled-full-refresh":
         return "The normal full-refresh cadence is due, so the next run should refresh portfolio truth before more incremental monitoring."
     if urgency == "urgent":
+        if top_item.get("aging_status") == "chronic":
+            return "This target has survived multiple cycles, so closing it now matters more than picking up newly ready work."
+        if top_item.get("newly_stale"):
+            return "This target has crossed from routine monitoring into follow-through debt and should be closed before it turns chronic."
         if resolution_trend.get("trend_status") == "worsening":
             return "The queue is moving in the wrong direction, so this should be reviewed before new noise compounds."
         if resolution_trend.get("trend_status") == "stable" and resolution_trend.get("persisting_attention_count", 0):
