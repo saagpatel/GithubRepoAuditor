@@ -36,7 +36,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.AUDIT_TOKEN }}
         run: |
-          audit saagpatel --skip-clone
+          audit saagpatel --skip-clone --excel-mode standard
 
       - name: Check for regressions
         id: check-regressions

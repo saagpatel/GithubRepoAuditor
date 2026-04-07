@@ -14,7 +14,7 @@ doctor:
 	audit $(USERNAME) --doctor $(ARGS)
 
 audit:
-	audit $(USERNAME) $(ARGS)
+	audit $(USERNAME) --excel-mode standard $(ARGS)
 
 control-center:
 	audit $(USERNAME) --control-center $(ARGS)
