@@ -186,3 +186,10 @@ Phase 30 also adds confidence calibration to the same artifact-first story:
 - `mixed`: the guidance is still useful, but recent outcomes stayed partly judgment-heavy
 - `noisy`: recent high-confidence guidance has missed often enough that you should verify before overcommitting
 - `insufficient-data`: there are not enough judged historical recommendations yet to say whether confidence is earning trust
+
+Phase 31 turns that calibration into live operator guidance:
+
+- `act-now`: the target is high-pressure and the tuned confidence is strong enough to move immediately
+- `act-with-review`: the recommendation is strong, but a quick operator review is still healthy
+- `verify-first`: the target still matters, but noisy or reopened evidence means you should confirm the latest state before committing
+- `monitor`: the queue is calm enough, or the current signal is light enough, that no forceful closure move is justified yet

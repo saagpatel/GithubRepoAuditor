@@ -699,6 +699,14 @@ def _print_control_center_summary(snapshot: dict) -> None:
             f"{summary.get('next_action_confidence_label', 'low')} "
             f"({summary.get('next_action_confidence_score', 0.0):.2f})"
         )
+    if summary.get("primary_target_trust_policy"):
+        print(
+            "  Trust policy: "
+            f"{summary.get('primary_target_trust_policy', 'monitor')} "
+            f"({summary.get('primary_target_trust_policy_reason', 'No trust-policy reason is recorded yet.')})"
+        )
+    if summary.get("adaptive_confidence_summary"):
+        print(f"  Why this confidence is actionable: {summary['adaptive_confidence_summary']}")
     if summary.get("recommendation_quality_summary"):
         print(f"  Recommendation quality: {summary['recommendation_quality_summary']}")
     if summary.get("confidence_validation_status"):

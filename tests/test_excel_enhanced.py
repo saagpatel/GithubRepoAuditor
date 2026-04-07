@@ -280,6 +280,11 @@ def _make_report(audits=None) -> dict:
             "next_action_confidence_score": 0.75,
             "next_action_confidence_label": "high",
             "next_action_confidence_reasons": ["The next step is tied directly to the current top target."],
+            "primary_target_trust_policy": "act-with-review",
+            "primary_target_trust_policy_reason": "Urgent work has enough tuned confidence to act, with a quick operator review.",
+            "next_action_trust_policy": "act-with-review",
+            "next_action_trust_policy_reason": "Healthy calibration supports a confident next step, with light operator judgment.",
+            "adaptive_confidence_summary": "Calibration is validating well, so the recommendation can be acted on with light operator review.",
             "recommendation_quality_summary": "Strong recommendation because the next step is tied directly to the current top target.",
             "confidence_validation_status": "healthy",
             "confidence_window_runs": 8,
@@ -588,6 +593,9 @@ class TestAnalystWorkbookSheets:
         assert review_ws["A20"].value == "Recommendation Confidence"
         assert review_ws["A21"].value == "Confidence Rationale"
         assert review_ws["A22"].value == "Next Action Confidence"
+        assert review_ws["A23"].value == "Trust Policy"
+        assert review_ws["A24"].value == "Trust Rationale"
+        assert review_ws["A25"].value == "Adaptive Confidence"
         assert executive_ws["D29"].value == "Trend"
         assert executive_ws["D32"].value == "Why Top Target"
         assert executive_ws["D33"].value == "Closure Guidance"
@@ -597,6 +605,9 @@ class TestAnalystWorkbookSheets:
         assert executive_ws["D39"].value == "Recommendation Confidence"
         assert executive_ws["D40"].value == "Confidence Rationale"
         assert executive_ws["D41"].value == "Next Action Confidence"
+        assert executive_ws["D42"].value == "Trust Policy"
+        assert executive_ws["D43"].value == "Trust Rationale"
+        assert executive_ws["D44"].value == "Adaptive Confidence"
         assert print_ws["A17"].value == "Primary Target"
         assert print_ws["A18"].value == "Why Top Target"
         assert print_ws["A19"].value == "What We Tried"
@@ -605,10 +616,14 @@ class TestAnalystWorkbookSheets:
         assert print_ws["A23"].value == "Recommendation Confidence"
         assert print_ws["A24"].value == "Confidence Rationale"
         assert print_ws["A25"].value == "Next Action Confidence"
+        assert print_ws["A26"].value == "Trust Policy"
+        assert print_ws["A27"].value == "Trust Rationale"
+        assert print_ws["A28"].value == "Adaptive Confidence"
         assert "Why Top Target" in dashboard_values
         assert "Closure Guidance" in dashboard_values
         assert "What We Tried" in dashboard_values
         assert "Recommendation Confidence" in dashboard_values
+        assert "Trust Policy" in dashboard_values
 
     def test_campaigns_show_empty_state_when_no_preview_rows(self):
         wb = Workbook()

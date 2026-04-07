@@ -335,6 +335,20 @@ def _operator_confidence_values(data: dict) -> tuple[str, str, str, str]:
     return primary_confidence, confidence_reason, next_action_confidence, recommendation_quality
 
 
+def _operator_trust_values(data: dict) -> tuple[str, str, str]:
+    summary = data.get("operator_summary") or {}
+    trust_policy = (summary.get("primary_target_trust_policy", "") or "monitor").replace("-", " ").title()
+    trust_reason = (
+        summary.get("primary_target_trust_policy_reason")
+        or "No trust-policy reason is recorded yet."
+    )
+    adaptive_summary = (
+        summary.get("adaptive_confidence_summary")
+        or "No adaptive confidence summary is recorded yet."
+    )
+    return trust_policy, trust_reason, adaptive_summary
+
+
 def _operator_calibration_values(data: dict) -> tuple[str, str, str, str]:
     summary = data.get("operator_summary") or {}
     validation_status = summary.get("confidence_validation_status", "") or "insufficient-data"
@@ -798,10 +812,7 @@ def _build_dashboard(
     primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
     last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
     primary_confidence, confidence_reason, next_action_confidence, recommendation_quality = _operator_confidence_values(data)
-    calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
-    calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
-    calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
-    calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
+    trust_policy, trust_policy_reason, adaptive_confidence_summary = _operator_trust_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
 
     operator_rows = [
@@ -849,6 +860,9 @@ def _build_dashboard(
                 ("Recommendation Confidence", primary_confidence),
                 ("Confidence Rationale", confidence_reason),
                 ("Next Action Confidence", next_action_confidence),
+                ("Trust Policy", trust_policy),
+                ("Trust Rationale", trust_policy_reason),
+                ("Adaptive Confidence", adaptive_confidence_summary),
                 ("Recommendation Quality", recommendation_quality),
                 ("Confidence Validation", f"{calibration_status} — {calibration_summary}"),
                 ("High-Confidence Hit Rate", high_hit_rate),
@@ -3501,8 +3515,7 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
     primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
     last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
     primary_confidence, confidence_reason, next_action_confidence, recommendation_quality = _operator_confidence_values(data)
-    calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
-    calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
+    trust_policy, trust_policy_reason, adaptive_confidence_summary = _operator_trust_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
     summary_rows = [
         ("Headline", (data.get("operator_summary") or {}).get("headline", "Review activity is available below.")),
@@ -3530,6 +3543,9 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
                 ("Recommendation Confidence", primary_confidence),
                 ("Confidence Rationale", confidence_reason),
                 ("Next Action Confidence", next_action_confidence),
+                ("Trust Policy", trust_policy),
+                ("Trust Rationale", trust_policy_reason),
+                ("Adaptive Confidence", adaptive_confidence_summary),
                 ("Recommendation Quality", recommendation_quality),
                 ("Confidence Validation", f"{calibration_status} — {calibration_summary}"),
                 ("High-Confidence Hit Rate", high_hit_rate),
@@ -3922,6 +3938,7 @@ def _build_executive_summary(
     primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
     last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
     primary_confidence, confidence_reason, next_action_confidence, recommendation_quality = _operator_confidence_values(data)
+    trust_policy, trust_policy_reason, adaptive_confidence_summary = _operator_trust_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
     recommended_focus = ""
     if data.get("operator_queue"):
@@ -3961,7 +3978,10 @@ def _build_executive_summary(
         narrative_rows.insert(9, ("Resolution Evidence", resolution_evidence))
         narrative_rows.insert(10, ("Recommendation Confidence", primary_confidence))
         narrative_rows.insert(11, ("Confidence Rationale", confidence_reason))
-        narrative_rows.insert(12, ("Confidence Validation", f"{calibration_status} — {calibration_summary}"))
+        narrative_rows.insert(12, ("Trust Policy", trust_policy))
+        narrative_rows.insert(13, ("Trust Rationale", trust_policy_reason))
+        narrative_rows.insert(14, ("Adaptive Confidence", adaptive_confidence_summary))
+        narrative_rows.insert(15, ("Confidence Validation", f"{calibration_status} — {calibration_summary}"))
     _write_key_value_block(ws, 4, 1, narrative_rows, title="Leadership Brief")
 
     write_kpi_card(ws, 10, 1, "Portfolio Grade", data.get("portfolio_grade", "F"))
@@ -4031,12 +4051,18 @@ def _build_executive_summary(
             ws.cell(row=40, column=5, value=confidence_reason)
             ws.cell(row=41, column=4, value="Next Action Confidence").font = SUBHEADER_FONT
             ws.cell(row=41, column=5, value=next_action_confidence)
-            ws.cell(row=42, column=4, value="Recommendation Quality").font = SUBHEADER_FONT
-            ws.cell(row=42, column=5, value=recommendation_quality)
-            ws.cell(row=43, column=4, value="Confidence Validation").font = SUBHEADER_FONT
-            ws.cell(row=43, column=5, value=f"{calibration_status} — {calibration_summary}")
-            ws.cell(row=44, column=4, value="Calibration Snapshot").font = SUBHEADER_FONT
-            ws.cell(row=44, column=5, value=f"High-confidence hit rate {high_hit_rate} | {reopened_recommendations}")
+            ws.cell(row=42, column=4, value="Trust Policy").font = SUBHEADER_FONT
+            ws.cell(row=42, column=5, value=trust_policy)
+            ws.cell(row=43, column=4, value="Trust Rationale").font = SUBHEADER_FONT
+            ws.cell(row=43, column=5, value=trust_policy_reason)
+            ws.cell(row=44, column=4, value="Adaptive Confidence").font = SUBHEADER_FONT
+            ws.cell(row=44, column=5, value=adaptive_confidence_summary)
+            ws.cell(row=45, column=4, value="Recommendation Quality").font = SUBHEADER_FONT
+            ws.cell(row=45, column=5, value=recommendation_quality)
+            ws.cell(row=46, column=4, value="Confidence Validation").font = SUBHEADER_FONT
+            ws.cell(row=46, column=5, value=f"{calibration_status} — {calibration_summary}")
+            ws.cell(row=47, column=4, value="Calibration Snapshot").font = SUBHEADER_FONT
+            ws.cell(row=47, column=5, value=f"High-confidence hit rate {high_hit_rate} | {reopened_recommendations}")
     preflight = data.get("preflight_summary") or {}
     if preflight and (preflight.get("blocking_errors", 0) or preflight.get("warnings", 0)):
         row_base = 47 if excel_mode == "standard" else 33
@@ -4084,6 +4110,7 @@ def _build_print_pack(
     primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
     last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
     primary_confidence, confidence_reason, next_action_confidence, recommendation_quality = _operator_confidence_values(data)
+    trust_policy, trust_policy_reason, adaptive_confidence_summary = _operator_trust_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
     ws["A7"] = "This Week"
     ws["B7"] = operator_summary.get("headline", "Review the latest workbook surfaces for change and drift.")
@@ -4128,17 +4155,23 @@ def _build_print_pack(
         ws["B24"] = confidence_reason
         ws["A25"] = "Next Action Confidence"
         ws["B25"] = next_action_confidence
-        ws["A26"] = "Recommendation Quality"
-        ws["B26"] = recommendation_quality
-        ws["A27"] = "Confidence Validation"
-        ws["B27"] = f"{calibration_status} — {calibration_summary}"
-        ws["A28"] = "Calibration Snapshot"
-        ws["B28"] = f"High-confidence hit rate {high_hit_rate} | {reopened_recommendations}"
-        ws["A29"] = "Top Risks"
-        ws["A29"].font = SECTION_FONT
-        risk_start_row = 29
-        opportunity_header_row = 29
-        page2_row = 38
+        ws["A26"] = "Trust Policy"
+        ws["B26"] = trust_policy
+        ws["A27"] = "Trust Rationale"
+        ws["B27"] = trust_policy_reason
+        ws["A28"] = "Adaptive Confidence"
+        ws["B28"] = adaptive_confidence_summary
+        ws["A29"] = "Recommendation Quality"
+        ws["B29"] = recommendation_quality
+        ws["A30"] = "Confidence Validation"
+        ws["B30"] = f"{calibration_status} — {calibration_summary}"
+        ws["A31"] = "Calibration Snapshot"
+        ws["B31"] = f"High-confidence hit rate {high_hit_rate} | {reopened_recommendations}"
+        ws["A32"] = "Top Risks"
+        ws["A32"].font = SECTION_FONT
+        risk_start_row = 32
+        opportunity_header_row = 32
+        page2_row = 41
     else:
         ws["A17"] = "Top Risks"
         ws["A17"].font = SECTION_FONT

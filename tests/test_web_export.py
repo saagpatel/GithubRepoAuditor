@@ -126,6 +126,11 @@ def _make_report(**overrides) -> dict:
             "next_action_confidence_score": 0.75,
             "next_action_confidence_label": "high",
             "next_action_confidence_reasons": ["The next step is tied directly to the current top target."],
+            "primary_target_trust_policy": "verify-first",
+            "primary_target_trust_policy_reason": "Recent calibration is noisy enough that this recommendation should be verified before acting on it.",
+            "next_action_trust_policy": "verify-first",
+            "next_action_trust_policy_reason": "Recent calibration is noisy enough that this recommendation should be verified before acting on it.",
+            "adaptive_confidence_summary": "Calibration is noisy, so the recommendation was softened and should be verified before acting.",
             "recommendation_quality_summary": "Strong recommendation because the next step is tied directly to the current top target.",
             "confidence_validation_status": "mixed",
             "confidence_window_runs": 8,
@@ -269,6 +274,8 @@ class TestRenderHtml:
         assert "Next Action Confidence:" in html
         assert "Recommendation Quality:" in html
         assert "Confidence Validation:" in html
+        assert "Trust Policy:" in html
+        assert "Why This Confidence Is Actionable:" in html
         assert "Recent Confidence Outcomes:" in html
         assert "RepoC: RepoC drift needs review" in html
 

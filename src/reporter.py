@@ -260,6 +260,13 @@ def write_markdown_report(
                 f"- Next Action Confidence: {report.operator_summary.get('next_action_confidence_label')} "
                 f"({report.operator_summary.get('next_action_confidence_score', 0.0):.2f})"
             )
+        if report.operator_summary.get("primary_target_trust_policy"):
+            _w(
+                f"- Trust Policy: {report.operator_summary.get('primary_target_trust_policy')} "
+                f"({report.operator_summary.get('primary_target_trust_policy_reason', 'No trust-policy reason is recorded yet.')})"
+            )
+        if report.operator_summary.get("adaptive_confidence_summary"):
+            _w(f"- Why This Confidence Is Actionable: {report.operator_summary.get('adaptive_confidence_summary')}")
         if report.operator_summary.get("recommendation_quality_summary"):
             _w(f"- Recommendation Quality: {report.operator_summary.get('recommendation_quality_summary')}")
         if report.operator_summary.get("confidence_validation_status"):

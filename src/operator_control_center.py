@@ -293,19 +293,32 @@ def build_operator_snapshot(
     }
     counts = {lane: sum(1 for item in queue if item["lane"] == lane) for lane in LANE_ORDER}
     watch_guidance = build_watch_guidance(report_data.get("watch_state") or {})
-    resolution_trend = _build_resolution_trend(
-        queue,
-        history,
-        evidence_bundle.get("events") or [],
-        current_generated_at=report_data.get("generated_at", ""),
-    )
-    follow_through = _build_follow_through(resolution_trend)
     confidence_calibration = _build_confidence_calibration(
         load_operator_calibration_history(
             output_dir,
             report_data.get("username", ""),
             limit=CALIBRATION_WINDOW_RUNS,
         )
+    )
+    resolution_trend = _build_resolution_trend(
+        queue,
+        history,
+        evidence_bundle.get("events") or [],
+        confidence_calibration=confidence_calibration,
+        current_generated_at=report_data.get("generated_at", ""),
+    )
+    follow_through = _build_follow_through(resolution_trend)
+    raw_next_action = _next_operator_action(
+        resolution_trend.get("primary_target") or (queue[0] if queue else {}),
+        watch_guidance,
+        follow_through,
+        resolution_trend,
+    )
+    confidence = _operator_confidence_summary(
+        resolution_trend.get("primary_target") or {},
+        raw_next_action,
+        watch_guidance,
+        confidence_calibration,
     )
     handoff = _build_operator_handoff(
         queue,
@@ -315,11 +328,8 @@ def build_operator_snapshot(
         follow_through,
         resolution_trend,
         confidence_calibration,
-    )
-    confidence = _operator_confidence_summary(
-        resolution_trend.get("primary_target") or {},
-        handoff["next_operator_action"],
-        watch_guidance,
+        confidence,
+        raw_next_action,
     )
     summary = {
         "headline": _headline_for_queue(queue, setup_health),
@@ -389,6 +399,11 @@ def build_operator_snapshot(
         "next_action_confidence_label": confidence["next_action_confidence_label"],
         "next_action_confidence_reasons": confidence["next_action_confidence_reasons"],
         "recommendation_quality_summary": confidence["recommendation_quality_summary"],
+        "primary_target_trust_policy": confidence["primary_target_trust_policy"],
+        "primary_target_trust_policy_reason": confidence["primary_target_trust_policy_reason"],
+        "next_action_trust_policy": confidence["next_action_trust_policy"],
+        "next_action_trust_policy_reason": confidence["next_action_trust_policy_reason"],
+        "adaptive_confidence_summary": confidence["adaptive_confidence_summary"],
         "confidence_validation_status": confidence_calibration["confidence_validation_status"],
         "confidence_window_runs": confidence_calibration["confidence_window_runs"],
         "validated_recommendation_count": confidence_calibration["validated_recommendation_count"],
@@ -472,6 +487,13 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
             f"*Next Action Confidence:* {summary['next_action_confidence_label']} "
             f"({summary.get('next_action_confidence_score', 0.0):.2f})"
         )
+    if summary.get("primary_target_trust_policy"):
+        lines.append(
+            f"*Trust Policy:* {summary.get('primary_target_trust_policy')} — "
+            f"{summary.get('primary_target_trust_policy_reason', 'No trust-policy reason is recorded yet.')}"
+        )
+    if summary.get("adaptive_confidence_summary"):
+        lines.append(f"*Why This Confidence Is Actionable:* {summary['adaptive_confidence_summary']}")
     if summary.get("recommendation_quality_summary"):
         lines.append(f"*Recommendation Quality:* {summary['recommendation_quality_summary']}")
     if summary.get("confidence_validation_status"):
@@ -633,12 +655,16 @@ def _build_operator_handoff(
     follow_through: dict,
     resolution_trend: dict,
     confidence_calibration: dict,
+    confidence: dict,
+    raw_next_action: str,
 ) -> dict:
     primary_target = resolution_trend.get("primary_target") or {}
     top_item = primary_target or (queue[0] if queue else {})
     top_lane = top_item.get("lane", "")
     top_summary = _summarize_operator_change(top_item, recent_changes, resolution_trend)
-    next_action = _next_operator_action(top_item, watch_guidance, follow_through, resolution_trend)
+    trust_policy = confidence.get("primary_target_trust_policy", "monitor")
+    trust_policy_reason = confidence.get("primary_target_trust_policy_reason", "")
+    what_changed = _with_trust_policy_brief(top_summary, trust_policy)
     escalation_reason = _escalation_reason(queue, setup_health, watch_guidance)
     urgency = _handoff_urgency(queue, setup_health)
     why_it_matters = _why_it_matters(
@@ -648,20 +674,28 @@ def _build_operator_handoff(
         top_item,
         resolution_trend,
         confidence_calibration,
+        trust_policy,
+        trust_policy_reason,
     )
-    next_action = _calibrated_next_action(next_action, confidence_calibration)
+    next_action = _adapt_next_action(
+        raw_next_action,
+        confidence_calibration,
+        trust_policy=confidence.get("next_action_trust_policy", trust_policy),
+        trust_policy_reason=confidence.get("next_action_trust_policy_reason", trust_policy_reason),
+    )
     operator_note = (
-        f"{top_summary} {why_it_matters} "
+        f"{what_changed} {why_it_matters} "
         f"{resolution_trend.get('trend_summary', '')} "
         f"{resolution_trend.get('resolution_evidence_summary', '')} "
         f"{confidence_calibration.get('confidence_calibration_summary', '')} "
+        f"{confidence.get('adaptive_confidence_summary', '')} "
         f"{follow_through.get('follow_through_summary', '')} "
         f"Next: {next_action}"
     ).strip()
     return {
         "urgency": urgency,
         "escalation_reason": escalation_reason,
-        "what_changed": top_summary,
+        "what_changed": what_changed,
         "why_it_matters": why_it_matters,
         "what_to_do_next": next_action,
         "next_operator_action": next_action,
@@ -935,6 +969,7 @@ def _build_resolution_trend(
     queue: list[dict],
     history: list[dict],
     evidence_events: list[dict],
+    confidence_calibration: dict,
     *,
     current_generated_at: str = "",
 ) -> dict:
@@ -953,7 +988,12 @@ def _build_resolution_trend(
     ) if len(recent_runs) > 2 else set()
 
     decision_memory_map = _decision_memory_map(recent_runs, evidence_events)
-    resolution_targets = _resolution_targets(queue, recent_runs, decision_memory_map)
+    resolution_targets = _resolution_targets(
+        queue,
+        recent_runs,
+        decision_memory_map,
+        confidence_calibration,
+    )
     new_attention_keys = current_attention_keys - previous_attention_keys
     resolved_attention_count = len(previous_attention_keys - current_attention_keys)
     persisting_attention_count = len(current_attention_keys & previous_attention_keys)
@@ -1076,7 +1116,12 @@ def _attention_items(snapshot: dict) -> dict[str, dict]:
     }
 
 
-def _resolution_targets(queue: list[dict], recent_runs: list[dict], decision_memory_map: dict[str, dict]) -> list[dict]:
+def _resolution_targets(
+    queue: list[dict],
+    recent_runs: list[dict],
+    decision_memory_map: dict[str, dict],
+    confidence_calibration: dict,
+) -> list[dict]:
     previous_attention_keys = set(_attention_items(recent_runs[1])) if len(recent_runs) > 1 else set()
     earlier_attention_keys = set().union(
         *[set(_attention_items(snapshot)) for snapshot in recent_runs[2:]]
@@ -1141,18 +1186,35 @@ def _resolution_targets(queue: list[dict], recent_runs: list[dict], decision_mem
                 **decision_memory_map.get(key, {}),
             }
         )
-    targets = [_with_confidence(target) for target in targets]
+    targets = [_with_confidence(target, confidence_calibration) for target in targets]
     targets.sort(key=_resolution_target_sort_key)
     return targets
 
 
-def _with_confidence(item: dict) -> dict:
-    score, label, reasons = _recommendation_confidence(item)
+def _with_confidence(item: dict, confidence_calibration: dict) -> dict:
+    score, _label, reasons = _recommendation_confidence(item)
+    (
+        tuned_score,
+        tuned_label,
+        calibration_adjustment,
+        calibration_adjustment_reason,
+    ) = _apply_calibration_adjustment(item, score, confidence_calibration)
+    trust_policy, trust_policy_reason = _trust_policy_for_item(
+        item,
+        tuned_score,
+        tuned_label,
+        confidence_calibration,
+        item.get("recommended_action", ""),
+    )
     return {
         **item,
-        "confidence_score": score,
-        "confidence_label": label,
+        "confidence_score": tuned_score,
+        "confidence_label": tuned_label,
         "confidence_reasons": reasons,
+        "calibration_adjustment": calibration_adjustment,
+        "calibration_adjustment_reason": calibration_adjustment_reason,
+        "trust_policy": trust_policy,
+        "trust_policy_reason": trust_policy_reason,
     }
 
 
@@ -1228,6 +1290,39 @@ def _recommendation_confidence(item: dict) -> tuple[float, str, list[str]]:
     return score, label, reasons[:4]
 
 
+def _apply_calibration_adjustment(
+    item: dict,
+    score: float,
+    confidence_calibration: dict,
+) -> tuple[float, str, float, str]:
+    status = confidence_calibration.get("confidence_validation_status", "insufficient-data")
+    current_label = _confidence_label(score)
+    adjustment = 0.0
+    reason = "Calibration is too lightly exercised to change the live score yet."
+
+    if status == "healthy" and item.get("lane") in {"blocked", "urgent"}:
+        adjustment += 0.05
+        reason = "Healthy calibration slightly strengthens blocked and urgent recommendations."
+    elif status == "mixed":
+        reason = "Mixed calibration keeps the live score unchanged for now."
+    elif status == "noisy":
+        if current_label == "high":
+            adjustment -= 0.10
+            reason = "Noisy calibration softens a previously high-confidence recommendation."
+        elif current_label == "medium":
+            adjustment -= 0.05
+            reason = "Noisy calibration slightly softens a medium-confidence recommendation."
+        else:
+            reason = "Noisy calibration leaves already low-confidence recommendations unchanged."
+
+    if status == "noisy" and item.get("decision_memory_status") == "reopened":
+        adjustment -= 0.05
+        reason = "Noisy calibration further softens reopened recommendations until they are re-verified."
+
+    tuned_score = max(0.05, min(0.95, round(score + adjustment, 2)))
+    return tuned_score, _confidence_label(tuned_score), round(adjustment, 2), reason
+
+
 def _confidence_label(score: float) -> str:
     if score >= 0.75:
         return "high"
@@ -1254,6 +1349,52 @@ def _is_generic_recommendation(action: str) -> bool:
     if not normalized:
         return True
     return any(phrase in normalized for phrase in GENERIC_RECOMMENDATION_PHRASES)
+
+
+def _is_generic_monitor_guidance(action: str) -> bool:
+    normalized = (action or "").strip().lower()
+    return bool(normalized) and any(phrase in normalized for phrase in GENERIC_MONITOR_PHRASES)
+
+
+def _is_generic_baseline_guidance(action: str, watch_guidance: dict | None = None) -> bool:
+    normalized = (action or "").strip().lower()
+    if normalized and any(phrase in normalized for phrase in GENERIC_BASELINE_PHRASES):
+        return True
+    return not normalized and bool(watch_guidance and watch_guidance.get("full_refresh_due"))
+
+
+def _trust_policy_for_item(
+    item: dict,
+    tuned_score: float,
+    tuned_label: str,
+    confidence_calibration: dict,
+    action_text: str,
+    *,
+    watch_guidance: dict | None = None,
+) -> tuple[str, str]:
+    status = confidence_calibration.get("confidence_validation_status", "insufficient-data")
+    lane = item.get("lane", "")
+    decision_memory_status = item.get("decision_memory_status", "")
+    generic_baseline = _is_generic_baseline_guidance(action_text, watch_guidance)
+    generic_monitor = _is_generic_monitor_guidance(action_text)
+
+    if lane == "deferred" or (lane == "ready" and tuned_label == "low"):
+        return "monitor", "This is low-pressure work, so monitoring is safer than forcing a strong closure move."
+    if generic_baseline or generic_monitor:
+        return "verify-first", "The next step is generic baseline or monitor guidance, so verify the latest state before treating it as decisive."
+    if decision_memory_status == "reopened" and status in {"mixed", "noisy"}:
+        return "verify-first", "This item reopened under less-trustworthy calibration, so verify the latest state before acting."
+    if status == "noisy" and tuned_score < 0.75:
+        return "verify-first", "Recent calibration is noisy, so this recommendation should be verified before acting on it."
+    if lane == "blocked" and tuned_score >= 0.75:
+        return "act-now", "Blocked work with tuned high confidence should be cleared before new work."
+    if lane == "urgent" and tuned_score >= 0.60:
+        return "act-with-review", "Urgent work has enough tuned confidence to act, with a quick operator review."
+    if lane == "ready" and tuned_score >= 0.75:
+        return "act-with-review", "Ready work is strong enough to act on, but it still benefits from a quick human review."
+    if status == "healthy":
+        return "act-with-review", "Healthy calibration supports a confident next step, with light operator judgment."
+    return "monitor", "The current signal is not strong enough to force immediate action, so monitor and reassess on the next cycle."
 
 
 def _recommendation_bucket(item: dict) -> int:
@@ -1707,14 +1848,33 @@ def _closure_guidance(primary_target: dict, done_criteria: str) -> str:
     return f"Treat this as done only when {done_criteria[0].lower() + done_criteria[1:]}"
 
 
-def _operator_confidence_summary(primary_target: dict, next_action: str, watch_guidance: dict) -> dict:
+def _operator_confidence_summary(
+    primary_target: dict,
+    next_action: str,
+    watch_guidance: dict,
+    confidence_calibration: dict,
+) -> dict:
     primary_score = primary_target.get("confidence_score", 0.05) if primary_target else 0.05
     primary_label = primary_target.get("confidence_label", _confidence_label(primary_score)) if primary_target else "low"
     primary_reasons = primary_target.get("confidence_reasons", []) if primary_target else []
+    primary_trust_policy = primary_target.get("trust_policy", "monitor") if primary_target else "monitor"
+    primary_trust_policy_reason = (
+        primary_target.get("trust_policy_reason", "No trust-policy reason is recorded yet.")
+        if primary_target
+        else "No trust-policy reason is recorded yet."
+    )
     next_score, next_label, next_reasons = _next_action_confidence(
         primary_target,
         next_action,
         watch_guidance,
+    )
+    next_trust_policy, next_trust_policy_reason = _trust_policy_for_item(
+        primary_target,
+        next_score,
+        next_label,
+        confidence_calibration,
+        next_action,
+        watch_guidance=watch_guidance,
     )
     return {
         "primary_target_confidence_score": primary_score,
@@ -1723,7 +1883,21 @@ def _operator_confidence_summary(primary_target: dict, next_action: str, watch_g
         "next_action_confidence_score": next_score,
         "next_action_confidence_label": next_label,
         "next_action_confidence_reasons": next_reasons,
-        "recommendation_quality_summary": _recommendation_quality_summary(next_label, next_reasons),
+        "recommendation_quality_summary": _recommendation_quality_summary(
+            next_label,
+            next_reasons,
+            next_trust_policy,
+        ),
+        "primary_target_trust_policy": primary_trust_policy,
+        "primary_target_trust_policy_reason": primary_trust_policy_reason,
+        "next_action_trust_policy": next_trust_policy,
+        "next_action_trust_policy_reason": next_trust_policy_reason,
+        "adaptive_confidence_summary": _adaptive_confidence_summary(
+            confidence_calibration.get("confidence_validation_status", "insufficient-data"),
+            primary_target,
+            primary_trust_policy,
+            next_trust_policy,
+        ),
     }
 
 
@@ -1766,13 +1940,43 @@ def _is_item_specific_action(primary_target: dict, next_action: str) -> bool:
     return False
 
 
-def _recommendation_quality_summary(label: str, reasons: list[str]) -> str:
+def _recommendation_quality_summary(label: str, reasons: list[str], trust_policy: str) -> str:
     reason = reasons[0] if reasons else "the current evidence is limited."
+    if trust_policy == "verify-first":
+        return (
+            "Tentative recommendation; verify before acting because "
+            f"{reason[0].lower() + reason[1:]}"
+        )
+    if trust_policy == "monitor":
+        return (
+            "Tentative recommendation; monitor before forcing a closure move because "
+            f"{reason[0].lower() + reason[1:]}"
+        )
     if label == "high":
         return f"Strong recommendation because {reason[0].lower() + reason[1:]}"
     if label == "medium":
         return f"Useful recommendation, but still partly judgment-based because {reason[0].lower() + reason[1:]}"
     return f"Tentative recommendation; monitor or verify before treating it as the single top priority because {reason[0].lower() + reason[1:]}"
+
+
+def _adaptive_confidence_summary(
+    calibration_status: str,
+    primary_target: dict,
+    primary_trust_policy: str,
+    next_trust_policy: str,
+) -> str:
+    lane = primary_target.get("lane", "")
+    if primary_trust_policy == "monitor":
+        return "The current signal stays light-touch, so keep monitoring instead of forcing action."
+    if calibration_status == "healthy" and primary_trust_policy == "act-now" and lane in {"blocked", "urgent"}:
+        return "Calibration is validating well, so the live recommendation was strengthened and is ready for immediate action."
+    if calibration_status == "healthy":
+        return "Calibration is validating well, so the recommendation can be acted on with light operator review."
+    if calibration_status == "mixed":
+        return "Calibration is mixed, so the recommendation is still useful but should be treated with operator judgment."
+    if calibration_status == "noisy" and next_trust_policy == "verify-first":
+        return "Calibration is noisy, so the recommendation was softened and should be verified before acting."
+    return "Calibration is still lightly exercised, so use the recommendation as guidance rather than as hard proof."
 
 
 def _accountability_summary(
@@ -1961,14 +2165,26 @@ def _next_operator_action(top_item: dict, watch_guidance: dict, follow_through: 
     return "Continue the normal audit/control-center loop and review the next artifact for change."
 
 
-def _calibrated_next_action(next_action: str, confidence_calibration: dict) -> str:
+def _adapt_next_action(
+    next_action: str,
+    confidence_calibration: dict,
+    *,
+    trust_policy: str,
+    trust_policy_reason: str,
+) -> str:
     status = confidence_calibration.get("confidence_validation_status", "insufficient-data")
     if not next_action:
         return next_action
-    if status == "noisy":
-        return f"Verify the latest repo state before acting: {next_action}"
+    if trust_policy == "act-now":
+        return f"Act now: {next_action}"
+    if trust_policy == "act-with-review":
+        return f"Act with review: {next_action}"
+    if trust_policy == "verify-first":
+        return f"Verify before acting: {next_action}"
+    if trust_policy_reason:
+        return f"Monitor for now: {trust_policy_reason}"
     if status == "healthy" and not _is_generic_recommendation(next_action):
-        return f"{next_action} Recent high-confidence guidance has been validating well."
+        return f"Monitor for now: {next_action}"
     return next_action
 
 
@@ -1998,73 +2214,76 @@ def _why_it_matters(
     top_item: dict,
     resolution_trend: dict,
     confidence_calibration: dict,
+    trust_policy: str,
+    trust_policy_reason: str,
 ) -> str:
     calibration_status = confidence_calibration.get("confidence_validation_status", "insufficient-data")
     calibration_sentence = _confidence_validation_sentence(calibration_status)
+    trust_sentence = _trust_policy_sentence(trust_policy, trust_policy_reason)
     if urgency == "blocked":
-        return f"A trustworthy next step is blocked until this is cleared. {calibration_sentence}".strip()
+        return f"A trustworthy next step is blocked until this is cleared. {trust_sentence} {calibration_sentence}".strip()
     if escalation_reason == "stale-baseline":
         return (
             "The latest baseline contract no longer matches, so incremental results should not be trusted until a full refresh completes. "
-            f"{calibration_sentence}"
+            f"{trust_sentence} {calibration_sentence}"
         ).strip()
     if escalation_reason == "scheduled-full-refresh":
         return (
             "The normal full-refresh cadence is due, so the next run should refresh portfolio truth before more incremental monitoring. "
-            f"{calibration_sentence}"
+            f"{trust_sentence} {calibration_sentence}"
         ).strip()
     if urgency == "urgent":
         if resolution_trend.get("decision_memory_status") == "reopened":
             return (
                 "This item came back after earlier quiet or resolution, so it should be treated as a regression instead of a net-new issue. "
-                f"{calibration_sentence}"
+                f"{trust_sentence} {calibration_sentence}"
             ).strip()
         if resolution_trend.get("decision_memory_status") in {"attempted", "persisting"}:
             return (
                 "A prior intervention has not cleared this item yet, so the next action should focus on proving closure instead of adding more noise. "
-                f"{calibration_sentence}"
+                f"{trust_sentence} {calibration_sentence}"
             ).strip()
         if top_item.get("aging_status") == "chronic":
             return (
                 "This target has survived multiple cycles, so closing it now matters more than picking up newly ready work. "
-                f"{calibration_sentence}"
+                f"{trust_sentence} {calibration_sentence}"
             ).strip()
         if top_item.get("newly_stale"):
             return (
                 "This target has crossed from routine monitoring into follow-through debt and should be closed before it turns chronic. "
-                f"{calibration_sentence}"
+                f"{trust_sentence} {calibration_sentence}"
             ).strip()
         if resolution_trend.get("trend_status") == "worsening":
             return (
                 "The queue is moving in the wrong direction, so this should be reviewed before new noise compounds. "
-                f"{calibration_sentence}"
+                f"{trust_sentence} {calibration_sentence}"
             ).strip()
         if resolution_trend.get("trend_status") == "stable" and resolution_trend.get("persisting_attention_count", 0):
             return (
                 "The same attention item is still open, so closing it now is more valuable than picking up newly ready work. "
-                f"{calibration_sentence}"
+                f"{trust_sentence} {calibration_sentence}"
             ).strip()
         return (
             "This has crossed into live drift, regression risk, or rollback exposure and should be reviewed before it spreads. "
-            f"{calibration_sentence}"
+            f"{trust_sentence} {calibration_sentence}"
         ).strip()
     if urgency == "ready":
-        return f"Nothing is blocked, but there is manual review or apply work ready to move forward. {calibration_sentence}".strip()
+        return f"Nothing is blocked, but there is manual review or apply work ready to move forward. {trust_sentence} {calibration_sentence}".strip()
     if urgency == "deferred":
-        return f"The current queue is stable enough to defer without losing important context. {calibration_sentence}".strip()
+        return f"The current queue is stable enough to defer without losing important context. {trust_sentence} {calibration_sentence}".strip()
     if resolution_trend.get("trend_status") == "quiet":
         return (
             f"The queue has stayed quiet for {resolution_trend.get('quiet_streak_runs', 0)} run(s), so no immediate intervention is needed. "
-            f"{calibration_sentence}"
+            f"{trust_sentence} {calibration_sentence}"
         ).strip()
     if watch_guidance.get("next_recommended_run_mode") == "incremental":
         return (
             "The latest baseline is still compatible, so the operator loop can stay lightweight for now. "
-            f"{calibration_sentence}"
+            f"{trust_sentence} {calibration_sentence}"
         ).strip()
     if top_item:
-        return f"This remains worth a quick manual review before the next cycle. {calibration_sentence}".strip()
-    return f"The latest run is quiet enough that no immediate operator intervention is required. {calibration_sentence}".strip()
+        return f"This remains worth a quick manual review before the next cycle. {trust_sentence} {calibration_sentence}".strip()
+    return f"The latest run is quiet enough that no immediate operator intervention is required. {trust_sentence} {calibration_sentence}".strip()
 
 
 def _confidence_validation_sentence(status: str) -> str:
@@ -2075,6 +2294,28 @@ def _confidence_validation_sentence(status: str) -> str:
     if status == "noisy":
         return "Recent high-confidence guidance has missed often enough that this target should be verified before overcommitting."
     return "The confidence model is still too lightly exercised to judge whether the current signal is earning trust."
+
+
+def _trust_policy_sentence(policy: str, reason: str) -> str:
+    if policy == "act-now":
+        return "Trust policy: act now because the current signal is strong and high-pressure."
+    if policy == "act-with-review":
+        return "Trust policy: act with review because the signal is strong enough to move, with light operator judgment."
+    if policy == "verify-first":
+        return f"Trust policy: verify first because {reason[0].lower() + reason[1:]}" if reason else "Trust policy: verify first because recent signal quality is softer."
+    return f"Trust policy: monitor because {reason[0].lower() + reason[1:]}" if reason else "Trust policy: monitor because no strong closure move is supported yet."
+
+
+def _with_trust_policy_brief(summary: str, policy: str) -> str:
+    if not summary:
+        return summary
+    if policy == "act-now":
+        return f"{summary} Trust policy: act now."
+    if policy == "act-with-review":
+        return f"{summary} Trust policy: act with review."
+    if policy == "verify-first":
+        return f"{summary} Trust policy: verify first."
+    return f"{summary} Trust policy: monitor."
 
 
 def _lane_reason(lane: str, kind: str) -> str:
