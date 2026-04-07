@@ -13,7 +13,7 @@ from openpyxl.worksheet.hyperlink import Hyperlink
 NAVY = "1B2A4A"
 TEAL = "0EA5E9"
 SLATE = "64748B"
-LIGHT_BG = "F8FAFC"
+LIGHT_BG = "F4F7FB"
 WHITE = "FFFFFF"
 LIGHT_BORDER = "E2E8F0"
 MED_BORDER = "CBD5E1"
@@ -67,24 +67,24 @@ GRADE_FILLS = {k: PatternFill("solid", fgColor=v) for k, v in GRADE_COLORS.items
 PATTERN_FILLS = {k: PatternFill("solid", fgColor=v) for k, v in PATTERN_COLORS.items()}
 
 HEADER_FILL = PatternFill("solid", fgColor=NAVY)
-SUBHEADER_FILL = PatternFill("solid", fgColor="E8EAF6")
+SUBHEADER_FILL = PatternFill("solid", fgColor="EAF1F8")
 KPI_CARD_FILL = PatternFill("solid", fgColor=LIGHT_BG)
-ZEBRA_FILL = PatternFill("solid", fgColor=LIGHT_BG)
+ZEBRA_FILL = PatternFill("solid", fgColor="F7FAFD")
 
 # ── Fonts ────────────────────────────────────────────────────────────
 
-TITLE_FONT = Font("Calibri", 20, bold=True, color=NAVY)
-SUBTITLE_FONT = Font("Calibri", 12, color=SLATE)
+TITLE_FONT = Font("Calibri", 22, bold=True, color=NAVY)
+SUBTITLE_FONT = Font("Calibri", 13, color=SLATE)
 HEADER_FONT = Font("Calibri", 11, bold=True, color=WHITE)
-SUBHEADER_FONT = Font("Calibri", 10, bold=True, color=NAVY)
+SUBHEADER_FONT = Font("Calibri", 11, bold=True, color=NAVY)
 KPI_NUMBER_FONT = Font("Calibri", 28, bold=True, color=NAVY)
-KPI_LABEL_FONT = Font("Calibri", 10, color=SLATE)
-DATA_FONT = Font("Calibri", 10)
-DATA_BOLD_FONT = Font("Calibri", 10, bold=True)
-TIER_FONT = Font("Calibri", 10, bold=True, color=WHITE)
-SECTION_FONT = Font("Calibri", 14, bold=True, color=NAVY)
+KPI_LABEL_FONT = Font("Calibri", 11, color=SLATE)
+DATA_FONT = Font("Calibri", 11)
+DATA_BOLD_FONT = Font("Calibri", 11, bold=True)
+TIER_FONT = Font("Calibri", 11, bold=True, color=WHITE)
+SECTION_FONT = Font("Calibri", 15, bold=True, color=NAVY)
 HIGHLIGHT_FONT = Font("Calibri", 11, bold=True, color=TEAL)
-NARRATIVE_FONT = Font("Calibri", 11, italic=True, color=SLATE)
+NARRATIVE_FONT = Font("Calibri", 12, italic=True, color=SLATE)
 SPARKLINE_FONT = Font("Courier New", 11, color=TEAL)
 
 # ── Borders ──────────────────────────────────────────────────────────
@@ -115,7 +115,7 @@ WRAP = Alignment(horizontal="left", vertical="center", wrap_text=True)
 
 def style_header_row(ws, row: int, max_col: int) -> None:
     """Apply dark navy header styling to a row."""
-    ws.row_dimensions[row].height = 28
+    ws.row_dimensions[row].height = 30
     for col in range(1, max_col + 1):
         cell = ws.cell(row=row, column=col)
         cell.fill = HEADER_FILL

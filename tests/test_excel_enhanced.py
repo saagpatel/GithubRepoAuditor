@@ -595,6 +595,35 @@ class TestWorkbookModes:
         assert "Governance Controls" in wb.sheetnames
         assert "Print Pack" in wb.sheetnames
 
+    def test_standard_mode_hides_advanced_tabs_by_default(self, tmp_path):
+        report_path = tmp_path / "report.json"
+        report_path.write_text(json.dumps(_make_report()))
+
+        output = export_excel(
+            report_path,
+            tmp_path / "out.xlsx",
+            excel_mode="standard",
+        )
+
+        wb = load_workbook(output)
+        visible_sheets = [ws.title for ws in wb.worksheets if ws.sheet_state == "visible"]
+        assert set(visible_sheets) == {
+            "Index",
+            "Dashboard",
+            "All Repos",
+            "Review Queue",
+            "Portfolio Explorer",
+            "Executive Summary",
+            "By Lens",
+            "By Collection",
+            "Trend Summary",
+            "Campaigns",
+            "Governance Controls",
+            "Print Pack",
+        }
+        assert visible_sheets[:2] == ["Index", "Dashboard"]
+        assert wb["Hotspots"].sheet_state == "hidden"
+
     def test_template_mode_generates_native_sparkline_xml_and_named_ranges(self, tmp_path):
         report_path = tmp_path / "report.json"
         report_path.write_text(json.dumps(_make_report()))

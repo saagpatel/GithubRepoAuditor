@@ -70,6 +70,20 @@ from src.excel_styles import (
 # Tier display order
 TIER_ORDER = ["shipped", "functional", "wip", "skeleton", "abandoned"]
 PIE_COLORS = ["166534", "1565C0", "D97706", "C2410C", "6B7280"]
+CORE_VISIBLE_SHEETS = {
+    "Index",
+    "Dashboard",
+    "All Repos",
+    "Portfolio Explorer",
+    "By Lens",
+    "By Collection",
+    "Trend Summary",
+    "Review Queue",
+    "Campaigns",
+    "Governance Controls",
+    "Executive Summary",
+    "Print Pack",
+}
 
 
 def _add_table(ws, table_name: str, max_col: int, max_row: int, start_row: int = 1) -> None:
@@ -173,6 +187,20 @@ def _refresh_pivot_caches_on_load(wb: Workbook) -> None:
             cache = getattr(pivot, "cache", None)
             if cache and getattr(cache, "refreshOnLoad", None) is not None:
                 cache.refreshOnLoad = True
+
+
+def _configure_sheet_view(ws, *, zoom: int = 110, show_grid_lines: bool = True) -> None:
+    ws.sheet_view.zoomScale = zoom
+    ws.sheet_view.zoomScaleNormal = 100
+    ws.sheet_view.showGridLines = show_grid_lines
+
+
+def _apply_visible_sheet_profile(wb: Workbook) -> None:
+    for ws in wb.worksheets:
+        if ws.title.startswith("Data_") or ws.title in {TEMPLATE_INFO_SHEET, "Lookups"}:
+            ws.sheet_state = "hidden"
+            continue
+        ws.sheet_state = "visible" if ws.title in CORE_VISIBLE_SHEETS else "hidden"
 
 
 def _reorder_workbook_sheets(wb: Workbook) -> None:
@@ -589,6 +617,7 @@ def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None, sc
     else:
         ws = _get_or_create_sheet(wb, "Dashboard")
     ws.sheet_properties.tabColor = NAVY
+    _configure_sheet_view(ws, zoom=120, show_grid_lines=False)
 
     # Title
     ws.merge_cells("A1:L1")
@@ -767,8 +796,8 @@ def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None, sc
         pt = DataPoint(idx=i)
         pt.graphicalProperties.solidFill = color
         pie.series[0].data_points.append(pt)
-    pie.width = 16
-    pie.height = 12
+    pie.width = 9
+    pie.height = 7
     ws.add_chart(pie, "A16")
 
     # Grade Distribution Bar Chart
@@ -788,9 +817,9 @@ def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None, sc
     bar_cats = Reference(ws, min_col=grade_label_col, min_row=grade_row, max_row=grade_row + 4)
     bar.add_data(bar_data, titles_from_data=False)
     bar.set_categories(bar_cats)
-    bar.width = 16
-    bar.height = 12
-    ws.add_chart(bar, "G16")
+    bar.width = 9
+    bar.height = 7
+    ws.add_chart(bar, "J16")
 
     # Highlights section
     highlight_row = 30
@@ -802,25 +831,25 @@ def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None, sc
         for i, name in enumerate(best_work[:5]):
             ws.cell(row=highlight_row + 1, column=2 + i, value=name)
 
-    for column_index in range(24, 33):
+    for column_index in range(24, 42):
         ws.column_dimensions[get_column_letter(column_index)].hidden = True
     preferred_widths = {
-        "A": 22,
+        "A": 24,
         "B": 12,
         "C": 12,
         "D": 12,
         "E": 12,
         "F": 12,
-        "G": 12,
-        "H": 12,
-        "I": 12,
-        "J": 12,
-        "K": 14,
-        "L": 16,
-        "O": 20,
-        "P": 24,
-        "Q": 18,
-        "R": 28,
+        "G": 11,
+        "H": 11,
+        "I": 11,
+        "J": 11,
+        "K": 12,
+        "L": 14,
+        "O": 18,
+        "P": 22,
+        "Q": 16,
+        "R": 24,
     }
     for column_letter, width in preferred_widths.items():
         ws.column_dimensions[column_letter].width = width
@@ -833,22 +862,24 @@ def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None, sc
 
     # Language distribution
     lang_dist = data.get("language_distribution", {})
+    lang_label_col = 30
+    lang_value_col = 31
     lang_row = 10
     for i, (lang, count) in enumerate(list(lang_dist.items())[:8]):
-        ws.cell(row=lang_row + i, column=9, value=lang)
-        ws.cell(row=lang_row + i, column=10, value=count)
+        ws.cell(row=lang_row + i, column=lang_label_col, value=lang)
+        ws.cell(row=lang_row + i, column=lang_value_col, value=count)
 
     if lang_dist:
         lang_bar = BarChart()
         lang_bar.type = "bar"
         lang_bar.title = "Top Languages"
         lang_bar.style = 10
-        lang_data = Reference(ws, min_col=10, min_row=lang_row, max_row=lang_row + min(7, len(lang_dist) - 1))
-        lang_cats = Reference(ws, min_col=9, min_row=lang_row, max_row=lang_row + min(7, len(lang_dist) - 1))
+        lang_data = Reference(ws, min_col=lang_value_col, min_row=lang_row, max_row=lang_row + min(7, len(lang_dist) - 1))
+        lang_cats = Reference(ws, min_col=lang_label_col, min_row=lang_row, max_row=lang_row + min(7, len(lang_dist) - 1))
         lang_bar.add_data(lang_data, titles_from_data=False)
         lang_bar.set_categories(lang_cats)
-        lang_bar.width = 16
-        lang_bar.height = 10
+        lang_bar.width = 8.5
+        lang_bar.height = 7
         ws.add_chart(lang_bar, "A34")
 
     # Scatter chart: Completeness vs Interest
@@ -861,11 +892,11 @@ def _build_scatter_on_dashboard(ws, data: dict) -> None:
     if len(audits) < 2:
         return
 
-    # Write scatter data to cols L-N (12-14) starting at row 10
+    # Write scatter data to hidden support columns starting at AG.
     data_start_row = 10
-    col_name = 12  # L: repo name (reference)
-    col_x = 13     # M: completeness
-    col_y = 14     # N: interest
+    col_name = 33  # AG: repo name (reference)
+    col_x = 34     # AH: completeness
+    col_y = 35     # AI: interest
 
     for i, audit in enumerate(audits):
         row = data_start_row + i
@@ -894,7 +925,7 @@ def _build_scatter_on_dashboard(ws, data: dict) -> None:
         chart.series[0].graphicalProperties.line.noFill = True
 
     # Quadrant lines — vertical at x=0.55, horizontal at y=0.45
-    line_col = 16  # col P for line data
+    line_col = 36  # AJ for line data
     ws.cell(row=data_start_row, column=line_col, value=0.55)
     ws.cell(row=data_start_row, column=line_col + 1, value=0.0)
     ws.cell(row=data_start_row + 1, column=line_col, value=0.55)
@@ -919,12 +950,12 @@ def _build_scatter_on_dashboard(ws, data: dict) -> None:
     if len(chart.series) > 2:
         chart.series[-1].graphicalProperties.line = LineProperties(w=12700, prstDash="dash", solidFill="808080")
 
-    chart.width = 18
-    chart.height = 14
-    ws.add_chart(chart, "G34")
+    chart.width = 10.5
+    chart.height = 8
+    ws.add_chart(chart, "J34")
 
     # Quadrant summary table
-    _write_quadrant_table(ws, audits, legend_row=49)
+    _write_quadrant_table(ws, audits, legend_row=52)
 
 
 X_MID = 0.55
@@ -953,16 +984,16 @@ def _write_quadrant_table(ws, audits: list[dict], legend_row: int) -> None:
         else:
             buckets[3].append(a["metadata"]["name"])
 
-    ws.cell(row=legend_row, column=7, value="Scatter Quadrants").font = SECTION_FONT
+    ws.cell(row=legend_row, column=10, value="Scatter Quadrants").font = SECTION_FONT
     headers = ["Quadrant", "Count", "Repos"]
     for j, h in enumerate(headers):
-        ws.cell(row=legend_row + 1, column=7 + j, value=h).font = SUBHEADER_FONT
+        ws.cell(row=legend_row + 1, column=10 + j, value=h).font = SUBHEADER_FONT
 
     for i, ((name, desc), repos) in enumerate(zip(QUADRANT_NAMES, buckets)):
         row = legend_row + 2 + i
-        ws.cell(row=row, column=7, value=f"{name}").font = Font("Calibri", 10, bold=True)
-        ws.cell(row=row, column=8, value=len(repos))
-        ws.cell(row=row, column=9, value=", ".join(repos[:8]) + ("..." if len(repos) > 8 else ""))
+        ws.cell(row=row, column=10, value=f"{name}").font = Font("Calibri", 11, bold=True)
+        ws.cell(row=row, column=11, value=len(repos))
+        ws.cell(row=row, column=12, value=", ".join(repos[:8]) + ("..." if len(repos) > 8 else ""))
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -973,6 +1004,7 @@ def _write_quadrant_table(ws, audits: list[dict], legend_row: int) -> None:
 def _build_all_repos(wb: Workbook, data: dict, score_history: dict[str, list[float]] | None = None) -> None:
     ws = _get_or_create_sheet(wb, "All Repos")
     ws.sheet_properties.tabColor = "1565C0"
+    _configure_sheet_view(ws, zoom=105, show_grid_lines=True)
 
     headers = [
         "Repo", "Grade", "Score", "Interest", "Interest Grade", "Interest Tier", "Tier", "Badges",
@@ -1169,6 +1201,7 @@ def _build_all_repos(wb: Workbook, data: dict, score_history: dict[str, list[flo
 def _build_heatmap(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Scoring Heatmap")
     ws.sheet_properties.tabColor = "D97706"
+    _configure_sheet_view(ws, zoom=105, show_grid_lines=True)
 
     dimensions = [
         "readme", "structure", "code_quality", "testing", "cicd",
@@ -1229,6 +1262,7 @@ def _build_heatmap(wb: Workbook, data: dict) -> None:
 def _build_quick_wins(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Quick Wins")
     ws.sheet_properties.tabColor = "0891B2"
+    _configure_sheet_view(ws, zoom=110, show_grid_lines=True)
 
     tier_next = {
         "abandoned": ("skeleton", 0.15),
@@ -1313,6 +1347,7 @@ def _build_quick_wins(wb: Workbook, data: dict) -> None:
 def _build_badges(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Badges")
     ws.sheet_properties.tabColor = "7C3AED"
+    _configure_sheet_view(ws, zoom=110, show_grid_lines=True)
 
     # Collect badge stats
     badge_counts: Counter = Counter()
@@ -1394,6 +1429,7 @@ def _build_tech_stack(wb: Workbook, data: dict) -> None:
 
     ws = _get_or_create_sheet(wb, "Tech Stack")
     ws.sheet_properties.tabColor = "4A148C"
+    _configure_sheet_view(ws, zoom=110, show_grid_lines=True)
 
     ws.merge_cells("A1:E1")
     ws["A1"].value = "Technology Stack"
@@ -1447,6 +1483,7 @@ def _build_tech_stack(wb: Workbook, data: dict) -> None:
 def _build_trends(wb: Workbook, data: dict, trend_data: list[dict] | None = None) -> None:
     ws = _get_or_create_sheet(wb, "Trends")
     ws.sheet_properties.tabColor = "311B92"
+    _configure_sheet_view(ws, zoom=110, show_grid_lines=True)
     ws.freeze_panes = "B4"
 
     ws.merge_cells("A1:F1")
@@ -1484,6 +1521,7 @@ def _build_trends(wb: Workbook, data: dict, trend_data: list[dict] | None = None
 def _build_tier_breakdown(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Tier Breakdown")
     ws.sheet_properties.tabColor = "166534"
+    _configure_sheet_view(ws, zoom=105, show_grid_lines=True)
     ws.freeze_panes = "B2"
 
     from openpyxl.styles import Font as XFont
@@ -1539,6 +1577,7 @@ def _build_tier_breakdown(wb: Workbook, data: dict) -> None:
 def _build_activity(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Activity")
     ws.sheet_properties.tabColor = "6A1B9A"
+    _configure_sheet_view(ws, zoom=105, show_grid_lines=True)
 
     headers = [
         "Repo", "Commit Pattern", "Days Since Push", "Total Commits",
@@ -1785,6 +1824,7 @@ def _build_action_items(wb: Workbook, data: dict) -> None:
     """Prioritized action item list with weekly sprint."""
     ws = _get_or_create_sheet(wb, "Action Items")
     ws.sheet_properties.tabColor = "E65100"
+    _configure_sheet_view(ws, zoom=110, show_grid_lines=True)
 
     actions = _collect_all_actions(data)
 
@@ -1837,6 +1877,7 @@ def _build_navigation(
     ws = wb["Index"] if "Index" in wb.sheetnames else wb.create_sheet("Index", 0)
     _clear_worksheet(ws)
     ws.sheet_properties.tabColor = "263238"
+    _configure_sheet_view(ws, zoom=125, show_grid_lines=False)
     ws.freeze_panes = "A11"
 
     ws.merge_cells("A1:G1")
@@ -1866,6 +1907,10 @@ def _build_navigation(
     ws["A8"] = "Start with Dashboard for the portfolio brief, move to Review Queue for action, then drill into Portfolio Explorer and Executive Summary for detail."
     ws["A8"].font = SUBTITLE_FONT
     ws["A8"].alignment = WRAP
+    ws.merge_cells("A9:G9")
+    ws["A9"] = "Advanced sheets are hidden by default to keep the core tab set manageable. Use Excel Unhide if you want the deeper diagnostics and supporting analysis tabs."
+    ws["A9"].font = SUBTITLE_FONT
+    ws["A9"].alignment = WRAP
 
     groups = [
         (
@@ -1970,6 +2015,7 @@ RADAR_LABELS = ["README", "Structure", "Code Quality", "Testing", "CI/CD",
 def _build_repo_profiles(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Repo Profiles")
     ws.sheet_properties.tabColor = "7C3AED"
+    _configure_sheet_view(ws, zoom=105, show_grid_lines=True)
     ws.freeze_panes = "B2"
 
     audits = sorted(data.get("audits", []), key=lambda a: a.get("overall_score", 0), reverse=True)[:20]
@@ -2020,6 +2066,7 @@ def _build_repo_profiles(wb: Workbook, data: dict) -> None:
 def _build_security(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Security")
     ws.sheet_properties.tabColor = "991B1B"
+    _configure_sheet_view(ws, zoom=105, show_grid_lines=True)
 
     headers = ["Repo", "Score", "Secrets", "Dangerous Files", "SECURITY.md", "Dependabot", "GitHub", "Findings"]
     for col, h in enumerate(headers, 1):
@@ -2230,6 +2277,7 @@ def _build_dependency_graph(wb: Workbook, data: dict) -> None:
 
     ws = _get_or_create_sheet(wb, "Dep Graph")
     ws.sheet_properties.tabColor = "0277BD"
+    _configure_sheet_view(ws, zoom=105, show_grid_lines=True)
 
     graph = build_dependency_graph(data.get("audits", []))
     shared = graph.get("shared_deps", [])
@@ -2268,6 +2316,7 @@ def _build_dependency_graph(wb: Workbook, data: dict) -> None:
 def _build_hotspots(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Hotspots")
     ws.sheet_properties.tabColor = "DC2626"
+    _configure_sheet_view(ws, zoom=105, show_grid_lines=True)
 
     headers = ["Repo", "Category", "Severity", "Title", "Summary", "Recommended Action", "Tier"]
     for col, header in enumerate(headers, 1):
@@ -2797,6 +2846,7 @@ def _build_hidden_data_sheets(
 def _build_security_controls(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Security Controls")
     ws.sheet_properties.tabColor = "0F766E"
+    _configure_sheet_view(ws, zoom=105, show_grid_lines=True)
     headers = ["Repo", "SECURITY.md", "Dependabot", "Dependency Graph", "SBOM", "Code Scanning", "Secret Scanning"]
     for col, header in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=header)
@@ -2829,6 +2879,7 @@ def _build_security_controls(wb: Workbook, data: dict) -> None:
 def _build_supply_chain(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Supply Chain")
     ws.sheet_properties.tabColor = "7C3AED"
+    _configure_sheet_view(ws, zoom=105, show_grid_lines=True)
     headers = ["Repo", "Security Score", "Dependency Graph", "SBOM", "Scorecard", "Top Recommendation"]
     for col, header in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=header)
@@ -2862,6 +2913,7 @@ def _build_supply_chain(wb: Workbook, data: dict) -> None:
 def _build_security_debt(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Security Debt")
     ws.sheet_properties.tabColor = "B91C1C"
+    _configure_sheet_view(ws, zoom=105, show_grid_lines=True)
     headers = ["Repo", "Priority", "Action", "Expected Lift", "Effort", "Source"]
     for col, header in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=header)
@@ -2891,6 +2943,7 @@ def _build_security_debt(wb: Workbook, data: dict) -> None:
 def _build_campaigns(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Campaigns")
     ws.sheet_properties.tabColor = "7C3AED"
+    _configure_sheet_view(ws, zoom=115, show_grid_lines=False)
     summary = data.get("campaign_summary", {})
     _set_sheet_header(
         ws,
@@ -2963,6 +3016,7 @@ def _build_campaigns(wb: Workbook, data: dict) -> None:
 def _build_writeback_audit(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Writeback Audit")
     ws.sheet_properties.tabColor = "B91C1C"
+    _configure_sheet_view(ws, zoom=110, show_grid_lines=False)
     _set_sheet_header(
         ws,
         "Writeback Audit",
@@ -3025,6 +3079,7 @@ def _build_portfolio_explorer(
     context = build_analyst_context(data, profile_name=portfolio_profile, collection_name=collection)
     ws = _get_or_create_sheet(wb, "Portfolio Explorer")
     ws.sheet_properties.tabColor = "1D4ED8"
+    _configure_sheet_view(ws, zoom=110, show_grid_lines=True)
     _set_sheet_header(
         ws,
         "Portfolio Explorer",
@@ -3082,6 +3137,7 @@ def _build_by_lens(
     context = build_analyst_context(data, profile_name=portfolio_profile, collection_name=collection)
     ws = _get_or_create_sheet(wb, "By Lens")
     ws.sheet_properties.tabColor = "0F766E"
+    _configure_sheet_view(ws, zoom=110, show_grid_lines=True)
     _set_sheet_header(
         ws,
         "By Lens",
@@ -3133,6 +3189,7 @@ def _build_by_collection(
 
     ws = _get_or_create_sheet(wb, "By Collection")
     ws.sheet_properties.tabColor = "7C3AED"
+    _configure_sheet_view(ws, zoom=115, show_grid_lines=True)
     _set_sheet_header(
         ws,
         "By Collection",
@@ -3181,6 +3238,7 @@ def _build_trend_summary(
     extended_score_history = _extend_score_history_with_current(data, score_history)
     ws = _get_or_create_sheet(wb, "Trend Summary")
     ws.sheet_properties.tabColor = "0EA5E9"
+    _configure_sheet_view(ws, zoom=115, show_grid_lines=False)
     _set_sheet_header(
         ws,
         "Trend Summary",
@@ -3229,6 +3287,7 @@ def _build_trend_summary(
 def _build_review_queue(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Review Queue")
     ws.sheet_properties.tabColor = "2563EB"
+    _configure_sheet_view(ws, zoom=115, show_grid_lines=False)
     _set_sheet_header(
         ws,
         "Review Queue",
@@ -3328,6 +3387,7 @@ def _build_review_queue(wb: Workbook, data: dict) -> None:
 def _build_review_history_sheet(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Review History")
     ws.sheet_properties.tabColor = "1D4ED8"
+    _configure_sheet_view(ws, zoom=110, show_grid_lines=False)
     _set_sheet_header(
         ws,
         "Review History",
@@ -3378,6 +3438,7 @@ def _build_review_history_sheet(wb: Workbook, data: dict) -> None:
 def _build_governance_controls(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Governance Controls")
     ws.sheet_properties.tabColor = "7C3AED"
+    _configure_sheet_view(ws, zoom=115, show_grid_lines=False)
     _set_sheet_header(
         ws,
         "Governance Controls",
@@ -3448,6 +3509,7 @@ def _build_governance_controls(wb: Workbook, data: dict) -> None:
 def _build_governance_audit(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Governance Audit")
     ws.sheet_properties.tabColor = "6D28D9"
+    _configure_sheet_view(ws, zoom=110, show_grid_lines=False)
     _set_sheet_header(
         ws,
         "Governance Audit",
@@ -3496,6 +3558,7 @@ def _build_compare_sheet(
 
     ws = _get_or_create_sheet(wb, "Compare")
     ws.sheet_properties.tabColor = "7C3AED"
+    _configure_sheet_view(ws, zoom=110, show_grid_lines=True)
     ws["A1"] = "Compare Summary"
     ws["A1"].font = TITLE_FONT
     ws["A2"] = f"Previous: {diff_data.get('previous_date', '')[:10]}"
@@ -3549,6 +3612,7 @@ def _build_scenario_planner(
     preview = context["scenario_preview"]
     ws = _get_or_create_sheet(wb, "Scenario Planner")
     ws.sheet_properties.tabColor = "CA8A04"
+    _configure_sheet_view(ws, zoom=110, show_grid_lines=False)
 
     ws["A1"] = "Scenario Planner"
     ws["A1"].font = TITLE_FONT
@@ -3607,6 +3671,7 @@ def _build_executive_summary(
     context = build_analyst_context(data, profile_name=portfolio_profile, collection_name=collection)
     ws = _get_or_create_sheet(wb, "Executive Summary")
     ws.sheet_properties.tabColor = NAVY
+    _configure_sheet_view(ws, zoom=120, show_grid_lines=False)
     _set_sheet_header(
         ws,
         "Executive Summary",
@@ -3700,6 +3765,7 @@ def _build_print_pack(
 ) -> None:
     ws = _get_or_create_sheet(wb, "Print Pack")
     ws.sheet_properties.tabColor = "CA8A04"
+    _configure_sheet_view(ws, zoom=125, show_grid_lines=False)
     _set_sheet_header(
         ws,
         "Print Pack",
@@ -3913,6 +3979,7 @@ def _build_excel_workbook(
         collection=collection,
         excel_mode=excel_mode,
     )
+    _apply_visible_sheet_profile(wb)
     _reorder_workbook_sheets(wb)
     _refresh_pivot_caches_on_load(wb)
     wb.calculation.fullCalcOnLoad = True
