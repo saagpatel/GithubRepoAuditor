@@ -397,6 +397,17 @@ def write_markdown_report(
                 f"- Reacquisition Controls: {report.operator_summary.get('primary_target_closure_forecast_reacquisition_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reacquisition_reason', 'No closure-forecast reacquisition reason is recorded yet.')})"
             )
+        if report.operator_summary.get("primary_target_closure_forecast_reacquisition_persistence_status"):
+            _w(
+                f"- Reacquisition Persistence: {report.operator_summary.get('primary_target_closure_forecast_reacquisition_persistence_status')} "
+                f"({report.operator_summary.get('primary_target_closure_forecast_reacquisition_persistence_score', 0.0):.2f}; "
+                f"{report.operator_summary.get('primary_target_closure_forecast_reacquisition_age_runs', 0)} run(s))"
+            )
+        if report.operator_summary.get("primary_target_closure_forecast_recovery_churn_status"):
+            _w(
+                f"- Recovery Churn Controls: {report.operator_summary.get('primary_target_closure_forecast_recovery_churn_status')} "
+                f"({report.operator_summary.get('primary_target_closure_forecast_recovery_churn_reason', 'No recovery-churn reason is recorded yet.')})"
+            )
         if report.operator_summary.get("recommendation_drift_status"):
             _w(
                 f"- Recommendation Drift: {report.operator_summary.get('recommendation_drift_status')} "
@@ -450,6 +461,10 @@ def write_markdown_report(
             _w(f"- Closure Forecast Refresh Recovery Summary: {report.operator_summary.get('closure_forecast_refresh_recovery_summary')}")
         if report.operator_summary.get("closure_forecast_reacquisition_summary"):
             _w(f"- Closure Forecast Reacquisition Summary: {report.operator_summary.get('closure_forecast_reacquisition_summary')}")
+        if report.operator_summary.get("closure_forecast_reacquisition_persistence_summary"):
+            _w(f"- Reacquisition Persistence Summary: {report.operator_summary.get('closure_forecast_reacquisition_persistence_summary')}")
+        if report.operator_summary.get("closure_forecast_recovery_churn_summary"):
+            _w(f"- Recovery Churn Summary: {report.operator_summary.get('closure_forecast_recovery_churn_summary')}")
         if report.operator_summary.get("recommendation_quality_summary"):
             _w(f"- Recommendation Quality: {report.operator_summary.get('recommendation_quality_summary')}")
         if report.operator_summary.get("confidence_validation_status"):

@@ -849,6 +849,23 @@ def _print_control_center_summary(snapshot: dict) -> None:
         )
     if summary.get("closure_forecast_reacquisition_summary"):
         print(f"  Closure forecast reacquisition summary: {summary['closure_forecast_reacquisition_summary']}")
+    if summary.get("primary_target_closure_forecast_reacquisition_persistence_status") not in {None, "", "none"}:
+        print(
+            "  Reacquisition persistence: "
+            f"{summary.get('primary_target_closure_forecast_reacquisition_persistence_status', 'none')} "
+            f"({summary.get('primary_target_closure_forecast_reacquisition_persistence_score', 0.0):.2f}; "
+            f"{summary.get('primary_target_closure_forecast_reacquisition_age_runs', 0)} run(s))"
+        )
+    if summary.get("closure_forecast_reacquisition_persistence_summary"):
+        print(f"  Reacquisition persistence summary: {summary['closure_forecast_reacquisition_persistence_summary']}")
+    if summary.get("primary_target_closure_forecast_recovery_churn_status") not in {None, "", "none"}:
+        print(
+            "  Recovery churn controls: "
+            f"{summary.get('primary_target_closure_forecast_recovery_churn_status', 'none')} "
+            f"({summary.get('primary_target_closure_forecast_recovery_churn_reason', 'No recovery-churn reason is recorded yet.')})"
+        )
+    if summary.get("closure_forecast_recovery_churn_summary"):
+        print(f"  Recovery churn summary: {summary['closure_forecast_recovery_churn_summary']}")
     if summary.get("recommendation_drift_status"):
         print(
             "  Recommendation drift: "
