@@ -47,6 +47,7 @@ def test_build_scheduled_handoff_writes_artifacts_and_issue_candidate(tmp_path):
 
     assert payload["status"] == "ok"
     assert payload["issue_candidate"]["should_open"] is True
+    assert payload["issue_candidate"]["action"] == "open"
     assert payload["issue_candidate"]["title"] == "Scheduled Audit Handoff: testuser"
     assert (tmp_path / "scheduled-handoff-testuser-2026-04-07.md").is_file()
     assert (tmp_path / "scheduled-handoff-testuser-2026-04-07.json").is_file()
@@ -66,5 +67,34 @@ def test_build_scheduled_handoff_stays_quiet_for_quiet_runs(tmp_path):
     result = build_scheduled_handoff(tmp_path)
 
     assert result["issue_candidate"]["should_open"] is False
+    assert result["issue_candidate"]["action"] == "quiet"
     markdown = (tmp_path / "scheduled-handoff-testuser-2026-04-07.md").read_text()
     assert "Issue automation: `quiet`" in markdown
+
+
+def test_build_scheduled_handoff_closes_open_issue_when_run_turns_quiet(tmp_path):
+    payload = _control_center_payload(urgency="quiet")
+    payload["operator_summary"]["headline"] = "No operator triage items are currently surfaced."
+    payload["operator_summary"]["counts"] = {"blocked": 0, "urgent": 0, "ready": 0, "deferred": 0}
+    payload["operator_summary"]["what_changed"] = "No new blocking or urgent drift is surfaced in the latest operator snapshot."
+    payload["operator_summary"]["why_it_matters"] = "The latest run is quiet enough that no immediate operator intervention is required."
+    payload["operator_summary"]["what_to_do_next"] = "Continue the normal audit/control-center loop and review the next artifact for change."
+    payload["operator_queue"] = []
+    (tmp_path / "operator-control-center-testuser-2026-04-07.json").write_text(json.dumps(payload))
+
+    result = build_scheduled_handoff(tmp_path, issue_state="open", issue_number="42", issue_url="https://example.com/42")
+
+    assert result["issue_candidate"]["action"] == "close"
+    assert result["issue_candidate"]["close_reason"] == "quiet-recovery"
+    assert result["issue_candidate"]["issue_number"] == "42"
+
+
+def test_build_scheduled_handoff_reopens_closed_canonical_issue_for_new_noise(tmp_path):
+    (tmp_path / "operator-control-center-testuser-2026-04-07.json").write_text(
+        json.dumps(_control_center_payload())
+    )
+
+    result = build_scheduled_handoff(tmp_path, issue_state="closed", issue_number="42", issue_url="https://example.com/42")
+
+    assert result["issue_candidate"]["action"] == "update"
+    assert result["issue_candidate"]["reopen_existing"] is True

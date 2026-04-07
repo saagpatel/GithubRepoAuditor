@@ -245,6 +245,7 @@ def _operator_section(data: dict) -> str:
         <div class="meta-line"><strong>What Changed:</strong> {escape(summary.get('what_changed', 'No operator change summary is recorded.'))}</div>
         <div class="meta-line"><strong>Why It Matters:</strong> {escape(summary.get('why_it_matters', 'No additional operator impact is recorded.'))}</div>
         <div class="meta-line"><strong>What To Do Next:</strong> {escape(summary.get('what_to_do_next', 'Continue the normal operator loop.'))}</div>
+        <div class="meta-line"><strong>Follow-Through:</strong> {escape(summary.get('follow_through_summary', 'No follow-through signal is recorded yet.'))}</div>
         <div class="meta-line"><strong>Blocked:</strong> {counts.get('blocked', 0)} | <strong>Urgent:</strong> {counts.get('urgent', 0)} | <strong>Ready:</strong> {counts.get('ready', 0)} | <strong>Deferred:</strong> {counts.get('deferred', 0)}</div>
         <ul class="bullet-list">{''.join(rows) or '<li>No triage items are currently surfaced.</li>'}</ul>
         <div class="meta-line"><strong>Recently Changed:</strong></div>

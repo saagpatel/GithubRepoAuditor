@@ -139,6 +139,12 @@ make workbook-gate
 
 That command generates stable sample `standard` and `template` workbooks, validates the visible-sheet and hidden `Data_*` invariants, writes an authoritative `workbook-gate-result.json`, adds a human-readable gate summary, and produces a manual desktop Excel checklist with pending signoff placeholders. The final release step is still opening the generated `standard` workbook in desktop Excel and confirming there is no repair prompt.
 
+After that manual desktop Excel check, record the outcome back into the gate artifacts:
+
+```bash
+make workbook-signoff ARGS="--reviewer <name> --outcome passed --check excel-open-no-repair=passed --check visible-tabs-present=passed --check normal-zoom-readable=passed --check chart-placement-clean=passed --check filters-work=passed"
+```
+
 ## Managed Campaigns and Governance
 
 Campaign writeback is now lifecycle-aware rather than one-shot:
@@ -164,8 +170,9 @@ The daily operator loop is now:
 - Work through `Ready for Manual Action`
 - Leave `Safe to Defer` items alone unless priorities change
 - Run `make workbook-gate` only when workbook-facing changes are in scope
+- Run `make workbook-signoff ...` after the manual Excel-open check for workbook-facing changes
 
-Scheduled automation stays artifact-first. The weekly workflow now runs the audit, generates a control-center artifact plus a scheduled handoff summary, uploads `output/`, and only opens or updates one canonical GitHub issue when blocked or urgent operator findings cross a meaningful threshold.
+Scheduled automation stays artifact-first. The weekly workflow now runs the audit, generates a control-center artifact plus a scheduled handoff summary, uploads `output/`, opens or updates one canonical GitHub issue only when blocked or urgent operator findings cross a meaningful threshold, and closes that same issue cleanly when later runs return to a quiet state.
 
 ## Troubleshooting
 

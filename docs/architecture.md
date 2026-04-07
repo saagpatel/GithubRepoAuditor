@@ -317,8 +317,20 @@ The weekly workflow now remains artifact-first but more decision-ready:
 - it builds a scheduled handoff JSON + Markdown summary from the same operator contract
 - it uploads `output/` as the primary artifact output
 - it only opens or updates one canonical GitHub issue when the handoff crosses a meaningful blocked, urgent, or regression threshold
+- it closes that same issue cleanly when the queue returns to a quiet state and reopens it later if meaningful noise returns
 
 Quiet runs do not create issues. The issue body is derived from the same handoff fields already present in the local artifacts.
+
+### Workbook Signoff Record
+
+The workbook gate remains local-artifact-first, but it now supports a recorded manual signoff after the desktop Excel check. `workbook-gate-result.json` remains authoritative and now carries:
+
+- automated validation status
+- release status (`pending_manual_signoff`, `ready`, or `blocked`)
+- the latest manual signoff outcome
+- additive local signoff history
+
+This phase still does not introduce any checked-in workbook release ledger.
 
 ### HTML Dashboard
 

@@ -103,6 +103,7 @@ def _make_report(**overrides) -> dict:
             "what_changed": "RepoC drift needs review — managed-issue-edited",
             "why_it_matters": "This has crossed into live drift, regression risk, or rollback exposure and should be reviewed before it spreads.",
             "what_to_do_next": "Inspect the managed issue before closing the campaign.",
+            "follow_through_summary": "1 urgent item repeated in the recent window.",
         },
         "operator_queue": [
             {
@@ -267,6 +268,7 @@ class TestRenderHtml:
         assert "RepoC drift needs review" in html
         assert "Why It Matters" in html
         assert "What To Do Next" in html
+        assert "Follow-Through" in html
 
     def test_data_embedded_as_json(self):
         html = _render_html(_make_report())
