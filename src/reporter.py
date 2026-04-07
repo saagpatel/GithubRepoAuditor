@@ -304,6 +304,16 @@ def write_markdown_report(
                 f"- Class-Level Trust Normalization: {report.operator_summary.get('primary_target_class_normalization_status')} "
                 f"({report.operator_summary.get('primary_target_class_normalization_reason', 'No class-normalization reason is recorded yet.')})"
             )
+        if report.operator_summary.get("primary_target_class_memory_freshness_status"):
+            _w(
+                f"- Class Memory Freshness: {report.operator_summary.get('primary_target_class_memory_freshness_status')} "
+                f"({report.operator_summary.get('primary_target_class_memory_freshness_reason', 'No class-memory freshness reason is recorded yet.')})"
+            )
+        if report.operator_summary.get("primary_target_class_decay_status") is not None:
+            _w(
+                f"- Trust Decay Controls: {report.operator_summary.get('primary_target_class_decay_status')} "
+                f"({report.operator_summary.get('primary_target_class_decay_reason', 'No class-decay reason is recorded yet.')})"
+            )
         if report.operator_summary.get("recommendation_drift_status"):
             _w(
                 f"- Recommendation Drift: {report.operator_summary.get('recommendation_drift_status')} "
@@ -317,6 +327,10 @@ def write_markdown_report(
             _w(f"- Policy Debt Summary: {report.operator_summary.get('policy_debt_summary')}")
         if report.operator_summary.get("trust_normalization_summary"):
             _w(f"- Trust Normalization Summary: {report.operator_summary.get('trust_normalization_summary')}")
+        if report.operator_summary.get("class_memory_summary"):
+            _w(f"- Class Memory Summary: {report.operator_summary.get('class_memory_summary')}")
+        if report.operator_summary.get("class_decay_summary"):
+            _w(f"- Class Decay Summary: {report.operator_summary.get('class_decay_summary')}")
         if report.operator_summary.get("recommendation_quality_summary"):
             _w(f"- Recommendation Quality: {report.operator_summary.get('recommendation_quality_summary')}")
         if report.operator_summary.get("confidence_validation_status"):

@@ -312,6 +312,15 @@ def _make_report(audits=None) -> dict:
             "policy_debt_hotspots": [],
             "normalized_class_hotspots": [],
             "class_normalization_window_runs": 4,
+            "primary_target_class_memory_freshness_status": "mixed-age",
+            "primary_target_class_memory_freshness_reason": "Class memory is still useful, but it is partly aging: 50% of the weighted signal is recent and the rest is older carry-forward.",
+            "primary_target_class_decay_status": "none",
+            "primary_target_class_decay_reason": "",
+            "class_memory_summary": "RepoC: Security posture needs attention still has useful class memory, but part of that signal is aging and should be treated more cautiously.",
+            "class_decay_summary": "Fresh class signals are still strong enough that no class-level trust posture needs to decay yet.",
+            "stale_class_memory_hotspots": [],
+            "fresh_class_signal_hotspots": [],
+            "class_decay_window_runs": 4,
             "recommendation_drift_status": "stable",
             "recommendation_drift_summary": "Recent trust-policy behavior is stable enough that no meaningful recommendation drift is recorded.",
             "policy_flip_hotspots": [],
@@ -640,9 +649,11 @@ class TestAnalystWorkbookSheets:
         assert review_ws["A29"].value == "Retirement Summary"
         assert review_ws["A30"].value == "Policy Debt"
         assert review_ws["A31"].value == "Class Normalization"
-        assert review_ws["A32"].value == "Exception Learning"
-        assert review_ws["A33"].value == "Recommendation Drift"
-        assert review_ws["A34"].value == "Adaptive Confidence"
+        assert review_ws["A32"].value == "Class Memory"
+        assert review_ws["A33"].value == "Trust Decay"
+        assert review_ws["A34"].value == "Exception Learning"
+        assert review_ws["A35"].value == "Recommendation Drift"
+        assert review_ws["A36"].value == "Adaptive Confidence"
         assert executive_ws["D29"].value == "Trend"
         assert executive_ws["D32"].value == "Why Top Target"
         assert executive_ws["D33"].value == "Closure Guidance"
@@ -660,11 +671,13 @@ class TestAnalystWorkbookSheets:
         assert executive_ws["D47"].value == "Retirement Summary"
         assert executive_ws["D48"].value == "Policy Debt"
         assert executive_ws["D49"].value == "Class Normalization"
-        assert executive_ws["D50"].value == "Exception Learning"
-        assert executive_ws["D51"].value == "Recommendation Drift"
-        assert executive_ws["D52"].value == "Adaptive Confidence"
-        assert executive_ws["D53"].value == "Recommendation Quality"
-        assert executive_ws["D54"].value == "Confidence Validation"
+        assert executive_ws["D50"].value == "Class Memory"
+        assert executive_ws["D51"].value == "Trust Decay"
+        assert executive_ws["D52"].value == "Exception Learning"
+        assert executive_ws["D53"].value == "Recommendation Drift"
+        assert executive_ws["D54"].value == "Adaptive Confidence"
+        assert executive_ws["D55"].value == "Recommendation Quality"
+        assert executive_ws["D56"].value == "Confidence Validation"
         assert print_ws["A17"].value == "Primary Target"
         assert print_ws["A18"].value == "Why Top Target"
         assert print_ws["A19"].value == "What We Tried"
@@ -682,9 +695,11 @@ class TestAnalystWorkbookSheets:
         assert print_ws["A32"].value == "Retirement Summary"
         assert print_ws["A33"].value == "Policy Debt"
         assert print_ws["A34"].value == "Class Normalization"
-        assert print_ws["A35"].value == "Exception Learning"
-        assert print_ws["A36"].value == "Recommendation Drift"
-        assert print_ws["A37"].value == "Adaptive Confidence"
+        assert print_ws["A35"].value == "Class Memory"
+        assert print_ws["A36"].value == "Trust Decay"
+        assert print_ws["A37"].value == "Exception Learning"
+        assert print_ws["A38"].value == "Recommendation Drift"
+        assert print_ws["A39"].value == "Adaptive Confidence"
         assert "Why Top Target" in dashboard_values
         assert "Closure Guidance" in dashboard_values
         assert "What We Tried" in dashboard_values
@@ -696,6 +711,8 @@ class TestAnalystWorkbookSheets:
         assert "Exception Retirement" in dashboard_values
         assert "Policy Debt" in dashboard_values
         assert "Class Normalization" in dashboard_values
+        assert "Class Memory" in dashboard_values
+        assert "Trust Decay" in dashboard_values
         assert "Exception Learning" in dashboard_values
         assert "Recommendation Drift" in dashboard_values
 

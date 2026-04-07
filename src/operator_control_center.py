@@ -29,6 +29,8 @@ VALIDATION_WINDOW_RUNS = 2
 TRUST_RECOVERY_WINDOW_RUNS = 3
 EXCEPTION_RETIREMENT_WINDOW_RUNS = 4
 CLASS_NORMALIZATION_WINDOW_RUNS = 4
+CLASS_MEMORY_FRESHNESS_WINDOW_RUNS = 4
+CLASS_MEMORY_RECENCY_WEIGHTS = (1.0, 1.0, 0.7, 0.7, 0.4, 0.4, 0.4, 0.2, 0.2, 0.2)
 GENERIC_RECOMMENDATION_PHRASES = (
     "continue the normal audit/control-center loop",
     "continue the normal operator loop",
@@ -415,6 +417,15 @@ def build_operator_snapshot(
         "policy_debt_hotspots": resolution_trend["policy_debt_hotspots"],
         "normalized_class_hotspots": resolution_trend["normalized_class_hotspots"],
         "class_normalization_window_runs": resolution_trend["class_normalization_window_runs"],
+        "primary_target_class_memory_freshness_status": resolution_trend["primary_target_class_memory_freshness_status"],
+        "primary_target_class_memory_freshness_reason": resolution_trend["primary_target_class_memory_freshness_reason"],
+        "primary_target_class_decay_status": resolution_trend["primary_target_class_decay_status"],
+        "primary_target_class_decay_reason": resolution_trend["primary_target_class_decay_reason"],
+        "class_memory_summary": resolution_trend["class_memory_summary"],
+        "class_decay_summary": resolution_trend["class_decay_summary"],
+        "stale_class_memory_hotspots": resolution_trend["stale_class_memory_hotspots"],
+        "fresh_class_signal_hotspots": resolution_trend["fresh_class_signal_hotspots"],
+        "class_decay_window_runs": resolution_trend["class_decay_window_runs"],
         "decision_memory_status": resolution_trend["decision_memory_status"],
         "primary_target_last_seen_at": resolution_trend["primary_target_last_seen_at"],
         "primary_target_last_intervention": resolution_trend["primary_target_last_intervention"],
@@ -564,6 +575,16 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
             f"*Class-Level Trust Normalization:* {summary.get('primary_target_class_normalization_status')} — "
             f"{summary.get('primary_target_class_normalization_reason', 'No class-normalization reason is recorded yet.')}"
         )
+    if summary.get("primary_target_class_memory_freshness_status"):
+        lines.append(
+            f"*Class Memory Freshness:* {summary.get('primary_target_class_memory_freshness_status')} — "
+            f"{summary.get('primary_target_class_memory_freshness_reason', 'No class-memory freshness reason is recorded yet.')}"
+        )
+    if summary.get("primary_target_class_decay_status") is not None:
+        lines.append(
+            f"*Trust Decay Controls:* {summary.get('primary_target_class_decay_status')} — "
+            f"{summary.get('primary_target_class_decay_reason', 'No class-decay reason is recorded yet.')}"
+        )
     if summary.get("recommendation_drift_status"):
         lines.append(
             f"*Recommendation Drift:* {summary.get('recommendation_drift_status')} — "
@@ -577,6 +598,10 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
         lines.append(f"*Policy Debt Summary:* {summary['policy_debt_summary']}")
     if summary.get("trust_normalization_summary"):
         lines.append(f"*Trust Normalization Summary:* {summary['trust_normalization_summary']}")
+    if summary.get("class_memory_summary"):
+        lines.append(f"*Class Memory Summary:* {summary['class_memory_summary']}")
+    if summary.get("class_decay_summary"):
+        lines.append(f"*Class Decay Summary:* {summary['class_decay_summary']}")
     if summary.get("recommendation_quality_summary"):
         lines.append(f"*Recommendation Quality:* {summary['recommendation_quality_summary']}")
     if summary.get("confidence_validation_status"):
@@ -755,6 +780,8 @@ def _build_operator_handoff(
         resolution_trend.get("primary_target_exception_retirement_status", "none"),
         resolution_trend.get("primary_target_policy_debt_status", "none"),
         resolution_trend.get("primary_target_class_normalization_status", "none"),
+        resolution_trend.get("primary_target_class_memory_freshness_status", "insufficient-data"),
+        resolution_trend.get("primary_target_class_decay_status", "none"),
     )
     escalation_reason = _escalation_reason(queue, setup_health, watch_guidance)
     urgency = _handoff_urgency(queue, setup_health)
@@ -785,6 +812,8 @@ def _build_operator_handoff(
         f"{_exception_retirement_note(resolution_trend)} "
         f"{_policy_debt_note(resolution_trend)} "
         f"{_class_normalization_note(resolution_trend)} "
+        f"{_class_memory_note(resolution_trend)} "
+        f"{_class_decay_note(resolution_trend)} "
         f"{_recommendation_drift_note(resolution_trend)} "
         f"{confidence_calibration.get('confidence_calibration_summary', '')} "
         f"{confidence.get('adaptive_confidence_summary', '')} "
@@ -1117,6 +1146,12 @@ def _build_resolution_trend(
         current_generated_at=current_generated_at,
         confidence_calibration=confidence_calibration,
     )
+    class_memory_decay = _apply_class_memory_decay(
+        resolution_targets,
+        history,
+        current_generated_at=current_generated_at,
+        confidence_calibration=confidence_calibration,
+    )
     new_attention_keys = current_attention_keys - previous_attention_keys
     resolved_attention_count = len(previous_attention_keys - current_attention_keys)
     persisting_attention_count = len(current_attention_keys & previous_attention_keys)
@@ -1219,15 +1254,28 @@ def _build_resolution_trend(
         "retired_exception_hotspots": exception_retirement["retired_exception_hotspots"],
         "sticky_exception_hotspots": exception_retirement["sticky_exception_hotspots"],
         "exception_retirement_window_runs": exception_retirement["exception_retirement_window_runs"],
-        "primary_target_policy_debt_status": class_normalization["primary_target_policy_debt_status"],
-        "primary_target_policy_debt_reason": class_normalization["primary_target_policy_debt_reason"],
-        "primary_target_class_normalization_status": class_normalization["primary_target_class_normalization_status"],
-        "primary_target_class_normalization_reason": class_normalization["primary_target_class_normalization_reason"],
-        "policy_debt_summary": class_normalization["policy_debt_summary"],
-        "trust_normalization_summary": class_normalization["trust_normalization_summary"],
+        "primary_target_policy_debt_status": primary_target.get("policy_debt_status", class_normalization["primary_target_policy_debt_status"]) if primary_target else class_normalization["primary_target_policy_debt_status"],
+        "primary_target_policy_debt_reason": primary_target.get("policy_debt_reason", class_normalization["primary_target_policy_debt_reason"]) if primary_target else class_normalization["primary_target_policy_debt_reason"],
+        "primary_target_class_normalization_status": primary_target.get("class_normalization_status", class_normalization["primary_target_class_normalization_status"]) if primary_target else class_normalization["primary_target_class_normalization_status"],
+        "primary_target_class_normalization_reason": primary_target.get("class_normalization_reason", class_normalization["primary_target_class_normalization_reason"]) if primary_target else class_normalization["primary_target_class_normalization_reason"],
+        "policy_debt_summary": _policy_debt_summary(primary_target, class_normalization["policy_debt_hotspots"]) if primary_target else class_normalization["policy_debt_summary"],
+        "trust_normalization_summary": _trust_normalization_summary(
+            primary_target,
+            class_normalization["normalized_class_hotspots"],
+            class_normalization["policy_debt_hotspots"],
+        ) if primary_target else class_normalization["trust_normalization_summary"],
         "policy_debt_hotspots": class_normalization["policy_debt_hotspots"],
         "normalized_class_hotspots": class_normalization["normalized_class_hotspots"],
         "class_normalization_window_runs": class_normalization["class_normalization_window_runs"],
+        "primary_target_class_memory_freshness_status": class_memory_decay["primary_target_class_memory_freshness_status"],
+        "primary_target_class_memory_freshness_reason": class_memory_decay["primary_target_class_memory_freshness_reason"],
+        "primary_target_class_decay_status": class_memory_decay["primary_target_class_decay_status"],
+        "primary_target_class_decay_reason": class_memory_decay["primary_target_class_decay_reason"],
+        "class_memory_summary": class_memory_decay["class_memory_summary"],
+        "class_decay_summary": class_memory_decay["class_decay_summary"],
+        "stale_class_memory_hotspots": class_memory_decay["stale_class_memory_hotspots"],
+        "fresh_class_signal_hotspots": class_memory_decay["fresh_class_signal_hotspots"],
+        "class_decay_window_runs": class_memory_decay["class_decay_window_runs"],
         "decision_memory_status": decision_memory["decision_memory_status"],
         "primary_target_last_seen_at": decision_memory["primary_target_last_seen_at"],
         "primary_target_last_intervention": decision_memory["primary_target_last_intervention"],
@@ -1727,6 +1775,11 @@ def _apply_class_trust_normalization(
         updated_targets.append(
             {
                 **target,
+                "pre_class_normalization_trust_policy": target.get("trust_policy", "monitor"),
+                "pre_class_normalization_trust_policy_reason": target.get(
+                    "trust_policy_reason",
+                    "No trust-policy reason is recorded yet.",
+                ),
                 "policy_debt_status": policy_debt_status,
                 "policy_debt_reason": policy_debt_reason,
                 "class_normalization_status": class_normalization_status,
@@ -1765,6 +1818,118 @@ def _apply_class_trust_normalization(
         "policy_debt_hotspots": policy_debt_hotspots,
         "normalized_class_hotspots": normalized_class_hotspots,
         "class_normalization_window_runs": CLASS_NORMALIZATION_WINDOW_RUNS,
+    }
+
+
+def _apply_class_memory_decay(
+    resolution_targets: list[dict],
+    history: list[dict],
+    *,
+    current_generated_at: str,
+    confidence_calibration: dict,
+) -> dict:
+    if not resolution_targets:
+        return {
+            "primary_target_class_memory_freshness_status": "insufficient-data",
+            "primary_target_class_memory_freshness_reason": "",
+            "primary_target_class_decay_status": "none",
+            "primary_target_class_decay_reason": "",
+            "class_memory_summary": "No class-memory freshness is recorded because there is no active target.",
+            "class_decay_summary": "No class-decay controls are recorded because there is no active target.",
+            "stale_class_memory_hotspots": [],
+            "fresh_class_signal_hotspots": [],
+            "class_decay_window_runs": CLASS_MEMORY_FRESHNESS_WINDOW_RUNS,
+        }
+
+    current_primary_target = resolution_targets[0]
+    current_bucket = _recommendation_bucket(current_primary_target)
+    class_events = _class_normalization_events(
+        history,
+        current_primary_target=current_primary_target,
+        current_generated_at=current_generated_at,
+    )
+    historical_cases = _historical_exception_cases(history)
+
+    updated_targets: list[dict] = []
+    for target in resolution_targets:
+        freshness_status = "insufficient-data"
+        freshness_reason = ""
+        class_memory_weight = 0.0
+        decayed_class_retirement_rate = 0.0
+        decayed_class_sticky_rate = 0.0
+        recent_class_signal_mix = ""
+        class_decay_status = "none"
+        class_decay_reason = ""
+        final_policy = target.get("trust_policy", "monitor")
+        final_reason = target.get("trust_policy_reason", "No trust-policy reason is recorded yet.")
+        policy_debt_status = target.get("policy_debt_status", "none")
+        policy_debt_reason = target.get("policy_debt_reason", "")
+        class_normalization_status = target.get("class_normalization_status", "none")
+        class_normalization_reason = target.get("class_normalization_reason", "")
+
+        if _recommendation_bucket(target) == current_bucket:
+            history_meta = _target_class_normalization_history(target, class_events, historical_cases)
+            freshness_status = history_meta["class_memory_freshness_status"]
+            freshness_reason = history_meta["class_memory_freshness_reason"]
+            class_memory_weight = history_meta["class_memory_weight"]
+            decayed_class_retirement_rate = history_meta["decayed_class_retirement_rate"]
+            decayed_class_sticky_rate = history_meta["decayed_class_sticky_rate"]
+            recent_class_signal_mix = history_meta["recent_class_signal_mix"]
+            (
+                class_decay_status,
+                class_decay_reason,
+                final_policy,
+                final_reason,
+                policy_debt_status,
+                policy_debt_reason,
+                class_normalization_status,
+                class_normalization_reason,
+            ) = _class_memory_decay_for_target(
+                target,
+                history_meta,
+                confidence_calibration,
+                trust_policy=final_policy,
+                trust_policy_reason=final_reason,
+                policy_debt_status=policy_debt_status,
+                policy_debt_reason=policy_debt_reason,
+                class_normalization_status=class_normalization_status,
+                class_normalization_reason=class_normalization_reason,
+            )
+
+        updated_targets.append(
+            {
+                **target,
+                "class_memory_freshness_status": freshness_status,
+                "class_memory_freshness_reason": freshness_reason,
+                "class_memory_weight": class_memory_weight,
+                "decayed_class_retirement_rate": decayed_class_retirement_rate,
+                "decayed_class_sticky_rate": decayed_class_sticky_rate,
+                "recent_class_signal_mix": recent_class_signal_mix,
+                "class_decay_status": class_decay_status,
+                "class_decay_reason": class_decay_reason,
+                "policy_debt_status": policy_debt_status,
+                "policy_debt_reason": policy_debt_reason,
+                "class_normalization_status": class_normalization_status,
+                "class_normalization_reason": class_normalization_reason,
+                "trust_policy": final_policy,
+                "trust_policy_reason": final_reason,
+            }
+        )
+
+    resolution_targets[:] = updated_targets
+    primary_target = resolution_targets[0]
+    stale_class_memory_hotspots = _class_memory_hotspots(resolution_targets, mode="stale")
+    fresh_class_signal_hotspots = _class_memory_hotspots(resolution_targets, mode="fresh")
+    return {
+        "primary_target_class_memory_freshness_status": primary_target.get("class_memory_freshness_status", "insufficient-data"),
+        "primary_target_class_memory_freshness_reason": primary_target.get("class_memory_freshness_reason", ""),
+        "primary_target_class_decay_status": primary_target.get("class_decay_status", "none"),
+        "primary_target_class_decay_reason": primary_target.get("class_decay_reason", ""),
+        "class_memory_summary": _class_memory_summary(primary_target, fresh_class_signal_hotspots, stale_class_memory_hotspots),
+        "class_decay_summary": _class_decay_summary(primary_target, stale_class_memory_hotspots, fresh_class_signal_hotspots),
+        "stale_class_memory_hotspots": stale_class_memory_hotspots,
+        "fresh_class_signal_hotspots": fresh_class_signal_hotspots,
+        "class_decay_window_runs": CLASS_MEMORY_FRESHNESS_WINDOW_RUNS,
     }
 
 
@@ -2193,9 +2358,12 @@ def _class_normalization_events(
                 "exception_retirement_status": current_primary_target.get("exception_retirement_status", "none"),
                 "confidence_validation_status": current_primary_target.get("confidence_validation_status", ""),
                 "exception_pattern_status": current_primary_target.get("exception_pattern_status", "none"),
+                "policy_debt_status": current_primary_target.get("policy_debt_status", "none"),
+                "class_normalization_status": current_primary_target.get("class_normalization_status", "none"),
+                "recency_index": 0,
             }
         )
-    for entry in history[: HISTORY_WINDOW_RUNS - 1]:
+    for index, entry in enumerate(history[: HISTORY_WINDOW_RUNS - 1], start=1):
         summary = entry.get("operator_summary") or {}
         primary_target = summary.get("primary_target") or {}
         trust_policy = summary.get("primary_target_trust_policy", "")
@@ -2217,6 +2385,9 @@ def _class_normalization_events(
                 "exception_retirement_status": summary.get("primary_target_exception_retirement_status", "none"),
                 "confidence_validation_status": summary.get("confidence_validation_status", ""),
                 "exception_pattern_status": summary.get("primary_target_exception_pattern_status", "none"),
+                "policy_debt_status": summary.get("primary_target_policy_debt_status", "none"),
+                "class_normalization_status": summary.get("primary_target_class_normalization_status", "none"),
+                "recency_index": index,
             }
         )
     return sorted(events, key=lambda item: item.get("generated_at", ""), reverse=True)
@@ -2262,6 +2433,28 @@ def _target_class_normalization_history(
         verify_first_count += 1
     class_retirement_rate = retired_count / max(exception_count, 1)
     class_sticky_rate = sticky_count / max(exception_count, 1)
+    weighted_exception_count = 0.0
+    weighted_retired_like = 0.0
+    weighted_sticky_like = 0.0
+    recent_exception_weight = 0.0
+    for event in matching_class_events[:HISTORY_WINDOW_RUNS]:
+        recency_index = min(event.get("recency_index", HISTORY_WINDOW_RUNS - 1), HISTORY_WINDOW_RUNS - 1)
+        if recency_index == 0:
+            continue
+        weight = CLASS_MEMORY_RECENCY_WEIGHTS[recency_index]
+        if not _is_class_memory_event(event):
+            continue
+        weighted_exception_count += weight
+        if recency_index <= CLASS_MEMORY_FRESHNESS_WINDOW_RUNS:
+            recent_exception_weight += weight
+        if _is_retired_like_class_event(event):
+            weighted_retired_like += weight
+        if _is_sticky_like_class_event(event):
+            weighted_sticky_like += weight
+    recent_window_weight_share = recent_exception_weight / max(weighted_exception_count, 1.0)
+    decayed_class_retirement_rate = weighted_retired_like / max(weighted_exception_count, 1.0)
+    decayed_class_sticky_rate = weighted_sticky_like / max(weighted_exception_count, 1.0)
+    freshness_status = _class_memory_freshness_status(weighted_exception_count, recent_window_weight_share)
     return {
         "exception_count": exception_count,
         "retired_count": retired_count,
@@ -2271,6 +2464,27 @@ def _target_class_normalization_history(
         "verify_first_count": verify_first_count,
         "class_retirement_rate": class_retirement_rate,
         "class_sticky_rate": class_sticky_rate,
+        "weighted_exception_count": round(weighted_exception_count, 2),
+        "weighted_retired_like": round(weighted_retired_like, 2),
+        "weighted_sticky_like": round(weighted_sticky_like, 2),
+        "recent_window_weight_share": round(recent_window_weight_share, 2),
+        "class_memory_freshness_status": freshness_status,
+        "class_memory_freshness_reason": _class_memory_freshness_reason(
+            freshness_status,
+            weighted_exception_count,
+            recent_window_weight_share,
+            decayed_class_retirement_rate,
+            decayed_class_sticky_rate,
+        ),
+        "class_memory_weight": round(recent_window_weight_share, 2),
+        "decayed_class_retirement_rate": round(decayed_class_retirement_rate, 2),
+        "decayed_class_sticky_rate": round(decayed_class_sticky_rate, 2),
+        "recent_class_signal_mix": _recent_class_signal_mix(
+            weighted_exception_count,
+            weighted_retired_like,
+            weighted_sticky_like,
+            recent_window_weight_share,
+        ),
         "stable_after_exception_runs": target.get("stable_after_exception_runs", _stable_policy_run_count(target_policies)),
         "recent_class_policy_path": " -> ".join(class_policies[:CLASS_NORMALIZATION_WINDOW_RUNS]),
         "recent_policy_flip_count": _policy_flip_count(target_policies),
@@ -2282,6 +2496,91 @@ def _target_class_normalization_history(
         ),
         "latest_case_outcome": _latest_case_outcome(target_cases, class_cases),
     }
+
+
+def _is_class_memory_event(item: dict) -> bool:
+    return (
+        item.get("trust_exception_status") not in {None, "", "none"}
+        or item.get("exception_retirement_status") not in {None, "", "none"}
+        or item.get("class_normalization_status") not in {None, "", "none"}
+        or item.get("policy_debt_status") not in {None, "", "none"}
+    )
+
+
+def _is_class_memory_target(target: dict) -> bool:
+    return (
+        target.get("trust_exception_status") not in {None, "", "none"}
+        or target.get("exception_retirement_status") not in {None, "", "none"}
+        or target.get("class_normalization_status") not in {None, "", "none"}
+        or target.get("policy_debt_status") not in {None, "", "none"}
+    )
+
+
+def _is_retired_like_class_event(item: dict) -> bool:
+    return (
+        item.get("exception_retirement_status") == "retired"
+        or item.get("exception_pattern_status") == "overcautious"
+        or item.get("class_normalization_status") == "applied"
+    )
+
+
+def _is_sticky_like_class_event(item: dict) -> bool:
+    return (
+        item.get("exception_retirement_status") == "blocked"
+        or item.get("exception_pattern_status") == "useful-caution"
+        or item.get("policy_debt_status") == "class-debt"
+    )
+
+
+def _class_memory_freshness_status(weighted_exception_count: float, recent_window_weight_share: float) -> str:
+    if weighted_exception_count < 2.0:
+        return "insufficient-data"
+    if recent_window_weight_share >= 0.60:
+        return "fresh"
+    if recent_window_weight_share >= 0.35:
+        return "mixed-age"
+    return "stale"
+
+
+def _class_memory_freshness_reason(
+    freshness_status: str,
+    weighted_exception_count: float,
+    recent_window_weight_share: float,
+    decayed_class_retirement_rate: float,
+    decayed_class_sticky_rate: float,
+) -> str:
+    if freshness_status == "fresh":
+        return (
+            "Recent class evidence is still current enough to trust, with "
+            f"{recent_window_weight_share:.0%} of the weighted signal coming from the latest {CLASS_MEMORY_FRESHNESS_WINDOW_RUNS} runs."
+        )
+    if freshness_status == "mixed-age":
+        return (
+            "Class memory is still useful, but it is partly aging: "
+            f"{recent_window_weight_share:.0%} of the weighted signal is recent and the rest is older carry-forward."
+        )
+    if freshness_status == "stale":
+        return (
+            "Older class evidence is now carrying more of the signal than recent runs, so class-level trust should not lean on it too heavily."
+        )
+    return (
+        "Class memory is still too lightly exercised to judge freshness, with "
+        f"{weighted_exception_count:.2f} weighted exception run(s), "
+        f"{decayed_class_retirement_rate:.0%} retired-like signal, and {decayed_class_sticky_rate:.0%} sticky signal."
+    )
+
+
+def _recent_class_signal_mix(
+    weighted_exception_count: float,
+    weighted_retired_like: float,
+    weighted_sticky_like: float,
+    recent_window_weight_share: float,
+) -> str:
+    return (
+        f"{weighted_exception_count:.2f} weighted exception run(s) with "
+        f"{weighted_retired_like:.2f} retired-like, {weighted_sticky_like:.2f} sticky-like, "
+        f"and {recent_window_weight_share:.0%} of the signal from the freshest runs."
+    )
 
 
 def _class_normalization_friendly(history_meta: dict) -> bool:
@@ -2472,6 +2771,221 @@ def _class_normalization_hotspots(
         )
     )
     return hotspots[:5]
+
+
+def _class_memory_decay_for_target(
+    target: dict,
+    history_meta: dict,
+    confidence_calibration: dict,
+    *,
+    trust_policy: str,
+    trust_policy_reason: str,
+    policy_debt_status: str,
+    policy_debt_reason: str,
+    class_normalization_status: str,
+    class_normalization_reason: str,
+) -> tuple[str, str, str, str, str, str, str, str]:
+    freshness_status = history_meta.get("class_memory_freshness_status", "insufficient-data")
+    decayed_class_retirement_rate = history_meta.get("decayed_class_retirement_rate", 0.0)
+    decayed_class_sticky_rate = history_meta.get("decayed_class_sticky_rate", 0.0)
+    local_noise = _target_specific_normalization_noise(target, history_meta)
+    calibration_status = confidence_calibration.get("confidence_validation_status", "insufficient-data")
+
+    if local_noise:
+        return (
+            "blocked",
+            "Local reopen, flip, or blocked-recovery noise still overrides healthier class memory for this target.",
+            trust_policy,
+            trust_policy_reason,
+            policy_debt_status,
+            policy_debt_reason,
+            class_normalization_status,
+            class_normalization_reason,
+        )
+
+    if (
+        class_normalization_status == "applied"
+        and freshness_status in {"stale", "insufficient-data"}
+    ):
+        reverted_policy = target.get("pre_class_normalization_trust_policy", trust_policy)
+        reverted_reason = target.get(
+            "pre_class_normalization_trust_policy_reason",
+            trust_policy_reason,
+        )
+        if target.get("lane") == "blocked" and target.get("kind") == "setup" and reverted_policy == "act-now":
+            reverted_policy = "act-with-review"
+            reverted_reason = (
+                "Class normalization was pulled back because the class lesson is aging out, and blocked setup items still should not skip review."
+            )
+        return (
+            "normalization-decayed",
+            "Class normalization was pulled back because the class lesson is too old or too lightly refreshed to keep carrying forward on its own.",
+            reverted_policy,
+            reverted_reason,
+            policy_debt_status,
+            policy_debt_reason,
+            "candidate",
+            "Class-level normalization is aging out, so the class trend remains promising but no longer strong enough to keep the stronger posture on its own.",
+        )
+
+    if (
+        policy_debt_status == "class-debt"
+        and decayed_class_sticky_rate < 0.50
+        and decayed_class_retirement_rate >= 0.50
+        and calibration_status == "healthy"
+    ):
+        return (
+            "policy-debt-decayed",
+            "Earlier sticky caution no longer has enough fresh class support to stay strong.",
+            trust_policy,
+            trust_policy_reason,
+            "watch",
+            "Fresh class evidence now looks mixed enough that sticky class-level caution should soften to watch.",
+            class_normalization_status,
+            class_normalization_reason,
+        )
+
+    if (
+        freshness_status == "fresh"
+        and (
+            class_normalization_status == "applied"
+            or policy_debt_status == "class-debt"
+        )
+    ):
+        return (
+            "none",
+            "",
+            trust_policy,
+            trust_policy_reason,
+            policy_debt_status,
+            policy_debt_reason,
+            class_normalization_status,
+            class_normalization_reason,
+        )
+
+    if calibration_status != "healthy" and policy_debt_status == "class-debt":
+        return (
+            "blocked",
+            "Class freshness is present, but calibration is not healthy enough to relax class-level caution any further.",
+            trust_policy,
+            trust_policy_reason,
+            policy_debt_status,
+            policy_debt_reason,
+            class_normalization_status,
+            class_normalization_reason,
+        )
+
+    return (
+        "none",
+        "",
+        trust_policy,
+        trust_policy_reason,
+        policy_debt_status,
+        policy_debt_reason,
+        class_normalization_status,
+        class_normalization_reason,
+    )
+
+
+def _class_memory_hotspots(resolution_targets: list[dict], *, mode: str) -> list[dict]:
+    grouped: dict[str, dict] = {}
+    for target in resolution_targets:
+        class_key = _target_class_key(target)
+        if not class_key:
+            continue
+        grouped[class_key] = {
+            "scope": "class",
+            "label": class_key,
+            "freshness_status": target.get("class_memory_freshness_status", "insufficient-data"),
+            "class_memory_weight": target.get("class_memory_weight", 0.0),
+            "weighted_exception_count": target.get("class_memory_weight", 0.0),
+            "decayed_class_retirement_rate": target.get("decayed_class_retirement_rate", 0.0),
+            "decayed_class_sticky_rate": target.get("decayed_class_sticky_rate", 0.0),
+            "recent_class_signal_mix": target.get("recent_class_signal_mix", ""),
+        }
+    hotspots = list(grouped.values())
+    if mode == "stale":
+        hotspots = [
+            item
+            for item in hotspots
+            if item.get("freshness_status") in {"stale", "insufficient-data"}
+        ]
+        hotspots.sort(
+            key=lambda item: (
+                item.get("class_memory_weight", 0.0),
+                -item.get("decayed_class_sticky_rate", 0.0),
+                item.get("label", ""),
+            )
+        )
+    else:
+        hotspots = [item for item in hotspots if item.get("freshness_status") == "fresh"]
+        hotspots.sort(
+            key=lambda item: (
+                -item.get("class_memory_weight", 0.0),
+                -item.get("decayed_class_retirement_rate", 0.0),
+                item.get("label", ""),
+            )
+        )
+    return hotspots[:5]
+
+
+def _class_memory_summary(
+    primary_target: dict,
+    fresh_class_signal_hotspots: list[dict],
+    stale_class_memory_hotspots: list[dict],
+) -> str:
+    label = _target_label(primary_target) or "The current target"
+    freshness_status = primary_target.get("class_memory_freshness_status", "insufficient-data")
+    if freshness_status == "fresh":
+        return f"{label} sits in class evidence that is still fresh enough to trust, so recent class behavior should carry more weight than older lessons."
+    if freshness_status == "mixed-age":
+        return f"{label} still has useful class memory, but part of that signal is aging and should be treated more cautiously."
+    if freshness_status == "stale":
+        return f"{label} is leaning on older class evidence that is now being down-weighted so it does not dominate the current trust posture."
+    if fresh_class_signal_hotspots:
+        hotspot = fresh_class_signal_hotspots[0]
+        return (
+            f"Fresh class evidence is strongest around {hotspot.get('label', 'recent hotspots')}, "
+            "so recent lessons there are still current enough to matter."
+        )
+    if stale_class_memory_hotspots:
+        hotspot = stale_class_memory_hotspots[0]
+        return (
+            f"Class memory is aging out most visibly around {hotspot.get('label', 'recent hotspots')}, "
+            "so older class lessons should not keep carrying forward there."
+        )
+    return "Class memory is still too lightly exercised to say whether recent class lessons are fresh or aging out."
+
+
+def _class_decay_summary(
+    primary_target: dict,
+    stale_class_memory_hotspots: list[dict],
+    fresh_class_signal_hotspots: list[dict],
+) -> str:
+    label = _target_label(primary_target) or "The current target"
+    decay_status = primary_target.get("class_decay_status", "none")
+    if decay_status == "normalization-decayed":
+        return f"{label} had class-level normalization pulled back because the class lesson is too old or too lightly refreshed to keep the stronger posture."
+    if decay_status == "policy-debt-decayed":
+        return f"{label} no longer has enough fresh sticky class evidence to keep strong class-debt caution in place."
+    if decay_status == "blocked":
+        return primary_target.get(
+            "class_decay_reason",
+            f"{label} still has local target noise blocking healthier class memory from changing the live posture.",
+        )
+    if stale_class_memory_hotspots:
+        hotspot = stale_class_memory_hotspots[0]
+        return (
+            f"Older class lessons are aging out around {hotspot.get('label', 'recent hotspots')}, "
+            "so trust posture there should rely less on stale carry-forward."
+        )
+    if fresh_class_signal_hotspots:
+        hotspot = fresh_class_signal_hotspots[0]
+        return (
+            f"Fresh class signals are still strongest around {hotspot.get('label', 'recent hotspots')}, "
+            "so current class posture there still has enough recent support."
+        )
+    return "Recent class evidence does not yet show a strong decay-or-stay pattern."
 
 
 def _trust_exception_events(
@@ -3820,8 +4334,20 @@ def _adaptive_confidence_summary(
     exception_retirement_status = primary_target.get("exception_retirement_status", "none")
     policy_debt_status = primary_target.get("policy_debt_status", "none")
     class_normalization_status = primary_target.get("class_normalization_status", "none")
+    class_memory_freshness_status = primary_target.get("class_memory_freshness_status", "insufficient-data")
+    class_decay_status = primary_target.get("class_decay_status", "none")
     recovery_confidence_label = primary_target.get("recovery_confidence_label", "low")
     drift_status = primary_target.get("recommendation_drift_status", "")
+    if class_decay_status == "normalization-decayed":
+        return "Class normalization was pulled back because the class lesson is too old or too lightly refreshed to keep carrying the stronger posture."
+    if class_decay_status == "policy-debt-decayed":
+        return "Earlier sticky class caution no longer has enough fresh support to stay strong, so class-debt pressure is softening."
+    if class_decay_status == "blocked":
+        return "Local target noise still overrides healthier class memory, so class freshness is not changing the live posture yet."
+    if class_memory_freshness_status == "stale":
+        return "Older class evidence is being down-weighted, so stale class lessons should not dominate the current trust posture."
+    if class_memory_freshness_status == "mixed-age":
+        return "Class memory is still useful, but part of the class signal is aging and should be treated more cautiously."
     if class_normalization_status == "applied":
         return "This class has repeatedly earned clean retirement, so the current target inherits a stronger act-with-review posture without changing lane priority."
     if class_normalization_status == "candidate":
@@ -4128,6 +4654,10 @@ def _why_it_matters(
         resolution_trend.get("primary_target_policy_debt_reason", ""),
         resolution_trend.get("primary_target_class_normalization_status", "none"),
         resolution_trend.get("primary_target_class_normalization_reason", ""),
+        resolution_trend.get("primary_target_class_memory_freshness_status", "insufficient-data"),
+        resolution_trend.get("primary_target_class_memory_freshness_reason", ""),
+        resolution_trend.get("primary_target_class_decay_status", "none"),
+        resolution_trend.get("primary_target_class_decay_reason", ""),
     )
     if urgency == "blocked":
         return f"A trustworthy next step is blocked until this is cleared. {trust_sentence} {calibration_sentence}".strip()
@@ -4222,7 +4752,24 @@ def _trust_policy_sentence(
     policy_debt_reason: str,
     class_normalization_status: str,
     class_normalization_reason: str,
+    class_memory_freshness_status: str,
+    class_memory_freshness_reason: str,
+    class_decay_status: str,
+    class_decay_reason: str,
 ) -> str:
+    if class_decay_status == "normalization-decayed":
+        detail = class_decay_reason or class_memory_freshness_reason or reason
+        return f"Trust policy: verify first because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: verify first because stale class memory pulled back class-level normalization."
+    if class_decay_status == "policy-debt-decayed":
+        return "Trust policy: verify first for now, but earlier sticky class caution is starting to age out."
+    if class_decay_status == "blocked":
+        detail = class_decay_reason or class_memory_freshness_reason or class_normalization_reason or policy_debt_reason or reason
+        return f"Trust policy: verify first because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: verify first because local target noise still overrides class freshness."
+    if class_memory_freshness_status == "stale":
+        detail = class_memory_freshness_reason or reason
+        return f"Trust policy: verify first because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: verify first because older class evidence is being down-weighted."
+    if class_memory_freshness_status == "mixed-age":
+        return "Trust policy: verify first because class memory is still useful, but part of the class signal is aging out."
     if class_normalization_status == "applied":
         return "Trust policy: act with review because this class has repeatedly earned clean retirement and the current target can inherit a stronger posture."
     if class_normalization_status == "candidate":
@@ -4282,9 +4829,21 @@ def _with_trust_policy_brief(
     exception_retirement_status: str,
     policy_debt_status: str,
     class_normalization_status: str,
+    class_memory_freshness_status: str,
+    class_decay_status: str,
 ) -> str:
     if not summary:
         return summary
+    if class_decay_status == "normalization-decayed":
+        return f"{summary} Trust policy: stale class memory pulled back class-level normalization."
+    if class_decay_status == "policy-debt-decayed":
+        return f"{summary} Trust policy: earlier sticky class caution is aging out."
+    if class_decay_status == "blocked":
+        return f"{summary} Trust policy: local target noise still overrides healthier class memory."
+    if class_memory_freshness_status == "stale":
+        return f"{summary} Trust policy: older class evidence is being down-weighted."
+    if class_memory_freshness_status == "mixed-age":
+        return f"{summary} Trust policy: class memory is still useful, but part of it is aging."
     if class_normalization_status == "applied":
         return f"{summary} Trust policy: class-level normalization applied."
     if class_normalization_status == "candidate":
@@ -4377,6 +4936,22 @@ def _class_normalization_note(resolution_trend: dict) -> str:
     if status in {None, "", "none"}:
         return ""
     return f"Class-level trust normalization: {status} — {reason}".strip()
+
+
+def _class_memory_note(resolution_trend: dict) -> str:
+    status = resolution_trend.get("primary_target_class_memory_freshness_status", "insufficient-data")
+    reason = resolution_trend.get("primary_target_class_memory_freshness_reason", "")
+    if not status:
+        return ""
+    return f"Class memory freshness: {status} — {reason}".strip()
+
+
+def _class_decay_note(resolution_trend: dict) -> str:
+    status = resolution_trend.get("primary_target_class_decay_status", "none")
+    reason = resolution_trend.get("primary_target_class_decay_reason", "")
+    if status in {None, "", "none"}:
+        return ""
+    return f"Trust decay controls: {status} — {reason}".strip()
 
 
 def _recommendation_drift_note(resolution_trend: dict) -> str:

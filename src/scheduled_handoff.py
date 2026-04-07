@@ -132,9 +132,17 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Trust recovery: `{summary.get('primary_target_trust_recovery_status', 'none')}` — {summary.get('primary_target_trust_recovery_reason', 'No trust-recovery reason is recorded yet.')}",
         f"- Recovery confidence: `{summary.get('primary_target_recovery_confidence_label', 'low')}` ({summary.get('primary_target_recovery_confidence_score', 0.0):.2f}) — {summary.get('recovery_confidence_summary', 'No recovery-confidence summary is recorded yet.')}",
         f"- Exception retirement: `{summary.get('primary_target_exception_retirement_status', 'none')}` — {summary.get('primary_target_exception_retirement_reason', 'No exception-retirement reason is recorded yet.')}",
+        f"- Policy debt cleanup: `{summary.get('primary_target_policy_debt_status', 'none')}` — {summary.get('primary_target_policy_debt_reason', 'No policy-debt reason is recorded yet.')}",
+        f"- Class-level trust normalization: `{summary.get('primary_target_class_normalization_status', 'none')}` — {summary.get('primary_target_class_normalization_reason', 'No class-normalization reason is recorded yet.')}",
+        f"- Class memory freshness: `{summary.get('primary_target_class_memory_freshness_status', 'insufficient-data')}` — {summary.get('primary_target_class_memory_freshness_reason', 'No class-memory freshness reason is recorded yet.')}",
+        f"- Trust decay controls: `{summary.get('primary_target_class_decay_status', 'none')}` — {summary.get('primary_target_class_decay_reason', 'No class-decay reason is recorded yet.')}",
         f"- Recommendation drift: `{summary.get('recommendation_drift_status', 'stable')}` — {summary.get('recommendation_drift_summary', 'No recommendation-drift summary is recorded yet.')}",
         f"- Exception pattern summary: {summary.get('exception_pattern_summary', 'No exception-pattern summary is recorded yet.')}",
         f"- Exception retirement summary: {summary.get('exception_retirement_summary', 'No exception-retirement summary is recorded yet.')}",
+        f"- Policy debt summary: {summary.get('policy_debt_summary', 'No policy-debt summary is recorded yet.')}",
+        f"- Trust normalization summary: {summary.get('trust_normalization_summary', 'No trust-normalization summary is recorded yet.')}",
+        f"- Class memory summary: {summary.get('class_memory_summary', 'No class-memory summary is recorded yet.')}",
+        f"- Class decay summary: {summary.get('class_decay_summary', 'No class-decay summary is recorded yet.')}",
         f"- Confidence validation: `{summary.get('confidence_validation_status', 'insufficient-data')}` — {summary.get('confidence_calibration_summary', 'No confidence-calibration summary is recorded yet.')}",
         f"- Next recommended run: `{summary.get('next_recommended_run_mode', 'n/a')}`",
         f"- Watch strategy: `{summary.get('watch_strategy', 'manual')}`",
@@ -344,6 +352,55 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
             )
     else:
         lines.append("- No repeated class-level normalization hotspots are recorded in the recent window.")
+    lines.append("")
+    lines.append("## Class Memory Freshness")
+    lines.append("")
+    lines.append(
+        f"- Freshness status: {summary.get('primary_target_class_memory_freshness_status', 'insufficient-data')} "
+        f"({summary.get('primary_target_class_memory_freshness_reason', 'No class-memory freshness reason is recorded yet.')})"
+    )
+    lines.append(
+        f"- Decayed retirement / sticky rates: {summary.get('primary_target', {}).get('decayed_class_retirement_rate', 0.0):.0%} retired-like, "
+        f"{summary.get('primary_target', {}).get('decayed_class_sticky_rate', 0.0):.0%} sticky-like"
+    )
+    lines.append(
+        f"- Freshness window: {summary.get('class_decay_window_runs', 4)} run(s)"
+    )
+    lines.append(
+        f"- {summary.get('class_memory_summary', 'No class-memory summary is recorded yet.')}"
+    )
+    fresh_hotspots = summary.get("fresh_class_signal_hotspots") or []
+    if fresh_hotspots:
+        for hotspot in fresh_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Fresh class hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('freshness_status', 'fresh')} with {hotspot.get('decayed_class_retirement_rate', 0.0):.0%} retired-like signal"
+            )
+    else:
+        lines.append("- No unusually fresh class-memory hotspots are recorded in the recent window.")
+    lines.append("")
+    lines.append("## Trust Decay Controls")
+    lines.append("")
+    lines.append(
+        f"- Decay status: {summary.get('primary_target_class_decay_status', 'none')} "
+        f"({summary.get('primary_target_class_decay_reason', 'No class-decay reason is recorded yet.')})"
+    )
+    lines.append(
+        f"- Final trust policy after decay: {summary.get('primary_target_trust_policy', 'monitor')} "
+        f"({summary.get('primary_target_trust_policy_reason', 'No trust-policy reason is recorded yet.')})"
+    )
+    lines.append(
+        f"- {summary.get('class_decay_summary', 'No class-decay summary is recorded yet.')}"
+    )
+    stale_hotspots = summary.get("stale_class_memory_hotspots") or []
+    if stale_hotspots:
+        for hotspot in stale_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Stale class hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('freshness_status', 'stale')} with {hotspot.get('decayed_class_sticky_rate', 0.0):.0%} sticky-like signal"
+            )
+    else:
+        lines.append("- No stale class-memory hotspots are recorded in the recent window.")
     lines.append("")
     lines.append("## Recommendation Drift")
     lines.append("")

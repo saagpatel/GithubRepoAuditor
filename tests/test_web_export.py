@@ -163,6 +163,15 @@ def _make_report(**overrides) -> dict:
             ],
             "normalized_class_hotspots": [],
             "class_normalization_window_runs": 4,
+            "primary_target_class_memory_freshness_status": "stale",
+            "primary_target_class_memory_freshness_reason": "Older class evidence is now carrying more of the signal than recent runs, so class-level trust should not lean on it too heavily.",
+            "primary_target_class_decay_status": "blocked",
+            "primary_target_class_decay_reason": "Local reopen, flip, or blocked-recovery noise still overrides healthier class memory for this target.",
+            "class_memory_summary": "RepoC: RepoC drift needs review is leaning on older class evidence that is now being down-weighted so it does not dominate the current trust posture.",
+            "class_decay_summary": "RepoC: RepoC drift needs review still has local target noise blocking healthier class memory from changing the live posture.",
+            "stale_class_memory_hotspots": [],
+            "fresh_class_signal_hotspots": [],
+            "class_decay_window_runs": 4,
             "recommendation_drift_status": "watch",
             "recommendation_drift_summary": "RepoC: RepoC drift needs review has started to wobble between trust policies in the recent window: act-with-review -> verify-first.",
             "policy_flip_hotspots": [
@@ -328,6 +337,8 @@ class TestRenderHtml:
         assert "Exception Retirement:" in html
         assert "Policy Debt Cleanup:" in html
         assert "Class-Level Trust Normalization:" in html
+        assert "Class Memory Freshness:" in html
+        assert "Trust Decay Controls:" in html
         assert "Recommendation Drift:" in html
         assert "Policy Debt Summary:" in html
         assert "Trust Normalization Summary:" in html

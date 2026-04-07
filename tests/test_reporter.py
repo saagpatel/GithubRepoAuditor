@@ -230,6 +230,15 @@ class TestMarkdownReport:
             "policy_debt_hotspots": [],
             "normalized_class_hotspots": [],
             "class_normalization_window_runs": 4,
+            "primary_target_class_memory_freshness_status": "fresh",
+            "primary_target_class_memory_freshness_reason": "Recent class evidence is still current enough to trust, with 70% of the weighted signal coming from the latest 4 runs.",
+            "primary_target_class_decay_status": "none",
+            "primary_target_class_decay_reason": "",
+            "class_memory_summary": "Missing template asset sits in class evidence that is still fresh enough to trust, so recent class behavior should carry more weight than older lessons.",
+            "class_decay_summary": "Fresh class signals are still strongest here, so the current class posture still has enough recent support.",
+            "stale_class_memory_hotspots": [],
+            "fresh_class_signal_hotspots": [],
+            "class_decay_window_runs": 4,
             "recommendation_drift_status": "stable",
             "recommendation_drift_summary": "Recent trust-policy behavior is stable enough that no meaningful recommendation drift is recorded.",
             "policy_flip_hotspots": [],
@@ -280,6 +289,8 @@ class TestMarkdownReport:
         assert "Exception Retirement:" in content
         assert "Policy Debt Cleanup:" in content
         assert "Class-Level Trust Normalization:" in content
+        assert "Class Memory Freshness:" in content
+        assert "Trust Decay Controls:" in content
         assert "Next Recommended Run" in content
         assert "Watch Strategy" in content
         assert "What Changed" in content
