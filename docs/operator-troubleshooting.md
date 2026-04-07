@@ -16,6 +16,11 @@ audit <github-username> --control-center
 
 That command is read-only. It loads the latest report + warehouse state, groups triage items into `Blocked`, `Needs Attention Now`, `Ready for Manual Action`, and `Safe to Defer`, and writes matching JSON + Markdown control-center artifacts.
 
+The operator summary now also answers three questions directly:
+- what changed
+- why it matters
+- what to do next
+
 If you are using watch mode, the tool can now decide full vs incremental per cycle:
 
 ```bash
@@ -124,14 +129,18 @@ The intended operator loop is:
 1. `audit <github-username> --doctor`
 2. `audit <github-username>` or `audit <github-username> --watch --watch-strategy adaptive`
 3. `audit <github-username> --control-center`
-4. Handle `Blocked`, then `Needs Attention Now`, then `Ready for Manual Action`
-5. Leave `Safe to Defer` items alone unless priorities changed
-6. Run `make workbook-gate` only when workbook-facing changes are part of the release
+4. Read the control-center handoff fields before drilling into the queue
+5. Handle `Blocked`, then `Needs Attention Now`, then `Ready for Manual Action`
+6. Leave `Safe to Defer` items alone unless priorities changed
+7. Run `make workbook-gate` only when workbook-facing changes are part of the release
 
 `--control-center` always writes:
 
 - `output/operator-control-center-<username>-<date>.json`
 - `output/operator-control-center-<username>-<date>.md`
+- On scheduled runs, the workflow also writes:
+  - `output/scheduled-handoff-<username>-<date>.json`
+  - `output/scheduled-handoff-<username>-<date>.md`
 
 ## Workbook Release Gate
 
@@ -141,4 +150,10 @@ For workbook-facing changes, use:
 make workbook-gate
 ```
 
-That command generates canonical sample `standard` and `template` workbooks, validates the visible-sheet and hidden `Data_*` invariants, and writes a manual desktop Excel checklist. The final release step is still opening the generated `standard` workbook in desktop Excel and confirming there is no repair prompt.
+That command generates canonical sample `standard` and `template` workbooks, validates the visible-sheet and hidden `Data_*` invariants, writes an authoritative `workbook-gate-result.json`, produces a readable gate summary, and creates a manual desktop Excel checklist with pending signoff placeholders. The final release step is still opening the generated `standard` workbook in desktop Excel and confirming there is no repair prompt.
+
+## Scheduled Issue Automation
+
+Scheduled automation stays artifact-first. A GitHub issue is only opened or updated when the scheduled handoff surfaces meaningful blocked or urgent findings, or when regressions are detected in the diff.
+
+Quiet runs stay in artifacts only. The workflow avoids issue spam by updating one canonical `scheduled-audit-handoff` issue title per username instead of creating a new issue every time.

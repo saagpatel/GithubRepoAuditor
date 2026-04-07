@@ -66,5 +66,9 @@ def test_workflows_install_package_and_use_audit_console_script():
     contents = workflow_path.read_text()
     assert 'pip install -e ".[config]"' in contents
     assert "audit \"$USERNAME\" --incremental --html --badges --diff --excel-mode standard" in contents
+    assert "audit \"$USERNAME\" --control-center" in contents
+    assert "python3 -m src.scheduled_handoff --output-dir output" in contents
+    assert "gh issue edit" in contents
     assert 'USERNAME="${{ github.event.inputs.username || \'saagpatel\' }}"' in contents
     assert "git add output/" not in contents
+    assert "Audit Regression:" not in contents

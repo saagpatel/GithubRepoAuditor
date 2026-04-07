@@ -242,6 +242,9 @@ def _operator_section(data: dict) -> str:
         <div class="meta-line"><strong>Next Recommended Run:</strong> {escape(summary.get('next_recommended_run_mode', 'n/a'))}</div>
         <div class="meta-line"><strong>Watch Strategy:</strong> {escape(summary.get('watch_strategy', 'manual'))}</div>
         <div class="meta-line"><strong>Watch Decision:</strong> {escape(summary.get('watch_decision_summary', 'No watch guidance is recorded.'))}</div>
+        <div class="meta-line"><strong>What Changed:</strong> {escape(summary.get('what_changed', 'No operator change summary is recorded.'))}</div>
+        <div class="meta-line"><strong>Why It Matters:</strong> {escape(summary.get('why_it_matters', 'No additional operator impact is recorded.'))}</div>
+        <div class="meta-line"><strong>What To Do Next:</strong> {escape(summary.get('what_to_do_next', 'Continue the normal operator loop.'))}</div>
         <div class="meta-line"><strong>Blocked:</strong> {counts.get('blocked', 0)} | <strong>Urgent:</strong> {counts.get('urgent', 0)} | <strong>Ready:</strong> {counts.get('ready', 0)} | <strong>Deferred:</strong> {counts.get('deferred', 0)}</div>
         <ul class="bullet-list">{''.join(rows) or '<li>No triage items are currently surfaced.</li>'}</ul>
         <div class="meta-line"><strong>Recently Changed:</strong></div>

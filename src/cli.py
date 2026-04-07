@@ -654,6 +654,12 @@ def _print_control_center_summary(snapshot: dict) -> None:
         )
     if summary.get("watch_strategy"):
         print(f"  Watch strategy: {summary['watch_strategy']}")
+    if summary.get("what_changed"):
+        print(f"  What changed: {summary['what_changed']}")
+    if summary.get("why_it_matters"):
+        print(f"  Why it matters: {summary['why_it_matters']}")
+    if summary.get("what_to_do_next"):
+        print(f"  What to do next: {summary['what_to_do_next']}")
     lane_labels = [
         ("blocked", "Blocked"),
         ("urgent", "Needs Attention Now"),

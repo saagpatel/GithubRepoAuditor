@@ -121,6 +121,10 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
     assert summary["watch_strategy"] == "adaptive"
     assert summary["next_recommended_run_mode"] == "full"
     assert summary["watch_decision_summary"].startswith("The next run should be full")
+    assert summary["what_changed"].startswith("GitHub authentication is required.")
+    assert summary["why_it_matters"]
+    assert summary["what_to_do_next"].startswith("Set GITHUB_TOKEN")
+    assert summary["urgency"] == "blocked"
 
 
 def test_normalize_review_state_backfills_missing_fields(tmp_path: Path):

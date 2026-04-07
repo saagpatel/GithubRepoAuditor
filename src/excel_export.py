@@ -246,6 +246,14 @@ def _operator_watch_values(data: dict) -> tuple[str, str, str]:
     return next_mode, strategy, decision
 
 
+def _operator_handoff_values(data: dict) -> tuple[str, str, str]:
+    summary = data.get("operator_summary") or {}
+    what_changed = summary.get("what_changed", "") or "No operator change summary is recorded."
+    why_it_matters = summary.get("why_it_matters", "") or "No additional operator impact is recorded."
+    next_action = summary.get("what_to_do_next", "") or "Continue the normal operator loop."
+    return what_changed, why_it_matters, next_action
+
+
 def _apply_workbook_named_ranges(
     wb: Workbook,
     data: dict,
@@ -684,6 +692,7 @@ def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None, sc
     setup_health = operator_summary.get("operator_setup_health") or {}
     lane_counts = _operator_counts(data)
     next_mode, watch_strategy, watch_decision = _operator_watch_values(data)
+    what_changed, why_it_matters, next_action = _operator_handoff_values(data)
 
     _write_key_value_block(
         ws,
@@ -700,6 +709,9 @@ def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None, sc
                 or campaign_summary.get("campaign_type")
                 or "No active managed campaign in this run.",
             ),
+            ("What Changed", what_changed),
+            ("Why It Matters", why_it_matters),
+            ("Next Action", next_action),
             ("Next Run", next_mode),
             ("Watch Strategy", watch_strategy),
             ("Watch Decision", watch_decision),
@@ -723,7 +735,7 @@ def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None, sc
         top_attention_rows.append(["Portfolio", "No open items", "Nothing is currently queued.", "Monitor future audits"])
     _write_ranked_list(
         ws,
-        12,
+        19,
         15,
         "Top Attention Items",
         ["Repo", "Counts", "Why Now", "Next Step"],
@@ -750,7 +762,7 @@ def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None, sc
             break
     _write_ranked_list(
         ws,
-        20,
+        27,
         15,
         "Top Opportunities",
         ["Repo", "Score", "Tier", "Best Next Move"],
@@ -769,7 +781,7 @@ def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None, sc
     ]
     _write_ranked_list(
         ws,
-        28,
+        35,
         15,
         "Top Laggards",
         ["Repo", "Score", "Tier", "What Is Dragging It Down"],
@@ -1910,6 +1922,7 @@ def _build_navigation(
     ws["A2"].font = SUBTITLE_FONT
     ws["A2"].alignment = CENTER
     next_mode, watch_strategy, watch_decision = _operator_watch_values(data)
+    what_changed, why_it_matters, next_action = _operator_handoff_values(data)
 
     ws.cell(row=4, column=1, value="Start Here").font = SECTION_FONT
     ws.cell(row=5, column=1, value="Workbook Mode").font = SUBHEADER_FONT
@@ -1933,22 +1946,30 @@ def _build_navigation(
     ws["A9"].font = SUBTITLE_FONT
     ws["A9"].alignment = WRAP
     ws.merge_cells("A10:G10")
-    ws["A10"] = "Start with Dashboard for the portfolio brief, move to Review Queue for action, then drill into Portfolio Explorer and Executive Summary for detail."
+    ws["A10"] = f"What changed: {what_changed}"
     ws["A10"].font = SUBTITLE_FONT
     ws["A10"].alignment = WRAP
     ws.merge_cells("A11:G11")
-    ws["A11"] = "Advanced sheets are hidden by default to keep the core tab set manageable. Use Excel Unhide if you want the deeper diagnostics and supporting analysis tabs."
+    ws["A11"] = f"Why it matters: {why_it_matters}"
     ws["A11"].font = SUBTITLE_FONT
     ws["A11"].alignment = WRAP
     ws.merge_cells("A12:G12")
-    ws["A12"] = "Operating rules: standard mode is the default path, visible sheets stay filter-based, and hidden Data_* sheets remain the workbook contract."
+    ws["A12"] = f"What to do next: {next_action}"
     ws["A12"].font = SUBTITLE_FONT
     ws["A12"].alignment = WRAP
+    ws.merge_cells("A13:G13")
+    ws["A13"] = "Start with Dashboard for the portfolio brief, move to Review Queue for action, then drill into Portfolio Explorer and Executive Summary for detail."
+    ws["A13"].font = SUBTITLE_FONT
+    ws["A13"].alignment = WRAP
+    ws.merge_cells("A14:G14")
+    ws["A14"] = "Operating rules: standard mode is the default path, visible sheets stay filter-based, and hidden Data_* sheets remain the workbook contract. Advanced sheets are hidden by default; use Excel Unhide when you need deeper diagnostics."
+    ws["A14"].font = SUBTITLE_FONT
+    ws["A14"].alignment = WRAP
 
     groups = [
         (
             "Daily Triage",
-            14,
+            16,
             1,
             [
                 ("Dashboard", "Start here for the big-picture health view and top attention items."),
@@ -1960,7 +1981,7 @@ def _build_navigation(
         ),
         (
             "Portfolio Analysis",
-            14,
+            16,
             5,
             [
                 ("Portfolio Explorer", "Rank repos, compare score quality, and drill from summary into raw facts."),
@@ -1972,7 +1993,7 @@ def _build_navigation(
         ),
         (
             "Executive Readout",
-            24,
+            26,
             1,
             [
                 ("Executive Summary", "Readable leadership summary with what changed and what matters this week."),
@@ -1981,7 +2002,7 @@ def _build_navigation(
         ),
         (
             "Deep Diagnostics",
-            24,
+            26,
             5,
             [
                 ("Security", "Raw security posture, secrets, and dangerous-file findings."),
@@ -2031,7 +2052,7 @@ def _build_navigation(
             go_cell.alignment = CENTER
             row += 1
 
-    auto_width(ws, 7, 32)
+    auto_width(ws, 7, 34)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -3726,6 +3747,7 @@ def _build_executive_summary(
     operator_summary = data.get("operator_summary") or {}
     preview = context["scenario_preview"].get("portfolio_projection", {})
     next_mode, watch_strategy, watch_decision = _operator_watch_values(data)
+    what_changed, why_it_matters, next_action = _operator_handoff_values(data)
     recommended_focus = ""
     if data.get("operator_queue"):
         recommended_focus = data["operator_queue"][0].get("recommended_action", "")
@@ -3751,8 +3773,9 @@ def _build_executive_summary(
             operator_summary.get("headline", "No urgent operator headline is present.")
             + (f" Critical security pressure is concentrated in {len(critical_repos)} repos." if critical_repos else ""),
         ),
-        ("What Changed", change_summary),
-        ("Focus This Week", recommended_focus or "Review the top queue items first, then protect the highest-value repos from drift."),
+        ("What Changed", what_changed or change_summary),
+        ("Why It Matters", why_it_matters),
+        ("Focus This Week", next_action or recommended_focus or "Review the top queue items first, then protect the highest-value repos from drift."),
     ]
     _write_key_value_block(ws, 4, 1, narrative_rows, title="Leadership Brief")
 
@@ -3788,11 +3811,12 @@ def _build_executive_summary(
         ws.cell(row=26, column=5, value=f"{next_mode} via {watch_strategy}")
         ws.cell(row=27, column=4, value="Watch Decision").font = SUBHEADER_FONT
         ws.cell(row=27, column=5, value=watch_decision)
-        ws.cell(row=28, column=4, value="Decision This Week").font = SUBHEADER_FONT
+        ws.cell(row=28, column=4, value="What To Do Next").font = SUBHEADER_FONT
         ws.cell(
             row=28,
             column=5,
-            value=(data.get("operator_queue", [{}])[0].get("recommended_action") if data.get("operator_queue") else "")
+            value=next_action
+            or (data.get("operator_queue", [{}])[0].get("recommended_action") if data.get("operator_queue") else "")
             or "Start with the top review queue item, then protect the current profile leaders.",
         )
     preflight = data.get("preflight_summary") or {}
@@ -3835,6 +3859,7 @@ def _build_print_pack(
     operator_summary = data.get("operator_summary") or {}
     counts = operator_summary.get("counts", {})
     next_mode, watch_strategy, watch_decision = _operator_watch_values(data)
+    what_changed, why_it_matters, next_action = _operator_handoff_values(data)
     ws["A7"] = "This Week"
     ws["B7"] = operator_summary.get("headline", "Review the latest workbook surfaces for change and drift.")
     ws["A8"] = "Operator Queue"
@@ -3851,35 +3876,36 @@ def _build_print_pack(
     ws["B11"] = f"{next_mode} via {watch_strategy}"
     ws["A12"] = "Watch Decision"
     ws["B12"] = watch_decision
-    ws["A13"] = "Decision This Week"
-    ws["B13"] = (
-        (data.get("operator_queue", [{}])[0].get("recommended_action") if data.get("operator_queue") else "")
-        or "Review the top queue item first, then confirm whether governance drift changes the immediate plan."
-    )
-    ws["A14"] = "Top Risks"
-    ws["A14"].font = SECTION_FONT
+    ws["A13"] = "What Changed"
+    ws["B13"] = what_changed
+    ws["A14"] = "Why It Matters"
+    ws["B14"] = why_it_matters
+    ws["A15"] = "Decision This Week"
+    ws["B15"] = next_action
+    ws["A16"] = "Top Risks"
+    ws["A16"].font = SECTION_FONT
     top_risks = sorted(data.get("hotspots", []) or [], key=lambda item: item.get("severity", 0), reverse=True)[:5]
     for offset, item in enumerate(top_risks, 1):
-        ws.cell(row=14 + offset, column=1, value=item.get("repo", ""))
-        ws.cell(row=14 + offset, column=2, value=item.get("category", ""))
-        ws.cell(row=14 + offset, column=3, value=round(item.get("severity", 0.0), 3))
-        ws.cell(row=14 + offset, column=4, value=item.get("title", ""))
-    ws["E14"] = "Top Opportunities"
-    ws["E14"].font = SECTION_FONT
+        ws.cell(row=16 + offset, column=1, value=item.get("repo", ""))
+        ws.cell(row=16 + offset, column=2, value=item.get("category", ""))
+        ws.cell(row=16 + offset, column=3, value=round(item.get("severity", 0.0), 3))
+        ws.cell(row=16 + offset, column=4, value=item.get("title", ""))
+    ws["E16"] = "Top Opportunities"
+    ws["E16"].font = SECTION_FONT
     top_opportunities = sorted(data.get("audits", []), key=lambda audit: audit.get("overall_score", 0), reverse=True)[:5]
     for offset, audit in enumerate(top_opportunities, 1):
-        ws.cell(row=14 + offset, column=5, value=audit.get("metadata", {}).get("name", ""))
-        ws.cell(row=14 + offset, column=6, value=(audit.get("action_candidates") or [{}])[0].get("title", ""))
-    ws["A23"] = "Page 2: Changes and Governance"
-    ws["A23"].font = SECTION_FONT
-    ws["A24"] = "Top Material Change Families"
-    ws["A24"].font = SUBHEADER_FONT
+        ws.cell(row=16 + offset, column=5, value=audit.get("metadata", {}).get("name", ""))
+        ws.cell(row=16 + offset, column=6, value=(audit.get("action_candidates") or [{}])[0].get("title", ""))
+    ws["A25"] = "Page 2: Changes and Governance"
+    ws["A25"].font = SECTION_FONT
+    ws["A26"] = "Top Material Change Families"
+    ws["A26"].font = SUBHEADER_FONT
     change_rows = [[label, count] for label, count in _summarize_top_issue_families(data.get("material_changes", []) or [], limit=6)]
     for offset, (label, count) in enumerate(change_rows, 1):
-        ws.cell(row=24 + offset, column=1, value=label)
-        ws.cell(row=24 + offset, column=2, value=count)
-    ws["D24"] = "Governance Highlights"
-    ws["D24"].font = SUBHEADER_FONT
+        ws.cell(row=26 + offset, column=1, value=label)
+        ws.cell(row=26 + offset, column=2, value=count)
+    ws["D26"] = "Governance Highlights"
+    ws["D26"].font = SUBHEADER_FONT
     governance_summary = data.get("governance_summary", {}) or {}
     governance_rows = [
         ("Status", _display_operator_state(governance_summary.get("status", "preview"))),
@@ -3888,10 +3914,10 @@ def _build_print_pack(
         ("Rollback Available", governance_summary.get("rollback_available_count", 0)),
     ]
     for offset, (label, value) in enumerate(governance_rows, 1):
-        ws.cell(row=24 + offset, column=4, value=label)
-        ws.cell(row=24 + offset, column=5, value=value)
+        ws.cell(row=26 + offset, column=4, value=label)
+        ws.cell(row=26 + offset, column=5, value=value)
     if diff_data:
-        row = 31
+        row = 33
         ws.cell(row=row, column=1, value="Compare Snapshot").font = SECTION_FONT
         ws.cell(row=row + 1, column=1, value="Average Score Delta")
         ws.cell(row=row + 1, column=2, value=diff_data.get("average_score_delta", 0.0))
@@ -3899,7 +3925,7 @@ def _build_print_pack(
         ws.cell(row=row + 2, column=2, value=len(diff_data.get("repo_changes", []) or []))
     preflight = data.get("preflight_summary") or {}
     if preflight and (preflight.get("blocking_errors", 0) or preflight.get("warnings", 0)):
-        row = 35
+        row = 37
         ws.cell(row=row, column=1, value="Preflight Diagnostics").font = SECTION_FONT
         ws.cell(row=row + 1, column=1, value="Status")
         ws.cell(row=row + 1, column=2, value=preflight.get("status", "unknown"))

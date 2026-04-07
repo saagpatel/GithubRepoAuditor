@@ -171,6 +171,9 @@ class TestMarkdownReport:
             "watch_strategy": "adaptive",
             "next_recommended_run_mode": "full",
             "watch_decision_summary": "The next run should be full because the scheduled full refresh interval has been reached.",
+            "what_changed": "Missing template asset — Template mode cannot load the workbook template.",
+            "why_it_matters": "A trustworthy next step is blocked until this is cleared.",
+            "what_to_do_next": "Restore the workbook template before exporting.",
         }
         report.operator_queue = [
             {
@@ -187,6 +190,8 @@ class TestMarkdownReport:
         assert "Missing template asset" in content
         assert "Next Recommended Run" in content
         assert "Watch Strategy" in content
+        assert "What Changed" in content
+        assert "What To Do Next" in content
 
     def test_includes_governance_operator_summary_when_present(self, tmp_path):
         report = _make_report()
