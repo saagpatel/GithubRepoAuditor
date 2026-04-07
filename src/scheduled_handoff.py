@@ -139,6 +139,8 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Class trust reweighting: `{summary.get('primary_target_class_trust_reweight_direction', 'neutral')}` ({summary.get('primary_target_class_trust_reweight_score', 0.0):.2f})",
         f"- Class transition health: `{summary.get('primary_target_class_transition_health_status', 'none')}` — {summary.get('primary_target_class_transition_health_reason', 'No class transition health reason is recorded yet.')}",
         f"- Pending transition resolution: `{summary.get('primary_target_class_transition_resolution_status', 'none')}` — {summary.get('primary_target_class_transition_resolution_reason', 'No class transition resolution reason is recorded yet.')}",
+        f"- Transition closure confidence: `{summary.get('primary_target_transition_closure_confidence_label', 'low')}` ({summary.get('primary_target_transition_closure_confidence_score', 0.0):.2f}) — {summary.get('primary_target_transition_closure_likely_outcome', 'none')}",
+        f"- Class pending debt audit: `{summary.get('primary_target_class_pending_debt_status', 'none')}` — {summary.get('primary_target_class_pending_debt_reason', 'No class pending-debt reason is recorded yet.')}",
         f"- Recommendation drift: `{summary.get('recommendation_drift_status', 'stable')}` — {summary.get('recommendation_drift_summary', 'No recommendation-drift summary is recorded yet.')}",
         f"- Exception pattern summary: {summary.get('exception_pattern_summary', 'No exception-pattern summary is recorded yet.')}",
         f"- Exception retirement summary: {summary.get('exception_retirement_summary', 'No exception-retirement summary is recorded yet.')}",
@@ -147,6 +149,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Class memory summary: {summary.get('class_memory_summary', 'No class-memory summary is recorded yet.')}",
         f"- Class decay summary: {summary.get('class_decay_summary', 'No class-decay summary is recorded yet.')}",
         f"- Class reweighting summary: {summary.get('class_reweighting_summary', 'No class reweighting summary is recorded yet.')}",
+        f"- Transition closure summary: {summary.get('transition_closure_confidence_summary', 'No transition-closure confidence summary is recorded yet.')}",
+        f"- Class pending debt summary: {summary.get('class_pending_debt_summary', 'No class pending-debt summary is recorded yet.')}",
+        f"- Class pending resolution summary: {summary.get('class_pending_resolution_summary', 'No class pending-resolution summary is recorded yet.')}",
         f"- Confidence validation: `{summary.get('confidence_validation_status', 'insufficient-data')}` — {summary.get('confidence_calibration_summary', 'No confidence-calibration summary is recorded yet.')}",
         f"- Next recommended run: `{summary.get('next_recommended_run_mode', 'n/a')}`",
         f"- Watch strategy: `{summary.get('watch_strategy', 'manual')}`",
@@ -532,6 +537,71 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
             )
     else:
         lines.append("- No recent pending-transition resolutions are recorded in the recent window.")
+    lines.append("")
+    lines.append("## Transition Closure Confidence")
+    lines.append("")
+    lines.append(
+        f"- Closure confidence: {summary.get('primary_target_transition_closure_confidence_label', 'low')} "
+        f"({summary.get('primary_target_transition_closure_confidence_score', 0.0):.2f}; "
+        f"{summary.get('primary_target_transition_closure_likely_outcome', 'none')})"
+    )
+    if summary.get("primary_target_transition_closure_confidence_reasons"):
+        lines.append(
+            "- Closure reasons: "
+            + "; ".join(summary.get("primary_target_transition_closure_confidence_reasons") or [])
+        )
+    lines.append(
+        f"- Closure window: {summary.get('transition_closure_window_runs', 4)} run(s)"
+    )
+    if primary_target.get("recent_transition_score_path"):
+        lines.append(
+            f"- Recent transition score path: {primary_target.get('recent_transition_score_path')}"
+        )
+    lines.append(
+        f"- {summary.get('transition_closure_confidence_summary', 'No transition-closure confidence summary is recorded yet.')}"
+    )
+    lines.append("")
+    lines.append("## Class Pending Debt Audit")
+    lines.append("")
+    lines.append(
+        f"- Pending-debt status: {summary.get('primary_target_class_pending_debt_status', 'none')} "
+        f"({summary.get('primary_target_class_pending_debt_reason', 'No class pending-debt reason is recorded yet.')})"
+    )
+    lines.append(
+        f"- Pending-debt rate: {summary.get('primary_target', {}).get('class_pending_debt_rate', 0.0):.0%}"
+    )
+    lines.append(
+        f"- Pending-resolution rate: {summary.get('primary_target', {}).get('class_pending_resolution_rate', 0.0):.0%}"
+    )
+    lines.append(
+        f"- Pending-debt window: {summary.get('class_pending_debt_window_runs', 10)} run(s)"
+    )
+    lines.append(
+        f"- {summary.get('class_pending_debt_summary', 'No class pending-debt summary is recorded yet.')}"
+    )
+    lines.append(
+        f"- {summary.get('class_pending_resolution_summary', 'No class pending-resolution summary is recorded yet.')}"
+    )
+    if primary_target.get("recent_pending_debt_path"):
+        lines.append(f"- Recent pending-debt path: {primary_target.get('recent_pending_debt_path')}")
+    pending_debt_hotspots = summary.get("pending_debt_hotspots") or []
+    healthy_pending_resolution_hotspots = summary.get("healthy_pending_resolution_hotspots") or []
+    if pending_debt_hotspots:
+        for hotspot in pending_debt_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Pending debt hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('class_pending_debt_status', 'active-debt')} across "
+                f"{hotspot.get('recent_pending_debt_path', 'no path recorded')}"
+            )
+    elif healthy_pending_resolution_hotspots:
+        for hotspot in healthy_pending_resolution_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Healthy pending hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('class_pending_debt_status', 'clearing')} across "
+                f"{hotspot.get('recent_pending_debt_path', 'no path recorded')}"
+            )
+    else:
+        lines.append("- No class pending-debt hotspots are recorded in the recent window.")
     lines.append("")
     lines.append("## Recommendation Drift")
     lines.append("")

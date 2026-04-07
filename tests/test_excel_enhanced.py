@@ -346,6 +346,23 @@ def _make_report(audits=None) -> dict:
             "class_transition_health_summary": "RepoC: Security posture needs attention still has a pending class signal that is accumulating and may confirm soon (1 run(s)).",
             "class_transition_resolution_summary": "No pending class transition has just confirmed, cleared, or expired in the recent window.",
             "class_transition_age_window_runs": 4,
+            "primary_target_transition_closure_confidence_score": 0.75,
+            "primary_target_transition_closure_confidence_label": "high",
+            "primary_target_transition_closure_likely_outcome": "confirm-soon",
+            "primary_target_transition_closure_confidence_reasons": [
+                "The pending class signal is still accumulating in the same direction and may confirm soon.",
+                "Class momentum is improving in the same direction and stability remains good enough to trust.",
+                "The reweight score is still strengthening in the same direction.",
+            ],
+            "transition_closure_confidence_summary": "RepoC: Security posture needs attention has a pending class signal that looks strong enough to confirm soon if the next run stays aligned.",
+            "transition_closure_window_runs": 4,
+            "primary_target_class_pending_debt_status": "watch",
+            "primary_target_class_pending_debt_reason": "This class has recent pending transitions, but they are not yet resolving cleanly enough or accumulating enough debt to call it a class-level problem.",
+            "class_pending_debt_summary": "RepoC: Security posture needs attention belongs to a class with some recent pending-transition drag, but not enough to call it active pending debt yet.",
+            "class_pending_resolution_summary": "Recent pending transitions for RepoC: Security posture needs attention are mixed, so keep watching whether they resolve or continue to stall.",
+            "class_pending_debt_window_runs": 10,
+            "pending_debt_hotspots": [],
+            "healthy_pending_resolution_hotspots": [],
             "stalled_transition_hotspots": [],
             "resolving_transition_hotspots": [],
             "sustained_class_hotspots": [],
@@ -692,10 +709,14 @@ class TestAnalystWorkbookSheets:
         assert review_ws["A38"].value == "Transition Health"
         assert review_ws["A39"].value == "Transition Resolution"
         assert review_ws["A40"].value == "Transition Summary"
-        assert review_ws["A41"].value == "Momentum Summary"
-        assert review_ws["A42"].value == "Exception Learning"
-        assert review_ws["A43"].value == "Recommendation Drift"
-        assert review_ws["A44"].value == "Adaptive Confidence"
+        assert review_ws["A41"].value == "Transition Closure"
+        assert review_ws["A42"].value == "Transition Likely Outcome"
+        assert review_ws["A43"].value == "Class Pending Debt"
+        assert review_ws["A44"].value == "Transition Closure Summary"
+        assert review_ws["A45"].value == "Momentum Summary"
+        assert review_ws["A46"].value == "Exception Learning"
+        assert review_ws["A47"].value == "Recommendation Drift"
+        assert review_ws["A48"].value == "Adaptive Confidence"
         assert executive_ws["D29"].value == "Trend"
         assert executive_ws["D32"].value == "Why Top Target"
         assert executive_ws["D33"].value == "Closure Guidance"
@@ -722,12 +743,16 @@ class TestAnalystWorkbookSheets:
         assert executive_ws["D56"].value == "Transition Health"
         assert executive_ws["D57"].value == "Transition Resolution"
         assert executive_ws["D58"].value == "Transition Summary"
-        assert executive_ws["D59"].value == "Momentum Summary"
-        assert executive_ws["D60"].value == "Exception Learning"
-        assert executive_ws["D61"].value == "Recommendation Drift"
-        assert executive_ws["D62"].value == "Adaptive Confidence"
-        assert executive_ws["D63"].value == "Recommendation Quality"
-        assert executive_ws["D64"].value == "Confidence Validation"
+        assert executive_ws["D59"].value == "Transition Closure"
+        assert executive_ws["D60"].value == "Transition Likely Outcome"
+        assert executive_ws["D61"].value == "Class Pending Debt"
+        assert executive_ws["D62"].value == "Transition Closure Summary"
+        assert executive_ws["D63"].value == "Momentum Summary"
+        assert executive_ws["D64"].value == "Exception Learning"
+        assert executive_ws["D65"].value == "Recommendation Drift"
+        assert executive_ws["D66"].value == "Adaptive Confidence"
+        assert executive_ws["D67"].value == "Recommendation Quality"
+        assert executive_ws["D68"].value == "Confidence Validation"
         assert print_ws["A17"].value == "Primary Target"
         assert print_ws["A18"].value == "Why Top Target"
         assert print_ws["A19"].value == "What We Tried"
@@ -754,10 +779,14 @@ class TestAnalystWorkbookSheets:
         assert print_ws["A41"].value == "Transition Health"
         assert print_ws["A42"].value == "Transition Resolution"
         assert print_ws["A43"].value == "Transition Summary"
-        assert print_ws["A44"].value == "Momentum Summary"
-        assert print_ws["A45"].value == "Exception Learning"
-        assert print_ws["A46"].value == "Recommendation Drift"
-        assert print_ws["A47"].value == "Adaptive Confidence"
+        assert print_ws["A44"].value == "Transition Closure"
+        assert print_ws["A45"].value == "Transition Likely Outcome"
+        assert print_ws["A46"].value == "Class Pending Debt"
+        assert print_ws["A47"].value == "Transition Closure Summary"
+        assert print_ws["A48"].value == "Momentum Summary"
+        assert print_ws["A49"].value == "Exception Learning"
+        assert print_ws["A50"].value == "Recommendation Drift"
+        assert print_ws["A51"].value == "Adaptive Confidence"
         assert "Why Top Target" in dashboard_values
         assert "Closure Guidance" in dashboard_values
         assert "What We Tried" in dashboard_values
@@ -776,6 +805,9 @@ class TestAnalystWorkbookSheets:
         assert "Reweight Stability" in dashboard_values
         assert "Transition Health" in dashboard_values
         assert "Transition Resolution" in dashboard_values
+        assert "Transition Closure" in dashboard_values
+        assert "Transition Likely Outcome" in dashboard_values
+        assert "Class Pending Debt" in dashboard_values
         assert "Exception Learning" in dashboard_values
         assert "Recommendation Drift" in dashboard_values
 
@@ -1003,7 +1035,7 @@ class TestWorkbookModes:
 
         wb = load_workbook(output)
         ws = wb["Review Queue"]
-        header_row = next(row for row in range(20, 60) if ws.cell(row=row, column=1).value == "Repo")
+        header_row = next(row for row in range(20, 70) if ws.cell(row=row, column=1).value == "Repo")
         assert ws.auto_filter.ref == f"A{header_row}:H{header_row + 1}"
         assert not ws.tables
 

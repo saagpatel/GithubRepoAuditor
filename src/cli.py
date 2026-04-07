@@ -763,6 +763,25 @@ def _print_control_center_summary(snapshot: dict) -> None:
             f"{summary.get('primary_target_class_decay_status', 'none')} "
             f"({summary.get('primary_target_class_decay_reason', 'No class-decay reason is recorded yet.')})"
         )
+    if summary.get("primary_target_transition_closure_confidence_label"):
+        print(
+            "  Transition closure confidence: "
+            f"{summary.get('primary_target_transition_closure_confidence_label', 'low')} "
+            f"({summary.get('primary_target_transition_closure_confidence_score', 0.0):.2f}; "
+            f"{summary.get('primary_target_transition_closure_likely_outcome', 'none')})"
+        )
+    if summary.get("transition_closure_confidence_summary"):
+        print(f"  Transition closure summary: {summary['transition_closure_confidence_summary']}")
+    if summary.get("primary_target_class_pending_debt_status") not in {None, "", "none"}:
+        print(
+            "  Class pending debt audit: "
+            f"{summary.get('primary_target_class_pending_debt_status', 'none')} "
+            f"({summary.get('primary_target_class_pending_debt_reason', 'No class pending-debt reason is recorded yet.')})"
+        )
+    if summary.get("class_pending_debt_summary"):
+        print(f"  Class pending debt summary: {summary['class_pending_debt_summary']}")
+    if summary.get("class_pending_resolution_summary"):
+        print(f"  Class pending resolution summary: {summary['class_pending_resolution_summary']}")
     if summary.get("recommendation_drift_status"):
         print(
             "  Recommendation drift: "

@@ -33,6 +33,8 @@ CLASS_MEMORY_FRESHNESS_WINDOW_RUNS = 4
 CLASS_REWEIGHTING_WINDOW_RUNS = 4
 CLASS_TRANSITION_WINDOW_RUNS = 4
 CLASS_PENDING_RESOLUTION_WINDOW_RUNS = 4
+CLASS_TRANSITION_CLOSURE_WINDOW_RUNS = 4
+CLASS_PENDING_DEBT_WINDOW_RUNS = HISTORY_WINDOW_RUNS
 CLASS_MEMORY_RECENCY_WEIGHTS = (1.0, 1.0, 0.7, 0.7, 0.4, 0.4, 0.4, 0.2, 0.2, 0.2)
 GENERIC_RECOMMENDATION_PHRASES = (
     "continue the normal audit/control-center loop",
@@ -441,8 +443,8 @@ def build_operator_snapshot(
         "primary_target_class_trust_momentum_score": resolution_trend["primary_target_class_trust_momentum_score"],
         "primary_target_class_trust_momentum_status": resolution_trend["primary_target_class_trust_momentum_status"],
         "primary_target_class_reweight_stability_status": resolution_trend["primary_target_class_reweight_stability_status"],
-        "primary_target_class_reweight_transition_status": resolution_trend["primary_target_class_reweight_transition_status"],
-        "primary_target_class_reweight_transition_reason": resolution_trend["primary_target_class_reweight_transition_reason"],
+        "primary_target_class_reweight_transition_status": resolution_trend["primary_target"].get("class_reweight_transition_status", resolution_trend["primary_target_class_reweight_transition_status"]) if resolution_trend.get("primary_target") else resolution_trend["primary_target_class_reweight_transition_status"],
+        "primary_target_class_reweight_transition_reason": resolution_trend["primary_target"].get("class_reweight_transition_reason", resolution_trend["primary_target_class_reweight_transition_reason"]) if resolution_trend.get("primary_target") else resolution_trend["primary_target_class_reweight_transition_reason"],
         "class_momentum_summary": resolution_trend["class_momentum_summary"],
         "class_reweight_stability_summary": resolution_trend["class_reweight_stability_summary"],
         "class_transition_window_runs": resolution_trend["class_transition_window_runs"],
@@ -455,6 +457,19 @@ def build_operator_snapshot(
         "class_transition_age_window_runs": resolution_trend["class_transition_age_window_runs"],
         "stalled_transition_hotspots": resolution_trend["stalled_transition_hotspots"],
         "resolving_transition_hotspots": resolution_trend["resolving_transition_hotspots"],
+        "primary_target_transition_closure_confidence_score": resolution_trend["primary_target_transition_closure_confidence_score"],
+        "primary_target_transition_closure_confidence_label": resolution_trend["primary_target_transition_closure_confidence_label"],
+        "primary_target_transition_closure_likely_outcome": resolution_trend["primary_target_transition_closure_likely_outcome"],
+        "primary_target_transition_closure_confidence_reasons": resolution_trend["primary_target_transition_closure_confidence_reasons"],
+        "transition_closure_confidence_summary": resolution_trend["transition_closure_confidence_summary"],
+        "transition_closure_window_runs": resolution_trend["transition_closure_window_runs"],
+        "primary_target_class_pending_debt_status": resolution_trend["primary_target_class_pending_debt_status"],
+        "primary_target_class_pending_debt_reason": resolution_trend["primary_target_class_pending_debt_reason"],
+        "class_pending_debt_summary": resolution_trend["class_pending_debt_summary"],
+        "class_pending_resolution_summary": resolution_trend["class_pending_resolution_summary"],
+        "class_pending_debt_window_runs": resolution_trend["class_pending_debt_window_runs"],
+        "pending_debt_hotspots": resolution_trend["pending_debt_hotspots"],
+        "healthy_pending_resolution_hotspots": resolution_trend["healthy_pending_resolution_hotspots"],
         "sustained_class_hotspots": resolution_trend["sustained_class_hotspots"],
         "oscillating_class_hotspots": resolution_trend["oscillating_class_hotspots"],
         "decision_memory_status": resolution_trend["decision_memory_status"],
@@ -647,6 +662,17 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
             f"*Pending Transition Resolution:* {summary.get('primary_target_class_transition_resolution_status')} — "
             f"{summary.get('class_transition_resolution_summary', 'No class transition resolution summary is recorded yet.')}"
         )
+    if summary.get("primary_target_transition_closure_confidence_label"):
+        lines.append(
+            f"*Transition Closure Confidence:* {summary.get('primary_target_transition_closure_confidence_label')} "
+            f"({summary.get('primary_target_transition_closure_confidence_score', 0.0):.2f}) — "
+            f"{summary.get('transition_closure_confidence_summary', 'No transition-closure confidence summary is recorded yet.')}"
+        )
+    if summary.get("primary_target_class_pending_debt_status"):
+        lines.append(
+            f"*Class Pending Debt Audit:* {summary.get('primary_target_class_pending_debt_status')} — "
+            f"{summary.get('class_pending_debt_summary', 'No class pending-debt summary is recorded yet.')}"
+        )
     if summary.get("recommendation_drift_status"):
         lines.append(
             f"*Recommendation Drift:* {summary.get('recommendation_drift_status')} — "
@@ -674,6 +700,12 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
         lines.append(f"*Class Transition Health Summary:* {summary['class_transition_health_summary']}")
     if summary.get("class_transition_resolution_summary"):
         lines.append(f"*Pending Transition Resolution Summary:* {summary['class_transition_resolution_summary']}")
+    if summary.get("transition_closure_confidence_summary"):
+        lines.append(f"*Transition Closure Confidence Summary:* {summary['transition_closure_confidence_summary']}")
+    if summary.get("class_pending_debt_summary"):
+        lines.append(f"*Class Pending Debt Summary:* {summary['class_pending_debt_summary']}")
+    if summary.get("class_pending_resolution_summary"):
+        lines.append(f"*Class Pending Resolution Summary:* {summary['class_pending_resolution_summary']}")
     if summary.get("recommendation_quality_summary"):
         lines.append(f"*Recommendation Quality:* {summary['recommendation_quality_summary']}")
     if summary.get("confidence_validation_status"):
@@ -898,6 +930,8 @@ def _build_operator_handoff(
         f"{_class_reweight_stability_note(resolution_trend)} "
         f"{_class_transition_health_note(resolution_trend)} "
         f"{_class_transition_resolution_note(resolution_trend)} "
+        f"{_transition_closure_confidence_note(resolution_trend)} "
+        f"{_class_pending_debt_note(resolution_trend)} "
         f"{_recommendation_drift_note(resolution_trend)} "
         f"{confidence_calibration.get('confidence_calibration_summary', '')} "
         f"{confidence.get('adaptive_confidence_summary', '')} "
@@ -1254,6 +1288,12 @@ def _build_resolution_trend(
         current_generated_at=current_generated_at,
         confidence_calibration=confidence_calibration,
     )
+    transition_closure = _apply_transition_closure_confidence(
+        resolution_targets,
+        history,
+        current_generated_at=current_generated_at,
+        confidence_calibration=confidence_calibration,
+    )
     new_attention_keys = current_attention_keys - previous_attention_keys
     resolved_attention_count = len(previous_attention_keys - current_attention_keys)
     persisting_attention_count = len(current_attention_keys & previous_attention_keys)
@@ -1395,15 +1435,35 @@ def _build_resolution_trend(
         "class_momentum_summary": class_trust_momentum["class_momentum_summary"],
         "class_reweight_stability_summary": class_trust_momentum["class_reweight_stability_summary"],
         "class_transition_window_runs": class_trust_momentum["class_transition_window_runs"],
-        "primary_target_class_transition_health_status": class_transition_resolution["primary_target_class_transition_health_status"],
-        "primary_target_class_transition_health_reason": class_transition_resolution["primary_target_class_transition_health_reason"],
-        "primary_target_class_transition_resolution_status": class_transition_resolution["primary_target_class_transition_resolution_status"],
-        "primary_target_class_transition_resolution_reason": class_transition_resolution["primary_target_class_transition_resolution_reason"],
-        "class_transition_health_summary": class_transition_resolution["class_transition_health_summary"],
-        "class_transition_resolution_summary": class_transition_resolution["class_transition_resolution_summary"],
+        "primary_target_class_transition_health_status": primary_target.get("class_transition_health_status", class_transition_resolution["primary_target_class_transition_health_status"]) if primary_target else class_transition_resolution["primary_target_class_transition_health_status"],
+        "primary_target_class_transition_health_reason": primary_target.get("class_transition_health_reason", class_transition_resolution["primary_target_class_transition_health_reason"]) if primary_target else class_transition_resolution["primary_target_class_transition_health_reason"],
+        "primary_target_class_transition_resolution_status": primary_target.get("class_transition_resolution_status", class_transition_resolution["primary_target_class_transition_resolution_status"]) if primary_target else class_transition_resolution["primary_target_class_transition_resolution_status"],
+        "primary_target_class_transition_resolution_reason": primary_target.get("class_transition_resolution_reason", class_transition_resolution["primary_target_class_transition_resolution_reason"]) if primary_target else class_transition_resolution["primary_target_class_transition_resolution_reason"],
+        "class_transition_health_summary": _class_transition_health_summary(
+            primary_target,
+            class_transition_resolution["stalled_transition_hotspots"],
+        ) if primary_target else class_transition_resolution["class_transition_health_summary"],
+        "class_transition_resolution_summary": _class_transition_resolution_summary(
+            primary_target,
+            class_transition_resolution["resolving_transition_hotspots"],
+            class_transition_resolution["stalled_transition_hotspots"],
+        ) if primary_target else class_transition_resolution["class_transition_resolution_summary"],
         "class_transition_age_window_runs": class_transition_resolution["class_transition_age_window_runs"],
         "stalled_transition_hotspots": class_transition_resolution["stalled_transition_hotspots"],
         "resolving_transition_hotspots": class_transition_resolution["resolving_transition_hotspots"],
+        "primary_target_transition_closure_confidence_score": transition_closure["primary_target_transition_closure_confidence_score"],
+        "primary_target_transition_closure_confidence_label": transition_closure["primary_target_transition_closure_confidence_label"],
+        "primary_target_transition_closure_likely_outcome": transition_closure["primary_target_transition_closure_likely_outcome"],
+        "primary_target_transition_closure_confidence_reasons": transition_closure["primary_target_transition_closure_confidence_reasons"],
+        "transition_closure_confidence_summary": transition_closure["transition_closure_confidence_summary"],
+        "transition_closure_window_runs": transition_closure["transition_closure_window_runs"],
+        "primary_target_class_pending_debt_status": transition_closure["primary_target_class_pending_debt_status"],
+        "primary_target_class_pending_debt_reason": transition_closure["primary_target_class_pending_debt_reason"],
+        "class_pending_debt_summary": transition_closure["class_pending_debt_summary"],
+        "class_pending_resolution_summary": transition_closure["class_pending_resolution_summary"],
+        "class_pending_debt_window_runs": transition_closure["class_pending_debt_window_runs"],
+        "pending_debt_hotspots": transition_closure["pending_debt_hotspots"],
+        "healthy_pending_resolution_hotspots": transition_closure["healthy_pending_resolution_hotspots"],
         "sustained_class_hotspots": class_trust_momentum["sustained_class_hotspots"],
         "oscillating_class_hotspots": class_trust_momentum["oscillating_class_hotspots"],
         "decision_memory_status": decision_memory["decision_memory_status"],
@@ -2760,6 +2820,184 @@ def _apply_class_transition_resolution(
     }
 
 
+def _apply_transition_closure_confidence(
+    resolution_targets: list[dict],
+    history: list[dict],
+    *,
+    current_generated_at: str,
+    confidence_calibration: dict,
+) -> dict:
+    if not resolution_targets:
+        return {
+            "primary_target_transition_closure_confidence_score": 0.05,
+            "primary_target_transition_closure_confidence_label": "low",
+            "primary_target_transition_closure_likely_outcome": "none",
+            "primary_target_transition_closure_confidence_reasons": [],
+            "transition_closure_confidence_summary": "No transition-closure confidence is recorded because there is no active target.",
+            "transition_closure_window_runs": CLASS_TRANSITION_CLOSURE_WINDOW_RUNS,
+            "primary_target_class_pending_debt_status": "none",
+            "primary_target_class_pending_debt_reason": "",
+            "class_pending_debt_summary": "No class pending-debt signal is recorded because there is no active target.",
+            "class_pending_resolution_summary": "No class pending-resolution signal is recorded because there is no active target.",
+            "class_pending_debt_window_runs": CLASS_PENDING_DEBT_WINDOW_RUNS,
+            "pending_debt_hotspots": [],
+            "healthy_pending_resolution_hotspots": [],
+        }
+
+    current_primary_target = resolution_targets[0]
+    current_bucket = _recommendation_bucket(current_primary_target)
+    transition_events = _class_transition_events(
+        history,
+        current_primary_target=current_primary_target,
+        current_generated_at=current_generated_at,
+    )
+    historical_transition_events = transition_events[1:]
+
+    updated_targets: list[dict] = []
+    for target in resolution_targets:
+        closure_score = 0.05
+        closure_label = "low"
+        likely_outcome = "none"
+        closure_reasons: list[str] = []
+        transition_score_delta = 0.0
+        recent_transition_score_path = ""
+        pending_debt_status = "none"
+        pending_debt_reason = ""
+        pending_debt_rate = 0.0
+        pending_resolution_rate = 0.0
+        recent_pending_debt_path = ""
+        final_policy = target.get("trust_policy", "monitor")
+        final_reason = target.get("trust_policy_reason", "No trust-policy reason is recorded yet.")
+        health_status = target.get("class_transition_health_status", "none")
+        health_reason = target.get("class_transition_health_reason", "")
+        resolution_status = target.get("class_transition_resolution_status", "none")
+        resolution_reason = target.get("class_transition_resolution_reason", "")
+        transition_status = target.get("class_reweight_transition_status", "none")
+        transition_reason = target.get("class_reweight_transition_reason", "")
+        policy_debt_status = target.get("policy_debt_status", "none")
+        policy_debt_reason = target.get("policy_debt_reason", "")
+        class_normalization_status = target.get("class_normalization_status", "none")
+        class_normalization_reason = target.get("class_normalization_reason", "")
+
+        if _recommendation_bucket(target) == current_bucket:
+            history_meta = _target_class_transition_history(target, transition_events)
+            transition_score_delta = history_meta.get("transition_score_delta", 0.0)
+            recent_transition_score_path = history_meta.get("recent_transition_score_path", "")
+            (
+                closure_score,
+                closure_label,
+                likely_outcome,
+                closure_reasons,
+            ) = _transition_closure_confidence_for_target(
+                target,
+                history_meta,
+            )
+            (
+                pending_debt_status,
+                pending_debt_reason,
+                pending_debt_rate,
+                pending_resolution_rate,
+                recent_pending_debt_path,
+            ) = _class_pending_debt_for_target(
+                target,
+                historical_transition_events,
+            )
+            (
+                health_status,
+                health_reason,
+                resolution_status,
+                resolution_reason,
+                transition_status,
+                transition_reason,
+                final_policy,
+                final_reason,
+                policy_debt_status,
+                policy_debt_reason,
+                class_normalization_status,
+                class_normalization_reason,
+            ) = _apply_transition_closure_control(
+                target,
+                trust_policy=final_policy,
+                trust_policy_reason=final_reason,
+                health_status=health_status,
+                health_reason=health_reason,
+                resolution_status=resolution_status,
+                resolution_reason=resolution_reason,
+                transition_status=transition_status,
+                transition_reason=transition_reason,
+                policy_debt_status=policy_debt_status,
+                policy_debt_reason=policy_debt_reason,
+                class_normalization_status=class_normalization_status,
+                class_normalization_reason=class_normalization_reason,
+                closure_confidence_label=closure_label,
+                closure_likely_outcome=likely_outcome,
+                pending_debt_status=pending_debt_status,
+            )
+
+        updated_targets.append(
+            {
+                **target,
+                "transition_closure_confidence_score": closure_score,
+                "transition_closure_confidence_label": closure_label,
+                "transition_closure_likely_outcome": likely_outcome,
+                "transition_closure_confidence_reasons": closure_reasons,
+                "transition_score_delta": transition_score_delta,
+                "recent_transition_score_path": recent_transition_score_path,
+                "class_pending_debt_status": pending_debt_status,
+                "class_pending_debt_reason": pending_debt_reason,
+                "class_pending_debt_rate": pending_debt_rate,
+                "class_pending_resolution_rate": pending_resolution_rate,
+                "recent_pending_debt_path": recent_pending_debt_path,
+                "class_transition_health_status": health_status,
+                "class_transition_health_reason": health_reason,
+                "class_transition_resolution_status": resolution_status,
+                "class_transition_resolution_reason": resolution_reason,
+                "class_reweight_transition_status": transition_status,
+                "class_reweight_transition_reason": transition_reason,
+                "policy_debt_status": policy_debt_status,
+                "policy_debt_reason": policy_debt_reason,
+                "class_normalization_status": class_normalization_status,
+                "class_normalization_reason": class_normalization_reason,
+                "trust_policy": final_policy,
+                "trust_policy_reason": final_reason,
+            }
+        )
+
+    resolution_targets[:] = updated_targets
+    primary_target = resolution_targets[0]
+    pending_debt_hotspots = _class_pending_debt_hotspots(resolution_targets, mode="debt")
+    healthy_pending_resolution_hotspots = _class_pending_debt_hotspots(
+        resolution_targets,
+        mode="healthy",
+    )
+    return {
+        "primary_target_transition_closure_confidence_score": primary_target.get("transition_closure_confidence_score", 0.05),
+        "primary_target_transition_closure_confidence_label": primary_target.get("transition_closure_confidence_label", "low"),
+        "primary_target_transition_closure_likely_outcome": primary_target.get("transition_closure_likely_outcome", "none"),
+        "primary_target_transition_closure_confidence_reasons": primary_target.get("transition_closure_confidence_reasons", []),
+        "transition_closure_confidence_summary": _transition_closure_confidence_summary(
+            primary_target,
+            pending_debt_hotspots,
+        ),
+        "transition_closure_window_runs": CLASS_TRANSITION_CLOSURE_WINDOW_RUNS,
+        "primary_target_class_pending_debt_status": primary_target.get("class_pending_debt_status", "none"),
+        "primary_target_class_pending_debt_reason": primary_target.get("class_pending_debt_reason", ""),
+        "class_pending_debt_summary": _class_pending_debt_summary(
+            primary_target,
+            pending_debt_hotspots,
+            healthy_pending_resolution_hotspots,
+        ),
+        "class_pending_resolution_summary": _class_pending_resolution_summary(
+            primary_target,
+            healthy_pending_resolution_hotspots,
+            pending_debt_hotspots,
+        ),
+        "class_pending_debt_window_runs": CLASS_PENDING_DEBT_WINDOW_RUNS,
+        "pending_debt_hotspots": pending_debt_hotspots,
+        "healthy_pending_resolution_hotspots": healthy_pending_resolution_hotspots,
+    }
+
+
 def _class_reweight_events(
     history: list[dict],
     *,
@@ -2830,6 +3068,11 @@ def _class_transition_events(
                 "class_reweight_stability_status": current_primary_target.get("class_reweight_stability_status", "watch"),
                 "class_reweight_transition_status": current_primary_target.get("class_reweight_transition_status", "none"),
                 "class_reweight_transition_reason": current_primary_target.get("class_reweight_transition_reason", ""),
+                "class_transition_health_status": current_primary_target.get("class_transition_health_status", "none"),
+                "class_transition_resolution_status": current_primary_target.get("class_transition_resolution_status", "none"),
+                "trust_policy": current_primary_target.get("trust_policy", "monitor"),
+                "decision_memory_status": current_primary_target.get("decision_memory_status", "new"),
+                "last_outcome": current_primary_target.get("last_outcome", "no-change"),
             }
         )
     historical_events: list[dict] = []
@@ -2868,6 +3111,26 @@ def _class_transition_events(
                     "primary_target_class_reweight_transition_reason",
                     primary_target.get("class_reweight_transition_reason", ""),
                 ),
+                "class_transition_health_status": summary.get(
+                    "primary_target_class_transition_health_status",
+                    primary_target.get("class_transition_health_status", "none"),
+                ),
+                "class_transition_resolution_status": summary.get(
+                    "primary_target_class_transition_resolution_status",
+                    primary_target.get("class_transition_resolution_status", "none"),
+                ),
+                "trust_policy": summary.get(
+                    "primary_target_trust_policy",
+                    primary_target.get("trust_policy", "monitor"),
+                ),
+                "decision_memory_status": summary.get(
+                    "decision_memory_status",
+                    primary_target.get("decision_memory_status", "new"),
+                ),
+                "last_outcome": summary.get(
+                    "primary_target_last_outcome",
+                    primary_target.get("last_outcome", "no-change"),
+                ),
             }
         )
     historical_events.sort(key=lambda item: item.get("generated_at", ""), reverse=True)
@@ -2881,11 +3144,27 @@ def _target_class_transition_history(target: dict, transition_events: list[dict]
     ]
     statuses = [event.get("class_reweight_transition_status", "none") or "none" for event in matching_events]
     scores = [float(event.get("class_trust_reweight_score", 0.0) or 0.0) for event in matching_events]
+    target_policies = [
+        policy
+        for policy in (
+            event.get("trust_policy")
+            for event in matching_events[:CLASS_TRANSITION_CLOSURE_WINDOW_RUNS]
+        )
+        if policy
+    ]
     directions = [
         _normalized_class_reweight_direction(
             event.get("class_trust_reweight_direction", "neutral"),
             event.get("class_trust_reweight_score", 0.0),
         )
+        for event in matching_events
+    ]
+    health_statuses = [
+        event.get("class_transition_health_status", "none") or "none"
+        for event in matching_events
+    ]
+    resolution_statuses = [
+        event.get("class_transition_resolution_status", "none") or "none"
         for event in matching_events
     ]
     current_status = statuses[0] if statuses else "none"
@@ -2928,15 +3207,31 @@ def _target_class_transition_history(target: dict, transition_events: list[dict]
         current_lost_pending_support = current_score < 0.20 or current_direction != "supporting-normalization"
     if recent_pending_status == "pending-caution" and current_status not in {"pending-caution", "confirmed-caution"}:
         current_lost_pending_support = current_score > -0.20 or current_direction != "supporting-caution"
+    if current_status == "pending-support" and len(scores) > 1:
+        transition_score_delta = _clamp_round(scores[0] - scores[1], lower=-0.95, upper=0.95)
+    elif current_status == "pending-caution" and len(scores) > 1:
+        transition_score_delta = _clamp_round(scores[1] - scores[0], lower=-0.95, upper=0.95)
+    else:
+        transition_score_delta = 0.0
     return {
         "class_transition_age_runs": class_transition_age_runs,
         "recent_transition_path": " -> ".join(statuses),
+        "recent_transition_score_path": " -> ".join(f"{score:.2f}" for score in scores[:CLASS_TRANSITION_CLOSURE_WINDOW_RUNS]),
         "current_transition_status": current_status,
+        "current_transition_health_status": health_statuses[0] if health_statuses else "none",
+        "current_transition_resolution_status": resolution_statuses[0] if resolution_statuses else "none",
         "recent_pending_status": recent_pending_status,
         "recent_pending_age_runs": recent_pending_age_runs,
         "current_transition_strengthening": current_strengthening,
         "current_transition_direction": current_direction,
         "current_transition_score": current_score,
+        "transition_score_delta": transition_score_delta,
+        "matching_transition_event_count": len(matching_events),
+        "recent_policy_flip_count": _policy_flip_count(target_policies),
+        "recent_reopened": any(
+            event.get("decision_memory_status") == "reopened" or event.get("last_outcome") == "reopened"
+            for event in matching_events[:CLASS_TRANSITION_CLOSURE_WINDOW_RUNS]
+        ),
         "current_transition_neutral": current_neutral,
         "current_transition_reversed": current_reversed,
         "current_lost_pending_support": current_lost_pending_support,
@@ -2972,6 +3267,432 @@ def _current_transition_strengthening(transition_status: str, scores: list[float
     if transition_status == "pending-caution":
         return previous_score - current_score >= 0.05
     return False
+
+
+def _transition_closure_confidence_for_target(
+    target: dict,
+    history_meta: dict,
+) -> tuple[float, str, str, list[str]]:
+    transition_status = target.get("class_reweight_transition_status", "none")
+    health_status = target.get(
+        "class_transition_health_status",
+        history_meta.get("current_transition_health_status", "none"),
+    )
+    resolution_status = target.get(
+        "class_transition_resolution_status",
+        history_meta.get("current_transition_resolution_status", "none"),
+    )
+    momentum_status = target.get("class_trust_momentum_status", "insufficient-data")
+    stability_status = target.get("class_reweight_stability_status", "watch")
+    reweight_score = float(target.get("class_trust_reweight_score", 0.0) or 0.0)
+    transition_age_runs = int(target.get("class_transition_age_runs", history_meta.get("class_transition_age_runs", 0)) or 0)
+    transition_score_delta = float(history_meta.get("transition_score_delta", 0.0) or 0.0)
+    current_strengthening = history_meta.get("current_transition_strengthening", False)
+    active_pending = transition_status in {"pending-support", "pending-caution"}
+    local_noise = _target_specific_normalization_noise(target, history_meta)
+    blocked = (
+        transition_status == "blocked"
+        or health_status == "blocked"
+        or resolution_status == "blocked"
+        or (transition_status == "pending-support" and local_noise)
+    )
+    matching_momentum = (
+        transition_status == "pending-support" and momentum_status == "sustained-support"
+    ) or (
+        transition_status == "pending-caution" and momentum_status == "sustained-caution"
+    )
+
+    if not active_pending:
+        if blocked:
+            blocked_reason = (
+                target.get("class_transition_resolution_reason")
+                or target.get("class_transition_health_reason")
+                or "Local target instability is preventing positive class strengthening."
+            )
+            return 0.05, "low", "blocked", [blocked_reason]
+        return 0.05, "low", "none", []
+
+    if history_meta.get("matching_transition_event_count", 0) < 2:
+        return (
+            0.25,
+            "low",
+            "insufficient-data",
+            ["Not enough pending-transition history exists yet to judge whether this class signal is likely to confirm."],
+        )
+
+    score = 0.25
+    if health_status == "building":
+        score += 0.15
+    if matching_momentum:
+        score += 0.10
+    if stability_status == "stable":
+        score += 0.10
+    if transition_score_delta >= 0.05:
+        score += 0.10
+    if transition_age_runs in {1, 2}:
+        score += 0.05
+    if health_status == "holding":
+        score -= 0.10
+    if health_status == "stalled":
+        score -= 0.20
+    if transition_age_runs >= 3 and not current_strengthening:
+        score -= 0.10
+    if abs(reweight_score) < 0.10:
+        score -= 0.10
+    if momentum_status == "reversing":
+        score -= 0.10
+    if blocked:
+        score -= 0.20
+
+    score = _clamp_round(score, lower=0.05, upper=0.95)
+    if score >= 0.75:
+        label = "high"
+    elif score >= 0.45:
+        label = "medium"
+    else:
+        label = "low"
+
+    if blocked:
+        outcome = "blocked"
+    elif transition_age_runs >= 3 and not current_strengthening:
+        outcome = "expire-risk"
+    elif label == "high" and matching_momentum:
+        outcome = "confirm-soon"
+    elif label == "low" and (
+        abs(reweight_score) < 0.10
+        or history_meta.get("current_lost_pending_support", False)
+        or history_meta.get("current_transition_neutral", False)
+        or history_meta.get("current_transition_reversed", False)
+    ):
+        outcome = "clear-risk"
+    elif label == "medium":
+        outcome = "hold"
+    else:
+        outcome = "hold"
+
+    reasons: list[str] = []
+    health_reason = target.get("class_transition_health_reason", "")
+    if health_status == "building":
+        reasons.append(health_reason or "The pending class signal is still building in the same direction.")
+    elif health_status == "holding":
+        reasons.append(health_reason or "The pending class signal is still visible, but it is no longer getting stronger.")
+    elif health_status == "stalled":
+        reasons.append(health_reason or "The pending class signal has lingered without enough strengthening.")
+    elif health_status == "blocked":
+        reasons.append(health_reason or "Local target instability is blocking this pending class transition.")
+
+    if matching_momentum:
+        reasons.append("Recent class momentum is still aligned with the pending direction.")
+    elif stability_status == "stable":
+        reasons.append("Class guidance is stable even though the pending signal has not confirmed yet.")
+    elif momentum_status == "reversing":
+        reasons.append("Recent class momentum is reversing against the pending direction.")
+
+    if transition_score_delta >= 0.05:
+        reasons.append(f"The reweight score improved by {transition_score_delta:.2f} in the pending direction.")
+    elif transition_age_runs >= 3 and not current_strengthening:
+        reasons.append("The pending signal has lasted three or more runs without same-direction strengthening.")
+    elif abs(reweight_score) < 0.10:
+        reasons.append("The live reweight score is now close to neutral.")
+
+    if blocked:
+        reasons.append(
+            target.get("class_transition_resolution_reason")
+            or health_reason
+            or "Local target instability is still overriding positive class strengthening."
+        )
+
+    return score, label, outcome, reasons[:4]
+
+
+def _apply_transition_closure_control(
+    target: dict,
+    *,
+    trust_policy: str,
+    trust_policy_reason: str,
+    health_status: str,
+    health_reason: str,
+    resolution_status: str,
+    resolution_reason: str,
+    transition_status: str,
+    transition_reason: str,
+    policy_debt_status: str,
+    policy_debt_reason: str,
+    class_normalization_status: str,
+    class_normalization_reason: str,
+    closure_confidence_label: str,
+    closure_likely_outcome: str,
+    pending_debt_status: str,
+) -> tuple[str, str, str, str, str, str, str, str, str, str, str, str]:
+    if (
+        transition_status in {"pending-support", "pending-caution"}
+        and closure_likely_outcome in {"clear-risk", "expire-risk"}
+        and closure_confidence_label == "low"
+        and pending_debt_status == "active-debt"
+    ):
+        clear_reason = (
+            "This pending class signal is low-confidence inside a class that keeps accumulating unresolved pending states, so the pending state was cleared back to the weaker posture."
+        )
+        if transition_status == "pending-support":
+            reverted_policy = target.get("pre_class_normalization_trust_policy", trust_policy)
+            reverted_reason = target.get("pre_class_normalization_trust_policy_reason", trust_policy_reason)
+            return (
+                "none",
+                "",
+                "cleared",
+                clear_reason,
+                "none",
+                clear_reason,
+                reverted_policy,
+                clear_reason if reverted_policy == "verify-first" else reverted_reason,
+                policy_debt_status,
+                policy_debt_reason,
+                "candidate",
+                clear_reason,
+            )
+        return (
+            "none",
+            "",
+            "cleared",
+            clear_reason,
+            "none",
+            clear_reason,
+            trust_policy,
+            trust_policy_reason,
+            "watch",
+            clear_reason,
+            class_normalization_status,
+            class_normalization_reason,
+        )
+
+    return (
+        health_status,
+        health_reason,
+        resolution_status,
+        resolution_reason,
+        transition_status,
+        transition_reason,
+        trust_policy,
+        trust_policy_reason,
+        policy_debt_status,
+        policy_debt_reason,
+        class_normalization_status,
+        class_normalization_reason,
+    )
+
+
+def _class_pending_debt_for_target(
+    target: dict,
+    transition_events: list[dict],
+) -> tuple[str, str, float, float, str]:
+    class_key = _target_class_key(target)
+    matching_events = [event for event in transition_events if event.get("class_key") == class_key][
+        : CLASS_PENDING_DEBT_WINDOW_RUNS
+    ]
+    outcomes = [_pending_debt_event_outcome(event) for event in matching_events]
+    relevant_outcomes = [outcome for outcome in outcomes if outcome != "none"]
+    pending_entry_count = len(relevant_outcomes)
+    confirmed_count = sum(1 for outcome in relevant_outcomes if outcome == "confirmed")
+    cleared_count = sum(1 for outcome in relevant_outcomes if outcome == "cleared")
+    expired_count = sum(1 for outcome in relevant_outcomes if outcome == "expired")
+    stalled_count = sum(1 for outcome in relevant_outcomes if outcome == "stalled")
+    blocked_count = sum(1 for outcome in relevant_outcomes if outcome == "blocked")
+    debt_like_count = stalled_count + expired_count + blocked_count
+    healthy_resolution_count = confirmed_count + cleared_count
+    class_pending_debt_rate = _clamp_round(
+        debt_like_count / max(pending_entry_count, 1),
+        lower=0.0,
+        upper=1.0,
+    )
+    class_pending_resolution_rate = _clamp_round(
+        healthy_resolution_count / max(pending_entry_count, 1),
+        lower=0.0,
+        upper=1.0,
+    )
+    recent_pending_debt_path = " -> ".join(relevant_outcomes[:4])
+
+    if pending_entry_count >= 3 and (
+        debt_like_count >= healthy_resolution_count + 1 or class_pending_debt_rate >= 0.60
+    ):
+        return (
+            "active-debt",
+            "This class keeps accumulating stalled, expired, or blocked pending transitions, so new pending signals should be treated more cautiously.",
+            class_pending_debt_rate,
+            class_pending_resolution_rate,
+            recent_pending_debt_path,
+        )
+    if pending_entry_count >= 2 and (
+        healthy_resolution_count >= debt_like_count + 1 or class_pending_resolution_rate >= 0.60
+    ):
+        return (
+            "clearing",
+            "This class is resolving pending transitions more cleanly again, so newer pending signals are less likely to linger indefinitely.",
+            class_pending_debt_rate,
+            class_pending_resolution_rate,
+            recent_pending_debt_path,
+        )
+    if pending_entry_count >= 2:
+        return (
+            "watch",
+            "This class has mixed recent pending-transition outcomes, so watch whether new pending signals resolve cleanly or start to accumulate debt.",
+            class_pending_debt_rate,
+            class_pending_resolution_rate,
+            recent_pending_debt_path,
+        )
+    return "none", "", class_pending_debt_rate, class_pending_resolution_rate, recent_pending_debt_path
+
+
+def _pending_debt_event_outcome(event: dict) -> str:
+    resolution_status = event.get("class_transition_resolution_status", "none")
+    health_status = event.get("class_transition_health_status", "none")
+    transition_status = event.get("class_reweight_transition_status", "none")
+    if resolution_status == "confirmed":
+        return "confirmed"
+    if resolution_status == "cleared":
+        return "cleared"
+    if resolution_status == "expired":
+        return "expired"
+    if resolution_status == "blocked" or health_status == "blocked" or transition_status == "blocked":
+        return "blocked"
+    if health_status == "stalled":
+        return "stalled"
+    if transition_status in {"pending-support", "pending-caution"} or health_status in {"building", "holding"}:
+        return "pending"
+    return "none"
+
+
+def _class_pending_debt_hotspots(resolution_targets: list[dict], *, mode: str) -> list[dict]:
+    grouped: dict[str, dict] = {}
+    for target in resolution_targets:
+        class_key = _target_class_key(target)
+        if not class_key:
+            continue
+        dominant_count = target.get("class_pending_debt_rate", 0.0)
+        if mode == "healthy":
+            dominant_count = target.get("class_pending_resolution_rate", 0.0)
+        current = {
+            "scope": "class",
+            "label": class_key,
+            "class_pending_debt_status": target.get("class_pending_debt_status", "none"),
+            "class_pending_debt_rate": target.get("class_pending_debt_rate", 0.0),
+            "class_pending_resolution_rate": target.get("class_pending_resolution_rate", 0.0),
+            "recent_pending_debt_path": target.get("recent_pending_debt_path", ""),
+            "dominant_count": dominant_count,
+            "pending_entry_count": len(
+                [part for part in (target.get("recent_pending_debt_path", "") or "").split(" -> ") if part]
+            ),
+        }
+        existing = grouped.get(class_key)
+        if existing is None or current["dominant_count"] > existing["dominant_count"]:
+            grouped[class_key] = current
+
+    hotspots = list(grouped.values())
+    if mode == "healthy":
+        hotspots = [
+            item for item in hotspots if item.get("class_pending_debt_status") == "clearing"
+        ]
+        hotspots.sort(
+            key=lambda item: (
+                -item.get("class_pending_resolution_rate", 0.0),
+                -item.get("pending_entry_count", 0),
+                item.get("label", ""),
+            )
+        )
+    else:
+        hotspots = [
+            item for item in hotspots if item.get("class_pending_debt_status") == "active-debt"
+        ]
+        hotspots.sort(
+            key=lambda item: (
+                -item.get("class_pending_debt_rate", 0.0),
+                -item.get("pending_entry_count", 0),
+                item.get("label", ""),
+            )
+        )
+    return hotspots[:5]
+
+
+def _transition_closure_confidence_summary(
+    primary_target: dict,
+    pending_debt_hotspots: list[dict],
+) -> str:
+    label = _target_label(primary_target) or "The current target"
+    likely_outcome = primary_target.get("transition_closure_likely_outcome", "none")
+    score = primary_target.get("transition_closure_confidence_score", 0.05)
+    if likely_outcome == "confirm-soon":
+        return f"{label} still has a pending class signal that looks strong enough to confirm soon if the next run stays aligned ({score:.2f})."
+    if likely_outcome == "hold":
+        return f"{label} still has a viable pending class signal, but it is not strong enough to trust fully yet ({score:.2f})."
+    if likely_outcome == "clear-risk":
+        return f"{label} has a pending class signal that is fading and may clear before it confirms ({score:.2f})."
+    if likely_outcome == "expire-risk":
+        return f"{label} has a pending class signal that has lingered long enough to risk aging out ({score:.2f})."
+    if likely_outcome == "blocked":
+        reasons = primary_target.get("transition_closure_confidence_reasons") or []
+        return reasons[0] if reasons else f"{label} still has local target instability blocking positive class strengthening."
+    if likely_outcome == "insufficient-data":
+        return f"{label} still has too little pending-transition history to judge whether the class signal is likely to confirm."
+    if pending_debt_hotspots:
+        hotspot = pending_debt_hotspots[0]
+        return (
+            f"Pending class signals are accumulating unresolved debt most around {hotspot.get('label', 'recent hotspots')}, "
+            "so new pending states there should be treated more cautiously."
+        )
+    return "No active pending class transition needs closure-confidence scoring right now."
+
+
+def _class_pending_debt_summary(
+    primary_target: dict,
+    pending_debt_hotspots: list[dict],
+    healthy_pending_resolution_hotspots: list[dict],
+) -> str:
+    label = _target_label(primary_target) or "The current target"
+    status = primary_target.get("class_pending_debt_status", "none")
+    if status == "active-debt":
+        return f"{label} belongs to a class that keeps accumulating unresolved pending transitions, so fresh pending signals there should be treated more cautiously."
+    if status == "clearing":
+        return f"{label} belongs to a class that is resolving pending transitions more cleanly again, so pending debt is easing."
+    if status == "watch":
+        return f"{label} belongs to a class with mixed pending-transition outcomes, so watch whether new pending signals confirm or start to linger."
+    if pending_debt_hotspots:
+        hotspot = pending_debt_hotspots[0]
+        return (
+            f"Pending-transition debt is accumulating most around {hotspot.get('label', 'recent hotspots')}, "
+            "so those classes should not let weak pending states linger."
+        )
+    if healthy_pending_resolution_hotspots:
+        hotspot = healthy_pending_resolution_hotspots[0]
+        return (
+            f"Pending transitions are resolving most cleanly around {hotspot.get('label', 'recent hotspots')}, "
+            "so those classes are showing healthier follow-through."
+        )
+    return "No class pending-debt pattern is strong enough to change how pending signals are interpreted yet."
+
+
+def _class_pending_resolution_summary(
+    primary_target: dict,
+    healthy_pending_resolution_hotspots: list[dict],
+    pending_debt_hotspots: list[dict],
+) -> str:
+    label = _target_label(primary_target) or "The current target"
+    status = primary_target.get("class_pending_debt_status", "none")
+    if status == "clearing":
+        return f"{label} belongs to a class that is resolving pending transitions more cleanly than it is stalling them."
+    if status == "active-debt":
+        return f"{label} belongs to a class where pending transitions are still stalling, expiring, or blocking more often than they resolve cleanly."
+    if healthy_pending_resolution_hotspots:
+        hotspot = healthy_pending_resolution_hotspots[0]
+        return (
+            f"Healthy pending-transition resolution is strongest around {hotspot.get('label', 'recent hotspots')}, "
+            "so those classes are proving whether pending signals can clear or confirm cleanly."
+        )
+    if pending_debt_hotspots:
+        hotspot = pending_debt_hotspots[0]
+        return (
+            f"Unresolved pending-transition debt is strongest around {hotspot.get('label', 'recent hotspots')}, "
+            "so those classes should clear weak pending signals earlier."
+        )
+    return "No class-level pending-resolution pattern is strong enough to call out yet."
 
 
 def _target_class_reweight_history(target: dict, reweight_events: list[dict]) -> dict:
@@ -3276,9 +3997,6 @@ def _class_transition_resolution_for_target(
     current_lost_pending_support = history_meta.get("current_lost_pending_support", False)
     recent_pending_status = history_meta.get("recent_pending_status", "none")
     recent_pending_age_runs = history_meta.get("recent_pending_age_runs", 0)
-    local_noise = _target_specific_normalization_noise(target, history_meta)
-    _ = confidence_calibration
-
     if current_transition_status == "blocked":
         blocked_reason = transition_reason or (
             "Local target instability is preventing positive class strengthening."
@@ -3316,32 +4034,7 @@ def _class_transition_resolution_for_target(
             class_normalization_status,
             class_normalization_reason,
         )
-
     if current_transition_status in {"pending-support", "pending-caution"}:
-        if (
-            current_transition_status == "pending-support"
-            and local_noise
-        ):
-            blocked_reason = (
-                "Local target instability or non-healthy calibration is preventing this pending class support from confirming."
-            )
-            reverted_policy = target.get("pre_class_normalization_trust_policy", trust_policy)
-            reverted_reason = target.get("pre_class_normalization_trust_policy_reason", trust_policy_reason)
-            return (
-                "blocked",
-                blocked_reason,
-                "blocked",
-                blocked_reason,
-                "blocked",
-                blocked_reason,
-                reverted_policy,
-                blocked_reason if reverted_policy == "verify-first" else reverted_reason,
-                policy_debt_status,
-                policy_debt_reason,
-                "candidate",
-                blocked_reason,
-            )
-
         if transition_age_runs >= 3 and not current_strengthening:
             stalled_reason = (
                 "The same pending class signal has lingered without enough strengthening, so it should stay visible but unconfirmed."
@@ -4334,7 +5027,6 @@ def _target_specific_normalization_noise(target: dict, history_meta: dict) -> bo
         history_meta.get("recent_reopened", False)
         or history_meta.get("recent_policy_flip_count", 0) > 0
         or target.get("trust_recovery_status") == "blocked"
-        or target.get("exception_retirement_status") == "blocked"
     )
 
 
@@ -6078,6 +6770,8 @@ def _adaptive_confidence_summary(
     class_reweight_transition_status = primary_target.get("class_reweight_transition_status", "none")
     class_transition_health_status = primary_target.get("class_transition_health_status", "none")
     class_transition_resolution_status = primary_target.get("class_transition_resolution_status", "none")
+    transition_closure_likely_outcome = primary_target.get("transition_closure_likely_outcome", "none")
+    class_pending_debt_status = primary_target.get("class_pending_debt_status", "none")
     recovery_confidence_label = primary_target.get("recovery_confidence_label", "low")
     drift_status = primary_target.get("recommendation_drift_status", "")
     if class_transition_resolution_status == "confirmed":
@@ -6088,6 +6782,20 @@ def _adaptive_confidence_summary(
         return "The earlier pending class signal aged out without confirmation, so it no longer changes the live posture."
     if class_transition_resolution_status == "blocked":
         return "Local target instability is preventing a pending class transition from confirming."
+    if transition_closure_likely_outcome == "confirm-soon":
+        return "The current pending class signal looks strong enough to confirm soon if the next run stays aligned."
+    if transition_closure_likely_outcome == "hold":
+        return "The current pending class signal is still viable, but it is not strong enough to trust fully yet."
+    if transition_closure_likely_outcome == "clear-risk":
+        return "The current pending class signal is fading and may be cleared before it confirms."
+    if transition_closure_likely_outcome == "expire-risk":
+        return "The current pending class signal has lingered long enough that it is at risk of aging out."
+    if transition_closure_likely_outcome == "blocked":
+        return "Local target instability is still blocking this pending class signal from confirming."
+    if class_pending_debt_status == "active-debt":
+        return "This class keeps accumulating unresolved pending states, so new pending signals there should be treated more cautiously."
+    if class_pending_debt_status == "clearing":
+        return "This class is resolving pending transitions more cleanly again, so pending debt is easing."
     if class_transition_health_status == "stalled":
         return "The current pending class signal is still visible, but it has lingered without enough strengthening to confirm safely."
     if class_transition_health_status == "holding":
@@ -6897,6 +7605,23 @@ def _class_transition_resolution_note(resolution_trend: dict) -> str:
     if status in {None, "", "none"} and not summary:
         return ""
     return f"Pending transition resolution: {status} — {summary}".strip()
+
+
+def _transition_closure_confidence_note(resolution_trend: dict) -> str:
+    label = resolution_trend.get("primary_target_transition_closure_confidence_label", "")
+    if not label:
+        return ""
+    score = resolution_trend.get("primary_target_transition_closure_confidence_score", 0.0)
+    summary = resolution_trend.get("transition_closure_confidence_summary", "")
+    return f"Transition closure confidence: {label} ({score:.2f}) — {summary}".strip()
+
+
+def _class_pending_debt_note(resolution_trend: dict) -> str:
+    status = resolution_trend.get("primary_target_class_pending_debt_status", "none")
+    summary = resolution_trend.get("class_pending_debt_summary", "")
+    if status in {None, "", "none"} and not summary:
+        return ""
+    return f"Class pending debt audit: {status} — {summary}".strip()
 
 
 def _recommendation_drift_note(resolution_trend: dict) -> str:
