@@ -2,6 +2,7 @@ output/*.json
 output/*.md
 output/*.xlsx
 output/*.html
+output/*.db
 output/~$*
 output/.cache/
 output/history/
@@ -10,6 +11,8 @@ output/.badge-gist-id
 output/PORTFOLIO.md
 !output/.gitkeep
 config/notion-config.json
+HANDOFF.md
+.claude/
 __pycache__/
 *.pyc
 .env
