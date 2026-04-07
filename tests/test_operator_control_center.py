@@ -29,6 +29,15 @@ def _make_report(**overrides) -> dict:
             "source_run_id": "testuser:2026-03-29T12:00:00+00:00",
             "status": "open",
         },
+        "watch_state": {
+            "watch_enabled": True,
+            "requested_strategy": "adaptive",
+            "chosen_mode": "full",
+            "next_recommended_run_mode": "full",
+            "reason": "full-refresh-due",
+            "reason_summary": "The next run should be full because the scheduled full refresh interval has been reached.",
+            "full_refresh_due": True,
+        },
         "review_targets": [
             {
                 "repo": "RepoA",
@@ -104,6 +113,14 @@ def test_operator_snapshot_filters_by_triage_view(tmp_path: Path):
     snapshot = build_operator_snapshot(_make_report(), output_dir=tmp_path, triage_view="ready")
     assert snapshot["operator_queue"]
     assert all(item["lane"] == "ready" for item in snapshot["operator_queue"])
+
+
+def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
+    snapshot = build_operator_snapshot(_make_report(), output_dir=tmp_path)
+    summary = snapshot["operator_summary"]
+    assert summary["watch_strategy"] == "adaptive"
+    assert summary["next_recommended_run_mode"] == "full"
+    assert summary["watch_decision_summary"].startswith("The next run should be full")
 
 
 def test_normalize_review_state_backfills_missing_fields(tmp_path: Path):

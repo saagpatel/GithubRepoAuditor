@@ -37,11 +37,12 @@ def test_requirements_cover_runtime_and_config_dependencies():
 
 def test_makefile_includes_operator_entrypoints():
     makefile = (ROOT / "Makefile").read_text()
-    for target in ("install:", "install-dev:", "doctor:", "audit:", "control-center:", "test:"):
+    for target in ("install:", "install-dev:", "doctor:", "audit:", "control-center:", "workbook-gate:", "test:"):
         assert target in makefile
     assert "audit $(USERNAME) --doctor $(ARGS)" in makefile
     assert "audit $(USERNAME) --excel-mode standard $(ARGS)" in makefile
     assert "audit $(USERNAME) --control-center $(ARGS)" in makefile
+    assert "$(PYTHON) -m src.workbook_gate $(ARGS)" in makefile
 
 
 def test_example_audit_config_is_parseable():
@@ -51,6 +52,7 @@ def test_example_audit_config_is_parseable():
     assert inspection.errors == []
     assert inspection.data["excel_mode"] == "standard"
     assert inspection.data["preflight_mode"] == "auto"
+    assert inspection.data["watch_strategy"] == "adaptive"
 
 
 def test_example_notion_config_is_parseable():
@@ -60,11 +62,9 @@ def test_example_notion_config_is_parseable():
 
 
 def test_workflows_install_package_and_use_audit_console_script():
-    workflow_files = [
-        ROOT / ".github" / "workflows" / "audit.yml",
-        ROOT / ".github" / "workflows" / "scheduled-audit.yml",
-    ]
-    contents = "\n".join(path.read_text() for path in workflow_files)
+    workflow_path = ROOT / ".github" / "workflows" / "audit.yml"
+    contents = workflow_path.read_text()
     assert 'pip install -e ".[config]"' in contents
-    assert "audit saagpatel --skip-clone" in contents
-    assert "audit ${{ github.event.inputs.username || 'saagpatel' }}" in contents
+    assert "audit \"$USERNAME\" --incremental --html --badges --diff --excel-mode standard" in contents
+    assert 'USERNAME="${{ github.event.inputs.username || \'saagpatel\' }}"' in contents
+    assert "git add output/" not in contents

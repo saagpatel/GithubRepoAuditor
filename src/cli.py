@@ -42,6 +42,7 @@ from src.reporter import (
     write_pcc_export,
     write_raw_metadata,
 )
+from src.recurring_review import FULL_REFRESH_DAYS
 from src.scorer import score_repo
 
 
@@ -314,6 +315,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=3600,
         help="Seconds between watch runs (default: 3600)",
+    )
+    parser.add_argument(
+        "--watch-strategy",
+        choices=["adaptive", "incremental", "full"],
+        default="adaptive",
+        help="How watch mode chooses each cycle: adaptive (default), incremental, or full",
     )
     parser.add_argument(
         "--create-issues",
@@ -639,6 +646,14 @@ def _print_control_center_summary(snapshot: dict) -> None:
         print(f"  Latest report: {summary['report_reference']}")
     if summary.get("source_run_id"):
         print(f"  Source run: {summary['source_run_id']}")
+    if summary.get("next_recommended_run_mode"):
+        print(
+            "  Next recommended run: "
+            f"{summary.get('next_recommended_run_mode', 'unknown')}"
+            f" ({summary.get('watch_decision_summary', 'No watch decision summary available.')})"
+        )
+    if summary.get("watch_strategy"):
+        print(f"  Watch strategy: {summary['watch_strategy']}")
     lane_labels = [
         ("blocked", "Blocked"),
         ("urgent", "Needs Attention Now"),
@@ -1307,6 +1322,8 @@ def _run_targeted_audit(
     scoring_profile_name: str,
     existing_report_path: Path | None = None,
     existing_report_data: dict | None = None,
+    watch_plan=None,
+    latest_trusted_baseline: dict | None = None,
 ) -> None:
     """Audit only specific repos and merge into the most recent full report."""
     target_names = _resolve_repo_names(args.repos)
@@ -1380,6 +1397,10 @@ def _run_targeted_audit(
         args,
         scoring_profile=scoring_profile_name,
         portfolio_baseline_size=len(filtered_repos),
+        run_mode="targeted",
+        watch_plan=watch_plan,
+        latest_trusted_baseline=latest_trusted_baseline,
+        full_refresh_interval_days=FULL_REFRESH_DAYS,
     )
     report.preflight_summary = getattr(args, "_preflight_summary", {})
     _apply_requested_reconciliation(report, args, merged_audits)
@@ -1406,10 +1427,13 @@ def _regenerate_outputs_from_latest_report(
     client: GitHubClient | None,
     existing_report_path: Path,
     existing_report_data: dict,
+    watch_state_override: dict | None = None,
 ) -> None:
     report = _report_from_dict(existing_report_data)
     if getattr(args, "_preflight_summary", {}):
         report.preflight_summary = getattr(args, "_preflight_summary", {})
+    if watch_state_override:
+        report.watch_state = watch_state_override
     needs_fresh_json = bool(args.campaign)
     outputs = _write_report_outputs(
         report,
@@ -1448,6 +1472,8 @@ def _run_incremental_audit(
     errors: list[dict],
     custom_weights: dict[str, float] | None,
     scoring_profile_name: str,
+    watch_plan=None,
+    latest_trusted_baseline: dict | None = None,
 ) -> None:
     """Only re-audit repos whose pushed_at changed since last run."""
     from src.history import load_fingerprints
@@ -1486,17 +1512,37 @@ def _run_incremental_audit(
     )
 
     if not needs_audit:
+        effective_watch_plan = watch_plan or argparse.Namespace(
+            mode="incremental",
+            reason="manual-incremental-run",
+            full_refresh_due=False,
+        )
         print_info("No changes. Regenerating outputs from latest report.")
+        watch_state = build_watch_state(
+            args,
+            scoring_profile=scoring_profile_name,
+            portfolio_baseline_size=existing_report_data.get("portfolio_baseline_size", len(repos)),
+            run_mode="incremental",
+            watch_plan=effective_watch_plan,
+            latest_trusted_baseline=latest_trusted_baseline,
+            full_refresh_interval_days=FULL_REFRESH_DAYS,
+        )
         _regenerate_outputs_from_latest_report(
             args,
             output_dir,
             client=client,
             existing_report_path=existing_report_path,
             existing_report_data=existing_report_data,
+            watch_state_override=watch_state,
         )
         return
 
     args.repos = needs_audit
+    effective_watch_plan = watch_plan or argparse.Namespace(
+        mode="incremental",
+        reason="manual-incremental-run",
+        full_refresh_due=False,
+    )
     _run_targeted_audit(
         args,
         client,
@@ -1507,6 +1553,8 @@ def _run_incremental_audit(
         scoring_profile_name=scoring_profile_name,
         existing_report_path=existing_report_path,
         existing_report_data=existing_report_data,
+        watch_plan=effective_watch_plan,
+        latest_trusted_baseline=latest_trusted_baseline,
     )
 
 
@@ -1773,6 +1821,8 @@ def main() -> None:
                 errors=errors,
                 custom_weights=custom_weights,
                 scoring_profile_name=scoring_profile_name,
+                watch_plan=getattr(args, "_watch_plan", None),
+                latest_trusted_baseline=getattr(args, "_latest_trusted_watch_baseline", None),
             )
             return
 
@@ -1785,6 +1835,8 @@ def main() -> None:
                 errors=errors,
                 custom_weights=custom_weights,
                 scoring_profile_name=scoring_profile_name,
+                watch_plan=getattr(args, "_watch_plan", None),
+                latest_trusted_baseline=getattr(args, "_latest_trusted_watch_baseline", None),
             )
             return
 
@@ -1839,6 +1891,10 @@ def main() -> None:
                 args,
                 scoring_profile=scoring_profile_name,
                 portfolio_baseline_size=len(repos),
+                run_mode="full",
+                watch_plan=getattr(args, "_watch_plan", None),
+                latest_trusted_baseline=getattr(args, "_latest_trusted_watch_baseline", None),
+                full_refresh_interval_days=FULL_REFRESH_DAYS,
             )
             report.preflight_summary = getattr(args, "_preflight_summary", {})
             _apply_requested_reconciliation(report, args, audits)
@@ -1888,10 +1944,32 @@ def main() -> None:
         )
 
     if args.watch:
+        from src.recurring_review import choose_watch_plan
         from src.watch import run_watch_loop
 
-        args.incremental = True
-        run_watch_loop(_run_once, interval=args.watch_interval)
+        def _run_watch_once() -> None:
+            watch_plan = choose_watch_plan(
+                Path(args.output_dir),
+                args,
+                scoring_profile=normalize_scoring_profile(args.scoring_profile),
+            )
+            print_info(
+                "Watch decision: "
+                f"{watch_plan.mode} ({watch_plan.reason})"
+            )
+            original_incremental = args.incremental
+            original_repos = args.repos
+            setattr(args, "_watch_plan", watch_plan)
+            setattr(args, "_latest_trusted_watch_baseline", watch_plan.latest_trusted_baseline)
+            try:
+                args.incremental = watch_plan.mode == "incremental"
+                args.repos = None
+                _run_once()
+            finally:
+                args.incremental = original_incremental
+                args.repos = original_repos
+
+        run_watch_loop(_run_watch_once, interval=args.watch_interval)
         return
 
     _run_once()

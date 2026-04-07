@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from src.baseline_context import build_watch_guidance
 from src.governance_activation import build_governance_summary
 from src.recurring_review import build_review_bundle
 from src.warehouse import load_recent_operator_changes
@@ -257,6 +258,7 @@ def build_operator_snapshot(
         "warnings": preflight.get("warnings", 0),
     }
     counts = {lane: sum(1 for item in queue if item["lane"] == lane) for lane in LANE_ORDER}
+    watch_guidance = build_watch_guidance(report_data.get("watch_state") or {})
     summary = {
         "headline": _headline_for_queue(queue, setup_health),
         "selected_view": triage_view,
@@ -268,6 +270,15 @@ def build_operator_snapshot(
         "review_status": review_summary.get("status", "unavailable"),
         "operator_setup_health": setup_health,
         "operator_recent_changes": recent_changes,
+        "watch_strategy": watch_guidance.get("requested_strategy", "manual"),
+        "watch_enabled": watch_guidance.get("watch_enabled", False),
+        "watch_chosen_mode": watch_guidance.get("chosen_mode", ""),
+        "watch_decision_reason": watch_guidance.get("reason", ""),
+        "watch_decision_summary": watch_guidance.get("reason_summary", ""),
+        "next_recommended_run_mode": watch_guidance.get("next_recommended_run_mode", ""),
+        "full_refresh_due": watch_guidance.get("full_refresh_due", False),
+        "latest_trusted_baseline": watch_guidance.get("latest_trusted_baseline", {}),
+        "operator_watch_decision": watch_guidance,
     }
     return {
         "operator_summary": summary,
@@ -291,6 +302,12 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
         lines.append(f"*Latest Report:* `{summary['report_reference']}`")
     if summary.get("source_run_id"):
         lines.append(f"*Source Run:* `{summary['source_run_id']}`")
+    if summary.get("next_recommended_run_mode"):
+        lines.append(f"*Next Recommended Run:* `{summary['next_recommended_run_mode']}`")
+    if summary.get("watch_strategy"):
+        lines.append(f"*Watch Strategy:* `{summary['watch_strategy']}`")
+    if summary.get("watch_decision_summary"):
+        lines.append(f"*Watch Decision:* {summary['watch_decision_summary']}")
     if summary.get("control_center_reference"):
         lines.append(f"*Control Center Artifact:* `{summary['control_center_reference']}`")
     lines.append(
@@ -329,6 +346,7 @@ def control_center_artifact_payload(report_data: dict, snapshot: dict) -> dict:
         "username": report_data.get("username", "unknown"),
         "generated_at": report_data.get("generated_at", ""),
         "report_reference": report_data.get("latest_report_path", ""),
+        "watch_state": report_data.get("watch_state", {}),
         "operator_summary": snapshot.get("operator_summary", {}),
         "operator_queue": snapshot.get("operator_queue", []),
         "operator_setup_health": snapshot.get("operator_setup_health", {}),

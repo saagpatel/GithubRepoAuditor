@@ -67,9 +67,10 @@ facts:
 
 1. Update the Python data builder first.
 2. Regenerate or edit the template only after the hidden-table contract is settled.
-3. Re-run workbook tests in both `template` and `standard` modes.
-4. Open the generated workbook in Excel desktop and verify the expected workbook behavior.
-5. If compatibility changes are required, preserve hidden `Data_*` table contracts and prefer visible-sheet autofilters over visible-sheet structured tables.
+3. Run `make workbook-gate` to generate canonical sample `standard` and `template` workbooks and validate the workbook invariants.
+4. Re-run workbook tests in both `template` and `standard` modes if the change touched workbook logic directly.
+5. Open the generated `standard` workbook in Excel desktop and verify there is no repair prompt and that the expected workbook behavior still holds.
+6. If compatibility changes are required, preserve hidden `Data_*` table contracts and prefer visible-sheet autofilters over visible-sheet structured tables.
 
 ## When Python-Only Changes Are Enough
 

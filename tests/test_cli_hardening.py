@@ -58,6 +58,7 @@ def _make_args(**overrides) -> Namespace:
         "preflight_mode": "auto",
         "watch": False,
         "watch_interval": 3600,
+        "watch_strategy": "adaptive",
         "create_issues": False,
         "analyzers_dir": None,
         "resume": False,
@@ -175,6 +176,12 @@ def test_build_parser_defaults_excel_mode_to_standard():
     assert args.excel_mode == "standard"
 
 
+def test_build_parser_defaults_watch_strategy_to_adaptive():
+    parser = cli.build_parser()
+    args = parser.parse_args(["testuser"])
+    assert args.watch_strategy == "adaptive"
+
+
 def test_main_forwards_scoring_profile_to_incremental_audit(monkeypatch, sample_metadata):
     args = _make_args(
         incremental=True,
@@ -193,6 +200,33 @@ def test_main_forwards_scoring_profile_to_incremental_audit(monkeypatch, sample_
     assert captured["custom_weights"] == {"readme": 1.5}
     assert captured["scoring_profile_name"] == "focus"
     assert captured["all_repos"] == [sample_metadata]
+
+
+def test_main_watch_uses_chosen_watch_plan(monkeypatch, sample_metadata, tmp_path):
+    args = _make_args(
+        watch=True,
+        output_dir=str(tmp_path),
+        preflight_mode="off",
+    )
+    captured: dict[str, object] = {}
+    watch_plan = Namespace(
+        mode="incremental",
+        reason="adaptive-incremental",
+        full_refresh_due=False,
+        latest_trusted_baseline={"run_id": "baseline-1", "report_path": "output/audit-report-testuser.json"},
+    )
+
+    monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
+    monkeypatch.setattr("src.recurring_review.choose_watch_plan", lambda *_a, **_k: watch_plan)
+    monkeypatch.setattr("src.watch.run_watch_loop", lambda audit_fn, interval=0: audit_fn())
+    monkeypatch.setattr(cli, "_load_scoring_profile", lambda name: (None, "default"))
+    monkeypatch.setattr(cli, "_fetch_repo_metadata", lambda *_: ([sample_metadata], []))
+    monkeypatch.setattr(cli, "_run_incremental_audit", lambda *a, **k: captured.update(k))
+
+    cli.main()
+
+    assert captured["watch_plan"] is watch_plan
+    assert captured["latest_trusted_baseline"] == watch_plan.latest_trusted_baseline
 
 
 def test_main_doctor_writes_artifact_and_exits_cleanly(monkeypatch, tmp_path):
@@ -292,7 +326,7 @@ def test_incremental_noop_regenerates_from_latest_report(monkeypatch, tmp_path, 
 
     calls: list[dict[str, object]] = []
 
-    def _record_regen(args, output_dir, *, client, existing_report_path, existing_report_data):
+    def _record_regen(args, output_dir, *, client, existing_report_path, existing_report_data, watch_state_override=None):
         calls.append(
             {
                 "args": args,
@@ -300,6 +334,7 @@ def test_incremental_noop_regenerates_from_latest_report(monkeypatch, tmp_path, 
                 "client": client,
                 "existing_report_path": existing_report_path,
                 "existing_report_data": existing_report_data,
+                "watch_state_override": watch_state_override,
             }
         )
 
@@ -319,6 +354,7 @@ def test_incremental_noop_regenerates_from_latest_report(monkeypatch, tmp_path, 
     assert calls[0]["client"] is not None
     assert calls[0]["existing_report_path"] == report_path
     assert calls[0]["existing_report_data"]["scoring_profile"] == "baseline"
+    assert calls[0]["watch_state_override"]["chosen_mode"] == "incremental"
 
 
 def test_targeted_audit_uses_full_filtered_portfolio_for_baseline(monkeypatch, tmp_path, sample_metadata):

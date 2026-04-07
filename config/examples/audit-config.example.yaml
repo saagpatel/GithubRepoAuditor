@@ -14,6 +14,7 @@ excel_mode: standard
 
 # Daily workflow defaults
 incremental: true
+watch_strategy: adaptive
 skip_forks: true
 skip_archived: true
 preflight_mode: auto

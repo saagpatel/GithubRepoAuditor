@@ -1,11 +1,16 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from src.analyst_views import build_analyst_context
-from src.baseline_context import build_filter_signature_from_args
+from src.baseline_context import (
+    build_filter_signature_from_args,
+    build_requested_baseline_context,
+    compare_baseline_context,
+    extract_baseline_context,
+)
 from src.warehouse import (
     load_latest_audit_runs,
     load_review_history,
@@ -28,29 +33,91 @@ class WatchPlan:
     filter_signature: str
     scoring_profile: str
     full_refresh_due: bool = False
+    latest_trusted_baseline: dict = field(default_factory=dict)
+
+
+def _latest_baseline_reference(run: dict | None) -> dict:
+    if not run:
+        return {}
+    baseline_context = extract_baseline_context(run)
+    return {
+        "run_id": run.get("run_id", ""),
+        "generated_at": run.get("generated_at", ""),
+        "report_path": run.get("report_path", ""),
+        "baseline_signature": baseline_context.get("baseline_signature") or run.get("baseline_signature", ""),
+    }
+
 
 def choose_watch_plan(output_dir: Path, args, *, scoring_profile: str) -> WatchPlan:
     strategy = getattr(args, "watch_strategy", "adaptive")
     signature = build_filter_signature_from_args(args, scoring_profile=scoring_profile)
+    requested_context = build_requested_baseline_context(args, scoring_profile=scoring_profile)
     checkpoint = load_watch_checkpoint(output_dir, getattr(args, "username", ""))
     runs = load_latest_audit_runs(output_dir, getattr(args, "username", ""), limit=20)
     latest = runs[0] if runs else None
     latest_full = next((run for run in runs if run.get("run_mode") == "full"), None)
+    latest_full_context = extract_baseline_context(latest_full)
+    latest_baseline_reference = _latest_baseline_reference(latest_full)
+    latest_full_mismatches = compare_baseline_context(
+        requested_context,
+        latest_full_context,
+        include_size=False,
+    ) if latest_full_context else []
 
     if strategy == "full":
-        return WatchPlan("full", "explicit-full-strategy", signature, scoring_profile)
+        return WatchPlan(
+            "full",
+            "explicit-full-strategy",
+            signature,
+            scoring_profile,
+            latest_trusted_baseline=latest_baseline_reference,
+        )
 
     if strategy == "incremental":
-        if latest_full:
-            return WatchPlan("incremental", "explicit-incremental-strategy", signature, scoring_profile)
-        return WatchPlan("full", "incremental-needs-baseline", signature, scoring_profile)
+        if latest_full and latest_full_context and not latest_full_mismatches:
+            return WatchPlan(
+                "incremental",
+                "explicit-incremental-strategy",
+                signature,
+                scoring_profile,
+                latest_trusted_baseline=latest_baseline_reference,
+            )
+        fallback_reason = "filter-or-profile-changed" if latest_full and latest_full_mismatches else "incremental-needs-baseline"
+        return WatchPlan(
+            "full",
+            fallback_reason,
+            signature,
+            scoring_profile,
+            latest_trusted_baseline=latest_baseline_reference,
+        )
 
-    if not latest or not latest_full:
-        return WatchPlan("full", "missing-trustworthy-baseline", signature, scoring_profile)
+    if not latest or not latest_full or not latest_full_context:
+        return WatchPlan(
+            "full",
+            "missing-trustworthy-baseline",
+            signature,
+            scoring_profile,
+            latest_trusted_baseline=latest_baseline_reference,
+        )
+
+    if latest_full_mismatches:
+        return WatchPlan(
+            "full",
+            "filter-or-profile-changed",
+            signature,
+            scoring_profile,
+            latest_trusted_baseline=latest_baseline_reference,
+        )
 
     checkpoint_signature = (checkpoint or {}).get("filter_signature") or (checkpoint or {}).get("baseline_signature")
     if checkpoint_signature and checkpoint_signature != signature:
-        return WatchPlan("full", "filter-or-profile-changed", signature, scoring_profile)
+        return WatchPlan(
+            "full",
+            "filter-or-profile-changed",
+            signature,
+            scoring_profile,
+            latest_trusted_baseline=latest_baseline_reference,
+        )
 
     last_full_at = _parse_ts(latest_full.get("generated_at"))
     full_refresh_due = (
@@ -58,9 +125,22 @@ def choose_watch_plan(output_dir: Path, args, *, scoring_profile: str) -> WatchP
         or datetime.now(timezone.utc) - last_full_at >= timedelta(days=FULL_REFRESH_DAYS)
     )
     if full_refresh_due:
-        return WatchPlan("full", "full-refresh-due", signature, scoring_profile, full_refresh_due=True)
+        return WatchPlan(
+            "full",
+            "full-refresh-due",
+            signature,
+            scoring_profile,
+            full_refresh_due=True,
+            latest_trusted_baseline=latest_baseline_reference,
+        )
 
-    return WatchPlan("incremental", "adaptive-incremental", signature, scoring_profile)
+    return WatchPlan(
+        "incremental",
+        "adaptive-incremental",
+        signature,
+        scoring_profile,
+        latest_trusted_baseline=latest_baseline_reference,
+    )
 
 
 def build_review_bundle(

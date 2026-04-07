@@ -89,6 +89,7 @@ _CONFIG_MAP = {
     "narrative": "narrative",
     "watch": "watch",
     "watch_interval": "watch_interval",
+    "watch_strategy": "watch_strategy",
     "preflight_mode": "preflight_mode",
     "triage_view": "triage_view",
     "create_issues": "create_issues",
@@ -136,6 +137,7 @@ _EXPECTED_TYPES = {
     "narrative": bool,
     "watch": bool,
     "watch_interval": int,
+    "watch_strategy": str,
     "preflight_mode": str,
     "triage_view": str,
     "create_issues": bool,
@@ -153,6 +155,7 @@ _CHOICE_VALIDATORS = {
     "campaign_sync_mode": {"reconcile", "append-only", "close-missing"},
     "governance_view": {"all", "ready", "drifted", "approved", "applied"},
     "preflight_mode": {"auto", "off", "strict"},
+    "watch_strategy": {"adaptive", "incremental", "full"},
     "triage_view": {"all", "urgent", "ready", "blocked", "deferred"},
 }
 
@@ -180,6 +183,7 @@ _ARG_DEFAULTS = {
     "governance_view": "all",
     "watch": False,
     "watch_interval": 3600,
+    "watch_strategy": "adaptive",
     "preflight_mode": "auto",
     "triage_view": "all",
 }

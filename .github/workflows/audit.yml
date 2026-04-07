@@ -2,11 +2,16 @@ name: Scheduled Audit
 
 on:
   schedule:
-    - cron: '0 6 * * 1'  # Every Monday at 6am UTC
-  workflow_dispatch:  # Manual trigger
+    - cron: '0 6 * * 0'
+  workflow_dispatch:
+    inputs:
+      username:
+        description: GitHub username to audit
+        required: false
+        default: saagpatel
 
 permissions:
-  contents: write
+  contents: read
   issues: write
 
 jobs:
@@ -28,7 +33,10 @@ jobs:
       - name: Restore previous audit history
         uses: actions/cache@v4
         with:
-          path: output/history
+          path: |
+            output/audit-report-*.json
+            output/history
+            output/.audit-fingerprints.json
           key: audit-history-${{ github.repository }}
           restore-keys: audit-history-
 
@@ -36,7 +44,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.AUDIT_TOKEN }}
         run: |
-          audit saagpatel --skip-clone --excel-mode standard
+          mkdir -p output/history
+          USERNAME="${{ github.event.inputs.username || 'saagpatel' }}"
+          if ls output/audit-report-*.json >/dev/null 2>&1 && [ -f output/.audit-fingerprints.json ]; then
+            audit "$USERNAME" --incremental --html --badges --diff --excel-mode standard
+          else
+            audit "$USERNAME" --html --badges --excel-mode standard
+          fi
 
       - name: Check for regressions
         id: check-regressions
@@ -75,7 +89,10 @@ jobs:
       - name: Save audit history
         uses: actions/cache/save@v4
         with:
-          path: output/history
+          path: |
+            output/audit-report-*.json
+            output/history
+            output/.audit-fingerprints.json
           key: audit-history-${{ github.repository }}-${{ github.run_number }}
 
       - name: Upload reports

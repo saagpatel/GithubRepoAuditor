@@ -97,6 +97,9 @@ def _make_report(**overrides) -> dict:
         "operator_summary": {
             "headline": "There is live drift or high-severity change that needs attention now.",
             "counts": {"blocked": 0, "urgent": 2, "ready": 1, "deferred": 1},
+            "watch_strategy": "adaptive",
+            "next_recommended_run_mode": "incremental",
+            "watch_decision_summary": "The current baseline is still compatible, so incremental watch remains safe for the next run.",
         },
         "operator_queue": [
             {
@@ -256,6 +259,8 @@ class TestRenderHtml:
     def test_html_includes_operator_control_center(self):
         html = _render_html(_make_report())
         assert "Operator Control Center" in html
+        assert "Next Recommended Run" in html
+        assert "Watch Strategy" in html
         assert "RepoC drift needs review" in html
 
     def test_data_embedded_as_json(self):
