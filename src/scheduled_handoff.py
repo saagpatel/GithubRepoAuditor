@@ -93,6 +93,14 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     queue = payload.get("operator_queue", []) or []
     recent_changes = payload.get("operator_recent_changes", []) or []
     issue_candidate = payload.get("issue_candidate", {})
+    primary_target = summary.get("primary_target") or {}
+    primary_target_label = (
+        f"{primary_target.get('repo')}: {primary_target.get('title')}"
+        if primary_target.get("repo")
+        else primary_target.get("title", "")
+    )
+    resolved_count = summary.get("resolved_attention_count", 0)
+    persisting_count = summary.get("persisting_attention_count", 0)
     lines = [
         f"# Scheduled Audit Handoff: {payload.get('username', 'unknown')}",
         "",
@@ -103,6 +111,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- What changed: {summary.get('what_changed', 'No operator change summary is recorded.')}",
         f"- Why it matters: {summary.get('why_it_matters', 'No additional operator impact is recorded.')}",
         f"- What to do next: {summary.get('what_to_do_next', 'Continue the normal operator loop.')}",
+        f"- Trend: `{summary.get('trend_status', 'stable')}` — {summary.get('trend_summary', 'No trend summary is recorded yet.')}",
+        f"- Attention counts: new={summary.get('new_attention_count', 0)}, resolved={resolved_count}, persisting={persisting_count}, reopened={summary.get('reopened_attention_count', 0)}",
+        f"- Primary target: {primary_target_label or 'No active target'}",
         f"- Next recommended run: `{summary.get('next_recommended_run_mode', 'n/a')}`",
         f"- Watch strategy: `{summary.get('watch_strategy', 'manual')}`",
         f"- Watch decision: {summary.get('watch_decision_summary', 'No watch guidance is recorded.')}",
@@ -111,6 +122,41 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         *( [f"- Existing issue: #{issue_candidate.get('issue_number')}"] if issue_candidate.get("issue_number") else [] ),
         "",
     ]
+    lines.append("## What Got Better")
+    lines.append("")
+    if resolved_count:
+        lines.append(f"- {resolved_count} attention item(s) cleared since the last run.")
+    elif summary.get("trend_status") == "quiet":
+        lines.append(
+            f"- The queue is quiet and has held for {summary.get('quiet_streak_runs', 0)} consecutive run(s)."
+        )
+    else:
+        lines.append("- No meaningful recovery signal is recorded in this handoff.")
+    lines.append("")
+    lines.append("## What Needs Attention Now")
+    lines.append("")
+    if primary_target_label:
+        lines.append(f"- Primary target: {primary_target_label}")
+        if primary_target.get("recommended_action"):
+            lines.append(f"- Next step: {primary_target.get('recommended_action')}")
+    else:
+        lines.append("- No blocked or urgent target is currently active.")
+    if queue:
+        for item in queue[:3]:
+            repo = f"{item.get('repo')}: " if item.get("repo") else ""
+            lines.append(
+                f"- [{item.get('lane_label', item.get('lane', 'ready'))}] {repo}{item.get('title', 'Triage item')} -> {item.get('recommended_action', 'Review the latest state.')}"
+            )
+    lines.append("")
+    lines.append("## What Is Still Stuck")
+    lines.append("")
+    if persisting_count:
+        lines.append(f"- {persisting_count} attention item(s) are still open from the previous run.")
+    if summary.get("follow_through_summary"):
+        lines.append(f"- {summary.get('follow_through_summary')}")
+    if not persisting_count and not summary.get("follow_through_summary"):
+        lines.append("- Nothing currently looks sticky across the recent run window.")
+    lines.append("")
     if queue:
         lines.append("## Top Queue Items")
         lines.append("")

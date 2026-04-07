@@ -129,7 +129,7 @@ The intended operator loop is:
 1. `audit <github-username> --doctor`
 2. `audit <github-username>` or `audit <github-username> --watch --watch-strategy adaptive`
 3. `audit <github-username> --control-center`
-4. Read the control-center handoff fields before drilling into the queue
+4. Read the control-center handoff fields before drilling into the queue, especially the trend summary and primary target
 5. Handle `Blocked`, then `Needs Attention Now`, then `Ready for Manual Action`
 6. Leave `Safe to Defer` items alone unless priorities changed
 7. Run `make workbook-gate` only when workbook-facing changes are part of the release
@@ -164,3 +164,10 @@ make workbook-signoff ARGS="--reviewer <name> --outcome passed --check excel-ope
 Scheduled automation stays artifact-first. A GitHub issue is only opened or updated when the scheduled handoff surfaces meaningful blocked or urgent findings, or when regressions are detected in the diff.
 
 Quiet runs no longer leave the issue hanging open. The workflow now comments with the latest quiet-state handoff, closes the canonical `scheduled-audit-handoff` issue, and reopens that same issue later if a future run becomes noisy again.
+
+The scheduled handoff also now makes the recent direction explicit:
+
+- `worsening`: new blocker/regression pressure appeared or the attention queue grew
+- `improving`: attention pressure fell or previously noisy work cleared
+- `stable`: the queue is still sticky and needs the same primary target closed next
+- `quiet`: the blocked/urgent queue stayed clear long enough to count as a quiet streak

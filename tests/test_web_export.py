@@ -103,7 +103,9 @@ def _make_report(**overrides) -> dict:
             "what_changed": "RepoC drift needs review — managed-issue-edited",
             "why_it_matters": "This has crossed into live drift, regression risk, or rollback exposure and should be reviewed before it spreads.",
             "what_to_do_next": "Inspect the managed issue before closing the campaign.",
+            "trend_summary": "The queue is stable but still sticky: 1 attention item is persisting from the last run.",
             "follow_through_summary": "1 urgent item repeated in the recent window.",
+            "primary_target": {"repo": "RepoC", "title": "RepoC drift needs review"},
         },
         "operator_queue": [
             {
@@ -210,6 +212,12 @@ class TestRenderHtml:
         assert "RepoC" in html
         assert "Profile" in html
         assert "Collections" in html
+
+    def test_operator_section_includes_trend_and_primary_target(self):
+        html = _render_html(_make_report())
+        assert "Trend:" in html
+        assert "Primary Target:" in html
+        assert "RepoC: RepoC drift needs review" in html
 
     def test_has_filter_controls(self):
         html = _render_html(_make_report())

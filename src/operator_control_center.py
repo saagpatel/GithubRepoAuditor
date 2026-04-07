@@ -17,6 +17,8 @@ LANE_LABELS = {
     "deferred": "Safe to Defer",
 }
 QUIET_HANDOFF = "No new blocking or urgent drift is surfaced in the latest operator snapshot."
+ATTENTION_LANES = {"blocked", "urgent"}
+HISTORY_WINDOW_RUNS = 10
 
 
 def normalize_review_state(
@@ -253,7 +255,7 @@ def build_operator_snapshot(
         queue = [item for item in queue if item["lane"] == triage_view]
 
     recent_changes = load_recent_operator_changes(output_dir, report_data.get("username", ""), limit=12)
-    history = load_operator_state_history(output_dir, report_data.get("username", ""), limit=5)
+    history = load_operator_state_history(output_dir, report_data.get("username", ""), limit=HISTORY_WINDOW_RUNS - 1)
     setup_health = {
         "status": preflight.get("status", "unknown"),
         "blocking_errors": preflight.get("blocking_errors", 0),
@@ -261,8 +263,16 @@ def build_operator_snapshot(
     }
     counts = {lane: sum(1 for item in queue if item["lane"] == lane) for lane in LANE_ORDER}
     watch_guidance = build_watch_guidance(report_data.get("watch_state") or {})
-    follow_through = _build_follow_through(queue, history)
-    handoff = _build_operator_handoff(queue, recent_changes, setup_health, watch_guidance, follow_through)
+    resolution_trend = _build_resolution_trend(queue, history)
+    follow_through = _build_follow_through(resolution_trend)
+    handoff = _build_operator_handoff(
+        queue,
+        recent_changes,
+        setup_health,
+        watch_guidance,
+        follow_through,
+        resolution_trend,
+    )
     summary = {
         "headline": _headline_for_queue(queue, setup_health),
         "selected_view": triage_view,
@@ -295,6 +305,15 @@ def build_operator_snapshot(
         "oldest_open_item_days": follow_through["oldest_open_item_days"],
         "quiet_streak_runs": follow_through["quiet_streak_runs"],
         "follow_through_summary": follow_through["follow_through_summary"],
+        "trend_status": resolution_trend["trend_status"],
+        "new_attention_count": resolution_trend["new_attention_count"],
+        "resolved_attention_count": resolution_trend["resolved_attention_count"],
+        "persisting_attention_count": resolution_trend["persisting_attention_count"],
+        "reopened_attention_count": resolution_trend["reopened_attention_count"],
+        "history_window_runs": resolution_trend["history_window_runs"],
+        "primary_target": resolution_trend["primary_target"],
+        "resolution_targets": resolution_trend["resolution_targets"],
+        "trend_summary": resolution_trend["trend_summary"],
     }
     return {
         "operator_summary": summary,
@@ -330,8 +349,14 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
         lines.append(f"*Why It Matters:* {summary['why_it_matters']}")
     if summary.get("what_to_do_next"):
         lines.append(f"*What To Do Next:* {summary['what_to_do_next']}")
+    if summary.get("trend_summary"):
+        lines.append(f"*Trend:* {summary['trend_summary']}")
     if summary.get("follow_through_summary"):
         lines.append(f"*Follow-Through:* {summary['follow_through_summary']}")
+    if summary.get("primary_target"):
+        target = summary["primary_target"]
+        repo = f"{target.get('repo')}: " if target.get("repo") else ""
+        lines.append(f"*Primary Target:* {repo}{target.get('title', 'Operator target')}")
     if summary.get("control_center_reference"):
         lines.append(f"*Control Center Artifact:* `{summary['control_center_reference']}`")
     lines.append(
@@ -481,15 +506,22 @@ def _build_operator_handoff(
     setup_health: dict,
     watch_guidance: dict,
     follow_through: dict,
+    resolution_trend: dict,
 ) -> dict:
-    top_item = queue[0] if queue else {}
+    primary_target = resolution_trend.get("primary_target") or {}
+    top_item = primary_target or (queue[0] if queue else {})
     top_lane = top_item.get("lane", "")
-    top_summary = _summarize_operator_change(top_item, recent_changes)
-    next_action = _next_operator_action(top_item, watch_guidance, follow_through)
+    top_summary = _summarize_operator_change(top_item, recent_changes, resolution_trend)
+    next_action = _next_operator_action(top_item, watch_guidance, follow_through, resolution_trend)
     escalation_reason = _escalation_reason(queue, setup_health, watch_guidance)
     urgency = _handoff_urgency(queue, setup_health)
-    why_it_matters = _why_it_matters(urgency, escalation_reason, watch_guidance, top_item)
-    operator_note = f"{top_summary} {why_it_matters} {follow_through.get('follow_through_summary', '')} Next: {next_action}".strip()
+    why_it_matters = _why_it_matters(urgency, escalation_reason, watch_guidance, top_item, resolution_trend)
+    operator_note = (
+        f"{top_summary} {why_it_matters} "
+        f"{resolution_trend.get('trend_summary', '')} "
+        f"{follow_through.get('follow_through_summary', '')} "
+        f"Next: {next_action}"
+    ).strip()
     return {
         "urgency": urgency,
         "escalation_reason": escalation_reason,
@@ -502,42 +534,12 @@ def _build_operator_handoff(
     }
 
 
-def _build_follow_through(queue: list[dict], history: list[dict]) -> dict:
-    current_items = [item for item in queue if item.get("lane") != "deferred"]
-    recent_runs = [_snapshot_from_queue(queue)] + [_snapshot_from_history(entry) for entry in history[:4]]
-    recent_runs = [snapshot for snapshot in recent_runs if snapshot["items"] or snapshot["has_attention"] is not None]
-
-    repeat_urgent_count = 0
-    stale_item_count = 0
-    oldest_open_item_days = 0
-    for item in current_items:
-        key = _queue_identity(item)
-        appearances = 0
-        earliest_days = item.get("age_days", 0)
-        for snapshot in recent_runs[:3]:
-            match = snapshot["items"].get(key)
-            if match and match.get("lane") in {"blocked", "urgent"}:
-                appearances += 1
-                earliest_days = max(earliest_days, match.get("age_days", 0))
-        if item.get("lane") in {"blocked", "urgent"} and appearances >= 2:
-            repeat_urgent_count += 1
-
-        non_deferred_appearances = 0
-        for snapshot in recent_runs:
-            match = snapshot["items"].get(key)
-            if match and match.get("lane") != "deferred":
-                non_deferred_appearances += 1
-                earliest_days = max(earliest_days, match.get("age_days", 0))
-        if non_deferred_appearances >= 3 or earliest_days > 7:
-            stale_item_count += 1
-        oldest_open_item_days = max(oldest_open_item_days, earliest_days)
-
-    quiet_streak_runs = 0
-    for snapshot in recent_runs:
-        if snapshot["has_attention"]:
-            break
-        quiet_streak_runs += 1
-
+def _build_follow_through(resolution_trend: dict) -> dict:
+    resolution_targets = resolution_trend.get("resolution_targets", [])
+    repeat_urgent_count = sum(1 for item in resolution_targets if item.get("repeat_urgent"))
+    stale_item_count = sum(1 for item in resolution_targets if item.get("stale"))
+    oldest_open_item_days = max((item.get("age_days", 0) for item in resolution_targets), default=0)
+    quiet_streak_runs = resolution_trend.get("quiet_streak_runs", 0)
     return {
         "repeat_urgent_count": repeat_urgent_count,
         "stale_item_count": stale_item_count,
@@ -552,11 +554,79 @@ def _build_follow_through(queue: list[dict], history: list[dict]) -> dict:
     }
 
 
+def _build_resolution_trend(queue: list[dict], history: list[dict]) -> dict:
+    recent_runs = [_snapshot_from_queue(queue)] + [_snapshot_from_history(entry) for entry in history[: HISTORY_WINDOW_RUNS - 1]]
+    recent_runs = [snapshot for snapshot in recent_runs if snapshot["items"] or snapshot["has_attention"] is not None]
+    current_snapshot = recent_runs[0] if recent_runs else {"items": {}, "has_attention": False}
+    previous_snapshot = recent_runs[1] if len(recent_runs) > 1 else None
+    current_attention = _attention_items(current_snapshot)
+    previous_attention = _attention_items(previous_snapshot or {"items": {}, "has_attention": False})
+    current_attention_keys = set(current_attention)
+    previous_attention_keys = set(previous_attention)
+    earlier_attention_keys = set().union(
+        *[set(_attention_items(snapshot)) for snapshot in recent_runs[2:]]
+    ) if len(recent_runs) > 2 else set()
+
+    resolution_targets = _resolution_targets(queue, recent_runs)
+    new_attention_keys = current_attention_keys - previous_attention_keys
+    resolved_attention_count = len(previous_attention_keys - current_attention_keys)
+    persisting_attention_count = len(current_attention_keys & previous_attention_keys)
+    reopened_attention_count = len(
+        {
+            key
+            for key in new_attention_keys
+            if key in earlier_attention_keys
+        }
+    )
+    new_blocked_attention = any(
+        current_attention.get(key, {}).get("lane") == "blocked"
+        for key in new_attention_keys
+    )
+    current_attention_count = len(current_attention_keys)
+    previous_attention_count = len(previous_attention_keys)
+
+    quiet_streak_runs = 0
+    for snapshot in recent_runs:
+        if snapshot["has_attention"]:
+            break
+        quiet_streak_runs += 1
+
+    trend_status = _trend_status(
+        current_attention_count=current_attention_count,
+        previous_attention_count=previous_attention_count,
+        new_blocked_attention=new_blocked_attention,
+        quiet_streak_runs=quiet_streak_runs,
+        has_previous=previous_snapshot is not None,
+    )
+    primary_target = _primary_target(resolution_targets)
+    trend_summary = _trend_summary(
+        trend_status=trend_status,
+        quiet_streak_runs=quiet_streak_runs,
+        new_attention_count=len(new_attention_keys),
+        resolved_attention_count=resolved_attention_count,
+        persisting_attention_count=persisting_attention_count,
+        reopened_attention_count=reopened_attention_count,
+        primary_target=primary_target,
+    )
+    return {
+        "trend_status": trend_status,
+        "new_attention_count": len(new_attention_keys),
+        "resolved_attention_count": resolved_attention_count,
+        "persisting_attention_count": persisting_attention_count,
+        "reopened_attention_count": reopened_attention_count,
+        "history_window_runs": len(recent_runs),
+        "quiet_streak_runs": quiet_streak_runs,
+        "primary_target": primary_target,
+        "resolution_targets": resolution_targets[:5],
+        "trend_summary": trend_summary,
+    }
+
+
 def _snapshot_from_queue(queue: list[dict]) -> dict:
     items = {_queue_identity(item): item for item in queue}
     return {
         "items": items,
-        "has_attention": any(item.get("lane") in {"blocked", "urgent"} for item in queue),
+        "has_attention": any(item.get("lane") in ATTENTION_LANES for item in queue),
     }
 
 
@@ -569,6 +639,172 @@ def _snapshot_from_history(entry: dict) -> dict:
         "items": items,
         "has_attention": bool(has_attention),
     }
+
+
+def _attention_items(snapshot: dict) -> dict[str, dict]:
+    return {
+        key: item
+        for key, item in (snapshot.get("items") or {}).items()
+        if item.get("lane") in ATTENTION_LANES
+    }
+
+
+def _resolution_targets(queue: list[dict], recent_runs: list[dict]) -> list[dict]:
+    previous_attention_keys = set(_attention_items(recent_runs[1])) if len(recent_runs) > 1 else set()
+    earlier_attention_keys = set().union(
+        *[set(_attention_items(snapshot)) for snapshot in recent_runs[2:]]
+    ) if len(recent_runs) > 2 else set()
+    targets: list[dict] = []
+    for item in queue:
+        if item.get("lane") == "deferred":
+            continue
+        key = _queue_identity(item)
+        earliest_days = item.get("age_days", 0)
+        non_deferred_appearances = 0
+        repeat_attention_appearances = 0
+        for snapshot in recent_runs:
+            match = snapshot["items"].get(key)
+            if not match:
+                continue
+            earliest_days = max(earliest_days, match.get("age_days", 0))
+            if match.get("lane") != "deferred":
+                non_deferred_appearances += 1
+            if match.get("lane") in ATTENTION_LANES:
+                repeat_attention_appearances += 1
+        is_stale = non_deferred_appearances >= 3 or earliest_days > 7
+        is_repeat_urgent = item.get("lane") in ATTENTION_LANES and repeat_attention_appearances >= 2
+        is_reopened = (
+            item.get("lane") in ATTENTION_LANES
+            and key not in previous_attention_keys
+            and key in earlier_attention_keys
+        )
+        targets.append(
+            {
+                "item_id": item.get("item_id", key),
+                "repo": item.get("repo", ""),
+                "title": item.get("title", ""),
+                "lane": item.get("lane", ""),
+                "lane_label": item.get("lane_label", LANE_LABELS.get(item.get("lane", ""), "")),
+                "kind": item.get("kind", ""),
+                "priority": item.get("priority", 0),
+                "recommended_action": item.get("recommended_action", ""),
+                "summary": item.get("summary", ""),
+                "age_days": earliest_days,
+                "stale": is_stale,
+                "reopened": is_reopened,
+                "repeat_urgent": is_repeat_urgent,
+            }
+        )
+    targets.sort(key=_resolution_target_sort_key)
+    return targets
+
+
+def _resolution_target_sort_key(item: dict) -> tuple:
+    return (
+        LANE_ORDER.get(item.get("lane", "deferred"), 99),
+        0 if item.get("stale") or item.get("reopened") else 1,
+        -item.get("age_days", 0),
+        -item.get("priority", 0),
+        item.get("repo", ""),
+        item.get("title", ""),
+    )
+
+
+def _primary_target(resolution_targets: list[dict]) -> dict:
+    if not resolution_targets:
+        return {}
+
+    def _pick(predicate, *, newest: bool = False) -> dict:
+        matches = [item for item in resolution_targets if predicate(item)]
+        if not matches:
+            return {}
+        if newest:
+            matches.sort(
+                key=lambda item: (
+                    item.get("age_days", 0),
+                    -item.get("priority", 0),
+                    item.get("repo", ""),
+                    item.get("title", ""),
+                )
+            )
+            return matches[0]
+        matches.sort(
+            key=lambda item: (
+                -item.get("age_days", 0),
+                -item.get("priority", 0),
+                item.get("repo", ""),
+                item.get("title", ""),
+            )
+        )
+        return matches[0]
+
+    return (
+        _pick(lambda item: item.get("lane") == "blocked" and item.get("kind") == "setup")
+        or _pick(lambda item: item.get("lane") == "blocked")
+        or _pick(lambda item: item.get("lane") == "urgent" and item.get("stale"))
+        or _pick(lambda item: item.get("lane") == "urgent" and item.get("reopened"))
+        or _pick(lambda item: item.get("lane") == "urgent", newest=True)
+        or _pick(lambda item: item.get("lane") == "ready")
+        or {}
+    )
+
+
+def _trend_status(
+    *,
+    current_attention_count: int,
+    previous_attention_count: int,
+    new_blocked_attention: bool,
+    quiet_streak_runs: int,
+    has_previous: bool,
+) -> str:
+    if current_attention_count == 0 and quiet_streak_runs >= 2:
+        return "quiet"
+    if not has_previous:
+        return "stable"
+    if new_blocked_attention or current_attention_count > previous_attention_count:
+        return "worsening"
+    if current_attention_count < previous_attention_count or (
+        current_attention_count == 0 and previous_attention_count > 0
+    ):
+        return "improving"
+    return "stable"
+
+
+def _trend_summary(
+    *,
+    trend_status: str,
+    quiet_streak_runs: int,
+    new_attention_count: int,
+    resolved_attention_count: int,
+    persisting_attention_count: int,
+    reopened_attention_count: int,
+    primary_target: dict,
+) -> str:
+    repo = f"{primary_target.get('repo')}: " if primary_target.get("repo") else ""
+    target_label = f"{repo}{primary_target.get('title', '')}".strip(": ")
+    if trend_status == "quiet":
+        return f"The queue is quiet and has stayed that way for {quiet_streak_runs} consecutive run(s)."
+    if trend_status == "worsening":
+        target_text = f" Focus first on {target_label}." if target_label else ""
+        return (
+            f"The operator picture is worsening: {new_attention_count} new attention item(s) appeared, "
+            f"{persisting_attention_count} still remain open, and {reopened_attention_count} reopened inside the recent window."
+            f"{target_text}"
+        )
+    if trend_status == "improving":
+        target_text = f" Remaining focus: {target_label}." if target_label else ""
+        return (
+            f"The operator picture is improving: {resolved_attention_count} attention item(s) cleared since the last run, "
+            f"and {persisting_attention_count} still remain open."
+            f"{target_text}"
+        )
+    if persisting_attention_count:
+        target_text = f" Close {target_label} next." if target_label else ""
+        return (
+            f"The queue is stable but still sticky: {persisting_attention_count} attention item(s) are persisting from the last run."
+            f"{target_text}"
+        )
+    return "The queue changed only lightly since the last run, with no clear worsening or recovery trend."
 
 
 def _queue_identity(item: dict) -> str:
@@ -611,7 +847,22 @@ def _handoff_urgency(queue: list[dict], setup_health: dict) -> str:
     return "quiet"
 
 
-def _summarize_operator_change(top_item: dict, recent_changes: list[dict]) -> str:
+def _summarize_operator_change(top_item: dict, recent_changes: list[dict], resolution_trend: dict) -> str:
+    trend_status = resolution_trend.get("trend_status", "stable")
+    if trend_status == "quiet":
+        return f"No new blocking or urgent drift is surfaced, and the queue has stayed quiet for {resolution_trend.get('quiet_streak_runs', 0)} consecutive run(s)."
+    if top_item and trend_status == "worsening":
+        subject = f"{top_item.get('repo')}: " if top_item.get("repo") else ""
+        return f"{subject}{top_item.get('title', 'Operator change')} is the new top priority."
+    if top_item and trend_status == "improving":
+        subject = f"{top_item.get('repo')}: " if top_item.get("repo") else ""
+        return (
+            f"{resolution_trend.get('resolved_attention_count', 0)} item(s) cleared since the last run; "
+            f"{subject}{top_item.get('title', 'Operator change')} remains the highest-value unresolved target."
+        )
+    if top_item and trend_status == "stable" and resolution_trend.get("persisting_attention_count", 0):
+        subject = f"{top_item.get('repo')}: " if top_item.get("repo") else ""
+        return f"{subject}{top_item.get('title', 'Operator change')} is still open from the prior run and remains the main target."
     if top_item:
         subject = f"{top_item.get('repo')}: " if top_item.get("repo") else ""
         detail = top_item.get("summary", "").strip()
@@ -626,9 +877,15 @@ def _summarize_operator_change(top_item: dict, recent_changes: list[dict]) -> st
     return QUIET_HANDOFF
 
 
-def _next_operator_action(top_item: dict, watch_guidance: dict, follow_through: dict) -> str:
+def _next_operator_action(top_item: dict, watch_guidance: dict, follow_through: dict, resolution_trend: dict) -> str:
     if top_item.get("kind") == "setup" and top_item.get("recommended_action"):
         return top_item["recommended_action"]
+    if resolution_trend.get("trend_status") == "quiet":
+        return f"Keep the operator loop light and only escalate if the next run breaks the {resolution_trend.get('quiet_streak_runs', 0)}-run quiet streak."
+    if resolution_trend.get("trend_status") == "worsening" and top_item.get("recommended_action"):
+        return top_item["recommended_action"]
+    if resolution_trend.get("trend_status") == "improving" and top_item.get("recommended_action"):
+        return f"Close the remaining top target next: {top_item['recommended_action']}"
     if follow_through.get("stale_item_count", 0):
         return "Start with the oldest repeated blocked or urgent item before taking on newly ready work."
     if follow_through.get("quiet_streak_runs", 0) >= 2:
@@ -659,7 +916,13 @@ def _escalation_reason(queue: list[dict], setup_health: dict, watch_guidance: di
     return "quiet"
 
 
-def _why_it_matters(urgency: str, escalation_reason: str, watch_guidance: dict, top_item: dict) -> str:
+def _why_it_matters(
+    urgency: str,
+    escalation_reason: str,
+    watch_guidance: dict,
+    top_item: dict,
+    resolution_trend: dict,
+) -> str:
     if urgency == "blocked":
         return "A trustworthy next step is blocked until this is cleared."
     if escalation_reason == "stale-baseline":
@@ -667,11 +930,17 @@ def _why_it_matters(urgency: str, escalation_reason: str, watch_guidance: dict, 
     if escalation_reason == "scheduled-full-refresh":
         return "The normal full-refresh cadence is due, so the next run should refresh portfolio truth before more incremental monitoring."
     if urgency == "urgent":
+        if resolution_trend.get("trend_status") == "worsening":
+            return "The queue is moving in the wrong direction, so this should be reviewed before new noise compounds."
+        if resolution_trend.get("trend_status") == "stable" and resolution_trend.get("persisting_attention_count", 0):
+            return "The same attention item is still open, so closing it now is more valuable than picking up newly ready work."
         return "This has crossed into live drift, regression risk, or rollback exposure and should be reviewed before it spreads."
     if urgency == "ready":
         return "Nothing is blocked, but there is manual review or apply work ready to move forward."
     if urgency == "deferred":
         return "The current queue is stable enough to defer without losing important context."
+    if resolution_trend.get("trend_status") == "quiet":
+        return f"The queue has stayed quiet for {resolution_trend.get('quiet_streak_runs', 0)} run(s), so no immediate intervention is needed."
     if watch_guidance.get("next_recommended_run_mode") == "incremental":
         return "The latest baseline is still compatible, so the operator loop can stay lightweight for now."
     if top_item:
