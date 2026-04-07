@@ -674,6 +674,14 @@ def _print_control_center_summary(snapshot: dict) -> None:
         print(f"  What counts as done: {summary['primary_target_done_criteria']}")
     if summary.get("closure_guidance"):
         print(f"  Closure guidance: {summary['closure_guidance']}")
+    if summary.get("primary_target_last_intervention"):
+        intervention = summary.get("primary_target_last_intervention") or {}
+        when = (intervention.get("recorded_at") or "")[:10]
+        event_type = intervention.get("event_type", "recorded")
+        outcome = intervention.get("outcome", event_type)
+        print(f"  What we tried: {when} {event_type} ({outcome})".strip())
+    if summary.get("primary_target_resolution_evidence"):
+        print(f"  Resolution evidence: {summary['primary_target_resolution_evidence']}")
     if summary.get("follow_through_summary"):
         print(f"  Follow-through: {summary['follow_through_summary']}")
     lane_labels = [

@@ -29,6 +29,32 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
             "primary_target_reason": "This urgent item is already being watched across recent runs, so it stays ahead of ready work until it clears.",
             "primary_target_done_criteria": "Inspect and reconcile the drift, then confirm this item no longer reappears on the next run.",
             "closure_guidance": "Inspect the managed issue before closing the campaign. Treat this as done only when inspect and reconcile the drift, then confirm this item no longer reappears on the next run.",
+            "decision_memory_status": "attempted",
+            "primary_target_last_intervention": {
+                "item_id": "campaign-drift:repo-c",
+                "repo": "RepoC",
+                "title": "RepoC drift needs review",
+                "event_type": "drifted",
+                "recorded_at": "2026-04-07T12:00:00+00:00",
+                "outcome": "drifted",
+            },
+            "primary_target_last_outcome": "no-change",
+            "primary_target_resolution_evidence": "The last intervention was drifted for RepoC: RepoC drift needs review, but the item is still open.",
+            "recent_interventions": [
+                {
+                    "item_id": "campaign-drift:repo-c",
+                    "repo": "RepoC",
+                    "title": "RepoC drift needs review",
+                    "event_type": "drifted",
+                    "recorded_at": "2026-04-07T12:00:00+00:00",
+                    "outcome": "drifted",
+                }
+            ],
+            "recently_quieted_count": 0,
+            "confirmed_resolved_count": 0,
+            "reopened_after_resolution_count": 0,
+            "decision_memory_window_runs": 3,
+            "resolution_evidence_summary": "The last intervention was drifted for RepoC: RepoC drift needs review, but the item is still open.",
             "chronic_item_count": 0,
             "newly_stale_count": 0,
             "longest_persisting_item": {
@@ -82,9 +108,12 @@ def test_build_scheduled_handoff_writes_artifacts_and_issue_candidate(tmp_path):
     assert "What Got Better" in markdown
     assert "What Needs Attention Now" in markdown
     assert "Primary target: RepoC: RepoC drift needs review" in markdown
+    assert "What We Tried" in markdown
     assert "Why This Is Still Open" in markdown
     assert "What Counts As Done" in markdown
+    assert "Resolution Evidence" in markdown
     assert "Aging Pressure" in markdown
+    assert "What Reopened" in markdown
 
 
 def test_build_scheduled_handoff_stays_quiet_for_quiet_runs(tmp_path):

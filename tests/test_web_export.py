@@ -109,6 +109,14 @@ def _make_report(**overrides) -> dict:
             "primary_target_reason": "This stays on top because urgent drift has persisted and should be cleared before lower-pressure work.",
             "primary_target_done_criteria": "Inspect the drift, reconcile it, and confirm the item no longer returns as urgent on the next run.",
             "closure_guidance": "Review the managed issue, reconcile the drift, and confirm the urgent queue shrinks on the next run.",
+            "primary_target_last_intervention": {
+                "repo": "RepoC",
+                "title": "RepoC drift needs review",
+                "event_type": "drifted",
+                "recorded_at": "2026-03-29T12:00:00+00:00",
+                "outcome": "drifted",
+            },
+            "primary_target_resolution_evidence": "The last intervention was drifted for RepoC: RepoC drift needs review, but the item is still open.",
             "primary_target": {"repo": "RepoC", "title": "RepoC drift needs review"},
         },
         "operator_queue": [
@@ -225,6 +233,8 @@ class TestRenderHtml:
         assert "Why This Is The Top Target:" in html
         assert "What Counts As Done:" in html
         assert "Closure Guidance:" in html
+        assert "What We Tried:" in html
+        assert "Resolution Evidence:" in html
         assert "RepoC: RepoC drift needs review" in html
 
     def test_has_filter_controls(self):

@@ -122,6 +122,8 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Attention counts: new={summary.get('new_attention_count', 0)}, resolved={resolved_count}, persisting={persisting_count}, reopened={summary.get('reopened_attention_count', 0)}",
         f"- Primary target: {primary_target_label or 'No active target'}",
         f"- Accountability: {summary.get('accountability_summary', 'No accountability summary is recorded yet.')}",
+        f"- Decision memory: `{summary.get('decision_memory_status', 'new')}`",
+        f"- Resolution evidence: {summary.get('resolution_evidence_summary', 'No resolution evidence is recorded yet.')}",
         f"- Next recommended run: `{summary.get('next_recommended_run_mode', 'n/a')}`",
         f"- Watch strategy: `{summary.get('watch_strategy', 'manual')}`",
         f"- Watch decision: {summary.get('watch_decision_summary', 'No watch guidance is recorded.')}",
@@ -172,6 +174,19 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     else:
         lines.append("- No active top-target rationale is recorded.")
     lines.append("")
+    lines.append("## What We Tried")
+    lines.append("")
+    if summary.get("primary_target_last_intervention"):
+        intervention = summary.get("primary_target_last_intervention") or {}
+        lines.append(
+            f"- {_intervention_markdown(intervention)}"
+        )
+    elif summary.get("recent_interventions"):
+        for intervention in (summary.get("recent_interventions") or [])[:3]:
+            lines.append(f"- {_intervention_markdown(intervention)}")
+    else:
+        lines.append("- No recent intervention is recorded in the evidence window yet.")
+    lines.append("")
     lines.append("## What Counts As Done")
     lines.append("")
     if summary.get("primary_target_done_criteria"):
@@ -180,6 +195,11 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         lines.append(f"- {summary.get('closure_guidance')}")
     if not summary.get("primary_target_done_criteria") and not summary.get("closure_guidance"):
         lines.append("- No active done-state guidance is recorded.")
+    lines.append("")
+    lines.append("## Resolution Evidence")
+    lines.append("")
+    lines.append(f"- {summary.get('primary_target_resolution_evidence', 'No resolution evidence is recorded yet.')}")
+    lines.append(f"- {summary.get('resolution_evidence_summary', 'No recent resolution-evidence rollup is recorded yet.')}")
     lines.append("")
     lines.append("## Aging Pressure")
     lines.append("")
@@ -195,6 +215,15 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         )
     else:
         lines.append("- No persisting item is currently recorded.")
+    lines.append("")
+    lines.append("## What Reopened")
+    lines.append("")
+    if summary.get("reopened_after_resolution_count", 0):
+        lines.append(
+            f"- {summary.get('reopened_after_resolution_count', 0)} item(s) reopened after an earlier quiet or resolved state."
+        )
+    else:
+        lines.append("- No item reopened after an earlier quiet or resolved state in the recent window.")
     lines.append("")
     if queue:
         lines.append("## Top Queue Items")
@@ -213,6 +242,15 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
             lines.append(f"- {change.get('generated_at', '')[:10]} {subject}: {change.get('summary', change.get('kind', 'change'))}")
         lines.append("")
     return "\n".join(lines).strip() + "\n"
+
+
+def _intervention_markdown(intervention: dict) -> str:
+    when = (intervention.get("recorded_at") or "")[:10]
+    event_type = intervention.get("event_type", "recorded")
+    outcome = intervention.get("outcome", event_type)
+    repo = f"{intervention.get('repo')}: " if intervention.get("repo") else ""
+    title = intervention.get("title", "")
+    return f"{when} {event_type} for {repo}{title} ({outcome})".strip()
 
 
 def build_scheduled_handoff(

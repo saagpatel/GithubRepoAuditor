@@ -244,6 +244,33 @@ def _make_report(audits=None) -> dict:
             "reopened_attention_count": 0,
             "quiet_streak_runs": 0,
             "aging_status": "watch",
+            "decision_memory_status": "attempted",
+            "primary_target_last_seen_at": "2026-03-29T10:00:00+00:00",
+            "primary_target_last_intervention": {
+                "item_id": "review-target:RepoC",
+                "repo": "RepoC",
+                "title": "Security posture needs attention",
+                "event_type": "drifted",
+                "recorded_at": "2026-03-29T10:00:00+00:00",
+                "outcome": "drifted",
+            },
+            "primary_target_last_outcome": "no-change",
+            "primary_target_resolution_evidence": "The last intervention was drifted for RepoC: Security posture needs attention, but the item is still open.",
+            "recent_interventions": [
+                {
+                    "item_id": "review-target:RepoC",
+                    "repo": "RepoC",
+                    "title": "Security posture needs attention",
+                    "event_type": "drifted",
+                    "recorded_at": "2026-03-29T10:00:00+00:00",
+                    "outcome": "drifted",
+                }
+            ],
+            "recently_quieted_count": 0,
+            "confirmed_resolved_count": 0,
+            "reopened_after_resolution_count": 0,
+            "decision_memory_window_runs": 3,
+            "resolution_evidence_summary": "The last intervention was drifted for RepoC: Security posture needs attention, but the item is still open.",
             "primary_target_reason": "This remains the top target because urgent review work should be closed before lower-pressure ready items.",
             "primary_target_done_criteria": "Complete the recommended review action and confirm the item exits urgent state on the next run.",
             "closure_guidance": "Preview the governance controls and confirm this urgent review target clears on the next run.",
@@ -496,8 +523,9 @@ class TestAnalystWorkbookSheets:
         ws = wb["Review Queue"]
         assert ws["A4"].value == "Summary"
         assert ws["E4"].value == "Top 10 To Act On"
-        assert ws["A25"].value == "Repo"
-        assert ws.freeze_panes == "A26"
+        header_row = next(row for row in range(20, 40) if ws.cell(row=row, column=1).value == "Repo")
+        assert header_row > 24
+        assert ws.freeze_panes == f"A{header_row + 1}"
 
     def test_standard_operator_sheets_include_trend_callouts(self):
         wb = Workbook()
@@ -524,15 +552,23 @@ class TestAnalystWorkbookSheets:
         assert "urgent review work" in str(review_ws["B13"].value).lower()
         assert review_ws["A14"].value == "Closure Guidance"
         assert review_ws["A15"].value == "Aging Pressure"
+        assert review_ws["A16"].value == "What We Tried"
+        assert review_ws["A17"].value == "Last Outcome"
+        assert review_ws["A18"].value == "Resolution Evidence"
         assert executive_ws["D29"].value == "Trend"
         assert executive_ws["D32"].value == "Why Top Target"
         assert executive_ws["D33"].value == "Closure Guidance"
+        assert executive_ws["D35"].value == "What We Tried"
+        assert executive_ws["D36"].value == "Last Outcome"
+        assert executive_ws["D37"].value == "Resolution Evidence"
         assert print_ws["A17"].value == "Primary Target"
         assert print_ws["A18"].value == "Why Top Target"
-        assert print_ws["A19"].value == "What Counts As Done"
-        assert print_ws["A20"].value == "Aging Pressure"
+        assert print_ws["A19"].value == "What We Tried"
+        assert print_ws["A20"].value == "Last Outcome"
+        assert print_ws["A21"].value == "Resolution Evidence"
         assert "Why Top Target" in dashboard_values
         assert "Closure Guidance" in dashboard_values
+        assert "What We Tried" in dashboard_values
 
     def test_campaigns_show_empty_state_when_no_preview_rows(self):
         wb = Workbook()
@@ -733,7 +769,10 @@ class TestWorkbookModes:
         assert standard_wb["Governance Controls"]["B5"].value == template_wb["Governance Controls"]["B5"].value
         assert standard_wb["Print Pack"]["B9"].value == template_wb["Print Pack"]["B9"].value
         assert template_wb["Review Queue"]["A4"].value == "Summary"
-        assert template_wb["Review Queue"]["A25"].value == "Repo"
+        template_header_row = next(
+            row for row in range(15, 45) if template_wb["Review Queue"].cell(row=row, column=1).value == "Repo"
+        )
+        assert template_header_row >= 17
 
     def test_internal_navigation_links_use_locations_not_external_relationships(self, tmp_path):
         report_path = tmp_path / "report.json"
@@ -753,10 +792,11 @@ class TestWorkbookModes:
 
         output = export_excel(report_path, tmp_path / "out.xlsx", excel_mode="standard")
 
-        with zipfile.ZipFile(output) as archive:
-            review_queue_xml = archive.read("xl/worksheets/sheet3.xml").decode("utf-8", "ignore")
-            assert "<autoFilter ref=\"A25:H26\"" in review_queue_xml
-            assert "<tableParts" not in review_queue_xml
+        wb = load_workbook(output)
+        ws = wb["Review Queue"]
+        header_row = next(row for row in range(20, 45) if ws.cell(row=row, column=1).value == "Repo")
+        assert ws.auto_filter.ref == f"A{header_row}:H{header_row + 1}"
+        assert not ws.tables
 
     def test_visible_sheets_use_filters_while_hidden_data_sheets_keep_tables(self, tmp_path):
         report_path = tmp_path / "report.json"

@@ -1582,3 +1582,118 @@ def load_operator_state_history(output_dir: Path, username: str, limit: int = 5)
             }
         )
     return history
+
+
+def load_recent_operator_evidence(
+    output_dir: Path,
+    username: str,
+    *,
+    snapshot_limit: int = 10,
+    event_limit: int = 30,
+) -> dict:
+    conn = _connect(output_dir)
+    if conn is None:
+        return {"history": [], "events": []}
+    try:
+        snapshot_rows = conn.execute(
+            """
+            SELECT run_id, generated_at, operator_summary_json, operator_queue_json
+            FROM audit_runs
+            WHERE username = ?
+            ORDER BY generated_at DESC
+            LIMIT ?
+            """,
+            (username, snapshot_limit),
+        ).fetchall()
+        event_rows = conn.execute(
+            """
+            SELECT audit_runs.generated_at AS recorded_at,
+                   'campaign' AS source,
+                   campaign_history.action_id AS action_id,
+                   campaign_history.repo_id AS repo_id,
+                   campaign_history.campaign_type AS event_group,
+                   campaign_history.lifecycle_state AS event_type,
+                   campaign_history.reconciliation_outcome AS outcome,
+                   campaign_history.closed_reason AS closed_reason,
+                   campaign_history.reopened_at AS reopened_at,
+                   campaign_history.details_json AS details_json
+            FROM campaign_history
+            JOIN audit_runs ON audit_runs.run_id = campaign_history.run_id
+            WHERE audit_runs.username = ?
+            UNION ALL
+            SELECT audit_runs.generated_at AS recorded_at,
+                   'governance' AS source,
+                   governance_drift_events.action_id AS action_id,
+                   governance_drift_events.repo_id AS repo_id,
+                   governance_drift_events.control_key AS event_group,
+                   governance_drift_events.drift_type AS event_type,
+                   'drifted' AS outcome,
+                   '' AS closed_reason,
+                   '' AS reopened_at,
+                   governance_drift_events.details_json AS details_json
+            FROM governance_drift_events
+            JOIN audit_runs ON audit_runs.run_id = REPLACE(governance_drift_events.run_id, 'governance:', '')
+            WHERE audit_runs.username = ?
+            ORDER BY recorded_at DESC
+            LIMIT ?
+            """,
+            (username, username, event_limit),
+        ).fetchall()
+    finally:
+        conn.close()
+    return {
+        "history": [
+            {
+                "run_id": row["run_id"],
+                "generated_at": row["generated_at"],
+                "operator_summary": json.loads(row["operator_summary_json"] or "{}"),
+                "operator_queue": json.loads(row["operator_queue_json"] or "[]"),
+            }
+            for row in snapshot_rows
+        ],
+        "events": [_normalize_operator_evidence_event(row) for row in event_rows],
+    }
+
+
+def _normalize_operator_evidence_event(row: sqlite3.Row) -> dict:
+    details = json.loads(row["details_json"] or "{}")
+    repo_full_name = details.get("repo_full_name") or row["repo_id"] or ""
+    repo = details.get("repo") or (repo_full_name.split("/")[-1] if repo_full_name else "")
+    action_id = row["action_id"] or details.get("action_id", "")
+    target = details.get("target") or details.get("control_key") or row["event_group"] or ""
+    source = row["source"]
+    if source == "campaign" and action_id:
+        item_id = f"campaign-drift:{action_id}:{target}" if target else f"campaign-drift:{action_id}"
+        title = details.get("title") or f"{repo or 'Campaign'} drift needs review"
+    elif source == "governance":
+        governance_key = action_id or repo_full_name or repo or "governance"
+        item_id = f"governance-drift:{governance_key}:{target}" if target else f"governance-drift:{governance_key}"
+        title = details.get("title") or f"{repo or 'Governance'} drift needs review"
+    else:
+        title = details.get("title") or (f"{repo}: {row['event_type']}" if repo else row["event_type"])
+        item_id = details.get("item_id") or f"{repo}:{title}".strip(":")
+    summary = (
+        details.get("summary")
+        or details.get("drift_state")
+        or details.get("drift_type")
+        or details.get("why")
+        or row["event_type"]
+        or "operator-event"
+    )
+    outcome = row["outcome"] or row["event_type"] or "recorded"
+    if row["reopened_at"]:
+        outcome = "reopened"
+    elif row["closed_reason"]:
+        outcome = row["closed_reason"] or outcome
+    return {
+        "item_id": item_id,
+        "repo": repo,
+        "repo_full_name": repo_full_name,
+        "title": title,
+        "summary": summary,
+        "source": source,
+        "event_type": row["event_type"] or "recorded",
+        "event_group": row["event_group"] or "",
+        "outcome": outcome,
+        "recorded_at": row["recorded_at"],
+    }

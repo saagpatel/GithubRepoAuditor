@@ -235,6 +235,16 @@ def write_markdown_report(
             _w(f"- What Counts As Done: {report.operator_summary.get('primary_target_done_criteria')}")
         if report.operator_summary.get("closure_guidance"):
             _w(f"- Closure Guidance: {report.operator_summary.get('closure_guidance')}")
+        if report.operator_summary.get("primary_target_last_intervention"):
+            intervention = report.operator_summary.get("primary_target_last_intervention") or {}
+            when = (intervention.get("recorded_at") or "")[:10]
+            repo = f"{intervention.get('repo')}: " if intervention.get("repo") else ""
+            title = intervention.get("title", "")
+            event_type = intervention.get("event_type", "recorded")
+            outcome = intervention.get("outcome", event_type)
+            _w(f"- What We Tried: {when} {event_type} for {repo}{title} ({outcome})".strip())
+        if report.operator_summary.get("primary_target_resolution_evidence"):
+            _w(f"- Resolution Evidence: {report.operator_summary.get('primary_target_resolution_evidence')}")
         if report.operator_summary.get("control_center_reference"):
             _w(f"- Control Center Artifact: `{report.operator_summary.get('control_center_reference')}`")
         counts = report.operator_summary.get("counts", {})
