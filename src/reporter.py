@@ -245,6 +245,23 @@ def write_markdown_report(
             _w(f"- What We Tried: {when} {event_type} for {repo}{title} ({outcome})".strip())
         if report.operator_summary.get("primary_target_resolution_evidence"):
             _w(f"- Resolution Evidence: {report.operator_summary.get('primary_target_resolution_evidence')}")
+        if report.operator_summary.get("primary_target_confidence_label"):
+            _w(
+                f"- Primary Target Confidence: {report.operator_summary.get('primary_target_confidence_label')} "
+                f"({report.operator_summary.get('primary_target_confidence_score', 0.0):.2f})"
+            )
+        if report.operator_summary.get("primary_target_confidence_reasons"):
+            _w(
+                "- Confidence Reasons: "
+                + ", ".join(report.operator_summary.get("primary_target_confidence_reasons") or [])
+            )
+        if report.operator_summary.get("next_action_confidence_label"):
+            _w(
+                f"- Next Action Confidence: {report.operator_summary.get('next_action_confidence_label')} "
+                f"({report.operator_summary.get('next_action_confidence_score', 0.0):.2f})"
+            )
+        if report.operator_summary.get("recommendation_quality_summary"):
+            _w(f"- Recommendation Quality: {report.operator_summary.get('recommendation_quality_summary')}")
         if report.operator_summary.get("control_center_reference"):
             _w(f"- Control Center Artifact: `{report.operator_summary.get('control_center_reference')}`")
         counts = report.operator_summary.get("counts", {})

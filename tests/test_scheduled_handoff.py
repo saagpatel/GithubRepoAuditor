@@ -40,6 +40,13 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
             },
             "primary_target_last_outcome": "no-change",
             "primary_target_resolution_evidence": "The last intervention was drifted for RepoC: RepoC drift needs review, but the item is still open.",
+            "primary_target_confidence_score": 0.7,
+            "primary_target_confidence_label": "medium",
+            "primary_target_confidence_reasons": [
+                "Urgent drift or regression needs attention before ready work.",
+                "A prior intervention happened, but the item is still open.",
+                "This item has repeated recently and is no longer brand new.",
+            ],
             "recent_interventions": [
                 {
                     "item_id": "campaign-drift:repo-c",
@@ -55,6 +62,10 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
             "reopened_after_resolution_count": 0,
             "decision_memory_window_runs": 3,
             "resolution_evidence_summary": "The last intervention was drifted for RepoC: RepoC drift needs review, but the item is still open.",
+            "next_action_confidence_score": 0.75,
+            "next_action_confidence_label": "high",
+            "next_action_confidence_reasons": ["The next step is tied directly to the current top target."],
+            "recommendation_quality_summary": "Strong recommendation because the next step is tied directly to the current top target.",
             "chronic_item_count": 0,
             "newly_stale_count": 0,
             "longest_persisting_item": {
@@ -112,6 +123,8 @@ def test_build_scheduled_handoff_writes_artifacts_and_issue_candidate(tmp_path):
     assert "Why This Is Still Open" in markdown
     assert "What Counts As Done" in markdown
     assert "Resolution Evidence" in markdown
+    assert "Recommendation Confidence" in markdown
+    assert "Primary target confidence: medium (0.70)" in markdown
     assert "Aging Pressure" in markdown
     assert "What Reopened" in markdown
 

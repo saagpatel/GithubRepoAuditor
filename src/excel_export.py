@@ -316,6 +316,25 @@ def _operator_decision_memory_values(data: dict) -> tuple[str, str, str, str]:
     return last_intervention_label, last_outcome.replace("-", " ").title(), resolution_evidence, recovery_counts
 
 
+def _operator_confidence_values(data: dict) -> tuple[str, str, str, str]:
+    summary = data.get("operator_summary") or {}
+    primary_confidence = (
+        f"{summary.get('primary_target_confidence_label', 'low').title()} "
+        f"({summary.get('primary_target_confidence_score', 0.0):.2f})"
+    )
+    reasons = summary.get("primary_target_confidence_reasons") or []
+    confidence_reason = reasons[0] if reasons else "No confidence rationale is recorded yet."
+    next_action_confidence = (
+        f"{summary.get('next_action_confidence_label', 'low').title()} "
+        f"({summary.get('next_action_confidence_score', 0.0):.2f})"
+    )
+    recommendation_quality = (
+        summary.get("recommendation_quality_summary")
+        or "No recommendation-quality summary is recorded yet."
+    )
+    return primary_confidence, confidence_reason, next_action_confidence, recommendation_quality
+
+
 def _apply_workbook_named_ranges(
     wb: Workbook,
     data: dict,
@@ -766,9 +785,10 @@ def _build_dashboard(
     trend_status, trend_summary, primary_target, resolution_counts = _operator_trend_values(data)
     primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
     last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
-    last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
-    last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
-    last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
+    primary_confidence, confidence_reason, next_action_confidence, recommendation_quality = _operator_confidence_values(data)
+    primary_confidence, confidence_reason, next_action_confidence, recommendation_quality = _operator_confidence_values(data)
+    primary_confidence, confidence_reason, next_action_confidence, recommendation_quality = _operator_confidence_values(data)
+    primary_confidence, confidence_reason, next_action_confidence, recommendation_quality = _operator_confidence_values(data)
 
     operator_rows = [
         ("Setup Health", _display_operator_state(setup_health.get("status", "ok"))),
@@ -812,6 +832,10 @@ def _build_dashboard(
                 ("Last Outcome", last_outcome),
                 ("Resolution Evidence", resolution_evidence),
                 ("Recovery Counts", recovery_counts),
+                ("Recommendation Confidence", primary_confidence),
+                ("Confidence Rationale", confidence_reason),
+                ("Next Action Confidence", next_action_confidence),
+                ("Recommendation Quality", recommendation_quality),
             ]
         )
     operator_block_end = _write_key_value_block(ws, 5, 15, operator_rows, title="Operator Snapshot")
@@ -3459,6 +3483,7 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
     trend_status, trend_summary, primary_target, resolution_counts = _operator_trend_values(data)
     primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
     last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
+    primary_confidence, confidence_reason, next_action_confidence, recommendation_quality = _operator_confidence_values(data)
     summary_rows = [
         ("Headline", (data.get("operator_summary") or {}).get("headline", "Review activity is available below.")),
         ("Queue Counts", _format_lane_counts(counts)),
@@ -3482,6 +3507,10 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
                 ("Last Outcome", last_outcome),
                 ("Resolution Evidence", resolution_evidence),
                 ("Recovery Counts", recovery_counts),
+                ("Recommendation Confidence", primary_confidence),
+                ("Confidence Rationale", confidence_reason),
+                ("Next Action Confidence", next_action_confidence),
+                ("Recommendation Quality", recommendation_quality),
             ]
         )
     summary_rows.append(("Source Run", (data.get("operator_summary") or {}).get("source_run_id", "")))
@@ -3869,6 +3898,7 @@ def _build_executive_summary(
     trend_status, trend_summary, primary_target, resolution_counts = _operator_trend_values(data)
     primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
     last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
+    primary_confidence, confidence_reason, next_action_confidence, recommendation_quality = _operator_confidence_values(data)
     recommended_focus = ""
     if data.get("operator_queue"):
         recommended_focus = data["operator_queue"][0].get("recommended_action", "")
@@ -3905,6 +3935,8 @@ def _build_executive_summary(
         narrative_rows.insert(7, ("Closure Guidance", closure_guidance))
         narrative_rows.insert(8, ("What We Tried", last_intervention))
         narrative_rows.insert(9, ("Resolution Evidence", resolution_evidence))
+        narrative_rows.insert(10, ("Recommendation Confidence", primary_confidence))
+        narrative_rows.insert(11, ("Confidence Rationale", confidence_reason))
     _write_key_value_block(ws, 4, 1, narrative_rows, title="Leadership Brief")
 
     write_kpi_card(ws, 10, 1, "Portfolio Grade", data.get("portfolio_grade", "F"))
@@ -3968,9 +4000,17 @@ def _build_executive_summary(
             ws.cell(row=37, column=5, value=resolution_evidence)
             ws.cell(row=38, column=4, value="Recovery Counts").font = SUBHEADER_FONT
             ws.cell(row=38, column=5, value=recovery_counts)
+            ws.cell(row=39, column=4, value="Recommendation Confidence").font = SUBHEADER_FONT
+            ws.cell(row=39, column=5, value=primary_confidence)
+            ws.cell(row=40, column=4, value="Confidence Rationale").font = SUBHEADER_FONT
+            ws.cell(row=40, column=5, value=confidence_reason)
+            ws.cell(row=41, column=4, value="Next Action Confidence").font = SUBHEADER_FONT
+            ws.cell(row=41, column=5, value=next_action_confidence)
+            ws.cell(row=42, column=4, value="Recommendation Quality").font = SUBHEADER_FONT
+            ws.cell(row=42, column=5, value=recommendation_quality)
     preflight = data.get("preflight_summary") or {}
     if preflight and (preflight.get("blocking_errors", 0) or preflight.get("warnings", 0)):
-        row_base = 41 if excel_mode == "standard" else 33
+        row_base = 45 if excel_mode == "standard" else 33
         ws.cell(row=row_base, column=1, value="Preflight Diagnostics").font = SECTION_FONT
         ws.cell(row=row_base + 1, column=1, value="Status").font = SUBHEADER_FONT
         ws.cell(row=row_base + 1, column=2, value=preflight.get("status", "unknown"))
@@ -3978,7 +4018,7 @@ def _build_executive_summary(
         ws.cell(row=row_base + 2, column=2, value=preflight.get("blocking_errors", 0))
         ws.cell(row=row_base + 3, column=1, value="Warnings").font = SUBHEADER_FONT
         ws.cell(row=row_base + 3, column=2, value=preflight.get("warnings", 0))
-    auto_width(ws, 6, 43 if excel_mode == "standard" else 35)
+    auto_width(ws, 6, 47 if excel_mode == "standard" else 35)
 
 
 def _build_print_pack(
@@ -4014,6 +4054,7 @@ def _build_print_pack(
     trend_status, trend_summary, primary_target, resolution_counts = _operator_trend_values(data)
     primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
     last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
+    primary_confidence, confidence_reason, next_action_confidence, recommendation_quality = _operator_confidence_values(data)
     ws["A7"] = "This Week"
     ws["B7"] = operator_summary.get("headline", "Review the latest workbook surfaces for change and drift.")
     ws["A8"] = "Operator Queue"
@@ -4051,11 +4092,19 @@ def _build_print_pack(
         ws["B21"] = resolution_evidence
         ws["A22"] = "Recovery Counts"
         ws["B22"] = recovery_counts
-        ws["A23"] = "Top Risks"
-        ws["A23"].font = SECTION_FONT
-        risk_start_row = 23
-        opportunity_header_row = 23
-        page2_row = 32
+        ws["A23"] = "Recommendation Confidence"
+        ws["B23"] = primary_confidence
+        ws["A24"] = "Confidence Rationale"
+        ws["B24"] = confidence_reason
+        ws["A25"] = "Next Action Confidence"
+        ws["B25"] = next_action_confidence
+        ws["A26"] = "Recommendation Quality"
+        ws["B26"] = recommendation_quality
+        ws["A27"] = "Top Risks"
+        ws["A27"].font = SECTION_FONT
+        risk_start_row = 27
+        opportunity_header_row = 27
+        page2_row = 36
     else:
         ws["A17"] = "Top Risks"
         ws["A17"].font = SECTION_FONT

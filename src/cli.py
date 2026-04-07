@@ -682,6 +682,25 @@ def _print_control_center_summary(snapshot: dict) -> None:
         print(f"  What we tried: {when} {event_type} ({outcome})".strip())
     if summary.get("primary_target_resolution_evidence"):
         print(f"  Resolution evidence: {summary['primary_target_resolution_evidence']}")
+    if summary.get("primary_target_confidence_label"):
+        print(
+            "  Primary target confidence: "
+            f"{summary.get('primary_target_confidence_label', 'low')} "
+            f"({summary.get('primary_target_confidence_score', 0.0):.2f})"
+        )
+    if summary.get("primary_target_confidence_reasons"):
+        print(
+            "  Confidence reasons: "
+            + ", ".join(summary.get("primary_target_confidence_reasons") or [])
+        )
+    if summary.get("next_action_confidence_label"):
+        print(
+            "  Next action confidence: "
+            f"{summary.get('next_action_confidence_label', 'low')} "
+            f"({summary.get('next_action_confidence_score', 0.0):.2f})"
+        )
+    if summary.get("recommendation_quality_summary"):
+        print(f"  Recommendation quality: {summary['recommendation_quality_summary']}")
     if summary.get("follow_through_summary"):
         print(f"  Follow-through: {summary['follow_through_summary']}")
     lane_labels = [

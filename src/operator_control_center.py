@@ -23,6 +23,19 @@ LANE_LABELS = {
 QUIET_HANDOFF = "No new blocking or urgent drift is surfaced in the latest operator snapshot."
 ATTENTION_LANES = {"blocked", "urgent"}
 HISTORY_WINDOW_RUNS = 10
+GENERIC_RECOMMENDATION_PHRASES = (
+    "continue the normal audit/control-center loop",
+    "continue the normal operator loop",
+    "review the latest state",
+    "inspect the latest changes and decide on next action",
+    "monitor future audits",
+    "open the repo queue details",
+)
+GENERIC_MONITOR_PHRASES = ("keep the operator loop light", "keep the operator loop lightweight")
+GENERIC_BASELINE_PHRASES = (
+    "run the next full audit to refresh the baseline",
+    "refresh the baseline before relying on incremental results",
+)
 
 
 def normalize_review_state(
@@ -292,6 +305,11 @@ def build_operator_snapshot(
         follow_through,
         resolution_trend,
     )
+    confidence = _operator_confidence_summary(
+        resolution_trend.get("primary_target") or {},
+        handoff["next_operator_action"],
+        watch_guidance,
+    )
     summary = {
         "headline": _headline_for_queue(queue, setup_health),
         "selected_view": triage_view,
@@ -353,6 +371,13 @@ def build_operator_snapshot(
         "reopened_after_resolution_count": resolution_trend["reopened_after_resolution_count"],
         "decision_memory_window_runs": resolution_trend["decision_memory_window_runs"],
         "resolution_evidence_summary": resolution_trend["resolution_evidence_summary"],
+        "primary_target_confidence_score": confidence["primary_target_confidence_score"],
+        "primary_target_confidence_label": confidence["primary_target_confidence_label"],
+        "primary_target_confidence_reasons": confidence["primary_target_confidence_reasons"],
+        "next_action_confidence_score": confidence["next_action_confidence_score"],
+        "next_action_confidence_label": confidence["next_action_confidence_label"],
+        "next_action_confidence_reasons": confidence["next_action_confidence_reasons"],
+        "recommendation_quality_summary": confidence["recommendation_quality_summary"],
     }
     return {
         "operator_summary": summary,
@@ -410,6 +435,22 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
         )
     if summary.get("primary_target_resolution_evidence"):
         lines.append(f"*Resolution Evidence:* {summary['primary_target_resolution_evidence']}")
+    if summary.get("primary_target_confidence_label"):
+        lines.append(
+            f"*Primary Target Confidence:* {summary['primary_target_confidence_label']} "
+            f"({summary.get('primary_target_confidence_score', 0.0):.2f})"
+        )
+    if summary.get("primary_target_confidence_reasons"):
+        lines.append(
+            f"*Confidence Reasons:* {', '.join(summary.get('primary_target_confidence_reasons') or [])}"
+        )
+    if summary.get("next_action_confidence_label"):
+        lines.append(
+            f"*Next Action Confidence:* {summary['next_action_confidence_label']} "
+            f"({summary.get('next_action_confidence_score', 0.0):.2f})"
+        )
+    if summary.get("recommendation_quality_summary"):
+        lines.append(f"*Recommendation Quality:* {summary['recommendation_quality_summary']}")
     if summary.get("control_center_reference"):
         lines.append(f"*Control Center Artifact:* `{summary['control_center_reference']}`")
     lines.append(
@@ -818,8 +859,136 @@ def _resolution_targets(queue: list[dict], recent_runs: list[dict], decision_mem
                 **decision_memory_map.get(key, {}),
             }
         )
+    targets = [_with_confidence(target) for target in targets]
     targets.sort(key=_resolution_target_sort_key)
     return targets
+
+
+def _with_confidence(item: dict) -> dict:
+    score, label, reasons = _recommendation_confidence(item)
+    return {
+        **item,
+        "confidence_score": score,
+        "confidence_label": label,
+        "confidence_reasons": reasons,
+    }
+
+
+def _recommendation_confidence(item: dict) -> tuple[float, str, list[str]]:
+    score = 0.20
+    lane_reason = ""
+    decision_reason = ""
+    aging_reason = ""
+    penalties: list[tuple[float, str]] = []
+
+    lane = item.get("lane", "")
+    kind = item.get("kind", "")
+    if lane == "blocked" and kind == "setup":
+        score += 0.40
+        lane_reason = "Blocked setup issue is directly stopping a trustworthy next step."
+    elif lane == "blocked":
+        score += 0.30
+        lane_reason = "Blocked operator work outranks urgent and ready items."
+    elif lane == "urgent":
+        score += 0.20
+        lane_reason = "Urgent drift or regression needs attention before ready work."
+    elif lane == "ready":
+        score += 0.05
+        lane_reason = "Ready work is actionable, but lower pressure than blocked or urgent items."
+
+    decision_memory_status = item.get("decision_memory_status", "")
+    if decision_memory_status == "reopened":
+        score += 0.20
+        decision_reason = "This item reopened after an earlier quiet or resolved period."
+    elif decision_memory_status == "persisting":
+        score += 0.15
+        decision_reason = "This item has persisted across multiple runs without clearing."
+    elif decision_memory_status == "attempted":
+        score += 0.10
+        decision_reason = "A prior intervention happened, but the item is still open."
+
+    aging_status = item.get("aging_status", "")
+    if aging_status == "chronic":
+        score += 0.15
+        aging_reason = "This item is now chronic, so follow-through pressure is high."
+    elif aging_status == "stale":
+        score += 0.10
+        aging_reason = "This item is stale and should be closed before it gets older."
+    elif aging_status == "watch":
+        score += 0.05
+        aging_reason = "This item has repeated recently and is no longer brand new."
+
+    if item.get("repeat_urgent"):
+        score += 0.10
+    if item.get("newly_stale"):
+        score += 0.10
+    priority = item.get("priority", 0)
+    if priority >= 85:
+        score += 0.10
+    elif priority >= 70:
+        score += 0.05
+
+    if lane == "ready" and priority < 60:
+        penalties.append((-0.15, "This is a lower-priority ready item, so the recommendation is less certain."))
+    if not item.get("last_intervention") and not _has_recent_change_evidence(item):
+        penalties.append((-0.10, "There is little recent change evidence behind this recommendation yet."))
+    if _is_generic_recommendation(item.get("recommended_action", "")):
+        penalties.append((-0.10, "The suggested next step is still generic rather than tightly item-specific."))
+
+    for penalty, _reason in penalties:
+        score += penalty
+    score = max(0.05, min(0.95, round(score, 2)))
+    label = _confidence_label(score)
+
+    reasons = [reason for reason in (lane_reason, decision_reason, aging_reason) if reason]
+    if penalties:
+        reasons.append(sorted(penalties, key=lambda item: item[0])[0][1])
+    return score, label, reasons[:4]
+
+
+def _confidence_label(score: float) -> str:
+    if score >= 0.75:
+        return "high"
+    if score >= 0.45:
+        return "medium"
+    return "low"
+
+
+def _has_recent_change_evidence(item: dict) -> bool:
+    return any(
+        [
+            item.get("repeat_urgent"),
+            item.get("newly_stale"),
+            item.get("reopened"),
+            item.get("stale"),
+            item.get("aging_status") in {"stale", "chronic"},
+            item.get("decision_memory_status") in {"reopened", "attempted", "persisting"},
+        ]
+    )
+
+
+def _is_generic_recommendation(action: str) -> bool:
+    normalized = (action or "").strip().lower()
+    if not normalized:
+        return True
+    return any(phrase in normalized for phrase in GENERIC_RECOMMENDATION_PHRASES)
+
+
+def _recommendation_bucket(item: dict) -> int:
+    lane = item.get("lane", "")
+    if lane == "blocked" and item.get("kind") == "setup":
+        return 0
+    if lane == "blocked":
+        return 1
+    if lane == "urgent" and item.get("aging_status") in {"stale", "chronic"}:
+        return 2
+    if lane == "urgent" and item.get("reopened"):
+        return 3
+    if lane == "urgent":
+        return 4
+    if lane == "ready":
+        return 5
+    return 6
 
 
 def _decision_memory_map(recent_runs: list[dict], evidence_events: list[dict]) -> dict[str, dict]:
@@ -1186,8 +1355,8 @@ def _longest_persisting_item(resolution_targets: list[dict]) -> dict:
 
 def _resolution_target_sort_key(item: dict) -> tuple:
     return (
-        LANE_ORDER.get(item.get("lane", "deferred"), 99),
-        0 if item.get("stale") or item.get("reopened") else 1,
+        _recommendation_bucket(item),
+        -item.get("confidence_score", 0.0),
         -item.get("age_days", 0),
         -item.get("priority", 0),
         item.get("repo", ""),
@@ -1196,42 +1365,7 @@ def _resolution_target_sort_key(item: dict) -> tuple:
 
 
 def _primary_target(resolution_targets: list[dict]) -> dict:
-    if not resolution_targets:
-        return {}
-
-    def _pick(predicate, *, newest: bool = False) -> dict:
-        matches = [item for item in resolution_targets if predicate(item)]
-        if not matches:
-            return {}
-        if newest:
-            matches.sort(
-                key=lambda item: (
-                    item.get("age_days", 0),
-                    -item.get("priority", 0),
-                    item.get("repo", ""),
-                    item.get("title", ""),
-                )
-            )
-            return matches[0]
-        matches.sort(
-            key=lambda item: (
-                -item.get("age_days", 0),
-                -item.get("priority", 0),
-                item.get("repo", ""),
-                item.get("title", ""),
-            )
-        )
-        return matches[0]
-
-    return (
-        _pick(lambda item: item.get("lane") == "blocked" and item.get("kind") == "setup")
-        or _pick(lambda item: item.get("lane") == "blocked")
-        or _pick(lambda item: item.get("lane") == "urgent" and item.get("stale"))
-        or _pick(lambda item: item.get("lane") == "urgent" and item.get("reopened"))
-        or _pick(lambda item: item.get("lane") == "urgent", newest=True)
-        or _pick(lambda item: item.get("lane") == "ready")
-        or {}
-    )
+    return resolution_targets[0] if resolution_targets else {}
 
 
 def _primary_target_reason(primary_target: dict) -> str:
@@ -1277,6 +1411,74 @@ def _closure_guidance(primary_target: dict, done_criteria: str) -> str:
     if action:
         return f"{action} Treat this as done only when {done_criteria[0].lower() + done_criteria[1:]}"
     return f"Treat this as done only when {done_criteria[0].lower() + done_criteria[1:]}"
+
+
+def _operator_confidence_summary(primary_target: dict, next_action: str, watch_guidance: dict) -> dict:
+    primary_score = primary_target.get("confidence_score", 0.05) if primary_target else 0.05
+    primary_label = primary_target.get("confidence_label", _confidence_label(primary_score)) if primary_target else "low"
+    primary_reasons = primary_target.get("confidence_reasons", []) if primary_target else []
+    next_score, next_label, next_reasons = _next_action_confidence(
+        primary_target,
+        next_action,
+        watch_guidance,
+    )
+    return {
+        "primary_target_confidence_score": primary_score,
+        "primary_target_confidence_label": primary_label,
+        "primary_target_confidence_reasons": primary_reasons,
+        "next_action_confidence_score": next_score,
+        "next_action_confidence_label": next_label,
+        "next_action_confidence_reasons": next_reasons,
+        "recommendation_quality_summary": _recommendation_quality_summary(next_label, next_reasons),
+    }
+
+
+def _next_action_confidence(primary_target: dict, next_action: str, watch_guidance: dict) -> tuple[float, str, list[str]]:
+    base_score = primary_target.get("confidence_score", 0.05) if primary_target else 0.05
+    action = (next_action or "").strip()
+    reasons: list[str] = []
+    normalized = action.lower()
+    if _is_item_specific_action(primary_target, action):
+        base_score += 0.05
+        reasons.append("The next step is tied directly to the current top target.")
+    elif any(phrase in normalized for phrase in GENERIC_MONITOR_PHRASES):
+        base_score -= 0.10
+        reasons.append("The next step is mostly watch-and-monitor guidance, so it is less decisive.")
+    elif any(phrase in normalized for phrase in GENERIC_BASELINE_PHRASES) or watch_guidance.get("full_refresh_due"):
+        base_score -= 0.10
+        reasons.append("The next step is baseline-refresh guidance rather than a direct closure action.")
+    else:
+        reasons.append("The next step follows the current top target closely enough to guide the next move.")
+    score = max(0.05, min(0.95, round(base_score, 2)))
+    label = _confidence_label(score)
+    return score, label, reasons[:3]
+
+
+def _is_item_specific_action(primary_target: dict, next_action: str) -> bool:
+    if not primary_target or not next_action:
+        return False
+    normalized = next_action.lower()
+    title = (primary_target.get("title") or "").lower()
+    repo = (primary_target.get("repo") or "").lower()
+    recommended_action = (primary_target.get("recommended_action") or "").lower()
+    if title and title in normalized:
+        return True
+    if repo and repo in normalized:
+        return True
+    if recommended_action and recommended_action == normalized:
+        return True
+    if normalized.startswith("close the remaining top target next:"):
+        return True
+    return False
+
+
+def _recommendation_quality_summary(label: str, reasons: list[str]) -> str:
+    reason = reasons[0] if reasons else "the current evidence is limited."
+    if label == "high":
+        return f"Strong recommendation because {reason[0].lower() + reason[1:]}"
+    if label == "medium":
+        return f"Useful recommendation, but still partly judgment-based because {reason[0].lower() + reason[1:]}"
+    return f"Tentative recommendation; monitor or verify before treating it as the single top priority because {reason[0].lower() + reason[1:]}"
 
 
 def _accountability_summary(
