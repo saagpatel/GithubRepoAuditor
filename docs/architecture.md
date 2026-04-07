@@ -8,6 +8,8 @@ Targeted and incremental reruns now rely on a shared baseline contract. A prior 
 
 The CLI also now has a read-only `--control-center` path. It loads the latest report + warehouse state, normalizes review state when older reports are missing it, and builds one shared triage queue for setup blockers, review work, campaign drift, and governance readiness without running a new audit.
 
+Watch mode now uses that same baseline contract in live execution. `--watch-strategy adaptive|incremental|full` controls how each cycle is chosen, and the resulting watch decision is recorded into `watch_state` so control-center, workbook, Markdown, and HTML surfaces can explain why the next run should be full or incremental.
+
 The documented primary command is now `audit`, exposed through the package console script. `python -m src` remains a supported fallback for environments that prefer module execution.
 
 ## Typical Invocation
@@ -48,6 +50,7 @@ github-repo-auditor/
 │   ├── badges.py               # Badge award logic and badge catalog
 │   ├── badge_export.py         # Shields.io badge URL generation + optional Gist upload
 │   ├── excel_export.py         # Standard + template-backed Excel workbook export
+│   ├── workbook_gate.py        # Canonical workbook release gate: sample artifacts + invariant checks
 │   ├── excel_styles.py         # Excel design system: colors, fonts, named styles
 │   ├── excel_template.py       # Template workbook helpers + native sparkline injection
 │   ├── web_export.py           # Interactive HTML dashboard generation
@@ -89,7 +92,7 @@ github-repo-auditor/
 ├── docs/                       # Architecture and initiative docs
 ├── requirements.txt            # Compatibility mirror of runtime deps in pyproject.toml
 ├── pyproject.toml             # Canonical package metadata + dependencies + console script
-├── Makefile                   # Operator/dev entrypoints: install, doctor, audit, control-center, test
+├── Makefile                   # Operator/dev entrypoints: install, doctor, audit, control-center, workbook-gate, test
 └── .env.example               # Environment template for GitHub, Notion, workbook, and optional AI usage
 ```
 

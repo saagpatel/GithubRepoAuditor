@@ -207,6 +207,12 @@ def write_markdown_report(
             _w(f"- Source Run: `{report.operator_summary.get('source_run_id')}`")
         if report.operator_summary.get("report_reference"):
             _w(f"- Latest Report: `{report.operator_summary.get('report_reference')}`")
+        if report.operator_summary.get("next_recommended_run_mode"):
+            _w(f"- Next Recommended Run: `{report.operator_summary.get('next_recommended_run_mode')}`")
+        if report.operator_summary.get("watch_strategy"):
+            _w(f"- Watch Strategy: `{report.operator_summary.get('watch_strategy')}`")
+        if report.operator_summary.get("watch_decision_summary"):
+            _w(f"- Watch Decision: {report.operator_summary.get('watch_decision_summary')}")
         if report.operator_summary.get("control_center_reference"):
             _w(f"- Control Center Artifact: `{report.operator_summary.get('control_center_reference')}`")
         counts = report.operator_summary.get("counts", {})

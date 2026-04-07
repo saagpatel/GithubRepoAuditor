@@ -22,6 +22,18 @@ FIELD_LABELS = {
     "security_offline": "security offline",
     "portfolio_baseline_size": "portfolio baseline size",
 }
+WATCH_REASON_SUMMARIES = {
+    "explicit-full-strategy": "Watch strategy is pinned to full runs, so this cycle should refresh the full baseline.",
+    "explicit-incremental-strategy": "Watch strategy is pinned to incremental runs and a trustworthy full baseline is available.",
+    "incremental-needs-baseline": "Incremental watch was requested, but there is no trustworthy full baseline yet, so a full run is required first.",
+    "missing-trustworthy-baseline": "No trustworthy full baseline is available yet, so the next run should be full.",
+    "filter-or-profile-changed": "The audit-affecting filter or scoring contract changed, so the next run should refresh the full baseline.",
+    "full-refresh-due": "The next run should be full because the scheduled full refresh interval has been reached.",
+    "adaptive-incremental": "The current baseline is still compatible, so incremental watch remains safe for the next run.",
+    "manual-full-run": "This was a manual full audit run.",
+    "manual-targeted-run": "This was a manual targeted rerun against the latest compatible baseline.",
+    "manual-incremental-run": "This was a manual incremental rerun against the latest compatible baseline.",
+}
 
 
 def normalize_scoring_profile(profile_name: str | None) -> str:
@@ -103,14 +115,42 @@ def build_requested_baseline_context(args, *, scoring_profile: str) -> dict:
     }
 
 
-def build_watch_state(args, *, scoring_profile: str, portfolio_baseline_size: int, review_sync: str = "local") -> dict:
+def build_watch_state(
+    args,
+    *,
+    scoring_profile: str,
+    portfolio_baseline_size: int,
+    review_sync: str = "local",
+    run_mode: str | None = None,
+    watch_plan=None,
+    latest_trusted_baseline: dict | None = None,
+    full_refresh_interval_days: int | None = None,
+) -> dict:
     baseline_context = build_baseline_context_from_args(
         args,
         scoring_profile=scoring_profile,
         portfolio_baseline_size=portfolio_baseline_size,
     )
+    watch_enabled = bool(getattr(args, "watch", False))
+    requested_strategy = getattr(args, "watch_strategy", "adaptive") if watch_enabled else "manual"
+    chosen_mode = run_mode or ("incremental" if getattr(args, "incremental", False) else "full")
+    reason = f"manual-{chosen_mode}-run"
+    full_refresh_due = False
+    if watch_plan is not None:
+        chosen_mode = getattr(watch_plan, "mode", chosen_mode)
+        reason = getattr(watch_plan, "reason", reason)
+        full_refresh_due = bool(getattr(watch_plan, "full_refresh_due", False))
     return {
+        "watch_enabled": watch_enabled,
         "review_sync": review_sync,
+        "requested_strategy": requested_strategy,
+        "chosen_mode": chosen_mode,
+        "next_recommended_run_mode": chosen_mode,
+        "reason": reason,
+        "reason_summary": summarize_watch_reason(reason, full_refresh_days=full_refresh_interval_days),
+        "full_refresh_due": full_refresh_due,
+        "full_refresh_interval_days": full_refresh_interval_days,
+        "latest_trusted_baseline": dict(latest_trusted_baseline or {}),
         "filter_signature": build_filter_signature_from_args(args, scoring_profile=scoring_profile),
         "baseline_signature": baseline_context["baseline_signature"],
         "baseline_context": baseline_context,
@@ -167,3 +207,26 @@ def format_mismatch_value(value: object) -> str:
         return "missing"
     return str(value)
 
+
+def summarize_watch_reason(reason: str, *, full_refresh_days: int | None = None) -> str:
+    summary = WATCH_REASON_SUMMARIES.get(reason, "The latest watch decision is recorded in the report.")
+    if reason == "full-refresh-due" and full_refresh_days:
+        return f"{summary} Full refreshes are due every {full_refresh_days} days."
+    return summary
+
+
+def build_watch_guidance(watch_state: dict | None) -> dict:
+    state = dict(watch_state or {})
+    chosen_mode = state.get("chosen_mode") or state.get("next_recommended_run_mode") or ""
+    reason = state.get("reason", "")
+    return {
+        "watch_enabled": bool(state.get("watch_enabled", False)),
+        "requested_strategy": state.get("requested_strategy", "manual"),
+        "chosen_mode": chosen_mode,
+        "next_recommended_run_mode": state.get("next_recommended_run_mode") or chosen_mode,
+        "reason": reason,
+        "reason_summary": state.get("reason_summary")
+        or summarize_watch_reason(reason, full_refresh_days=state.get("full_refresh_interval_days")),
+        "full_refresh_due": bool(state.get("full_refresh_due", False)),
+        "latest_trusted_baseline": dict(state.get("latest_trusted_baseline") or {}),
+    }

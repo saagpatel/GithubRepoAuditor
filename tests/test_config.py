@@ -98,10 +98,11 @@ class TestMergeConfig:
         assert not hasattr(args, "nonexistent_key")
 
     def test_config_overrides_known_string_defaults(self):
-        args = argparse.Namespace(excel_mode="standard", preflight_mode="auto")
-        merge_config_with_args(args, {"excel_mode": "template", "preflight_mode": "strict"})
+        args = argparse.Namespace(excel_mode="standard", preflight_mode="auto", watch_strategy="adaptive")
+        merge_config_with_args(args, {"excel_mode": "template", "preflight_mode": "strict", "watch_strategy": "full"})
         assert args.excel_mode == "template"
         assert args.preflight_mode == "strict"
+        assert args.watch_strategy == "full"
 
 
 class TestValidateConfigData:
@@ -118,5 +119,5 @@ class TestValidateConfigData:
         assert issues[0]["severity"] == "error"
 
     def test_accepts_new_operator_choices(self):
-        issues = validate_config_data({"preflight_mode": "strict", "triage_view": "urgent"})
+        issues = validate_config_data({"preflight_mode": "strict", "triage_view": "urgent", "watch_strategy": "adaptive"})
         assert issues == []

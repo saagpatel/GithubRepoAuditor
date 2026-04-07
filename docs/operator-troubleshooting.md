@@ -16,6 +16,14 @@ audit <github-username> --control-center
 
 That command is read-only. It loads the latest report + warehouse state, groups triage items into `Blocked`, `Needs Attention Now`, `Ready for Manual Action`, and `Safe to Defer`, and writes matching JSON + Markdown control-center artifacts.
 
+If you are using watch mode, the tool can now decide full vs incremental per cycle:
+
+```bash
+audit <github-username> --watch --watch-strategy adaptive
+```
+
+`adaptive` is the default watch strategy. It reuses the stored baseline contract and the full-refresh interval to decide when incremental is still safe and when the next cycle must refresh the full baseline.
+
 ## Common Issues
 
 ### Missing GitHub token
@@ -91,6 +99,8 @@ Fix:
 
 Targeted and incremental reruns depend on the full filtered portfolio baseline, both for merging outputs and for keeping interest/novelty scoring stable.
 
+The same rule now drives adaptive watch mode: if the baseline contract no longer matches or the scheduled full refresh is due, watch escalates to a full run automatically.
+
 ### Missing incremental fingerprints
 
 Symptoms:
@@ -112,12 +122,23 @@ Fix:
 The intended operator loop is:
 
 1. `audit <github-username> --doctor`
-2. `audit <github-username>`
+2. `audit <github-username>` or `audit <github-username> --watch --watch-strategy adaptive`
 3. `audit <github-username> --control-center`
 4. Handle `Blocked`, then `Needs Attention Now`, then `Ready for Manual Action`
 5. Leave `Safe to Defer` items alone unless priorities changed
+6. Run `make workbook-gate` only when workbook-facing changes are part of the release
 
 `--control-center` always writes:
 
 - `output/operator-control-center-<username>-<date>.json`
 - `output/operator-control-center-<username>-<date>.md`
+
+## Workbook Release Gate
+
+For workbook-facing changes, use:
+
+```bash
+make workbook-gate
+```
+
+That command generates canonical sample `standard` and `template` workbooks, validates the visible-sheet and hidden `Data_*` invariants, and writes a manual desktop Excel checklist. The final release step is still opening the generated `standard` workbook in desktop Excel and confirming there is no repair prompt.

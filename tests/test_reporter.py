@@ -168,6 +168,9 @@ class TestMarkdownReport:
         report.operator_summary = {
             "headline": "A blocked setup item needs attention.",
             "counts": {"blocked": 1, "urgent": 1, "ready": 0, "deferred": 0},
+            "watch_strategy": "adaptive",
+            "next_recommended_run_mode": "full",
+            "watch_decision_summary": "The next run should be full because the scheduled full refresh interval has been reached.",
         }
         report.operator_queue = [
             {
@@ -182,6 +185,8 @@ class TestMarkdownReport:
         content = path.read_text()
         assert "Operator Control Center" in content
         assert "Missing template asset" in content
+        assert "Next Recommended Run" in content
+        assert "Watch Strategy" in content
 
     def test_includes_governance_operator_summary_when_present(self, tmp_path):
         report = _make_report()

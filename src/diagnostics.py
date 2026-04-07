@@ -85,6 +85,8 @@ def infer_requested_features(args) -> list[str]:
 
     if getattr(args, "doctor", False):
         features.append("doctor")
+    if getattr(args, "watch", False):
+        features.append(f"watch:{getattr(args, 'watch_strategy', 'adaptive')}")
     if getattr(args, "notion", False):
         features.append("notion-export")
     if getattr(args, "notion_sync", False):

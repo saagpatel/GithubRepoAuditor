@@ -48,6 +48,9 @@ audit <github-username> --doctor
 # Control center — daily read-only triage from the latest state
 audit <github-username> --control-center
 
+# Watch mode — let the tool choose full vs incremental each cycle
+audit <github-username> --watch --watch-strategy adaptive
+
 # Audit a GitHub user's repos
 audit <github-username>
 
@@ -68,6 +71,8 @@ Normal runs now perform a lightweight automatic preflight before fetching repos.
 
 The new `--control-center` path is read-only. It loads the latest report + warehouse state, groups open work into `Blocked`, `Needs Attention Now`, `Ready for Manual Action`, and `Safe to Defer`, and writes `operator-control-center-<username>-<date>.json` plus `.md`.
 
+Watch mode now supports `--watch-strategy adaptive|incremental|full`. `adaptive` is the default and uses the stored baseline contract plus the scheduled full-refresh interval to decide whether each watch cycle should run full or incremental.
+
 ### First-Run Flow
 
 ```bash
@@ -77,6 +82,7 @@ cp config/examples/audit-config.example.yaml audit-config.yaml
 audit <github-username> --doctor
 audit <github-username>
 audit <github-username> --control-center
+make workbook-gate
 ```
 
 ### Run tests
@@ -108,6 +114,8 @@ Before normal runs start, the CLI now performs a shared preflight that checks co
 
 For day-to-day operations, `--control-center` is now the clean read-only entrypoint. It reuses the latest report, review state, campaign history, governance drift, and setup health to build one shared operator queue without running a new audit or mutating any external system.
 
+Watch mode now uses that same baseline contract in live execution. Each cycle records the requested watch strategy, the chosen mode, and the reason a full refresh was required or an incremental rerun remained safe.
+
 `pyproject.toml` is the canonical dependency definition, and `requirements.txt` is kept as a synchronized compatibility mirror for environments that still prefer a flat requirements file.
 
 ## Excel Workbook
@@ -122,6 +130,14 @@ Both modes read from the same report + warehouse facts. Python owns the hidden `
 Template mode is also validated during preflight: the committed workbook asset must exist and pass a lightweight shell check before the run will continue.
 
 This workbook boundary is unchanged in the current phase: the project still emits one workbook artifact, visible sheets remain filter-based, and hidden `Data_*` sheets remain the contract surface for workbook facts and downstream bindings.
+
+For workbook-facing changes, use the canonical release gate:
+
+```bash
+make workbook-gate
+```
+
+That command generates stable sample `standard` and `template` workbooks, validates the visible-sheet and hidden `Data_*` invariants, writes a result JSON file, and produces a manual desktop Excel checklist. The final release step is still opening the generated `standard` workbook in desktop Excel and confirming there is no repair prompt.
 
 ## Managed Campaigns and Governance
 
@@ -139,11 +155,14 @@ When writeback or governance-related actions are requested, preflight checks now
 
 The daily operator loop is now:
 
+- Run `audit <github-username> --doctor`
+- Run `audit <github-username>` or `audit <github-username> --watch --watch-strategy adaptive`
 - Run `audit <github-username> --control-center`
 - Clear anything in `Blocked` first
 - Review `Needs Attention Now` for drift and high-severity changes
 - Work through `Ready for Manual Action`
 - Leave `Safe to Defer` items alone unless priorities change
+- Run `make workbook-gate` only when workbook-facing changes are in scope
 
 ## Troubleshooting
 
