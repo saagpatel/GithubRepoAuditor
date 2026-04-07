@@ -26,6 +26,7 @@ ATTENTION_LANES = {"blocked", "urgent"}
 HISTORY_WINDOW_RUNS = 10
 CALIBRATION_WINDOW_RUNS = 20
 VALIDATION_WINDOW_RUNS = 2
+TRUST_RECOVERY_WINDOW_RUNS = 3
 GENERIC_RECOMMENDATION_PHRASES = (
     "continue the normal audit/control-center loop",
     "continue the normal operator loop",
@@ -386,6 +387,13 @@ def build_operator_snapshot(
         "recommendation_drift_status": resolution_trend["recommendation_drift_status"],
         "recommendation_drift_summary": resolution_trend["recommendation_drift_summary"],
         "policy_flip_hotspots": resolution_trend["policy_flip_hotspots"],
+        "primary_target_exception_pattern_status": resolution_trend["primary_target_exception_pattern_status"],
+        "primary_target_exception_pattern_reason": resolution_trend["primary_target_exception_pattern_reason"],
+        "primary_target_trust_recovery_status": resolution_trend["primary_target_trust_recovery_status"],
+        "primary_target_trust_recovery_reason": resolution_trend["primary_target_trust_recovery_reason"],
+        "exception_pattern_summary": resolution_trend["exception_pattern_summary"],
+        "false_positive_exception_hotspots": resolution_trend["false_positive_exception_hotspots"],
+        "trust_recovery_window_runs": resolution_trend["trust_recovery_window_runs"],
         "decision_memory_status": resolution_trend["decision_memory_status"],
         "primary_target_last_seen_at": resolution_trend["primary_target_last_seen_at"],
         "primary_target_last_intervention": resolution_trend["primary_target_last_intervention"],
@@ -504,11 +512,23 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
             f"*Trust Policy Exception:* {summary.get('primary_target_exception_status')} — "
             f"{summary.get('primary_target_exception_reason', 'No trust-policy exception reason is recorded yet.')}"
         )
+    if summary.get("primary_target_exception_pattern_status") and summary.get("primary_target_exception_pattern_status") != "none":
+        lines.append(
+            f"*Exception Pattern Learning:* {summary.get('primary_target_exception_pattern_status')} — "
+            f"{summary.get('primary_target_exception_pattern_reason', 'No exception-pattern reason is recorded yet.')}"
+        )
+    if summary.get("primary_target_trust_recovery_status") and summary.get("primary_target_trust_recovery_status") != "none":
+        lines.append(
+            f"*Trust Recovery:* {summary.get('primary_target_trust_recovery_status')} — "
+            f"{summary.get('primary_target_trust_recovery_reason', 'No trust-recovery reason is recorded yet.')}"
+        )
     if summary.get("recommendation_drift_status"):
         lines.append(
             f"*Recommendation Drift:* {summary.get('recommendation_drift_status')} — "
             f"{summary.get('recommendation_drift_summary', 'No recommendation-drift summary is recorded yet.')}"
         )
+    if summary.get("exception_pattern_summary"):
+        lines.append(f"*Exception Pattern Summary:* {summary['exception_pattern_summary']}")
     if summary.get("recommendation_quality_summary"):
         lines.append(f"*Recommendation Quality:* {summary['recommendation_quality_summary']}")
     if summary.get("confidence_validation_status"):
@@ -683,6 +703,7 @@ def _build_operator_handoff(
         top_summary,
         trust_policy,
         resolution_trend.get("primary_target_exception_status", "none"),
+        resolution_trend.get("primary_target_trust_recovery_status", "none"),
     )
     escalation_reason = _escalation_reason(queue, setup_health, watch_guidance)
     urgency = _handoff_urgency(queue, setup_health)
@@ -707,6 +728,8 @@ def _build_operator_handoff(
         f"{resolution_trend.get('trend_summary', '')} "
         f"{resolution_trend.get('resolution_evidence_summary', '')} "
         f"{_trust_exception_note(resolution_trend)} "
+        f"{_exception_pattern_note(resolution_trend)} "
+        f"{_trust_recovery_note(resolution_trend)} "
         f"{_recommendation_drift_note(resolution_trend)} "
         f"{confidence_calibration.get('confidence_calibration_summary', '')} "
         f"{confidence.get('adaptive_confidence_summary', '')} "
@@ -1021,6 +1044,12 @@ def _build_resolution_trend(
         current_generated_at=current_generated_at,
         confidence_calibration=confidence_calibration,
     )
+    exception_learning = _apply_exception_pattern_learning(
+        resolution_targets,
+        history,
+        current_generated_at=current_generated_at,
+        confidence_calibration=confidence_calibration,
+    )
     new_attention_keys = current_attention_keys - previous_attention_keys
     resolved_attention_count = len(previous_attention_keys - current_attention_keys)
     persisting_attention_count = len(current_attention_keys & previous_attention_keys)
@@ -1106,6 +1135,13 @@ def _build_resolution_trend(
         "recommendation_drift_status": recommendation_drift["recommendation_drift_status"],
         "recommendation_drift_summary": recommendation_drift["recommendation_drift_summary"],
         "policy_flip_hotspots": recommendation_drift["policy_flip_hotspots"],
+        "primary_target_exception_pattern_status": exception_learning["primary_target_exception_pattern_status"],
+        "primary_target_exception_pattern_reason": exception_learning["primary_target_exception_pattern_reason"],
+        "primary_target_trust_recovery_status": exception_learning["primary_target_trust_recovery_status"],
+        "primary_target_trust_recovery_reason": exception_learning["primary_target_trust_recovery_reason"],
+        "exception_pattern_summary": exception_learning["exception_pattern_summary"],
+        "false_positive_exception_hotspots": exception_learning["false_positive_exception_hotspots"],
+        "trust_recovery_window_runs": exception_learning["trust_recovery_window_runs"],
         "decision_memory_status": decision_memory["decision_memory_status"],
         "primary_target_last_seen_at": decision_memory["primary_target_last_seen_at"],
         "primary_target_last_intervention": decision_memory["primary_target_last_intervention"],
@@ -1325,6 +1361,415 @@ def _apply_trust_policy_exceptions(
         ),
         "policy_flip_hotspots": policy_flip_hotspots,
     }
+
+
+def _apply_exception_pattern_learning(
+    resolution_targets: list[dict],
+    history: list[dict],
+    *,
+    current_generated_at: str,
+    confidence_calibration: dict,
+) -> dict:
+    if not resolution_targets:
+        return {
+            "primary_target_exception_pattern_status": "none",
+            "primary_target_exception_pattern_reason": "",
+            "primary_target_trust_recovery_status": "none",
+            "primary_target_trust_recovery_reason": "",
+            "exception_pattern_summary": "No exception-pattern learning is recorded because there is no active target.",
+            "false_positive_exception_hotspots": [],
+            "trust_recovery_window_runs": TRUST_RECOVERY_WINDOW_RUNS,
+        }
+
+    current_primary_target = resolution_targets[0]
+    current_bucket = _recommendation_bucket(current_primary_target)
+    exception_events = _trust_exception_events(
+        history,
+        current_primary_target=current_primary_target,
+        current_generated_at=current_generated_at,
+    )
+    historical_cases = _historical_exception_cases(history)
+    false_positive_hotspots = _false_positive_exception_hotspots(historical_cases)
+
+    updated_targets: list[dict] = []
+    for target in resolution_targets:
+        pattern_status = "none"
+        pattern_reason = ""
+        recovery_status = "none"
+        recovery_reason = ""
+        stable_policy_run_count = 0
+        recent_exception_path = ""
+        final_policy = target.get("trust_policy", "monitor")
+        final_reason = target.get("trust_policy_reason", "No trust-policy reason is recorded yet.")
+
+        if _recommendation_bucket(target) == current_bucket:
+            history_meta = _target_exception_history(target, exception_events, historical_cases)
+            stable_policy_run_count = history_meta["stable_policy_run_count"]
+            recent_exception_path = history_meta["recent_exception_path"]
+            pattern_status, pattern_reason = _exception_pattern_for_target(target, history_meta)
+            (
+                recovery_status,
+                recovery_reason,
+                final_policy,
+                final_reason,
+            ) = _trust_recovery_for_target(
+                target,
+                history_meta,
+                confidence_calibration,
+                trust_policy=final_policy,
+                trust_policy_reason=final_reason,
+            )
+            if recovery_status in {"candidate", "earned"}:
+                pattern_status = "recovering"
+                pattern_reason = _recovery_pattern_reason(recovery_status, recovery_reason)
+            elif recovery_status == "blocked" and pattern_status == "none":
+                pattern_status = "recovering"
+                pattern_reason = recovery_reason
+
+        updated_targets.append(
+            {
+                **target,
+                "exception_pattern_status": pattern_status,
+                "exception_pattern_reason": pattern_reason,
+                "trust_recovery_status": recovery_status,
+                "trust_recovery_reason": recovery_reason,
+                "stable_policy_run_count": stable_policy_run_count,
+                "recent_exception_path": recent_exception_path,
+                "trust_policy": final_policy,
+                "trust_policy_reason": final_reason,
+            }
+        )
+
+    resolution_targets[:] = updated_targets
+    primary_target = resolution_targets[0]
+    return {
+        "primary_target_exception_pattern_status": primary_target.get("exception_pattern_status", "none"),
+        "primary_target_exception_pattern_reason": primary_target.get("exception_pattern_reason", ""),
+        "primary_target_trust_recovery_status": primary_target.get("trust_recovery_status", "none"),
+        "primary_target_trust_recovery_reason": primary_target.get("trust_recovery_reason", ""),
+        "exception_pattern_summary": _exception_pattern_summary(primary_target, false_positive_hotspots),
+        "false_positive_exception_hotspots": false_positive_hotspots,
+        "trust_recovery_window_runs": TRUST_RECOVERY_WINDOW_RUNS,
+    }
+
+
+def _trust_exception_events(
+    history: list[dict],
+    *,
+    current_primary_target: dict,
+    current_generated_at: str,
+) -> list[dict]:
+    events: list[dict] = []
+    if current_primary_target and current_primary_target.get("trust_policy"):
+        events.append(
+            {
+                "key": _queue_identity(current_primary_target),
+                "class_key": _target_class_key(current_primary_target),
+                "label": _target_label(current_primary_target),
+                "trust_policy": current_primary_target.get("trust_policy", "monitor"),
+                "trust_exception_status": current_primary_target.get("trust_exception_status", "none"),
+                "generated_at": current_generated_at or "",
+                "lane": current_primary_target.get("lane", ""),
+                "kind": current_primary_target.get("kind", ""),
+                "decision_memory_status": current_primary_target.get("decision_memory_status", ""),
+                "last_outcome": current_primary_target.get("last_outcome", ""),
+                "confidence_validation_status": current_primary_target.get("confidence_validation_status", ""),
+            }
+        )
+    for entry in history[: HISTORY_WINDOW_RUNS - 1]:
+        summary = entry.get("operator_summary") or {}
+        primary_target = summary.get("primary_target") or {}
+        trust_policy = summary.get("primary_target_trust_policy", "")
+        if not primary_target or not trust_policy:
+            continue
+        events.append(
+            {
+                "key": _queue_identity(primary_target),
+                "class_key": _target_class_key(primary_target),
+                "label": _target_label(primary_target),
+                "trust_policy": trust_policy,
+                "trust_exception_status": summary.get("primary_target_exception_status", "none"),
+                "generated_at": entry.get("generated_at", ""),
+                "lane": primary_target.get("lane", ""),
+                "kind": primary_target.get("kind", ""),
+                "decision_memory_status": summary.get("decision_memory_status", ""),
+                "last_outcome": summary.get("primary_target_last_outcome", ""),
+                "confidence_validation_status": summary.get("confidence_validation_status", ""),
+            }
+        )
+    return sorted(events, key=lambda item: item.get("generated_at", ""), reverse=True)
+
+
+def _historical_exception_cases(history: list[dict]) -> list[dict]:
+    ordered_runs = sorted(
+        [
+            {
+                "generated_at": entry.get("generated_at", ""),
+                "operator_summary": entry.get("operator_summary") or {},
+                "operator_queue": entry.get("operator_queue") or [],
+            }
+            for entry in history[: HISTORY_WINDOW_RUNS - 1]
+        ],
+        key=lambda item: item.get("generated_at", ""),
+    )
+    cases: list[dict] = []
+    for index, run in enumerate(ordered_runs):
+        summary = run.get("operator_summary") or {}
+        target = summary.get("primary_target") or {}
+        exception_status = summary.get("primary_target_exception_status", "none")
+        if not target or exception_status in {None, "", "none"}:
+            continue
+        future_runs = ordered_runs[index + 1 : index + 1 + TRUST_RECOVERY_WINDOW_RUNS]
+        cases.append(
+            {
+                "key": _queue_identity(target),
+                "class_key": _target_class_key(target),
+                "label": _target_label(target),
+                "generated_at": run.get("generated_at", ""),
+                "lane": target.get("lane", ""),
+                "kind": target.get("kind", ""),
+                "trust_exception_status": exception_status,
+                "case_outcome": _exception_case_outcome(run, future_runs),
+            }
+        )
+    return sorted(cases, key=lambda item: item.get("generated_at", ""), reverse=True)
+
+
+def _exception_case_outcome(run: dict, future_runs: list[dict]) -> str:
+    if len(future_runs) < TRUST_RECOVERY_WINDOW_RUNS:
+        return "insufficient-data"
+    summary = run.get("operator_summary") or {}
+    target = summary.get("primary_target") or {}
+    target_key = _queue_identity(target)
+    future_matches = [_run_target_match(candidate, target_key) for candidate in future_runs]
+    future_lanes = [match.get("lane") if match else None for match in future_matches]
+    reopened = any(
+        (
+            (candidate.get("operator_summary") or {}).get("decision_memory_status") == "reopened"
+            or (candidate.get("operator_summary") or {}).get("primary_target_last_outcome") == "reopened"
+        )
+        and _queue_identity((candidate.get("operator_summary") or {}).get("primary_target") or {}) == target_key
+        for candidate in future_runs
+    )
+    if reopened or any(lane in ATTENTION_LANES for lane in future_lanes):
+        return "useful-caution"
+    return "overcautious"
+
+
+def _target_exception_history(
+    target: dict,
+    exception_events: list[dict],
+    historical_cases: list[dict],
+) -> dict:
+    key = _queue_identity(target)
+    class_key = _target_class_key(target)
+    target_events = [event for event in exception_events if event.get("key") == key]
+    class_events = [event for event in exception_events if event.get("class_key") == class_key]
+    target_exception_events = [event for event in target_events if event.get("trust_exception_status") not in {None, "", "none"}]
+    class_exception_events = [event for event in class_events if event.get("trust_exception_status") not in {None, "", "none"}]
+    target_cases = [case for case in historical_cases if case.get("key") == key]
+    class_cases = [case for case in historical_cases if case.get("class_key") == class_key]
+    target_policies = [event.get("trust_policy", "monitor") for event in target_events[:TRUST_RECOVERY_WINDOW_RUNS]]
+    target_lanes = [event.get("lane", "") for event in target_events[:TRUST_RECOVERY_WINDOW_RUNS]]
+    recent_exception_path = " -> ".join(
+        event.get("trust_exception_status", "none") for event in target_exception_events[:4]
+    ) or " -> ".join(event.get("trust_exception_status", "none") for event in class_exception_events[:4])
+    return {
+        "stable_policy_run_count": _stable_policy_run_count(target_policies),
+        "recent_exception_path": recent_exception_path,
+        "recent_policy_flip_count": _policy_flip_count(target_policies),
+        "same_or_lower_pressure_path": _same_or_lower_pressure_path(target_lanes),
+        "recent_reopened": any(
+            event.get("decision_memory_status") == "reopened" or event.get("last_outcome") == "reopened"
+            for event in target_events[:TRUST_RECOVERY_WINDOW_RUNS]
+        ),
+        "latest_case_outcome": _latest_case_outcome(target_cases, class_cases),
+        "total_exception_count": len(target_cases) or len(class_cases),
+        "overcautious_count": sum(1 for case in target_cases if case.get("case_outcome") == "overcautious"),
+        "target_cases": target_cases,
+        "class_cases": class_cases,
+    }
+
+
+def _stable_policy_run_count(policies: list[str]) -> int:
+    if not policies:
+        return 0
+    first = policies[0]
+    count = 0
+    for policy in policies:
+        if policy != first:
+            break
+        count += 1
+    return count
+
+
+def _same_or_lower_pressure_path(lanes: list[str]) -> bool:
+    if len(lanes) < 2:
+        return True
+    chronological = [_lane_pressure(lane or None) for lane in reversed(lanes)]
+    return all(current <= previous for previous, current in zip(chronological, chronological[1:]))
+
+
+def _latest_case_outcome(target_cases: list[dict], class_cases: list[dict]) -> str | None:
+    if target_cases:
+        return target_cases[0].get("case_outcome")
+    if class_cases:
+        return class_cases[0].get("case_outcome")
+    return None
+
+
+def _exception_pattern_for_target(target: dict, history_meta: dict) -> tuple[str, str]:
+    latest_case_outcome = history_meta.get("latest_case_outcome")
+    if latest_case_outcome == "useful-caution":
+        return (
+            "useful-caution",
+            "Recent soft caution was followed by renewed instability or unresolved pressure, so the softer posture still looks justified.",
+        )
+    if latest_case_outcome == "overcautious":
+        return (
+            "overcautious",
+            "Recent soft caution was followed by stable recovery without renewed pressure, so the softer posture may now be more cautious than the evidence supports.",
+        )
+    if target.get("trust_exception_status") not in {None, "", "none"}:
+        return (
+            "insufficient-data",
+            "There is not enough target-specific exception history yet to say whether recent soft caution is helping.",
+        )
+    return "none", ""
+
+
+def _trust_recovery_for_target(
+    target: dict,
+    history_meta: dict,
+    confidence_calibration: dict,
+    *,
+    trust_policy: str,
+    trust_policy_reason: str,
+) -> tuple[str, str, str, str]:
+    if target.get("trust_exception_status") in {None, "", "none"} or trust_policy != "verify-first":
+        return "none", "", trust_policy, trust_policy_reason
+
+    if confidence_calibration.get("confidence_validation_status") != "healthy":
+        return (
+            "blocked",
+            "Trust recovery is blocked because confidence calibration has not stayed healthy enough yet.",
+            trust_policy,
+            trust_policy_reason,
+        )
+    if history_meta.get("recent_reopened"):
+        return (
+            "blocked",
+            "Trust recovery is blocked because this target reopened again inside the recent recovery window.",
+            trust_policy,
+            trust_policy_reason,
+        )
+    if history_meta.get("recent_policy_flip_count", 0) > 0:
+        return (
+            "blocked",
+            "Trust recovery is blocked because the target is still flipping trust policy inside the recent recovery window.",
+            trust_policy,
+            trust_policy_reason,
+        )
+    if not history_meta.get("same_or_lower_pressure_path", True):
+        return (
+            "blocked",
+            "Trust recovery is blocked because the target has not stayed on the same or lower-pressure path yet.",
+            trust_policy,
+            trust_policy_reason,
+        )
+    if history_meta.get("stable_policy_run_count", 0) >= TRUST_RECOVERY_WINDOW_RUNS:
+        recovered_policy = "act-with-review"
+        recovered_reason = "Recent stability has earned this target back from verify-first to act-with-review."
+        if target.get("lane") == "blocked" and target.get("kind") == "setup":
+            recovered_reason = "Recent stability has earned this blocked setup target back to act-with-review, but setup blockers still should not skip review."
+        return "earned", recovered_reason, recovered_policy, recovered_reason
+    return (
+        "candidate",
+        "This target is stabilizing under healthy calibration, but it has not held steady long enough to earn stronger trust yet.",
+        trust_policy,
+        trust_policy_reason,
+    )
+
+
+def _recovery_pattern_reason(recovery_status: str, recovery_reason: str) -> str:
+    if recovery_status == "earned":
+        return recovery_reason or "Recent stability has earned stronger trust again."
+    if recovery_status == "candidate":
+        return recovery_reason or "This target is stabilizing, but it has not yet earned stronger trust."
+    return recovery_reason or "Trust recovery is still being evaluated."
+
+
+def _exception_pattern_summary(primary_target: dict, false_positive_hotspots: list[dict]) -> str:
+    pattern_status = primary_target.get("exception_pattern_status", "none")
+    recovery_status = primary_target.get("trust_recovery_status", "none")
+    label = _target_label(primary_target) or "The current target"
+    if recovery_status == "earned":
+        return f"{label} has stayed stable long enough to earn trust back from verify-first to act-with-review."
+    if recovery_status == "candidate":
+        return f"{label} is stabilizing, but it has not yet earned stronger trust."
+    if recovery_status == "blocked":
+        return primary_target.get(
+            "trust_recovery_reason",
+            f"{label} still has fresh reopen, flip, or calibration noise blocking trust recovery.",
+        )
+    if pattern_status == "useful-caution":
+        return f"Recent soft caution for {label} has been justified and still looks appropriate."
+    if pattern_status == "overcautious":
+        return f"Recent soft caution for {label} may now be more cautious than the evidence supports."
+    if false_positive_hotspots:
+        hotspot = false_positive_hotspots[0]
+        return (
+            f"Recent soft exceptions have been most overcautious around {hotspot.get('label', 'recent hotspots')}, "
+            f"so verify-first guidance should not linger there longer than the evidence supports."
+        )
+    if pattern_status == "insufficient-data":
+        return "Exception learning is still too lightly exercised to say whether recent soft caution is helping."
+    return "Recent exception behavior does not yet show a strong overcautious or recovery pattern."
+
+
+def _false_positive_exception_hotspots(historical_cases: list[dict]) -> list[dict]:
+    target_groups = _group_exception_hotspots(historical_cases, key_name="key", label_name="label", scope="target")
+    class_groups = _group_exception_hotspots(historical_cases, key_name="class_key", label_name="class_key", scope="class")
+    hotspots = target_groups + class_groups
+    hotspots.sort(
+        key=lambda item: (
+            -item.get("overcautious_count", 0),
+            -item.get("exception_count", 0),
+            item.get("label", ""),
+        )
+    )
+    return [item for item in hotspots if item.get("overcautious_count", 0) > 0][:5]
+
+
+def _group_exception_hotspots(
+    historical_cases: list[dict],
+    *,
+    key_name: str,
+    label_name: str,
+    scope: str,
+) -> list[dict]:
+    grouped: dict[str, list[dict]] = {}
+    for case in historical_cases:
+        key = case.get(key_name, "")
+        if not key:
+            continue
+        grouped.setdefault(key, []).append(case)
+
+    hotspots: list[dict] = []
+    for cases in grouped.values():
+        overcautious_count = sum(1 for case in cases if case.get("case_outcome") == "overcautious")
+        if overcautious_count <= 0:
+            continue
+        hotspots.append(
+            {
+                "scope": scope,
+                "label": cases[0].get(label_name, ""),
+                "overcautious_count": overcautious_count,
+                "exception_count": len(cases),
+                "recent_exception_path": " -> ".join(case.get("trust_exception_status", "none") for case in cases[:4]),
+            }
+        )
+    return hotspots
 
 
 def _trust_policy_events(
@@ -2231,7 +2676,10 @@ def _operator_confidence_summary(
         next_action,
         watch_guidance=watch_guidance,
     )
-    if primary_target.get("trust_exception_status") not in {None, "", "none"}:
+    if (
+        primary_target.get("trust_exception_status") not in {None, "", "none"}
+        and primary_target.get("trust_recovery_status") != "earned"
+    ):
         next_trust_policy, next_trust_policy_reason = _soften_next_action_policy(
             next_trust_policy,
             next_trust_policy_reason,
@@ -2345,7 +2793,19 @@ def _adaptive_confidence_summary(
 ) -> str:
     lane = primary_target.get("lane", "")
     exception_status = primary_target.get("trust_exception_status", "none")
+    exception_pattern_status = primary_target.get("exception_pattern_status", "none")
+    trust_recovery_status = primary_target.get("trust_recovery_status", "none")
     drift_status = primary_target.get("recommendation_drift_status", "")
+    if trust_recovery_status == "earned":
+        return "Recent stability has earned this recommendation back from verify-first to act-with-review, so the softer caution can start relaxing."
+    if trust_recovery_status == "candidate":
+        return "Recent stability is improving, but the target has not held steady long enough to earn stronger trust yet."
+    if trust_recovery_status == "blocked":
+        return "Trust recovery is still blocked by fresh reopen, flip, or calibration noise, so keep the softer posture in place."
+    if exception_pattern_status == "useful-caution":
+        return "Recent soft caution has been justified, so the verification-aware posture still looks appropriate."
+    if exception_pattern_status == "overcautious":
+        return "Recent soft caution may now be more cautious than the evidence supports, so watch for trust recovery instead of leaving verify-first in place by default."
     if exception_status == "softened-for-noise":
         return "Recent trust noise softened the recommendation, so verify the latest state before treating it as fully stable."
     if exception_status == "softened-for-flip-churn":
@@ -2613,6 +3073,10 @@ def _why_it_matters(
         resolution_trend.get("primary_target_exception_status", "none"),
         resolution_trend.get("primary_target_exception_reason", ""),
         resolution_trend.get("recommendation_drift_status", "stable"),
+        resolution_trend.get("primary_target_exception_pattern_status", "none"),
+        resolution_trend.get("primary_target_exception_pattern_reason", ""),
+        resolution_trend.get("primary_target_trust_recovery_status", "none"),
+        resolution_trend.get("primary_target_trust_recovery_reason", ""),
     )
     if urgency == "blocked":
         return f"A trustworthy next step is blocked until this is cleared. {trust_sentence} {calibration_sentence}".strip()
@@ -2696,7 +3160,22 @@ def _trust_policy_sentence(
     exception_status: str,
     exception_reason: str,
     drift_status: str,
+    exception_pattern_status: str,
+    exception_pattern_reason: str,
+    trust_recovery_status: str,
+    trust_recovery_reason: str,
 ) -> str:
+    if trust_recovery_status == "earned":
+        return "Trust policy: act with review because recent stability has earned this target back from verify-first."
+    if trust_recovery_status == "candidate":
+        return "Trust policy: verify first because the target is stabilizing, but it has not held steady long enough to earn stronger trust yet."
+    if trust_recovery_status == "blocked":
+        detail = trust_recovery_reason or exception_reason or reason
+        return f"Trust policy: verify first because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: verify first because trust recovery is still blocked."
+    if exception_pattern_status == "useful-caution":
+        return "Trust policy: verify first because recent soft caution has been justified and still looks appropriate."
+    if exception_pattern_status == "overcautious":
+        return "Trust policy: verify first for now, but recent evidence suggests the softer posture may be more cautious than necessary."
     if exception_status == "softened-for-noise":
         return "Trust policy: verify first because the target still matters, but recent trust noise warrants a verification step."
     if exception_status == "softened-for-flip-churn":
@@ -2715,9 +3194,15 @@ def _trust_policy_sentence(
     return f"Trust policy: monitor because {reason[0].lower() + reason[1:]}" if reason else "Trust policy: monitor because no strong closure move is supported yet."
 
 
-def _with_trust_policy_brief(summary: str, policy: str, exception_status: str) -> str:
+def _with_trust_policy_brief(summary: str, policy: str, exception_status: str, trust_recovery_status: str) -> str:
     if not summary:
         return summary
+    if trust_recovery_status == "earned":
+        return f"{summary} Trust policy: act with review because recent stability has earned stronger trust again."
+    if trust_recovery_status == "candidate":
+        return f"{summary} Trust policy: verify first because the target is stabilizing, but it has not earned stronger trust yet."
+    if trust_recovery_status == "blocked":
+        return f"{summary} Trust policy: verify first because trust recovery is still blocked."
     if exception_status == "softened-for-noise":
         return f"{summary} Trust policy: verify first because recent trust noise softened the recommendation."
     if exception_status == "softened-for-flip-churn":
@@ -2739,6 +3224,22 @@ def _trust_exception_note(resolution_trend: dict) -> str:
     if status in {None, "", "none"}:
         return ""
     return f"Trust policy exception: {status} — {reason}"
+
+
+def _exception_pattern_note(resolution_trend: dict) -> str:
+    status = resolution_trend.get("primary_target_exception_pattern_status", "none")
+    reason = resolution_trend.get("primary_target_exception_pattern_reason", "")
+    if status in {None, "", "none"}:
+        return ""
+    return f"Exception pattern learning: {status} — {reason}".strip()
+
+
+def _trust_recovery_note(resolution_trend: dict) -> str:
+    status = resolution_trend.get("primary_target_trust_recovery_status", "none")
+    reason = resolution_trend.get("primary_target_trust_recovery_reason", "")
+    if status in {None, "", "none"}:
+        return ""
+    return f"Trust recovery: {status} — {reason}".strip()
 
 
 def _recommendation_drift_note(resolution_trend: dict) -> str:

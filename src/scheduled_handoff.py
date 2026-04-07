@@ -128,7 +128,10 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Next action confidence: `{summary.get('next_action_confidence_label', 'low')}` ({summary.get('next_action_confidence_score', 0.0):.2f})",
         f"- Trust policy: `{summary.get('primary_target_trust_policy', 'monitor')}` — {summary.get('primary_target_trust_policy_reason', 'No trust-policy reason is recorded yet.')}",
         f"- Trust policy exception: `{summary.get('primary_target_exception_status', 'none')}` — {summary.get('primary_target_exception_reason', 'No trust-policy exception reason is recorded yet.')}",
+        f"- Exception pattern learning: `{summary.get('primary_target_exception_pattern_status', 'none')}` — {summary.get('primary_target_exception_pattern_reason', 'No exception-pattern reason is recorded yet.')}",
+        f"- Trust recovery: `{summary.get('primary_target_trust_recovery_status', 'none')}` — {summary.get('primary_target_trust_recovery_reason', 'No trust-recovery reason is recorded yet.')}",
         f"- Recommendation drift: `{summary.get('recommendation_drift_status', 'stable')}` — {summary.get('recommendation_drift_summary', 'No recommendation-drift summary is recorded yet.')}",
+        f"- Exception pattern summary: {summary.get('exception_pattern_summary', 'No exception-pattern summary is recorded yet.')}",
         f"- Confidence validation: `{summary.get('confidence_validation_status', 'insufficient-data')}` — {summary.get('confidence_calibration_summary', 'No confidence-calibration summary is recorded yet.')}",
         f"- Next recommended run: `{summary.get('next_recommended_run_mode', 'n/a')}`",
         f"- Watch strategy: `{summary.get('watch_strategy', 'manual')}`",
@@ -211,6 +214,39 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         )
     else:
         lines.append("- Recent policy path: No recent trust-policy flip path is recorded for the current target.")
+    lines.append("")
+    lines.append("## Exception Pattern Learning")
+    lines.append("")
+    lines.append(
+        f"- Pattern status: {summary.get('primary_target_exception_pattern_status', 'none')} "
+        f"({summary.get('primary_target_exception_pattern_reason', 'No exception-pattern reason is recorded yet.')})"
+    )
+    lines.append(
+        f"- {summary.get('exception_pattern_summary', 'No exception-pattern summary is recorded yet.')}"
+    )
+    hotspots = summary.get("false_positive_exception_hotspots") or []
+    if hotspots:
+        for hotspot in hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Recent hotspot')} [{hotspot.get('scope', 'target')}] -> "
+                f"{hotspot.get('overcautious_count', 0)} overcautious case(s) across {hotspot.get('exception_count', 0)} exception case(s)"
+            )
+    else:
+        lines.append("- No repeated overcautious exception hotspots are recorded in the recent window.")
+    lines.append("")
+    lines.append("## Trust Recovery")
+    lines.append("")
+    lines.append(
+        f"- Recovery status: {summary.get('primary_target_trust_recovery_status', 'none')} "
+        f"({summary.get('primary_target_trust_recovery_reason', 'No trust-recovery reason is recorded yet.')})"
+    )
+    lines.append(
+        f"- Final trust policy: {summary.get('primary_target_trust_policy', 'monitor')} "
+        f"({summary.get('primary_target_trust_policy_reason', 'No trust-policy reason is recorded yet.')})"
+    )
+    lines.append(
+        f"- Recovery window: {summary.get('trust_recovery_window_runs', 3)} run(s)"
+    )
     lines.append("")
     lines.append("## Recommendation Drift")
     lines.append("")

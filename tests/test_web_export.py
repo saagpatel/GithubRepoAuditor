@@ -132,6 +132,10 @@ def _make_report(**overrides) -> dict:
             "next_action_trust_policy_reason": "Recent calibration is noisy enough that this recommendation should be verified before acting on it.",
             "primary_target_exception_status": "softened-for-noise",
             "primary_target_exception_reason": "Recent trust noise plus a reopened target warrants a softer verification-first posture.",
+            "primary_target_exception_pattern_status": "useful-caution",
+            "primary_target_exception_pattern_reason": "Recent soft caution was followed by renewed instability or unresolved pressure, so the softer posture still looks justified.",
+            "primary_target_trust_recovery_status": "blocked",
+            "primary_target_trust_recovery_reason": "Trust recovery is blocked because this target reopened again inside the recent recovery window.",
             "recommendation_drift_status": "watch",
             "recommendation_drift_summary": "RepoC: RepoC drift needs review has started to wobble between trust policies in the recent window: act-with-review -> verify-first.",
             "policy_flip_hotspots": [
@@ -142,6 +146,9 @@ def _make_report(**overrides) -> dict:
                     "recent_policy_path": "verify-first -> act-with-review",
                 }
             ],
+            "exception_pattern_summary": "Recent soft caution for RepoC: RepoC drift needs review has been justified and still looks appropriate.",
+            "false_positive_exception_hotspots": [],
+            "trust_recovery_window_runs": 3,
             "adaptive_confidence_summary": "Calibration is noisy, so the recommendation was softened and should be verified before acting.",
             "recommendation_quality_summary": "Strong recommendation because the next step is tied directly to the current top target.",
             "confidence_validation_status": "mixed",
@@ -288,6 +295,8 @@ class TestRenderHtml:
         assert "Confidence Validation:" in html
         assert "Trust Policy:" in html
         assert "Trust Policy Exception:" in html
+        assert "Exception Pattern Learning:" in html
+        assert "Trust Recovery:" in html
         assert "Recommendation Drift:" in html
         assert "Why This Confidence Is Actionable:" in html
         assert "Recent Confidence Outcomes:" in html
