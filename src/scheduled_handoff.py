@@ -690,6 +690,67 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     else:
         lines.append("- No closure-forecast reweighting hotspots are recorded in the recent window.")
     lines.append("")
+    lines.append("## Closure Forecast Momentum")
+    lines.append("")
+    lines.append(
+        f"- Forecast momentum: {summary.get('primary_target_closure_forecast_momentum_status', 'insufficient-data')} "
+        f"({summary.get('primary_target_closure_forecast_momentum_score', 0.0):.2f})"
+    )
+    lines.append(
+        f"- Forecast stability: {summary.get('primary_target_closure_forecast_stability_status', 'watch')}"
+    )
+    lines.append(
+        f"- Forecast transition window: {summary.get('closure_forecast_transition_window_runs', 4)} run(s)"
+    )
+    if primary_target.get("recent_closure_forecast_path"):
+        lines.append(
+            f"- Recent closure-forecast path: {primary_target.get('recent_closure_forecast_path')}"
+        )
+    lines.append(
+        f"- {summary.get('closure_forecast_momentum_summary', 'No closure-forecast momentum summary is recorded yet.')}"
+    )
+    sustained_confirmation_hotspots = summary.get("sustained_confirmation_hotspots") or []
+    sustained_clearance_hotspots = summary.get("sustained_clearance_hotspots") or []
+    if sustained_confirmation_hotspots:
+        for hotspot in sustained_confirmation_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Confirmation hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('closure_forecast_momentum_status', 'sustained-confirmation')} at "
+                f"{hotspot.get('closure_forecast_momentum_score', 0.0):.2f}"
+            )
+    elif sustained_clearance_hotspots:
+        for hotspot in sustained_clearance_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Clearance hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('closure_forecast_momentum_status', 'sustained-clearance')} at "
+                f"{hotspot.get('closure_forecast_momentum_score', 0.0):.2f}"
+            )
+    else:
+        lines.append("- No closure-forecast momentum hotspots are recorded in the recent window.")
+    lines.append("")
+    lines.append("## Closure Forecast Hysteresis")
+    lines.append("")
+    lines.append(
+        f"- Hysteresis status: {summary.get('primary_target_closure_forecast_hysteresis_status', 'none')} "
+        f"({summary.get('primary_target_closure_forecast_hysteresis_reason', 'No closure-forecast hysteresis reason is recorded yet.')})"
+    )
+    lines.append(
+        f"- {summary.get('closure_forecast_stability_summary', 'No closure-forecast stability summary is recorded yet.')}"
+    )
+    lines.append(
+        f"- {summary.get('closure_forecast_hysteresis_summary', 'No closure-forecast hysteresis summary is recorded yet.')}"
+    )
+    oscillating_closure_forecast_hotspots = summary.get("oscillating_closure_forecast_hotspots") or []
+    if oscillating_closure_forecast_hotspots:
+        for hotspot in oscillating_closure_forecast_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Oscillating forecast hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('closure_forecast_stability_status', 'oscillating')} across "
+                f"{hotspot.get('recent_closure_forecast_path', 'no forecast path recorded')}"
+            )
+    else:
+        lines.append("- No oscillating closure-forecast hotspots are recorded in the recent window.")
+    lines.append("")
     lines.append("## Recommendation Drift")
     lines.append("")
     lines.append(

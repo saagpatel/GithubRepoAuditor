@@ -366,6 +366,17 @@ def write_markdown_report(
                 f"- Closure Forecast Reweighting: {report.operator_summary.get('primary_target_closure_forecast_reweight_direction')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reweight_score', 0.0):.2f})"
             )
+        if report.operator_summary.get("primary_target_closure_forecast_momentum_status"):
+            _w(
+                f"- Closure Forecast Momentum: {report.operator_summary.get('primary_target_closure_forecast_momentum_status')} "
+                f"({report.operator_summary.get('primary_target_closure_forecast_momentum_score', 0.0):.2f})"
+            )
+        if report.operator_summary.get("primary_target_closure_forecast_stability_status"):
+            _w(
+                f"- Closure Forecast Hysteresis: {report.operator_summary.get('primary_target_closure_forecast_stability_status')} "
+                f"({report.operator_summary.get('primary_target_closure_forecast_hysteresis_status', 'none')}: "
+                f"{report.operator_summary.get('primary_target_closure_forecast_hysteresis_reason', 'No closure-forecast hysteresis reason is recorded yet.')})"
+            )
         if report.operator_summary.get("recommendation_drift_status"):
             _w(
                 f"- Recommendation Drift: {report.operator_summary.get('recommendation_drift_status')} "
@@ -405,6 +416,12 @@ def write_markdown_report(
             _w(f"- Pending Debt Decay Summary: {report.operator_summary.get('pending_debt_decay_summary')}")
         if report.operator_summary.get("closure_forecast_reweighting_summary"):
             _w(f"- Closure Forecast Reweighting Summary: {report.operator_summary.get('closure_forecast_reweighting_summary')}")
+        if report.operator_summary.get("closure_forecast_momentum_summary"):
+            _w(f"- Closure Forecast Momentum Summary: {report.operator_summary.get('closure_forecast_momentum_summary')}")
+        if report.operator_summary.get("closure_forecast_stability_summary"):
+            _w(f"- Closure Forecast Stability Summary: {report.operator_summary.get('closure_forecast_stability_summary')}")
+        if report.operator_summary.get("closure_forecast_hysteresis_summary"):
+            _w(f"- Closure Forecast Hysteresis Summary: {report.operator_summary.get('closure_forecast_hysteresis_summary')}")
         if report.operator_summary.get("recommendation_quality_summary"):
             _w(f"- Recommendation Quality: {report.operator_summary.get('recommendation_quality_summary')}")
         if report.operator_summary.get("confidence_validation_status"):
