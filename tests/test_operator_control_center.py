@@ -233,8 +233,22 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
         "confirmed-clearance",
         "blocked",
     }
+    assert summary["primary_target_closure_forecast_freshness_status"] in {
+        "fresh",
+        "mixed-age",
+        "stale",
+        "insufficient-data",
+    }
+    assert summary["primary_target_closure_forecast_decay_status"] in {
+        "none",
+        "confirmation-decayed",
+        "clearance-decayed",
+        "blocked",
+    }
     assert -0.95 <= summary["primary_target_closure_forecast_reweight_score"] <= 0.95
     assert -0.95 <= summary["primary_target_closure_forecast_momentum_score"] <= 0.95
+    assert 0.0 <= summary["primary_target"]["decayed_confirmation_forecast_rate"] <= 1.0
+    assert 0.0 <= summary["primary_target"]["decayed_clearance_forecast_rate"] <= 1.0
     assert 0.0 <= summary["primary_target_weighted_pending_resolution_support_score"] <= 0.95
     assert 0.0 <= summary["primary_target_weighted_pending_debt_caution_score"] <= 0.95
     assert summary["class_decay_window_runs"] == 4
@@ -247,6 +261,7 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
     assert summary["pending_debt_decay_window_runs"] == 4
     assert summary["closure_forecast_reweighting_window_runs"] == 4
     assert summary["closure_forecast_transition_window_runs"] == 4
+    assert summary["closure_forecast_decay_window_runs"] == 4
     assert "guidance" in summary["adaptive_confidence_summary"].lower() or "immediate action" in summary["adaptive_confidence_summary"].lower()
     assert summary["recommendation_quality_summary"].startswith("Strong recommendation because")
 

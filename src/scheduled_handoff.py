@@ -141,6 +141,8 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Pending transition resolution: `{summary.get('primary_target_class_transition_resolution_status', 'none')}` — {summary.get('primary_target_class_transition_resolution_reason', 'No class transition resolution reason is recorded yet.')}",
         f"- Transition closure confidence: `{summary.get('primary_target_transition_closure_confidence_label', 'low')}` ({summary.get('primary_target_transition_closure_confidence_score', 0.0):.2f}) — {summary.get('primary_target_transition_closure_likely_outcome', 'none')}",
         f"- Class pending debt audit: `{summary.get('primary_target_class_pending_debt_status', 'none')}` — {summary.get('primary_target_class_pending_debt_reason', 'No class pending-debt reason is recorded yet.')}",
+        f"- Closure forecast freshness: `{summary.get('primary_target_closure_forecast_freshness_status', 'insufficient-data')}` — {summary.get('primary_target_closure_forecast_freshness_reason', 'No closure-forecast freshness reason is recorded yet.')}",
+        f"- Hysteresis decay controls: `{summary.get('primary_target_closure_forecast_decay_status', 'none')}` — {summary.get('primary_target_closure_forecast_decay_reason', 'No closure-forecast decay reason is recorded yet.')}",
         f"- Recommendation drift: `{summary.get('recommendation_drift_status', 'stable')}` — {summary.get('recommendation_drift_summary', 'No recommendation-drift summary is recorded yet.')}",
         f"- Exception pattern summary: {summary.get('exception_pattern_summary', 'No exception-pattern summary is recorded yet.')}",
         f"- Exception retirement summary: {summary.get('exception_retirement_summary', 'No exception-retirement summary is recorded yet.')}",
@@ -152,6 +154,8 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Transition closure summary: {summary.get('transition_closure_confidence_summary', 'No transition-closure confidence summary is recorded yet.')}",
         f"- Class pending debt summary: {summary.get('class_pending_debt_summary', 'No class pending-debt summary is recorded yet.')}",
         f"- Class pending resolution summary: {summary.get('class_pending_resolution_summary', 'No class pending-resolution summary is recorded yet.')}",
+        f"- Closure forecast freshness summary: {summary.get('closure_forecast_freshness_summary', 'No closure-forecast freshness summary is recorded yet.')}",
+        f"- Closure forecast decay summary: {summary.get('closure_forecast_decay_summary', 'No closure-forecast decay summary is recorded yet.')}",
         f"- Confidence validation: `{summary.get('confidence_validation_status', 'insufficient-data')}` — {summary.get('confidence_calibration_summary', 'No confidence-calibration summary is recorded yet.')}",
         f"- Next recommended run: `{summary.get('next_recommended_run_mode', 'n/a')}`",
         f"- Watch strategy: `{summary.get('watch_strategy', 'manual')}`",
@@ -690,6 +694,47 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     else:
         lines.append("- No closure-forecast reweighting hotspots are recorded in the recent window.")
     lines.append("")
+    lines.append("## Closure Forecast Freshness")
+    lines.append("")
+    lines.append(
+        f"- Forecast freshness: {summary.get('primary_target_closure_forecast_freshness_status', 'insufficient-data')} "
+        f"({summary.get('primary_target_closure_forecast_freshness_reason', 'No closure-forecast freshness reason is recorded yet.')})"
+    )
+    lines.append(
+        f"- Decayed confirmation rate: {primary_target.get('decayed_confirmation_forecast_rate', 0.0):.0%}"
+    )
+    lines.append(
+        f"- Decayed clearance rate: {primary_target.get('decayed_clearance_forecast_rate', 0.0):.0%}"
+    )
+    lines.append(
+        f"- Forecast freshness window: {summary.get('closure_forecast_decay_window_runs', 4)} run(s)"
+    )
+    if primary_target.get("recent_closure_forecast_signal_mix"):
+        lines.append(
+            f"- Recent closure-forecast signal mix: {primary_target.get('recent_closure_forecast_signal_mix')}"
+        )
+    lines.append(
+        f"- {summary.get('closure_forecast_freshness_summary', 'No closure-forecast freshness summary is recorded yet.')}"
+    )
+    stale_closure_forecast_hotspots = summary.get("stale_closure_forecast_hotspots") or []
+    fresh_closure_forecast_signal_hotspots = summary.get("fresh_closure_forecast_signal_hotspots") or []
+    if stale_closure_forecast_hotspots:
+        for hotspot in stale_closure_forecast_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Stale forecast hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('closure_forecast_freshness_status', 'stale')} at "
+                f"{max(hotspot.get('decayed_confirmation_forecast_rate', 0.0), hotspot.get('decayed_clearance_forecast_rate', 0.0)):.0%}"
+            )
+    elif fresh_closure_forecast_signal_hotspots:
+        for hotspot in fresh_closure_forecast_signal_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Fresh forecast hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('closure_forecast_freshness_status', 'fresh')} at "
+                f"{max(hotspot.get('decayed_confirmation_forecast_rate', 0.0), hotspot.get('decayed_clearance_forecast_rate', 0.0)):.0%}"
+            )
+    else:
+        lines.append("- No closure-forecast freshness hotspots are recorded in the recent window.")
+    lines.append("")
     lines.append("## Closure Forecast Momentum")
     lines.append("")
     lines.append(
@@ -727,6 +772,16 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
             )
     else:
         lines.append("- No closure-forecast momentum hotspots are recorded in the recent window.")
+    lines.append("")
+    lines.append("## Hysteresis Decay Controls")
+    lines.append("")
+    lines.append(
+        f"- Decay status: {summary.get('primary_target_closure_forecast_decay_status', 'none')} "
+        f"({summary.get('primary_target_closure_forecast_decay_reason', 'No closure-forecast decay reason is recorded yet.')})"
+    )
+    lines.append(
+        f"- {summary.get('closure_forecast_decay_summary', 'No closure-forecast decay summary is recorded yet.')}"
+    )
     lines.append("")
     lines.append("## Closure Forecast Hysteresis")
     lines.append("")
