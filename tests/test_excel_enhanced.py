@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import zipfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
@@ -616,3 +617,67 @@ class TestWorkbookModes:
         assert standard_wb["Print Pack"]["B9"].value == template_wb["Print Pack"]["B9"].value
         assert template_wb["Review Queue"]["A4"].value == "Summary"
         assert template_wb["Review Queue"]["A20"].value == "Repo"
+
+    def test_internal_navigation_links_use_locations_not_external_relationships(self, tmp_path):
+        report_path = tmp_path / "report.json"
+        report_path.write_text(json.dumps(_make_report()))
+
+        output = export_excel(report_path, tmp_path / "out.xlsx", excel_mode="standard")
+
+        with zipfile.ZipFile(output) as archive:
+            rel_name = "xl/worksheets/_rels/sheet1.xml.rels"
+            if rel_name in archive.namelist():
+                rel_xml = archive.read(rel_name).decode("utf-8", "ignore")
+                assert "relationships/hyperlink" not in rel_xml
+
+    def test_review_queue_uses_autofilter_not_structured_table(self, tmp_path):
+        report_path = tmp_path / "report.json"
+        report_path.write_text(json.dumps(_make_report()))
+
+        output = export_excel(report_path, tmp_path / "out.xlsx", excel_mode="standard")
+
+        with zipfile.ZipFile(output) as archive:
+            review_queue_xml = archive.read("xl/worksheets/sheet3.xml").decode("utf-8", "ignore")
+            assert "<autoFilter ref=\"A20:H21\"" in review_queue_xml
+            assert "<tableParts" not in review_queue_xml
+
+    def test_visible_sheets_use_filters_while_hidden_data_sheets_keep_tables(self, tmp_path):
+        report_path = tmp_path / "report.json"
+        report_path.write_text(json.dumps(_make_report()))
+
+        output = export_excel(report_path, tmp_path / "out.xlsx", excel_mode="standard")
+
+        with zipfile.ZipFile(output) as archive:
+            workbook_root = ET.fromstring(archive.read("xl/workbook.xml"))
+            workbook_rels = ET.fromstring(archive.read("xl/_rels/workbook.xml.rels"))
+            rel_targets = {
+                rel.attrib["Id"]: rel.attrib["Target"].lstrip("/")
+                for rel in workbook_rels
+                if rel.attrib.get("Type", "").endswith("/worksheet")
+            }
+            visible_targets = []
+            hidden_targets = []
+            for sheet in workbook_root.findall("{http://schemas.openxmlformats.org/spreadsheetml/2006/main}sheets/{http://schemas.openxmlformats.org/spreadsheetml/2006/main}sheet"):
+                target = rel_targets[sheet.attrib["{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"]]
+                if sheet.attrib.get("state") == "hidden":
+                    hidden_targets.append(target)
+                else:
+                    visible_targets.append(target)
+
+            visible_table_rels = []
+            hidden_table_rels = []
+            for target in visible_targets:
+                rel_name = target.replace("worksheets/", "worksheets/_rels/") + ".rels"
+                if rel_name in archive.namelist():
+                    rel_xml = archive.read(rel_name).decode("utf-8", "ignore")
+                    if "relationships/table" in rel_xml:
+                        visible_table_rels.append(rel_name)
+            for target in hidden_targets:
+                rel_name = target.replace("worksheets/", "worksheets/_rels/") + ".rels"
+                if rel_name in archive.namelist():
+                    rel_xml = archive.read(rel_name).decode("utf-8", "ignore")
+                    if "relationships/table" in rel_xml:
+                        hidden_table_rels.append(rel_name)
+
+            assert not visible_table_rels
+            assert hidden_table_rels

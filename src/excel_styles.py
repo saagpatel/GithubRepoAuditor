@@ -6,6 +6,7 @@ All sheets import from here for consistent visual language.
 from __future__ import annotations
 
 from openpyxl.styles import Alignment, Border, Font, NamedStyle, PatternFill, Side
+from openpyxl.worksheet.hyperlink import Hyperlink
 
 # ── Color Palette ────────────────────────────────────────────────────
 
@@ -177,7 +178,14 @@ def write_kpi_card(
     value_cell.alignment = CENTER
 
     if hyperlink:
-        value_cell.hyperlink = hyperlink
+        if hyperlink.startswith("#"):
+            value_cell.hyperlink = Hyperlink(
+                ref=value_cell.coordinate,
+                location=hyperlink[1:],
+                display=str(value),
+            )
+        else:
+            value_cell.hyperlink = hyperlink
 
     # Merge 2 cols wide for each card
     ws.merge_cells(start_row=row, start_column=col, end_row=row, end_column=col + 1)

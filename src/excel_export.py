@@ -20,6 +20,7 @@ from openpyxl.formatting.rule import ColorScaleRule, DataBarRule, IconSetRule
 from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
+from openpyxl.worksheet.hyperlink import Hyperlink
 from openpyxl.worksheet.table import Table, TableStyleInfo
 from openpyxl.workbook.defined_name import DefinedName
 
@@ -72,8 +73,11 @@ PIE_COLORS = ["166534", "1565C0", "D97706", "C2410C", "6B7280"]
 
 
 def _add_table(ws, table_name: str, max_col: int, max_row: int, start_row: int = 1) -> None:
-    """Attach a structured table to an already-populated range."""
+    """Attach a structured table to hidden sheets and a plain filter to visible ones."""
     if max_row <= start_row:
+        return
+    if ws.sheet_state == "visible":
+        _set_autofilter(ws, max_col, max_row, start_row=start_row)
         return
     ref = f"A{start_row}:{get_column_letter(max_col)}{max_row}"
     table = Table(displayName=table_name, ref=ref)
@@ -85,6 +89,13 @@ def _add_table(ws, table_name: str, max_col: int, max_row: int, start_row: int =
         showColumnStripes=False,
     )
     ws.add_table(table)
+
+
+def _set_autofilter(ws, max_col: int, max_row: int, start_row: int = 1) -> None:
+    """Attach a plain AutoFilter to an already-populated range."""
+    if max_row <= start_row:
+        return
+    ws.auto_filter.ref = f"A{start_row}:{get_column_letter(max_col)}{max_row}"
 
 
 def _clear_worksheet(ws) -> None:
@@ -257,6 +268,13 @@ def _collection_memberships(data: dict) -> dict[str, list[str]]:
             repo_name = repo_data["name"] if isinstance(repo_data, dict) else str(repo_data)
             memberships.setdefault(repo_name, []).append(collection_name)
     return memberships
+
+
+def _sheet_location(sheet_name: str, cell: str = "A1") -> str:
+    escaped = sheet_name.replace("'", "''")
+    if any(ch in sheet_name for ch in {" ", "'", "!", "-"}):
+        return f"'{escaped}'!{cell}"
+    return f"{escaped}!{cell}"
 
 
 def _display_operator_state(value: str | None) -> str:
@@ -564,9 +582,9 @@ def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None, sc
     write_kpi_card(ws, 5, 1, "Portfolio Grade", grade, grade_color)
     write_kpi_card(ws, 5, 3, "Avg Score", f"{data['average_score']:.2f}")
     tiers = data.get("tier_distribution", {})
-    write_kpi_card(ws, 5, 5, "Shipped", tiers.get("shipped", 0), "166534", "#Tier Breakdown!A1")
-    write_kpi_card(ws, 5, 7, "Functional", tiers.get("functional", 0), "1565C0", "#Tier Breakdown!A1")
-    write_kpi_card(ws, 5, 9, "WIP", tiers.get("wip", 0), "D97706", "#Quick Wins!A1")
+    write_kpi_card(ws, 5, 5, "Shipped", tiers.get("shipped", 0), "166534", f"#{_sheet_location('Tier Breakdown')}")
+    write_kpi_card(ws, 5, 7, "Functional", tiers.get("functional", 0), "1565C0", f"#{_sheet_location('Tier Breakdown')}")
+    write_kpi_card(ws, 5, 9, "WIP", tiers.get("wip", 0), "D97706", f"#{_sheet_location('Quick Wins')}")
     skel_aband = tiers.get("skeleton", 0) + tiers.get("abandoned", 0)
     write_kpi_card(ws, 5, 11, "Needs Work", skel_aband, "C2410C")
 
@@ -1838,13 +1856,21 @@ def _build_navigation(
             if name not in wb.sheetnames:
                 continue
             sheet_cell = ws.cell(row=row, column=start_col, value=name)
-            sheet_cell.hyperlink = f"#{name}!A1"
+            sheet_cell.hyperlink = Hyperlink(
+                ref=sheet_cell.coordinate,
+                location=_sheet_location(name),
+                display=str(name),
+            )
             sheet_cell.font = Font("Calibri", 11, bold=True, color=TEAL, underline="single")
             sheet_cell.border = THIN_BORDER
             sheet_cell.alignment = LEFT
             style_data_cell(ws.cell(row=row, column=start_col + 1, value=desc), "left")
             go_cell = ws.cell(row=row, column=start_col + 2, value="Open")
-            go_cell.hyperlink = f"#{name}!A1"
+            go_cell.hyperlink = Hyperlink(
+                ref=go_cell.coordinate,
+                location=_sheet_location(name),
+                display="Open",
+            )
             go_cell.font = Font("Calibri", 10, bold=True, color=TEAL, underline="single")
             go_cell.border = THIN_BORDER
             go_cell.alignment = CENTER
@@ -3179,7 +3205,7 @@ def _build_review_queue(wb: Workbook, data: dict) -> None:
     max_row = len(targets) + start_row
     if targets:
         apply_zebra_stripes(ws, start_row + 1, max_row, len(headers))
-        _add_table(ws, "tblReviewQueue", len(headers), max_row, start_row=start_row)
+        _set_autofilter(ws, len(headers), max_row, start_row=start_row)
     auto_width(ws, len(headers), max_row)
 
 
