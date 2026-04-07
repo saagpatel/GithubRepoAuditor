@@ -227,6 +227,12 @@ def _operator_section(data: dict) -> str:
             "</li>"
         )
     recent_changes = summary.get("operator_recent_changes", [])
+    primary_target = summary.get("primary_target") or {}
+    primary_target_label = (
+        f"{primary_target.get('repo')}: {primary_target.get('title')}"
+        if primary_target.get("repo")
+        else primary_target.get("title", "")
+    )
     recent_markup = "".join(
         f"<li>{escape(change.get('generated_at', '')[:10])} "
         f"{escape(change.get('repo') or change.get('repo_full_name') or change.get('item_id') or 'portfolio')}: "
@@ -245,7 +251,9 @@ def _operator_section(data: dict) -> str:
         <div class="meta-line"><strong>What Changed:</strong> {escape(summary.get('what_changed', 'No operator change summary is recorded.'))}</div>
         <div class="meta-line"><strong>Why It Matters:</strong> {escape(summary.get('why_it_matters', 'No additional operator impact is recorded.'))}</div>
         <div class="meta-line"><strong>What To Do Next:</strong> {escape(summary.get('what_to_do_next', 'Continue the normal operator loop.'))}</div>
+        <div class="meta-line"><strong>Trend:</strong> {escape(summary.get('trend_summary', 'No trend summary is recorded yet.'))}</div>
         <div class="meta-line"><strong>Follow-Through:</strong> {escape(summary.get('follow_through_summary', 'No follow-through signal is recorded yet.'))}</div>
+        <div class="meta-line"><strong>Primary Target:</strong> {escape(primary_target_label or 'No active target')}</div>
         <div class="meta-line"><strong>Blocked:</strong> {counts.get('blocked', 0)} | <strong>Urgent:</strong> {counts.get('urgent', 0)} | <strong>Ready:</strong> {counts.get('ready', 0)} | <strong>Deferred:</strong> {counts.get('deferred', 0)}</div>
         <ul class="bullet-list">{''.join(rows) or '<li>No triage items are currently surfaced.</li>'}</ul>
         <div class="meta-line"><strong>Recently Changed:</strong></div>

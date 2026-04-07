@@ -660,6 +660,14 @@ def _print_control_center_summary(snapshot: dict) -> None:
         print(f"  Why it matters: {summary['why_it_matters']}")
     if summary.get("what_to_do_next"):
         print(f"  What to do next: {summary['what_to_do_next']}")
+    if summary.get("trend_summary"):
+        print(f"  Trend: {summary['trend_summary']}")
+    primary_target = summary.get("primary_target") or {}
+    if primary_target:
+        repo = f"{primary_target.get('repo')}: " if primary_target.get("repo") else ""
+        print(f"  Primary target: {repo}{primary_target.get('title', 'Operator target')}")
+    if summary.get("follow_through_summary"):
+        print(f"  Follow-through: {summary['follow_through_summary']}")
     lane_labels = [
         ("blocked", "Blocked"),
         ("urgent", "Needs Attention Now"),

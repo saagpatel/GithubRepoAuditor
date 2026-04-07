@@ -236,6 +236,18 @@ def _make_report(audits=None) -> dict:
         "operator_summary": {
             "headline": "There is live drift or high-severity change that needs attention now.",
             "counts": {"blocked": 0, "urgent": 2, "ready": 1, "deferred": 0},
+            "trend_status": "stable",
+            "trend_summary": "The queue is stable but still sticky: 1 attention item is persisting from the last run.",
+            "new_attention_count": 0,
+            "resolved_attention_count": 0,
+            "persisting_attention_count": 1,
+            "reopened_attention_count": 0,
+            "quiet_streak_runs": 0,
+            "primary_target": {
+                "item_id": "review-target:RepoC",
+                "repo": "RepoC",
+                "title": "Security posture needs attention",
+            },
         },
         "operator_queue": [
             {
@@ -469,6 +481,22 @@ class TestAnalystWorkbookSheets:
         assert ws["E4"].value == "Top 10 To Act On"
         assert ws["A25"].value == "Repo"
         assert ws.freeze_panes == "A26"
+
+    def test_standard_operator_sheets_include_trend_callouts(self):
+        wb = Workbook()
+        report = _make_report()
+        _build_review_queue(wb, report, excel_mode="standard")
+        _build_executive_summary(wb, report, None, portfolio_profile="default", collection="showcase", excel_mode="standard")
+        _build_print_pack(wb, report, None, portfolio_profile="default", collection="showcase", excel_mode="standard")
+
+        review_ws = wb["Review Queue"]
+        executive_ws = wb["Executive Summary"]
+        print_ws = wb["Print Pack"]
+
+        assert review_ws["A10"].value == "Trend"
+        assert "stable" in str(review_ws["B10"].value).lower()
+        assert executive_ws["D29"].value == "Trend"
+        assert print_ws["A17"].value == "Primary Target"
 
     def test_campaigns_show_empty_state_when_no_preview_rows(self):
         wb = Workbook()

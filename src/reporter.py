@@ -219,8 +219,14 @@ def write_markdown_report(
             _w(f"- Why It Matters: {report.operator_summary.get('why_it_matters')}")
         if report.operator_summary.get("what_to_do_next"):
             _w(f"- What To Do Next: {report.operator_summary.get('what_to_do_next')}")
+        if report.operator_summary.get("trend_summary"):
+            _w(f"- Trend: {report.operator_summary.get('trend_summary')}")
         if report.operator_summary.get("follow_through_summary"):
             _w(f"- Follow-Through: {report.operator_summary.get('follow_through_summary')}")
+        primary_target = report.operator_summary.get("primary_target") or {}
+        if primary_target:
+            repo = f"{primary_target.get('repo')}: " if primary_target.get("repo") else ""
+            _w(f"- Primary Target: {repo}{primary_target.get('title', 'Operator target')}")
         if report.operator_summary.get("control_center_reference"):
             _w(f"- Control Center Artifact: `{report.operator_summary.get('control_center_reference')}`")
         counts = report.operator_summary.get("counts", {})

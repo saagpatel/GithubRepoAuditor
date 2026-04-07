@@ -125,6 +125,8 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
     assert summary["why_it_matters"]
     assert summary["what_to_do_next"].startswith("Set GITHUB_TOKEN")
     assert summary["urgency"] == "blocked"
+    assert summary["trend_status"] == "stable"
+    assert summary["primary_target"]["title"] == "GitHub authentication is required."
 
 
 def test_operator_snapshot_adds_follow_through_from_recent_history(tmp_path: Path, monkeypatch):
@@ -165,6 +167,94 @@ def test_operator_snapshot_adds_follow_through_from_recent_history(tmp_path: Pat
     assert summary["stale_item_count"] >= 1
     assert summary["oldest_open_item_days"] >= 8
     assert "urgent item" in summary["follow_through_summary"]
+    assert summary["persisting_attention_count"] >= 1
+    assert summary["trend_status"] == "worsening"
+
+
+def test_operator_snapshot_marks_quiet_recovery_as_improving(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history",
+        lambda *_args, **_kwargs: [
+            {
+                "operator_summary": {"counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}},
+                "operator_queue": [
+                    {
+                        "item_id": "campaign-drift:campaign-1:github-issue",
+                        "lane": "urgent",
+                        "age_days": 1,
+                        "repo": "RepoD",
+                        "title": "RepoD drift needs review",
+                    }
+                ],
+            }
+        ],
+    )
+
+    snapshot = build_operator_snapshot(
+        _make_report(
+            preflight_summary={},
+            material_changes=[],
+            managed_state_drift=[],
+            governance_drift=[],
+            governance_preview={},
+            rollback_preview={},
+            review_targets=[
+                {
+                    "repo": "RepoB",
+                    "reason": "Nothing crossed the threshold",
+                    "severity": 0.2,
+                    "recommended_next_step": "Safe to defer.",
+                }
+            ],
+        ),
+        output_dir=tmp_path,
+    )
+    summary = snapshot["operator_summary"]
+
+    assert summary["trend_status"] == "improving"
+    assert summary["resolved_attention_count"] == 1
+    assert "cleared" in summary["trend_summary"]
+
+
+def test_operator_snapshot_tracks_reopened_attention_items(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history",
+        lambda *_args, **_kwargs: [
+            {
+                "operator_summary": {"counts": {"blocked": 0, "urgent": 0, "ready": 0, "deferred": 0}},
+                "operator_queue": [],
+            },
+            {
+                "operator_summary": {"counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}},
+                "operator_queue": [
+                    {
+                        "item_id": "campaign-drift:campaign-1:github-issue",
+                        "lane": "urgent",
+                        "age_days": 4,
+                        "repo": "RepoD",
+                        "title": "RepoD drift needs review",
+                    }
+                ],
+            },
+        ],
+    )
+
+    snapshot = build_operator_snapshot(
+        _make_report(
+            preflight_summary={},
+            governance_drift=[],
+            governance_preview={},
+            rollback_preview={},
+            review_targets=[],
+            material_changes=[],
+        ),
+        output_dir=tmp_path,
+    )
+    summary = snapshot["operator_summary"]
+
+    assert summary["trend_status"] == "worsening"
+    assert summary["reopened_attention_count"] >= 1
+    assert summary["primary_target"]["title"] == "RepoD drift needs review"
 
 
 def test_normalize_review_state_backfills_missing_fields(tmp_path: Path):

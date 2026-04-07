@@ -18,6 +18,19 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
             "what_changed": "RepoC drift needs review — managed-issue-edited",
             "why_it_matters": "This has crossed into live drift, regression risk, or rollback exposure and should be reviewed before it spreads.",
             "what_to_do_next": "Inspect the managed issue before closing the campaign.",
+            "trend_status": "stable",
+            "trend_summary": "The queue is stable but still sticky: 1 attention item is persisting from the last run. Close RepoC: RepoC drift needs review next.",
+            "new_attention_count": 0,
+            "resolved_attention_count": 0,
+            "persisting_attention_count": 1,
+            "reopened_attention_count": 0,
+            "quiet_streak_runs": 0,
+            "primary_target": {
+                "item_id": "campaign-drift:repo-c",
+                "repo": "RepoC",
+                "title": "RepoC drift needs review",
+                "recommended_action": "Inspect the managed issue before closing the campaign.",
+            },
             "next_recommended_run_mode": "incremental",
             "watch_strategy": "adaptive",
             "watch_decision_summary": "The current baseline is still compatible, so incremental watch remains safe for the next run.",
@@ -51,6 +64,10 @@ def test_build_scheduled_handoff_writes_artifacts_and_issue_candidate(tmp_path):
     assert payload["issue_candidate"]["title"] == "Scheduled Audit Handoff: testuser"
     assert (tmp_path / "scheduled-handoff-testuser-2026-04-07.md").is_file()
     assert (tmp_path / "scheduled-handoff-testuser-2026-04-07.json").is_file()
+    markdown = (tmp_path / "scheduled-handoff-testuser-2026-04-07.md").read_text()
+    assert "What Got Better" in markdown
+    assert "What Needs Attention Now" in markdown
+    assert "Primary target: RepoC: RepoC drift needs review" in markdown
 
 
 def test_build_scheduled_handoff_stays_quiet_for_quiet_runs(tmp_path):
@@ -60,6 +77,11 @@ def test_build_scheduled_handoff_stays_quiet_for_quiet_runs(tmp_path):
     payload["operator_summary"]["why_it_matters"] = "The latest run is quiet enough that no immediate operator intervention is required."
     payload["operator_summary"]["what_to_do_next"] = "Continue the normal audit/control-center loop and review the next artifact for change."
     payload["operator_summary"]["counts"] = {"blocked": 0, "urgent": 0, "ready": 0, "deferred": 0}
+    payload["operator_summary"]["trend_status"] = "quiet"
+    payload["operator_summary"]["trend_summary"] = "The queue is quiet and has stayed that way for 2 consecutive run(s)."
+    payload["operator_summary"]["quiet_streak_runs"] = 2
+    payload["operator_summary"]["resolved_attention_count"] = 1
+    payload["operator_summary"]["persisting_attention_count"] = 0
     payload["operator_queue"] = []
     payload["operator_recent_changes"] = []
     (tmp_path / "operator-control-center-testuser-2026-04-07.json").write_text(json.dumps(payload))
@@ -70,6 +92,7 @@ def test_build_scheduled_handoff_stays_quiet_for_quiet_runs(tmp_path):
     assert result["issue_candidate"]["action"] == "quiet"
     markdown = (tmp_path / "scheduled-handoff-testuser-2026-04-07.md").read_text()
     assert "Issue automation: `quiet`" in markdown
+    assert "2 consecutive run(s)" in markdown
 
 
 def test_build_scheduled_handoff_closes_open_issue_when_run_turns_quiet(tmp_path):
