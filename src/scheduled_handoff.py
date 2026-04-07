@@ -126,6 +126,7 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Resolution evidence: {summary.get('resolution_evidence_summary', 'No resolution evidence is recorded yet.')}",
         f"- Recommendation confidence: `{summary.get('primary_target_confidence_label', 'low')}` ({summary.get('primary_target_confidence_score', 0.0):.2f})",
         f"- Next action confidence: `{summary.get('next_action_confidence_label', 'low')}` ({summary.get('next_action_confidence_score', 0.0):.2f})",
+        f"- Trust policy: `{summary.get('primary_target_trust_policy', 'monitor')}` — {summary.get('primary_target_trust_policy_reason', 'No trust-policy reason is recorded yet.')}",
         f"- Confidence validation: `{summary.get('confidence_validation_status', 'insufficient-data')}` — {summary.get('confidence_calibration_summary', 'No confidence-calibration summary is recorded yet.')}",
         f"- Next recommended run: `{summary.get('next_recommended_run_mode', 'n/a')}`",
         f"- Watch strategy: `{summary.get('watch_strategy', 'manual')}`",
@@ -142,6 +143,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     )
     lines.append(
         f"- Next action confidence: {summary.get('next_action_confidence_label', 'low')} ({summary.get('next_action_confidence_score', 0.0):.2f})"
+    )
+    lines.append(
+        f"- Trust policy: {summary.get('primary_target_trust_policy', 'monitor')} ({summary.get('primary_target_trust_policy_reason', 'No trust-policy reason is recorded yet.')})"
     )
     if summary.get("primary_target_confidence_reasons"):
         lines.append(
@@ -165,6 +169,32 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
             f"[{item.get('confidence_label', 'low')}] -> "
             f"{str(item.get('outcome', 'unresolved')).replace('_', ' ')}"
         )
+    lines.append("")
+    lines.append("## Operator Trust Policy")
+    lines.append("")
+    lines.append(
+        f"- Current tuned primary-target confidence: {summary.get('primary_target_confidence_label', 'low')} "
+        f"({summary.get('primary_target_confidence_score', 0.0):.2f})"
+    )
+    lines.append(
+        f"- Current tuned next-action confidence: {summary.get('next_action_confidence_label', 'low')} "
+        f"({summary.get('next_action_confidence_score', 0.0):.2f})"
+    )
+    lines.append(
+        f"- Target trust policy: {summary.get('primary_target_trust_policy', 'monitor')} "
+        f"-> {summary.get('primary_target_trust_policy_reason', 'No trust-policy reason is recorded yet.')}"
+    )
+    lines.append(
+        f"- Next-action trust policy: {summary.get('next_action_trust_policy', 'monitor')} "
+        f"-> {summary.get('next_action_trust_policy_reason', 'No trust-policy reason is recorded yet.')}"
+    )
+    lines.append(
+        f"- Calibration status: {summary.get('confidence_validation_status', 'insufficient-data')} "
+        f"-> {summary.get('confidence_calibration_summary', 'No confidence-calibration summary is recorded yet.')}"
+    )
+    lines.append(
+        f"- {summary.get('adaptive_confidence_summary', 'No adaptive confidence summary is recorded yet.')}"
+    )
     lines.append("")
     lines.append("## What Got Better")
     lines.append("")

@@ -123,7 +123,7 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
     assert summary["watch_decision_summary"].startswith("The next run should be full")
     assert summary["what_changed"].startswith("GitHub authentication is required.")
     assert summary["why_it_matters"]
-    assert summary["what_to_do_next"].startswith("Set GITHUB_TOKEN")
+    assert summary["what_to_do_next"].startswith("Act now: Set GITHUB_TOKEN")
     assert summary["urgency"] == "blocked"
     assert summary["trend_status"] == "stable"
     assert summary["primary_target"]["title"] == "GitHub authentication is required."
@@ -137,6 +137,9 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
     assert summary["primary_target_confidence_label"] == "high"
     assert summary["primary_target_confidence_score"] >= 0.75
     assert summary["next_action_confidence_label"] == "high"
+    assert summary["primary_target_trust_policy"] == "act-now"
+    assert "blocked" in summary["primary_target_trust_policy_reason"].lower()
+    assert "guidance" in summary["adaptive_confidence_summary"].lower() or "immediate action" in summary["adaptive_confidence_summary"].lower()
     assert summary["recommendation_quality_summary"].startswith("Strong recommendation because")
 
 
@@ -754,6 +757,139 @@ def test_operator_snapshot_tracks_partially_validated_recommendations(tmp_path: 
         item["outcome"] == "partially_validated"
         for item in summary["recent_validation_outcomes"]
     )
+
+
+def test_operator_snapshot_healthy_calibration_boosts_urgent_confidence(tmp_path: Path, monkeypatch):
+    report = _make_report(
+        preflight_summary={},
+        material_changes=[
+            {
+                "change_key": "high-1",
+                "change_type": "security-change",
+                "repo_name": "RepoC",
+                "severity": 0.9,
+                "title": "RepoC security posture changed",
+                "summary": "critical -> watch",
+                "recommended_next_step": "Review RepoC security posture changed now.",
+            }
+        ],
+        managed_state_drift=[],
+        governance_drift=[],
+        governance_preview={},
+        rollback_preview={},
+    )
+    monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: [])
+
+    monkeypatch.setattr(
+        "src.operator_control_center._build_confidence_calibration",
+        lambda _history: {
+            "confidence_validation_status": "healthy",
+            "confidence_window_runs": 8,
+            "validated_recommendation_count": 4,
+            "partially_validated_recommendation_count": 1,
+            "unresolved_recommendation_count": 1,
+            "reopened_recommendation_count": 0,
+            "insufficient_future_runs_count": 2,
+            "high_confidence_hit_rate": 0.75,
+            "medium_confidence_hit_rate": 0.5,
+            "low_confidence_caution_rate": 1.0,
+            "recent_validation_outcomes": [],
+            "confidence_calibration_summary": "Recent high-confidence recommendations are validating well.",
+        },
+    )
+    healthy_snapshot = build_operator_snapshot(report, output_dir=tmp_path)
+
+    monkeypatch.setattr(
+        "src.operator_control_center._build_confidence_calibration",
+        lambda _history: {
+            "confidence_validation_status": "mixed",
+            "confidence_window_runs": 8,
+            "validated_recommendation_count": 2,
+            "partially_validated_recommendation_count": 1,
+            "unresolved_recommendation_count": 1,
+            "reopened_recommendation_count": 1,
+            "insufficient_future_runs_count": 2,
+            "high_confidence_hit_rate": 0.5,
+            "medium_confidence_hit_rate": 0.67,
+            "low_confidence_caution_rate": 1.0,
+            "recent_validation_outcomes": [],
+            "confidence_calibration_summary": "Confidence is still useful, but recent outcomes are mixed.",
+        },
+    )
+    mixed_snapshot = build_operator_snapshot(report, output_dir=tmp_path)
+
+    assert healthy_snapshot["operator_summary"]["confidence_validation_status"] == "healthy"
+    assert mixed_snapshot["operator_summary"]["confidence_validation_status"] == "mixed"
+    assert (
+        healthy_snapshot["operator_summary"]["primary_target_confidence_score"]
+        == mixed_snapshot["operator_summary"]["primary_target_confidence_score"] + 0.05
+    )
+
+
+def test_operator_snapshot_uses_verify_first_for_noisy_reopened_targets(tmp_path: Path, monkeypatch):
+    report = _make_report(
+        preflight_summary={},
+        material_changes=[
+            {
+                "change_key": "high-1",
+                "change_type": "security-change",
+                "repo_name": "RepoC",
+                "severity": 0.9,
+                "title": "RepoC security posture changed",
+                "summary": "critical -> watch",
+                "recommended_next_step": "Review RepoC security posture changed now.",
+            }
+        ],
+        managed_state_drift=[],
+        governance_drift=[],
+        governance_preview={},
+        rollback_preview={},
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history",
+        lambda *_args, **_kwargs: [
+            {"operator_summary": {"counts": {"blocked": 0, "urgent": 0, "ready": 0, "deferred": 0}}, "operator_queue": []},
+            {
+                "operator_summary": {"counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}},
+                    "operator_queue": [
+                        {
+                            "lane": "urgent",
+                            "priority": 90,
+                            "repo": "RepoC",
+                            "title": "RepoC security posture changed",
+                            "age_days": 2,
+                    }
+                ],
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center._build_confidence_calibration",
+        lambda _history: {
+            "confidence_validation_status": "noisy",
+            "confidence_window_runs": 8,
+            "validated_recommendation_count": 1,
+            "partially_validated_recommendation_count": 1,
+            "unresolved_recommendation_count": 2,
+            "reopened_recommendation_count": 2,
+            "insufficient_future_runs_count": 1,
+            "high_confidence_hit_rate": 0.4,
+            "medium_confidence_hit_rate": 0.5,
+            "low_confidence_caution_rate": 1.0,
+            "recent_validation_outcomes": [],
+            "confidence_calibration_summary": "Recent high-confidence guidance has missed often enough that operators should verify before overcommitting.",
+        },
+    )
+    monkeypatch.setattr("src.operator_control_center._was_resolved_then_reopened", lambda *_args, **_kwargs: True)
+
+    snapshot = build_operator_snapshot(report, output_dir=tmp_path)
+    summary = snapshot["operator_summary"]
+
+    assert summary["confidence_validation_status"] == "noisy"
+    assert summary["decision_memory_status"] == "reopened"
+    assert summary["primary_target_trust_policy"] == "verify-first"
+    assert summary["next_action_trust_policy"] == "verify-first"
+    assert summary["what_to_do_next"].startswith("Verify before acting:")
 
 
 def test_normalize_review_state_backfills_missing_fields(tmp_path: Path):

@@ -264,6 +264,8 @@ def _operator_section(data: dict) -> str:
         <div class="meta-line"><strong>Primary Target Confidence:</strong> {escape(summary.get('primary_target_confidence_label', 'low'))} ({summary.get('primary_target_confidence_score', 0.0):.2f})</div>
         <div class="meta-line"><strong>Confidence Reasons:</strong> {escape(', '.join(summary.get('primary_target_confidence_reasons', []) or ['No confidence rationale is recorded yet.']))}</div>
         <div class="meta-line"><strong>Next Action Confidence:</strong> {escape(summary.get('next_action_confidence_label', 'low'))} ({summary.get('next_action_confidence_score', 0.0):.2f})</div>
+        <div class="meta-line"><strong>Trust Policy:</strong> {escape(summary.get('primary_target_trust_policy', 'monitor'))} — {escape(summary.get('primary_target_trust_policy_reason', 'No trust-policy reason is recorded yet.'))}</div>
+        <div class="meta-line"><strong>Why This Confidence Is Actionable:</strong> {escape(summary.get('adaptive_confidence_summary', 'No adaptive confidence summary is recorded yet.'))}</div>
         <div class="meta-line"><strong>Recommendation Quality:</strong> {escape(summary.get('recommendation_quality_summary', 'No recommendation-quality summary is recorded yet.'))}</div>
         <div class="meta-line"><strong>Confidence Validation:</strong> {escape(summary.get('confidence_validation_status', 'insufficient-data'))} — {escape(summary.get('confidence_calibration_summary', 'No confidence-calibration summary is recorded yet.'))}</div>
         <div class="meta-line"><strong>Recent Confidence Outcomes:</strong> {escape(_recent_confidence_outcomes_label(summary.get('recent_validation_outcomes') or []))}</div>

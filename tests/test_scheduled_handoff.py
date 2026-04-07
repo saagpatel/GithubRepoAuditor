@@ -65,6 +65,11 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
             "next_action_confidence_score": 0.75,
             "next_action_confidence_label": "high",
             "next_action_confidence_reasons": ["The next step is tied directly to the current top target."],
+            "primary_target_trust_policy": "act-with-review",
+            "primary_target_trust_policy_reason": "Urgent work has enough tuned confidence to act, with a quick operator review.",
+            "next_action_trust_policy": "act-with-review",
+            "next_action_trust_policy_reason": "Healthy calibration supports a confident next step, with light operator judgment.",
+            "adaptive_confidence_summary": "Calibration is validating well, so the recommendation can be acted on with light operator review.",
             "recommendation_quality_summary": "Strong recommendation because the next step is tied directly to the current top target.",
             "confidence_validation_status": "healthy",
             "confidence_window_runs": 8,
@@ -145,6 +150,8 @@ def test_build_scheduled_handoff_writes_artifacts_and_issue_candidate(tmp_path):
     assert "Resolution Evidence" in markdown
     assert "Recommendation Confidence" in markdown
     assert "Primary target confidence: medium (0.70)" in markdown
+    assert "Operator Trust Policy" in markdown
+    assert "act-with-review" in markdown
     assert "Confidence Validation" in markdown
     assert "75%" in markdown
     assert "Aging Pressure" in markdown

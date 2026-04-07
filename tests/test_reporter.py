@@ -197,6 +197,11 @@ class TestMarkdownReport:
             "next_action_confidence_score": 0.95,
             "next_action_confidence_label": "high",
             "next_action_confidence_reasons": ["The next step is tied directly to the current top target."],
+            "primary_target_trust_policy": "act-now",
+            "primary_target_trust_policy_reason": "Blocked work with tuned high confidence should be cleared before new work.",
+            "next_action_trust_policy": "act-now",
+            "next_action_trust_policy_reason": "Blocked work with tuned high confidence should be cleared before new work.",
+            "adaptive_confidence_summary": "Calibration is validating well, so the live recommendation was strengthened and is ready for immediate action.",
             "recommendation_quality_summary": "Strong recommendation because the next step is tied directly to the current top target.",
             "confidence_validation_status": "healthy",
             "confidence_window_runs": 8,
@@ -248,6 +253,8 @@ class TestMarkdownReport:
         assert "Resolution Evidence" in content
         assert "Primary Target Confidence" in content
         assert "Next Action Confidence" in content
+        assert "Trust Policy" in content
+        assert "Why This Confidence Is Actionable" in content
         assert "Recommendation Quality" in content
         assert "Confidence Validation" in content
         assert "Recent Confidence Outcomes" in content
