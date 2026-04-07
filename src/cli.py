@@ -725,6 +725,20 @@ def _print_control_center_summary(snapshot: dict) -> None:
             f"{summary.get('primary_target_trust_recovery_status', 'none')} "
             f"({summary.get('primary_target_trust_recovery_reason', 'No trust-recovery reason is recorded yet.')})"
         )
+    if summary.get("primary_target_recovery_confidence_label"):
+        print(
+            "  Recovery confidence: "
+            f"{summary.get('primary_target_recovery_confidence_label', 'low')} "
+            f"({summary.get('primary_target_recovery_confidence_score', 0.0):.2f})"
+        )
+    if summary.get("recovery_confidence_summary"):
+        print(f"  Recovery confidence summary: {summary['recovery_confidence_summary']}")
+    if summary.get("primary_target_exception_retirement_status") not in {None, "", "none"}:
+        print(
+            "  Exception retirement: "
+            f"{summary.get('primary_target_exception_retirement_status', 'none')} "
+            f"({summary.get('primary_target_exception_retirement_reason', 'No exception-retirement reason is recorded yet.')})"
+        )
     if summary.get("recommendation_drift_status"):
         print(
             "  Recommendation drift: "
@@ -733,6 +747,8 @@ def _print_control_center_summary(snapshot: dict) -> None:
         )
     if summary.get("exception_pattern_summary"):
         print(f"  Exception pattern summary: {summary['exception_pattern_summary']}")
+    if summary.get("exception_retirement_summary"):
+        print(f"  Exception retirement summary: {summary['exception_retirement_summary']}")
     if summary.get("recommendation_quality_summary"):
         print(f"  Recommendation quality: {summary['recommendation_quality_summary']}")
     if summary.get("confidence_validation_status"):

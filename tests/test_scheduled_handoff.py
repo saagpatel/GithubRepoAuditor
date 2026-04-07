@@ -75,6 +75,19 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
             "primary_target_exception_pattern_reason": "This target is stabilizing under healthy calibration, but it has not held steady long enough to earn stronger trust yet.",
             "primary_target_trust_recovery_status": "candidate",
             "primary_target_trust_recovery_reason": "This target is stabilizing under healthy calibration, but it has not held steady long enough to earn stronger trust yet.",
+            "primary_target_recovery_confidence_score": 0.72,
+            "primary_target_recovery_confidence_label": "medium",
+            "primary_target_recovery_confidence_reasons": [
+                "Healthy calibration supports relaxing the earlier soft caution.",
+                "Recent runs are stabilizing, but the retirement window is still short.",
+            ],
+            "recovery_confidence_summary": "RepoC: RepoC drift needs review is building recovery confidence (medium, 0.72), but the earlier caution has not retired yet.",
+            "primary_target_exception_retirement_status": "candidate",
+            "primary_target_exception_retirement_reason": "This target is trending toward retirement, but it has not earned it yet.",
+            "exception_retirement_summary": "RepoC: RepoC drift needs review is trending toward exception retirement, but the evidence is not strong enough to retire it yet.",
+            "retired_exception_hotspots": [],
+            "sticky_exception_hotspots": [],
+            "exception_retirement_window_runs": 4,
             "recommendation_drift_status": "stable",
             "recommendation_drift_summary": "Recent trust-policy behavior is stable enough that no meaningful recommendation drift is recorded.",
             "policy_flip_hotspots": [],
@@ -173,6 +186,8 @@ def test_build_scheduled_handoff_writes_artifacts_and_issue_candidate(tmp_path):
     assert "Trust Policy Exception" in markdown
     assert "Exception Pattern Learning" in markdown
     assert "Trust Recovery" in markdown
+    assert "Recovery Confidence" in markdown
+    assert "Exception Retirement" in markdown
     assert "Recommendation Drift" in markdown
     assert "Confidence Validation" in markdown
     assert "75%" in markdown

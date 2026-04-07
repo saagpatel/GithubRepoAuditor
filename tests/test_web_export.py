@@ -136,6 +136,22 @@ def _make_report(**overrides) -> dict:
             "primary_target_exception_pattern_reason": "Recent soft caution was followed by renewed instability or unresolved pressure, so the softer posture still looks justified.",
             "primary_target_trust_recovery_status": "blocked",
             "primary_target_trust_recovery_reason": "Trust recovery is blocked because this target reopened again inside the recent recovery window.",
+            "primary_target_recovery_confidence_score": 0.35,
+            "primary_target_recovery_confidence_label": "low",
+            "primary_target_recovery_confidence_reasons": [
+                "Mixed calibration keeps retirement confidence in the middle for now.",
+                "Recent exception history still shows useful caution, so the softer posture remains justified.",
+                "The target reopened inside the retirement window, so caution still needs to stay in place.",
+            ],
+            "recovery_confidence_summary": "RepoC: RepoC drift needs review still has low recovery confidence (0.35), so the softer caution should stay in place.",
+            "primary_target_exception_retirement_status": "blocked",
+            "primary_target_exception_retirement_reason": "Exception retirement is blocked because the target reopened inside the retirement window.",
+            "exception_retirement_summary": "RepoC: RepoC drift needs review still has reopen, flip, or calibration noise blocking exception retirement.",
+            "retired_exception_hotspots": [],
+            "sticky_exception_hotspots": [
+                {"scope": "class", "label": "urgent:campaign", "sticky_count": 2, "exception_count": 2}
+            ],
+            "exception_retirement_window_runs": 4,
             "recommendation_drift_status": "watch",
             "recommendation_drift_summary": "RepoC: RepoC drift needs review has started to wobble between trust policies in the recent window: act-with-review -> verify-first.",
             "policy_flip_hotspots": [
@@ -297,6 +313,8 @@ class TestRenderHtml:
         assert "Trust Policy Exception:" in html
         assert "Exception Pattern Learning:" in html
         assert "Trust Recovery:" in html
+        assert "Recovery Confidence:" in html
+        assert "Exception Retirement:" in html
         assert "Recommendation Drift:" in html
         assert "Why This Confidence Is Actionable:" in html
         assert "Recent Confidence Outcomes:" in html

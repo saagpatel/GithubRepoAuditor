@@ -387,6 +387,26 @@ def _operator_learning_values(data: dict) -> tuple[str, str, str, str]:
     return recovery_status, recovery_reason, pattern_status, pattern_summary
 
 
+def _operator_retirement_values(data: dict) -> tuple[str, str, str, str]:
+    summary = data.get("operator_summary") or {}
+    recovery_confidence = (
+        f"{summary.get('primary_target_recovery_confidence_label', 'low').title()} "
+        f"({summary.get('primary_target_recovery_confidence_score', 0.0):.2f})"
+    )
+    retirement_status = (
+        summary.get("primary_target_exception_retirement_status", "") or "none"
+    ).replace("-", " ").title()
+    retirement_reason = (
+        summary.get("primary_target_exception_retirement_reason")
+        or "No exception-retirement reason is recorded yet."
+    )
+    retirement_summary = (
+        summary.get("exception_retirement_summary")
+        or "No exception-retirement summary is recorded yet."
+    )
+    return recovery_confidence, retirement_status, retirement_reason, retirement_summary
+
+
 def _operator_calibration_values(data: dict) -> tuple[str, str, str, str]:
     summary = data.get("operator_summary") or {}
     validation_status = summary.get("confidence_validation_status", "") or "insufficient-data"
@@ -853,6 +873,7 @@ def _build_dashboard(
     trust_policy, trust_policy_reason, adaptive_confidence_summary = _operator_trust_values(data)
     exception_status, exception_reason, drift_status, drift_summary = _operator_exception_values(data)
     trust_recovery_status, trust_recovery_reason, exception_pattern_status, exception_pattern_summary = _operator_learning_values(data)
+    recovery_confidence, retirement_status, retirement_reason, retirement_summary = _operator_retirement_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
 
     operator_rows = [
@@ -904,6 +925,9 @@ def _build_dashboard(
                 ("Trust Rationale", trust_policy_reason),
                 ("Trust Exception", f"{exception_status} — {exception_reason}"),
                 ("Trust Recovery", f"{trust_recovery_status} — {trust_recovery_reason}"),
+                ("Recovery Confidence", recovery_confidence),
+                ("Exception Retirement", f"{retirement_status} — {retirement_reason}"),
+                ("Retirement Summary", retirement_summary),
                 ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}"),
                 ("Recommendation Drift", f"{drift_status} — {drift_summary}"),
                 ("Adaptive Confidence", adaptive_confidence_summary),
@@ -3562,6 +3586,7 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
     trust_policy, trust_policy_reason, adaptive_confidence_summary = _operator_trust_values(data)
     exception_status, exception_reason, drift_status, drift_summary = _operator_exception_values(data)
     trust_recovery_status, trust_recovery_reason, exception_pattern_status, exception_pattern_summary = _operator_learning_values(data)
+    recovery_confidence, retirement_status, retirement_reason, retirement_summary = _operator_retirement_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
     summary_rows = [
         ("Headline", (data.get("operator_summary") or {}).get("headline", "Review activity is available below.")),
@@ -3593,6 +3618,9 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
                 ("Trust Rationale", trust_policy_reason),
                 ("Trust Exception", f"{exception_status} — {exception_reason}"),
                 ("Trust Recovery", f"{trust_recovery_status} — {trust_recovery_reason}"),
+                ("Recovery Confidence", recovery_confidence),
+                ("Exception Retirement", f"{retirement_status} — {retirement_reason}"),
+                ("Retirement Summary", retirement_summary),
                 ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}"),
                 ("Recommendation Drift", f"{drift_status} — {drift_summary}"),
                 ("Adaptive Confidence", adaptive_confidence_summary),
@@ -3991,6 +4019,7 @@ def _build_executive_summary(
     trust_policy, trust_policy_reason, adaptive_confidence_summary = _operator_trust_values(data)
     exception_status, exception_reason, drift_status, drift_summary = _operator_exception_values(data)
     trust_recovery_status, trust_recovery_reason, exception_pattern_status, exception_pattern_summary = _operator_learning_values(data)
+    recovery_confidence, retirement_status, retirement_reason, retirement_summary = _operator_retirement_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
     recommended_focus = ""
     if data.get("operator_queue"):
@@ -4034,10 +4063,13 @@ def _build_executive_summary(
         narrative_rows.insert(13, ("Trust Rationale", trust_policy_reason))
         narrative_rows.insert(14, ("Trust Exception", f"{exception_status} — {exception_reason}"))
         narrative_rows.insert(15, ("Trust Recovery", f"{trust_recovery_status} — {trust_recovery_reason}"))
-        narrative_rows.insert(16, ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}"))
-        narrative_rows.insert(17, ("Recommendation Drift", f"{drift_status} — {drift_summary}"))
-        narrative_rows.insert(18, ("Adaptive Confidence", adaptive_confidence_summary))
-        narrative_rows.insert(19, ("Confidence Validation", f"{calibration_status} — {calibration_summary}"))
+        narrative_rows.insert(16, ("Recovery Confidence", recovery_confidence))
+        narrative_rows.insert(17, ("Exception Retirement", f"{retirement_status} — {retirement_reason}"))
+        narrative_rows.insert(18, ("Retirement Summary", retirement_summary))
+        narrative_rows.insert(19, ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}"))
+        narrative_rows.insert(20, ("Recommendation Drift", f"{drift_status} — {drift_summary}"))
+        narrative_rows.insert(21, ("Adaptive Confidence", adaptive_confidence_summary))
+        narrative_rows.insert(22, ("Confidence Validation", f"{calibration_status} — {calibration_summary}"))
     _write_key_value_block(ws, 4, 1, narrative_rows, title="Leadership Brief")
 
     write_kpi_card(ws, 10, 1, "Portfolio Grade", data.get("portfolio_grade", "F"))
@@ -4113,19 +4145,27 @@ def _build_executive_summary(
             ws.cell(row=43, column=5, value=trust_policy_reason)
             ws.cell(row=44, column=4, value="Trust Recovery").font = SUBHEADER_FONT
             ws.cell(row=44, column=5, value=f"{trust_recovery_status} — {trust_recovery_reason}")
-            ws.cell(row=45, column=4, value="Exception Learning").font = SUBHEADER_FONT
-            ws.cell(row=45, column=5, value=f"{exception_pattern_status} — {exception_pattern_summary}")
-            ws.cell(row=46, column=4, value="Adaptive Confidence").font = SUBHEADER_FONT
-            ws.cell(row=46, column=5, value=adaptive_confidence_summary)
-            ws.cell(row=47, column=4, value="Recommendation Quality").font = SUBHEADER_FONT
-            ws.cell(row=47, column=5, value=recommendation_quality)
-            ws.cell(row=48, column=4, value="Confidence Validation").font = SUBHEADER_FONT
-            ws.cell(row=48, column=5, value=f"{calibration_status} — {calibration_summary}")
-            ws.cell(row=49, column=4, value="Calibration Snapshot").font = SUBHEADER_FONT
-            ws.cell(row=49, column=5, value=f"High-confidence hit rate {high_hit_rate} | {reopened_recommendations}")
+            ws.cell(row=45, column=4, value="Recovery Confidence").font = SUBHEADER_FONT
+            ws.cell(row=45, column=5, value=recovery_confidence)
+            ws.cell(row=46, column=4, value="Exception Retirement").font = SUBHEADER_FONT
+            ws.cell(row=46, column=5, value=f"{retirement_status} — {retirement_reason}")
+            ws.cell(row=47, column=4, value="Retirement Summary").font = SUBHEADER_FONT
+            ws.cell(row=47, column=5, value=retirement_summary)
+            ws.cell(row=48, column=4, value="Exception Learning").font = SUBHEADER_FONT
+            ws.cell(row=48, column=5, value=f"{exception_pattern_status} — {exception_pattern_summary}")
+            ws.cell(row=49, column=4, value="Recommendation Drift").font = SUBHEADER_FONT
+            ws.cell(row=49, column=5, value=f"{drift_status} — {drift_summary}")
+            ws.cell(row=50, column=4, value="Adaptive Confidence").font = SUBHEADER_FONT
+            ws.cell(row=50, column=5, value=adaptive_confidence_summary)
+            ws.cell(row=51, column=4, value="Recommendation Quality").font = SUBHEADER_FONT
+            ws.cell(row=51, column=5, value=recommendation_quality)
+            ws.cell(row=52, column=4, value="Confidence Validation").font = SUBHEADER_FONT
+            ws.cell(row=52, column=5, value=f"{calibration_status} — {calibration_summary}")
+            ws.cell(row=53, column=4, value="Calibration Snapshot").font = SUBHEADER_FONT
+            ws.cell(row=53, column=5, value=f"High-confidence hit rate {high_hit_rate} | {reopened_recommendations}")
     preflight = data.get("preflight_summary") or {}
     if preflight and (preflight.get("blocking_errors", 0) or preflight.get("warnings", 0)):
-        row_base = 49 if excel_mode == "standard" else 33
+        row_base = 53 if excel_mode == "standard" else 33
         ws.cell(row=row_base, column=1, value="Preflight Diagnostics").font = SECTION_FONT
         ws.cell(row=row_base + 1, column=1, value="Status").font = SUBHEADER_FONT
         ws.cell(row=row_base + 1, column=2, value=preflight.get("status", "unknown"))
@@ -4133,7 +4173,7 @@ def _build_executive_summary(
         ws.cell(row=row_base + 2, column=2, value=preflight.get("blocking_errors", 0))
         ws.cell(row=row_base + 3, column=1, value="Warnings").font = SUBHEADER_FONT
         ws.cell(row=row_base + 3, column=2, value=preflight.get("warnings", 0))
-    auto_width(ws, 6, 51 if excel_mode == "standard" else 35)
+    auto_width(ws, 6, 55 if excel_mode == "standard" else 35)
 
 
 def _build_print_pack(
@@ -4173,6 +4213,7 @@ def _build_print_pack(
     trust_policy, trust_policy_reason, adaptive_confidence_summary = _operator_trust_values(data)
     exception_status, exception_reason, drift_status, drift_summary = _operator_exception_values(data)
     trust_recovery_status, trust_recovery_reason, exception_pattern_status, exception_pattern_summary = _operator_learning_values(data)
+    recovery_confidence, retirement_status, retirement_reason, retirement_summary = _operator_retirement_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
     ws["A7"] = "This Week"
     ws["B7"] = operator_summary.get("headline", "Review the latest workbook surfaces for change and drift.")
@@ -4225,21 +4266,27 @@ def _build_print_pack(
         ws["B28"] = f"{exception_status} — {exception_reason}"
         ws["A29"] = "Trust Recovery"
         ws["B29"] = f"{trust_recovery_status} — {trust_recovery_reason}"
-        ws["A30"] = "Exception Learning"
-        ws["B30"] = f"{exception_pattern_status} — {exception_pattern_summary}"
-        ws["A31"] = "Recommendation Drift"
-        ws["B31"] = f"{drift_status} — {drift_summary}"
-        ws["A32"] = "Adaptive Confidence"
-        ws["B32"] = adaptive_confidence_summary
-        ws["A33"] = "Recommendation Quality"
-        ws["B33"] = recommendation_quality
-        ws["A34"] = "Confidence Validation"
-        ws["B34"] = f"{calibration_status} — {calibration_summary}"
-        ws["A35"] = "Calibration Snapshot"
-        ws["B35"] = f"High-confidence hit rate {high_hit_rate} | {reopened_recommendations}"
-        ws["A36"] = "Top Risks"
-        ws["A36"].font = SECTION_FONT
-        risk_start_row = 36
+        ws["A30"] = "Recovery Confidence"
+        ws["B30"] = recovery_confidence
+        ws["A31"] = "Exception Retirement"
+        ws["B31"] = f"{retirement_status} — {retirement_reason}"
+        ws["A32"] = "Retirement Summary"
+        ws["B32"] = retirement_summary
+        ws["A33"] = "Exception Learning"
+        ws["B33"] = f"{exception_pattern_status} — {exception_pattern_summary}"
+        ws["A34"] = "Recommendation Drift"
+        ws["B34"] = f"{drift_status} — {drift_summary}"
+        ws["A35"] = "Adaptive Confidence"
+        ws["B35"] = adaptive_confidence_summary
+        ws["A36"] = "Recommendation Quality"
+        ws["B36"] = recommendation_quality
+        ws["A37"] = "Confidence Validation"
+        ws["B37"] = f"{calibration_status} — {calibration_summary}"
+        ws["A38"] = "Calibration Snapshot"
+        ws["B38"] = f"High-confidence hit rate {high_hit_rate} | {reopened_recommendations}"
+        ws["A39"] = "Top Risks"
+        ws["A39"].font = SECTION_FONT
+        risk_start_row = 39
         opportunity_header_row = 34
         page2_row = 43
     else:
