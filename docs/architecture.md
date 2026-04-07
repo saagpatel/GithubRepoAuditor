@@ -306,6 +306,20 @@ Outputs may project the compact `preflight_summary`, but they do not recompute s
 
 The same shared `operator_summary` and `operator_queue` are then projected into Markdown, HTML, Excel, and review-pack surfaces. Those outputs do not maintain separate triage logic.
 
+The current phase also extends `operator_summary` with shared handoff fields: `what_changed`, `why_it_matters`, `what_to_do_next`, `operator_note`, `urgency`, and `escalation_reason`. Scheduled automation reuses that same contract rather than inventing a second issue-only summary format.
+
+### Scheduled Handoff
+
+The weekly workflow now remains artifact-first but more decision-ready:
+
+- it runs the audit
+- it generates the read-only control-center artifact
+- it builds a scheduled handoff JSON + Markdown summary from the same operator contract
+- it uploads `output/` as the primary artifact output
+- it only opens or updates one canonical GitHub issue when the handoff crosses a meaningful blocked, urgent, or regression threshold
+
+Quiet runs do not create issues. The issue body is derived from the same handoff fields already present in the local artifacts.
+
 ### HTML Dashboard
 
 `output/dashboard-{username}-{date}.html` — self-contained single-file interactive dashboard (`src/web_export.py`) with filterable/sortable repo table and embedded tech radar SVG. No server required; opens directly in a browser.

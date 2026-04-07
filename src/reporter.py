@@ -213,6 +213,12 @@ def write_markdown_report(
             _w(f"- Watch Strategy: `{report.operator_summary.get('watch_strategy')}`")
         if report.operator_summary.get("watch_decision_summary"):
             _w(f"- Watch Decision: {report.operator_summary.get('watch_decision_summary')}")
+        if report.operator_summary.get("what_changed"):
+            _w(f"- What Changed: {report.operator_summary.get('what_changed')}")
+        if report.operator_summary.get("why_it_matters"):
+            _w(f"- Why It Matters: {report.operator_summary.get('why_it_matters')}")
+        if report.operator_summary.get("what_to_do_next"):
+            _w(f"- What To Do Next: {report.operator_summary.get('what_to_do_next')}")
         if report.operator_summary.get("control_center_reference"):
             _w(f"- Control Center Artifact: `{report.operator_summary.get('control_center_reference')}`")
         counts = report.operator_summary.get("counts", {})

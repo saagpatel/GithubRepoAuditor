@@ -16,6 +16,7 @@ LANE_LABELS = {
     "ready": "Ready for Manual Action",
     "deferred": "Safe to Defer",
 }
+QUIET_HANDOFF = "No new blocking or urgent drift is surfaced in the latest operator snapshot."
 
 
 def normalize_review_state(
@@ -259,6 +260,7 @@ def build_operator_snapshot(
     }
     counts = {lane: sum(1 for item in queue if item["lane"] == lane) for lane in LANE_ORDER}
     watch_guidance = build_watch_guidance(report_data.get("watch_state") or {})
+    handoff = _build_operator_handoff(queue, recent_changes, setup_health, watch_guidance)
     summary = {
         "headline": _headline_for_queue(queue, setup_health),
         "selected_view": triage_view,
@@ -279,6 +281,13 @@ def build_operator_snapshot(
         "full_refresh_due": watch_guidance.get("full_refresh_due", False),
         "latest_trusted_baseline": watch_guidance.get("latest_trusted_baseline", {}),
         "operator_watch_decision": watch_guidance,
+        "urgency": handoff["urgency"],
+        "escalation_reason": handoff["escalation_reason"],
+        "what_changed": handoff["what_changed"],
+        "why_it_matters": handoff["why_it_matters"],
+        "what_to_do_next": handoff["what_to_do_next"],
+        "next_operator_action": handoff["next_operator_action"],
+        "operator_note": handoff["operator_note"],
     }
     return {
         "operator_summary": summary,
@@ -308,6 +317,12 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
         lines.append(f"*Watch Strategy:* `{summary['watch_strategy']}`")
     if summary.get("watch_decision_summary"):
         lines.append(f"*Watch Decision:* {summary['watch_decision_summary']}")
+    if summary.get("what_changed"):
+        lines.append(f"*What Changed:* {summary['what_changed']}")
+    if summary.get("why_it_matters"):
+        lines.append(f"*Why It Matters:* {summary['why_it_matters']}")
+    if summary.get("what_to_do_next"):
+        lines.append(f"*What To Do Next:* {summary['what_to_do_next']}")
     if summary.get("control_center_reference"):
         lines.append(f"*Control Center Artifact:* `{summary['control_center_reference']}`")
     lines.append(
@@ -449,6 +464,108 @@ def _headline_for_queue(queue: list[dict], setup_health: dict) -> str:
     if any(item["lane"] == "deferred" for item in queue):
         return "Everything currently surfaced is safe to defer."
     return "No operator triage items are currently surfaced."
+
+
+def _build_operator_handoff(
+    queue: list[dict],
+    recent_changes: list[dict],
+    setup_health: dict,
+    watch_guidance: dict,
+) -> dict:
+    top_item = queue[0] if queue else {}
+    top_lane = top_item.get("lane", "")
+    top_summary = _summarize_operator_change(top_item, recent_changes)
+    next_action = _next_operator_action(top_item, watch_guidance)
+    escalation_reason = _escalation_reason(queue, setup_health, watch_guidance)
+    urgency = _handoff_urgency(queue, setup_health)
+    why_it_matters = _why_it_matters(urgency, escalation_reason, watch_guidance, top_item)
+    operator_note = f"{top_summary} {why_it_matters} Next: {next_action}".strip()
+    return {
+        "urgency": urgency,
+        "escalation_reason": escalation_reason,
+        "what_changed": top_summary,
+        "why_it_matters": why_it_matters,
+        "what_to_do_next": next_action,
+        "next_operator_action": next_action,
+        "operator_note": operator_note,
+        "top_lane": top_lane,
+    }
+
+
+def _handoff_urgency(queue: list[dict], setup_health: dict) -> str:
+    if setup_health.get("blocking_errors", 0):
+        return "blocked"
+    if any(item.get("lane") == "blocked" for item in queue):
+        return "blocked"
+    if any(item.get("lane") == "urgent" for item in queue):
+        return "urgent"
+    if any(item.get("lane") == "ready" for item in queue):
+        return "ready"
+    if any(item.get("lane") == "deferred" for item in queue):
+        return "deferred"
+    return "quiet"
+
+
+def _summarize_operator_change(top_item: dict, recent_changes: list[dict]) -> str:
+    if top_item:
+        subject = f"{top_item.get('repo')}: " if top_item.get("repo") else ""
+        detail = top_item.get("summary", "").strip()
+        if detail:
+            return f"{subject}{top_item.get('title', 'Operator change')} — {detail}"
+        return f"{subject}{top_item.get('title', 'Operator change')}"
+    if recent_changes:
+        change = recent_changes[0]
+        subject = change.get("repo") or change.get("repo_full_name") or change.get("item_id") or "portfolio"
+        detail = change.get("summary", change.get("kind", "operator change"))
+        return f"{subject}: {detail}"
+    return QUIET_HANDOFF
+
+
+def _next_operator_action(top_item: dict, watch_guidance: dict) -> str:
+    if top_item.get("recommended_action"):
+        return top_item["recommended_action"]
+    if watch_guidance.get("full_refresh_due"):
+        return "Run the next full audit to refresh the baseline before relying on incremental results."
+    return "Continue the normal audit/control-center loop and review the next artifact for change."
+
+
+def _escalation_reason(queue: list[dict], setup_health: dict, watch_guidance: dict) -> str:
+    if setup_health.get("blocking_errors", 0):
+        return "setup-blocker"
+    watch_reason = watch_guidance.get("reason", "")
+    if watch_reason == "full-refresh-due":
+        return "scheduled-full-refresh"
+    if watch_reason in {"filter-or-profile-changed", "missing-trustworthy-baseline"}:
+        return "stale-baseline"
+    if any(item.get("lane") == "blocked" for item in queue):
+        return "blocked-operator-item"
+    if any(item.get("lane") == "urgent" for item in queue):
+        return "drift-or-regression"
+    if any(item.get("lane") == "ready" for item in queue):
+        return "manual-review-ready"
+    if any(item.get("lane") == "deferred" for item in queue):
+        return "safe-to-defer"
+    return "quiet"
+
+
+def _why_it_matters(urgency: str, escalation_reason: str, watch_guidance: dict, top_item: dict) -> str:
+    if urgency == "blocked":
+        return "A trustworthy next step is blocked until this is cleared."
+    if escalation_reason == "stale-baseline":
+        return "The latest baseline contract no longer matches, so incremental results should not be trusted until a full refresh completes."
+    if escalation_reason == "scheduled-full-refresh":
+        return "The normal full-refresh cadence is due, so the next run should refresh portfolio truth before more incremental monitoring."
+    if urgency == "urgent":
+        return "This has crossed into live drift, regression risk, or rollback exposure and should be reviewed before it spreads."
+    if urgency == "ready":
+        return "Nothing is blocked, but there is manual review or apply work ready to move forward."
+    if urgency == "deferred":
+        return "The current queue is stable enough to defer without losing important context."
+    if watch_guidance.get("next_recommended_run_mode") == "incremental":
+        return "The latest baseline is still compatible, so the operator loop can stay lightweight for now."
+    if top_item:
+        return "This remains worth a quick manual review before the next cycle."
+    return "The latest run is quiet enough that no immediate operator intervention is required."
 
 
 def _lane_reason(lane: str, kind: str) -> str:

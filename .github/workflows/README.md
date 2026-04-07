@@ -1,35 +1,35 @@
 # GitHub Actions Workflows
 
-## ci.yml — Continuous Integration
+## `ci.yml` — Continuous Integration
 
 Runs on every push and pull request to `main`. Tests against Python 3.11, 3.12, and 3.13.
 
-**Steps:**
+Steps:
 1. Install dependencies via `pip install -e ".[dev]"`
 2. Run the full test suite with `pytest tests/ -v --tb=short`
 3. Lint with `ruff check src/ tests/`
 
-No secrets required for CI.
+No secrets are required for CI.
 
-## scheduled-audit.yml — Weekly Automated Audit
+## `audit.yml` — Weekly Automated Audit
 
 Runs every Sunday at 06:00 UTC, or manually via `workflow_dispatch`.
 
-**Steps:**
-1. Installs the package
-2. Runs `audit <username> --incremental --html --badges --diff`
-3. Uploads the `output/` directory as a build artifact (retained 90 days)
-4. On scheduled runs only: commits the updated output back to the repo
+Steps:
+1. Install the package with config support.
+2. Restore cached audit history and incremental fingerprints.
+3. Run the audit in `standard` workbook mode, using incremental mode when a trustworthy cached baseline already exists.
+4. Run `audit <username> --control-center` to generate the read-only operator triage artifact.
+5. Run `python3 -m src.scheduled_handoff --output-dir output` to build the scheduled handoff JSON + Markdown summary.
+6. Upload `output/` as the primary artifact output.
+7. Open or update one canonical `scheduled-audit-handoff` issue only when the scheduled handoff surfaces meaningful blocked, urgent, or regression-level findings.
 
-### Required secret
+The workflow does not commit generated runtime artifacts back into the repository.
 
-Add `AUDIT_GITHUB_TOKEN` to your repository secrets:
+### Required secrets
 
-1. Go to **Settings → Secrets and variables → Actions → New repository secret**
-2. Name: `AUDIT_GITHUB_TOKEN`
-3. Value: A GitHub Personal Access Token with `repo` scope (needed to read private repos and push results back)
-
-The token must have at least `public_repo` scope for public-only audits, or `repo` for private repos.
+- `AUDIT_TOKEN`: GitHub Personal Access Token used by the audit itself when private-repo access or higher rate limits are needed.
+- `GITHUB_TOKEN`: GitHub Actions token used to create or update the optional scheduled handoff issue.
 
 ### Manual trigger
 

@@ -137,7 +137,7 @@ For workbook-facing changes, use the canonical release gate:
 make workbook-gate
 ```
 
-That command generates stable sample `standard` and `template` workbooks, validates the visible-sheet and hidden `Data_*` invariants, writes a result JSON file, and produces a manual desktop Excel checklist. The final release step is still opening the generated `standard` workbook in desktop Excel and confirming there is no repair prompt.
+That command generates stable sample `standard` and `template` workbooks, validates the visible-sheet and hidden `Data_*` invariants, writes an authoritative `workbook-gate-result.json`, adds a human-readable gate summary, and produces a manual desktop Excel checklist with pending signoff placeholders. The final release step is still opening the generated `standard` workbook in desktop Excel and confirming there is no repair prompt.
 
 ## Managed Campaigns and Governance
 
@@ -158,11 +158,14 @@ The daily operator loop is now:
 - Run `audit <github-username> --doctor`
 - Run `audit <github-username>` or `audit <github-username> --watch --watch-strategy adaptive`
 - Run `audit <github-username> --control-center`
+- Review the handoff fields: what changed, why it matters, and what to do next
 - Clear anything in `Blocked` first
 - Review `Needs Attention Now` for drift and high-severity changes
 - Work through `Ready for Manual Action`
 - Leave `Safe to Defer` items alone unless priorities change
 - Run `make workbook-gate` only when workbook-facing changes are in scope
+
+Scheduled automation stays artifact-first. The weekly workflow now runs the audit, generates a control-center artifact plus a scheduled handoff summary, uploads `output/`, and only opens or updates one canonical GitHub issue when blocked or urgent operator findings cross a meaningful threshold.
 
 ## Troubleshooting
 

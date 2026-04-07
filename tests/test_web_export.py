@@ -100,6 +100,9 @@ def _make_report(**overrides) -> dict:
             "watch_strategy": "adaptive",
             "next_recommended_run_mode": "incremental",
             "watch_decision_summary": "The current baseline is still compatible, so incremental watch remains safe for the next run.",
+            "what_changed": "RepoC drift needs review — managed-issue-edited",
+            "why_it_matters": "This has crossed into live drift, regression risk, or rollback exposure and should be reviewed before it spreads.",
+            "what_to_do_next": "Inspect the managed issue before closing the campaign.",
         },
         "operator_queue": [
             {
@@ -262,6 +265,8 @@ class TestRenderHtml:
         assert "Next Recommended Run" in html
         assert "Watch Strategy" in html
         assert "RepoC drift needs review" in html
+        assert "Why It Matters" in html
+        assert "What To Do Next" in html
 
     def test_data_embedded_as_json(self):
         html = _render_html(_make_report())
