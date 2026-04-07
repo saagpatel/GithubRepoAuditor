@@ -97,6 +97,15 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
             "policy_debt_hotspots": [],
             "normalized_class_hotspots": [],
             "class_normalization_window_runs": 4,
+            "primary_target_class_memory_freshness_status": "mixed-age",
+            "primary_target_class_memory_freshness_reason": "Class memory is still useful, but it is partly aging: 50% of the weighted signal is recent and the rest is older carry-forward.",
+            "primary_target_class_decay_status": "none",
+            "primary_target_class_decay_reason": "",
+            "class_memory_summary": "RepoC: RepoC drift needs review still has useful class memory, but part of that signal is aging and should be treated more cautiously.",
+            "class_decay_summary": "Fresh class signals are still strong enough that no class-level trust posture needs to decay yet.",
+            "stale_class_memory_hotspots": [],
+            "fresh_class_signal_hotspots": [],
+            "class_decay_window_runs": 4,
             "recommendation_drift_status": "stable",
             "recommendation_drift_summary": "Recent trust-policy behavior is stable enough that no meaningful recommendation drift is recorded.",
             "policy_flip_hotspots": [],
@@ -201,6 +210,8 @@ def test_build_scheduled_handoff_writes_artifacts_and_issue_candidate(tmp_path):
     assert "Exception Retirement" in markdown
     assert "Policy Debt Cleanup" in markdown
     assert "Class-Level Trust Normalization" in markdown
+    assert "Class Memory Freshness" in markdown
+    assert "Trust Decay Controls" in markdown
     assert "Recommendation Drift" in markdown
     assert "Confidence Validation" in markdown
     assert "75%" in markdown
