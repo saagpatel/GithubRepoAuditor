@@ -129,7 +129,7 @@ The intended operator loop is:
 1. `audit <github-username> --doctor`
 2. `audit <github-username>` or `audit <github-username> --watch --watch-strategy adaptive`
 3. `audit <github-username> --control-center`
-4. Read the control-center handoff fields before drilling into the queue, especially the trend summary, primary target, why it is still the top target, what was tried, and whether the item is only quieting down or now counts as confirmed resolved
+4. Read the control-center handoff fields before drilling into the queue, especially the trend summary, primary target, why it is still the top target, what was tried, whether the item is only quieting down or now counts as confirmed resolved, and whether recent confidence has actually been validating
 5. Handle `Blocked`, then `Needs Attention Now`, then `Ready for Manual Action`
 6. Leave `Safe to Defer` items alone unless priorities changed
 7. Run `make workbook-gate` only when workbook-facing changes are part of the release
@@ -179,3 +179,10 @@ It also now explains the accountability story for the current top target:
 - whether the queue is carrying newly stale or chronic follow-through pressure
 - what was tried most recently
 - whether the latest intervention only quieted the item or produced confirmed resolution evidence
+
+Phase 30 also adds confidence calibration to the same artifact-first story:
+
+- `healthy`: recent high-confidence recommendations have mostly validated
+- `mixed`: the guidance is still useful, but recent outcomes stayed partly judgment-heavy
+- `noisy`: recent high-confidence guidance has missed often enough that you should verify before overcommitting
+- `insufficient-data`: there are not enough judged historical recommendations yet to say whether confidence is earning trust

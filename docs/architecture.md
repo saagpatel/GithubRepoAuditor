@@ -10,6 +10,8 @@ The CLI also now has a read-only `--control-center` path. It loads the latest re
 
 Watch mode now uses that same baseline contract in live execution. `--watch-strategy adaptive|incremental|full` controls how each cycle is chosen, and the resulting watch decision is recorded into `watch_state` so control-center, workbook, Markdown, and HTML surfaces can explain why the next run should be full or incremental.
 
+The operator summary now also carries confidence calibration derived from recent warehouse history. That calibration is explanatory only in the current phase: it does not rewrite live ranking, but it does tell the operator whether recent high-confidence recommendations have been validating, mixed, noisy, or too lightly exercised to judge yet.
+
 The documented primary command is now `audit`, exposed through the package console script. `python -m src` remains a supported fallback for environments that prefer module execution.
 
 ## Typical Invocation

@@ -8,6 +8,7 @@ from src.baseline_context import build_watch_guidance
 from src.governance_activation import build_governance_summary
 from src.recurring_review import build_review_bundle
 from src.warehouse import (
+    load_operator_calibration_history,
     load_operator_state_history,
     load_recent_operator_changes,
     load_recent_operator_evidence,
@@ -23,6 +24,8 @@ LANE_LABELS = {
 QUIET_HANDOFF = "No new blocking or urgent drift is surfaced in the latest operator snapshot."
 ATTENTION_LANES = {"blocked", "urgent"}
 HISTORY_WINDOW_RUNS = 10
+CALIBRATION_WINDOW_RUNS = 20
+VALIDATION_WINDOW_RUNS = 2
 GENERIC_RECOMMENDATION_PHRASES = (
     "continue the normal audit/control-center loop",
     "continue the normal operator loop",
@@ -297,6 +300,13 @@ def build_operator_snapshot(
         current_generated_at=report_data.get("generated_at", ""),
     )
     follow_through = _build_follow_through(resolution_trend)
+    confidence_calibration = _build_confidence_calibration(
+        load_operator_calibration_history(
+            output_dir,
+            report_data.get("username", ""),
+            limit=CALIBRATION_WINDOW_RUNS,
+        )
+    )
     handoff = _build_operator_handoff(
         queue,
         recent_changes,
@@ -304,6 +314,7 @@ def build_operator_snapshot(
         watch_guidance,
         follow_through,
         resolution_trend,
+        confidence_calibration,
     )
     confidence = _operator_confidence_summary(
         resolution_trend.get("primary_target") or {},
@@ -378,6 +389,18 @@ def build_operator_snapshot(
         "next_action_confidence_label": confidence["next_action_confidence_label"],
         "next_action_confidence_reasons": confidence["next_action_confidence_reasons"],
         "recommendation_quality_summary": confidence["recommendation_quality_summary"],
+        "confidence_validation_status": confidence_calibration["confidence_validation_status"],
+        "confidence_window_runs": confidence_calibration["confidence_window_runs"],
+        "validated_recommendation_count": confidence_calibration["validated_recommendation_count"],
+        "partially_validated_recommendation_count": confidence_calibration["partially_validated_recommendation_count"],
+        "unresolved_recommendation_count": confidence_calibration["unresolved_recommendation_count"],
+        "reopened_recommendation_count": confidence_calibration["reopened_recommendation_count"],
+        "insufficient_future_runs_count": confidence_calibration["insufficient_future_runs_count"],
+        "high_confidence_hit_rate": confidence_calibration["high_confidence_hit_rate"],
+        "medium_confidence_hit_rate": confidence_calibration["medium_confidence_hit_rate"],
+        "low_confidence_caution_rate": confidence_calibration["low_confidence_caution_rate"],
+        "recent_validation_outcomes": confidence_calibration["recent_validation_outcomes"],
+        "confidence_calibration_summary": confidence_calibration["confidence_calibration_summary"],
     }
     return {
         "operator_summary": summary,
@@ -451,6 +474,14 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
         )
     if summary.get("recommendation_quality_summary"):
         lines.append(f"*Recommendation Quality:* {summary['recommendation_quality_summary']}")
+    if summary.get("confidence_validation_status"):
+        lines.append(
+            f"*Confidence Validation:* {summary.get('confidence_validation_status')} — "
+            f"{summary.get('confidence_calibration_summary', 'No confidence-calibration summary is recorded yet.')}"
+        )
+    recent_outcomes_line = _recent_validation_outcomes_line(summary.get("recent_validation_outcomes") or [])
+    if recent_outcomes_line:
+        lines.append(f"*Recent Confidence Outcomes:* {recent_outcomes_line}")
     if summary.get("control_center_reference"):
         lines.append(f"*Control Center Artifact:* `{summary['control_center_reference']}`")
     lines.append(
@@ -601,6 +632,7 @@ def _build_operator_handoff(
     watch_guidance: dict,
     follow_through: dict,
     resolution_trend: dict,
+    confidence_calibration: dict,
 ) -> dict:
     primary_target = resolution_trend.get("primary_target") or {}
     top_item = primary_target or (queue[0] if queue else {})
@@ -609,11 +641,20 @@ def _build_operator_handoff(
     next_action = _next_operator_action(top_item, watch_guidance, follow_through, resolution_trend)
     escalation_reason = _escalation_reason(queue, setup_health, watch_guidance)
     urgency = _handoff_urgency(queue, setup_health)
-    why_it_matters = _why_it_matters(urgency, escalation_reason, watch_guidance, top_item, resolution_trend)
+    why_it_matters = _why_it_matters(
+        urgency,
+        escalation_reason,
+        watch_guidance,
+        top_item,
+        resolution_trend,
+        confidence_calibration,
+    )
+    next_action = _calibrated_next_action(next_action, confidence_calibration)
     operator_note = (
         f"{top_summary} {why_it_matters} "
         f"{resolution_trend.get('trend_summary', '')} "
         f"{resolution_trend.get('resolution_evidence_summary', '')} "
+        f"{confidence_calibration.get('confidence_calibration_summary', '')} "
         f"{follow_through.get('follow_through_summary', '')} "
         f"Next: {next_action}"
     ).strip()
@@ -647,6 +688,247 @@ def _build_follow_through(resolution_trend: dict) -> dict:
             quiet_streak_runs,
         ),
     }
+
+
+def _build_confidence_calibration(history: list[dict]) -> dict:
+    ordered_runs = sorted(
+        [
+            {
+                "run_id": entry.get("run_id", ""),
+                "generated_at": entry.get("generated_at", ""),
+                "operator_summary": entry.get("operator_summary") or {},
+                "operator_queue": entry.get("operator_queue") or [],
+            }
+            for entry in history[:CALIBRATION_WINDOW_RUNS]
+        ],
+        key=lambda item: item.get("generated_at", ""),
+    )
+    evaluations: list[dict] = []
+    for index, run in enumerate(ordered_runs):
+        summary = run.get("operator_summary") or {}
+        target = summary.get("primary_target") or {}
+        confidence_label = summary.get("primary_target_confidence_label", "")
+        if not target or confidence_label not in {"high", "medium", "low"}:
+            continue
+        outcome, validated_in_runs = _calibration_outcome(
+            run,
+            ordered_runs[index + 1 : index + 1 + VALIDATION_WINDOW_RUNS],
+        )
+        target_label = _target_label(target)
+        evaluations.append(
+            {
+                "run_id": run.get("run_id", ""),
+                "generated_at": run.get("generated_at", ""),
+                "target_label": target_label,
+                "confidence_label": confidence_label,
+                "outcome": outcome,
+                "validated_in_runs": validated_in_runs,
+                "health_state": _confidence_health_state(confidence_label, outcome),
+            }
+        )
+
+    judged = [item for item in evaluations if item.get("outcome") != "insufficient_future_runs"]
+    high_judged = [item for item in judged if item.get("confidence_label") == "high"]
+    medium_judged = [item for item in judged if item.get("confidence_label") == "medium"]
+    low_all = [item for item in evaluations if item.get("confidence_label") == "low"]
+    high_hits = sum(1 for item in high_judged if item.get("health_state") == "healthy")
+    medium_hits = sum(1 for item in medium_judged if item.get("health_state") == "healthy")
+    low_cautions = sum(1 for item in low_all if item.get("health_state") == "healthy")
+    reopened_high_count = sum(
+        1
+        for item in evaluations
+        if item.get("confidence_label") == "high" and item.get("outcome") == "reopened"
+    )
+    high_confidence_hit_rate = round(high_hits / len(high_judged), 2) if high_judged else 0.0
+    medium_confidence_hit_rate = round(medium_hits / len(medium_judged), 2) if medium_judged else 0.0
+    low_confidence_caution_rate = round(low_cautions / len(low_all), 2) if low_all else 0.0
+    confidence_validation_status = _confidence_validation_status(
+        judged_count=len(judged),
+        high_confidence_hit_rate=high_confidence_hit_rate,
+        reopened_recommendation_count=sum(1 for item in judged if item.get("outcome") == "reopened"),
+        reopened_high_count=reopened_high_count,
+    )
+    recent_validation_outcomes = [
+        {
+            "run_id": item.get("run_id", ""),
+            "target_label": item.get("target_label", ""),
+            "confidence_label": item.get("confidence_label", "low"),
+            "outcome": item.get("outcome", "unresolved"),
+            "validated_in_runs": item.get("validated_in_runs"),
+        }
+        for item in sorted(judged, key=lambda item: item.get("generated_at", ""), reverse=True)[:5]
+    ]
+    return {
+        "confidence_validation_status": confidence_validation_status,
+        "confidence_window_runs": len(ordered_runs),
+        "validated_recommendation_count": sum(1 for item in evaluations if item.get("outcome") == "validated"),
+        "partially_validated_recommendation_count": sum(
+            1 for item in evaluations if item.get("outcome") == "partially_validated"
+        ),
+        "unresolved_recommendation_count": sum(1 for item in evaluations if item.get("outcome") == "unresolved"),
+        "reopened_recommendation_count": sum(1 for item in evaluations if item.get("outcome") == "reopened"),
+        "insufficient_future_runs_count": sum(
+            1 for item in evaluations if item.get("outcome") == "insufficient_future_runs"
+        ),
+        "high_confidence_hit_rate": high_confidence_hit_rate,
+        "medium_confidence_hit_rate": medium_confidence_hit_rate,
+        "low_confidence_caution_rate": low_confidence_caution_rate,
+        "recent_validation_outcomes": recent_validation_outcomes,
+        "confidence_calibration_summary": _confidence_calibration_summary(
+            confidence_validation_status=confidence_validation_status,
+            high_confidence_hit_rate=high_confidence_hit_rate,
+            medium_confidence_hit_rate=medium_confidence_hit_rate,
+            low_confidence_caution_rate=low_confidence_caution_rate,
+            reopened_recommendation_count=sum(1 for item in evaluations if item.get("outcome") == "reopened"),
+            judged_count=len(judged),
+        ),
+    }
+
+
+def _calibration_outcome(run: dict, future_runs: list[dict]) -> tuple[str, int | None]:
+    if len(future_runs) < VALIDATION_WINDOW_RUNS:
+        return "insufficient_future_runs", None
+    summary = run.get("operator_summary") or {}
+    target = summary.get("primary_target") or {}
+    target_key = _queue_identity(target)
+    original_lane = _target_lane(run, target_key, target)
+    future_matches = [_run_target_match(candidate, target_key) for candidate in future_runs]
+    future_lanes = [match.get("lane") if match else None for match in future_matches]
+    clear_index = next(
+        (
+            index
+            for index, lane in enumerate(future_lanes, start=1)
+            if lane is None or lane not in ATTENTION_LANES
+        ),
+        None,
+    )
+    if clear_index is not None and any(
+        lane in ATTENTION_LANES for lane in future_lanes[clear_index:]
+    ):
+        return "reopened", VALIDATION_WINDOW_RUNS
+    if clear_index is not None:
+        final_match = future_matches[-1]
+        if final_match is None:
+            return "validated", clear_index
+        return "partially_validated", clear_index
+    if _has_pressure_drop(original_lane, future_lanes):
+        return "partially_validated", _first_pressure_drop_run(original_lane, future_lanes)
+    return "unresolved", VALIDATION_WINDOW_RUNS
+
+
+def _target_label(target: dict) -> str:
+    repo = target.get("repo", "")
+    title = target.get("title", "")
+    if repo and title:
+        return f"{repo}: {title}"
+    return title or repo or "Operator target"
+
+
+def _run_target_match(run: dict, target_key: str) -> dict | None:
+    for item in run.get("operator_queue") or []:
+        if _queue_identity(item) == target_key:
+            return item
+    return None
+
+
+def _target_lane(run: dict, target_key: str, target: dict) -> str:
+    match = _run_target_match(run, target_key)
+    if match:
+        return match.get("lane", "")
+    return target.get("lane", "")
+
+
+def _lane_pressure(lane: str | None) -> int:
+    if lane == "blocked":
+        return 3
+    if lane == "urgent":
+        return 2
+    if lane == "ready":
+        return 1
+    if lane == "deferred":
+        return 0
+    return -1
+
+
+def _has_pressure_drop(original_lane: str, future_lanes: list[str | None]) -> bool:
+    origin_pressure = _lane_pressure(original_lane)
+    return any(
+        lane is not None and _lane_pressure(lane) < origin_pressure
+        for lane in future_lanes
+    )
+
+
+def _first_pressure_drop_run(original_lane: str, future_lanes: list[str | None]) -> int | None:
+    origin_pressure = _lane_pressure(original_lane)
+    for index, lane in enumerate(future_lanes, start=1):
+        if lane is not None and _lane_pressure(lane) < origin_pressure:
+            return index
+    return None
+
+
+def _confidence_health_state(confidence_label: str, outcome: str) -> str:
+    if confidence_label == "high":
+        if outcome == "validated":
+            return "healthy"
+        if outcome in {"unresolved", "reopened"}:
+            return "overstated"
+        return "mixed"
+    if confidence_label == "medium":
+        if outcome in {"validated", "partially_validated"}:
+            return "healthy"
+        return "mixed"
+    if confidence_label == "low":
+        if outcome in {"unresolved", "reopened", "insufficient_future_runs"}:
+            return "healthy"
+        return "mixed"
+    return "mixed"
+
+
+def _confidence_validation_status(
+    *,
+    judged_count: int,
+    high_confidence_hit_rate: float,
+    reopened_recommendation_count: int,
+    reopened_high_count: int,
+) -> str:
+    if judged_count < 4:
+        return "insufficient-data"
+    if high_confidence_hit_rate < 0.50 or reopened_high_count >= 2:
+        return "noisy"
+    if high_confidence_hit_rate >= 0.70 and reopened_recommendation_count == 0:
+        return "healthy"
+    return "mixed"
+
+
+def _confidence_calibration_summary(
+    *,
+    confidence_validation_status: str,
+    high_confidence_hit_rate: float,
+    medium_confidence_hit_rate: float,
+    low_confidence_caution_rate: float,
+    reopened_recommendation_count: int,
+    judged_count: int,
+) -> str:
+    if confidence_validation_status == "healthy":
+        return (
+            f"Recent high-confidence recommendations are validating well: "
+            f"{high_confidence_hit_rate:.0%} high-confidence hit rate across {judged_count} judged runs with no reopen noise."
+        )
+    if confidence_validation_status == "mixed":
+        return (
+            f"Confidence is still useful, but recent outcomes are mixed: "
+            f"{high_confidence_hit_rate:.0%} high-confidence hit rate, "
+            f"{medium_confidence_hit_rate:.0%} medium-confidence hit rate, and {reopened_recommendation_count} reopened outcome(s)."
+        )
+    if confidence_validation_status == "noisy":
+        return (
+            f"Recent high-confidence guidance has been noisy: "
+            f"{high_confidence_hit_rate:.0%} high-confidence hit rate and {reopened_recommendation_count} reopened outcome(s) in the judged window."
+        )
+    return (
+        "The confidence model does not have enough judged history yet to say whether recent confidence has been validating. "
+        f"Low-confidence caution rate so far: {low_confidence_caution_rate:.0%}."
+    )
 
 
 def _build_resolution_trend(
@@ -1306,6 +1588,18 @@ def _format_intervention(intervention: dict) -> str:
     return f"{when} — {event_type} ({outcome})"
 
 
+def _recent_validation_outcomes_line(outcomes: list[dict]) -> str:
+    if not outcomes:
+        return ""
+    parts = []
+    for item in outcomes[:3]:
+        target_label = item.get("target_label", "Operator target")
+        confidence_label = item.get("confidence_label", "low")
+        outcome = str(item.get("outcome", "unresolved")).replace("_", " ")
+        parts.append(f"{target_label} [{confidence_label}] -> {outcome}")
+    return "; ".join(parts)
+
+
 def _aging_status(appearances: int, age_days: int) -> str:
     if appearances >= 5 or age_days > 21:
         return "chronic"
@@ -1667,6 +1961,17 @@ def _next_operator_action(top_item: dict, watch_guidance: dict, follow_through: 
     return "Continue the normal audit/control-center loop and review the next artifact for change."
 
 
+def _calibrated_next_action(next_action: str, confidence_calibration: dict) -> str:
+    status = confidence_calibration.get("confidence_validation_status", "insufficient-data")
+    if not next_action:
+        return next_action
+    if status == "noisy":
+        return f"Verify the latest repo state before acting: {next_action}"
+    if status == "healthy" and not _is_generic_recommendation(next_action):
+        return f"{next_action} Recent high-confidence guidance has been validating well."
+    return next_action
+
+
 def _escalation_reason(queue: list[dict], setup_health: dict, watch_guidance: dict) -> str:
     if setup_health.get("blocking_errors", 0):
         return "setup-blocker"
@@ -1692,38 +1997,84 @@ def _why_it_matters(
     watch_guidance: dict,
     top_item: dict,
     resolution_trend: dict,
+    confidence_calibration: dict,
 ) -> str:
+    calibration_status = confidence_calibration.get("confidence_validation_status", "insufficient-data")
+    calibration_sentence = _confidence_validation_sentence(calibration_status)
     if urgency == "blocked":
-        return "A trustworthy next step is blocked until this is cleared."
+        return f"A trustworthy next step is blocked until this is cleared. {calibration_sentence}".strip()
     if escalation_reason == "stale-baseline":
-        return "The latest baseline contract no longer matches, so incremental results should not be trusted until a full refresh completes."
+        return (
+            "The latest baseline contract no longer matches, so incremental results should not be trusted until a full refresh completes. "
+            f"{calibration_sentence}"
+        ).strip()
     if escalation_reason == "scheduled-full-refresh":
-        return "The normal full-refresh cadence is due, so the next run should refresh portfolio truth before more incremental monitoring."
+        return (
+            "The normal full-refresh cadence is due, so the next run should refresh portfolio truth before more incremental monitoring. "
+            f"{calibration_sentence}"
+        ).strip()
     if urgency == "urgent":
         if resolution_trend.get("decision_memory_status") == "reopened":
-            return "This item came back after earlier quiet or resolution, so it should be treated as a regression instead of a net-new issue."
+            return (
+                "This item came back after earlier quiet or resolution, so it should be treated as a regression instead of a net-new issue. "
+                f"{calibration_sentence}"
+            ).strip()
         if resolution_trend.get("decision_memory_status") in {"attempted", "persisting"}:
-            return "A prior intervention has not cleared this item yet, so the next action should focus on proving closure instead of adding more noise."
+            return (
+                "A prior intervention has not cleared this item yet, so the next action should focus on proving closure instead of adding more noise. "
+                f"{calibration_sentence}"
+            ).strip()
         if top_item.get("aging_status") == "chronic":
-            return "This target has survived multiple cycles, so closing it now matters more than picking up newly ready work."
+            return (
+                "This target has survived multiple cycles, so closing it now matters more than picking up newly ready work. "
+                f"{calibration_sentence}"
+            ).strip()
         if top_item.get("newly_stale"):
-            return "This target has crossed from routine monitoring into follow-through debt and should be closed before it turns chronic."
+            return (
+                "This target has crossed from routine monitoring into follow-through debt and should be closed before it turns chronic. "
+                f"{calibration_sentence}"
+            ).strip()
         if resolution_trend.get("trend_status") == "worsening":
-            return "The queue is moving in the wrong direction, so this should be reviewed before new noise compounds."
+            return (
+                "The queue is moving in the wrong direction, so this should be reviewed before new noise compounds. "
+                f"{calibration_sentence}"
+            ).strip()
         if resolution_trend.get("trend_status") == "stable" and resolution_trend.get("persisting_attention_count", 0):
-            return "The same attention item is still open, so closing it now is more valuable than picking up newly ready work."
-        return "This has crossed into live drift, regression risk, or rollback exposure and should be reviewed before it spreads."
+            return (
+                "The same attention item is still open, so closing it now is more valuable than picking up newly ready work. "
+                f"{calibration_sentence}"
+            ).strip()
+        return (
+            "This has crossed into live drift, regression risk, or rollback exposure and should be reviewed before it spreads. "
+            f"{calibration_sentence}"
+        ).strip()
     if urgency == "ready":
-        return "Nothing is blocked, but there is manual review or apply work ready to move forward."
+        return f"Nothing is blocked, but there is manual review or apply work ready to move forward. {calibration_sentence}".strip()
     if urgency == "deferred":
-        return "The current queue is stable enough to defer without losing important context."
+        return f"The current queue is stable enough to defer without losing important context. {calibration_sentence}".strip()
     if resolution_trend.get("trend_status") == "quiet":
-        return f"The queue has stayed quiet for {resolution_trend.get('quiet_streak_runs', 0)} run(s), so no immediate intervention is needed."
+        return (
+            f"The queue has stayed quiet for {resolution_trend.get('quiet_streak_runs', 0)} run(s), so no immediate intervention is needed. "
+            f"{calibration_sentence}"
+        ).strip()
     if watch_guidance.get("next_recommended_run_mode") == "incremental":
-        return "The latest baseline is still compatible, so the operator loop can stay lightweight for now."
+        return (
+            "The latest baseline is still compatible, so the operator loop can stay lightweight for now. "
+            f"{calibration_sentence}"
+        ).strip()
     if top_item:
-        return "This remains worth a quick manual review before the next cycle."
-    return "The latest run is quiet enough that no immediate operator intervention is required."
+        return f"This remains worth a quick manual review before the next cycle. {calibration_sentence}".strip()
+    return f"The latest run is quiet enough that no immediate operator intervention is required. {calibration_sentence}".strip()
+
+
+def _confidence_validation_sentence(status: str) -> str:
+    if status == "healthy":
+        return "Recent high-confidence recommendations are mostly validating, so the current confidence signal has been earning trust."
+    if status == "mixed":
+        return "Recent confidence is still useful, but some outcomes have stayed judgment-heavy."
+    if status == "noisy":
+        return "Recent high-confidence guidance has missed often enough that this target should be verified before overcommitting."
+    return "The confidence model is still too lightly exercised to judge whether the current signal is earning trust."
 
 
 def _lane_reason(lane: str, kind: str) -> str:

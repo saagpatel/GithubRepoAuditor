@@ -559,6 +559,203 @@ def test_operator_snapshot_marks_generic_low_priority_ready_work_as_low_confiden
     assert summary["recommendation_quality_summary"].startswith("Tentative recommendation;")
 
 
+def test_operator_snapshot_calibrates_healthy_confidence_history(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_calibration_history",
+        lambda *_args, **_kwargs: [
+            {
+                "run_id": "run-6",
+                "generated_at": "2026-04-06T12:00:00+00:00",
+                "operator_summary": {},
+                "operator_queue": [],
+            },
+            {
+                "run_id": "run-5",
+                "generated_at": "2026-04-05T12:00:00+00:00",
+                "operator_summary": {},
+                "operator_queue": [],
+            },
+            {
+                "run_id": "run-4",
+                "generated_at": "2026-04-04T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {"item_id": "target-d", "repo": "RepoD", "title": "Drift D", "lane": "urgent"},
+                    "primary_target_confidence_label": "high",
+                },
+                "operator_queue": [{"item_id": "target-d", "repo": "RepoD", "title": "Drift D", "lane": "urgent"}],
+            },
+            {
+                "run_id": "run-3",
+                "generated_at": "2026-04-03T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {"item_id": "target-c", "repo": "RepoC", "title": "Drift C", "lane": "urgent"},
+                    "primary_target_confidence_label": "high",
+                },
+                "operator_queue": [{"item_id": "target-c", "repo": "RepoC", "title": "Drift C", "lane": "urgent"}],
+            },
+            {
+                "run_id": "run-2",
+                "generated_at": "2026-04-02T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {"item_id": "target-b", "repo": "RepoB", "title": "Drift B", "lane": "urgent"},
+                    "primary_target_confidence_label": "high",
+                },
+                "operator_queue": [{"item_id": "target-b", "repo": "RepoB", "title": "Drift B", "lane": "urgent"}],
+            },
+            {
+                "run_id": "run-1",
+                "generated_at": "2026-04-01T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {"item_id": "target-a", "repo": "RepoA", "title": "Drift A", "lane": "urgent"},
+                    "primary_target_confidence_label": "high",
+                },
+                "operator_queue": [{"item_id": "target-a", "repo": "RepoA", "title": "Drift A", "lane": "urgent"}],
+            },
+        ],
+    )
+
+    snapshot = build_operator_snapshot(_make_report(), output_dir=tmp_path)
+    summary = snapshot["operator_summary"]
+
+    assert summary["confidence_validation_status"] == "healthy"
+    assert summary["validated_recommendation_count"] == 4
+    assert summary["high_confidence_hit_rate"] == 1.0
+    assert summary["recent_validation_outcomes"]
+    assert "validating well" in summary["confidence_calibration_summary"].lower()
+
+
+def test_operator_snapshot_marks_noisy_calibration_when_reopens_repeat(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_calibration_history",
+        lambda *_args, **_kwargs: [
+            {
+                "run_id": "run-6",
+                "generated_at": "2026-04-06T12:00:00+00:00",
+                "operator_summary": {},
+                "operator_queue": [],
+            },
+            {
+                "run_id": "run-5",
+                "generated_at": "2026-04-05T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {"item_id": "target-c", "repo": "RepoC", "title": "Drift C", "lane": "urgent"},
+                    "primary_target_confidence_label": "high",
+                },
+                "operator_queue": [{"item_id": "target-c", "repo": "RepoC", "title": "Drift C", "lane": "urgent"}],
+            },
+            {
+                "run_id": "run-4",
+                "generated_at": "2026-04-04T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {"item_id": "target-b", "repo": "RepoB", "title": "Drift B", "lane": "urgent"},
+                    "primary_target_confidence_label": "high",
+                },
+                "operator_queue": [{"item_id": "target-b", "repo": "RepoB", "title": "Drift B", "lane": "urgent"}],
+            },
+            {
+                "run_id": "run-3",
+                "generated_at": "2026-04-03T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {"item_id": "target-a", "repo": "RepoA", "title": "Drift A", "lane": "urgent"},
+                    "primary_target_confidence_label": "high",
+                },
+                "operator_queue": [{"item_id": "target-a", "repo": "RepoA", "title": "Drift A", "lane": "urgent"}],
+            },
+            {
+                "run_id": "run-2",
+                "generated_at": "2026-04-02T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {"item_id": "target-b", "repo": "RepoB", "title": "Drift B", "lane": "urgent"},
+                    "primary_target_confidence_label": "high",
+                },
+                "operator_queue": [{"item_id": "target-b", "repo": "RepoB", "title": "Drift B", "lane": "urgent"}],
+            },
+            {
+                "run_id": "run-1",
+                "generated_at": "2026-04-01T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {"item_id": "target-a", "repo": "RepoA", "title": "Drift A", "lane": "urgent"},
+                    "primary_target_confidence_label": "high",
+                },
+                "operator_queue": [{"item_id": "target-a", "repo": "RepoA", "title": "Drift A", "lane": "urgent"}],
+            },
+        ],
+    )
+
+    snapshot = build_operator_snapshot(_make_report(), output_dir=tmp_path)
+    summary = snapshot["operator_summary"]
+
+    assert summary["confidence_validation_status"] == "noisy"
+    assert summary["reopened_recommendation_count"] >= 2
+    assert summary["high_confidence_hit_rate"] == 0.5
+    assert "noisy" in summary["confidence_calibration_summary"].lower()
+
+
+def test_operator_snapshot_tracks_partially_validated_recommendations(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_calibration_history",
+        lambda *_args, **_kwargs: [
+            {
+                "run_id": "run-5",
+                "generated_at": "2026-04-05T12:00:00+00:00",
+                "operator_summary": {},
+                "operator_queue": [],
+            },
+            {
+                "run_id": "run-4",
+                "generated_at": "2026-04-04T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {"item_id": "target-c", "repo": "RepoC", "title": "Drift C", "lane": "urgent"},
+                    "primary_target_confidence_label": "high",
+                },
+                "operator_queue": [{"item_id": "target-c", "repo": "RepoC", "title": "Drift C", "lane": "urgent"}],
+            },
+            {
+                "run_id": "run-3",
+                "generated_at": "2026-04-03T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {"item_id": "target-b", "repo": "RepoB", "title": "Drift B", "lane": "urgent"},
+                    "primary_target_confidence_label": "high",
+                },
+                "operator_queue": [
+                    {"item_id": "target-a", "repo": "RepoA", "title": "Drift A", "lane": "ready"},
+                    {"item_id": "target-b", "repo": "RepoB", "title": "Drift B", "lane": "urgent"},
+                ],
+            },
+            {
+                "run_id": "run-2",
+                "generated_at": "2026-04-02T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {"item_id": "target-b", "repo": "RepoB", "title": "Drift B", "lane": "urgent"},
+                    "primary_target_confidence_label": "high",
+                },
+                "operator_queue": [
+                    {"item_id": "target-a", "repo": "RepoA", "title": "Drift A", "lane": "urgent"},
+                    {"item_id": "target-b", "repo": "RepoB", "title": "Drift B", "lane": "urgent"},
+                ],
+            },
+            {
+                "run_id": "run-1",
+                "generated_at": "2026-04-01T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {"item_id": "target-a", "repo": "RepoA", "title": "Drift A", "lane": "blocked"},
+                    "primary_target_confidence_label": "medium",
+                },
+                "operator_queue": [{"item_id": "target-a", "repo": "RepoA", "title": "Drift A", "lane": "blocked"}],
+            },
+        ],
+    )
+
+    snapshot = build_operator_snapshot(_make_report(), output_dir=tmp_path)
+    summary = snapshot["operator_summary"]
+
+    assert summary["partially_validated_recommendation_count"] >= 1
+    assert any(
+        item["outcome"] == "partially_validated"
+        for item in summary["recent_validation_outcomes"]
+    )
+
+
 def test_normalize_review_state_backfills_missing_fields(tmp_path: Path):
     report = normalize_review_state(
         {

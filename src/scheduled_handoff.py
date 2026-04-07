@@ -126,6 +126,7 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Resolution evidence: {summary.get('resolution_evidence_summary', 'No resolution evidence is recorded yet.')}",
         f"- Recommendation confidence: `{summary.get('primary_target_confidence_label', 'low')}` ({summary.get('primary_target_confidence_score', 0.0):.2f})",
         f"- Next action confidence: `{summary.get('next_action_confidence_label', 'low')}` ({summary.get('next_action_confidence_score', 0.0):.2f})",
+        f"- Confidence validation: `{summary.get('confidence_validation_status', 'insufficient-data')}` — {summary.get('confidence_calibration_summary', 'No confidence-calibration summary is recorded yet.')}",
         f"- Next recommended run: `{summary.get('next_recommended_run_mode', 'n/a')}`",
         f"- Watch strategy: `{summary.get('watch_strategy', 'manual')}`",
         f"- Watch decision: {summary.get('watch_decision_summary', 'No watch guidance is recorded.')}",
@@ -149,6 +150,21 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     lines.append(
         f"- {summary.get('recommendation_quality_summary', 'No recommendation-quality summary is recorded yet.')}"
     )
+    lines.append(
+        f"- Confidence validation: {summary.get('confidence_validation_status', 'insufficient-data')} "
+        f"({summary.get('confidence_calibration_summary', 'No confidence-calibration summary is recorded yet.')})"
+    )
+    lines.append(
+        f"- Hit / caution rates: high={summary.get('high_confidence_hit_rate', 0.0):.0%}, "
+        f"medium={summary.get('medium_confidence_hit_rate', 0.0):.0%}, "
+        f"low={summary.get('low_confidence_caution_rate', 0.0):.0%}"
+    )
+    for item in (summary.get("recent_validation_outcomes") or [])[:3]:
+        lines.append(
+            f"- {item.get('target_label', 'Operator target')} "
+            f"[{item.get('confidence_label', 'low')}] -> "
+            f"{str(item.get('outcome', 'unresolved')).replace('_', ' ')}"
+        )
     lines.append("")
     lines.append("## What Got Better")
     lines.append("")
@@ -242,6 +258,32 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         )
     else:
         lines.append("- No item reopened after an earlier quiet or resolved state in the recent window.")
+    lines.append("")
+    lines.append("## Confidence Validation")
+    lines.append("")
+    lines.append(
+        f"- Current primary-target confidence: {summary.get('primary_target_confidence_label', 'low')} "
+        f"({summary.get('primary_target_confidence_score', 0.0):.2f})"
+    )
+    lines.append(
+        f"- Calibration status: {summary.get('confidence_validation_status', 'insufficient-data')} "
+        f"-> {summary.get('confidence_calibration_summary', 'No confidence-calibration summary is recorded yet.')}"
+    )
+    lines.append(
+        f"- High-confidence hit rate: {summary.get('high_confidence_hit_rate', 0.0):.0%} | "
+        f"Medium-confidence hit rate: {summary.get('medium_confidence_hit_rate', 0.0):.0%} | "
+        f"Low-confidence caution rate: {summary.get('low_confidence_caution_rate', 0.0):.0%}"
+    )
+    recent_validation_outcomes = summary.get("recent_validation_outcomes") or []
+    if recent_validation_outcomes:
+        for item in recent_validation_outcomes[:3]:
+            lines.append(
+                f"- {item.get('target_label', 'Operator target')} "
+                f"[{item.get('confidence_label', 'low')}] -> "
+                f"{str(item.get('outcome', 'unresolved')).replace('_', ' ')}"
+            )
+    else:
+        lines.append("- No judged confidence outcomes are recorded yet.")
     lines.append("")
     if queue:
         lines.append("## Top Queue Items")

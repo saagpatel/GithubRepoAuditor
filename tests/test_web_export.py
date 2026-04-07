@@ -127,6 +127,26 @@ def _make_report(**overrides) -> dict:
             "next_action_confidence_label": "high",
             "next_action_confidence_reasons": ["The next step is tied directly to the current top target."],
             "recommendation_quality_summary": "Strong recommendation because the next step is tied directly to the current top target.",
+            "confidence_validation_status": "mixed",
+            "confidence_window_runs": 8,
+            "validated_recommendation_count": 2,
+            "partially_validated_recommendation_count": 1,
+            "unresolved_recommendation_count": 1,
+            "reopened_recommendation_count": 1,
+            "insufficient_future_runs_count": 2,
+            "high_confidence_hit_rate": 0.5,
+            "medium_confidence_hit_rate": 0.67,
+            "low_confidence_caution_rate": 1.0,
+            "recent_validation_outcomes": [
+                {
+                    "run_id": "testuser:2026-03-27T12:00:00+00:00",
+                    "target_label": "RepoC: RepoC drift needs review",
+                    "confidence_label": "high",
+                    "outcome": "reopened",
+                    "validated_in_runs": 2,
+                }
+            ],
+            "confidence_calibration_summary": "Confidence is still useful, but recent outcomes are mixed: 50% high-confidence hit rate, 67% medium-confidence hit rate, and 1 reopened outcome(s).",
             "primary_target": {"repo": "RepoC", "title": "RepoC drift needs review"},
         },
         "operator_queue": [
@@ -248,6 +268,8 @@ class TestRenderHtml:
         assert "Primary Target Confidence:" in html
         assert "Next Action Confidence:" in html
         assert "Recommendation Quality:" in html
+        assert "Confidence Validation:" in html
+        assert "Recent Confidence Outcomes:" in html
         assert "RepoC: RepoC drift needs review" in html
 
     def test_has_filter_controls(self):
