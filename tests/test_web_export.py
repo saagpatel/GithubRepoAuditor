@@ -197,6 +197,21 @@ def _make_report(**overrides) -> dict:
             "class_transition_health_summary": "No active pending class transition is building or stalling right now.",
             "class_transition_resolution_summary": "RepoC: RepoC drift needs review resolved its earlier pending class transition into a confirmed broader class posture.",
             "class_transition_age_window_runs": 4,
+            "primary_target_transition_closure_confidence_score": 0.72,
+            "primary_target_transition_closure_confidence_label": "medium",
+            "primary_target_transition_closure_likely_outcome": "hold",
+            "primary_target_transition_closure_confidence_reasons": [
+                "The pending class signal is still visible, but it is not strong enough to trust fully yet."
+            ],
+            "transition_closure_confidence_summary": "RepoC: RepoC drift needs review still has a viable pending class signal, but it is not strong enough to trust fully yet (0.72).",
+            "transition_closure_window_runs": 4,
+            "primary_target_class_pending_debt_status": "watch",
+            "primary_target_class_pending_debt_reason": "This class has mixed recent pending-transition outcomes, so watch whether new pending signals resolve cleanly or start to accumulate debt.",
+            "class_pending_debt_summary": "RepoC: RepoC drift needs review belongs to a class with mixed pending-transition outcomes, so watch whether new pending signals confirm or start to linger.",
+            "class_pending_resolution_summary": "No class-level pending-resolution pattern is strong enough to call out yet.",
+            "class_pending_debt_window_runs": 10,
+            "pending_debt_hotspots": [],
+            "healthy_pending_resolution_hotspots": [],
             "stalled_transition_hotspots": [],
             "resolving_transition_hotspots": [],
             "sustained_class_hotspots": [],
@@ -377,6 +392,8 @@ class TestRenderHtml:
         assert "Reweighting Stability:" in html
         assert "Class Transition Health:" in html
         assert "Pending Transition Resolution:" in html
+        assert "Transition Closure Confidence:" in html
+        assert "Class Pending Debt Audit:" in html
         assert "Recommendation Drift:" in html
         assert "Policy Debt Summary:" in html
         assert "Trust Normalization Summary:" in html
@@ -385,6 +402,8 @@ class TestRenderHtml:
         assert "Reweighting Stability Summary:" in html
         assert "Class Transition Health Summary:" in html
         assert "Pending Transition Resolution Summary:" in html
+        assert "Transition Closure Confidence Summary:" in html
+        assert "Class Pending Debt Summary:" in html
         assert "Why This Confidence Is Actionable:" in html
         assert "Recent Confidence Outcomes:" in html
         assert "RepoC: RepoC drift needs review" in html

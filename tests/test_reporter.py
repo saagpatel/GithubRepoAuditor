@@ -264,6 +264,21 @@ class TestMarkdownReport:
             "class_transition_health_summary": "No active pending class transition is building or stalling right now.",
             "class_transition_resolution_summary": "Missing template asset resolved its earlier pending class transition into a confirmed broader class posture.",
             "class_transition_age_window_runs": 4,
+            "primary_target_transition_closure_confidence_score": 0.78,
+            "primary_target_transition_closure_confidence_label": "high",
+            "primary_target_transition_closure_likely_outcome": "confirm-soon",
+            "primary_target_transition_closure_confidence_reasons": [
+                "The pending class signal is still accumulating in the same direction and may confirm soon."
+            ],
+            "transition_closure_confidence_summary": "Missing template asset still has a pending class signal that looks strong enough to confirm soon if the next run stays aligned (0.78).",
+            "transition_closure_window_runs": 4,
+            "primary_target_class_pending_debt_status": "watch",
+            "primary_target_class_pending_debt_reason": "This class has mixed recent pending-transition outcomes, so watch whether new pending signals resolve cleanly or start to accumulate debt.",
+            "class_pending_debt_summary": "Missing template asset belongs to a class with mixed pending-transition outcomes, so watch whether new pending signals confirm or start to linger.",
+            "class_pending_resolution_summary": "No class-level pending-resolution pattern is strong enough to call out yet.",
+            "class_pending_debt_window_runs": 10,
+            "pending_debt_hotspots": [],
+            "healthy_pending_resolution_hotspots": [],
             "stalled_transition_hotspots": [],
             "resolving_transition_hotspots": [],
             "sustained_class_hotspots": [],
@@ -329,6 +344,8 @@ class TestMarkdownReport:
         assert "Reweighting Stability:" in content
         assert "Class Transition Health:" in content
         assert "Pending Transition Resolution:" in content
+        assert "Transition Closure Confidence:" in content
+        assert "Class Pending Debt Audit:" in content
         assert "Next Recommended Run" in content
         assert "Watch Strategy" in content
         assert "What Changed" in content
@@ -354,6 +371,8 @@ class TestMarkdownReport:
         assert "Reweighting Stability Summary" in content
         assert "Class Transition Health Summary" in content
         assert "Pending Transition Resolution Summary" in content
+        assert "Transition Closure Confidence Summary" in content
+        assert "Class Pending Debt Summary" in content
         assert "Confidence Validation" in content
         assert "Recent Confidence Outcomes" in content
 

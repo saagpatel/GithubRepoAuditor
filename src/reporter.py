@@ -345,6 +345,17 @@ def write_markdown_report(
                 f"- Pending Transition Resolution: {report.operator_summary.get('primary_target_class_transition_resolution_status')} "
                 f"({report.operator_summary.get('primary_target_class_transition_resolution_reason', 'No class transition resolution reason is recorded yet.')})"
             )
+        if report.operator_summary.get("primary_target_transition_closure_confidence_label"):
+            _w(
+                f"- Transition Closure Confidence: {report.operator_summary.get('primary_target_transition_closure_confidence_label')} "
+                f"({report.operator_summary.get('primary_target_transition_closure_confidence_score', 0.0):.2f}; "
+                f"{report.operator_summary.get('primary_target_transition_closure_likely_outcome', 'none')})"
+            )
+        if report.operator_summary.get("primary_target_class_pending_debt_status"):
+            _w(
+                f"- Class Pending Debt Audit: {report.operator_summary.get('primary_target_class_pending_debt_status')} "
+                f"({report.operator_summary.get('primary_target_class_pending_debt_reason', 'No class pending-debt reason is recorded yet.')})"
+            )
         if report.operator_summary.get("recommendation_drift_status"):
             _w(
                 f"- Recommendation Drift: {report.operator_summary.get('recommendation_drift_status')} "
@@ -372,6 +383,12 @@ def write_markdown_report(
             _w(f"- Class Transition Health Summary: {report.operator_summary.get('class_transition_health_summary')}")
         if report.operator_summary.get("class_transition_resolution_summary"):
             _w(f"- Pending Transition Resolution Summary: {report.operator_summary.get('class_transition_resolution_summary')}")
+        if report.operator_summary.get("transition_closure_confidence_summary"):
+            _w(f"- Transition Closure Confidence Summary: {report.operator_summary.get('transition_closure_confidence_summary')}")
+        if report.operator_summary.get("class_pending_debt_summary"):
+            _w(f"- Class Pending Debt Summary: {report.operator_summary.get('class_pending_debt_summary')}")
+        if report.operator_summary.get("class_pending_resolution_summary"):
+            _w(f"- Class Pending Resolution Summary: {report.operator_summary.get('class_pending_resolution_summary')}")
         if report.operator_summary.get("recommendation_quality_summary"):
             _w(f"- Recommendation Quality: {report.operator_summary.get('recommendation_quality_summary')}")
         if report.operator_summary.get("confidence_validation_status"):

@@ -131,6 +131,21 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
             "class_transition_health_summary": "RepoC: RepoC drift needs review still has a pending class signal that is accumulating and may confirm soon (1 run(s)).",
             "class_transition_resolution_summary": "No pending class transition has just confirmed, cleared, or expired in the recent window.",
             "class_transition_age_window_runs": 4,
+            "primary_target_transition_closure_confidence_score": 0.75,
+            "primary_target_transition_closure_confidence_label": "high",
+            "primary_target_transition_closure_likely_outcome": "confirm-soon",
+            "primary_target_transition_closure_confidence_reasons": [
+                "The pending class signal is still accumulating in the same direction and may confirm soon."
+            ],
+            "transition_closure_confidence_summary": "RepoC: RepoC drift needs review still has a pending class signal that looks strong enough to confirm soon if the next run stays aligned (0.75).",
+            "transition_closure_window_runs": 4,
+            "primary_target_class_pending_debt_status": "watch",
+            "primary_target_class_pending_debt_reason": "This class has mixed recent pending-transition outcomes, so watch whether new pending signals resolve cleanly or start to accumulate debt.",
+            "class_pending_debt_summary": "RepoC: RepoC drift needs review belongs to a class with mixed pending-transition outcomes, so watch whether new pending signals confirm or start to linger.",
+            "class_pending_resolution_summary": "No class-level pending-resolution pattern is strong enough to call out yet.",
+            "class_pending_debt_window_runs": 10,
+            "pending_debt_hotspots": [],
+            "healthy_pending_resolution_hotspots": [],
             "stalled_transition_hotspots": [],
             "resolving_transition_hotspots": [],
             "sustained_class_hotspots": [],
@@ -251,6 +266,8 @@ def test_build_scheduled_handoff_writes_artifacts_and_issue_candidate(tmp_path):
     assert "Reweighting Stability" in markdown
     assert "Class Transition Health" in markdown
     assert "Pending Transition Resolution" in markdown
+    assert "Transition Closure Confidence" in markdown
+    assert "Class Pending Debt Audit" in markdown
     assert "Why class guidance shifted" in markdown
     assert "Recommendation Drift" in markdown
     assert "Confidence Validation" in markdown

@@ -184,11 +184,30 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
         "expired",
         "blocked",
     }
+    assert summary["primary_target_transition_closure_confidence_label"] in {"high", "medium", "low"}
+    assert summary["primary_target_transition_closure_likely_outcome"] in {
+        "none",
+        "confirm-soon",
+        "hold",
+        "clear-risk",
+        "expire-risk",
+        "blocked",
+        "insufficient-data",
+    }
+    assert 0.05 <= summary["primary_target_transition_closure_confidence_score"] <= 0.95
+    assert summary["primary_target_class_pending_debt_status"] in {
+        "none",
+        "watch",
+        "active-debt",
+        "clearing",
+    }
     assert summary["class_decay_window_runs"] == 4
     assert summary["class_normalization_window_runs"] == 4
     assert summary["class_reweighting_window_runs"] == 4
     assert summary["class_transition_window_runs"] == 4
     assert summary["class_transition_age_window_runs"] == 4
+    assert summary["transition_closure_window_runs"] == 4
+    assert summary["class_pending_debt_window_runs"] == 10
     assert "guidance" in summary["adaptive_confidence_summary"].lower() or "immediate action" in summary["adaptive_confidence_summary"].lower()
     assert summary["recommendation_quality_summary"].startswith("Strong recommendation because")
 
@@ -2546,6 +2565,378 @@ def test_operator_snapshot_marks_blocked_pending_support_when_local_noise_overri
     assert summary["primary_target_class_transition_resolution_status"] == "blocked"
     assert summary["primary_target_class_reweight_transition_status"] == "blocked"
     assert summary["primary_target_class_normalization_status"] == "candidate"
+
+
+def test_operator_snapshot_scores_pending_support_as_confirm_soon_without_auto_confirming(
+    tmp_path: Path, monkeypatch
+):
+    report = _make_report(
+        preflight_summary={"status": "ok", "blocking_errors": 0, "warnings": 0, "checks": []},
+        review_targets=[],
+        managed_state_drift=[],
+        governance_drift=[],
+        governance_preview={},
+        rollback_preview={},
+        material_changes=[
+            {
+                "change_key": "high-1",
+                "change_type": "security-change",
+                "repo_name": "RepoC",
+                "severity": 0.9,
+                "title": "RepoC security posture changed",
+                "summary": "critical -> watch",
+                "recommended_next_step": "Review RepoC security posture changed now.",
+            }
+        ],
+    )
+    history = [
+        {
+            "generated_at": "2026-04-06T12:00:00+00:00",
+            "operator_summary": {
+                "primary_target": {
+                    "item_id": "review-target:RepoC",
+                    "repo": "RepoC",
+                    "title": "RepoC security posture changed",
+                    "lane": "urgent",
+                    "kind": "review",
+                },
+                "primary_target_class_trust_reweight_direction": "supporting-normalization",
+                "primary_target_class_trust_reweight_score": 0.20,
+                "primary_target_class_trust_momentum_status": "sustained-support",
+                "primary_target_class_reweight_stability_status": "stable",
+                "primary_target_class_reweight_transition_status": "pending-support",
+                "primary_target_class_reweight_transition_reason": "Pending support is still visible.",
+                "primary_target_class_transition_health_status": "building",
+                "primary_target_class_transition_resolution_status": "none",
+                "primary_target_trust_policy": "verify-first",
+            },
+            "operator_queue": [],
+        }
+    ]
+    monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
+    monkeypatch.setattr(
+        "src.operator_control_center._build_confidence_calibration",
+        lambda _history: {
+            "confidence_validation_status": "healthy",
+            "confidence_window_runs": 8,
+            "validated_recommendation_count": 4,
+            "partially_validated_recommendation_count": 1,
+            "unresolved_recommendation_count": 1,
+            "reopened_recommendation_count": 0,
+            "insufficient_future_runs_count": 2,
+            "high_confidence_hit_rate": 0.75,
+            "medium_confidence_hit_rate": 0.5,
+            "low_confidence_caution_rate": 1.0,
+            "recent_validation_outcomes": [],
+            "confidence_calibration_summary": "Recent high-confidence recommendations are validating well.",
+        },
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center._trust_policy_exception_for_target",
+        lambda target, *_args, **_kwargs: (
+            "softened-for-flip-churn",
+            "Recent trust-policy flips have been bouncing enough that this recommendation should not be treated as fully stable yet.",
+            "verify-first",
+            "Recent trust-policy churn means this target should be handled with a softer, verification-aware posture.",
+        ),
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center._trust_recovery_for_target",
+        lambda target, *_args, **_kwargs: (
+            "candidate",
+            "This target is stabilizing under healthy calibration, but it has not held steady long enough to earn stronger trust yet.",
+            "verify-first",
+            "Recent trust-policy churn means this target should be handled with a softer, verification-aware posture.",
+        ),
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center._class_memory_decay_for_target",
+        lambda target, _history_meta, _calibration, **kwargs: (
+            "none",
+            "",
+            kwargs["trust_policy"],
+            kwargs["trust_policy_reason"],
+            kwargs["policy_debt_status"],
+            kwargs["policy_debt_reason"],
+            kwargs["class_normalization_status"],
+            kwargs["class_normalization_reason"],
+        ),
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center._class_trust_reweight_scores_for_target",
+        lambda target, _history_meta: (0.55, 0.20, 0.35, "supporting-normalization", []),
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center._class_trust_reweight_for_target",
+        lambda target, _history_meta, _calibration, **kwargs: (
+            "normalization-boosted",
+            "Fresh class support crossed the reweight threshold, so this target inherits a stronger act-with-review posture.",
+            "act-with-review",
+            "Fresh class support crossed the reweight threshold, so this target inherits a stronger act-with-review posture.",
+            kwargs["policy_debt_status"],
+            kwargs["policy_debt_reason"],
+            "applied",
+            "Fresh class support crossed the reweight threshold, so this target inherits a stronger act-with-review posture.",
+        ),
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center._class_trust_momentum_for_target",
+        lambda target, _history_meta, _calibration, **kwargs: (
+            "pending-support",
+            "The class signal is visible, but it has not stayed strong long enough to confirm broader normalization yet.",
+            "verify-first",
+            "The class signal is visible, but it has not stayed strong long enough to confirm broader normalization yet.",
+            kwargs["policy_debt_status"],
+            kwargs["policy_debt_reason"],
+            "candidate",
+            "The class signal is visible, but it has not stayed strong long enough to confirm broader normalization yet.",
+        ),
+    )
+
+    summary = build_operator_snapshot(report, output_dir=tmp_path)["operator_summary"]
+
+    assert summary["primary_target_class_reweight_transition_status"] == "pending-support"
+    assert summary["primary_target_transition_closure_confidence_label"] == "high"
+    assert summary["primary_target_transition_closure_likely_outcome"] == "confirm-soon"
+    assert summary["primary_target_class_transition_resolution_status"] == "none"
+
+
+def test_operator_snapshot_clears_low_confidence_pending_support_with_active_pending_debt(
+    tmp_path: Path, monkeypatch
+):
+    report = _make_report(
+        preflight_summary={"status": "ok", "blocking_errors": 0, "warnings": 0, "checks": []},
+        review_targets=[],
+        managed_state_drift=[],
+        governance_drift=[],
+        governance_preview={},
+        rollback_preview={},
+        material_changes=[
+            {
+                "change_key": "high-1",
+                "change_type": "security-change",
+                "repo_name": "RepoC",
+                "severity": 0.9,
+                "title": "RepoC security posture changed",
+                "summary": "critical -> watch",
+                "recommended_next_step": "Review RepoC security posture changed now.",
+            }
+        ],
+    )
+    history = [
+        {
+            "generated_at": "2026-04-06T12:00:00+00:00",
+            "operator_summary": {
+                "primary_target": {
+                    "item_id": "review-target:RepoC",
+                    "repo": "RepoC",
+                    "title": "RepoC security posture changed",
+                    "lane": "urgent",
+                    "kind": "review",
+                },
+                "primary_target_class_trust_reweight_direction": "supporting-normalization",
+                "primary_target_class_trust_reweight_score": 0.06,
+                "primary_target_class_trust_momentum_status": "building",
+                "primary_target_class_reweight_stability_status": "watch",
+                "primary_target_class_reweight_transition_status": "pending-support",
+                "primary_target_class_reweight_transition_reason": "Pending support is still visible.",
+                "primary_target_class_transition_health_status": "stalled",
+                "primary_target_class_transition_resolution_status": "none",
+                "primary_target_trust_policy": "verify-first",
+            },
+            "operator_queue": [],
+        },
+        {
+            "generated_at": "2026-04-05T12:00:00+00:00",
+            "operator_summary": {
+                "primary_target": {
+                    "item_id": "review-target:RepoC",
+                    "repo": "RepoC",
+                    "title": "RepoC security posture changed",
+                    "lane": "urgent",
+                    "kind": "review",
+                },
+                "primary_target_class_trust_reweight_direction": "supporting-normalization",
+                "primary_target_class_trust_reweight_score": 0.05,
+                "primary_target_class_trust_momentum_status": "building",
+                "primary_target_class_reweight_stability_status": "watch",
+                "primary_target_class_reweight_transition_status": "pending-support",
+                "primary_target_class_reweight_transition_reason": "Pending support is still visible.",
+                "primary_target_class_transition_health_status": "stalled",
+                "primary_target_class_transition_resolution_status": "none",
+                "primary_target_trust_policy": "verify-first",
+            },
+            "operator_queue": [],
+        },
+        {
+            "generated_at": "2026-04-04T12:00:00+00:00",
+            "operator_summary": {
+                "primary_target": {
+                    "item_id": "review-target:RepoC",
+                    "repo": "RepoC",
+                    "title": "RepoC security posture changed",
+                    "lane": "urgent",
+                    "kind": "review",
+                },
+                "primary_target_class_trust_reweight_direction": "neutral",
+                "primary_target_class_trust_reweight_score": 0.02,
+                "primary_target_class_trust_momentum_status": "reversing",
+                "primary_target_class_reweight_stability_status": "watch",
+                "primary_target_class_reweight_transition_status": "none",
+                "primary_target_class_reweight_transition_reason": "",
+                "primary_target_class_transition_health_status": "expired",
+                "primary_target_class_transition_resolution_status": "expired",
+                "primary_target_trust_policy": "verify-first",
+            },
+            "operator_queue": [],
+        },
+    ]
+    monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
+    monkeypatch.setattr(
+        "src.operator_control_center._build_confidence_calibration",
+        lambda _history: {
+            "confidence_validation_status": "healthy",
+            "confidence_window_runs": 8,
+            "validated_recommendation_count": 4,
+            "partially_validated_recommendation_count": 1,
+            "unresolved_recommendation_count": 1,
+            "reopened_recommendation_count": 0,
+            "insufficient_future_runs_count": 2,
+            "high_confidence_hit_rate": 0.75,
+            "medium_confidence_hit_rate": 0.5,
+            "low_confidence_caution_rate": 1.0,
+            "recent_validation_outcomes": [],
+            "confidence_calibration_summary": "Recent high-confidence recommendations are validating well.",
+        },
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center._trust_policy_exception_for_target",
+        lambda target, *_args, **_kwargs: (
+            "softened-for-flip-churn",
+            "Recent trust-policy flips have been bouncing enough that this recommendation should not be treated as fully stable yet.",
+            "verify-first",
+            "Recent trust-policy churn means this target should be handled with a softer, verification-aware posture.",
+        ),
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center._trust_recovery_for_target",
+        lambda target, *_args, **_kwargs: (
+            "candidate",
+            "This target is stabilizing under healthy calibration, but it has not held steady long enough to earn stronger trust yet.",
+            "verify-first",
+            "Recent trust-policy churn means this target should be handled with a softer, verification-aware posture.",
+        ),
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center._class_memory_decay_for_target",
+        lambda target, _history_meta, _calibration, **kwargs: (
+            "none",
+            "",
+            kwargs["trust_policy"],
+            kwargs["trust_policy_reason"],
+            kwargs["policy_debt_status"],
+            kwargs["policy_debt_reason"],
+            kwargs["class_normalization_status"],
+            kwargs["class_normalization_reason"],
+        ),
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center._class_trust_reweight_scores_for_target",
+        lambda target, _history_meta: (0.08, 0.03, 0.05, "neutral", []),
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center._class_trust_reweight_for_target",
+        lambda target, _history_meta, _calibration, **kwargs: (
+            "none",
+            "",
+            kwargs["trust_policy"],
+            kwargs["trust_policy_reason"],
+            kwargs["policy_debt_status"],
+            kwargs["policy_debt_reason"],
+            kwargs["class_normalization_status"],
+            kwargs["class_normalization_reason"],
+        ),
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center._class_trust_momentum_for_target",
+        lambda target, _history_meta, _calibration, **kwargs: (
+            "pending-support",
+            "The class signal is visible, but it has not stayed strong long enough to confirm broader normalization yet.",
+            "verify-first",
+            "The class signal is visible, but it has not stayed strong long enough to confirm broader normalization yet.",
+            kwargs["policy_debt_status"],
+            kwargs["policy_debt_reason"],
+            "candidate",
+            "The class signal is visible, but it has not stayed strong long enough to confirm broader normalization yet.",
+        ),
+    )
+
+    summary = build_operator_snapshot(report, output_dir=tmp_path)["operator_summary"]
+
+    assert summary["primary_target_class_pending_debt_status"] == "active-debt"
+    assert summary["primary_target_transition_closure_confidence_label"] == "low"
+    assert summary["primary_target_transition_closure_likely_outcome"] in {"clear-risk", "expire-risk"}
+    assert summary["primary_target_class_transition_resolution_status"] == "cleared"
+    assert summary["primary_target_class_reweight_transition_status"] == "none"
+    assert summary["primary_target_trust_policy"] == "verify-first"
+
+
+def test_operator_snapshot_marks_class_pending_debt_as_clearing(tmp_path: Path, monkeypatch):
+    report = _make_report(
+        preflight_summary={"status": "ok", "blocking_errors": 0, "warnings": 0, "checks": []},
+        review_targets=[],
+        managed_state_drift=[],
+        governance_drift=[],
+        governance_preview={},
+        rollback_preview={},
+        material_changes=[
+            {
+                "change_key": "high-1",
+                "change_type": "security-change",
+                "repo_name": "RepoC",
+                "severity": 0.9,
+                "title": "RepoC security posture changed",
+                "summary": "critical -> watch",
+                "recommended_next_step": "Review RepoC security posture changed now.",
+            }
+        ],
+    )
+    history = [
+        {
+            "generated_at": "2026-04-06T12:00:00+00:00",
+            "operator_summary": {
+                "primary_target": {
+                    "item_id": "review-target:RepoC",
+                    "repo": "RepoC",
+                    "title": "RepoC security posture changed",
+                    "lane": "urgent",
+                    "kind": "review",
+                },
+                "primary_target_class_transition_resolution_status": "confirmed",
+            },
+            "operator_queue": [],
+        },
+        {
+            "generated_at": "2026-04-05T12:00:00+00:00",
+            "operator_summary": {
+                "primary_target": {
+                    "item_id": "review-target:RepoC",
+                    "repo": "RepoC",
+                    "title": "RepoC security posture changed",
+                    "lane": "urgent",
+                    "kind": "review",
+                },
+                "primary_target_class_transition_resolution_status": "cleared",
+            },
+            "operator_queue": [],
+        },
+    ]
+    monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
+
+    summary = build_operator_snapshot(report, output_dir=tmp_path)["operator_summary"]
+
+    assert summary["primary_target_class_pending_debt_status"] == "clearing"
+    assert "resolving pending transitions more cleanly" in summary["class_pending_debt_summary"].lower()
 
 
 def test_operator_snapshot_learns_when_soft_exception_was_overcautious(tmp_path: Path, monkeypatch):
