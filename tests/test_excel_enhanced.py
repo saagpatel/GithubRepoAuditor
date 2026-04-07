@@ -381,6 +381,18 @@ def _make_report(audits=None) -> dict:
             ],
             "closure_forecast_reweighting_summary": "RepoC: Security posture needs attention still needs persistence before confirmation, but fresh class resolution behavior is strengthening the pending forecast (0.27).",
             "closure_forecast_reweighting_window_runs": 4,
+            "primary_target_closure_forecast_momentum_score": 0.18,
+            "primary_target_closure_forecast_momentum_status": "building",
+            "primary_target_closure_forecast_stability_status": "watch",
+            "primary_target_closure_forecast_hysteresis_status": "pending-confirmation",
+            "primary_target_closure_forecast_hysteresis_reason": "The confirmation-leaning forecast is visible, but it has not stayed persistent enough to trust fully yet.",
+            "closure_forecast_momentum_summary": "The closure forecast for RepoC: Security posture needs attention is trending in one direction, but it has not held long enough to lock in (0.18).",
+            "closure_forecast_stability_summary": "Closure forecasting for RepoC: Security posture needs attention is still settling and should be watched for one more stable stretch: supporting-confirmation -> neutral.",
+            "closure_forecast_hysteresis_summary": "The confirmation-leaning forecast for RepoC: Security posture needs attention is visible but not yet persistent enough to trust fully.",
+            "closure_forecast_transition_window_runs": 4,
+            "sustained_confirmation_hotspots": [],
+            "sustained_clearance_hotspots": [],
+            "oscillating_closure_forecast_hotspots": [],
             "supporting_pending_resolution_hotspots": [],
             "caution_pending_debt_hotspots": [],
             "stalled_transition_hotspots": [],
@@ -733,11 +745,13 @@ class TestAnalystWorkbookSheets:
         assert review_ws["A42"].value == "Transition Likely Outcome"
         assert review_ws["A43"].value == "Pending Debt Freshness"
         assert review_ws["A44"].value == "Closure Forecast"
-        assert review_ws["A45"].value == "Closure Forecast Summary"
-        assert review_ws["A46"].value == "Momentum Summary"
-        assert review_ws["A47"].value == "Exception Learning"
-        assert review_ws["A48"].value == "Recommendation Drift"
-        assert review_ws["A49"].value == "Adaptive Confidence"
+        assert review_ws["A45"].value == "Forecast Momentum"
+        assert review_ws["A46"].value == "Forecast Stability"
+        assert review_ws["A47"].value == "Closure Forecast Summary"
+        assert review_ws["A48"].value == "Momentum Summary"
+        assert review_ws["A49"].value == "Exception Learning"
+        assert review_ws["A50"].value == "Recommendation Drift"
+        assert review_ws["A51"].value == "Adaptive Confidence"
         assert executive_ws["D29"].value == "Trend"
         assert executive_ws["D32"].value == "Why Top Target"
         assert executive_ws["D33"].value == "Closure Guidance"
@@ -768,13 +782,15 @@ class TestAnalystWorkbookSheets:
         assert executive_ws["D60"].value == "Transition Likely Outcome"
         assert executive_ws["D61"].value == "Pending Debt Freshness"
         assert executive_ws["D62"].value == "Closure Forecast"
-        assert executive_ws["D63"].value == "Closure Forecast Summary"
-        assert executive_ws["D64"].value == "Momentum Summary"
-        assert executive_ws["D65"].value == "Exception Learning"
-        assert executive_ws["D66"].value == "Recommendation Drift"
-        assert executive_ws["D67"].value == "Adaptive Confidence"
-        assert executive_ws["D68"].value == "Recommendation Quality"
-        assert executive_ws["D69"].value == "Confidence Validation"
+        assert executive_ws["D63"].value == "Forecast Momentum"
+        assert executive_ws["D64"].value == "Forecast Stability"
+        assert executive_ws["D65"].value == "Closure Forecast Summary"
+        assert executive_ws["D66"].value == "Momentum Summary"
+        assert executive_ws["D67"].value == "Exception Learning"
+        assert executive_ws["D68"].value == "Recommendation Drift"
+        assert executive_ws["D69"].value == "Adaptive Confidence"
+        assert executive_ws["D70"].value == "Recommendation Quality"
+        assert executive_ws["D71"].value == "Confidence Validation"
         assert print_ws["A17"].value == "Primary Target"
         assert print_ws["A18"].value == "Why Top Target"
         assert print_ws["A19"].value == "What We Tried"
@@ -805,11 +821,13 @@ class TestAnalystWorkbookSheets:
         assert print_ws["A45"].value == "Transition Likely Outcome"
         assert print_ws["A46"].value == "Pending Debt Freshness"
         assert print_ws["A47"].value == "Closure Forecast"
-        assert print_ws["A48"].value == "Closure Forecast Summary"
-        assert print_ws["A49"].value == "Momentum Summary"
-        assert print_ws["A50"].value == "Exception Learning"
-        assert print_ws["A51"].value == "Recommendation Drift"
-        assert print_ws["A52"].value == "Adaptive Confidence"
+        assert print_ws["A48"].value == "Forecast Momentum"
+        assert print_ws["A49"].value == "Forecast Stability"
+        assert print_ws["A50"].value == "Closure Forecast Summary"
+        assert print_ws["A51"].value == "Momentum Summary"
+        assert print_ws["A52"].value == "Exception Learning"
+        assert print_ws["A53"].value == "Recommendation Drift"
+        assert print_ws["A54"].value == "Adaptive Confidence"
         assert "Why Top Target" in dashboard_values
         assert "Closure Guidance" in dashboard_values
         assert "What We Tried" in dashboard_values
@@ -832,6 +850,8 @@ class TestAnalystWorkbookSheets:
         assert "Transition Likely Outcome" in dashboard_values
         assert "Pending Debt Freshness" in dashboard_values
         assert "Closure Forecast" in dashboard_values
+        assert "Forecast Momentum" in dashboard_values
+        assert "Forecast Stability" in dashboard_values
         assert "Exception Learning" in dashboard_values
         assert "Recommendation Drift" in dashboard_values
 

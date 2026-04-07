@@ -212,7 +212,29 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
         "neutral",
         "supporting-clearance",
     }
+    assert summary["primary_target_closure_forecast_momentum_status"] in {
+        "sustained-confirmation",
+        "sustained-clearance",
+        "building",
+        "reversing",
+        "unstable",
+        "insufficient-data",
+    }
+    assert summary["primary_target_closure_forecast_stability_status"] in {
+        "stable",
+        "watch",
+        "oscillating",
+    }
+    assert summary["primary_target_closure_forecast_hysteresis_status"] in {
+        "none",
+        "pending-confirmation",
+        "pending-clearance",
+        "confirmed-confirmation",
+        "confirmed-clearance",
+        "blocked",
+    }
     assert -0.95 <= summary["primary_target_closure_forecast_reweight_score"] <= 0.95
+    assert -0.95 <= summary["primary_target_closure_forecast_momentum_score"] <= 0.95
     assert 0.0 <= summary["primary_target_weighted_pending_resolution_support_score"] <= 0.95
     assert 0.0 <= summary["primary_target_weighted_pending_debt_caution_score"] <= 0.95
     assert summary["class_decay_window_runs"] == 4
@@ -224,6 +246,7 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
     assert summary["class_pending_debt_window_runs"] == 10
     assert summary["pending_debt_decay_window_runs"] == 4
     assert summary["closure_forecast_reweighting_window_runs"] == 4
+    assert summary["closure_forecast_transition_window_runs"] == 4
     assert "guidance" in summary["adaptive_confidence_summary"].lower() or "immediate action" in summary["adaptive_confidence_summary"].lower()
     assert summary["recommendation_quality_summary"].startswith("Strong recommendation because")
 
@@ -2718,6 +2741,16 @@ def test_operator_snapshot_scores_pending_support_as_confirm_soon_without_auto_c
         "neutral",
         "supporting-confirmation",
     }
+    assert summary["primary_target_closure_forecast_momentum_status"] in {
+        "building",
+        "sustained-confirmation",
+        "insufficient-data",
+    }
+    assert summary["primary_target_closure_forecast_hysteresis_status"] in {
+        "none",
+        "pending-confirmation",
+        "confirmed-confirmation",
+    }
     assert summary["primary_target_class_transition_resolution_status"] == "none"
 
 
@@ -2762,6 +2795,8 @@ def test_operator_snapshot_clears_low_confidence_pending_support_with_active_pen
                 "primary_target_class_reweight_transition_reason": "Pending support is still visible.",
                 "primary_target_class_transition_health_status": "stalled",
                 "primary_target_class_transition_resolution_status": "none",
+                "primary_target_closure_forecast_reweight_direction": "supporting-clearance",
+                "primary_target_closure_forecast_reweight_score": -0.34,
                 "primary_target_trust_policy": "verify-first",
             },
             "operator_queue": [],
@@ -2784,6 +2819,8 @@ def test_operator_snapshot_clears_low_confidence_pending_support_with_active_pen
                 "primary_target_class_reweight_transition_reason": "Pending support is still visible.",
                 "primary_target_class_transition_health_status": "stalled",
                 "primary_target_class_transition_resolution_status": "none",
+                "primary_target_closure_forecast_reweight_direction": "supporting-clearance",
+                "primary_target_closure_forecast_reweight_score": -0.29,
                 "primary_target_trust_policy": "verify-first",
             },
             "operator_queue": [],
@@ -2806,6 +2843,8 @@ def test_operator_snapshot_clears_low_confidence_pending_support_with_active_pen
                 "primary_target_class_reweight_transition_reason": "",
                 "primary_target_class_transition_health_status": "expired",
                 "primary_target_class_transition_resolution_status": "expired",
+                "primary_target_closure_forecast_reweight_direction": "supporting-clearance",
+                "primary_target_closure_forecast_reweight_score": -0.24,
                 "primary_target_trust_policy": "verify-first",
             },
             "operator_queue": [],
@@ -2901,6 +2940,8 @@ def test_operator_snapshot_clears_low_confidence_pending_support_with_active_pen
         "neutral",
         "supporting-clearance",
     }
+    assert summary["primary_target_closure_forecast_momentum_status"] == "sustained-clearance"
+    assert summary["primary_target_closure_forecast_hysteresis_status"] == "confirmed-clearance"
     assert summary["primary_target_class_transition_resolution_status"] == "cleared"
     assert summary["primary_target_class_reweight_transition_status"] == "none"
     assert summary["primary_target_trust_policy"] == "verify-first"

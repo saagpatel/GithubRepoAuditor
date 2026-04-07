@@ -297,6 +297,18 @@ class TestMarkdownReport:
             ],
             "closure_forecast_reweighting_summary": "Missing template asset still needs persistence before confirmation, but fresh class resolution behavior is strengthening the pending forecast (0.27).",
             "closure_forecast_reweighting_window_runs": 4,
+            "primary_target_closure_forecast_momentum_score": 0.18,
+            "primary_target_closure_forecast_momentum_status": "building",
+            "primary_target_closure_forecast_stability_status": "watch",
+            "primary_target_closure_forecast_hysteresis_status": "pending-confirmation",
+            "primary_target_closure_forecast_hysteresis_reason": "The confirmation-leaning forecast is visible, but it has not stayed persistent enough to trust fully yet.",
+            "closure_forecast_momentum_summary": "The closure forecast for Missing template asset is trending in one direction, but it has not held long enough to lock in (0.18).",
+            "closure_forecast_stability_summary": "Closure forecasting for Missing template asset is still settling and should be watched for one more stable stretch: supporting-confirmation -> neutral.",
+            "closure_forecast_hysteresis_summary": "The confirmation-leaning forecast for Missing template asset is visible but not yet persistent enough to trust fully.",
+            "closure_forecast_transition_window_runs": 4,
+            "sustained_confirmation_hotspots": [],
+            "sustained_clearance_hotspots": [],
+            "oscillating_closure_forecast_hotspots": [],
             "supporting_pending_resolution_hotspots": [],
             "caution_pending_debt_hotspots": [],
             "stalled_transition_hotspots": [],
@@ -368,6 +380,8 @@ class TestMarkdownReport:
         assert "Class Pending Debt Audit:" in content
         assert "Pending Debt Freshness:" in content
         assert "Closure Forecast Reweighting:" in content
+        assert "Closure Forecast Momentum:" in content
+        assert "Closure Forecast Hysteresis:" in content
         assert "Next Recommended Run" in content
         assert "Watch Strategy" in content
         assert "What Changed" in content
@@ -396,6 +410,8 @@ class TestMarkdownReport:
         assert "Transition Closure Confidence Summary" in content
         assert "Pending Debt Freshness Summary" in content
         assert "Closure Forecast Reweighting Summary" in content
+        assert "Closure Forecast Momentum Summary" in content
+        assert "Closure Forecast Hysteresis Summary" in content
         assert "Class Pending Debt Summary" in content
         assert "Confidence Validation" in content
         assert "Recent Confidence Outcomes" in content

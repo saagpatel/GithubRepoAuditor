@@ -164,6 +164,18 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
             ],
             "closure_forecast_reweighting_summary": "RepoC: RepoC drift needs review still needs persistence before confirmation, but fresh class resolution behavior is strengthening the pending forecast (0.27).",
             "closure_forecast_reweighting_window_runs": 4,
+            "primary_target_closure_forecast_momentum_score": 0.18,
+            "primary_target_closure_forecast_momentum_status": "building",
+            "primary_target_closure_forecast_stability_status": "watch",
+            "primary_target_closure_forecast_hysteresis_status": "pending-confirmation",
+            "primary_target_closure_forecast_hysteresis_reason": "The confirmation-leaning forecast is visible, but it has not stayed persistent enough to trust fully yet.",
+            "closure_forecast_momentum_summary": "The closure forecast for RepoC: RepoC drift needs review is trending in one direction, but it has not held long enough to lock in (0.18).",
+            "closure_forecast_stability_summary": "Closure forecasting for RepoC: RepoC drift needs review is still settling and should be watched for one more stable stretch: supporting-confirmation -> neutral.",
+            "closure_forecast_hysteresis_summary": "The confirmation-leaning forecast for RepoC: RepoC drift needs review is visible but not yet persistent enough to trust fully.",
+            "closure_forecast_transition_window_runs": 4,
+            "sustained_confirmation_hotspots": [],
+            "sustained_clearance_hotspots": [],
+            "oscillating_closure_forecast_hotspots": [],
             "supporting_pending_resolution_hotspots": [],
             "caution_pending_debt_hotspots": [],
             "stalled_transition_hotspots": [],
@@ -226,6 +238,7 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
                 "class_sticky_rate": 0.25,
                 "class_transition_age_runs": 1,
                 "recent_transition_path": "pending-support",
+                "recent_closure_forecast_path": "supporting-confirmation -> neutral",
             },
             "next_recommended_run_mode": "incremental",
             "watch_strategy": "adaptive",
@@ -290,6 +303,8 @@ def test_build_scheduled_handoff_writes_artifacts_and_issue_candidate(tmp_path):
     assert "Class Pending Debt Audit" in markdown
     assert "Pending Debt Freshness" in markdown
     assert "Closure Forecast Reweighting" in markdown
+    assert "Closure Forecast Momentum" in markdown
+    assert "Closure Forecast Hysteresis" in markdown
     assert "Why class guidance shifted" in markdown
     assert "Recommendation Drift" in markdown
     assert "Confidence Validation" in markdown

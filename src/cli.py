@@ -800,6 +800,23 @@ def _print_control_center_summary(snapshot: dict) -> None:
         )
     if summary.get("closure_forecast_reweighting_summary"):
         print(f"  Closure forecast reweighting summary: {summary['closure_forecast_reweighting_summary']}")
+    if summary.get("primary_target_closure_forecast_momentum_status"):
+        print(
+            "  Closure forecast momentum: "
+            f"{summary.get('primary_target_closure_forecast_momentum_status', 'insufficient-data')} "
+            f"({summary.get('primary_target_closure_forecast_momentum_score', 0.0):.2f})"
+        )
+    if summary.get("closure_forecast_momentum_summary"):
+        print(f"  Closure forecast momentum summary: {summary['closure_forecast_momentum_summary']}")
+    if summary.get("primary_target_closure_forecast_stability_status"):
+        print(
+            "  Closure forecast hysteresis: "
+            f"{summary.get('primary_target_closure_forecast_stability_status', 'watch')} "
+            f"({summary.get('primary_target_closure_forecast_hysteresis_status', 'none')}: "
+            f"{summary.get('primary_target_closure_forecast_hysteresis_reason', 'No closure-forecast hysteresis reason is recorded yet.')})"
+        )
+    if summary.get("closure_forecast_hysteresis_summary"):
+        print(f"  Closure forecast hysteresis summary: {summary['closure_forecast_hysteresis_summary']}")
     if summary.get("recommendation_drift_status"):
         print(
             "  Recommendation drift: "
