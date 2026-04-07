@@ -198,6 +198,26 @@ class TestMarkdownReport:
             "next_action_confidence_label": "high",
             "next_action_confidence_reasons": ["The next step is tied directly to the current top target."],
             "recommendation_quality_summary": "Strong recommendation because the next step is tied directly to the current top target.",
+            "confidence_validation_status": "healthy",
+            "confidence_window_runs": 8,
+            "validated_recommendation_count": 4,
+            "partially_validated_recommendation_count": 1,
+            "unresolved_recommendation_count": 1,
+            "reopened_recommendation_count": 0,
+            "insufficient_future_runs_count": 2,
+            "high_confidence_hit_rate": 0.75,
+            "medium_confidence_hit_rate": 0.5,
+            "low_confidence_caution_rate": 1.0,
+            "recent_validation_outcomes": [
+                {
+                    "run_id": "user:2026-04-05T12:00:00+00:00",
+                    "target_label": "Missing template asset",
+                    "confidence_label": "high",
+                    "outcome": "validated",
+                    "validated_in_runs": 2,
+                }
+            ],
+            "confidence_calibration_summary": "Recent high-confidence recommendations are validating well: 75% high-confidence hit rate across 6 judged runs with no reopen noise.",
             "primary_target": {"title": "Missing template asset"},
         }
         report.operator_queue = [
@@ -229,6 +249,8 @@ class TestMarkdownReport:
         assert "Primary Target Confidence" in content
         assert "Next Action Confidence" in content
         assert "Recommendation Quality" in content
+        assert "Confidence Validation" in content
+        assert "Recent Confidence Outcomes" in content
 
     def test_includes_governance_operator_summary_when_present(self, tmp_path):
         report = _make_report()

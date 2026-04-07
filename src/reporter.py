@@ -262,6 +262,19 @@ def write_markdown_report(
             )
         if report.operator_summary.get("recommendation_quality_summary"):
             _w(f"- Recommendation Quality: {report.operator_summary.get('recommendation_quality_summary')}")
+        if report.operator_summary.get("confidence_validation_status"):
+            _w(
+                f"- Confidence Validation: {report.operator_summary.get('confidence_validation_status')} "
+                f"({report.operator_summary.get('confidence_calibration_summary', 'No confidence-calibration summary is recorded yet.')})"
+            )
+        if report.operator_summary.get("recent_validation_outcomes"):
+            recent_outcomes = []
+            for item in (report.operator_summary.get("recent_validation_outcomes") or [])[:3]:
+                recent_outcomes.append(
+                    f"{item.get('target_label', 'Operator target')} "
+                    f"[{item.get('confidence_label', 'low')}] -> {str(item.get('outcome', 'unresolved')).replace('_', ' ')}"
+                )
+            _w("- Recent Confidence Outcomes: " + "; ".join(recent_outcomes))
         if report.operator_summary.get("control_center_reference"):
             _w(f"- Control Center Artifact: `{report.operator_summary.get('control_center_reference')}`")
         counts = report.operator_summary.get("counts", {})

@@ -66,6 +66,26 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
             "next_action_confidence_label": "high",
             "next_action_confidence_reasons": ["The next step is tied directly to the current top target."],
             "recommendation_quality_summary": "Strong recommendation because the next step is tied directly to the current top target.",
+            "confidence_validation_status": "healthy",
+            "confidence_window_runs": 8,
+            "validated_recommendation_count": 4,
+            "partially_validated_recommendation_count": 1,
+            "unresolved_recommendation_count": 1,
+            "reopened_recommendation_count": 0,
+            "insufficient_future_runs_count": 2,
+            "high_confidence_hit_rate": 0.75,
+            "medium_confidence_hit_rate": 0.5,
+            "low_confidence_caution_rate": 1.0,
+            "recent_validation_outcomes": [
+                {
+                    "run_id": "testuser:2026-04-05T12:00:00+00:00",
+                    "target_label": "RepoC: RepoC drift needs review",
+                    "confidence_label": "high",
+                    "outcome": "validated",
+                    "validated_in_runs": 2,
+                }
+            ],
+            "confidence_calibration_summary": "Recent high-confidence recommendations are validating well: 75% high-confidence hit rate across 6 judged runs with no reopen noise.",
             "chronic_item_count": 0,
             "newly_stale_count": 0,
             "longest_persisting_item": {
@@ -125,6 +145,8 @@ def test_build_scheduled_handoff_writes_artifacts_and_issue_candidate(tmp_path):
     assert "Resolution Evidence" in markdown
     assert "Recommendation Confidence" in markdown
     assert "Primary target confidence: medium (0.70)" in markdown
+    assert "Confidence Validation" in markdown
+    assert "75%" in markdown
     assert "Aging Pressure" in markdown
     assert "What Reopened" in markdown
 

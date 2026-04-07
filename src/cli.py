@@ -701,6 +701,20 @@ def _print_control_center_summary(snapshot: dict) -> None:
         )
     if summary.get("recommendation_quality_summary"):
         print(f"  Recommendation quality: {summary['recommendation_quality_summary']}")
+    if summary.get("confidence_validation_status"):
+        print(
+            "  Confidence validation: "
+            f"{summary.get('confidence_validation_status', 'insufficient-data')} "
+            f"({summary.get('confidence_calibration_summary', 'No confidence-calibration summary is recorded yet.')})"
+        )
+    if summary.get("recent_validation_outcomes"):
+        recent_bits = []
+        for item in (summary.get("recent_validation_outcomes") or [])[:3]:
+            recent_bits.append(
+                f"{item.get('target_label', 'Operator target')} "
+                f"[{item.get('confidence_label', 'low')}] -> {str(item.get('outcome', 'unresolved')).replace('_', ' ')}"
+            )
+        print("  Recent confidence outcomes: " + "; ".join(recent_bits))
     if summary.get("follow_through_summary"):
         print(f"  Follow-through: {summary['follow_through_summary']}")
     lane_labels = [

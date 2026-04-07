@@ -265,6 +265,8 @@ def _operator_section(data: dict) -> str:
         <div class="meta-line"><strong>Confidence Reasons:</strong> {escape(', '.join(summary.get('primary_target_confidence_reasons', []) or ['No confidence rationale is recorded yet.']))}</div>
         <div class="meta-line"><strong>Next Action Confidence:</strong> {escape(summary.get('next_action_confidence_label', 'low'))} ({summary.get('next_action_confidence_score', 0.0):.2f})</div>
         <div class="meta-line"><strong>Recommendation Quality:</strong> {escape(summary.get('recommendation_quality_summary', 'No recommendation-quality summary is recorded yet.'))}</div>
+        <div class="meta-line"><strong>Confidence Validation:</strong> {escape(summary.get('confidence_validation_status', 'insufficient-data'))} — {escape(summary.get('confidence_calibration_summary', 'No confidence-calibration summary is recorded yet.'))}</div>
+        <div class="meta-line"><strong>Recent Confidence Outcomes:</strong> {escape(_recent_confidence_outcomes_label(summary.get('recent_validation_outcomes') or []))}</div>
         <div class="meta-line"><strong>Blocked:</strong> {counts.get('blocked', 0)} | <strong>Urgent:</strong> {counts.get('urgent', 0)} | <strong>Ready:</strong> {counts.get('ready', 0)} | <strong>Deferred:</strong> {counts.get('deferred', 0)}</div>
         <ul class="bullet-list">{''.join(rows) or '<li>No triage items are currently surfaced.</li>'}</ul>
         <div class="meta-line"><strong>Recently Changed:</strong></div>
@@ -280,6 +282,18 @@ def _intervention_label(intervention: dict) -> str:
     event_type = intervention.get("event_type", "recorded")
     outcome = intervention.get("outcome", event_type)
     return f"{when} — {event_type} ({outcome})".strip()
+
+
+def _recent_confidence_outcomes_label(outcomes: list[dict]) -> str:
+    if not outcomes:
+        return "No recent judged confidence outcomes are recorded yet."
+    parts = []
+    for item in outcomes[:3]:
+        parts.append(
+            f"{item.get('target_label', 'Operator target')} "
+            f"[{item.get('confidence_label', 'low')}] -> {str(item.get('outcome', 'unresolved')).replace('_', ' ')}"
+        )
+    return "; ".join(parts)
 
 
 def _analyst_summary_section(context: dict) -> str:

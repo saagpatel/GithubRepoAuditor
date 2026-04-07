@@ -164,7 +164,7 @@ The daily operator loop is now:
 - Run `audit <github-username> --doctor`
 - Run `audit <github-username>` or `audit <github-username> --watch --watch-strategy adaptive`
 - Run `audit <github-username> --control-center`
-- Review the handoff fields: what changed, why it matters, what to do next, whether the queue is improving or worsening, what was tried for the top target, and whether it is only quieting down or now counts as confirmed resolved
+- Review the handoff fields: what changed, why it matters, what to do next, whether the queue is improving or worsening, what was tried for the top target, whether it is only quieting down or now counts as confirmed resolved, and whether recent confidence has actually been validating
 - Clear anything in `Blocked` first
 - Use the reported primary target as the single next thing to close before taking on newly ready work
 - Review `Needs Attention Now` for drift and high-severity changes
@@ -173,7 +173,7 @@ The daily operator loop is now:
 - Run `make workbook-gate` only when workbook-facing changes are in scope
 - Run `make workbook-signoff ...` after the manual Excel-open check for workbook-facing changes
 
-Scheduled automation stays artifact-first. The weekly workflow now runs the audit, generates a control-center artifact plus a scheduled handoff summary, uploads `output/`, opens or updates one canonical GitHub issue only when blocked or urgent operator findings cross a meaningful threshold, and closes that same issue cleanly when later runs return to a quiet state. The handoff now also calls out whether the queue is getting better, worse, or staying stuck, what was tried most recently, whether that intervention actually helped, and whether recovery is only quiet for now or confirmed resolved.
+Scheduled automation stays artifact-first. The weekly workflow now runs the audit, generates a control-center artifact plus a scheduled handoff summary, uploads `output/`, opens or updates one canonical GitHub issue only when blocked or urgent operator findings cross a meaningful threshold, and closes that same issue cleanly when later runs return to a quiet state. The handoff now also calls out whether the queue is getting better, worse, or staying stuck, what was tried most recently, whether that intervention actually helped, whether recovery is only quiet for now or confirmed resolved, and whether recent high-confidence guidance has been validating or turning noisy.
 
 ## Troubleshooting
 
