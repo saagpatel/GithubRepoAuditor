@@ -389,6 +389,15 @@ def _make_report(audits=None) -> dict:
             "closure_forecast_momentum_summary": "The closure forecast for RepoC: Security posture needs attention is trending in one direction, but it has not held long enough to lock in (0.18).",
             "closure_forecast_stability_summary": "Closure forecasting for RepoC: Security posture needs attention is still settling and should be watched for one more stable stretch: supporting-confirmation -> neutral.",
             "closure_forecast_hysteresis_summary": "The confirmation-leaning forecast for RepoC: Security posture needs attention is visible but not yet persistent enough to trust fully.",
+            "primary_target_closure_forecast_freshness_status": "mixed-age",
+            "primary_target_closure_forecast_freshness_reason": "Closure-forecast memory is still useful, but it is partly aging: 50% of the weighted forecast signal is recent and the rest is older carry-forward.",
+            "primary_target_closure_forecast_decay_status": "none",
+            "primary_target_closure_forecast_decay_reason": "",
+            "closure_forecast_freshness_summary": "RepoC: Security posture needs attention still has useful closure-forecast memory, but some of that signal is aging and should be weighted more cautiously.",
+            "closure_forecast_decay_summary": "Recent closure-forecast evidence is still fresh enough that no forecast carry-forward needs to decay yet.",
+            "stale_closure_forecast_hotspots": [],
+            "fresh_closure_forecast_signal_hotspots": [],
+            "closure_forecast_decay_window_runs": 4,
             "closure_forecast_transition_window_runs": 4,
             "sustained_confirmation_hotspots": [],
             "sustained_clearance_hotspots": [],
@@ -745,8 +754,8 @@ class TestAnalystWorkbookSheets:
         assert review_ws["A42"].value == "Transition Likely Outcome"
         assert review_ws["A43"].value == "Pending Debt Freshness"
         assert review_ws["A44"].value == "Closure Forecast"
-        assert review_ws["A45"].value == "Forecast Momentum"
-        assert review_ws["A46"].value == "Forecast Stability"
+        assert review_ws["A45"].value == "Forecast Freshness"
+        assert review_ws["A46"].value == "Forecast Decay"
         assert review_ws["A47"].value == "Closure Forecast Summary"
         assert review_ws["A48"].value == "Momentum Summary"
         assert review_ws["A49"].value == "Exception Learning"
@@ -782,8 +791,8 @@ class TestAnalystWorkbookSheets:
         assert executive_ws["D60"].value == "Transition Likely Outcome"
         assert executive_ws["D61"].value == "Pending Debt Freshness"
         assert executive_ws["D62"].value == "Closure Forecast"
-        assert executive_ws["D63"].value == "Forecast Momentum"
-        assert executive_ws["D64"].value == "Forecast Stability"
+        assert executive_ws["D63"].value == "Forecast Freshness"
+        assert executive_ws["D64"].value == "Forecast Decay"
         assert executive_ws["D65"].value == "Closure Forecast Summary"
         assert executive_ws["D66"].value == "Momentum Summary"
         assert executive_ws["D67"].value == "Exception Learning"
@@ -821,8 +830,8 @@ class TestAnalystWorkbookSheets:
         assert print_ws["A45"].value == "Transition Likely Outcome"
         assert print_ws["A46"].value == "Pending Debt Freshness"
         assert print_ws["A47"].value == "Closure Forecast"
-        assert print_ws["A48"].value == "Forecast Momentum"
-        assert print_ws["A49"].value == "Forecast Stability"
+        assert print_ws["A48"].value == "Forecast Freshness"
+        assert print_ws["A49"].value == "Forecast Decay"
         assert print_ws["A50"].value == "Closure Forecast Summary"
         assert print_ws["A51"].value == "Momentum Summary"
         assert print_ws["A52"].value == "Exception Learning"
@@ -850,8 +859,8 @@ class TestAnalystWorkbookSheets:
         assert "Transition Likely Outcome" in dashboard_values
         assert "Pending Debt Freshness" in dashboard_values
         assert "Closure Forecast" in dashboard_values
-        assert "Forecast Momentum" in dashboard_values
-        assert "Forecast Stability" in dashboard_values
+        assert "Forecast Freshness" in dashboard_values
+        assert "Forecast Decay" in dashboard_values
         assert "Exception Learning" in dashboard_values
         assert "Recommendation Drift" in dashboard_values
 

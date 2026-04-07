@@ -238,6 +238,15 @@ def _make_report(**overrides) -> dict:
             "closure_forecast_momentum_summary": "The closure forecast for RepoC: RepoC drift needs review is trending in one direction, but it has not held long enough to lock in (0.18).",
             "closure_forecast_stability_summary": "Closure forecasting for RepoC: RepoC drift needs review is still settling and should be watched for one more stable stretch: supporting-confirmation -> neutral.",
             "closure_forecast_hysteresis_summary": "The confirmation-leaning forecast for RepoC: RepoC drift needs review is visible but not yet persistent enough to trust fully.",
+            "primary_target_closure_forecast_freshness_status": "mixed-age",
+            "primary_target_closure_forecast_freshness_reason": "Closure-forecast memory is still useful, but it is partly aging: 50% of the weighted forecast signal is recent and the rest is older carry-forward.",
+            "primary_target_closure_forecast_decay_status": "none",
+            "primary_target_closure_forecast_decay_reason": "",
+            "closure_forecast_freshness_summary": "RepoC: RepoC drift needs review still has useful closure-forecast memory, but some of that signal is aging and should be weighted more cautiously.",
+            "closure_forecast_decay_summary": "Recent closure-forecast evidence is still fresh enough that no forecast carry-forward needs to decay yet.",
+            "stale_closure_forecast_hotspots": [],
+            "fresh_closure_forecast_signal_hotspots": [],
+            "closure_forecast_decay_window_runs": 4,
             "closure_forecast_transition_window_runs": 4,
             "sustained_confirmation_hotspots": [],
             "sustained_clearance_hotspots": [],
@@ -430,6 +439,8 @@ class TestRenderHtml:
         assert "Closure Forecast Reweighting:" in html
         assert "Closure Forecast Momentum:" in html
         assert "Closure Forecast Hysteresis:" in html
+        assert "Closure Forecast Freshness:" in html
+        assert "Hysteresis Decay Controls:" in html
         assert "Recommendation Drift:" in html
         assert "Policy Debt Summary:" in html
         assert "Trust Normalization Summary:" in html
@@ -444,6 +455,8 @@ class TestRenderHtml:
         assert "Class Pending Debt Summary:" in html
         assert "Closure Forecast Momentum Summary:" in html
         assert "Closure Forecast Hysteresis Summary:" in html
+        assert "Closure Forecast Freshness Summary:" in html
+        assert "Closure Forecast Decay Summary:" in html
         assert "Why This Confidence Is Actionable:" in html
         assert "Recent Confidence Outcomes:" in html
         assert "RepoC: RepoC drift needs review" in html

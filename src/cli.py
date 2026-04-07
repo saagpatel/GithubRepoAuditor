@@ -808,6 +808,14 @@ def _print_control_center_summary(snapshot: dict) -> None:
         )
     if summary.get("closure_forecast_momentum_summary"):
         print(f"  Closure forecast momentum summary: {summary['closure_forecast_momentum_summary']}")
+    if summary.get("primary_target_closure_forecast_freshness_status"):
+        print(
+            "  Closure forecast freshness: "
+            f"{summary.get('primary_target_closure_forecast_freshness_status', 'insufficient-data')} "
+            f"({summary.get('primary_target_closure_forecast_freshness_reason', 'No closure-forecast freshness reason is recorded yet.')})"
+        )
+    if summary.get("closure_forecast_freshness_summary"):
+        print(f"  Closure forecast freshness summary: {summary['closure_forecast_freshness_summary']}")
     if summary.get("primary_target_closure_forecast_stability_status"):
         print(
             "  Closure forecast hysteresis: "
@@ -817,6 +825,14 @@ def _print_control_center_summary(snapshot: dict) -> None:
         )
     if summary.get("closure_forecast_hysteresis_summary"):
         print(f"  Closure forecast hysteresis summary: {summary['closure_forecast_hysteresis_summary']}")
+    if summary.get("primary_target_closure_forecast_decay_status") not in {None, "", "none"}:
+        print(
+            "  Hysteresis decay controls: "
+            f"{summary.get('primary_target_closure_forecast_decay_status', 'none')} "
+            f"({summary.get('primary_target_closure_forecast_decay_reason', 'No closure-forecast decay reason is recorded yet.')})"
+        )
+    if summary.get("closure_forecast_decay_summary"):
+        print(f"  Closure forecast decay summary: {summary['closure_forecast_decay_summary']}")
     if summary.get("recommendation_drift_status"):
         print(
             "  Recommendation drift: "
