@@ -219,6 +219,8 @@ def write_markdown_report(
             _w(f"- Why It Matters: {report.operator_summary.get('why_it_matters')}")
         if report.operator_summary.get("what_to_do_next"):
             _w(f"- What To Do Next: {report.operator_summary.get('what_to_do_next')}")
+        if report.operator_summary.get("follow_through_summary"):
+            _w(f"- Follow-Through: {report.operator_summary.get('follow_through_summary')}")
         if report.operator_summary.get("control_center_reference"):
             _w(f"- Control Center Artifact: `{report.operator_summary.get('control_center_reference')}`")
         counts = report.operator_summary.get("counts", {})

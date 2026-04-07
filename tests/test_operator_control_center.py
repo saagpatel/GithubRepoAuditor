@@ -127,6 +127,46 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
     assert summary["urgency"] == "blocked"
 
 
+def test_operator_snapshot_adds_follow_through_from_recent_history(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history",
+        lambda *_args, **_kwargs: [
+            {
+                "operator_summary": {"counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}},
+                "operator_queue": [
+                    {
+                        "item_id": "campaign-drift:campaign-1:github-issue",
+                        "lane": "urgent",
+                        "age_days": 8,
+                        "repo": "RepoD",
+                        "title": "RepoD drift needs review",
+                    }
+                ],
+            },
+            {
+                "operator_summary": {"counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}},
+                "operator_queue": [
+                    {
+                        "item_id": "campaign-drift:campaign-1:github-issue",
+                        "lane": "urgent",
+                        "age_days": 9,
+                        "repo": "RepoD",
+                        "title": "RepoD drift needs review",
+                    }
+                ],
+            },
+        ],
+    )
+
+    snapshot = build_operator_snapshot(_make_report(preflight_summary={}), output_dir=tmp_path)
+    summary = snapshot["operator_summary"]
+
+    assert summary["repeat_urgent_count"] >= 1
+    assert summary["stale_item_count"] >= 1
+    assert summary["oldest_open_item_days"] >= 8
+    assert "urgent item" in summary["follow_through_summary"]
+
+
 def test_normalize_review_state_backfills_missing_fields(tmp_path: Path):
     report = normalize_review_state(
         {

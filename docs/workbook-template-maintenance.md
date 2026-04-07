@@ -72,7 +72,8 @@ facts:
 5. Review `output/workbook-gate/workbook-gate-summary.md` for the human-readable pass/fail summary.
 6. Re-run workbook tests in both `template` and `standard` modes if the change touched workbook logic directly.
 7. Open the generated `standard` workbook in Excel desktop and complete the manual checklist: no repair prompt, expected visible tabs, readable normal zoom, clean chart placement, and working filters.
-8. If compatibility changes are required, preserve hidden `Data_*` table contracts and prefer visible-sheet autofilters over visible-sheet structured tables.
+8. Record the signoff outcome locally with `make workbook-signoff ARGS="--reviewer <name> --outcome ... --check ..."` so the gate artifact captures reviewer, outcome, timestamp, and notes.
+9. If compatibility changes are required, preserve hidden `Data_*` table contracts and prefer visible-sheet autofilters over visible-sheet structured tables.
 
 ## When Python-Only Changes Are Enough
 

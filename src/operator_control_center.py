@@ -7,7 +7,7 @@ from pathlib import Path
 from src.baseline_context import build_watch_guidance
 from src.governance_activation import build_governance_summary
 from src.recurring_review import build_review_bundle
-from src.warehouse import load_recent_operator_changes
+from src.warehouse import load_operator_state_history, load_recent_operator_changes
 
 LANE_ORDER = {"blocked": 0, "urgent": 1, "ready": 2, "deferred": 3}
 LANE_LABELS = {
@@ -253,6 +253,7 @@ def build_operator_snapshot(
         queue = [item for item in queue if item["lane"] == triage_view]
 
     recent_changes = load_recent_operator_changes(output_dir, report_data.get("username", ""), limit=12)
+    history = load_operator_state_history(output_dir, report_data.get("username", ""), limit=5)
     setup_health = {
         "status": preflight.get("status", "unknown"),
         "blocking_errors": preflight.get("blocking_errors", 0),
@@ -260,7 +261,8 @@ def build_operator_snapshot(
     }
     counts = {lane: sum(1 for item in queue if item["lane"] == lane) for lane in LANE_ORDER}
     watch_guidance = build_watch_guidance(report_data.get("watch_state") or {})
-    handoff = _build_operator_handoff(queue, recent_changes, setup_health, watch_guidance)
+    follow_through = _build_follow_through(queue, history)
+    handoff = _build_operator_handoff(queue, recent_changes, setup_health, watch_guidance, follow_through)
     summary = {
         "headline": _headline_for_queue(queue, setup_health),
         "selected_view": triage_view,
@@ -288,6 +290,11 @@ def build_operator_snapshot(
         "what_to_do_next": handoff["what_to_do_next"],
         "next_operator_action": handoff["next_operator_action"],
         "operator_note": handoff["operator_note"],
+        "repeat_urgent_count": follow_through["repeat_urgent_count"],
+        "stale_item_count": follow_through["stale_item_count"],
+        "oldest_open_item_days": follow_through["oldest_open_item_days"],
+        "quiet_streak_runs": follow_through["quiet_streak_runs"],
+        "follow_through_summary": follow_through["follow_through_summary"],
     }
     return {
         "operator_summary": summary,
@@ -323,6 +330,8 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
         lines.append(f"*Why It Matters:* {summary['why_it_matters']}")
     if summary.get("what_to_do_next"):
         lines.append(f"*What To Do Next:* {summary['what_to_do_next']}")
+    if summary.get("follow_through_summary"):
+        lines.append(f"*Follow-Through:* {summary['follow_through_summary']}")
     if summary.get("control_center_reference"):
         lines.append(f"*Control Center Artifact:* `{summary['control_center_reference']}`")
     lines.append(
@@ -471,15 +480,16 @@ def _build_operator_handoff(
     recent_changes: list[dict],
     setup_health: dict,
     watch_guidance: dict,
+    follow_through: dict,
 ) -> dict:
     top_item = queue[0] if queue else {}
     top_lane = top_item.get("lane", "")
     top_summary = _summarize_operator_change(top_item, recent_changes)
-    next_action = _next_operator_action(top_item, watch_guidance)
+    next_action = _next_operator_action(top_item, watch_guidance, follow_through)
     escalation_reason = _escalation_reason(queue, setup_health, watch_guidance)
     urgency = _handoff_urgency(queue, setup_health)
     why_it_matters = _why_it_matters(urgency, escalation_reason, watch_guidance, top_item)
-    operator_note = f"{top_summary} {why_it_matters} Next: {next_action}".strip()
+    operator_note = f"{top_summary} {why_it_matters} {follow_through.get('follow_through_summary', '')} Next: {next_action}".strip()
     return {
         "urgency": urgency,
         "escalation_reason": escalation_reason,
@@ -490,6 +500,101 @@ def _build_operator_handoff(
         "operator_note": operator_note,
         "top_lane": top_lane,
     }
+
+
+def _build_follow_through(queue: list[dict], history: list[dict]) -> dict:
+    current_items = [item for item in queue if item.get("lane") != "deferred"]
+    recent_runs = [_snapshot_from_queue(queue)] + [_snapshot_from_history(entry) for entry in history[:4]]
+    recent_runs = [snapshot for snapshot in recent_runs if snapshot["items"] or snapshot["has_attention"] is not None]
+
+    repeat_urgent_count = 0
+    stale_item_count = 0
+    oldest_open_item_days = 0
+    for item in current_items:
+        key = _queue_identity(item)
+        appearances = 0
+        earliest_days = item.get("age_days", 0)
+        for snapshot in recent_runs[:3]:
+            match = snapshot["items"].get(key)
+            if match and match.get("lane") in {"blocked", "urgent"}:
+                appearances += 1
+                earliest_days = max(earliest_days, match.get("age_days", 0))
+        if item.get("lane") in {"blocked", "urgent"} and appearances >= 2:
+            repeat_urgent_count += 1
+
+        non_deferred_appearances = 0
+        for snapshot in recent_runs:
+            match = snapshot["items"].get(key)
+            if match and match.get("lane") != "deferred":
+                non_deferred_appearances += 1
+                earliest_days = max(earliest_days, match.get("age_days", 0))
+        if non_deferred_appearances >= 3 or earliest_days > 7:
+            stale_item_count += 1
+        oldest_open_item_days = max(oldest_open_item_days, earliest_days)
+
+    quiet_streak_runs = 0
+    for snapshot in recent_runs:
+        if snapshot["has_attention"]:
+            break
+        quiet_streak_runs += 1
+
+    return {
+        "repeat_urgent_count": repeat_urgent_count,
+        "stale_item_count": stale_item_count,
+        "oldest_open_item_days": oldest_open_item_days,
+        "quiet_streak_runs": quiet_streak_runs,
+        "follow_through_summary": _follow_through_summary(
+            repeat_urgent_count,
+            stale_item_count,
+            oldest_open_item_days,
+            quiet_streak_runs,
+        ),
+    }
+
+
+def _snapshot_from_queue(queue: list[dict]) -> dict:
+    items = {_queue_identity(item): item for item in queue}
+    return {
+        "items": items,
+        "has_attention": any(item.get("lane") in {"blocked", "urgent"} for item in queue),
+    }
+
+
+def _snapshot_from_history(entry: dict) -> dict:
+    queue = entry.get("operator_queue", []) or []
+    items = {_queue_identity(item): item for item in queue}
+    summary = entry.get("operator_summary", {}) or {}
+    has_attention = summary.get("counts", {}).get("blocked", 0) or summary.get("counts", {}).get("urgent", 0)
+    return {
+        "items": items,
+        "has_attention": bool(has_attention),
+    }
+
+
+def _queue_identity(item: dict) -> str:
+    if item.get("item_id"):
+        return item["item_id"]
+    repo = item.get("repo", "")
+    title = item.get("title", "")
+    return f"{repo}:{title}"
+
+
+def _follow_through_summary(
+    repeat_urgent_count: int,
+    stale_item_count: int,
+    oldest_open_item_days: int,
+    quiet_streak_runs: int,
+) -> str:
+    if repeat_urgent_count or stale_item_count:
+        return (
+            f"{repeat_urgent_count} urgent item(s) repeated in the recent window, "
+            f"{stale_item_count} open item(s) now look stale, and the oldest open item has been visible for about {oldest_open_item_days} day(s)."
+        )
+    if quiet_streak_runs >= 2:
+        return f"The operator queue has stayed quiet for {quiet_streak_runs} consecutive run(s)."
+    if quiet_streak_runs == 1:
+        return "The latest run is quiet, but the recent window has not stayed quiet long enough to count as a streak yet."
+    return "This is the first noisy run in the recent window, so follow-through pressure is still fresh."
 
 
 def _handoff_urgency(queue: list[dict], setup_health: dict) -> str:
@@ -521,7 +626,13 @@ def _summarize_operator_change(top_item: dict, recent_changes: list[dict]) -> st
     return QUIET_HANDOFF
 
 
-def _next_operator_action(top_item: dict, watch_guidance: dict) -> str:
+def _next_operator_action(top_item: dict, watch_guidance: dict, follow_through: dict) -> str:
+    if top_item.get("kind") == "setup" and top_item.get("recommended_action"):
+        return top_item["recommended_action"]
+    if follow_through.get("stale_item_count", 0):
+        return "Start with the oldest repeated blocked or urgent item before taking on newly ready work."
+    if follow_through.get("quiet_streak_runs", 0) >= 2:
+        return "Keep the operator loop lightweight and only escalate if the next scheduled run breaks the quiet streak."
     if top_item.get("recommended_action"):
         return top_item["recommended_action"]
     if watch_guidance.get("full_refresh_due"):

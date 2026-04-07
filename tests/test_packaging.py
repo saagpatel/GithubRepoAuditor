@@ -37,12 +37,13 @@ def test_requirements_cover_runtime_and_config_dependencies():
 
 def test_makefile_includes_operator_entrypoints():
     makefile = (ROOT / "Makefile").read_text()
-    for target in ("install:", "install-dev:", "doctor:", "audit:", "control-center:", "workbook-gate:", "test:"):
+    for target in ("install:", "install-dev:", "doctor:", "audit:", "control-center:", "workbook-gate:", "workbook-signoff:", "test:"):
         assert target in makefile
     assert "audit $(USERNAME) --doctor $(ARGS)" in makefile
     assert "audit $(USERNAME) --excel-mode standard $(ARGS)" in makefile
     assert "audit $(USERNAME) --control-center $(ARGS)" in makefile
     assert "$(PYTHON) -m src.workbook_gate $(ARGS)" in makefile
+    assert "$(PYTHON) -m src.workbook_gate --record-signoff $(ARGS)" in makefile
 
 
 def test_example_audit_config_is_parseable():
@@ -67,8 +68,9 @@ def test_workflows_install_package_and_use_audit_console_script():
     assert 'pip install -e ".[config]"' in contents
     assert "audit \"$USERNAME\" --incremental --html --badges --diff --excel-mode standard" in contents
     assert "audit \"$USERNAME\" --control-center" in contents
-    assert "python3 -m src.scheduled_handoff --output-dir output" in contents
-    assert "gh issue edit" in contents
+    assert "--issue-state" in contents
+    assert "gh issue reopen" in contents
+    assert "gh issue close" in contents
     assert 'USERNAME="${{ github.event.inputs.username || \'saagpatel\' }}"' in contents
     assert "git add output/" not in contents
     assert "Audit Regression:" not in contents

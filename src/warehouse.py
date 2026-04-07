@@ -1552,3 +1552,33 @@ def load_recent_operator_changes(output_dir: Path, username: str, limit: int = 2
         payload["generated_at"] = row["generated_at"]
         changes.append(payload)
     return changes
+
+
+def load_operator_state_history(output_dir: Path, username: str, limit: int = 5) -> list[dict]:
+    conn = _connect(output_dir)
+    if conn is None:
+        return []
+    try:
+        rows = conn.execute(
+            """
+            SELECT run_id, generated_at, operator_summary_json, operator_queue_json
+            FROM audit_runs
+            WHERE username = ?
+            ORDER BY generated_at DESC
+            LIMIT ?
+            """,
+            (username, limit),
+        ).fetchall()
+    finally:
+        conn.close()
+    history: list[dict] = []
+    for row in rows:
+        history.append(
+            {
+                "run_id": row["run_id"],
+                "generated_at": row["generated_at"],
+                "operator_summary": json.loads(row["operator_summary_json"] or "{}"),
+                "operator_queue": json.loads(row["operator_queue_json"] or "[]"),
+            }
+        )
+    return history

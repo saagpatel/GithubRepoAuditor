@@ -133,6 +133,7 @@ The intended operator loop is:
 5. Handle `Blocked`, then `Needs Attention Now`, then `Ready for Manual Action`
 6. Leave `Safe to Defer` items alone unless priorities changed
 7. Run `make workbook-gate` only when workbook-facing changes are part of the release
+8. Run `make workbook-signoff ...` after the manual desktop Excel-open check
 
 `--control-center` always writes:
 
@@ -152,8 +153,14 @@ make workbook-gate
 
 That command generates canonical sample `standard` and `template` workbooks, validates the visible-sheet and hidden `Data_*` invariants, writes an authoritative `workbook-gate-result.json`, produces a readable gate summary, and creates a manual desktop Excel checklist with pending signoff placeholders. The final release step is still opening the generated `standard` workbook in desktop Excel and confirming there is no repair prompt.
 
+After the manual Excel check, record the result back into the local gate artifacts:
+
+```bash
+make workbook-signoff ARGS="--reviewer <name> --outcome passed --check excel-open-no-repair=passed --check visible-tabs-present=passed --check normal-zoom-readable=passed --check chart-placement-clean=passed --check filters-work=passed"
+```
+
 ## Scheduled Issue Automation
 
 Scheduled automation stays artifact-first. A GitHub issue is only opened or updated when the scheduled handoff surfaces meaningful blocked or urgent findings, or when regressions are detected in the diff.
 
-Quiet runs stay in artifacts only. The workflow avoids issue spam by updating one canonical `scheduled-audit-handoff` issue title per username instead of creating a new issue every time.
+Quiet runs no longer leave the issue hanging open. The workflow now comments with the latest quiet-state handoff, closes the canonical `scheduled-audit-handoff` issue, and reopens that same issue later if a future run becomes noisy again.

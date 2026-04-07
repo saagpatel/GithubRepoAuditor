@@ -41,20 +41,49 @@ def _has_regressions(diff_data: dict) -> bool:
     return bool(regressions or downgrades)
 
 
-def _issue_candidate(summary: dict, diff_data: dict, username: str, body_path: Path) -> dict:
+def _issue_candidate(
+    summary: dict,
+    diff_data: dict,
+    username: str,
+    body_path: Path,
+    *,
+    issue_state: str = "absent",
+    issue_number: str = "",
+    issue_url: str = "",
+) -> dict:
     urgency = summary.get("urgency", "quiet")
     regressions_detected = _has_regressions(diff_data)
-    should_open = urgency in {"blocked", "urgent"} or regressions_detected
+    noisy = urgency in {"blocked", "urgent"} or regressions_detected
     reason = summary.get("escalation_reason", "quiet")
     if regressions_detected:
         reason = "regressions-detected"
+    action = "quiet"
+    reopen_existing = False
+    close_reason = ""
+    if noisy:
+        if issue_state == "open":
+            action = "update"
+        elif issue_state == "closed":
+            action = "update"
+            reopen_existing = True
+        else:
+            action = "open"
+    elif issue_state == "open":
+        action = "close"
+        close_reason = "quiet-recovery"
     return {
-        "should_open": should_open,
+        "should_open": noisy,
         "reason": reason,
         "severity": urgency,
+        "action": action,
+        "reopen_existing": reopen_existing,
+        "close_reason": close_reason,
         "label": ISSUE_LABEL,
         "title": f"Scheduled Audit Handoff: {username}",
         "marker": f"scheduled-audit-handoff:{username}",
+        "issue_state": issue_state,
+        "issue_number": issue_number,
+        "issue_url": issue_url,
         "body_path": str(body_path),
     }
 
@@ -78,7 +107,8 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Watch strategy: `{summary.get('watch_strategy', 'manual')}`",
         f"- Watch decision: {summary.get('watch_decision_summary', 'No watch guidance is recorded.')}",
         f"- Queue counts: {_queue_counts(summary)}",
-        f"- Issue automation: `{'open-or-update' if issue_candidate.get('should_open') else 'quiet'}` ({issue_candidate.get('reason', 'quiet')})",
+        f"- Issue automation: `{issue_candidate.get('action', 'quiet')}` ({issue_candidate.get('reason', 'quiet')})",
+        *( [f"- Existing issue: #{issue_candidate.get('issue_number')}"] if issue_candidate.get("issue_number") else [] ),
         "",
     ]
     if queue:
@@ -100,7 +130,13 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     return "\n".join(lines).strip() + "\n"
 
 
-def build_scheduled_handoff(output_dir: Path) -> dict:
+def build_scheduled_handoff(
+    output_dir: Path,
+    *,
+    issue_state: str = "absent",
+    issue_number: str = "",
+    issue_url: str = "",
+) -> dict:
     control_center_path = _latest_artifact(output_dir, "operator-control-center-*.json")
     control_center = _load_json(control_center_path)
     if not control_center:
@@ -113,7 +149,15 @@ def build_scheduled_handoff(output_dir: Path) -> dict:
     stamp = (generated_at or "unknown").split("T", 1)[0]
     markdown_path = output_dir / f"scheduled-handoff-{username}-{stamp}.md"
     json_path = output_dir / f"scheduled-handoff-{username}-{stamp}.json"
-    issue_candidate = _issue_candidate(summary, diff_data, username, markdown_path)
+    issue_candidate = _issue_candidate(
+        summary,
+        diff_data,
+        username,
+        markdown_path,
+        issue_state=issue_state,
+        issue_number=issue_number,
+        issue_url=issue_url,
+    )
     payload = {
         "status": "ok",
         "username": username,
@@ -142,11 +186,32 @@ def main() -> None:
         default="output",
         help="Directory that contains the latest audit/control-center artifacts.",
     )
+    parser.add_argument(
+        "--issue-state",
+        choices=["absent", "open", "closed"],
+        default="absent",
+        help="Current state of the canonical scheduled handoff issue, if one already exists.",
+    )
+    parser.add_argument(
+        "--issue-number",
+        default="",
+        help="Existing canonical issue number when one is already present.",
+    )
+    parser.add_argument(
+        "--issue-url",
+        default="",
+        help="Existing canonical issue URL when one is already present.",
+    )
     args = parser.parse_args()
-    payload = build_scheduled_handoff(Path(args.output_dir))
+    payload = build_scheduled_handoff(
+        Path(args.output_dir),
+        issue_state=args.issue_state,
+        issue_number=args.issue_number,
+        issue_url=args.issue_url,
+    )
     issue = payload.get("issue_candidate", {})
     print(f"Scheduled handoff: {payload.get('markdown_path', '')}")
-    print(f"Issue automation: {'open-or-update' if issue.get('should_open') else 'quiet'} ({issue.get('reason', 'quiet')})")
+    print(f"Issue automation: {issue.get('action', 'quiet')} ({issue.get('reason', 'quiet')})")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-.PHONY: install install-dev doctor audit control-center workbook-gate test lint format type-check run clean
+.PHONY: install install-dev doctor audit control-center workbook-gate workbook-signoff test lint format type-check run clean
 
 PYTHON := python3
 USERNAME ?= saagpatel
@@ -21,6 +21,9 @@ control-center:
 
 workbook-gate:
 	$(PYTHON) -m src.workbook_gate $(ARGS)
+
+workbook-signoff:
+	$(PYTHON) -m src.workbook_gate --record-signoff $(ARGS)
 
 test:
 	$(PYTHON) -m pytest tests/ -v

@@ -57,8 +57,47 @@ jobs:
           USERNAME="${{ github.event.inputs.username || 'saagpatel' }}"
           audit "$USERNAME" --control-center
 
+      - name: Inspect canonical scheduled handoff issue
+        id: issue-state
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          USERNAME="${{ github.event.inputs.username || 'saagpatel' }}"
+          TITLE="Scheduled Audit Handoff: $USERNAME"
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+
+          title = os.environ["TITLE"]
+          output_path = os.environ["GITHUB_OUTPUT"]
+          items = json.loads(
+              subprocess.check_output(
+                  ["gh", "issue", "list", "--state", "all", "--limit", "100", "--json", "number,title,state,url"],
+                  text=True,
+              )
+          )
+          match = next((item for item in items if item.get("title") == title), None)
+          state = "absent"
+          number = ""
+          url = ""
+          if match:
+              state = (match.get("state") or "").lower()
+              number = str(match.get("number", ""))
+              url = match.get("url", "")
+          with open(output_path, "a", encoding="utf-8") as fh:
+              fh.write(f"issue_state={state}\n")
+              fh.write(f"issue_number={number}\n")
+              fh.write(f"issue_url={url}\n")
+          PY
+
       - name: Build scheduled handoff artifact
-        run: python3 -m src.scheduled_handoff --output-dir output
+        run: |
+          python3 -m src.scheduled_handoff \
+            --output-dir output \
+            --issue-state "${{ steps.issue-state.outputs.issue_state }}" \
+            --issue-number "${{ steps.issue-state.outputs.issue_number }}" \
+            --issue-url "${{ steps.issue-state.outputs.issue_url }}"
 
       - name: Read scheduled handoff decision
         id: scheduled-handoff
@@ -72,45 +111,38 @@ jobs:
           payload = json.loads(path.read_text())
           issue = payload.get("issue_candidate", {})
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
-              fh.write(f"should_open={'true' if issue.get('should_open') else 'false'}\n")
+              fh.write(f"action={issue.get('action', 'quiet')}\n")
               fh.write(f"issue_title={issue.get('title', '')}\n")
               fh.write(f"issue_label={issue.get('label', '')}\n")
               fh.write(f"body_path={issue.get('body_path', '')}\n")
+              fh.write(f"issue_number={issue.get('issue_number', '')}\n")
+              fh.write(f"reopen_existing={'true' if issue.get('reopen_existing') else 'false'}\n")
           PY
 
-      - name: Open or update scheduled handoff issue
-        if: steps.scheduled-handoff.outputs.should_open == 'true'
+      - name: Apply scheduled handoff issue lifecycle
+        if: steps.scheduled-handoff.outputs.action != 'quiet'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTION: ${{ steps.scheduled-handoff.outputs.action }}
           TITLE: ${{ steps.scheduled-handoff.outputs.issue_title }}
           LABEL: ${{ steps.scheduled-handoff.outputs.issue_label }}
           BODY_PATH: ${{ steps.scheduled-handoff.outputs.body_path }}
+          ISSUE_NUMBER: ${{ steps.scheduled-handoff.outputs.issue_number }}
+          REOPEN_EXISTING: ${{ steps.scheduled-handoff.outputs.reopen_existing }}
         run: |
           if ! gh label list --limit 200 --json name --jq '.[].name' | grep -qx "$LABEL"; then
             gh label create "$LABEL" --color "1D76DB" --description "Meaningful scheduled audit findings"
           fi
-          ISSUE_NUMBER=$(python3 - <<'PY'
-          import json
-          import os
-          import subprocess
-
-          data = json.loads(
-              subprocess.check_output(
-                  ["gh", "issue", "list", "--state", "open", "--limit", "100", "--json", "number,title"],
-                  text=True,
-              )
-          )
-          title = os.environ["TITLE"]
-          for item in data:
-              if item.get("title") == title:
-                  print(item.get("number", ""))
-                  break
-          PY
-          )
-          if [ -n "$ISSUE_NUMBER" ]; then
-            gh issue edit "$ISSUE_NUMBER" --body-file "$BODY_PATH" --add-label "$LABEL"
-          else
+          if [ "$ACTION" = "open" ]; then
             gh issue create --title "$TITLE" --body-file "$BODY_PATH" --label "$LABEL"
+          elif [ "$ACTION" = "update" ]; then
+            if [ "$REOPEN_EXISTING" = "true" ] && [ -n "$ISSUE_NUMBER" ]; then
+              gh issue reopen "$ISSUE_NUMBER"
+            fi
+            gh issue edit "$ISSUE_NUMBER" --body-file "$BODY_PATH" --add-label "$LABEL"
+          elif [ "$ACTION" = "close" ]; then
+            gh issue comment "$ISSUE_NUMBER" --body-file "$BODY_PATH"
+            gh issue close "$ISSUE_NUMBER"
           fi
 
       - name: Save audit history

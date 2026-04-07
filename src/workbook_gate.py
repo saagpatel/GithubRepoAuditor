@@ -13,6 +13,10 @@ from src.excel_export import CORE_VISIBLE_SHEETS, export_excel
 from src.excel_template import DEFAULT_TEMPLATE_PATH
 
 DEFAULT_GATE_DIR = Path("output") / "workbook-gate"
+RESULT_FILENAME = "workbook-gate-result.json"
+MANUAL_SIGNOFF_STATES = {"pending", "passed", "failed"}
+MANUAL_SIGNOFF_OUTCOMES = {"passed", "failed"}
+MANUAL_CHECK_STATES = {"passed", "failed", "n/a"}
 
 
 def _sample_report_data() -> dict:
@@ -466,8 +470,36 @@ def _manual_signoff_template(standard_path: Path) -> dict:
     }
 
 
+def _manual_check_lookup(manual_signoff: dict) -> dict[str, dict]:
+    return {item.get("id", ""): item for item in manual_signoff.get("checks", []) if item.get("id")}
+
+
+def _release_status(result: dict) -> str:
+    if result.get("automated_checks", {}).get("status") != "passed":
+        return "blocked"
+    manual_status = (result.get("manual_signoff") or {}).get("status", "pending")
+    if manual_status == "passed":
+        return "ready"
+    if manual_status == "failed":
+        return "blocked"
+    return "pending_manual_signoff"
+
+
+def _format_manual_check_marker(status: str) -> str:
+    if status == "passed":
+        return "[x]"
+    if status == "failed":
+        return "[!]"
+    if status == "n/a":
+        return "[-]"
+    return "[ ]"
+
+
 def _write_manual_checklist(output_dir: Path, manual_signoff: dict) -> Path:
     checklist_path = output_dir / "workbook-gate-checklist.md"
+    reviewer = manual_signoff.get("reviewer", "")
+    reviewed_at = manual_signoff.get("reviewed_at", "")
+    notes = manual_signoff.get("notes", "")
     checklist_path.write_text(
         "\n".join(
             [
@@ -477,10 +509,16 @@ def _write_manual_checklist(output_dir: Path, manual_signoff: dict) -> Path:
                 "",
                 f"- Workbook: `{manual_signoff['workbook']}`",
                 f"- Status: `{manual_signoff['status']}`",
+                *( [f"- Reviewer: `{reviewer}`"] if reviewer else [] ),
+                *( [f"- Reviewed At: `{reviewed_at}`"] if reviewed_at else [] ),
+                *( [f"- Notes: {notes}"] if notes else [] ),
                 "",
                 "## Required Checks",
                 "",
-                *[f"- [ ] {item['label']}" for item in manual_signoff.get("checks", [])],
+                *[
+                    f"- {_format_manual_check_marker(item.get('status', 'pending'))} {item['label']}"
+                    for item in manual_signoff.get("checks", [])
+                ],
                 "",
             ]
         )
@@ -521,11 +559,28 @@ def _write_gate_summary(output_dir: Path, result: dict) -> Path:
             "",
             f"- Status: `{manual.get('status', 'pending')}`",
             f"- Authority: `{manual.get('authority', 'desktop-excel')}`",
+            *( [f"- Reviewer: `{manual.get('reviewer', '')}`"] if manual.get("reviewer") else [] ),
+            *( [f"- Reviewed At: `{manual.get('reviewed_at', '')}`"] if manual.get("reviewed_at") else [] ),
+            *( [f"- Notes: {manual.get('notes', '')}"] if manual.get("notes") else [] ),
             "",
         ]
     )
     for check in manual.get("checks", []):
-        lines.append(f"- [ ] {check.get('label', '')}")
+        lines.append(f"- {_format_manual_check_marker(check.get('status', 'pending'))} {check.get('label', '')}")
+    history = result.get("manual_signoff_history", []) or []
+    if history:
+        lines.extend(
+            [
+                "",
+                "## Signoff History",
+                "",
+            ]
+        )
+        for entry in history[-5:]:
+            lines.append(
+                f"- `{entry.get('reviewed_at', '')}` {entry.get('reviewer', 'unknown')} -> "
+                f"`{entry.get('outcome', 'pending')}`"
+            )
     lines.append("")
     summary_path.write_text("\n".join(lines))
     return summary_path
@@ -584,12 +639,113 @@ def run_workbook_gate(output_dir: Path = DEFAULT_GATE_DIR) -> dict:
             "sections": automated_sections,
         },
         "manual_signoff": manual_signoff,
+        "manual_signoff_history": [],
         "errors": validation_errors,
     }
+    result["release_status"] = _release_status(result)
     summary_path = _write_gate_summary(output_dir, result)
     result["gate_summary"] = str(summary_path)
     result["artifacts"]["gate_summary"] = str(summary_path)
-    (output_dir / "workbook-gate-result.json").write_text(json.dumps(result, indent=2))
+    (output_dir / RESULT_FILENAME).write_text(json.dumps(result, indent=2))
+    return result
+
+
+def _load_gate_result(output_dir: Path) -> dict:
+    result_path = output_dir / RESULT_FILENAME
+    if not result_path.exists():
+        raise FileNotFoundError("No workbook gate result exists yet. Run workbook-gate first.")
+    return json.loads(result_path.read_text())
+
+
+def _validate_signoff_args(result: dict, *, reviewer: str, outcome: str, checks: list[str]) -> dict[str, str]:
+    if result.get("automated_checks", {}).get("status") != "passed":
+        raise ValueError("Workbook signoff cannot be recorded while automated checks are failing.")
+    if not reviewer.strip():
+        raise ValueError("--reviewer is required when recording signoff.")
+    if outcome not in MANUAL_SIGNOFF_OUTCOMES:
+        raise ValueError(f"--outcome must be one of {sorted(MANUAL_SIGNOFF_OUTCOMES)}.")
+    if not checks:
+        raise ValueError("At least one --check entry is required when recording signoff.")
+
+    parsed: dict[str, str] = {}
+    for raw in checks:
+        if "=" not in raw:
+            raise ValueError(f"Invalid --check value `{raw}`. Use <id>=passed|failed|n/a.")
+        check_id, status = raw.split("=", 1)
+        check_id = check_id.strip()
+        status = status.strip()
+        if not check_id:
+            raise ValueError(f"Invalid --check value `{raw}`. Check id cannot be empty.")
+        if status not in MANUAL_CHECK_STATES:
+            raise ValueError(f"Invalid check status `{status}` for `{check_id}`.")
+        if check_id in parsed:
+            raise ValueError(f"Duplicate check status provided for `{check_id}`.")
+        parsed[check_id] = status
+
+    manual_lookup = _manual_check_lookup(result.get("manual_signoff") or {})
+    expected_ids = set(manual_lookup)
+    provided_ids = set(parsed)
+    missing = sorted(expected_ids - provided_ids)
+    extra = sorted(provided_ids - expected_ids)
+    if missing:
+        raise ValueError(f"Missing manual signoff checks: {', '.join(missing)}.")
+    if extra:
+        raise ValueError(f"Unknown manual signoff checks: {', '.join(extra)}.")
+
+    statuses = list(parsed.values())
+    if outcome == "passed" and any(status != "passed" for status in statuses):
+        raise ValueError("A passing signoff requires every manual check to be marked passed.")
+    if outcome == "failed" and "failed" not in statuses:
+        raise ValueError("A failing signoff requires at least one manual check to be marked failed.")
+    return parsed
+
+
+def record_manual_signoff(
+    output_dir: Path = DEFAULT_GATE_DIR,
+    *,
+    reviewer: str,
+    outcome: str,
+    checks: list[str],
+    notes: str = "",
+) -> dict:
+    result = _load_gate_result(output_dir)
+    parsed_checks = _validate_signoff_args(result, reviewer=reviewer, outcome=outcome, checks=checks)
+    reviewed_at = datetime.now(timezone.utc).isoformat()
+
+    manual_signoff = dict(result.get("manual_signoff") or {})
+    updated_checks: list[dict] = []
+    for item in manual_signoff.get("checks", []) or []:
+        updated_item = dict(item)
+        updated_item["status"] = parsed_checks[item["id"]]
+        updated_checks.append(updated_item)
+    manual_signoff.update(
+        {
+            "status": outcome,
+            "reviewer": reviewer.strip(),
+            "reviewed_at": reviewed_at,
+            "outcome": outcome,
+            "notes": notes.strip(),
+            "checks": updated_checks,
+        }
+    )
+    history_entry = {
+        "reviewer": reviewer.strip(),
+        "reviewed_at": reviewed_at,
+        "outcome": outcome,
+        "notes": notes.strip(),
+        "checks": {item["id"]: item["status"] for item in updated_checks},
+    }
+    result["manual_signoff"] = manual_signoff
+    result["manual_signoff_history"] = [*(result.get("manual_signoff_history") or []), history_entry]
+    result["release_status"] = _release_status(result)
+
+    checklist_path = _write_manual_checklist(output_dir, manual_signoff)
+    result.setdefault("artifacts", {})["manual_checklist"] = str(checklist_path)
+    result["manual_checklist"] = str(checklist_path)
+    summary_path = _write_gate_summary(output_dir, result)
+    result["artifacts"]["gate_summary"] = str(summary_path)
+    result["gate_summary"] = str(summary_path)
+    (output_dir / RESULT_FILENAME).write_text(json.dumps(result, indent=2))
     return result
 
 
@@ -597,6 +753,7 @@ def format_gate_result(result: dict) -> str:
     artifacts = result.get("artifacts", {})
     lines = [
         f"Workbook gate status: {result.get('status', 'error')}",
+        f"Release status: {result.get('release_status', 'pending_manual_signoff')}",
         f"Sample report: {artifacts.get('report_path', '')}",
         f"Standard workbook: {artifacts.get('standard_workbook', '')}",
         f"Template workbook: {artifacts.get('template_workbook', '')}",
@@ -624,8 +781,44 @@ def main() -> None:
         default=str(DEFAULT_GATE_DIR),
         help="Directory for workbook gate artifacts (default: output/workbook-gate)",
     )
+    parser.add_argument(
+        "--record-signoff",
+        action="store_true",
+        help="Record the outcome of the manual desktop Excel signoff against the existing workbook gate artifact.",
+    )
+    parser.add_argument(
+        "--reviewer",
+        default="",
+        help="Reviewer name for a recorded manual signoff.",
+    )
+    parser.add_argument(
+        "--outcome",
+        choices=sorted(MANUAL_SIGNOFF_OUTCOMES),
+        help="Outcome for a recorded manual signoff.",
+    )
+    parser.add_argument(
+        "--check",
+        action="append",
+        default=[],
+        metavar="ID=STATUS",
+        help="Manual check result in the form <id>=passed|failed|n/a. Repeat for every manual signoff check.",
+    )
+    parser.add_argument(
+        "--notes",
+        default="",
+        help="Optional notes to attach to a recorded manual signoff.",
+    )
     args = parser.parse_args()
-    result = run_workbook_gate(Path(args.output_dir))
+    if args.record_signoff:
+        result = record_manual_signoff(
+            Path(args.output_dir),
+            reviewer=args.reviewer,
+            outcome=args.outcome or "",
+            checks=args.check,
+            notes=args.notes,
+        )
+    else:
+        result = run_workbook_gate(Path(args.output_dir))
     print(format_gate_result(result))
     if result["status"] != "ok":
         raise SystemExit(1)
