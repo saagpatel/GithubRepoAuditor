@@ -124,6 +124,8 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Accountability: {summary.get('accountability_summary', 'No accountability summary is recorded yet.')}",
         f"- Decision memory: `{summary.get('decision_memory_status', 'new')}`",
         f"- Resolution evidence: {summary.get('resolution_evidence_summary', 'No resolution evidence is recorded yet.')}",
+        f"- Recommendation confidence: `{summary.get('primary_target_confidence_label', 'low')}` ({summary.get('primary_target_confidence_score', 0.0):.2f})",
+        f"- Next action confidence: `{summary.get('next_action_confidence_label', 'low')}` ({summary.get('next_action_confidence_score', 0.0):.2f})",
         f"- Next recommended run: `{summary.get('next_recommended_run_mode', 'n/a')}`",
         f"- Watch strategy: `{summary.get('watch_strategy', 'manual')}`",
         f"- Watch decision: {summary.get('watch_decision_summary', 'No watch guidance is recorded.')}",
@@ -132,6 +134,22 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         *( [f"- Existing issue: #{issue_candidate.get('issue_number')}"] if issue_candidate.get("issue_number") else [] ),
         "",
     ]
+    lines.append("## Recommendation Confidence")
+    lines.append("")
+    lines.append(
+        f"- Primary target confidence: {summary.get('primary_target_confidence_label', 'low')} ({summary.get('primary_target_confidence_score', 0.0):.2f})"
+    )
+    lines.append(
+        f"- Next action confidence: {summary.get('next_action_confidence_label', 'low')} ({summary.get('next_action_confidence_score', 0.0):.2f})"
+    )
+    if summary.get("primary_target_confidence_reasons"):
+        lines.append(
+            f"- Confidence reasons: {', '.join(summary.get('primary_target_confidence_reasons') or [])}"
+        )
+    lines.append(
+        f"- {summary.get('recommendation_quality_summary', 'No recommendation-quality summary is recorded yet.')}"
+    )
+    lines.append("")
     lines.append("## What Got Better")
     lines.append("")
     if resolved_count:

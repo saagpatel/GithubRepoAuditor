@@ -134,6 +134,10 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
     assert summary["decision_memory_status"] == "new"
     assert summary["primary_target_last_outcome"] == "no-change"
     assert "no earlier intervention" in summary["primary_target_resolution_evidence"].lower()
+    assert summary["primary_target_confidence_label"] == "high"
+    assert summary["primary_target_confidence_score"] >= 0.75
+    assert summary["next_action_confidence_label"] == "high"
+    assert summary["recommendation_quality_summary"].startswith("Strong recommendation because")
 
 
 def test_operator_snapshot_adds_follow_through_from_recent_history(tmp_path: Path, monkeypatch):
@@ -262,6 +266,48 @@ def test_operator_snapshot_tracks_reopened_attention_items(tmp_path: Path, monke
     assert summary["trend_status"] == "worsening"
     assert summary["reopened_attention_count"] >= 1
     assert summary["primary_target"]["title"] == "RepoD drift needs review"
+
+
+def test_operator_snapshot_prefers_reopened_urgent_over_fresh_urgent(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history",
+        lambda *_args, **_kwargs: [
+            {
+                "operator_summary": {"counts": {"blocked": 0, "urgent": 0, "ready": 0, "deferred": 0}},
+                "operator_queue": [],
+            },
+            {
+                "operator_summary": {"counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}},
+                "operator_queue": [
+                    {
+                        "item_id": "campaign-drift:campaign-1:github-issue",
+                        "lane": "urgent",
+                        "age_days": 4,
+                        "repo": "RepoD",
+                        "title": "RepoD drift needs review",
+                    }
+                ],
+            },
+        ],
+    )
+
+    snapshot = build_operator_snapshot(
+        _make_report(
+            preflight_summary={},
+            governance_drift=[],
+            governance_preview={},
+            rollback_preview={},
+            review_targets=[],
+        ),
+        output_dir=tmp_path,
+    )
+    summary = snapshot["operator_summary"]
+    resolution_targets = summary["resolution_targets"]
+
+    assert resolution_targets[0]["title"] == "RepoD drift needs review"
+    assert resolution_targets[0]["confidence_score"] >= resolution_targets[1]["confidence_score"]
+    assert summary["primary_target"]["title"] == "RepoD drift needs review"
+    assert summary["primary_target"]["item_id"] == resolution_targets[0]["item_id"]
 
 
 def test_operator_snapshot_marks_chronic_targets_and_longest_persisting_item(tmp_path: Path, monkeypatch):
@@ -479,6 +525,38 @@ def test_operator_snapshot_tracks_confirmed_resolution_and_reopen_evidence(tmp_p
     assert reopened_summary["decision_memory_status"] == "reopened"
     assert reopened_summary["primary_target_last_outcome"] == "reopened"
     assert reopened_summary["reopened_after_resolution_count"] >= 1
+
+
+def test_operator_snapshot_marks_generic_low_priority_ready_work_as_low_confidence(tmp_path: Path):
+    snapshot = build_operator_snapshot(
+        _make_report(
+            preflight_summary={},
+            material_changes=[],
+            managed_state_drift=[],
+            governance_drift=[],
+            governance_preview={},
+            rollback_preview={},
+            campaign_summary={},
+            writeback_preview={},
+            review_targets=[
+                {
+                    "repo": "RepoZ",
+                    "reason": "Needs a manual look",
+                    "severity": 0.1,
+                    "recommended_next_step": "Review the latest state.",
+                }
+            ],
+        ),
+        output_dir=tmp_path,
+    )
+    summary = snapshot["operator_summary"]
+    target = summary["resolution_targets"][0]
+
+    assert target["lane"] == "ready"
+    assert target["confidence_label"] == "low"
+    assert target["confidence_score"] < 0.45
+    assert summary["next_action_confidence_label"] == "low"
+    assert summary["recommendation_quality_summary"].startswith("Tentative recommendation;")
 
 
 def test_normalize_review_state_backfills_missing_fields(tmp_path: Path):

@@ -188,6 +188,16 @@ class TestMarkdownReport:
                 "outcome": "no-change",
             },
             "primary_target_resolution_evidence": "The last intervention reran the export path, but the blocker is still open.",
+            "primary_target_confidence_score": 0.9,
+            "primary_target_confidence_label": "high",
+            "primary_target_confidence_reasons": [
+                "Blocked setup issue is directly stopping a trustworthy next step.",
+                "This item is now chronic, so follow-through pressure is high.",
+            ],
+            "next_action_confidence_score": 0.95,
+            "next_action_confidence_label": "high",
+            "next_action_confidence_reasons": ["The next step is tied directly to the current top target."],
+            "recommendation_quality_summary": "Strong recommendation because the next step is tied directly to the current top target.",
             "primary_target": {"title": "Missing template asset"},
         }
         report.operator_queue = [
@@ -216,6 +226,9 @@ class TestMarkdownReport:
         assert "Closure Guidance" in content
         assert "What We Tried" in content
         assert "Resolution Evidence" in content
+        assert "Primary Target Confidence" in content
+        assert "Next Action Confidence" in content
+        assert "Recommendation Quality" in content
 
     def test_includes_governance_operator_summary_when_present(self, tmp_path):
         report = _make_report()

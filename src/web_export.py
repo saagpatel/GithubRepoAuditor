@@ -261,6 +261,10 @@ def _operator_section(data: dict) -> str:
         <div class="meta-line"><strong>Closure Guidance:</strong> {escape(summary.get('closure_guidance', 'No closure guidance is recorded yet.'))}</div>
         <div class="meta-line"><strong>What We Tried:</strong> {escape(intervention_label)}</div>
         <div class="meta-line"><strong>Resolution Evidence:</strong> {escape(summary.get('primary_target_resolution_evidence', 'No resolution evidence is recorded yet.'))}</div>
+        <div class="meta-line"><strong>Primary Target Confidence:</strong> {escape(summary.get('primary_target_confidence_label', 'low'))} ({summary.get('primary_target_confidence_score', 0.0):.2f})</div>
+        <div class="meta-line"><strong>Confidence Reasons:</strong> {escape(', '.join(summary.get('primary_target_confidence_reasons', []) or ['No confidence rationale is recorded yet.']))}</div>
+        <div class="meta-line"><strong>Next Action Confidence:</strong> {escape(summary.get('next_action_confidence_label', 'low'))} ({summary.get('next_action_confidence_score', 0.0):.2f})</div>
+        <div class="meta-line"><strong>Recommendation Quality:</strong> {escape(summary.get('recommendation_quality_summary', 'No recommendation-quality summary is recorded yet.'))}</div>
         <div class="meta-line"><strong>Blocked:</strong> {counts.get('blocked', 0)} | <strong>Urgent:</strong> {counts.get('urgent', 0)} | <strong>Ready:</strong> {counts.get('ready', 0)} | <strong>Deferred:</strong> {counts.get('deferred', 0)}</div>
         <ul class="bullet-list">{''.join(rows) or '<li>No triage items are currently surfaced.</li>'}</ul>
         <div class="meta-line"><strong>Recently Changed:</strong></div>

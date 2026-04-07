@@ -256,6 +256,12 @@ def _make_report(audits=None) -> dict:
             },
             "primary_target_last_outcome": "no-change",
             "primary_target_resolution_evidence": "The last intervention was drifted for RepoC: Security posture needs attention, but the item is still open.",
+            "primary_target_confidence_score": 0.7,
+            "primary_target_confidence_label": "medium",
+            "primary_target_confidence_reasons": [
+                "Urgent drift or regression needs attention before ready work.",
+                "A prior intervention happened, but the item is still open.",
+            ],
             "recent_interventions": [
                 {
                     "item_id": "review-target:RepoC",
@@ -271,6 +277,10 @@ def _make_report(audits=None) -> dict:
             "reopened_after_resolution_count": 0,
             "decision_memory_window_runs": 3,
             "resolution_evidence_summary": "The last intervention was drifted for RepoC: Security posture needs attention, but the item is still open.",
+            "next_action_confidence_score": 0.75,
+            "next_action_confidence_label": "high",
+            "next_action_confidence_reasons": ["The next step is tied directly to the current top target."],
+            "recommendation_quality_summary": "Strong recommendation because the next step is tied directly to the current top target.",
             "primary_target_reason": "This remains the top target because urgent review work should be closed before lower-pressure ready items.",
             "primary_target_done_criteria": "Complete the recommended review action and confirm the item exits urgent state on the next run.",
             "closure_guidance": "Preview the governance controls and confirm this urgent review target clears on the next run.",
@@ -555,20 +565,30 @@ class TestAnalystWorkbookSheets:
         assert review_ws["A16"].value == "What We Tried"
         assert review_ws["A17"].value == "Last Outcome"
         assert review_ws["A18"].value == "Resolution Evidence"
+        assert review_ws["A20"].value == "Recommendation Confidence"
+        assert review_ws["A21"].value == "Confidence Rationale"
+        assert review_ws["A22"].value == "Next Action Confidence"
         assert executive_ws["D29"].value == "Trend"
         assert executive_ws["D32"].value == "Why Top Target"
         assert executive_ws["D33"].value == "Closure Guidance"
         assert executive_ws["D35"].value == "What We Tried"
         assert executive_ws["D36"].value == "Last Outcome"
         assert executive_ws["D37"].value == "Resolution Evidence"
+        assert executive_ws["D39"].value == "Recommendation Confidence"
+        assert executive_ws["D40"].value == "Confidence Rationale"
+        assert executive_ws["D41"].value == "Next Action Confidence"
         assert print_ws["A17"].value == "Primary Target"
         assert print_ws["A18"].value == "Why Top Target"
         assert print_ws["A19"].value == "What We Tried"
         assert print_ws["A20"].value == "Last Outcome"
         assert print_ws["A21"].value == "Resolution Evidence"
+        assert print_ws["A23"].value == "Recommendation Confidence"
+        assert print_ws["A24"].value == "Confidence Rationale"
+        assert print_ws["A25"].value == "Next Action Confidence"
         assert "Why Top Target" in dashboard_values
         assert "Closure Guidance" in dashboard_values
         assert "What We Tried" in dashboard_values
+        assert "Recommendation Confidence" in dashboard_values
 
     def test_campaigns_show_empty_state_when_no_preview_rows(self):
         wb = Workbook()

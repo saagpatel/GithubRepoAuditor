@@ -117,6 +117,16 @@ def _make_report(**overrides) -> dict:
                 "outcome": "drifted",
             },
             "primary_target_resolution_evidence": "The last intervention was drifted for RepoC: RepoC drift needs review, but the item is still open.",
+            "primary_target_confidence_score": 0.7,
+            "primary_target_confidence_label": "medium",
+            "primary_target_confidence_reasons": [
+                "Urgent drift or regression needs attention before ready work.",
+                "A prior intervention happened, but the item is still open.",
+            ],
+            "next_action_confidence_score": 0.75,
+            "next_action_confidence_label": "high",
+            "next_action_confidence_reasons": ["The next step is tied directly to the current top target."],
+            "recommendation_quality_summary": "Strong recommendation because the next step is tied directly to the current top target.",
             "primary_target": {"repo": "RepoC", "title": "RepoC drift needs review"},
         },
         "operator_queue": [
@@ -235,6 +245,9 @@ class TestRenderHtml:
         assert "Closure Guidance:" in html
         assert "What We Tried:" in html
         assert "Resolution Evidence:" in html
+        assert "Primary Target Confidence:" in html
+        assert "Next Action Confidence:" in html
+        assert "Recommendation Quality:" in html
         assert "RepoC: RepoC drift needs review" in html
 
     def test_has_filter_controls(self):
