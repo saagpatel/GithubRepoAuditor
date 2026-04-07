@@ -297,6 +297,25 @@ def _operator_accountability_values(data: dict) -> tuple[str, str, str]:
     return primary_target_reason, closure_guidance, aging_pressure
 
 
+def _operator_decision_memory_values(data: dict) -> tuple[str, str, str, str]:
+    summary = data.get("operator_summary") or {}
+    last_intervention = summary.get("primary_target_last_intervention") or {}
+    last_outcome = summary.get("primary_target_last_outcome", "") or "no-change"
+    resolution_evidence = summary.get("resolution_evidence_summary", "") or "No resolution evidence is recorded yet."
+    if last_intervention:
+        when = (last_intervention.get("recorded_at") or "")[:10]
+        event_type = last_intervention.get("event_type", "recorded")
+        outcome = last_intervention.get("outcome", event_type)
+        last_intervention_label = f"{when} {event_type} ({outcome})".strip()
+    else:
+        last_intervention_label = "No recent intervention recorded"
+    recovery_counts = (
+        f"Confirmed resolved {summary.get('confirmed_resolved_count', 0)} | "
+        f"Reopened {summary.get('reopened_after_resolution_count', 0)}"
+    )
+    return last_intervention_label, last_outcome.replace("-", " ").title(), resolution_evidence, recovery_counts
+
+
 def _apply_workbook_named_ranges(
     wb: Workbook,
     data: dict,
@@ -746,6 +765,10 @@ def _build_dashboard(
     follow_through = _operator_follow_through_value(data)
     trend_status, trend_summary, primary_target, resolution_counts = _operator_trend_values(data)
     primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
+    last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
+    last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
+    last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
+    last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
 
     operator_rows = [
         ("Setup Health", _display_operator_state(setup_health.get("status", "ok"))),
@@ -785,6 +808,10 @@ def _build_dashboard(
                 ("Why Top Target", primary_target_reason),
                 ("Closure Guidance", closure_guidance),
                 ("Aging Pressure", aging_pressure),
+                ("What We Tried", last_intervention),
+                ("Last Outcome", last_outcome),
+                ("Resolution Evidence", resolution_evidence),
+                ("Recovery Counts", recovery_counts),
             ]
         )
     operator_block_end = _write_key_value_block(ws, 5, 15, operator_rows, title="Operator Snapshot")
@@ -3431,6 +3458,7 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
     top_issue_families = _summarize_top_issue_families(material_changes)
     trend_status, trend_summary, primary_target, resolution_counts = _operator_trend_values(data)
     primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
+    last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
     summary_rows = [
         ("Headline", (data.get("operator_summary") or {}).get("headline", "Review activity is available below.")),
         ("Queue Counts", _format_lane_counts(counts)),
@@ -3450,10 +3478,14 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
                 ("Why Top Target", primary_target_reason),
                 ("Closure Guidance", closure_guidance),
                 ("Aging Pressure", aging_pressure),
+                ("What We Tried", last_intervention),
+                ("Last Outcome", last_outcome),
+                ("Resolution Evidence", resolution_evidence),
+                ("Recovery Counts", recovery_counts),
             ]
         )
     summary_rows.append(("Source Run", (data.get("operator_summary") or {}).get("source_run_id", "")))
-    _write_key_value_block(ws, 4, 1, summary_rows, title="Summary")
+    summary_end = _write_key_value_block(ws, 4, 1, summary_rows, title="Summary")
     top_repo_rows = [
         [
             repo,
@@ -3464,7 +3496,7 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
         ]
         for repo, _total, blocked, urgent, ready, deferred, _kind, _priority, title, action in repo_rollups[:10]
     ] or [["Portfolio", "Clear", "0 blocked, 0 urgent, 0 ready, 0 deferred", "No open review items.", "Monitor future audits."]]
-    _write_ranked_list(
+    top_repo_end = _write_ranked_list(
         ws,
         4,
         5,
@@ -3472,12 +3504,13 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
         ["Repo", "Primary Lane", "Counts", "Why Now", "Next Step"],
         top_repo_rows,
     )
+    secondary_start = max(summary_end, top_repo_end) + 2
     issue_family_rows = [[label, count] for label, count in top_issue_families]
     if not issue_family_rows:
         issue_family_rows = [["No material change families", 0]]
-    _write_ranked_list(
+    issue_family_end = _write_ranked_list(
         ws,
-        17,
+        secondary_start,
         1,
         "Top Issue Families",
         ["Issue Family", "Count"],
@@ -3486,24 +3519,24 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
     action_rows = [[action, count] for action, count in _summarize_top_actions(queue)]
     if not action_rows:
         action_rows = [["No recommended actions", 0]]
-    _write_ranked_list(
+    action_end = _write_ranked_list(
         ws,
-        17,
+        secondary_start,
         5,
         "Top Recommended Actions",
         ["Action", "Count"],
         action_rows,
     )
-    ws.merge_cells("A24:H24")
-    ws["A24"] = "Read this table top-down: urgent items first, ready items second, and safe-to-defer rows last."
-    ws["A24"].font = SUBTITLE_FONT
-    ws["A24"].alignment = WRAP
+    guidance_row = max(issue_family_end, action_end) + 2
+    ws.merge_cells(start_row=guidance_row, start_column=1, end_row=guidance_row, end_column=8)
+    ws.cell(row=guidance_row, column=1, value="Read this table top-down: urgent items first, ready items second, and safe-to-defer rows last.").font = SUBTITLE_FONT
+    ws.cell(row=guidance_row, column=1).alignment = WRAP
     headers = ["Repo", "Title", "Lane", "Kind", "Priority", "Next Step", "Decision Hint", "Safe To Defer"]
-    start_row = 25
+    start_row = guidance_row + 1
     for col, header in enumerate(headers, 1):
         ws.cell(row=start_row, column=col, value=header)
     style_header_row(ws, start_row, len(headers))
-    ws.freeze_panes = "A26"
+    ws.freeze_panes = f"A{start_row + 1}"
 
     targets = ordered_queue or data.get("review_targets", [])
     for row, item in enumerate(targets, start_row + 1):
@@ -3835,6 +3868,7 @@ def _build_executive_summary(
     follow_through = _operator_follow_through_value(data)
     trend_status, trend_summary, primary_target, resolution_counts = _operator_trend_values(data)
     primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
+    last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
     recommended_focus = ""
     if data.get("operator_queue"):
         recommended_focus = data["operator_queue"][0].get("recommended_action", "")
@@ -3869,6 +3903,8 @@ def _build_executive_summary(
         narrative_rows.insert(5, ("Trend", f"{trend_status} — {trend_summary}"))
         narrative_rows.insert(6, ("Why Top Target", primary_target_reason))
         narrative_rows.insert(7, ("Closure Guidance", closure_guidance))
+        narrative_rows.insert(8, ("What We Tried", last_intervention))
+        narrative_rows.insert(9, ("Resolution Evidence", resolution_evidence))
     _write_key_value_block(ws, 4, 1, narrative_rows, title="Leadership Brief")
 
     write_kpi_card(ws, 10, 1, "Portfolio Grade", data.get("portfolio_grade", "F"))
@@ -3924,9 +3960,17 @@ def _build_executive_summary(
             ws.cell(row=33, column=5, value=closure_guidance)
             ws.cell(row=34, column=4, value="Aging Pressure").font = SUBHEADER_FONT
             ws.cell(row=34, column=5, value=aging_pressure)
+            ws.cell(row=35, column=4, value="What We Tried").font = SUBHEADER_FONT
+            ws.cell(row=35, column=5, value=last_intervention)
+            ws.cell(row=36, column=4, value="Last Outcome").font = SUBHEADER_FONT
+            ws.cell(row=36, column=5, value=last_outcome)
+            ws.cell(row=37, column=4, value="Resolution Evidence").font = SUBHEADER_FONT
+            ws.cell(row=37, column=5, value=resolution_evidence)
+            ws.cell(row=38, column=4, value="Recovery Counts").font = SUBHEADER_FONT
+            ws.cell(row=38, column=5, value=recovery_counts)
     preflight = data.get("preflight_summary") or {}
     if preflight and (preflight.get("blocking_errors", 0) or preflight.get("warnings", 0)):
-        row_base = 37 if excel_mode == "standard" else 33
+        row_base = 41 if excel_mode == "standard" else 33
         ws.cell(row=row_base, column=1, value="Preflight Diagnostics").font = SECTION_FONT
         ws.cell(row=row_base + 1, column=1, value="Status").font = SUBHEADER_FONT
         ws.cell(row=row_base + 1, column=2, value=preflight.get("status", "unknown"))
@@ -3934,7 +3978,7 @@ def _build_executive_summary(
         ws.cell(row=row_base + 2, column=2, value=preflight.get("blocking_errors", 0))
         ws.cell(row=row_base + 3, column=1, value="Warnings").font = SUBHEADER_FONT
         ws.cell(row=row_base + 3, column=2, value=preflight.get("warnings", 0))
-    auto_width(ws, 6, 39 if excel_mode == "standard" else 35)
+    auto_width(ws, 6, 43 if excel_mode == "standard" else 35)
 
 
 def _build_print_pack(
@@ -3969,6 +4013,7 @@ def _build_print_pack(
     follow_through = _operator_follow_through_value(data)
     trend_status, trend_summary, primary_target, resolution_counts = _operator_trend_values(data)
     primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
+    last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
     ws["A7"] = "This Week"
     ws["B7"] = operator_summary.get("headline", "Review the latest workbook surfaces for change and drift.")
     ws["A8"] = "Operator Queue"
@@ -3998,15 +4043,19 @@ def _build_print_pack(
         ws["B17"] = primary_target
         ws["A18"] = "Why Top Target"
         ws["B18"] = primary_target_reason
-        ws["A19"] = "What Counts As Done"
-        ws["B19"] = closure_guidance
-        ws["A20"] = "Aging Pressure"
-        ws["B20"] = aging_pressure
-        ws["A21"] = "Top Risks"
-        ws["A21"].font = SECTION_FONT
-        risk_start_row = 21
-        opportunity_header_row = 21
-        page2_row = 30
+        ws["A19"] = "What We Tried"
+        ws["B19"] = last_intervention
+        ws["A20"] = "Last Outcome"
+        ws["B20"] = last_outcome
+        ws["A21"] = "Resolution Evidence"
+        ws["B21"] = resolution_evidence
+        ws["A22"] = "Recovery Counts"
+        ws["B22"] = recovery_counts
+        ws["A23"] = "Top Risks"
+        ws["A23"].font = SECTION_FONT
+        risk_start_row = 23
+        opportunity_header_row = 23
+        page2_row = 32
     else:
         ws["A17"] = "Top Risks"
         ws["A17"].font = SECTION_FONT

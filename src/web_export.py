@@ -239,6 +239,7 @@ def _operator_section(data: dict) -> str:
         f"{escape(change.get('summary', change.get('kind', 'change')))}</li>"
         for change in recent_changes[:4]
     )
+    intervention_label = _intervention_label(summary.get("primary_target_last_intervention") or {})
     return f"""
     <div class="section">
       <h2>Operator Control Center</h2>
@@ -258,12 +259,23 @@ def _operator_section(data: dict) -> str:
         <div class="meta-line"><strong>Why This Is The Top Target:</strong> {escape(summary.get('primary_target_reason', 'No target rationale is recorded yet.'))}</div>
         <div class="meta-line"><strong>What Counts As Done:</strong> {escape(summary.get('primary_target_done_criteria', 'No done-state guidance is recorded yet.'))}</div>
         <div class="meta-line"><strong>Closure Guidance:</strong> {escape(summary.get('closure_guidance', 'No closure guidance is recorded yet.'))}</div>
+        <div class="meta-line"><strong>What We Tried:</strong> {escape(intervention_label)}</div>
+        <div class="meta-line"><strong>Resolution Evidence:</strong> {escape(summary.get('primary_target_resolution_evidence', 'No resolution evidence is recorded yet.'))}</div>
         <div class="meta-line"><strong>Blocked:</strong> {counts.get('blocked', 0)} | <strong>Urgent:</strong> {counts.get('urgent', 0)} | <strong>Ready:</strong> {counts.get('ready', 0)} | <strong>Deferred:</strong> {counts.get('deferred', 0)}</div>
         <ul class="bullet-list">{''.join(rows) or '<li>No triage items are currently surfaced.</li>'}</ul>
         <div class="meta-line"><strong>Recently Changed:</strong></div>
         <ul class="bullet-list">{recent_markup or '<li>No recent operator changes were loaded.</li>'}</ul>
       </div>
     </div>"""
+
+
+def _intervention_label(intervention: dict) -> str:
+    if not intervention:
+        return "No intervention evidence is recorded yet."
+    when = (intervention.get("recorded_at") or "")[:10]
+    event_type = intervention.get("event_type", "recorded")
+    outcome = intervention.get("outcome", event_type)
+    return f"{when} — {event_type} ({outcome})".strip()
 
 
 def _analyst_summary_section(context: dict) -> str:

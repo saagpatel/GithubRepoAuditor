@@ -7,7 +7,11 @@ from pathlib import Path
 from src.baseline_context import build_watch_guidance
 from src.governance_activation import build_governance_summary
 from src.recurring_review import build_review_bundle
-from src.warehouse import load_operator_state_history, load_recent_operator_changes
+from src.warehouse import (
+    load_operator_state_history,
+    load_recent_operator_changes,
+    load_recent_operator_evidence,
+)
 
 LANE_ORDER = {"blocked": 0, "urgent": 1, "ready": 2, "deferred": 3}
 LANE_LABELS = {
@@ -255,7 +259,17 @@ def build_operator_snapshot(
         queue = [item for item in queue if item["lane"] == triage_view]
 
     recent_changes = load_recent_operator_changes(output_dir, report_data.get("username", ""), limit=12)
-    history = load_operator_state_history(output_dir, report_data.get("username", ""), limit=HISTORY_WINDOW_RUNS - 1)
+    evidence_bundle = load_recent_operator_evidence(
+        output_dir,
+        report_data.get("username", ""),
+        snapshot_limit=HISTORY_WINDOW_RUNS,
+        event_limit=30,
+    )
+    history = evidence_bundle.get("history") or load_operator_state_history(
+        output_dir,
+        report_data.get("username", ""),
+        limit=HISTORY_WINDOW_RUNS - 1,
+    )
     setup_health = {
         "status": preflight.get("status", "unknown"),
         "blocking_errors": preflight.get("blocking_errors", 0),
@@ -263,7 +277,12 @@ def build_operator_snapshot(
     }
     counts = {lane: sum(1 for item in queue if item["lane"] == lane) for lane in LANE_ORDER}
     watch_guidance = build_watch_guidance(report_data.get("watch_state") or {})
-    resolution_trend = _build_resolution_trend(queue, history)
+    resolution_trend = _build_resolution_trend(
+        queue,
+        history,
+        evidence_bundle.get("events") or [],
+        current_generated_at=report_data.get("generated_at", ""),
+    )
     follow_through = _build_follow_through(resolution_trend)
     handoff = _build_operator_handoff(
         queue,
@@ -323,6 +342,17 @@ def build_operator_snapshot(
         "primary_target": resolution_trend["primary_target"],
         "resolution_targets": resolution_trend["resolution_targets"],
         "trend_summary": resolution_trend["trend_summary"],
+        "decision_memory_status": resolution_trend["decision_memory_status"],
+        "primary_target_last_seen_at": resolution_trend["primary_target_last_seen_at"],
+        "primary_target_last_intervention": resolution_trend["primary_target_last_intervention"],
+        "primary_target_last_outcome": resolution_trend["primary_target_last_outcome"],
+        "primary_target_resolution_evidence": resolution_trend["primary_target_resolution_evidence"],
+        "recent_interventions": resolution_trend["recent_interventions"],
+        "recently_quieted_count": resolution_trend["recently_quieted_count"],
+        "confirmed_resolved_count": resolution_trend["confirmed_resolved_count"],
+        "reopened_after_resolution_count": resolution_trend["reopened_after_resolution_count"],
+        "decision_memory_window_runs": resolution_trend["decision_memory_window_runs"],
+        "resolution_evidence_summary": resolution_trend["resolution_evidence_summary"],
     }
     return {
         "operator_summary": summary,
@@ -374,6 +404,12 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
         lines.append(f"*What Counts As Done:* {summary['primary_target_done_criteria']}")
     if summary.get("closure_guidance"):
         lines.append(f"*Closure Guidance:* {summary['closure_guidance']}")
+    if summary.get("primary_target_last_intervention"):
+        lines.append(
+            f"*What We Tried:* {_format_intervention(summary['primary_target_last_intervention'])}"
+        )
+    if summary.get("primary_target_resolution_evidence"):
+        lines.append(f"*Resolution Evidence:* {summary['primary_target_resolution_evidence']}")
     if summary.get("control_center_reference"):
         lines.append(f"*Control Center Artifact:* `{summary['control_center_reference']}`")
     lines.append(
@@ -536,6 +572,7 @@ def _build_operator_handoff(
     operator_note = (
         f"{top_summary} {why_it_matters} "
         f"{resolution_trend.get('trend_summary', '')} "
+        f"{resolution_trend.get('resolution_evidence_summary', '')} "
         f"{follow_through.get('follow_through_summary', '')} "
         f"Next: {next_action}"
     ).strip()
@@ -571,8 +608,16 @@ def _build_follow_through(resolution_trend: dict) -> dict:
     }
 
 
-def _build_resolution_trend(queue: list[dict], history: list[dict]) -> dict:
-    recent_runs = [_snapshot_from_queue(queue)] + [_snapshot_from_history(entry) for entry in history[: HISTORY_WINDOW_RUNS - 1]]
+def _build_resolution_trend(
+    queue: list[dict],
+    history: list[dict],
+    evidence_events: list[dict],
+    *,
+    current_generated_at: str = "",
+) -> dict:
+    recent_runs = [_snapshot_from_queue(queue, generated_at=current_generated_at)] + [
+        _snapshot_from_history(entry) for entry in history[: HISTORY_WINDOW_RUNS - 1]
+    ]
     recent_runs = [snapshot for snapshot in recent_runs if snapshot["items"] or snapshot["has_attention"] is not None]
     current_snapshot = recent_runs[0] if recent_runs else {"items": {}, "has_attention": False}
     previous_snapshot = recent_runs[1] if len(recent_runs) > 1 else None
@@ -584,7 +629,8 @@ def _build_resolution_trend(queue: list[dict], history: list[dict]) -> dict:
         *[set(_attention_items(snapshot)) for snapshot in recent_runs[2:]]
     ) if len(recent_runs) > 2 else set()
 
-    resolution_targets = _resolution_targets(queue, recent_runs)
+    decision_memory_map = _decision_memory_map(recent_runs, evidence_events)
+    resolution_targets = _resolution_targets(queue, recent_runs, decision_memory_map)
     new_attention_keys = current_attention_keys - previous_attention_keys
     resolved_attention_count = len(previous_attention_keys - current_attention_keys)
     persisting_attention_count = len(current_attention_keys & previous_attention_keys)
@@ -634,6 +680,7 @@ def _build_resolution_trend(queue: list[dict], history: list[dict]) -> dict:
             "done_criteria": primary_target_done_criteria,
             "closure_guidance": closure_guidance,
         }
+    decision_memory = _summary_decision_memory(primary_target, decision_memory_map, recent_runs)
     trend_summary = _trend_summary(
         trend_status=trend_status,
         quiet_streak_runs=quiet_streak_runs,
@@ -663,14 +710,26 @@ def _build_resolution_trend(queue: list[dict], history: list[dict]) -> dict:
         "primary_target": primary_target,
         "resolution_targets": resolution_targets[:5],
         "trend_summary": trend_summary,
+        "decision_memory_status": decision_memory["decision_memory_status"],
+        "primary_target_last_seen_at": decision_memory["primary_target_last_seen_at"],
+        "primary_target_last_intervention": decision_memory["primary_target_last_intervention"],
+        "primary_target_last_outcome": decision_memory["primary_target_last_outcome"],
+        "primary_target_resolution_evidence": decision_memory["primary_target_resolution_evidence"],
+        "recent_interventions": decision_memory["recent_interventions"],
+        "recently_quieted_count": decision_memory["recently_quieted_count"],
+        "confirmed_resolved_count": decision_memory["confirmed_resolved_count"],
+        "reopened_after_resolution_count": decision_memory["reopened_after_resolution_count"],
+        "decision_memory_window_runs": decision_memory["decision_memory_window_runs"],
+        "resolution_evidence_summary": decision_memory["resolution_evidence_summary"],
     }
 
 
-def _snapshot_from_queue(queue: list[dict]) -> dict:
+def _snapshot_from_queue(queue: list[dict], *, generated_at: str = "") -> dict:
     items = {_queue_identity(item): item for item in queue}
     return {
         "items": items,
         "has_attention": any(item.get("lane") in ATTENTION_LANES for item in queue),
+        "generated_at": generated_at,
     }
 
 
@@ -682,6 +741,7 @@ def _snapshot_from_history(entry: dict) -> dict:
     return {
         "items": items,
         "has_attention": bool(has_attention),
+        "generated_at": entry.get("generated_at", ""),
     }
 
 
@@ -693,7 +753,7 @@ def _attention_items(snapshot: dict) -> dict[str, dict]:
     }
 
 
-def _resolution_targets(queue: list[dict], recent_runs: list[dict]) -> list[dict]:
+def _resolution_targets(queue: list[dict], recent_runs: list[dict], decision_memory_map: dict[str, dict]) -> list[dict]:
     previous_attention_keys = set(_attention_items(recent_runs[1])) if len(recent_runs) > 1 else set()
     earlier_attention_keys = set().union(
         *[set(_attention_items(snapshot)) for snapshot in recent_runs[2:]]
@@ -755,10 +815,326 @@ def _resolution_targets(queue: list[dict], recent_runs: list[dict]) -> list[dict
                 "reopened": is_reopened,
                 "repeat_urgent": is_repeat_urgent,
                 "newly_stale": newly_stale,
+                **decision_memory_map.get(key, {}),
             }
         )
     targets.sort(key=_resolution_target_sort_key)
     return targets
+
+
+def _decision_memory_map(recent_runs: list[dict], evidence_events: list[dict]) -> dict[str, dict]:
+    evidence_by_key: dict[str, list[dict]] = {}
+    for event in evidence_events:
+        key = event.get("item_id") or _queue_identity(event)
+        evidence_by_key.setdefault(key, []).append(event)
+    for events in evidence_by_key.values():
+        events.sort(key=lambda item: item.get("recorded_at", ""), reverse=True)
+
+    history_keys = {
+        key
+        for snapshot in recent_runs
+        for key, item in (snapshot.get("items") or {}).items()
+        if item.get("lane") != "deferred"
+    }
+    current_snapshot = recent_runs[0] if recent_runs else {"items": {}, "generated_at": ""}
+    current_items = {
+        key: item
+        for key, item in (current_snapshot.get("items") or {}).items()
+        if item.get("lane") != "deferred"
+    }
+    attention_history = [_attention_items(snapshot) for snapshot in recent_runs]
+    memory: dict[str, dict] = {}
+
+    recently_quieted_count = 0
+    confirmed_resolved_count = 0
+    for key in history_keys:
+        current_item = current_items.get(key)
+        latest_event = (evidence_by_key.get(key) or [None])[0]
+        if current_item:
+            status = _current_decision_memory_status(key, current_item, recent_runs, latest_event)
+            previous_match = recent_runs[1]["items"].get(key) if len(recent_runs) > 1 else None
+            outcome = _current_item_last_outcome(current_item, previous_match, status)
+            resolution_evidence = _current_item_resolution_evidence(
+                current_item,
+                status,
+                latest_event,
+                previous_match,
+                recent_runs,
+            )
+            memory[key] = {
+                "decision_memory_status": status,
+                "last_seen_at": current_snapshot.get("generated_at", ""),
+                "last_intervention": latest_event or {},
+                "last_outcome": outcome,
+                "resolution_evidence": resolution_evidence,
+            }
+            continue
+
+        absent_info = _absent_decision_memory(key, attention_history, recent_runs, latest_event)
+        if absent_info["status"] == "quieted":
+            recently_quieted_count += 1
+        elif absent_info["status"] == "confirmed_resolved":
+            confirmed_resolved_count += 1
+        memory[key] = {
+            "decision_memory_status": absent_info["status"],
+            "last_seen_at": absent_info["last_seen_at"],
+            "last_intervention": latest_event or {},
+            "last_outcome": absent_info["last_outcome"],
+            "resolution_evidence": absent_info["resolution_evidence"],
+        }
+
+    recent_interventions = _recent_interventions(evidence_events)
+    reopened_after_resolution_count = sum(
+        1 for item in current_items.values() if memory.get(_queue_identity(item), {}).get("decision_memory_status") == "reopened"
+    )
+    return {
+        **{
+            key: {
+                "decision_memory_status": value.get("decision_memory_status", "new"),
+                "last_seen_at": value.get("last_seen_at", ""),
+                "last_intervention": value.get("last_intervention", {}),
+                "last_outcome": value.get("last_outcome", "no-change"),
+                "resolution_evidence": value.get("resolution_evidence", ""),
+            }
+            for key, value in memory.items()
+        },
+        "__summary__": {
+            "recently_quieted_count": recently_quieted_count,
+            "confirmed_resolved_count": confirmed_resolved_count,
+            "reopened_after_resolution_count": reopened_after_resolution_count,
+            "recent_interventions": recent_interventions,
+            "decision_memory_window_runs": len(recent_runs),
+        },
+    }
+
+
+def _current_decision_memory_status(
+    key: str,
+    current_item: dict,
+    recent_runs: list[dict],
+    latest_event: dict | None,
+) -> str:
+    if _was_resolved_then_reopened(key, recent_runs, current_item):
+        return "reopened"
+    prior_matches = [
+        snapshot["items"].get(key)
+        for snapshot in recent_runs[1:]
+        if snapshot["items"].get(key) and snapshot["items"][key].get("lane") != "deferred"
+    ]
+    if not prior_matches:
+        return "new"
+    if latest_event:
+        return "attempted"
+    return "persisting"
+
+
+def _was_resolved_then_reopened(key: str, recent_runs: list[dict], current_item: dict) -> bool:
+    if current_item.get("lane") not in ATTENTION_LANES:
+        return False
+    absent_streak = 0
+    saw_earlier_attention = False
+    for snapshot in recent_runs[1:]:
+        match = (snapshot.get("items") or {}).get(key)
+        if match and match.get("lane") in ATTENTION_LANES:
+            saw_earlier_attention = True
+            break
+        absent_streak += 1
+    return absent_streak >= 1 and saw_earlier_attention
+
+
+def _current_item_last_outcome(current_item: dict, previous_match: dict | None, status: str) -> str:
+    if status == "reopened":
+        return "reopened"
+    if not previous_match:
+        return "no-change"
+    if previous_match.get("lane") in ATTENTION_LANES and current_item.get("lane") not in ATTENTION_LANES:
+        return "quieted"
+    if previous_match.get("lane") == "blocked" and current_item.get("lane") in {"urgent", "ready"}:
+        return "improved"
+    if previous_match.get("lane") == "urgent" and current_item.get("lane") == "ready":
+        return "improved"
+    return "no-change"
+
+
+def _current_item_resolution_evidence(
+    current_item: dict,
+    status: str,
+    latest_event: dict | None,
+    previous_match: dict | None,
+    recent_runs: list[dict],
+) -> str:
+    if status == "reopened":
+        return "This item returned after an earlier quiet or resolved period, so treat it as a regression rather than a net-new issue."
+    if status == "attempted" and latest_event:
+        return (
+            f"The last intervention was {_format_intervention(latest_event).lower()}, "
+            "but the item is still open."
+        )
+    if status == "persisting":
+        appearances = sum(
+            1
+            for snapshot in recent_runs
+            if (snapshot.get("items") or {}).get(_queue_identity(current_item), {}).get("lane") != "deferred"
+            and (snapshot.get("items") or {}).get(_queue_identity(current_item))
+        )
+        return f"This item is still open after {appearances} recent run(s), with no confirmed recovery signal yet."
+    if previous_match and previous_match.get("lane") in ATTENTION_LANES and current_item.get("lane") not in ATTENTION_LANES:
+        return "The last run reduced this item out of blocked or urgent lanes, but it is not yet confirmed resolved."
+    return "No earlier intervention or durable recovery evidence is recorded in the recent window yet."
+
+
+def _absent_decision_memory(
+    key: str,
+    attention_history: list[dict[str, dict]],
+    recent_runs: list[dict],
+    latest_event: dict | None,
+) -> dict:
+    current_absent = key not in attention_history[0]
+    previous_present = len(attention_history) > 1 and key in attention_history[1]
+    previous_absent = len(attention_history) > 1 and key not in attention_history[1]
+    earlier_present = any(key in snapshot for snapshot in attention_history[2:])
+    last_seen_at = ""
+    for snapshot in recent_runs[1:]:
+        match = (snapshot.get("items") or {}).get(key)
+        if match:
+            last_seen_at = snapshot.get("generated_at", "")
+            break
+    if current_absent and previous_present:
+        return {
+            "status": "quieted",
+            "last_outcome": "quieted",
+            "last_seen_at": last_seen_at,
+            "resolution_evidence": "This item is absent for 1 run after prior attention, so it looks quieter but is not yet confirmed resolved.",
+        }
+    if current_absent and previous_absent and earlier_present:
+        return {
+            "status": "confirmed_resolved",
+            "last_outcome": "confirmed-resolved",
+            "last_seen_at": last_seen_at,
+            "resolution_evidence": "This item has stayed absent from blocked or urgent lanes for 2 consecutive runs and now counts as confirmed resolved.",
+        }
+    if latest_event:
+        return {
+            "status": "attempted",
+            "last_outcome": "no-change",
+            "last_seen_at": last_seen_at,
+            "resolution_evidence": "A recent intervention is recorded, but there is not enough absence history yet to count this as durable resolution.",
+        }
+    return {
+        "status": "new",
+        "last_outcome": "no-change",
+        "last_seen_at": last_seen_at,
+        "resolution_evidence": "No durable resolution evidence is recorded for this item yet.",
+    }
+
+
+def _recent_interventions(evidence_events: list[dict]) -> list[dict]:
+    interventions: list[dict] = []
+    for event in evidence_events[:5]:
+        interventions.append(
+            {
+                "item_id": event.get("item_id", ""),
+                "repo": event.get("repo", ""),
+                "title": event.get("title", ""),
+                "event_type": event.get("event_type", ""),
+                "recorded_at": event.get("recorded_at", ""),
+                "outcome": event.get("outcome", ""),
+            }
+        )
+    return interventions
+
+
+def _summary_decision_memory(primary_target: dict, decision_memory_map: dict[str, dict], recent_runs: list[dict]) -> dict:
+    summary = decision_memory_map.get("__summary__", {})
+    recent_interventions = summary.get("recent_interventions", [])
+    if primary_target:
+        key = _queue_identity(primary_target)
+        memory = decision_memory_map.get(key, {})
+        return {
+            "decision_memory_status": memory.get("decision_memory_status", "new"),
+            "primary_target_last_seen_at": memory.get("last_seen_at", recent_runs[0].get("generated_at", "") if recent_runs else ""),
+            "primary_target_last_intervention": memory.get("last_intervention", {}),
+            "primary_target_last_outcome": memory.get("last_outcome", "no-change"),
+            "primary_target_resolution_evidence": memory.get("resolution_evidence", ""),
+            "recent_interventions": recent_interventions,
+            "recently_quieted_count": summary.get("recently_quieted_count", 0),
+            "confirmed_resolved_count": summary.get("confirmed_resolved_count", 0),
+            "reopened_after_resolution_count": summary.get("reopened_after_resolution_count", 0),
+            "decision_memory_window_runs": summary.get("decision_memory_window_runs", len(recent_runs)),
+            "resolution_evidence_summary": _resolution_evidence_summary(
+                memory.get("decision_memory_status", "new"),
+                memory.get("resolution_evidence", ""),
+                summary.get("recently_quieted_count", 0),
+                summary.get("confirmed_resolved_count", 0),
+                summary.get("reopened_after_resolution_count", 0),
+            ),
+        }
+    default_status = "confirmed_resolved" if summary.get("confirmed_resolved_count", 0) else "quieted" if summary.get("recently_quieted_count", 0) else "new"
+    default_outcome = "confirmed-resolved" if summary.get("confirmed_resolved_count", 0) else "quieted" if summary.get("recently_quieted_count", 0) else "no-change"
+    return {
+        "decision_memory_status": default_status,
+        "primary_target_last_seen_at": "",
+        "primary_target_last_intervention": recent_interventions[0] if recent_interventions else {},
+        "primary_target_last_outcome": default_outcome,
+        "primary_target_resolution_evidence": _resolution_evidence_summary(
+            default_status,
+            "",
+            summary.get("recently_quieted_count", 0),
+            summary.get("confirmed_resolved_count", 0),
+            summary.get("reopened_after_resolution_count", 0),
+        ),
+        "recent_interventions": recent_interventions,
+        "recently_quieted_count": summary.get("recently_quieted_count", 0),
+        "confirmed_resolved_count": summary.get("confirmed_resolved_count", 0),
+        "reopened_after_resolution_count": summary.get("reopened_after_resolution_count", 0),
+        "decision_memory_window_runs": summary.get("decision_memory_window_runs", len(recent_runs)),
+        "resolution_evidence_summary": _resolution_evidence_summary(
+            default_status,
+            "",
+            summary.get("recently_quieted_count", 0),
+            summary.get("confirmed_resolved_count", 0),
+            summary.get("reopened_after_resolution_count", 0),
+        ),
+    }
+
+
+def _resolution_evidence_summary(
+    decision_memory_status: str,
+    primary_target_resolution_evidence: str,
+    recently_quieted_count: int,
+    confirmed_resolved_count: int,
+    reopened_after_resolution_count: int,
+) -> str:
+    if decision_memory_status == "reopened":
+        return (
+            f"{primary_target_resolution_evidence} "
+            f"{reopened_after_resolution_count} item(s) reopened after an earlier quiet or resolved state in the recent window."
+        ).strip()
+    if decision_memory_status == "confirmed_resolved":
+        return f"{confirmed_resolved_count} item(s) now count as confirmed resolved in the recent window."
+    if decision_memory_status == "quieted":
+        return f"{recently_quieted_count} item(s) are quieter, but not yet confirmed resolved."
+    if primary_target_resolution_evidence:
+        return primary_target_resolution_evidence
+    return (
+        f"Resolution evidence in the recent window: {confirmed_resolved_count} confirmed resolved, "
+        f"{recently_quieted_count} quieted, {reopened_after_resolution_count} reopened."
+    )
+
+
+def _format_intervention(intervention: dict) -> str:
+    if not intervention:
+        return "No recent intervention is recorded yet."
+    recorded_at = intervention.get("recorded_at", "")
+    when = recorded_at[:10] if recorded_at else "recently"
+    event_type = intervention.get("event_type", "recorded")
+    outcome = intervention.get("outcome", event_type)
+    repo = f"{intervention.get('repo')}: " if intervention.get("repo") else ""
+    title = intervention.get("title", "").strip()
+    subject = f"{repo}{title}".strip(": ")
+    if subject:
+        return f"{when} — {event_type} for {subject} ({outcome})"
+    return f"{when} — {event_type} ({outcome})"
 
 
 def _aging_status(appearances: int, age_days: int) -> str:
@@ -1022,11 +1398,18 @@ def _handoff_urgency(queue: list[dict], setup_health: dict) -> str:
 
 def _summarize_operator_change(top_item: dict, recent_changes: list[dict], resolution_trend: dict) -> str:
     trend_status = resolution_trend.get("trend_status", "stable")
+    decision_memory_status = resolution_trend.get("decision_memory_status", "new")
     if trend_status == "quiet":
         return f"No new blocking or urgent drift is surfaced, and the queue has stayed quiet for {resolution_trend.get('quiet_streak_runs', 0)} consecutive run(s)."
+    if top_item and decision_memory_status == "reopened":
+        subject = f"{top_item.get('repo')}: " if top_item.get("repo") else ""
+        return f"{subject}{top_item.get('title', 'Operator change')} returned after an earlier quiet or resolved period and is back at the top of the queue."
     if top_item and top_item.get("aging_status") == "chronic":
         subject = f"{top_item.get('repo')}: " if top_item.get("repo") else ""
         return f"{subject}{top_item.get('title', 'Operator change')} has survived multiple cycles and remains the top target."
+    if top_item and decision_memory_status in {"attempted", "persisting"}:
+        subject = f"{top_item.get('repo')}: " if top_item.get("repo") else ""
+        return f"{subject}{top_item.get('title', 'Operator change')} is still open after earlier intervention and remains the main target."
     if top_item and top_item.get("newly_stale"):
         subject = f"{top_item.get('repo')}: " if top_item.get("repo") else ""
         return f"{subject}{top_item.get('title', 'Operator change')} has crossed into follow-through debt and is now the main target."
@@ -1061,6 +1444,8 @@ def _next_operator_action(top_item: dict, watch_guidance: dict, follow_through: 
         return top_item["recommended_action"]
     if resolution_trend.get("trend_status") == "quiet":
         return f"Keep the operator loop light and only escalate if the next run breaks the {resolution_trend.get('quiet_streak_runs', 0)}-run quiet streak."
+    if resolution_trend.get("decision_memory_status") == "reopened" and top_item.get("closure_guidance"):
+        return top_item["closure_guidance"]
     if top_item.get("aging_status") == "chronic" and top_item.get("closure_guidance"):
         return top_item["closure_guidance"]
     if top_item.get("newly_stale") and top_item.get("closure_guidance"):
@@ -1113,6 +1498,10 @@ def _why_it_matters(
     if escalation_reason == "scheduled-full-refresh":
         return "The normal full-refresh cadence is due, so the next run should refresh portfolio truth before more incremental monitoring."
     if urgency == "urgent":
+        if resolution_trend.get("decision_memory_status") == "reopened":
+            return "This item came back after earlier quiet or resolution, so it should be treated as a regression instead of a net-new issue."
+        if resolution_trend.get("decision_memory_status") in {"attempted", "persisting"}:
+            return "A prior intervention has not cleared this item yet, so the next action should focus on proving closure instead of adding more noise."
         if top_item.get("aging_status") == "chronic":
             return "This target has survived multiple cycles, so closing it now matters more than picking up newly ready work."
         if top_item.get("newly_stale"):

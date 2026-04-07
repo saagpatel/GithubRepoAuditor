@@ -180,6 +180,14 @@ class TestMarkdownReport:
             "primary_target_reason": "This outranks the rest of the queue because a setup blocker stops the next trustworthy export path.",
             "primary_target_done_criteria": "Clear the failing prerequisite and rerun the relevant export command so the blocker exits the queue.",
             "closure_guidance": "Restore the workbook template, rerun the export, and confirm this blocker disappears on the next run.",
+            "primary_target_last_intervention": {
+                "repo": "",
+                "title": "Missing template asset",
+                "event_type": "rerun",
+                "recorded_at": "2026-04-07T12:00:00+00:00",
+                "outcome": "no-change",
+            },
+            "primary_target_resolution_evidence": "The last intervention reran the export path, but the blocker is still open.",
             "primary_target": {"title": "Missing template asset"},
         }
         report.operator_queue = [
@@ -206,6 +214,8 @@ class TestMarkdownReport:
         assert "Why This Is The Top Target" in content
         assert "What Counts As Done" in content
         assert "Closure Guidance" in content
+        assert "What We Tried" in content
+        assert "Resolution Evidence" in content
 
     def test_includes_governance_operator_summary_when_present(self, tmp_path):
         report = _make_report()

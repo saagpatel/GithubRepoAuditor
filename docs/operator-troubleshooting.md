@@ -129,7 +129,7 @@ The intended operator loop is:
 1. `audit <github-username> --doctor`
 2. `audit <github-username>` or `audit <github-username> --watch --watch-strategy adaptive`
 3. `audit <github-username> --control-center`
-4. Read the control-center handoff fields before drilling into the queue, especially the trend summary, primary target, why it is still the top target, and what counts as done
+4. Read the control-center handoff fields before drilling into the queue, especially the trend summary, primary target, why it is still the top target, what was tried, and whether the item is only quieting down or now counts as confirmed resolved
 5. Handle `Blocked`, then `Needs Attention Now`, then `Ready for Manual Action`
 6. Leave `Safe to Defer` items alone unless priorities changed
 7. Run `make workbook-gate` only when workbook-facing changes are part of the release
@@ -177,3 +177,5 @@ It also now explains the accountability story for the current top target:
 - why this item is still the top target
 - what would count as done on the next run
 - whether the queue is carrying newly stale or chronic follow-through pressure
+- what was tried most recently
+- whether the latest intervention only quieted the item or produced confirmed resolution evidence

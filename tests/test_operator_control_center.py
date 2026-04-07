@@ -131,6 +131,9 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
     assert "setup blocker" in summary["primary_target_reason"].lower()
     assert "rerun the relevant command" in summary["primary_target_done_criteria"].lower()
     assert "Set GITHUB_TOKEN" in summary["closure_guidance"]
+    assert summary["decision_memory_status"] == "new"
+    assert summary["primary_target_last_outcome"] == "no-change"
+    assert "no earlier intervention" in summary["primary_target_resolution_evidence"].lower()
 
 
 def test_operator_snapshot_adds_follow_through_from_recent_history(tmp_path: Path, monkeypatch):
@@ -335,6 +338,147 @@ def test_operator_snapshot_marks_chronic_targets_and_longest_persisting_item(tmp
     assert "multiple cycles" in summary["primary_target_reason"]
     assert "reconcile the drift" in summary["primary_target_done_criteria"].lower()
     assert "aging pressure" in summary["accountability_summary"].lower()
+
+
+def test_operator_snapshot_marks_attempted_when_recent_intervention_exists(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(
+        "src.operator_control_center.load_recent_operator_evidence",
+        lambda *_args, **_kwargs: {
+            "history": [
+                {
+                    "generated_at": "2026-03-28T12:00:00+00:00",
+                    "operator_summary": {"counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}},
+                    "operator_queue": [
+                        {
+                            "item_id": "campaign-drift:campaign-1:github-issue",
+                            "lane": "urgent",
+                            "age_days": 2,
+                            "repo": "RepoD",
+                            "title": "RepoD drift needs review",
+                        }
+                    ],
+                }
+            ],
+            "events": [
+                {
+                    "item_id": "campaign-drift:campaign-1:github-issue",
+                    "repo": "RepoD",
+                    "title": "RepoD drift needs review",
+                    "event_type": "drifted",
+                    "recorded_at": "2026-03-29T12:00:00+00:00",
+                    "outcome": "drifted",
+                }
+            ],
+        },
+    )
+
+    snapshot = build_operator_snapshot(_make_report(preflight_summary={}, material_changes=[], governance_drift=[], governance_preview={}, rollback_preview={}, review_targets=[]), output_dir=tmp_path)
+    summary = snapshot["operator_summary"]
+
+    assert summary["decision_memory_status"] == "attempted"
+    assert summary["primary_target_last_intervention"]["event_type"] == "drifted"
+    assert summary["primary_target_last_outcome"] == "no-change"
+    assert "still open" in summary["primary_target_resolution_evidence"].lower()
+
+
+def test_operator_snapshot_tracks_confirmed_resolution_and_reopen_evidence(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(
+        "src.operator_control_center.load_recent_operator_evidence",
+        lambda *_args, **_kwargs: {
+            "history": [
+                {
+                    "generated_at": "2026-04-06T12:00:00+00:00",
+                    "operator_summary": {"counts": {"blocked": 0, "urgent": 0, "ready": 0, "deferred": 0}},
+                    "operator_queue": [],
+                },
+                {
+                    "generated_at": "2026-04-05T12:00:00+00:00",
+                    "operator_summary": {"counts": {"blocked": 0, "urgent": 0, "ready": 0, "deferred": 0}},
+                    "operator_queue": [],
+                },
+                {
+                    "generated_at": "2026-04-04T12:00:00+00:00",
+                    "operator_summary": {"counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}},
+                    "operator_queue": [
+                        {
+                            "item_id": "campaign-drift:campaign-1:github-issue",
+                            "lane": "urgent",
+                            "age_days": 4,
+                            "repo": "RepoD",
+                            "title": "RepoD drift needs review",
+                        }
+                    ],
+                },
+            ],
+            "events": [],
+        },
+    )
+
+    quiet_snapshot = build_operator_snapshot(
+        _make_report(
+            preflight_summary={},
+            managed_state_drift=[],
+            governance_drift=[],
+            governance_preview={},
+            rollback_preview={},
+            campaign_summary={},
+            writeback_preview={},
+            review_targets=[],
+            material_changes=[],
+        ),
+        output_dir=tmp_path,
+    )
+    quiet_summary = quiet_snapshot["operator_summary"]
+    assert quiet_summary["decision_memory_status"] == "confirmed_resolved"
+    assert quiet_summary["confirmed_resolved_count"] >= 1
+    assert "confirmed resolved" in quiet_summary["resolution_evidence_summary"].lower()
+
+    monkeypatch.setattr(
+        "src.operator_control_center.load_recent_operator_evidence",
+        lambda *_args, **_kwargs: {
+            "history": [
+                {
+                    "generated_at": "2026-04-06T12:00:00+00:00",
+                    "operator_summary": {"counts": {"blocked": 0, "urgent": 0, "ready": 0, "deferred": 0}},
+                    "operator_queue": [],
+                },
+                {
+                    "generated_at": "2026-04-05T12:00:00+00:00",
+                    "operator_summary": {"counts": {"blocked": 0, "urgent": 0, "ready": 0, "deferred": 0}},
+                    "operator_queue": [],
+                },
+                {
+                    "generated_at": "2026-04-04T12:00:00+00:00",
+                    "operator_summary": {"counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}},
+                    "operator_queue": [
+                        {
+                            "item_id": "campaign-drift:campaign-1:github-issue",
+                            "lane": "urgent",
+                            "age_days": 4,
+                            "repo": "RepoD",
+                            "title": "RepoD drift needs review",
+                        }
+                    ],
+                },
+            ],
+            "events": [],
+        },
+    )
+    reopened_snapshot = build_operator_snapshot(
+        _make_report(
+            preflight_summary={},
+            governance_drift=[],
+            governance_preview={},
+            rollback_preview={},
+            review_targets=[],
+            material_changes=[],
+        ),
+        output_dir=tmp_path,
+    )
+    reopened_summary = reopened_snapshot["operator_summary"]
+    assert reopened_summary["decision_memory_status"] == "reopened"
+    assert reopened_summary["primary_target_last_outcome"] == "reopened"
+    assert reopened_summary["reopened_after_resolution_count"] >= 1
 
 
 def test_normalize_review_state_backfills_missing_fields(tmp_path: Path):
