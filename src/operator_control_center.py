@@ -35,6 +35,8 @@ CLASS_TRANSITION_WINDOW_RUNS = 4
 CLASS_PENDING_RESOLUTION_WINDOW_RUNS = 4
 CLASS_TRANSITION_CLOSURE_WINDOW_RUNS = 4
 CLASS_PENDING_DEBT_WINDOW_RUNS = HISTORY_WINDOW_RUNS
+PENDING_DEBT_FRESHNESS_WINDOW_RUNS = 4
+CLASS_CLOSURE_FORECAST_REWEIGHTING_WINDOW_RUNS = 4
 CLASS_MEMORY_RECENCY_WEIGHTS = (1.0, 1.0, 0.7, 0.7, 0.4, 0.4, 0.4, 0.2, 0.2, 0.2)
 GENERIC_RECOMMENDATION_PHRASES = (
     "continue the normal audit/control-center loop",
@@ -470,6 +472,22 @@ def build_operator_snapshot(
         "class_pending_debt_window_runs": resolution_trend["class_pending_debt_window_runs"],
         "pending_debt_hotspots": resolution_trend["pending_debt_hotspots"],
         "healthy_pending_resolution_hotspots": resolution_trend["healthy_pending_resolution_hotspots"],
+        "primary_target_pending_debt_freshness_status": resolution_trend["primary_target_pending_debt_freshness_status"],
+        "primary_target_pending_debt_freshness_reason": resolution_trend["primary_target_pending_debt_freshness_reason"],
+        "pending_debt_freshness_summary": resolution_trend["pending_debt_freshness_summary"],
+        "pending_debt_decay_summary": resolution_trend["pending_debt_decay_summary"],
+        "stale_pending_debt_hotspots": resolution_trend["stale_pending_debt_hotspots"],
+        "fresh_pending_resolution_hotspots": resolution_trend["fresh_pending_resolution_hotspots"],
+        "pending_debt_decay_window_runs": resolution_trend["pending_debt_decay_window_runs"],
+        "primary_target_weighted_pending_resolution_support_score": resolution_trend["primary_target_weighted_pending_resolution_support_score"],
+        "primary_target_weighted_pending_debt_caution_score": resolution_trend["primary_target_weighted_pending_debt_caution_score"],
+        "primary_target_closure_forecast_reweight_score": resolution_trend["primary_target_closure_forecast_reweight_score"],
+        "primary_target_closure_forecast_reweight_direction": resolution_trend["primary_target_closure_forecast_reweight_direction"],
+        "primary_target_closure_forecast_reweight_reasons": resolution_trend["primary_target_closure_forecast_reweight_reasons"],
+        "closure_forecast_reweighting_summary": resolution_trend["closure_forecast_reweighting_summary"],
+        "closure_forecast_reweighting_window_runs": resolution_trend["closure_forecast_reweighting_window_runs"],
+        "supporting_pending_resolution_hotspots": resolution_trend["supporting_pending_resolution_hotspots"],
+        "caution_pending_debt_hotspots": resolution_trend["caution_pending_debt_hotspots"],
         "sustained_class_hotspots": resolution_trend["sustained_class_hotspots"],
         "oscillating_class_hotspots": resolution_trend["oscillating_class_hotspots"],
         "decision_memory_status": resolution_trend["decision_memory_status"],
@@ -673,6 +691,17 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
             f"*Class Pending Debt Audit:* {summary.get('primary_target_class_pending_debt_status')} — "
             f"{summary.get('class_pending_debt_summary', 'No class pending-debt summary is recorded yet.')}"
         )
+    if summary.get("primary_target_pending_debt_freshness_status"):
+        lines.append(
+            f"*Pending Debt Freshness:* {summary.get('primary_target_pending_debt_freshness_status')} — "
+            f"{summary.get('primary_target_pending_debt_freshness_reason', 'No pending-debt freshness reason is recorded yet.')}"
+        )
+    if summary.get("primary_target_closure_forecast_reweight_direction"):
+        lines.append(
+            f"*Closure Forecast Reweighting:* {summary.get('primary_target_closure_forecast_reweight_direction')} "
+            f"({summary.get('primary_target_closure_forecast_reweight_score', 0.0):.2f}) — "
+            f"{summary.get('closure_forecast_reweighting_summary', 'No closure forecast reweighting summary is recorded yet.')}"
+        )
     if summary.get("recommendation_drift_status"):
         lines.append(
             f"*Recommendation Drift:* {summary.get('recommendation_drift_status')} — "
@@ -706,6 +735,12 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
         lines.append(f"*Class Pending Debt Summary:* {summary['class_pending_debt_summary']}")
     if summary.get("class_pending_resolution_summary"):
         lines.append(f"*Class Pending Resolution Summary:* {summary['class_pending_resolution_summary']}")
+    if summary.get("pending_debt_freshness_summary"):
+        lines.append(f"*Pending Debt Freshness Summary:* {summary['pending_debt_freshness_summary']}")
+    if summary.get("pending_debt_decay_summary"):
+        lines.append(f"*Pending Debt Decay Summary:* {summary['pending_debt_decay_summary']}")
+    if summary.get("closure_forecast_reweighting_summary"):
+        lines.append(f"*Closure Forecast Reweighting Summary:* {summary['closure_forecast_reweighting_summary']}")
     if summary.get("recommendation_quality_summary"):
         lines.append(f"*Recommendation Quality:* {summary['recommendation_quality_summary']}")
     if summary.get("confidence_validation_status"):
@@ -893,6 +928,9 @@ def _build_operator_handoff(
         resolution_trend.get("primary_target_class_reweight_transition_status", "none"),
         resolution_trend.get("primary_target_class_transition_health_status", "none"),
         resolution_trend.get("primary_target_class_transition_resolution_status", "none"),
+        resolution_trend.get("primary_target_pending_debt_freshness_status", "insufficient-data"),
+        resolution_trend.get("primary_target_closure_forecast_reweight_direction", "neutral"),
+        primary_target.get("closure_forecast_reweight_effect", "none"),
     )
     escalation_reason = _escalation_reason(queue, setup_health, watch_guidance)
     urgency = _handoff_urgency(queue, setup_health)
@@ -932,6 +970,8 @@ def _build_operator_handoff(
         f"{_class_transition_resolution_note(resolution_trend)} "
         f"{_transition_closure_confidence_note(resolution_trend)} "
         f"{_class_pending_debt_note(resolution_trend)} "
+        f"{_pending_debt_freshness_note(resolution_trend)} "
+        f"{_closure_forecast_reweighting_note(resolution_trend)} "
         f"{_recommendation_drift_note(resolution_trend)} "
         f"{confidence_calibration.get('confidence_calibration_summary', '')} "
         f"{confidence.get('adaptive_confidence_summary', '')} "
@@ -1288,7 +1328,13 @@ def _build_resolution_trend(
         current_generated_at=current_generated_at,
         confidence_calibration=confidence_calibration,
     )
-    transition_closure = _apply_transition_closure_confidence(
+    _apply_transition_closure_confidence(
+        resolution_targets,
+        history,
+        current_generated_at=current_generated_at,
+        confidence_calibration=confidence_calibration,
+    )
+    pending_debt_freshness = _apply_pending_debt_freshness_and_closure_forecast_reweighting(
         resolution_targets,
         history,
         current_generated_at=current_generated_at,
@@ -1451,19 +1497,35 @@ def _build_resolution_trend(
         "class_transition_age_window_runs": class_transition_resolution["class_transition_age_window_runs"],
         "stalled_transition_hotspots": class_transition_resolution["stalled_transition_hotspots"],
         "resolving_transition_hotspots": class_transition_resolution["resolving_transition_hotspots"],
-        "primary_target_transition_closure_confidence_score": transition_closure["primary_target_transition_closure_confidence_score"],
-        "primary_target_transition_closure_confidence_label": transition_closure["primary_target_transition_closure_confidence_label"],
-        "primary_target_transition_closure_likely_outcome": transition_closure["primary_target_transition_closure_likely_outcome"],
-        "primary_target_transition_closure_confidence_reasons": transition_closure["primary_target_transition_closure_confidence_reasons"],
-        "transition_closure_confidence_summary": transition_closure["transition_closure_confidence_summary"],
-        "transition_closure_window_runs": transition_closure["transition_closure_window_runs"],
-        "primary_target_class_pending_debt_status": transition_closure["primary_target_class_pending_debt_status"],
-        "primary_target_class_pending_debt_reason": transition_closure["primary_target_class_pending_debt_reason"],
-        "class_pending_debt_summary": transition_closure["class_pending_debt_summary"],
-        "class_pending_resolution_summary": transition_closure["class_pending_resolution_summary"],
-        "class_pending_debt_window_runs": transition_closure["class_pending_debt_window_runs"],
-        "pending_debt_hotspots": transition_closure["pending_debt_hotspots"],
-        "healthy_pending_resolution_hotspots": transition_closure["healthy_pending_resolution_hotspots"],
+        "primary_target_transition_closure_confidence_score": pending_debt_freshness["primary_target_transition_closure_confidence_score"],
+        "primary_target_transition_closure_confidence_label": pending_debt_freshness["primary_target_transition_closure_confidence_label"],
+        "primary_target_transition_closure_likely_outcome": pending_debt_freshness["primary_target_transition_closure_likely_outcome"],
+        "primary_target_transition_closure_confidence_reasons": pending_debt_freshness["primary_target_transition_closure_confidence_reasons"],
+        "transition_closure_confidence_summary": pending_debt_freshness["transition_closure_confidence_summary"],
+        "transition_closure_window_runs": pending_debt_freshness["transition_closure_window_runs"],
+        "primary_target_class_pending_debt_status": pending_debt_freshness["primary_target_class_pending_debt_status"],
+        "primary_target_class_pending_debt_reason": pending_debt_freshness["primary_target_class_pending_debt_reason"],
+        "class_pending_debt_summary": pending_debt_freshness["class_pending_debt_summary"],
+        "class_pending_resolution_summary": pending_debt_freshness["class_pending_resolution_summary"],
+        "class_pending_debt_window_runs": pending_debt_freshness["class_pending_debt_window_runs"],
+        "pending_debt_hotspots": pending_debt_freshness["pending_debt_hotspots"],
+        "healthy_pending_resolution_hotspots": pending_debt_freshness["healthy_pending_resolution_hotspots"],
+        "primary_target_pending_debt_freshness_status": pending_debt_freshness["primary_target_pending_debt_freshness_status"],
+        "primary_target_pending_debt_freshness_reason": pending_debt_freshness["primary_target_pending_debt_freshness_reason"],
+        "pending_debt_freshness_summary": pending_debt_freshness["pending_debt_freshness_summary"],
+        "pending_debt_decay_summary": pending_debt_freshness["pending_debt_decay_summary"],
+        "stale_pending_debt_hotspots": pending_debt_freshness["stale_pending_debt_hotspots"],
+        "fresh_pending_resolution_hotspots": pending_debt_freshness["fresh_pending_resolution_hotspots"],
+        "pending_debt_decay_window_runs": pending_debt_freshness["pending_debt_decay_window_runs"],
+        "primary_target_weighted_pending_resolution_support_score": pending_debt_freshness["primary_target_weighted_pending_resolution_support_score"],
+        "primary_target_weighted_pending_debt_caution_score": pending_debt_freshness["primary_target_weighted_pending_debt_caution_score"],
+        "primary_target_closure_forecast_reweight_score": pending_debt_freshness["primary_target_closure_forecast_reweight_score"],
+        "primary_target_closure_forecast_reweight_direction": pending_debt_freshness["primary_target_closure_forecast_reweight_direction"],
+        "primary_target_closure_forecast_reweight_reasons": pending_debt_freshness["primary_target_closure_forecast_reweight_reasons"],
+        "closure_forecast_reweighting_summary": pending_debt_freshness["closure_forecast_reweighting_summary"],
+        "closure_forecast_reweighting_window_runs": pending_debt_freshness["closure_forecast_reweighting_window_runs"],
+        "supporting_pending_resolution_hotspots": pending_debt_freshness["supporting_pending_resolution_hotspots"],
+        "caution_pending_debt_hotspots": pending_debt_freshness["caution_pending_debt_hotspots"],
         "sustained_class_hotspots": class_trust_momentum["sustained_class_hotspots"],
         "oscillating_class_hotspots": class_trust_momentum["oscillating_class_hotspots"],
         "decision_memory_status": decision_memory["decision_memory_status"],
@@ -2998,6 +3060,261 @@ def _apply_transition_closure_confidence(
     }
 
 
+def _apply_pending_debt_freshness_and_closure_forecast_reweighting(
+    resolution_targets: list[dict],
+    history: list[dict],
+    *,
+    current_generated_at: str,
+    confidence_calibration: dict,
+) -> dict:
+    if not resolution_targets:
+        return {
+            "primary_target_transition_closure_confidence_score": 0.05,
+            "primary_target_transition_closure_confidence_label": "low",
+            "primary_target_transition_closure_likely_outcome": "none",
+            "primary_target_transition_closure_confidence_reasons": [],
+            "transition_closure_confidence_summary": "No transition-closure confidence is recorded because there is no active target.",
+            "transition_closure_window_runs": CLASS_TRANSITION_CLOSURE_WINDOW_RUNS,
+            "primary_target_class_pending_debt_status": "none",
+            "primary_target_class_pending_debt_reason": "",
+            "class_pending_debt_summary": "No class pending-debt signal is recorded because there is no active target.",
+            "class_pending_resolution_summary": "No class pending-resolution signal is recorded because there is no active target.",
+            "class_pending_debt_window_runs": CLASS_PENDING_DEBT_WINDOW_RUNS,
+            "pending_debt_hotspots": [],
+            "healthy_pending_resolution_hotspots": [],
+            "primary_target_pending_debt_freshness_status": "insufficient-data",
+            "primary_target_pending_debt_freshness_reason": "",
+            "pending_debt_freshness_summary": "No pending-debt freshness is recorded because there is no active target.",
+            "pending_debt_decay_summary": "No pending-debt decay is recorded because there is no active target.",
+            "stale_pending_debt_hotspots": [],
+            "fresh_pending_resolution_hotspots": [],
+            "pending_debt_decay_window_runs": PENDING_DEBT_FRESHNESS_WINDOW_RUNS,
+            "primary_target_weighted_pending_resolution_support_score": 0.0,
+            "primary_target_weighted_pending_debt_caution_score": 0.0,
+            "primary_target_closure_forecast_reweight_score": 0.0,
+            "primary_target_closure_forecast_reweight_direction": "neutral",
+            "primary_target_closure_forecast_reweight_reasons": [],
+            "closure_forecast_reweighting_summary": "No closure-forecast reweighting is recorded because there is no active target.",
+            "closure_forecast_reweighting_window_runs": CLASS_CLOSURE_FORECAST_REWEIGHTING_WINDOW_RUNS,
+            "supporting_pending_resolution_hotspots": [],
+            "caution_pending_debt_hotspots": [],
+        }
+
+    current_primary_target = resolution_targets[0]
+    current_bucket = _recommendation_bucket(current_primary_target)
+    transition_events = _class_transition_events(
+        history,
+        current_primary_target=current_primary_target,
+        current_generated_at=current_generated_at,
+    )
+    historical_transition_events = transition_events[1:]
+
+    updated_targets: list[dict] = []
+    for target in resolution_targets:
+        pending_debt_freshness_status = "insufficient-data"
+        pending_debt_freshness_reason = ""
+        pending_debt_memory_weight = 0.0
+        decayed_pending_debt_rate = 0.0
+        decayed_pending_resolution_rate = 0.0
+        recent_pending_signal_mix = ""
+        weighted_pending_resolution_support_score = 0.0
+        weighted_pending_debt_caution_score = 0.0
+        closure_forecast_reweight_score = 0.0
+        closure_forecast_reweight_direction = "neutral"
+        closure_forecast_reweight_reasons: list[str] = []
+        closure_forecast_reweight_effect = "none"
+        closure_forecast_reweight_effect_reason = ""
+        transition_closure_likely_outcome = target.get("transition_closure_likely_outcome", "none")
+        transition_closure_confidence_label = target.get("transition_closure_confidence_label", "low")
+        transition_closure_confidence_score = target.get("transition_closure_confidence_score", 0.05)
+        transition_closure_confidence_reasons = target.get("transition_closure_confidence_reasons", [])
+        transition_status = target.get("class_reweight_transition_status", "none")
+        transition_reason = target.get("class_reweight_transition_reason", "")
+        resolution_status = target.get("class_transition_resolution_status", "none")
+        resolution_reason = target.get("class_transition_resolution_reason", "")
+        health_status = target.get("class_transition_health_status", "none")
+        health_reason = target.get("class_transition_health_reason", "")
+        trust_policy = target.get("trust_policy", "monitor")
+        trust_policy_reason = target.get("trust_policy_reason", "No trust-policy reason is recorded yet.")
+        pending_debt_status = target.get("class_pending_debt_status", "none")
+        pending_debt_reason = target.get("class_pending_debt_reason", "")
+        policy_debt_status = target.get("policy_debt_status", "none")
+        policy_debt_reason = target.get("policy_debt_reason", "")
+        class_normalization_status = target.get("class_normalization_status", "none")
+        class_normalization_reason = target.get("class_normalization_reason", "")
+
+        if _recommendation_bucket(target) == current_bucket:
+            transition_history_meta = _target_class_transition_history(target, transition_events)
+            pending_history_meta = _pending_debt_freshness_for_target(
+                target,
+                historical_transition_events,
+            )
+            pending_debt_freshness_status = pending_history_meta["pending_debt_freshness_status"]
+            pending_debt_freshness_reason = pending_history_meta["pending_debt_freshness_reason"]
+            pending_debt_memory_weight = pending_history_meta["pending_debt_memory_weight"]
+            decayed_pending_debt_rate = pending_history_meta["decayed_pending_debt_rate"]
+            decayed_pending_resolution_rate = pending_history_meta["decayed_pending_resolution_rate"]
+            recent_pending_signal_mix = pending_history_meta["recent_pending_signal_mix"]
+            (
+                weighted_pending_resolution_support_score,
+                weighted_pending_debt_caution_score,
+                closure_forecast_reweight_score,
+                closure_forecast_reweight_direction,
+                closure_forecast_reweight_reasons,
+            ) = _closure_forecast_reweight_scores_for_target(
+                target,
+                transition_history_meta,
+                pending_history_meta,
+            )
+            (
+                closure_forecast_reweight_effect,
+                closure_forecast_reweight_effect_reason,
+                transition_closure_likely_outcome,
+                transition_status,
+                transition_reason,
+                resolution_status,
+                resolution_reason,
+                trust_policy,
+                trust_policy_reason,
+                pending_debt_status,
+                pending_debt_reason,
+                policy_debt_status,
+                policy_debt_reason,
+                class_normalization_status,
+                class_normalization_reason,
+            ) = _apply_closure_forecast_reweighting_control(
+                target,
+                transition_history_meta=transition_history_meta,
+                trust_policy=trust_policy,
+                trust_policy_reason=trust_policy_reason,
+                transition_status=transition_status,
+                transition_reason=transition_reason,
+                resolution_status=resolution_status,
+                resolution_reason=resolution_reason,
+                pending_debt_status=pending_debt_status,
+                pending_debt_reason=pending_debt_reason,
+                policy_debt_status=policy_debt_status,
+                policy_debt_reason=policy_debt_reason,
+                class_normalization_status=class_normalization_status,
+                class_normalization_reason=class_normalization_reason,
+                closure_confidence_label=transition_closure_confidence_label,
+                closure_likely_outcome=transition_closure_likely_outcome,
+                pending_debt_freshness_status=pending_debt_freshness_status,
+                closure_forecast_reweight_direction=closure_forecast_reweight_direction,
+                closure_forecast_reweight_score=closure_forecast_reweight_score,
+            )
+
+        updated_targets.append(
+            {
+                **target,
+                "pending_debt_freshness_status": pending_debt_freshness_status,
+                "pending_debt_freshness_reason": pending_debt_freshness_reason,
+                "pending_debt_memory_weight": pending_debt_memory_weight,
+                "decayed_pending_debt_rate": decayed_pending_debt_rate,
+                "decayed_pending_resolution_rate": decayed_pending_resolution_rate,
+                "recent_pending_signal_mix": recent_pending_signal_mix,
+                "weighted_pending_resolution_support_score": weighted_pending_resolution_support_score,
+                "weighted_pending_debt_caution_score": weighted_pending_debt_caution_score,
+                "closure_forecast_reweight_score": closure_forecast_reweight_score,
+                "closure_forecast_reweight_direction": closure_forecast_reweight_direction,
+                "closure_forecast_reweight_reasons": closure_forecast_reweight_reasons,
+                "closure_forecast_reweight_effect": closure_forecast_reweight_effect,
+                "closure_forecast_reweight_effect_reason": closure_forecast_reweight_effect_reason,
+                "transition_closure_likely_outcome": transition_closure_likely_outcome,
+                "class_reweight_transition_status": transition_status,
+                "class_reweight_transition_reason": transition_reason,
+                "class_transition_resolution_status": resolution_status,
+                "class_transition_resolution_reason": resolution_reason,
+                "class_pending_debt_status": pending_debt_status,
+                "class_pending_debt_reason": pending_debt_reason,
+                "policy_debt_status": policy_debt_status,
+                "policy_debt_reason": policy_debt_reason,
+                "class_normalization_status": class_normalization_status,
+                "class_normalization_reason": class_normalization_reason,
+                "trust_policy": trust_policy,
+                "trust_policy_reason": trust_policy_reason,
+            }
+        )
+
+    resolution_targets[:] = updated_targets
+    primary_target = resolution_targets[0]
+    pending_debt_hotspots = _class_pending_debt_hotspots(resolution_targets, mode="debt")
+    healthy_pending_resolution_hotspots = _class_pending_debt_hotspots(
+        resolution_targets,
+        mode="healthy",
+    )
+    stale_pending_debt_hotspots = _pending_debt_freshness_hotspots(
+        resolution_targets,
+        mode="stale",
+    )
+    fresh_pending_resolution_hotspots = _pending_debt_freshness_hotspots(
+        resolution_targets,
+        mode="fresh",
+    )
+    supporting_pending_resolution_hotspots = _closure_forecast_hotspots(
+        resolution_targets,
+        mode="support",
+    )
+    caution_pending_debt_hotspots = _closure_forecast_hotspots(
+        resolution_targets,
+        mode="caution",
+    )
+    return {
+        "primary_target_transition_closure_confidence_score": primary_target.get("transition_closure_confidence_score", 0.05),
+        "primary_target_transition_closure_confidence_label": primary_target.get("transition_closure_confidence_label", "low"),
+        "primary_target_transition_closure_likely_outcome": primary_target.get("transition_closure_likely_outcome", "none"),
+        "primary_target_transition_closure_confidence_reasons": primary_target.get("transition_closure_confidence_reasons", []),
+        "transition_closure_confidence_summary": _transition_closure_confidence_summary(
+            primary_target,
+            pending_debt_hotspots,
+        ),
+        "transition_closure_window_runs": CLASS_TRANSITION_CLOSURE_WINDOW_RUNS,
+        "primary_target_class_pending_debt_status": primary_target.get("class_pending_debt_status", "none"),
+        "primary_target_class_pending_debt_reason": primary_target.get("class_pending_debt_reason", ""),
+        "class_pending_debt_summary": _class_pending_debt_summary(
+            primary_target,
+            pending_debt_hotspots,
+            healthy_pending_resolution_hotspots,
+        ),
+        "class_pending_resolution_summary": _class_pending_resolution_summary(
+            primary_target,
+            healthy_pending_resolution_hotspots,
+            pending_debt_hotspots,
+        ),
+        "class_pending_debt_window_runs": CLASS_PENDING_DEBT_WINDOW_RUNS,
+        "pending_debt_hotspots": pending_debt_hotspots,
+        "healthy_pending_resolution_hotspots": healthy_pending_resolution_hotspots,
+        "primary_target_pending_debt_freshness_status": primary_target.get("pending_debt_freshness_status", "insufficient-data"),
+        "primary_target_pending_debt_freshness_reason": primary_target.get("pending_debt_freshness_reason", ""),
+        "pending_debt_freshness_summary": _pending_debt_freshness_summary(
+            primary_target,
+            stale_pending_debt_hotspots,
+            fresh_pending_resolution_hotspots,
+        ),
+        "pending_debt_decay_summary": _pending_debt_decay_summary(
+            primary_target,
+            fresh_pending_resolution_hotspots,
+            stale_pending_debt_hotspots,
+        ),
+        "stale_pending_debt_hotspots": stale_pending_debt_hotspots,
+        "fresh_pending_resolution_hotspots": fresh_pending_resolution_hotspots,
+        "pending_debt_decay_window_runs": PENDING_DEBT_FRESHNESS_WINDOW_RUNS,
+        "primary_target_weighted_pending_resolution_support_score": primary_target.get("weighted_pending_resolution_support_score", 0.0),
+        "primary_target_weighted_pending_debt_caution_score": primary_target.get("weighted_pending_debt_caution_score", 0.0),
+        "primary_target_closure_forecast_reweight_score": primary_target.get("closure_forecast_reweight_score", 0.0),
+        "primary_target_closure_forecast_reweight_direction": primary_target.get("closure_forecast_reweight_direction", "neutral"),
+        "primary_target_closure_forecast_reweight_reasons": primary_target.get("closure_forecast_reweight_reasons", []),
+        "closure_forecast_reweighting_summary": _closure_forecast_reweighting_summary(
+            primary_target,
+            supporting_pending_resolution_hotspots,
+            caution_pending_debt_hotspots,
+        ),
+        "closure_forecast_reweighting_window_runs": CLASS_CLOSURE_FORECAST_REWEIGHTING_WINDOW_RUNS,
+        "supporting_pending_resolution_hotspots": supporting_pending_resolution_hotspots,
+        "caution_pending_debt_hotspots": caution_pending_debt_hotspots,
+    }
+
+
 def _class_reweight_events(
     history: list[dict],
     *,
@@ -3612,6 +3929,477 @@ def _class_pending_debt_hotspots(resolution_targets: list[dict], *, mode: str) -
     return hotspots[:5]
 
 
+def _pending_debt_freshness_for_target(target: dict, transition_events: list[dict]) -> dict:
+    class_key = _target_class_key(target)
+    class_events = [event for event in transition_events if event.get("class_key") == class_key]
+    relevant_events: list[tuple[dict, str]] = []
+    for event in class_events:
+        outcome = _pending_debt_event_outcome(event)
+        if outcome == "none":
+            continue
+        relevant_events.append((event, outcome))
+        if len(relevant_events) >= CLASS_PENDING_DEBT_WINDOW_RUNS:
+            break
+
+    weighted_pending_entry_count = 0.0
+    weighted_debt_like = 0.0
+    weighted_healthy_resolution = 0.0
+    recent_pending_weight = 0.0
+    recent_outcomes = [outcome for _, outcome in relevant_events[:PENDING_DEBT_FRESHNESS_WINDOW_RUNS]]
+    for index, (_event, outcome) in enumerate(relevant_events):
+        weight = CLASS_MEMORY_RECENCY_WEIGHTS[min(index, HISTORY_WINDOW_RUNS - 1)]
+        weighted_pending_entry_count += weight
+        if index < PENDING_DEBT_FRESHNESS_WINDOW_RUNS:
+            recent_pending_weight += weight
+        if outcome in {"stalled", "expired", "blocked"}:
+            weighted_debt_like += weight
+        if outcome in {"confirmed", "cleared"}:
+            weighted_healthy_resolution += weight
+
+    recent_window_weight_share = recent_pending_weight / max(weighted_pending_entry_count, 1.0)
+    freshness_status = _pending_debt_freshness_status(
+        weighted_pending_entry_count,
+        recent_window_weight_share,
+    )
+    decayed_pending_debt_rate = weighted_debt_like / max(weighted_pending_entry_count, 1.0)
+    decayed_pending_resolution_rate = weighted_healthy_resolution / max(weighted_pending_entry_count, 1.0)
+    return {
+        "pending_debt_freshness_status": freshness_status,
+        "pending_debt_freshness_reason": _pending_debt_freshness_reason(
+            freshness_status,
+            weighted_pending_entry_count,
+            recent_window_weight_share,
+            decayed_pending_debt_rate,
+            decayed_pending_resolution_rate,
+        ),
+        "pending_debt_memory_weight": round(recent_window_weight_share, 2),
+        "decayed_pending_debt_rate": round(decayed_pending_debt_rate, 2),
+        "decayed_pending_resolution_rate": round(decayed_pending_resolution_rate, 2),
+        "recent_pending_signal_mix": _recent_pending_signal_mix(
+            weighted_pending_entry_count,
+            weighted_debt_like,
+            weighted_healthy_resolution,
+            recent_window_weight_share,
+        ),
+        "recent_pending_debt_path": " -> ".join(recent_outcomes),
+    }
+
+
+def _pending_debt_freshness_status(weighted_pending_entry_count: float, recent_window_weight_share: float) -> str:
+    if weighted_pending_entry_count < 2.0:
+        return "insufficient-data"
+    if recent_window_weight_share >= 0.60:
+        return "fresh"
+    if recent_window_weight_share >= 0.35:
+        return "mixed-age"
+    return "stale"
+
+
+def _pending_debt_freshness_reason(
+    freshness_status: str,
+    weighted_pending_entry_count: float,
+    recent_window_weight_share: float,
+    decayed_pending_debt_rate: float,
+    decayed_pending_resolution_rate: float,
+) -> str:
+    if freshness_status == "fresh":
+        return (
+            "Recent pending-transition evidence is still current enough to trust, with "
+            f"{recent_window_weight_share:.0%} of the weighted signal coming from the latest {PENDING_DEBT_FRESHNESS_WINDOW_RUNS} runs."
+        )
+    if freshness_status == "mixed-age":
+        return (
+            "Pending-transition memory is still useful, but it is partly aging: "
+            f"{recent_window_weight_share:.0%} of the weighted signal is recent and the rest is older carry-forward."
+        )
+    if freshness_status == "stale":
+        return (
+            "Older pending-debt patterns are now carrying more of the signal than recent runs, so they should not dominate closure forecasting."
+        )
+    return (
+        "Pending-transition memory is still too lightly exercised to judge freshness, with "
+        f"{weighted_pending_entry_count:.2f} weighted pending-entry run(s), "
+        f"{decayed_pending_debt_rate:.0%} debt-like signal, and {decayed_pending_resolution_rate:.0%} healthy-resolution signal."
+    )
+
+
+def _recent_pending_signal_mix(
+    weighted_pending_entry_count: float,
+    weighted_debt_like: float,
+    weighted_healthy_resolution: float,
+    recent_window_weight_share: float,
+) -> str:
+    return (
+        f"{weighted_pending_entry_count:.2f} weighted pending-entry run(s) with "
+        f"{weighted_debt_like:.2f} debt-like, {weighted_healthy_resolution:.2f} healthy-resolution, "
+        f"and {recent_window_weight_share:.0%} of the signal from the freshest runs."
+    )
+
+
+def _closure_forecast_reweight_scores_for_target(
+    target: dict,
+    transition_history_meta: dict,
+    pending_history_meta: dict,
+) -> tuple[float, float, float, str, list[str]]:
+    transition_status = target.get("class_reweight_transition_status", "none")
+    if transition_status not in {"pending-support", "pending-caution"}:
+        return 0.0, 0.0, 0.0, "neutral", []
+
+    freshness_status = pending_history_meta.get("pending_debt_freshness_status", "insufficient-data")
+    freshness_multiplier = {
+        "fresh": 1.00,
+        "mixed-age": 0.65,
+        "stale": 0.35,
+        "insufficient-data": 0.20,
+    }.get(freshness_status, 0.20)
+    transition_direction = _pending_transition_direction(transition_status)
+    transition_score_delta = float(transition_history_meta.get("transition_score_delta", 0.0) or 0.0)
+    health_status = target.get("class_transition_health_status", "none")
+    likely_outcome = target.get("transition_closure_likely_outcome", "none")
+    pending_debt_status = target.get("class_pending_debt_status", "none")
+    local_noise = _target_specific_normalization_noise(target, transition_history_meta)
+    matching_transition_strengthening = (
+        transition_status == "pending-support" and transition_score_delta >= 0.05
+    ) or (
+        transition_status == "pending-caution" and transition_score_delta >= 0.05
+    )
+
+    support_adjustments = 0.0
+    if likely_outcome == "confirm-soon":
+        support_adjustments += 0.10
+    if health_status == "building":
+        support_adjustments += 0.10
+    if target.get("class_reweight_stability_status", "watch") == "stable":
+        support_adjustments += 0.05
+    if matching_transition_strengthening:
+        support_adjustments += 0.05
+    if health_status in {"stalled", "expired"}:
+        support_adjustments -= 0.10
+    if local_noise:
+        support_adjustments -= 0.10
+
+    caution_adjustments = 0.0
+    if pending_debt_status == "active-debt":
+        caution_adjustments += 0.10
+    if likely_outcome in {"clear-risk", "expire-risk"}:
+        caution_adjustments += 0.10
+    if health_status == "holding":
+        caution_adjustments += 0.05
+    if int(target.get("class_transition_age_runs", 0) or 0) >= 3 and not transition_history_meta.get(
+        "current_transition_strengthening",
+        False,
+    ):
+        caution_adjustments += 0.05
+    if pending_debt_status == "clearing":
+        caution_adjustments -= 0.10
+    if target.get("class_transition_resolution_status", "none") == "confirmed":
+        caution_adjustments -= 0.05
+
+    support_score = _clamp_round(
+        pending_history_meta.get("decayed_pending_resolution_rate", 0.0) * freshness_multiplier
+        + support_adjustments,
+        lower=0.0,
+        upper=0.95,
+    )
+    caution_score = _clamp_round(
+        pending_history_meta.get("decayed_pending_debt_rate", 0.0) * freshness_multiplier
+        + caution_adjustments,
+        lower=0.0,
+        upper=0.95,
+    )
+    reweight_score = _clamp_round(
+        support_score - caution_score,
+        lower=-0.95,
+        upper=0.95,
+    )
+    if reweight_score >= 0.20:
+        direction = "supporting-confirmation"
+    elif reweight_score <= -0.20:
+        direction = "supporting-clearance"
+    else:
+        direction = "neutral"
+
+    reasons: list[str] = []
+    freshness_reason = pending_history_meta.get("pending_debt_freshness_reason", "")
+    if freshness_reason:
+        reasons.append(freshness_reason)
+    if likely_outcome == "confirm-soon":
+        reasons.append("Recent class resolution behavior is still strong enough that this pending signal could confirm soon.")
+    elif health_status == "building":
+        reasons.append("The live pending signal is still building in the same direction.")
+    elif target.get("class_reweight_stability_status", "watch") == "stable":
+        reasons.append("Class transition stability is still good enough to keep the pending forecast coherent.")
+    if pending_debt_status == "active-debt":
+        reasons.append("Fresh unresolved pending debt is still clustering in this class.")
+    elif likely_outcome in {"clear-risk", "expire-risk"}:
+        reasons.append("The live pending signal is already leaning toward clearance or expiry risk.")
+    elif health_status == "holding":
+        reasons.append("The live pending signal is holding instead of strengthening.")
+    if local_noise:
+        reasons.append("Local target instability is still limiting how much class evidence can strengthen the pending forecast.")
+    return support_score, caution_score, reweight_score, direction, reasons[:4]
+
+
+def _apply_closure_forecast_reweighting_control(
+    target: dict,
+    *,
+    transition_history_meta: dict,
+    trust_policy: str,
+    trust_policy_reason: str,
+    transition_status: str,
+    transition_reason: str,
+    resolution_status: str,
+    resolution_reason: str,
+    pending_debt_status: str,
+    pending_debt_reason: str,
+    policy_debt_status: str,
+    policy_debt_reason: str,
+    class_normalization_status: str,
+    class_normalization_reason: str,
+    closure_confidence_label: str,
+    closure_likely_outcome: str,
+    pending_debt_freshness_status: str,
+    closure_forecast_reweight_direction: str,
+    closure_forecast_reweight_score: float,
+) -> tuple[str, str, str, str, str, str, str, str, str, str, str, str, str, str, str]:
+    effect = "none"
+    effect_reason = ""
+    local_noise = _target_specific_normalization_noise(target, transition_history_meta)
+    transition_age_runs = int(target.get("class_transition_age_runs", 0) or 0)
+    current_strengthening = transition_history_meta.get("current_transition_strengthening", False)
+
+    if transition_status not in {"pending-support", "pending-caution"}:
+        return (
+            effect,
+            effect_reason,
+            closure_likely_outcome,
+            transition_status,
+            transition_reason,
+            resolution_status,
+            resolution_reason,
+            trust_policy,
+            trust_policy_reason,
+            pending_debt_status,
+            pending_debt_reason,
+            policy_debt_status,
+            policy_debt_reason,
+            class_normalization_status,
+            class_normalization_reason,
+        )
+
+    if closure_forecast_reweight_direction == "supporting-confirmation":
+        if pending_debt_freshness_status == "fresh" and not local_noise and pending_debt_status != "clearing":
+            effect = "confirm-support-strengthened"
+            effect_reason = (
+                "Fresh class resolution behavior is clean enough to strengthen the pending forecast, but the pending state still needs Phase 39 persistence before it can confirm."
+            )
+        elif pending_debt_freshness_status in {"stale", "insufficient-data"}:
+            effect = "confirm-support-softened"
+            effect_reason = (
+                "Older pending-transition evidence is aging out, so it cannot keep strengthening confirmation support from scratch."
+            )
+            if closure_likely_outcome == "confirm-soon":
+                closure_likely_outcome = "hold"
+    elif closure_forecast_reweight_direction == "supporting-clearance":
+        if pending_debt_freshness_status in {"fresh", "mixed-age"}:
+            effect = "clear-risk-strengthened"
+            effect_reason = (
+                "Fresh unresolved pending debt is still clustering, so the live pending signal should be treated as more likely to clear or expire than confirm."
+            )
+            if closure_likely_outcome not in {"blocked", "insufficient-data"}:
+                closure_likely_outcome = "expire-risk" if transition_age_runs >= 3 and not current_strengthening else "clear-risk"
+        else:
+            effect = "clear-risk-softened"
+            effect_reason = (
+                "Older pending-debt patterns are fading, so they should not strengthen clearance risk from scratch."
+            )
+
+    if (
+        transition_status in {"pending-support", "pending-caution"}
+        and closure_forecast_reweight_direction == "supporting-clearance"
+        and closure_confidence_label == "low"
+        and pending_debt_status == "active-debt"
+    ):
+        clear_reason = (
+            "This pending class signal is low-confidence inside a class with fresh unresolved pending debt, so the pending state was cleared back to the weaker posture."
+        )
+        if transition_status == "pending-support":
+            reverted_policy = target.get("pre_class_normalization_trust_policy", trust_policy)
+            reverted_reason = target.get("pre_class_normalization_trust_policy_reason", trust_policy_reason)
+            return (
+                "clear-risk-strengthened",
+                clear_reason,
+                closure_likely_outcome,
+                "none",
+                "",
+                "cleared",
+                clear_reason,
+                reverted_policy,
+                clear_reason if reverted_policy == "verify-first" else reverted_reason,
+                pending_debt_status,
+                pending_debt_reason,
+                policy_debt_status,
+                policy_debt_reason,
+                "candidate",
+                clear_reason,
+            )
+        return (
+            "clear-risk-strengthened",
+            clear_reason,
+            closure_likely_outcome,
+            "none",
+            "",
+            "cleared",
+            clear_reason,
+            trust_policy,
+            trust_policy_reason,
+            pending_debt_status,
+            pending_debt_reason,
+            "watch",
+            clear_reason,
+            class_normalization_status,
+            class_normalization_reason,
+        )
+
+    if local_noise and closure_forecast_reweight_direction == "supporting-confirmation":
+        effect = "confirm-support-softened"
+        effect_reason = (
+            "Local target instability is still overriding healthier class evidence, so the pending forecast cannot strengthen beyond the existing posture."
+        )
+        if closure_likely_outcome == "confirm-soon":
+            closure_likely_outcome = "hold"
+
+    return (
+        effect,
+        effect_reason,
+        closure_likely_outcome,
+        transition_status,
+        transition_reason,
+        resolution_status,
+        resolution_reason,
+        trust_policy,
+        trust_policy_reason,
+        pending_debt_status,
+        pending_debt_reason,
+        policy_debt_status,
+        policy_debt_reason,
+        class_normalization_status,
+        class_normalization_reason,
+    )
+
+
+def _pending_debt_freshness_hotspots(resolution_targets: list[dict], *, mode: str) -> list[dict]:
+    grouped: dict[str, dict] = {}
+    for target in resolution_targets:
+        class_key = _target_class_key(target)
+        if not class_key:
+            continue
+        current = {
+            "scope": "class",
+            "label": class_key,
+            "pending_debt_freshness_status": target.get("pending_debt_freshness_status", "insufficient-data"),
+            "decayed_pending_debt_rate": target.get("decayed_pending_debt_rate", 0.0),
+            "decayed_pending_resolution_rate": target.get("decayed_pending_resolution_rate", 0.0),
+            "recent_pending_signal_mix": target.get("recent_pending_signal_mix", ""),
+            "recent_pending_debt_path": target.get("recent_pending_debt_path", ""),
+            "dominant_count": target.get("decayed_pending_debt_rate", 0.0),
+            "pending_entry_count": len(
+                [part for part in (target.get("recent_pending_debt_path", "") or "").split(" -> ") if part]
+            ),
+        }
+        if mode == "fresh":
+            current["dominant_count"] = target.get("decayed_pending_resolution_rate", 0.0)
+        existing = grouped.get(class_key)
+        if existing is None or current["dominant_count"] > existing["dominant_count"]:
+            grouped[class_key] = current
+
+    hotspots = list(grouped.values())
+    if mode == "fresh":
+        hotspots = [
+            item
+            for item in hotspots
+            if item.get("pending_debt_freshness_status") == "fresh"
+            and item.get("decayed_pending_resolution_rate", 0.0) > 0.0
+        ]
+        hotspots.sort(
+            key=lambda item: (
+                -item.get("decayed_pending_resolution_rate", 0.0),
+                -item.get("pending_entry_count", 0),
+                item.get("label", ""),
+            )
+        )
+    else:
+        hotspots = [
+            item
+            for item in hotspots
+            if item.get("pending_debt_freshness_status") == "stale"
+            and item.get("decayed_pending_debt_rate", 0.0) > 0.0
+        ]
+        hotspots.sort(
+            key=lambda item: (
+                -item.get("decayed_pending_debt_rate", 0.0),
+                -item.get("pending_entry_count", 0),
+                item.get("label", ""),
+            )
+        )
+    return hotspots[:5]
+
+
+def _closure_forecast_hotspots(resolution_targets: list[dict], *, mode: str) -> list[dict]:
+    grouped: dict[str, dict] = {}
+    for target in resolution_targets:
+        class_key = _target_class_key(target)
+        if not class_key:
+            continue
+        current = {
+            "scope": "class",
+            "label": class_key,
+            "closure_forecast_reweight_direction": target.get("closure_forecast_reweight_direction", "neutral"),
+            "weighted_pending_resolution_support_score": target.get("weighted_pending_resolution_support_score", 0.0),
+            "weighted_pending_debt_caution_score": target.get("weighted_pending_debt_caution_score", 0.0),
+            "recent_pending_signal_mix": target.get("recent_pending_signal_mix", ""),
+            "recent_pending_debt_path": target.get("recent_pending_debt_path", ""),
+            "pending_entry_count": len(
+                [part for part in (target.get("recent_pending_debt_path", "") or "").split(" -> ") if part]
+            ),
+        }
+        current["dominant_count"] = current["weighted_pending_resolution_support_score"]
+        if mode == "caution":
+            current["dominant_count"] = current["weighted_pending_debt_caution_score"]
+        existing = grouped.get(class_key)
+        if existing is None or current["dominant_count"] > existing["dominant_count"]:
+            grouped[class_key] = current
+
+    hotspots = list(grouped.values())
+    if mode == "support":
+        hotspots = [
+            item
+            for item in hotspots
+            if item.get("closure_forecast_reweight_direction") == "supporting-confirmation"
+        ]
+        hotspots.sort(
+            key=lambda item: (
+                -item.get("weighted_pending_resolution_support_score", 0.0),
+                -item.get("pending_entry_count", 0),
+                item.get("label", ""),
+            )
+        )
+    else:
+        hotspots = [
+            item
+            for item in hotspots
+            if item.get("closure_forecast_reweight_direction") == "supporting-clearance"
+        ]
+        hotspots.sort(
+            key=lambda item: (
+                -item.get("weighted_pending_debt_caution_score", 0.0),
+                -item.get("pending_entry_count", 0),
+                item.get("label", ""),
+            )
+        )
+    return hotspots[:5]
+
+
 def _transition_closure_confidence_summary(
     primary_target: dict,
     pending_debt_hotspots: list[dict],
@@ -3693,6 +4481,100 @@ def _class_pending_resolution_summary(
             "so those classes should clear weak pending signals earlier."
         )
     return "No class-level pending-resolution pattern is strong enough to call out yet."
+
+
+def _pending_debt_freshness_summary(
+    primary_target: dict,
+    stale_pending_debt_hotspots: list[dict],
+    fresh_pending_resolution_hotspots: list[dict],
+) -> str:
+    label = _target_label(primary_target) or "The current target"
+    freshness_status = primary_target.get("pending_debt_freshness_status", "insufficient-data")
+    if freshness_status == "fresh":
+        return f"{label} still has fresh pending-transition memory, so recent class evidence should carry most of the closure forecast."
+    if freshness_status == "mixed-age":
+        return f"{label} still has useful pending-transition memory, but some of that signal is aging and should be weighted more cautiously."
+    if freshness_status == "stale":
+        return f"{label} is leaning on older pending-debt patterns more than fresh runs, so those class signals should not dominate the closure forecast."
+    if fresh_pending_resolution_hotspots:
+        hotspot = fresh_pending_resolution_hotspots[0]
+        return (
+            f"Fresh pending-resolution evidence is strongest around {hotspot.get('label', 'recent hotspots')}, "
+            "so those classes deserve more trust than older pending-debt carry-forward."
+        )
+    if stale_pending_debt_hotspots:
+        hotspot = stale_pending_debt_hotspots[0]
+        return (
+            f"Older pending-debt memory is lingering most around {hotspot.get('label', 'recent hotspots')}, "
+            "so those classes should not let stale debt dominate new pending forecasts."
+        )
+    return "Pending-transition memory is still too lightly exercised to say whether fresh or stale class debt should lead the forecast."
+
+
+def _pending_debt_decay_summary(
+    primary_target: dict,
+    fresh_pending_resolution_hotspots: list[dict],
+    stale_pending_debt_hotspots: list[dict],
+) -> str:
+    label = _target_label(primary_target) or "The current target"
+    freshness_status = primary_target.get("pending_debt_freshness_status", "insufficient-data")
+    resolution_rate = primary_target.get("decayed_pending_resolution_rate", 0.0)
+    debt_rate = primary_target.get("decayed_pending_debt_rate", 0.0)
+    if freshness_status == "fresh" and resolution_rate >= debt_rate:
+        return f"Fresh pending-transition evidence for {label} is resolving more cleanly than it is stalling, so the closure forecast can lean more on recent healthy outcomes."
+    if freshness_status == "fresh":
+        return f"Fresh pending-transition debt for {label} is still clustering, so unresolved pending states should be treated more cautiously than older clean outcomes suggest."
+    if freshness_status == "stale":
+        return f"Older pending-debt patterns are being down-weighted for {label}, so stale class drag should not control the live closure forecast."
+    if fresh_pending_resolution_hotspots:
+        hotspot = fresh_pending_resolution_hotspots[0]
+        return (
+            f"Fresh pending-resolution behavior is strongest around {hotspot.get('label', 'recent hotspots')}, "
+            "so those classes are earning cleaner closure forecasts."
+        )
+    if stale_pending_debt_hotspots:
+        hotspot = stale_pending_debt_hotspots[0]
+        return (
+            f"Stale pending-debt memory is strongest around {hotspot.get('label', 'recent hotspots')}, "
+            "so those older caution patterns should keep decaying instead of carrying forward indefinitely."
+        )
+    return "No strong pending-debt freshness trend is dominating the closure forecast yet."
+
+
+def _closure_forecast_reweighting_summary(
+    primary_target: dict,
+    supporting_pending_resolution_hotspots: list[dict],
+    caution_pending_debt_hotspots: list[dict],
+) -> str:
+    label = _target_label(primary_target) or "The current target"
+    direction = primary_target.get("closure_forecast_reweight_direction", "neutral")
+    effect = primary_target.get("closure_forecast_reweight_effect", "none")
+    score = primary_target.get("closure_forecast_reweight_score", 0.0)
+    if effect == "confirm-support-strengthened":
+        return f"{label} still needs persistence before confirmation, but fresh class resolution behavior is strengthening the pending forecast ({score:.2f})."
+    if effect == "confirm-support-softened":
+        return f"{label} still has a pending class signal, but older pending-transition evidence is softening how much confidence that forecast deserves ({score:.2f})."
+    if effect == "clear-risk-strengthened":
+        return f"{label} is seeing fresher unresolved pending debt, so the live pending forecast is leaning more strongly toward clearance or expiry risk ({score:.2f})."
+    if effect == "clear-risk-softened":
+        return f"{label} still carries some pending-debt caution, but older debt patterns are fading instead of fully driving the forecast ({score:.2f})."
+    if direction == "supporting-confirmation":
+        return f"Recent class resolution behavior around {label} is clean enough to strengthen the pending forecast, but not enough to confirm it yet ({score:.2f})."
+    if direction == "supporting-clearance":
+        return f"Recent class pending debt around {label} is still fresh enough to push the pending forecast toward clearance or expiry risk ({score:.2f})."
+    if supporting_pending_resolution_hotspots:
+        hotspot = supporting_pending_resolution_hotspots[0]
+        return (
+            f"Fresh closure support is strongest around {hotspot.get('label', 'recent hotspots')}, "
+            "so those classes are closest to cleaner pending confirmation paths."
+        )
+    if caution_pending_debt_hotspots:
+        hotspot = caution_pending_debt_hotspots[0]
+        return (
+            f"Fresh pending-debt caution is strongest around {hotspot.get('label', 'recent hotspots')}, "
+            "so those classes should keep weak pending states from lingering."
+        )
+    return "Class evidence is informative, but it is not strong enough to move the closure forecast by itself yet."
 
 
 def _target_class_reweight_history(target: dict, reweight_events: list[dict]) -> dict:
@@ -7168,6 +8050,11 @@ def _why_it_matters(
         resolution_trend.get("primary_target_class_transition_health_reason", ""),
         resolution_trend.get("primary_target_class_transition_resolution_status", "none"),
         resolution_trend.get("primary_target_class_transition_resolution_reason", ""),
+        resolution_trend.get("primary_target_pending_debt_freshness_status", "insufficient-data"),
+        resolution_trend.get("primary_target_pending_debt_freshness_reason", ""),
+        resolution_trend.get("primary_target_closure_forecast_reweight_direction", "neutral"),
+        primary_target.get("closure_forecast_reweight_effect", "none"),
+        primary_target.get("closure_forecast_reweight_effect_reason", ""),
     )
     if urgency == "blocked":
         return f"A trustworthy next step is blocked until this is cleared. {trust_sentence} {calibration_sentence}".strip()
@@ -7273,6 +8160,11 @@ def _trust_policy_sentence(
     class_transition_health_reason: str,
     class_transition_resolution_status: str,
     class_transition_resolution_reason: str,
+    pending_debt_freshness_status: str,
+    pending_debt_freshness_reason: str,
+    closure_forecast_reweight_direction: str,
+    closure_forecast_reweight_effect: str,
+    closure_forecast_reweight_effect_reason: str,
 ) -> str:
     if class_transition_resolution_status == "confirmed":
         detail = class_transition_resolution_reason or reason
@@ -7300,6 +8192,14 @@ def _trust_policy_sentence(
     if class_transition_health_status == "blocked":
         detail = class_transition_health_reason or reason
         return f"Trust policy: keep the weaker class posture because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: keep the weaker class posture because local target instability is blocking a pending class transition."
+    if closure_forecast_reweight_effect == "clear-risk-strengthened":
+        detail = closure_forecast_reweight_effect_reason or reason
+        return f"Trust policy: keep the weaker class posture because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: keep the weaker class posture because fresh pending debt is pushing the class signal toward clearance risk."
+    if closure_forecast_reweight_effect == "confirm-support-softened":
+        detail = closure_forecast_reweight_effect_reason or pending_debt_freshness_reason or reason
+        return f"Trust policy: keep the weaker class posture because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: keep the weaker class posture because the pending forecast is aging and cannot support stronger confirmation from scratch."
+    if closure_forecast_reweight_effect == "clear-risk-softened":
+        return "Trust policy: keep the current weaker posture, but older pending-debt patterns are fading rather than fully driving the forecast."
     if class_trust_reweight_effect == "normalization-boosted":
         detail = class_trust_reweight_effect_reason or reason
         return f"Trust policy: act with review because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: act with review because fresh class support crossed the reweight threshold."
@@ -7317,6 +8217,13 @@ def _trust_policy_sentence(
         return "Trust policy: verify first for now because class evidence is improving, but not strongly enough to move posture by itself yet."
     if class_trust_reweight_direction == "supporting-caution":
         return "Trust policy: verify first because recent class evidence is still caution-heavy enough to keep class trust conservative."
+    if closure_forecast_reweight_effect == "confirm-support-strengthened":
+        detail = closure_forecast_reweight_effect_reason or reason
+        return f"Trust policy: keep the weaker class posture for now because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: keep the weaker class posture for now because fresh pending-resolution evidence is strengthening the forecast without confirming it yet."
+    if closure_forecast_reweight_direction == "supporting-confirmation":
+        return "Trust policy: keep the weaker class posture for now because fresh pending-resolution evidence is making the pending forecast healthier, but it has not confirmed yet."
+    if closure_forecast_reweight_direction == "supporting-clearance":
+        return "Trust policy: keep the weaker class posture because fresh pending debt is still pushing this class signal toward clearance or expiry risk."
     if class_decay_status == "normalization-decayed":
         detail = class_decay_reason or class_memory_freshness_reason or reason
         return f"Trust policy: verify first because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: verify first because stale class memory pulled back class-level normalization."
@@ -7330,6 +8237,11 @@ def _trust_policy_sentence(
         return f"Trust policy: verify first because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: verify first because older class evidence is being down-weighted."
     if class_memory_freshness_status == "mixed-age":
         return "Trust policy: verify first because class memory is still useful, but part of the class signal is aging out."
+    if pending_debt_freshness_status == "stale":
+        detail = pending_debt_freshness_reason or reason
+        return f"Trust policy: verify first because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: verify first because older pending-debt patterns are being down-weighted."
+    if pending_debt_freshness_status == "mixed-age":
+        return "Trust policy: verify first because recent pending-transition evidence is still useful, but part of the pending-debt signal is aging out."
     if class_normalization_status == "applied":
         return "Trust policy: act with review because this class has repeatedly earned clean retirement and the current target can inherit a stronger posture."
     if class_normalization_status == "candidate":
@@ -7398,6 +8310,9 @@ def _with_trust_policy_brief(
     class_reweight_transition_status: str,
     class_transition_health_status: str,
     class_transition_resolution_status: str,
+    pending_debt_freshness_status: str,
+    closure_forecast_reweight_direction: str,
+    closure_forecast_reweight_effect: str,
 ) -> str:
     if not summary:
         return summary
@@ -7419,6 +8334,14 @@ def _with_trust_policy_brief(
         return f"{summary} Trust policy: the earlier pending class signal aged out."
     if class_transition_health_status == "blocked":
         return f"{summary} Trust policy: local target instability is still blocking a pending class transition."
+    if closure_forecast_reweight_effect == "clear-risk-strengthened":
+        return f"{summary} Trust policy: fresh pending debt is pushing the live pending signal toward clearance or expiry risk."
+    if closure_forecast_reweight_effect == "confirm-support-strengthened":
+        return f"{summary} Trust policy: fresh pending-resolution evidence is strengthening the forecast, but the pending class signal still has to confirm."
+    if closure_forecast_reweight_effect == "confirm-support-softened":
+        return f"{summary} Trust policy: older pending-transition evidence is softening how much trust the live pending forecast deserves."
+    if closure_forecast_reweight_effect == "clear-risk-softened":
+        return f"{summary} Trust policy: older pending-debt patterns are fading instead of dominating the forecast."
     if class_reweight_transition_status == "confirmed-support":
         return f"{summary} Trust policy: broader normalization is now confirmed by sustained class support."
     if class_reweight_transition_status == "confirmed-caution":
@@ -7447,6 +8370,10 @@ def _with_trust_policy_brief(
         return f"{summary} Trust policy: class evidence is leaning healthier, but not strongly enough to move posture by itself yet."
     if class_trust_reweight_direction == "supporting-caution":
         return f"{summary} Trust policy: recent class evidence is still caution-heavy."
+    if closure_forecast_reweight_direction == "supporting-confirmation":
+        return f"{summary} Trust policy: fresh pending-resolution evidence is making the live pending forecast look healthier."
+    if closure_forecast_reweight_direction == "supporting-clearance":
+        return f"{summary} Trust policy: fresh pending debt is making the live pending forecast more cautious."
     if class_decay_status == "normalization-decayed":
         return f"{summary} Trust policy: stale class memory pulled back class-level normalization."
     if class_decay_status == "policy-debt-decayed":
@@ -7457,6 +8384,10 @@ def _with_trust_policy_brief(
         return f"{summary} Trust policy: older class evidence is being down-weighted."
     if class_memory_freshness_status == "mixed-age":
         return f"{summary} Trust policy: class memory is still useful, but part of it is aging."
+    if pending_debt_freshness_status == "stale":
+        return f"{summary} Trust policy: older pending-debt patterns are being down-weighted."
+    if pending_debt_freshness_status == "mixed-age":
+        return f"{summary} Trust policy: recent pending-transition evidence is still useful, but part of it is aging."
     if class_normalization_status == "applied":
         return f"{summary} Trust policy: class-level normalization applied."
     if class_normalization_status == "candidate":
@@ -7622,6 +8553,22 @@ def _class_pending_debt_note(resolution_trend: dict) -> str:
     if status in {None, "", "none"} and not summary:
         return ""
     return f"Class pending debt audit: {status} — {summary}".strip()
+
+
+def _pending_debt_freshness_note(resolution_trend: dict) -> str:
+    status = resolution_trend.get("primary_target_pending_debt_freshness_status", "insufficient-data")
+    summary = resolution_trend.get("pending_debt_freshness_summary", "")
+    if status in {None, ""} and not summary:
+        return ""
+    return f"Pending debt freshness: {status} — {summary}".strip()
+
+
+def _closure_forecast_reweighting_note(resolution_trend: dict) -> str:
+    direction = resolution_trend.get("primary_target_closure_forecast_reweight_direction", "neutral")
+    summary = resolution_trend.get("closure_forecast_reweighting_summary", "")
+    if direction in {None, ""} and not summary:
+        return ""
+    return f"Closure forecast reweighting: {direction} — {summary}".strip()
 
 
 def _recommendation_drift_note(resolution_trend: dict) -> str:

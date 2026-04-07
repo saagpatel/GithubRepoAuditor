@@ -363,6 +363,26 @@ def _make_report(audits=None) -> dict:
             "class_pending_debt_window_runs": 10,
             "pending_debt_hotspots": [],
             "healthy_pending_resolution_hotspots": [],
+            "primary_target_pending_debt_freshness_status": "mixed-age",
+            "primary_target_pending_debt_freshness_reason": "Pending-transition memory is still useful, but it is partly aging: 50% of the weighted signal is recent and the rest is older carry-forward.",
+            "pending_debt_freshness_summary": "RepoC: Security posture needs attention still has useful pending-transition memory, but some of that signal is aging and should be weighted more cautiously.",
+            "pending_debt_decay_summary": "No strong pending-debt freshness trend is dominating the closure forecast yet.",
+            "stale_pending_debt_hotspots": [],
+            "fresh_pending_resolution_hotspots": [],
+            "pending_debt_decay_window_runs": 4,
+            "primary_target_weighted_pending_resolution_support_score": 0.58,
+            "primary_target_weighted_pending_debt_caution_score": 0.31,
+            "primary_target_closure_forecast_reweight_score": 0.27,
+            "primary_target_closure_forecast_reweight_direction": "supporting-confirmation",
+            "primary_target_closure_forecast_reweight_reasons": [
+                "Pending-transition memory is still useful, but it is partly aging: 50% of the weighted signal is recent and the rest is older carry-forward.",
+                "Recent class resolution behavior is still strong enough that this pending signal could confirm soon.",
+                "The live pending signal is still building in the same direction.",
+            ],
+            "closure_forecast_reweighting_summary": "RepoC: Security posture needs attention still needs persistence before confirmation, but fresh class resolution behavior is strengthening the pending forecast (0.27).",
+            "closure_forecast_reweighting_window_runs": 4,
+            "supporting_pending_resolution_hotspots": [],
+            "caution_pending_debt_hotspots": [],
             "stalled_transition_hotspots": [],
             "resolving_transition_hotspots": [],
             "sustained_class_hotspots": [],
@@ -711,12 +731,13 @@ class TestAnalystWorkbookSheets:
         assert review_ws["A40"].value == "Transition Summary"
         assert review_ws["A41"].value == "Transition Closure"
         assert review_ws["A42"].value == "Transition Likely Outcome"
-        assert review_ws["A43"].value == "Class Pending Debt"
-        assert review_ws["A44"].value == "Transition Closure Summary"
-        assert review_ws["A45"].value == "Momentum Summary"
-        assert review_ws["A46"].value == "Exception Learning"
-        assert review_ws["A47"].value == "Recommendation Drift"
-        assert review_ws["A48"].value == "Adaptive Confidence"
+        assert review_ws["A43"].value == "Pending Debt Freshness"
+        assert review_ws["A44"].value == "Closure Forecast"
+        assert review_ws["A45"].value == "Closure Forecast Summary"
+        assert review_ws["A46"].value == "Momentum Summary"
+        assert review_ws["A47"].value == "Exception Learning"
+        assert review_ws["A48"].value == "Recommendation Drift"
+        assert review_ws["A49"].value == "Adaptive Confidence"
         assert executive_ws["D29"].value == "Trend"
         assert executive_ws["D32"].value == "Why Top Target"
         assert executive_ws["D33"].value == "Closure Guidance"
@@ -745,14 +766,15 @@ class TestAnalystWorkbookSheets:
         assert executive_ws["D58"].value == "Transition Summary"
         assert executive_ws["D59"].value == "Transition Closure"
         assert executive_ws["D60"].value == "Transition Likely Outcome"
-        assert executive_ws["D61"].value == "Class Pending Debt"
-        assert executive_ws["D62"].value == "Transition Closure Summary"
-        assert executive_ws["D63"].value == "Momentum Summary"
-        assert executive_ws["D64"].value == "Exception Learning"
-        assert executive_ws["D65"].value == "Recommendation Drift"
-        assert executive_ws["D66"].value == "Adaptive Confidence"
-        assert executive_ws["D67"].value == "Recommendation Quality"
-        assert executive_ws["D68"].value == "Confidence Validation"
+        assert executive_ws["D61"].value == "Pending Debt Freshness"
+        assert executive_ws["D62"].value == "Closure Forecast"
+        assert executive_ws["D63"].value == "Closure Forecast Summary"
+        assert executive_ws["D64"].value == "Momentum Summary"
+        assert executive_ws["D65"].value == "Exception Learning"
+        assert executive_ws["D66"].value == "Recommendation Drift"
+        assert executive_ws["D67"].value == "Adaptive Confidence"
+        assert executive_ws["D68"].value == "Recommendation Quality"
+        assert executive_ws["D69"].value == "Confidence Validation"
         assert print_ws["A17"].value == "Primary Target"
         assert print_ws["A18"].value == "Why Top Target"
         assert print_ws["A19"].value == "What We Tried"
@@ -781,12 +803,13 @@ class TestAnalystWorkbookSheets:
         assert print_ws["A43"].value == "Transition Summary"
         assert print_ws["A44"].value == "Transition Closure"
         assert print_ws["A45"].value == "Transition Likely Outcome"
-        assert print_ws["A46"].value == "Class Pending Debt"
-        assert print_ws["A47"].value == "Transition Closure Summary"
-        assert print_ws["A48"].value == "Momentum Summary"
-        assert print_ws["A49"].value == "Exception Learning"
-        assert print_ws["A50"].value == "Recommendation Drift"
-        assert print_ws["A51"].value == "Adaptive Confidence"
+        assert print_ws["A46"].value == "Pending Debt Freshness"
+        assert print_ws["A47"].value == "Closure Forecast"
+        assert print_ws["A48"].value == "Closure Forecast Summary"
+        assert print_ws["A49"].value == "Momentum Summary"
+        assert print_ws["A50"].value == "Exception Learning"
+        assert print_ws["A51"].value == "Recommendation Drift"
+        assert print_ws["A52"].value == "Adaptive Confidence"
         assert "Why Top Target" in dashboard_values
         assert "Closure Guidance" in dashboard_values
         assert "What We Tried" in dashboard_values
@@ -807,7 +830,8 @@ class TestAnalystWorkbookSheets:
         assert "Transition Resolution" in dashboard_values
         assert "Transition Closure" in dashboard_values
         assert "Transition Likely Outcome" in dashboard_values
-        assert "Class Pending Debt" in dashboard_values
+        assert "Pending Debt Freshness" in dashboard_values
+        assert "Closure Forecast" in dashboard_values
         assert "Exception Learning" in dashboard_values
         assert "Recommendation Drift" in dashboard_values
 

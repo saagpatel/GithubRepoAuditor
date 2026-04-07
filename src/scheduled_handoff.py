@@ -603,6 +603,93 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     else:
         lines.append("- No class pending-debt hotspots are recorded in the recent window.")
     lines.append("")
+    lines.append("## Pending Debt Freshness")
+    lines.append("")
+    lines.append(
+        f"- Pending-debt freshness: {summary.get('primary_target_pending_debt_freshness_status', 'insufficient-data')} "
+        f"({summary.get('primary_target_pending_debt_freshness_reason', 'No pending-debt freshness reason is recorded yet.')})"
+    )
+    lines.append(
+        f"- Pending-debt memory weight: {summary.get('primary_target', {}).get('pending_debt_memory_weight', 0.0):.0%}"
+    )
+    lines.append(
+        f"- Decayed pending-debt rate: {summary.get('primary_target', {}).get('decayed_pending_debt_rate', 0.0):.0%}"
+    )
+    lines.append(
+        f"- Decayed pending-resolution rate: {summary.get('primary_target', {}).get('decayed_pending_resolution_rate', 0.0):.0%}"
+    )
+    lines.append(
+        f"- Freshness window: {summary.get('pending_debt_decay_window_runs', 4)} run(s)"
+    )
+    lines.append(
+        f"- {summary.get('pending_debt_freshness_summary', 'No pending-debt freshness summary is recorded yet.')}"
+    )
+    lines.append(
+        f"- {summary.get('pending_debt_decay_summary', 'No pending-debt decay summary is recorded yet.')}"
+    )
+    if primary_target.get("recent_pending_signal_mix"):
+        lines.append(f"- Recent pending signal mix: {primary_target.get('recent_pending_signal_mix')}")
+    stale_pending_debt_hotspots = summary.get("stale_pending_debt_hotspots") or []
+    fresh_pending_resolution_hotspots = summary.get("fresh_pending_resolution_hotspots") or []
+    if stale_pending_debt_hotspots:
+        for hotspot in stale_pending_debt_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Stale pending-debt hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"stale debt at {hotspot.get('decayed_pending_debt_rate', 0.0):.0%} across "
+                f"{hotspot.get('recent_pending_signal_mix', 'no mix recorded')}"
+            )
+    elif fresh_pending_resolution_hotspots:
+        for hotspot in fresh_pending_resolution_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Fresh pending-resolution hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"fresh resolution at {hotspot.get('decayed_pending_resolution_rate', 0.0):.0%} across "
+                f"{hotspot.get('recent_pending_signal_mix', 'no mix recorded')}"
+            )
+    else:
+        lines.append("- No pending-debt freshness hotspots are recorded in the recent window.")
+    lines.append("")
+    lines.append("## Closure Forecast Reweighting")
+    lines.append("")
+    lines.append(
+        f"- Forecast reweighting: {summary.get('primary_target_closure_forecast_reweight_direction', 'neutral')} "
+        f"({summary.get('primary_target_closure_forecast_reweight_score', 0.0):.2f})"
+    )
+    lines.append(
+        f"- Resolution-support score: {summary.get('primary_target_weighted_pending_resolution_support_score', 0.0):.2f}"
+    )
+    lines.append(
+        f"- Pending-debt caution score: {summary.get('primary_target_weighted_pending_debt_caution_score', 0.0):.2f}"
+    )
+    if summary.get("primary_target_closure_forecast_reweight_reasons"):
+        lines.append(
+            "- Forecast reasons: "
+            + "; ".join(summary.get("primary_target_closure_forecast_reweight_reasons") or [])
+        )
+    lines.append(
+        f"- Reweighting window: {summary.get('closure_forecast_reweighting_window_runs', 4)} run(s)"
+    )
+    lines.append(
+        f"- {summary.get('closure_forecast_reweighting_summary', 'No closure-forecast reweighting summary is recorded yet.')}"
+    )
+    supporting_pending_resolution_hotspots = summary.get("supporting_pending_resolution_hotspots") or []
+    caution_pending_debt_hotspots = summary.get("caution_pending_debt_hotspots") or []
+    if supporting_pending_resolution_hotspots:
+        for hotspot in supporting_pending_resolution_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Supporting pending-resolution hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('closure_forecast_reweight_direction', 'supporting-confirmation')} at "
+                f"{hotspot.get('weighted_pending_resolution_support_score', 0.0):.2f}"
+            )
+    elif caution_pending_debt_hotspots:
+        for hotspot in caution_pending_debt_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Caution pending-debt hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('closure_forecast_reweight_direction', 'supporting-clearance')} at "
+                f"{hotspot.get('weighted_pending_debt_caution_score', 0.0):.2f}"
+            )
+    else:
+        lines.append("- No closure-forecast reweighting hotspots are recorded in the recent window.")
+    lines.append("")
     lines.append("## Recommendation Drift")
     lines.append("")
     lines.append(

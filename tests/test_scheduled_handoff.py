@@ -146,6 +146,26 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
             "class_pending_debt_window_runs": 10,
             "pending_debt_hotspots": [],
             "healthy_pending_resolution_hotspots": [],
+            "primary_target_pending_debt_freshness_status": "mixed-age",
+            "primary_target_pending_debt_freshness_reason": "Pending-transition memory is still useful, but it is partly aging: 50% of the weighted signal is recent and the rest is older carry-forward.",
+            "pending_debt_freshness_summary": "RepoC: RepoC drift needs review still has useful pending-transition memory, but some of that signal is aging and should be weighted more cautiously.",
+            "pending_debt_decay_summary": "No strong pending-debt freshness trend is dominating the closure forecast yet.",
+            "stale_pending_debt_hotspots": [],
+            "fresh_pending_resolution_hotspots": [],
+            "pending_debt_decay_window_runs": 4,
+            "primary_target_weighted_pending_resolution_support_score": 0.58,
+            "primary_target_weighted_pending_debt_caution_score": 0.31,
+            "primary_target_closure_forecast_reweight_score": 0.27,
+            "primary_target_closure_forecast_reweight_direction": "supporting-confirmation",
+            "primary_target_closure_forecast_reweight_reasons": [
+                "Pending-transition memory is still useful, but it is partly aging: 50% of the weighted signal is recent and the rest is older carry-forward.",
+                "Recent class resolution behavior is still strong enough that this pending signal could confirm soon.",
+                "The live pending signal is still building in the same direction.",
+            ],
+            "closure_forecast_reweighting_summary": "RepoC: RepoC drift needs review still needs persistence before confirmation, but fresh class resolution behavior is strengthening the pending forecast (0.27).",
+            "closure_forecast_reweighting_window_runs": 4,
+            "supporting_pending_resolution_hotspots": [],
+            "caution_pending_debt_hotspots": [],
             "stalled_transition_hotspots": [],
             "resolving_transition_hotspots": [],
             "sustained_class_hotspots": [],
@@ -268,6 +288,8 @@ def test_build_scheduled_handoff_writes_artifacts_and_issue_candidate(tmp_path):
     assert "Pending Transition Resolution" in markdown
     assert "Transition Closure Confidence" in markdown
     assert "Class Pending Debt Audit" in markdown
+    assert "Pending Debt Freshness" in markdown
+    assert "Closure Forecast Reweighting" in markdown
     assert "Why class guidance shifted" in markdown
     assert "Recommendation Drift" in markdown
     assert "Confidence Validation" in markdown
