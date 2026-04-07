@@ -10,7 +10,7 @@ html: true
 badges: true
 review_pack: true
 portfolio_readme: true
-excel_mode: template
+excel_mode: standard
 
 # Daily workflow defaults
 incremental: true

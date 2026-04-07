@@ -339,6 +339,42 @@ def _summarize_top_issue_families(material_changes: list[dict], *, limit: int = 
     return issue_counts.most_common(limit)
 
 
+def _primary_lane_label(blocked: object, urgent: object, ready: object, deferred: object) -> str:
+    lane_counts = {
+        "Blocked": int(blocked or 0),
+        "Needs Attention Now": int(urgent or 0),
+        "Ready for Manual Action": int(ready or 0),
+        "Safe to Defer": int(deferred or 0),
+    }
+    return max(lane_counts.items(), key=lambda item: (item[1], -list(lane_counts.keys()).index(item[0])))[0]
+
+
+def _format_repo_rollup_counts(blocked: object, urgent: object, ready: object, deferred: object) -> str:
+    return f"{int(blocked or 0)} blocked, {int(urgent or 0)} urgent, {int(ready or 0)} ready, {int(deferred or 0)} deferred"
+
+
+def _ordered_queue_items(queue: list[dict]) -> list[dict]:
+    lane_order = {"blocked": 0, "urgent": 1, "ready": 2, "deferred": 3}
+
+    def _sort_key(item: dict) -> tuple[object, ...]:
+        lane = str(item.get("lane", "urgent")).lower()
+        priority = _severity_rank(item.get("priority", item.get("severity", 0)))
+        text = " ".join(
+            str(item.get(key, "") or "")
+            for key in ("title", "summary", "recommended_action", "next_step", "decision_hint")
+        ).lower()
+        strategic_signal = 1 if any(token in text for token in ("drift", "security", "rollback", "approval")) else 0
+        return (
+            lane_order.get(lane, 4),
+            -strategic_signal,
+            -priority,
+            str(item.get("repo", item.get("repo_name", ""))),
+            str(item.get("title", "")),
+        )
+
+    return sorted(queue, key=_sort_key)
+
+
 def _build_workbook_rollups(data: dict) -> tuple[list[list[object]], list[list[object]], list[list[object]]]:
     queue = data.get("operator_queue", []) or []
     material_changes = data.get("material_changes", []) or []
@@ -575,6 +611,10 @@ def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None, sc
     c.alignment = WRAP
     ws.row_dimensions[3].height = 30
     ws.freeze_panes = "A5"
+    ws["A4"] = "Portfolio Health"
+    ws["A4"].font = SECTION_FONT
+    ws["O4"] = "Operator Attention"
+    ws["O4"].font = SECTION_FONT
 
     # KPI Cards (row 5-6)
     grade = data.get("portfolio_grade", "?")
@@ -699,23 +739,25 @@ def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None, sc
     dna_row = 8
     ws.cell(row=dna_row, column=1, value="Portfolio DNA").font = SUBHEADER_FONT
     audits_sorted = sorted(data.get("audits", []), key=lambda a: a.get("overall_score", 0), reverse=True)
-    for i, audit in enumerate(audits_sorted[:120]):
+    for i, audit in enumerate(audits_sorted[:24]):
         cell = ws.cell(row=dna_row, column=2 + i, value="")
         tier = audit.get("completeness_tier", "abandoned")
         if tier in TIER_FILLS:
             cell.fill = TIER_FILLS[tier]
 
     # Tier Pie Chart
+    pie_label_col = 24
+    pie_value_col = 25
     pie_start = 10
     for i, tier in enumerate(TIER_ORDER):
-        ws.cell(row=pie_start + i, column=1, value=tier.capitalize())
-        ws.cell(row=pie_start + i, column=2, value=tiers.get(tier, 0))
+        ws.cell(row=pie_start + i, column=pie_label_col, value=tier.capitalize())
+        ws.cell(row=pie_start + i, column=pie_value_col, value=tiers.get(tier, 0))
 
     pie = PieChart()
     pie.title = "Tier Distribution"
     pie.style = 10
-    labels = Reference(ws, min_col=1, min_row=pie_start, max_row=pie_start + 4)
-    values = Reference(ws, min_col=2, min_row=pie_start, max_row=pie_start + 4)
+    labels = Reference(ws, min_col=pie_label_col, min_row=pie_start, max_row=pie_start + 4)
+    values = Reference(ws, min_col=pie_value_col, min_row=pie_start, max_row=pie_start + 4)
     pie.add_data(values, titles_from_data=False)
     pie.set_categories(labels)
     pie.dataLabels = DataLabelList()
@@ -731,17 +773,19 @@ def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None, sc
 
     # Grade Distribution Bar Chart
     grade_dist = Counter(a.get("grade", "F") for a in data.get("audits", []))
+    grade_label_col = 27
+    grade_value_col = 28
     grade_row = 10
     for i, g in enumerate(["A", "B", "C", "D", "F"]):
-        ws.cell(row=grade_row + i, column=5, value=g)
-        ws.cell(row=grade_row + i, column=6, value=grade_dist.get(g, 0))
+        ws.cell(row=grade_row + i, column=grade_label_col, value=g)
+        ws.cell(row=grade_row + i, column=grade_value_col, value=grade_dist.get(g, 0))
 
     bar = BarChart()
     bar.type = "col"
     bar.title = "Grade Distribution"
     bar.style = 10
-    bar_data = Reference(ws, min_col=6, min_row=grade_row, max_row=grade_row + 4)
-    bar_cats = Reference(ws, min_col=5, min_row=grade_row, max_row=grade_row + 4)
+    bar_data = Reference(ws, min_col=grade_value_col, min_row=grade_row, max_row=grade_row + 4)
+    bar_cats = Reference(ws, min_col=grade_label_col, min_row=grade_row, max_row=grade_row + 4)
     bar.add_data(bar_data, titles_from_data=False)
     bar.set_categories(bar_cats)
     bar.width = 16
@@ -757,6 +801,29 @@ def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None, sc
         ws.cell(row=highlight_row + 1, column=1, value="Best Work:").font = SUBHEADER_FONT
         for i, name in enumerate(best_work[:5]):
             ws.cell(row=highlight_row + 1, column=2 + i, value=name)
+
+    for column_index in range(24, 33):
+        ws.column_dimensions[get_column_letter(column_index)].hidden = True
+    preferred_widths = {
+        "A": 22,
+        "B": 12,
+        "C": 12,
+        "D": 12,
+        "E": 12,
+        "F": 12,
+        "G": 12,
+        "H": 12,
+        "I": 12,
+        "J": 12,
+        "K": 14,
+        "L": 16,
+        "O": 20,
+        "P": 24,
+        "Q": 18,
+        "R": 28,
+    }
+    for column_letter, width in preferred_widths.items():
+        ws.column_dimensions[column_letter].width = width
 
     lowest = data.get("summary", {}).get("lowest_scored", [])
     if lowest:
@@ -1380,6 +1447,7 @@ def _build_tech_stack(wb: Workbook, data: dict) -> None:
 def _build_trends(wb: Workbook, data: dict, trend_data: list[dict] | None = None) -> None:
     ws = _get_or_create_sheet(wb, "Trends")
     ws.sheet_properties.tabColor = "311B92"
+    ws.freeze_panes = "B4"
 
     ws.merge_cells("A1:F1")
     ws["A1"].value = "Portfolio Trends"
@@ -1613,6 +1681,7 @@ def _build_score_explainer(wb: Workbook) -> None:
     for col, h in enumerate(["Dimension", "Weight", "What It Measures", "How to Improve"], 1):
         ws.cell(row=4, column=col, value=h)
     style_header_row(ws, 4, 4)
+    ws.freeze_panes = "A5"
 
     row = 5
     for dim, weight in sorted(WEIGHTS.items(), key=lambda x: x[1], reverse=True):
@@ -1722,6 +1791,7 @@ def _build_action_items(wb: Workbook, data: dict) -> None:
     ws.merge_cells("A1:F1")
     ws["A1"].value = f"Action Items — {len(actions)} prioritized improvements"
     ws["A1"].font = SECTION_FONT
+    ws.freeze_panes = "A5"
 
     sprint = [a for a in actions if a["effort"] == "Low"][:5]
     headers = ["#", "Repo", "Action", "Impact", "Effort", "Dimension"]
@@ -1748,8 +1818,11 @@ def _build_action_items(wb: Workbook, data: dict) -> None:
             cell = ws.cell(row=i, column=col, value=val)
             style_data_cell(cell)
 
-    apply_zebra_stripes(ws, full_start + 1, full_start + min(len(actions), 100), len(headers))
-    auto_width(ws, len(headers), full_start + min(len(actions), 100) + 1)
+    final_row = full_start + min(len(actions), 100)
+    apply_zebra_stripes(ws, full_start + 1, final_row, len(headers))
+    if actions:
+        _set_autofilter(ws, len(headers), final_row, start_row=full_start)
+    auto_width(ws, len(headers), final_row + 1)
 
 
 def _build_navigation(
@@ -1764,7 +1837,7 @@ def _build_navigation(
     ws = wb["Index"] if "Index" in wb.sheetnames else wb.create_sheet("Index", 0)
     _clear_worksheet(ws)
     ws.sheet_properties.tabColor = "263238"
-    ws.freeze_panes = "A10"
+    ws.freeze_panes = "A11"
 
     ws.merge_cells("A1:G1")
     ws["A1"].value = f"GitHub Portfolio Audit: {data['username']}"
@@ -1789,11 +1862,15 @@ def _build_navigation(
     ws.cell(row=7, column=2, value=(data.get("operator_summary") or {}).get("report_reference", ""))
     ws.cell(row=7, column=3, value="Operator Headline").font = SUBHEADER_FONT
     ws.cell(row=7, column=4, value=(data.get("operator_summary") or {}).get("headline", ""))
+    ws.merge_cells("A8:G8")
+    ws["A8"] = "Start with Dashboard for the portfolio brief, move to Review Queue for action, then drill into Portfolio Explorer and Executive Summary for detail."
+    ws["A8"].font = SUBTITLE_FONT
+    ws["A8"].alignment = WRAP
 
     groups = [
         (
             "Daily Triage",
-            10,
+            11,
             1,
             [
                 ("Dashboard", "Start here for the big-picture health view and top attention items."),
@@ -1805,7 +1882,7 @@ def _build_navigation(
         ),
         (
             "Portfolio Analysis",
-            10,
+            11,
             5,
             [
                 ("Portfolio Explorer", "Rank repos, compare score quality, and drill from summary into raw facts."),
@@ -1817,7 +1894,7 @@ def _build_navigation(
         ),
         (
             "Executive Readout",
-            18,
+            20,
             1,
             [
                 ("Executive Summary", "Readable leadership summary with what changed and what matters this week."),
@@ -1826,7 +1903,7 @@ def _build_navigation(
         ),
         (
             "Deep Diagnostics",
-            18,
+            20,
             5,
             [
                 ("Security", "Raw security posture, secrets, and dangerous-file findings."),
@@ -1876,7 +1953,7 @@ def _build_navigation(
             go_cell.alignment = CENTER
             row += 1
 
-    auto_width(ws, 7, 30)
+    auto_width(ws, 7, 32)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -1893,6 +1970,7 @@ RADAR_LABELS = ["README", "Structure", "Code Quality", "Testing", "CI/CD",
 def _build_repo_profiles(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Repo Profiles")
     ws.sheet_properties.tabColor = "7C3AED"
+    ws.freeze_panes = "B2"
 
     audits = sorted(data.get("audits", []), key=lambda a: a.get("overall_score", 0), reverse=True)[:20]
     if len(audits) < 2:
@@ -2195,6 +2273,7 @@ def _build_hotspots(wb: Workbook, data: dict) -> None:
     for col, header in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=header)
     style_header_row(ws, 1, len(headers))
+    ws.freeze_panes = "A2"
 
     hotspots = data.get("hotspots", [])
     for row, hotspot in enumerate(hotspots, 2):
@@ -2787,6 +2866,7 @@ def _build_security_debt(wb: Workbook, data: dict) -> None:
     for col, header in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=header)
     style_header_row(ws, 1, len(headers))
+    ws.freeze_panes = "A2"
 
     preview = data.get("security_governance_preview", [])
     for row, item in enumerate(preview, 2):
@@ -2818,12 +2898,24 @@ def _build_campaigns(wb: Workbook, data: dict) -> None:
         "Managed campaign state stays local-authoritative here. This sheet is where you see open work, stale items, and whether there is anything to reconcile.",
         width=8,
     )
+    preview_rows = data.get("writeback_preview", {}).get("repos", [])
+    campaign_requested = bool(summary.get("campaign_type") or summary.get("label"))
+    if not campaign_requested:
+        request_state = "No campaign requested in this run."
+    else:
+        request_state = "Campaign requested from the current report facts."
+    if not preview_rows:
+        row_state = "Campaign requested but no current rows matched." if campaign_requested else "No current rows because no managed campaign was requested."
+    else:
+        row_state = "Campaign rows are present. External mutation stays manual until writeback apply is explicitly requested."
     _write_key_value_block(
         ws,
         4,
         1,
         [
             ("Campaign", summary.get("label", summary.get("campaign_type", "No active campaign"))),
+            ("Request State", request_state),
+            ("Row State", row_state),
             ("Profile", summary.get("portfolio_profile", "default")),
             ("Collection", summary.get("collection_name") or "all"),
             ("Actions", summary.get("action_count", 0)),
@@ -2839,7 +2931,6 @@ def _build_campaigns(wb: Workbook, data: dict) -> None:
     style_header_row(ws, start_row, len(headers))
     ws.freeze_panes = "A13"
 
-    preview_rows = data.get("writeback_preview", {}).get("repos", [])
     drift_repo_keys = {
         drift.get("repo_full_name") or drift.get("repo") or ""
         for drift in data.get("managed_state_drift", []) or []
@@ -2940,15 +3031,19 @@ def _build_portfolio_explorer(
         "Use this sheet to rank the portfolio, sort by profile-aware score, and drill from summary into repo-level facts.",
         width=10,
     )
+    ws.merge_cells("A3:J3")
+    ws["A3"] = "How to use this sheet: sort by Profile Score first, then filter by tier or collection when you want to narrow the drill-down."
+    ws["A3"].font = SUBTITLE_FONT
+    ws["A3"].alignment = WRAP
     headers = [
         "Repo", "Profile Score", "Overall", "Interest", "Tier", "Collections",
         "Security", "Hotspots", "Top Hotspot", "Primary Action",
     ]
-    start_row = 4
+    start_row = 5
     for col, header in enumerate(headers, 1):
         ws.cell(row=start_row, column=col, value=header)
     style_header_row(ws, start_row, len(headers))
-    ws.freeze_panes = "B5"
+    ws.freeze_panes = "B6"
 
     for row, entry in enumerate(context["ranked_audits"], start_row + 1):
         audit = entry["audit"]
@@ -2993,13 +3088,17 @@ def _build_by_lens(
         "Compare the same repos through different decision lenses so you can separate shipped work, risk, momentum, and showcase value.",
         width=9,
     )
+    ws.merge_cells("A3:I3")
+    ws["A3"] = f"Current view: profile {portfolio_profile} | collection {collection or 'all'} | use this sheet to compare the same repo through multiple decision lenses."
+    ws["A3"].font = SUBTITLE_FONT
+    ws["A3"].alignment = WRAP
     lens_headers = ["Ship Readiness", "Maintenance Risk", "Showcase", "Security", "Momentum", "Portfolio Fit"]
     headers = ["Repo", "Profile Score", "Tier"] + lens_headers
-    start_row = 4
+    start_row = 5
     for col, header in enumerate(headers, 1):
         ws.cell(row=start_row, column=col, value=header)
     style_header_row(ws, start_row, len(headers))
-    ws.freeze_panes = "B5"
+    ws.freeze_panes = "B6"
 
     for row, entry in enumerate(context["ranked_audits"], start_row + 1):
         lenses = entry["audit"].get("lenses", {})
@@ -3040,12 +3139,16 @@ def _build_by_collection(
         "Use this sheet to understand which collections are concentrated, which repos lead them, and where your showcase value is clustered.",
         width=5,
     )
+    ws.merge_cells("A3:E3")
+    ws["A3"] = f"Current profile: {portfolio_profile}. Use this sheet to see how each collection groups related repos and where its best work sits."
+    ws["A3"].font = SUBTITLE_FONT
+    ws["A3"].alignment = WRAP
     headers = ["Collection", "Repos", "Description", "Top Repo", "Top Score"]
-    start_row = 4
+    start_row = 5
     for col, header in enumerate(headers, 1):
         ws.cell(row=start_row, column=col, value=header)
     style_header_row(ws, start_row, len(headers))
-    ws.freeze_panes = "B5"
+    ws.freeze_panes = "B6"
 
     for row, collection_name in enumerate(data.get("collections", {}).keys(), start_row + 1):
         context = build_analyst_context(data, profile_name=portfolio_profile, collection_name=collection_name)
@@ -3084,13 +3187,17 @@ def _build_trend_summary(
         "Track portfolio movement over time, then scan the short repo trendlines below to see who is actually improving or drifting.",
         width=8,
     )
+    ws.merge_cells("A3:H3")
+    ws["A3"] = "Use this sheet when you want portfolio-wide movement first, then repo-level trendlines second."
+    ws["A3"].font = SUBTITLE_FONT
+    ws["A3"].alignment = WRAP
 
     headers = ["Date", "Average Score", "Repos", "Shipped", "Functional", "Review Emitted", "Campaign Drift", "Governance Drift"]
-    start_row = 4
+    start_row = 5
     for col, header in enumerate(headers, 1):
         ws.cell(row=start_row, column=col, value=header)
     style_header_row(ws, start_row, len(headers))
-    ws.freeze_panes = "A5"
+    ws.freeze_panes = "A6"
 
     for offset, trend in enumerate(extended_trends, 1):
         values = [
@@ -3131,6 +3238,9 @@ def _build_review_queue(wb: Workbook, data: dict) -> None:
     counts = _operator_counts(data)
     queue = data.get("operator_queue", []) or []
     material_changes = data.get("material_changes", []) or []
+    ordered_queue = _ordered_queue_items(queue)
+    repo_rollups = _build_workbook_rollups(data)[1]
+    top_issue_families = _summarize_top_issue_families(material_changes)
     _write_key_value_block(
         ws,
         4,
@@ -3139,29 +3249,35 @@ def _build_review_queue(wb: Workbook, data: dict) -> None:
             ("Headline", (data.get("operator_summary") or {}).get("headline", "Review activity is available below.")),
             ("Queue Counts", _format_lane_counts(counts)),
             ("Total Queue Items", len(queue)),
+            ("Top Issue Family", f"{top_issue_families[0][0]} ({top_issue_families[0][1]})" if top_issue_families else "No material change families"),
             ("Source Run", (data.get("operator_summary") or {}).get("source_run_id", "")),
         ],
         title="Summary",
     )
-    repo_rollups = _build_workbook_rollups(data)[1]
     top_repo_rows = [
-        [repo, total, urgent, ready, title]
-        for repo, total, _blocked, urgent, ready, _deferred, _kind, _priority, title, _action in repo_rollups[:5]
-    ] or [["Portfolio", 0, 0, 0, "No open review items."]]
+        [
+            repo,
+            _primary_lane_label(blocked, urgent, ready, deferred),
+            _format_repo_rollup_counts(blocked, urgent, ready, deferred),
+            title or "See detailed queue rows below.",
+            action or "Open the repo queue details.",
+        ]
+        for repo, _total, blocked, urgent, ready, deferred, _kind, _priority, title, action in repo_rollups[:10]
+    ] or [["Portfolio", "Clear", "0 blocked, 0 urgent, 0 ready, 0 deferred", "No open review items.", "Monitor future audits."]]
     _write_ranked_list(
         ws,
         4,
         5,
-        "Top Repos By Issue Volume",
-        ["Repo", "Items", "Urgent", "Ready", "Why"],
+        "Top 10 To Act On",
+        ["Repo", "Primary Lane", "Counts", "Why Now", "Next Step"],
         top_repo_rows,
     )
-    issue_family_rows = [[label, count] for label, count in _summarize_top_issue_families(material_changes)]
+    issue_family_rows = [[label, count] for label, count in top_issue_families]
     if not issue_family_rows:
         issue_family_rows = [["No material change families", 0]]
     _write_ranked_list(
         ws,
-        12,
+        17,
         1,
         "Top Issue Families",
         ["Issue Family", "Count"],
@@ -3172,20 +3288,20 @@ def _build_review_queue(wb: Workbook, data: dict) -> None:
         action_rows = [["No recommended actions", 0]]
     _write_ranked_list(
         ws,
-        12,
+        17,
         5,
         "Top Recommended Actions",
         ["Action", "Count"],
         action_rows,
     )
     headers = ["Repo", "Title", "Lane", "Kind", "Priority", "Next Step", "Decision Hint", "Safe To Defer"]
-    start_row = 20
+    start_row = 25
     for col, header in enumerate(headers, 1):
         ws.cell(row=start_row, column=col, value=header)
     style_header_row(ws, start_row, len(headers))
-    ws.freeze_panes = "A21"
+    ws.freeze_panes = "A26"
 
-    targets = queue or data.get("review_targets", [])
+    targets = ordered_queue or data.get("review_targets", [])
     for row, item in enumerate(targets, start_row + 1):
         next_step = item.get("recommended_action", item.get("next_step", ""))
         safe_to_defer = item.get("lane") == "deferred" or item.get("safe_to_defer")
@@ -3227,6 +3343,7 @@ def _build_review_history_sheet(wb: Workbook, data: dict) -> None:
             ("Current Review", active_review.get("review_id", "—")),
             ("Current Status", active_review.get("status", "unknown")),
             ("History Rows", len(data.get("review_history", []) or [])),
+            ("How To Read This", "The active review is summarized above; the ledger below is the historical trail."),
         ],
         title="Current State",
     )
@@ -3274,10 +3391,11 @@ def _build_governance_controls(wb: Workbook, data: dict) -> None:
         1,
         [
             ("Status", _display_operator_state(governance_summary.get("status", "preview"))),
+            ("Selected View", governance_summary.get("selected_view", data.get("governance_preview", {}).get("selected_view", "all"))),
             ("Approval", _display_operator_state(governance_summary.get("approval_status", "preview-only"))),
             ("Needs Re-Approval", "yes" if governance_summary.get("needs_reapproval") else "no"),
             ("Rollback Available", governance_summary.get("rollback_available_count", 0)),
-            ("Selected View", governance_summary.get("selected_view", data.get("governance_preview", {}).get("selected_view", "all"))),
+            ("Headline", governance_summary.get("headline", "Governed controls are being tracked locally.")),
         ],
         title="Governance Snapshot",
     )
@@ -3436,6 +3554,7 @@ def _build_scenario_planner(
     ws["A1"].font = TITLE_FONT
     ws["A2"] = f"Profile: {context['profile_name']}"
     ws["A3"] = f"Collection: {context['collection_name'] or 'all'}"
+    ws.freeze_panes = "B6"
 
     headers = ["Lever", "Lens", "Repo Count", "Avg Lift", "Weighted Impact", "Projected Promotions"]
     for col, header in enumerate(headers, 1):
@@ -3505,14 +3624,28 @@ def _build_executive_summary(
         recommended_focus = data["operator_queue"][0].get("recommended_action", "")
     elif leaders:
         recommended_focus = f"Protect momentum around {leaders[0]['name']}"
+    if diff_data:
+        change_summary = (
+            f"Average score moved {diff_data.get('average_score_delta', 0.0):+.3f} across "
+            f"{len(diff_data.get('repo_changes', []) or [])} repos with notable changes."
+        )
+    else:
+        change_summary = (
+            f"{len(data.get('material_changes', []) or [])} material changes and "
+            f"{len(data.get('governance_drift', []) or [])} governance drift signals were captured in this run."
+        )
     narrative_rows = [
-        ("What Is Going Well", f"{data.get('tier_distribution', {}).get('shipped', 0)} repos are shipped with an average score of {data.get('average_score', 0):.2f}."),
-        ("What Needs Attention", operator_summary.get("headline", "No urgent operator headline is present.")),
         (
-            "What Changed",
-            f"{len(data.get('material_changes', []) or [])} material changes and {len(data.get('governance_drift', []) or [])} governance drift signals were captured in this run.",
+            "What Is Going Well",
+            f"{data.get('tier_distribution', {}).get('shipped', 0)} repos are shipped, the portfolio average is {data.get('average_score', 0):.2f}, and {leaders[0]['name'] if leaders else 'the current leaders'} set the current high-water mark.",
         ),
-        ("Focus This Week", recommended_focus or "Review the top queue items and protect the highest-value repos first."),
+        (
+            "What Needs Attention",
+            operator_summary.get("headline", "No urgent operator headline is present.")
+            + (f" Critical security pressure is concentrated in {len(critical_repos)} repos." if critical_repos else ""),
+        ),
+        ("What Changed", change_summary),
+        ("Focus This Week", recommended_focus or "Review the top queue items first, then protect the highest-value repos from drift."),
     ]
     _write_key_value_block(ws, 4, 1, narrative_rows, title="Leadership Brief")
 
@@ -3574,45 +3707,50 @@ def _build_print_pack(
         width=6,
     )
     ws.freeze_panes = "A5"
-    ws["A4"] = "Page 1: Portfolio Status"
+    ws["A4"] = "Page 1: Leadership Brief"
     ws["A4"].font = SECTION_FONT
     ws["A5"] = "Portfolio Grade"
     ws["B5"] = data.get("portfolio_grade", "F")
     ws["A6"] = "Average Score"
     ws["B6"] = round(data.get("average_score", 0.0), 3)
-    ws["A7"] = "Open Review Targets"
-    ws["B7"] = len(data.get("review_targets", []))
-    ws["A8"] = "Campaign Actions"
-    ws["B8"] = data.get("campaign_summary", {}).get("action_count", 0)
     operator_summary = data.get("operator_summary") or {}
+    counts = operator_summary.get("counts", {})
+    ws["A7"] = "This Week"
+    ws["B7"] = operator_summary.get("headline", "Review the latest workbook surfaces for change and drift.")
+    ws["A8"] = "Operator Queue"
     if operator_summary:
-        counts = operator_summary.get("counts", {})
-        ws["A9"] = "Blocked / Urgent / Ready / Deferred"
-        ws["B9"] = _format_lane_counts(counts)
-    ws["A11"] = "Top Risks"
-    ws["A11"].font = SECTION_FONT
+        ws["B8"] = (
+            f"{counts.get('blocked', 0)} blocked, {counts.get('urgent', 0)} need attention now, "
+            f"and {counts.get('ready', 0)} are ready for manual action."
+        )
+    ws["A9"] = "Campaign Actions"
+    ws["B9"] = data.get("campaign_summary", {}).get("action_count", 0)
+    ws["A10"] = "Open Review Targets"
+    ws["B10"] = len(data.get("review_targets", []))
+    ws["A12"] = "Top Risks"
+    ws["A12"].font = SECTION_FONT
     top_risks = sorted(data.get("hotspots", []) or [], key=lambda item: item.get("severity", 0), reverse=True)[:5]
     for offset, item in enumerate(top_risks, 1):
-        ws.cell(row=11 + offset, column=1, value=item.get("repo", ""))
-        ws.cell(row=11 + offset, column=2, value=item.get("category", ""))
-        ws.cell(row=11 + offset, column=3, value=round(item.get("severity", 0.0), 3))
-        ws.cell(row=11 + offset, column=4, value=item.get("title", ""))
-    ws["E11"] = "Top Opportunities"
-    ws["E11"].font = SECTION_FONT
+        ws.cell(row=12 + offset, column=1, value=item.get("repo", ""))
+        ws.cell(row=12 + offset, column=2, value=item.get("category", ""))
+        ws.cell(row=12 + offset, column=3, value=round(item.get("severity", 0.0), 3))
+        ws.cell(row=12 + offset, column=4, value=item.get("title", ""))
+    ws["E12"] = "Top Opportunities"
+    ws["E12"].font = SECTION_FONT
     top_opportunities = sorted(data.get("audits", []), key=lambda audit: audit.get("overall_score", 0), reverse=True)[:5]
     for offset, audit in enumerate(top_opportunities, 1):
-        ws.cell(row=11 + offset, column=5, value=audit.get("metadata", {}).get("name", ""))
-        ws.cell(row=11 + offset, column=6, value=(audit.get("action_candidates") or [{}])[0].get("title", ""))
-    ws["A19"] = "Page 2: Changes and Governance"
-    ws["A19"].font = SECTION_FONT
-    ws["A20"] = "Top Material Change Families"
-    ws["A20"].font = SUBHEADER_FONT
+        ws.cell(row=12 + offset, column=5, value=audit.get("metadata", {}).get("name", ""))
+        ws.cell(row=12 + offset, column=6, value=(audit.get("action_candidates") or [{}])[0].get("title", ""))
+    ws["A21"] = "Page 2: Changes and Governance"
+    ws["A21"].font = SECTION_FONT
+    ws["A22"] = "Top Material Change Families"
+    ws["A22"].font = SUBHEADER_FONT
     change_rows = [[label, count] for label, count in _summarize_top_issue_families(data.get("material_changes", []) or [], limit=6)]
     for offset, (label, count) in enumerate(change_rows, 1):
-        ws.cell(row=20 + offset, column=1, value=label)
-        ws.cell(row=20 + offset, column=2, value=count)
-    ws["D20"] = "Governance Highlights"
-    ws["D20"].font = SUBHEADER_FONT
+        ws.cell(row=22 + offset, column=1, value=label)
+        ws.cell(row=22 + offset, column=2, value=count)
+    ws["D22"] = "Governance Highlights"
+    ws["D22"].font = SUBHEADER_FONT
     governance_summary = data.get("governance_summary", {}) or {}
     governance_rows = [
         ("Status", _display_operator_state(governance_summary.get("status", "preview"))),
@@ -3621,10 +3759,10 @@ def _build_print_pack(
         ("Rollback Available", governance_summary.get("rollback_available_count", 0)),
     ]
     for offset, (label, value) in enumerate(governance_rows, 1):
-        ws.cell(row=20 + offset, column=4, value=label)
-        ws.cell(row=20 + offset, column=5, value=value)
+        ws.cell(row=22 + offset, column=4, value=label)
+        ws.cell(row=22 + offset, column=5, value=value)
     if diff_data:
-        row = 27
+        row = 29
         ws.cell(row=row, column=1, value="Compare Snapshot").font = SECTION_FONT
         ws.cell(row=row + 1, column=1, value="Average Score Delta")
         ws.cell(row=row + 1, column=2, value=diff_data.get("average_score_delta", 0.0))
@@ -3632,7 +3770,7 @@ def _build_print_pack(
         ws.cell(row=row + 2, column=2, value=len(diff_data.get("repo_changes", []) or []))
     preflight = data.get("preflight_summary") or {}
     if preflight and (preflight.get("blocking_errors", 0) or preflight.get("warnings", 0)):
-        row = 31
+        row = 33
         ws.cell(row=row, column=1, value="Preflight Diagnostics").font = SECTION_FONT
         ws.cell(row=row + 1, column=1, value="Status")
         ws.cell(row=row + 1, column=2, value=preflight.get("status", "unknown"))
@@ -3789,7 +3927,7 @@ def export_excel(
     score_history: dict[str, list[float]] | None = None,
     portfolio_profile: str = "default",
     collection: str | None = None,
-    excel_mode: str = "template",
+    excel_mode: str = "standard",
     template_path: Path | None = None,
 ) -> Path:
     """Generate the flagship Excel dashboard."""

@@ -40,7 +40,7 @@ def test_makefile_includes_operator_entrypoints():
     for target in ("install:", "install-dev:", "doctor:", "audit:", "control-center:", "test:"):
         assert target in makefile
     assert "audit $(USERNAME) --doctor $(ARGS)" in makefile
-    assert "audit $(USERNAME) $(ARGS)" in makefile
+    assert "audit $(USERNAME) --excel-mode standard $(ARGS)" in makefile
     assert "audit $(USERNAME) --control-center $(ARGS)" in makefile
 
 
@@ -49,7 +49,7 @@ def test_example_audit_config_is_parseable():
     inspection = inspect_config(ROOT / "config" / "examples" / "audit-config.example.yaml")
     assert inspection.exists is True
     assert inspection.errors == []
-    assert inspection.data["excel_mode"] == "template"
+    assert inspection.data["excel_mode"] == "standard"
     assert inspection.data["preflight_mode"] == "auto"
 
 

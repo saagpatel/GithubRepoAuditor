@@ -11,10 +11,14 @@ from openpyxl import Workbook, load_workbook
 from src.excel_export import (
     _build_dashboard,
     _build_all_repos,
+    _build_action_items,
     _build_by_collection,
     _build_trend_summary,
+    _build_trends,
+    _build_score_explainer,
     _build_repo_profiles,
     _build_security,
+    _build_security_debt,
     _build_changes,
     _build_hidden_data_sheets,
     _build_hotspots,
@@ -462,8 +466,9 @@ class TestAnalystWorkbookSheets:
         _build_review_queue(wb, _make_report())
         ws = wb["Review Queue"]
         assert ws["A4"].value == "Summary"
-        assert ws["A20"].value == "Repo"
-        assert ws.freeze_panes == "A21"
+        assert ws["E4"].value == "Top 10 To Act On"
+        assert ws["A25"].value == "Repo"
+        assert ws.freeze_panes == "A26"
 
     def test_campaigns_show_empty_state_when_no_preview_rows(self):
         wb = Workbook()
@@ -527,6 +532,25 @@ class TestAnalystWorkbookSheets:
         _build_executive_summary(wb, _make_report(), None, portfolio_profile="default", collection="showcase")
         assert "Scenario Planner" in wb.sheetnames
         assert "Executive Summary" in wb.sheetnames
+
+    def test_secondary_visible_sheets_gain_freeze_panes(self):
+        wb = Workbook()
+        report = _make_report()
+        _build_action_items(wb, report)
+        _build_hotspots(wb, report)
+        _build_repo_profiles(wb, report)
+        _build_scenario_planner(wb, report, portfolio_profile="default", collection="showcase")
+        _build_security_debt(wb, report)
+        _build_score_explainer(wb)
+        _build_trends(wb, report, trend_data=[{"date": "2026-03-28", "average_score": 0.6, "repos_audited": 3, "tier_distribution": {"shipped": 1, "functional": 1}}])
+
+        assert wb["Action Items"].freeze_panes == "A5"
+        assert wb["Hotspots"].freeze_panes == "A2"
+        assert wb["Repo Profiles"].freeze_panes == "B2"
+        assert wb["Scenario Planner"].freeze_panes == "B6"
+        assert wb["Security Debt"].freeze_panes == "A2"
+        assert wb["Score Explainer"].freeze_panes == "A5"
+        assert wb["Trends"].freeze_panes == "B4"
 
     def test_creates_security_phase_sheets(self):
         from src.excel_export import _build_security_controls, _build_supply_chain, _build_security_debt
@@ -616,7 +640,7 @@ class TestWorkbookModes:
         assert standard_wb["Governance Controls"]["B5"].value == template_wb["Governance Controls"]["B5"].value
         assert standard_wb["Print Pack"]["B9"].value == template_wb["Print Pack"]["B9"].value
         assert template_wb["Review Queue"]["A4"].value == "Summary"
-        assert template_wb["Review Queue"]["A20"].value == "Repo"
+        assert template_wb["Review Queue"]["A25"].value == "Repo"
 
     def test_internal_navigation_links_use_locations_not_external_relationships(self, tmp_path):
         report_path = tmp_path / "report.json"
@@ -638,7 +662,7 @@ class TestWorkbookModes:
 
         with zipfile.ZipFile(output) as archive:
             review_queue_xml = archive.read("xl/worksheets/sheet3.xml").decode("utf-8", "ignore")
-            assert "<autoFilter ref=\"A20:H21\"" in review_queue_xml
+            assert "<autoFilter ref=\"A25:H26\"" in review_queue_xml
             assert "<tableParts" not in review_queue_xml
 
     def test_visible_sheets_use_filters_while_hidden_data_sheets_keep_tables(self, tmp_path):

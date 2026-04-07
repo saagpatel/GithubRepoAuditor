@@ -165,7 +165,7 @@ _ARG_DEFAULTS = {
     "upload_badges": False,
     "html": False,
     "pdf": False,
-    "excel_mode": "template",
+    "excel_mode": "standard",
     "notion": False,
     "notion_sync": False,
     "notion_registry": False,

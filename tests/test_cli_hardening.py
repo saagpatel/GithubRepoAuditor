@@ -33,7 +33,7 @@ def _make_args(**overrides) -> Namespace:
         "readme_suggestions": False,
         "notion_registry": False,
         "html": False,
-        "excel_mode": "template",
+        "excel_mode": "standard",
         "scoring_profile": None,
         "portfolio_profile": "default",
         "collection": None,
@@ -147,6 +147,12 @@ def test_main_forwards_scoring_profile_to_targeted_audit(monkeypatch, sample_met
     assert captured["custom_weights"] == {"readme": 1.5}
     assert captured["scoring_profile_name"] == "focus"
     assert captured["all_repos"] == [sample_metadata]
+
+
+def test_build_parser_defaults_excel_mode_to_standard():
+    parser = cli.build_parser()
+    args = parser.parse_args(["testuser"])
+    assert args.excel_mode == "standard"
 
 
 def test_main_forwards_scoring_profile_to_incremental_audit(monkeypatch, sample_metadata):
@@ -393,7 +399,7 @@ def test_write_report_outputs_forwards_analyst_view_args(monkeypatch, tmp_path, 
 
     assert html_calls["portfolio_profile"] == "shipping"
     assert html_calls["collection"] == "showcase"
-    assert excel_calls["excel_mode"] == "template"
+    assert excel_calls["excel_mode"] == "standard"
     assert review_pack_calls["portfolio_profile"] == "shipping"
     assert review_pack_calls["collection"] == "showcase"
     assert outputs["review_pack_info"]

@@ -2,7 +2,7 @@
 
 The Excel workbook now supports two render modes:
 
-- `standard`: uses the stable code-generated workbook path and is the recommended automation mode
+- `standard`: uses the stable code-generated workbook path, is the CLI default, and is the recommended automation mode
 - `template`: hydrates the committed workbook template in `assets/excel/analyst-template.xlsx`
 
 ## Ownership Boundary

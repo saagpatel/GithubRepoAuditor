@@ -12,7 +12,7 @@ GitHub Repo Auditor clones every repo on your GitHub account, runs 12 analyzers 
 - **Dual-Axis Scoring** — Completeness (does this project have what shipped software should?) and Interest (is this worth anyone's time?) scored independently on 0.0–1.0 scales
 - **Letter Grades + Tier Classification** — A–F grades with Shipped / Functional / WIP / Skeleton / Abandoned tiers; 15 achievement badges ("Fully Tested", "CI Champion", "Zero Debt", etc.)
 - **Quick Wins Engine** — For each repo, shows exactly which single action moves it to the next tier and how far it is from getting there
-- **Multiple Dashboard Outputs** — Flagship Excel workbook with `template` and `standard` modes, interactive HTML dashboard with scatter chart and tech radar, portfolio README, shields.io badges
+- **Multiple Dashboard Outputs** — Flagship Excel workbook with a stable `standard` mode and optional `template` mode, interactive HTML dashboard with scatter chart and tech radar, portfolio README, shields.io badges
 - **Notion Integration** — Pushes audit signals into your Notion operating system: completeness cards, managed campaign records, and lifecycle-aware review sync
 - **History & Regression Detection** — Archives every run to SQLite, auto-diffs between runs, detects score regressions, and flags archive candidates
 - **AI Narrative** — Optional Claude-powered portfolio analysis that reads the audit data and writes a human-readable summary
@@ -52,6 +52,9 @@ audit <github-username> --control-center
 audit <github-username>
 
 # Generate the native workbook + HTML dashboard
+audit <github-username> --html
+
+# Optional curated presentation workbook path
 audit <github-username> --html --excel-mode template
 
 # Dry run — no cloning, no writes
@@ -109,7 +112,7 @@ For day-to-day operations, `--control-center` is now the clean read-only entrypo
 
 The workbook now supports two modes:
 
-- `--excel-mode standard` — stable operational workbook path used by automation and recommended for Mac Excel compatibility
+- `--excel-mode standard` — stable operational workbook path, the CLI default, and the recommended mode for automation and Mac Excel compatibility
 - `--excel-mode template` — template-backed workbook path using `assets/excel/analyst-template.xlsx` for controlled template work
 
 Both modes read from the same report + warehouse facts. Python owns the hidden `Data_*` sheets, stable table names, and workbook facts. The template-backed workbook still owns the template shell, named-range bindings, native sparkline placement, and print layout, but the standard workbook path is now the safest default for automated generation and Excel compatibility.

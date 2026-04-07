@@ -98,9 +98,9 @@ class TestMergeConfig:
         assert not hasattr(args, "nonexistent_key")
 
     def test_config_overrides_known_string_defaults(self):
-        args = argparse.Namespace(excel_mode="template", preflight_mode="auto")
-        merge_config_with_args(args, {"excel_mode": "standard", "preflight_mode": "strict"})
-        assert args.excel_mode == "standard"
+        args = argparse.Namespace(excel_mode="standard", preflight_mode="auto")
+        merge_config_with_args(args, {"excel_mode": "template", "preflight_mode": "strict"})
+        assert args.excel_mode == "template"
         assert args.preflight_mode == "strict"
 
 

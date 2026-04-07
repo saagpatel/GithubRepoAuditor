@@ -8,4 +8,4 @@ review_pack: true
 incremental: true
 skip_forks: true
 skip_archived: true
-excel_mode: template
+excel_mode: standard

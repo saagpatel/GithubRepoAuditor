@@ -84,7 +84,7 @@ def infer_requested_features(args) -> list[str]:
         features.append("notion-sync")
     if getattr(args, "notion_registry", False):
         features.append("notion-registry")
-    if getattr(args, "excel_mode", "template") == "template":
+    if getattr(args, "excel_mode", "standard") == "template":
         features.append("excel-template")
     if getattr(args, "scorecard", False):
         features.append("scorecard")
@@ -458,7 +458,7 @@ def _add_notion_checks(checks: list[DiagnosticCheck], args, *, full: bool) -> No
 
 
 def _add_excel_checks(checks: list[DiagnosticCheck], args) -> None:
-    if getattr(args, "excel_mode", "template") != "template":
+    if getattr(args, "excel_mode", "standard") != "template":
         return
     template_path = DEFAULT_TEMPLATE_PATH
     if not template_path.is_file():
