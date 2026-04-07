@@ -186,7 +186,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--excel-mode",
         choices=["template", "standard"],
         default="template",
-        help="Generate the native template-backed workbook or the fallback standard workbook",
+        help="Generate the template-backed workbook or the stable standard workbook",
     )
     parser.add_argument(
         "--scoring-profile",

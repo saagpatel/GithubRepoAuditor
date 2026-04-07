@@ -109,10 +109,10 @@ For day-to-day operations, `--control-center` is now the clean read-only entrypo
 
 The workbook now supports two modes:
 
-- `--excel-mode template` — flagship workbook path using `assets/excel/analyst-template.xlsx`
-- `--excel-mode standard` — fallback fully code-generated workbook for CI, debugging, or template-free environments
+- `--excel-mode standard` — stable operational workbook path used by automation and recommended for Mac Excel compatibility
+- `--excel-mode template` — template-backed workbook path using `assets/excel/analyst-template.xlsx` for controlled template work
 
-Both modes read from the same report + warehouse facts. The template-backed workbook owns the workbook shell, named-range bindings, native sparkline placement, and print layout. Python owns the hidden `Data_*` sheets, stable table names, and workbook facts.
+Both modes read from the same report + warehouse facts. Python owns the hidden `Data_*` sheets, stable table names, and workbook facts. The template-backed workbook still owns the template shell, named-range bindings, native sparkline placement, and print layout, but the standard workbook path is now the safest default for automated generation and Excel compatibility.
 
 Template mode is also validated during preflight: the committed workbook asset must exist and pass a lightweight shell check before the run will continue.
 

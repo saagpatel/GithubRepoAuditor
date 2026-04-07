@@ -2,8 +2,8 @@
 
 The Excel workbook now supports two render modes:
 
-- `template` (default): hydrates the committed workbook template in `assets/excel/analyst-template.xlsx`
-- `standard`: uses the fallback code-generated workbook path
+- `standard`: uses the stable code-generated workbook path and is the recommended automation mode
+- `template`: hydrates the committed workbook template in `assets/excel/analyst-template.xlsx`
 
 ## Ownership Boundary
 
@@ -13,6 +13,7 @@ Python owns:
 - stable table names and column order
 - workbook named ranges used for operator KPIs and filters
 - template hydration and native sparkline injection
+- visible-sheet compatibility rules, including the current Excel-safe pattern of using plain filtered ranges on visible sheets and structured tables only on hidden `Data_*` sheets
 
 The workbook template owns:
 - workbook shell and sheet organization
@@ -66,6 +67,7 @@ facts:
 2. Regenerate or edit the template only after the hidden-table contract is settled.
 3. Re-run workbook tests in both `template` and `standard` modes.
 4. Open the generated workbook in Excel desktop and verify the expected workbook behavior.
+5. If compatibility changes are required, preserve hidden `Data_*` table contracts and prefer visible-sheet autofilters over visible-sheet structured tables.
 
 ## When Python-Only Changes Are Enough
 

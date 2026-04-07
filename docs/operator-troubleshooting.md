@@ -78,7 +78,7 @@ Fix:
 - restore `assets/excel/analyst-template.xlsx`
 - or run with `--excel-mode standard`
 
-Template mode is the flagship workbook path, but standard mode remains a supported fallback for CI and debugging.
+Standard mode is the stable operational workbook path and the safest choice for Mac Excel compatibility. Template mode remains available when template-specific layout work is needed.
 
 ### Missing baseline report for targeted or incremental runs
 

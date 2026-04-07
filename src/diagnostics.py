@@ -470,7 +470,7 @@ def _add_excel_checks(checks: list[DiagnosticCheck], args) -> None:
                 status="error",
                 summary="Template workbook is missing.",
                 details=f"Expected template at {template_path}.",
-                recommended_fix="Restore assets/excel/analyst-template.xlsx or switch to --excel-mode standard.",
+                recommended_fix="Restore assets/excel/analyst-template.xlsx or use the stable --excel-mode standard path.",
             )
         )
         return
