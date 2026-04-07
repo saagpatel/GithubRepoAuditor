@@ -318,6 +318,38 @@ def _make_report(audits=None) -> dict:
             "primary_target_class_decay_reason": "",
             "class_memory_summary": "RepoC: Security posture needs attention still has useful class memory, but part of that signal is aging and should be treated more cautiously.",
             "class_decay_summary": "Fresh class signals are still strong enough that no class-level trust posture needs to decay yet.",
+            "primary_target_weighted_class_support_score": 0.48,
+            "primary_target_weighted_class_caution_score": 0.24,
+            "primary_target_class_trust_reweight_score": 0.24,
+            "primary_target_class_trust_reweight_direction": "supporting-normalization",
+            "primary_target_class_trust_reweight_reasons": [
+                "Class memory is still useful, but it is partly aging: 50% of the weighted signal is recent and the rest is older carry-forward.",
+                "Existing class normalization support is still contributing to a stronger posture.",
+                "Fresh sticky class evidence is still carrying meaningful caution.",
+            ],
+            "class_reweighting_summary": "RepoC: Security posture needs attention inherited a stronger posture because fresh class support crossed the reweight threshold (0.24).",
+            "supporting_class_hotspots": [],
+            "caution_class_hotspots": [],
+            "class_reweighting_window_runs": 4,
+            "primary_target_class_trust_momentum_score": 0.26,
+            "primary_target_class_trust_momentum_status": "building",
+            "primary_target_class_reweight_stability_status": "watch",
+            "primary_target_class_reweight_transition_status": "pending-support",
+            "primary_target_class_reweight_transition_reason": "The class signal is visible, but it has not stayed strong long enough to confirm broader normalization yet.",
+            "class_momentum_summary": "RepoC: Security posture needs attention shows healthier class support, but it has not stayed persistent enough to confirm broader normalization yet (0.26).",
+            "class_reweight_stability_summary": "Class guidance for RepoC: Security posture needs attention is still settling and should be watched for one more stable stretch: supporting-normalization -> neutral.",
+            "class_transition_window_runs": 4,
+            "primary_target_class_transition_health_status": "building",
+            "primary_target_class_transition_health_reason": "The pending class signal is still accumulating in the same direction and may confirm soon.",
+            "primary_target_class_transition_resolution_status": "none",
+            "primary_target_class_transition_resolution_reason": "",
+            "class_transition_health_summary": "RepoC: Security posture needs attention still has a pending class signal that is accumulating and may confirm soon (1 run(s)).",
+            "class_transition_resolution_summary": "No pending class transition has just confirmed, cleared, or expired in the recent window.",
+            "class_transition_age_window_runs": 4,
+            "stalled_transition_hotspots": [],
+            "resolving_transition_hotspots": [],
+            "sustained_class_hotspots": [],
+            "oscillating_class_hotspots": [],
             "stale_class_memory_hotspots": [],
             "fresh_class_signal_hotspots": [],
             "class_decay_window_runs": 4,
@@ -371,6 +403,8 @@ def _make_report(audits=None) -> dict:
                 "trust_recovery_reason": "This target is stabilizing under healthy calibration, but it has not held steady long enough to earn stronger trust yet.",
                 "exception_pattern_status": "recovering",
                 "exception_pattern_reason": "This target is stabilizing under healthy calibration, but it has not held steady long enough to earn stronger trust yet.",
+                "class_transition_age_runs": 1,
+                "recent_transition_path": "pending-support",
             },
         },
         "operator_queue": [
@@ -605,7 +639,7 @@ class TestAnalystWorkbookSheets:
         ws = wb["Review Queue"]
         assert ws["A4"].value == "Summary"
         assert ws["E4"].value == "Top 10 To Act On"
-        header_row = next(row for row in range(20, 55) if ws.cell(row=row, column=1).value == "Repo")
+        header_row = next(row for row in range(20, 65) if ws.cell(row=row, column=1).value == "Repo")
         assert header_row > 24
         assert ws.freeze_panes == f"A{header_row + 1}"
 
@@ -623,7 +657,7 @@ class TestAnalystWorkbookSheets:
         print_ws = wb["Print Pack"]
         dashboard_values = [
             cell
-            for row in dashboard_ws.iter_rows(min_row=1, max_row=50, min_col=1, max_col=25, values_only=True)
+            for row in dashboard_ws.iter_rows(min_row=1, max_row=70, min_col=1, max_col=25, values_only=True)
             for cell in row
             if cell is not None
         ]
@@ -651,9 +685,17 @@ class TestAnalystWorkbookSheets:
         assert review_ws["A31"].value == "Class Normalization"
         assert review_ws["A32"].value == "Class Memory"
         assert review_ws["A33"].value == "Trust Decay"
-        assert review_ws["A34"].value == "Exception Learning"
-        assert review_ws["A35"].value == "Recommendation Drift"
-        assert review_ws["A36"].value == "Adaptive Confidence"
+        assert review_ws["A34"].value == "Class Reweighting"
+        assert review_ws["A35"].value == "Class Reweighting Why"
+        assert review_ws["A36"].value == "Class Momentum"
+        assert review_ws["A37"].value == "Reweight Stability"
+        assert review_ws["A38"].value == "Transition Health"
+        assert review_ws["A39"].value == "Transition Resolution"
+        assert review_ws["A40"].value == "Transition Summary"
+        assert review_ws["A41"].value == "Momentum Summary"
+        assert review_ws["A42"].value == "Exception Learning"
+        assert review_ws["A43"].value == "Recommendation Drift"
+        assert review_ws["A44"].value == "Adaptive Confidence"
         assert executive_ws["D29"].value == "Trend"
         assert executive_ws["D32"].value == "Why Top Target"
         assert executive_ws["D33"].value == "Closure Guidance"
@@ -673,11 +715,19 @@ class TestAnalystWorkbookSheets:
         assert executive_ws["D49"].value == "Class Normalization"
         assert executive_ws["D50"].value == "Class Memory"
         assert executive_ws["D51"].value == "Trust Decay"
-        assert executive_ws["D52"].value == "Exception Learning"
-        assert executive_ws["D53"].value == "Recommendation Drift"
-        assert executive_ws["D54"].value == "Adaptive Confidence"
-        assert executive_ws["D55"].value == "Recommendation Quality"
-        assert executive_ws["D56"].value == "Confidence Validation"
+        assert executive_ws["D52"].value == "Class Reweighting"
+        assert executive_ws["D53"].value == "Class Reweighting Why"
+        assert executive_ws["D54"].value == "Class Momentum"
+        assert executive_ws["D55"].value == "Reweight Stability"
+        assert executive_ws["D56"].value == "Transition Health"
+        assert executive_ws["D57"].value == "Transition Resolution"
+        assert executive_ws["D58"].value == "Transition Summary"
+        assert executive_ws["D59"].value == "Momentum Summary"
+        assert executive_ws["D60"].value == "Exception Learning"
+        assert executive_ws["D61"].value == "Recommendation Drift"
+        assert executive_ws["D62"].value == "Adaptive Confidence"
+        assert executive_ws["D63"].value == "Recommendation Quality"
+        assert executive_ws["D64"].value == "Confidence Validation"
         assert print_ws["A17"].value == "Primary Target"
         assert print_ws["A18"].value == "Why Top Target"
         assert print_ws["A19"].value == "What We Tried"
@@ -697,9 +747,17 @@ class TestAnalystWorkbookSheets:
         assert print_ws["A34"].value == "Class Normalization"
         assert print_ws["A35"].value == "Class Memory"
         assert print_ws["A36"].value == "Trust Decay"
-        assert print_ws["A37"].value == "Exception Learning"
-        assert print_ws["A38"].value == "Recommendation Drift"
-        assert print_ws["A39"].value == "Adaptive Confidence"
+        assert print_ws["A37"].value == "Class Reweighting"
+        assert print_ws["A38"].value == "Class Reweighting Why"
+        assert print_ws["A39"].value == "Class Momentum"
+        assert print_ws["A40"].value == "Reweight Stability"
+        assert print_ws["A41"].value == "Transition Health"
+        assert print_ws["A42"].value == "Transition Resolution"
+        assert print_ws["A43"].value == "Transition Summary"
+        assert print_ws["A44"].value == "Momentum Summary"
+        assert print_ws["A45"].value == "Exception Learning"
+        assert print_ws["A46"].value == "Recommendation Drift"
+        assert print_ws["A47"].value == "Adaptive Confidence"
         assert "Why Top Target" in dashboard_values
         assert "Closure Guidance" in dashboard_values
         assert "What We Tried" in dashboard_values
@@ -713,6 +771,11 @@ class TestAnalystWorkbookSheets:
         assert "Class Normalization" in dashboard_values
         assert "Class Memory" in dashboard_values
         assert "Trust Decay" in dashboard_values
+        assert "Class Reweighting" in dashboard_values
+        assert "Class Momentum" in dashboard_values
+        assert "Reweight Stability" in dashboard_values
+        assert "Transition Health" in dashboard_values
+        assert "Transition Resolution" in dashboard_values
         assert "Exception Learning" in dashboard_values
         assert "Recommendation Drift" in dashboard_values
 

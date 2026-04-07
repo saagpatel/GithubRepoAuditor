@@ -447,6 +447,62 @@ def _operator_class_memory_values(data: dict) -> tuple[str, str, str, str]:
     return freshness_status, freshness_reason, class_decay_status, class_decay_summary
 
 
+def _operator_class_reweight_values(data: dict) -> tuple[str, str, str, str]:
+    summary = data.get("operator_summary") or {}
+    direction = (
+        summary.get("primary_target_class_trust_reweight_direction", "") or "neutral"
+    ).replace("-", " ").title()
+    reweight_score = f"{summary.get('primary_target_class_trust_reweight_score', 0.0):.2f}"
+    reasons = ", ".join(summary.get("primary_target_class_trust_reweight_reasons") or [])
+    if not reasons:
+        reasons = "No class reweighting rationale is recorded yet."
+    reweight_summary = (
+        summary.get("class_reweighting_summary")
+        or "No class reweighting summary is recorded yet."
+    )
+    return direction, reweight_score, reasons, reweight_summary
+
+
+def _operator_class_momentum_values(data: dict) -> tuple[str, str, str]:
+    summary = data.get("operator_summary") or {}
+    momentum_status = (
+        summary.get("primary_target_class_trust_momentum_status", "") or "insufficient-data"
+    ).replace("-", " ").title()
+    stability_status = (
+        summary.get("primary_target_class_reweight_stability_status", "") or "watch"
+    ).replace("-", " ").title()
+    transition_status = (
+        summary.get("primary_target_class_reweight_transition_status", "") or "none"
+    ).replace("-", " ").title()
+    transition_reason = (
+        summary.get("primary_target_class_reweight_transition_reason")
+        or "No class transition reason is recorded yet."
+    )
+    stability_summary = f"{stability_status} — {transition_status}: {transition_reason}"
+    momentum_summary = (
+        summary.get("class_momentum_summary")
+        or summary.get("class_reweight_stability_summary")
+        or "No class momentum summary is recorded yet."
+    )
+    return momentum_status, stability_summary, momentum_summary
+
+
+def _operator_class_transition_values(data: dict) -> tuple[str, str, str]:
+    summary = data.get("operator_summary") or {}
+    health_status = (
+        summary.get("primary_target_class_transition_health_status", "") or "none"
+    ).replace("-", " ").title()
+    resolution_status = (
+        summary.get("primary_target_class_transition_resolution_status", "") or "none"
+    ).replace("-", " ").title()
+    transition_summary = (
+        summary.get("class_transition_resolution_summary")
+        or summary.get("class_transition_health_summary")
+        or "No pending transition summary is recorded yet."
+    )
+    return health_status, resolution_status, transition_summary
+
+
 def _operator_calibration_values(data: dict) -> tuple[str, str, str, str]:
     summary = data.get("operator_summary") or {}
     validation_status = summary.get("confidence_validation_status", "") or "insufficient-data"
@@ -916,6 +972,9 @@ def _build_dashboard(
     recovery_confidence, retirement_status, retirement_reason, retirement_summary = _operator_retirement_values(data)
     policy_debt_status, policy_debt_reason, class_normalization_status, trust_normalization_summary = _operator_class_normalization_values(data)
     class_memory_status, class_memory_reason, class_decay_status, class_decay_summary = _operator_class_memory_values(data)
+    class_reweight_direction, class_reweight_score, class_reweight_reason, class_reweight_summary = _operator_class_reweight_values(data)
+    class_momentum_status, class_reweight_stability, class_momentum_summary = _operator_class_momentum_values(data)
+    class_transition_health, class_transition_resolution, class_transition_summary = _operator_class_transition_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
 
     operator_rows = [
@@ -974,6 +1033,14 @@ def _build_dashboard(
                 ("Class Normalization", f"{class_normalization_status} — {trust_normalization_summary}"),
                 ("Class Memory", f"{class_memory_status} — {class_memory_reason}"),
                 ("Trust Decay", f"{class_decay_status} — {class_decay_summary}"),
+                ("Class Reweighting", f"{class_reweight_direction} ({class_reweight_score}) — {class_reweight_summary}"),
+                ("Class Reweighting Why", class_reweight_reason),
+                ("Class Momentum", class_momentum_status),
+                ("Reweight Stability", class_reweight_stability),
+                ("Transition Health", class_transition_health),
+                ("Transition Resolution", class_transition_resolution),
+                ("Transition Summary", class_transition_summary),
+                ("Momentum Summary", class_momentum_summary),
                 ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}"),
                 ("Recommendation Drift", f"{drift_status} — {drift_summary}"),
                 ("Adaptive Confidence", adaptive_confidence_summary),
@@ -3635,6 +3702,9 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
     recovery_confidence, retirement_status, retirement_reason, retirement_summary = _operator_retirement_values(data)
     policy_debt_status, policy_debt_reason, class_normalization_status, trust_normalization_summary = _operator_class_normalization_values(data)
     class_memory_status, class_memory_reason, class_decay_status, class_decay_summary = _operator_class_memory_values(data)
+    class_reweight_direction, class_reweight_score, class_reweight_reason, class_reweight_summary = _operator_class_reweight_values(data)
+    class_momentum_status, class_reweight_stability, class_momentum_summary = _operator_class_momentum_values(data)
+    class_transition_health, class_transition_resolution, class_transition_summary = _operator_class_transition_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
     summary_rows = [
         ("Headline", (data.get("operator_summary") or {}).get("headline", "Review activity is available below.")),
@@ -3673,6 +3743,14 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
                 ("Class Normalization", f"{class_normalization_status} — {trust_normalization_summary}"),
                 ("Class Memory", f"{class_memory_status} — {class_memory_reason}"),
                 ("Trust Decay", f"{class_decay_status} — {class_decay_summary}"),
+                ("Class Reweighting", f"{class_reweight_direction} ({class_reweight_score}) — {class_reweight_summary}"),
+                ("Class Reweighting Why", class_reweight_reason),
+                ("Class Momentum", class_momentum_status),
+                ("Reweight Stability", class_reweight_stability),
+                ("Transition Health", class_transition_health),
+                ("Transition Resolution", class_transition_resolution),
+                ("Transition Summary", class_transition_summary),
+                ("Momentum Summary", class_momentum_summary),
                 ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}"),
                 ("Recommendation Drift", f"{drift_status} — {drift_summary}"),
                 ("Adaptive Confidence", adaptive_confidence_summary),
@@ -4074,6 +4152,9 @@ def _build_executive_summary(
     recovery_confidence, retirement_status, retirement_reason, retirement_summary = _operator_retirement_values(data)
     policy_debt_status, policy_debt_reason, class_normalization_status, trust_normalization_summary = _operator_class_normalization_values(data)
     class_memory_status, class_memory_reason, class_decay_status, class_decay_summary = _operator_class_memory_values(data)
+    class_reweight_direction, class_reweight_score, class_reweight_reason, class_reweight_summary = _operator_class_reweight_values(data)
+    class_momentum_status, class_reweight_stability, class_momentum_summary = _operator_class_momentum_values(data)
+    class_transition_health, class_transition_resolution, class_transition_summary = _operator_class_transition_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
     recommended_focus = ""
     if data.get("operator_queue"):
@@ -4124,10 +4205,18 @@ def _build_executive_summary(
         narrative_rows.insert(20, ("Class Normalization", f"{class_normalization_status} — {trust_normalization_summary}"))
         narrative_rows.insert(21, ("Class Memory", f"{class_memory_status} — {class_memory_reason}"))
         narrative_rows.insert(22, ("Trust Decay", f"{class_decay_status} — {class_decay_summary}"))
-        narrative_rows.insert(23, ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}"))
-        narrative_rows.insert(24, ("Recommendation Drift", f"{drift_status} — {drift_summary}"))
-        narrative_rows.insert(25, ("Adaptive Confidence", adaptive_confidence_summary))
-        narrative_rows.insert(26, ("Confidence Validation", f"{calibration_status} — {calibration_summary}"))
+        narrative_rows.insert(23, ("Class Reweighting", f"{class_reweight_direction} ({class_reweight_score}) — {class_reweight_summary}"))
+        narrative_rows.insert(24, ("Class Reweighting Why", class_reweight_reason))
+        narrative_rows.insert(25, ("Class Momentum", class_momentum_status))
+        narrative_rows.insert(26, ("Reweight Stability", class_reweight_stability))
+        narrative_rows.insert(27, ("Transition Health", class_transition_health))
+        narrative_rows.insert(28, ("Transition Resolution", class_transition_resolution))
+        narrative_rows.insert(29, ("Transition Summary", class_transition_summary))
+        narrative_rows.insert(30, ("Momentum Summary", class_momentum_summary))
+        narrative_rows.insert(31, ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}"))
+        narrative_rows.insert(32, ("Recommendation Drift", f"{drift_status} — {drift_summary}"))
+        narrative_rows.insert(33, ("Adaptive Confidence", adaptive_confidence_summary))
+        narrative_rows.insert(34, ("Confidence Validation", f"{calibration_status} — {calibration_summary}"))
     _write_key_value_block(ws, 4, 1, narrative_rows, title="Leadership Brief")
 
     write_kpi_card(ws, 10, 1, "Portfolio Grade", data.get("portfolio_grade", "F"))
@@ -4217,18 +4306,34 @@ def _build_executive_summary(
             ws.cell(row=50, column=5, value=f"{class_memory_status} — {class_memory_reason}")
             ws.cell(row=51, column=4, value="Trust Decay").font = SUBHEADER_FONT
             ws.cell(row=51, column=5, value=f"{class_decay_status} — {class_decay_summary}")
-            ws.cell(row=52, column=4, value="Exception Learning").font = SUBHEADER_FONT
-            ws.cell(row=52, column=5, value=f"{exception_pattern_status} — {exception_pattern_summary}")
-            ws.cell(row=53, column=4, value="Recommendation Drift").font = SUBHEADER_FONT
-            ws.cell(row=53, column=5, value=f"{drift_status} — {drift_summary}")
-            ws.cell(row=54, column=4, value="Adaptive Confidence").font = SUBHEADER_FONT
-            ws.cell(row=54, column=5, value=adaptive_confidence_summary)
-            ws.cell(row=55, column=4, value="Recommendation Quality").font = SUBHEADER_FONT
-            ws.cell(row=55, column=5, value=recommendation_quality)
-            ws.cell(row=56, column=4, value="Confidence Validation").font = SUBHEADER_FONT
-            ws.cell(row=56, column=5, value=f"{calibration_status} — {calibration_summary}")
-            ws.cell(row=57, column=4, value="Calibration Snapshot").font = SUBHEADER_FONT
-            ws.cell(row=57, column=5, value=f"High-confidence hit rate {high_hit_rate} | {reopened_recommendations}")
+            ws.cell(row=52, column=4, value="Class Reweighting").font = SUBHEADER_FONT
+            ws.cell(row=52, column=5, value=f"{class_reweight_direction} ({class_reweight_score}) — {class_reweight_summary}")
+            ws.cell(row=53, column=4, value="Class Reweighting Why").font = SUBHEADER_FONT
+            ws.cell(row=53, column=5, value=class_reweight_reason)
+            ws.cell(row=54, column=4, value="Class Momentum").font = SUBHEADER_FONT
+            ws.cell(row=54, column=5, value=class_momentum_status)
+            ws.cell(row=55, column=4, value="Reweight Stability").font = SUBHEADER_FONT
+            ws.cell(row=55, column=5, value=class_reweight_stability)
+            ws.cell(row=56, column=4, value="Transition Health").font = SUBHEADER_FONT
+            ws.cell(row=56, column=5, value=class_transition_health)
+            ws.cell(row=57, column=4, value="Transition Resolution").font = SUBHEADER_FONT
+            ws.cell(row=57, column=5, value=class_transition_resolution)
+            ws.cell(row=58, column=4, value="Transition Summary").font = SUBHEADER_FONT
+            ws.cell(row=58, column=5, value=class_transition_summary)
+            ws.cell(row=59, column=4, value="Momentum Summary").font = SUBHEADER_FONT
+            ws.cell(row=59, column=5, value=class_momentum_summary)
+            ws.cell(row=60, column=4, value="Exception Learning").font = SUBHEADER_FONT
+            ws.cell(row=60, column=5, value=f"{exception_pattern_status} — {exception_pattern_summary}")
+            ws.cell(row=61, column=4, value="Recommendation Drift").font = SUBHEADER_FONT
+            ws.cell(row=61, column=5, value=f"{drift_status} — {drift_summary}")
+            ws.cell(row=62, column=4, value="Adaptive Confidence").font = SUBHEADER_FONT
+            ws.cell(row=62, column=5, value=adaptive_confidence_summary)
+            ws.cell(row=63, column=4, value="Recommendation Quality").font = SUBHEADER_FONT
+            ws.cell(row=63, column=5, value=recommendation_quality)
+            ws.cell(row=64, column=4, value="Confidence Validation").font = SUBHEADER_FONT
+            ws.cell(row=64, column=5, value=f"{calibration_status} — {calibration_summary}")
+            ws.cell(row=65, column=4, value="Calibration Snapshot").font = SUBHEADER_FONT
+            ws.cell(row=65, column=5, value=f"High-confidence hit rate {high_hit_rate} | {reopened_recommendations}")
     preflight = data.get("preflight_summary") or {}
     if preflight and (preflight.get("blocking_errors", 0) or preflight.get("warnings", 0)):
         row_base = 57 if excel_mode == "standard" else 33
@@ -4239,7 +4344,7 @@ def _build_executive_summary(
         ws.cell(row=row_base + 2, column=2, value=preflight.get("blocking_errors", 0))
         ws.cell(row=row_base + 3, column=1, value="Warnings").font = SUBHEADER_FONT
         ws.cell(row=row_base + 3, column=2, value=preflight.get("warnings", 0))
-    auto_width(ws, 6, 59 if excel_mode == "standard" else 35)
+    auto_width(ws, 6, 65 if excel_mode == "standard" else 35)
 
 
 def _build_print_pack(
@@ -4282,6 +4387,9 @@ def _build_print_pack(
     recovery_confidence, retirement_status, retirement_reason, retirement_summary = _operator_retirement_values(data)
     policy_debt_status, policy_debt_reason, class_normalization_status, trust_normalization_summary = _operator_class_normalization_values(data)
     class_memory_status, class_memory_reason, class_decay_status, class_decay_summary = _operator_class_memory_values(data)
+    class_reweight_direction, class_reweight_score, class_reweight_reason, class_reweight_summary = _operator_class_reweight_values(data)
+    class_momentum_status, class_reweight_stability, class_momentum_summary = _operator_class_momentum_values(data)
+    class_transition_health, class_transition_resolution, class_transition_summary = _operator_class_transition_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
     ws["A7"] = "This Week"
     ws["B7"] = operator_summary.get("headline", "Review the latest workbook surfaces for change and drift.")
@@ -4348,23 +4456,39 @@ def _build_print_pack(
         ws["B35"] = f"{class_memory_status} — {class_memory_reason}"
         ws["A36"] = "Trust Decay"
         ws["B36"] = f"{class_decay_status} — {class_decay_summary}"
-        ws["A37"] = "Exception Learning"
-        ws["B37"] = f"{exception_pattern_status} — {exception_pattern_summary}"
-        ws["A38"] = "Recommendation Drift"
-        ws["B38"] = f"{drift_status} — {drift_summary}"
-        ws["A39"] = "Adaptive Confidence"
-        ws["B39"] = adaptive_confidence_summary
-        ws["A40"] = "Recommendation Quality"
-        ws["B40"] = recommendation_quality
-        ws["A41"] = "Confidence Validation"
-        ws["B41"] = f"{calibration_status} — {calibration_summary}"
-        ws["A42"] = "Calibration Snapshot"
-        ws["B42"] = f"High-confidence hit rate {high_hit_rate} | {reopened_recommendations}"
-        ws["A43"] = "Top Risks"
-        ws["A43"].font = SECTION_FONT
-        risk_start_row = 43
-        opportunity_header_row = 38
-        page2_row = 49
+        ws["A37"] = "Class Reweighting"
+        ws["B37"] = f"{class_reweight_direction} ({class_reweight_score}) — {class_reweight_summary}"
+        ws["A38"] = "Class Reweighting Why"
+        ws["B38"] = class_reweight_reason
+        ws["A39"] = "Class Momentum"
+        ws["B39"] = class_momentum_status
+        ws["A40"] = "Reweight Stability"
+        ws["B40"] = class_reweight_stability
+        ws["A41"] = "Transition Health"
+        ws["B41"] = class_transition_health
+        ws["A42"] = "Transition Resolution"
+        ws["B42"] = class_transition_resolution
+        ws["A43"] = "Transition Summary"
+        ws["B43"] = class_transition_summary
+        ws["A44"] = "Momentum Summary"
+        ws["B44"] = class_momentum_summary
+        ws["A45"] = "Exception Learning"
+        ws["B45"] = f"{exception_pattern_status} — {exception_pattern_summary}"
+        ws["A46"] = "Recommendation Drift"
+        ws["B46"] = f"{drift_status} — {drift_summary}"
+        ws["A47"] = "Adaptive Confidence"
+        ws["B47"] = adaptive_confidence_summary
+        ws["A48"] = "Recommendation Quality"
+        ws["B48"] = recommendation_quality
+        ws["A49"] = "Confidence Validation"
+        ws["B49"] = f"{calibration_status} — {calibration_summary}"
+        ws["A50"] = "Calibration Snapshot"
+        ws["B50"] = f"High-confidence hit rate {high_hit_rate} | {reopened_recommendations}"
+        ws["A48"] = "Top Risks"
+        ws["A48"].font = SECTION_FONT
+        risk_start_row = 48
+        opportunity_header_row = 41
+        page2_row = 54
     else:
         ws["A17"] = "Top Risks"
         ws["A17"].font = SECTION_FONT

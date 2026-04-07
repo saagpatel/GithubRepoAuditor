@@ -314,6 +314,37 @@ def write_markdown_report(
                 f"- Trust Decay Controls: {report.operator_summary.get('primary_target_class_decay_status')} "
                 f"({report.operator_summary.get('primary_target_class_decay_reason', 'No class-decay reason is recorded yet.')})"
             )
+        if report.operator_summary.get("primary_target_class_trust_reweight_direction"):
+            _w(
+                f"- Class Trust Reweighting: {report.operator_summary.get('primary_target_class_trust_reweight_direction')} "
+                f"({report.operator_summary.get('primary_target_class_trust_reweight_score', 0.0):.2f})"
+            )
+        if report.operator_summary.get("primary_target_class_trust_reweight_reasons"):
+            _w(
+                "- Why Class Guidance Shifted: "
+                + ", ".join(report.operator_summary.get("primary_target_class_trust_reweight_reasons") or [])
+            )
+        if report.operator_summary.get("primary_target_class_trust_momentum_status"):
+            _w(
+                f"- Class Trust Momentum: {report.operator_summary.get('primary_target_class_trust_momentum_status')} "
+                f"({report.operator_summary.get('primary_target_class_trust_momentum_score', 0.0):.2f})"
+            )
+        if report.operator_summary.get("primary_target_class_reweight_stability_status"):
+            _w(
+                f"- Reweighting Stability: {report.operator_summary.get('primary_target_class_reweight_stability_status')} "
+                f"({report.operator_summary.get('primary_target_class_reweight_transition_status', 'none')}: "
+                f"{report.operator_summary.get('primary_target_class_reweight_transition_reason', 'No class transition reason is recorded yet.')})"
+            )
+        if report.operator_summary.get("primary_target_class_transition_health_status"):
+            _w(
+                f"- Class Transition Health: {report.operator_summary.get('primary_target_class_transition_health_status')} "
+                f"({report.operator_summary.get('primary_target_class_transition_health_reason', 'No class transition health reason is recorded yet.')})"
+            )
+        if report.operator_summary.get("primary_target_class_transition_resolution_status"):
+            _w(
+                f"- Pending Transition Resolution: {report.operator_summary.get('primary_target_class_transition_resolution_status')} "
+                f"({report.operator_summary.get('primary_target_class_transition_resolution_reason', 'No class transition resolution reason is recorded yet.')})"
+            )
         if report.operator_summary.get("recommendation_drift_status"):
             _w(
                 f"- Recommendation Drift: {report.operator_summary.get('recommendation_drift_status')} "
@@ -331,6 +362,16 @@ def write_markdown_report(
             _w(f"- Class Memory Summary: {report.operator_summary.get('class_memory_summary')}")
         if report.operator_summary.get("class_decay_summary"):
             _w(f"- Class Decay Summary: {report.operator_summary.get('class_decay_summary')}")
+        if report.operator_summary.get("class_reweighting_summary"):
+            _w(f"- Class Reweighting Summary: {report.operator_summary.get('class_reweighting_summary')}")
+        if report.operator_summary.get("class_momentum_summary"):
+            _w(f"- Class Momentum Summary: {report.operator_summary.get('class_momentum_summary')}")
+        if report.operator_summary.get("class_reweight_stability_summary"):
+            _w(f"- Reweighting Stability Summary: {report.operator_summary.get('class_reweight_stability_summary')}")
+        if report.operator_summary.get("class_transition_health_summary"):
+            _w(f"- Class Transition Health Summary: {report.operator_summary.get('class_transition_health_summary')}")
+        if report.operator_summary.get("class_transition_resolution_summary"):
+            _w(f"- Pending Transition Resolution Summary: {report.operator_summary.get('class_transition_resolution_summary')}")
         if report.operator_summary.get("recommendation_quality_summary"):
             _w(f"- Recommendation Quality: {report.operator_summary.get('recommendation_quality_summary')}")
         if report.operator_summary.get("confidence_validation_status"):

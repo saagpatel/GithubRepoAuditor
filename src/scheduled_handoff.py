@@ -136,6 +136,9 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Class-level trust normalization: `{summary.get('primary_target_class_normalization_status', 'none')}` — {summary.get('primary_target_class_normalization_reason', 'No class-normalization reason is recorded yet.')}",
         f"- Class memory freshness: `{summary.get('primary_target_class_memory_freshness_status', 'insufficient-data')}` — {summary.get('primary_target_class_memory_freshness_reason', 'No class-memory freshness reason is recorded yet.')}",
         f"- Trust decay controls: `{summary.get('primary_target_class_decay_status', 'none')}` — {summary.get('primary_target_class_decay_reason', 'No class-decay reason is recorded yet.')}",
+        f"- Class trust reweighting: `{summary.get('primary_target_class_trust_reweight_direction', 'neutral')}` ({summary.get('primary_target_class_trust_reweight_score', 0.0):.2f})",
+        f"- Class transition health: `{summary.get('primary_target_class_transition_health_status', 'none')}` — {summary.get('primary_target_class_transition_health_reason', 'No class transition health reason is recorded yet.')}",
+        f"- Pending transition resolution: `{summary.get('primary_target_class_transition_resolution_status', 'none')}` — {summary.get('primary_target_class_transition_resolution_reason', 'No class transition resolution reason is recorded yet.')}",
         f"- Recommendation drift: `{summary.get('recommendation_drift_status', 'stable')}` — {summary.get('recommendation_drift_summary', 'No recommendation-drift summary is recorded yet.')}",
         f"- Exception pattern summary: {summary.get('exception_pattern_summary', 'No exception-pattern summary is recorded yet.')}",
         f"- Exception retirement summary: {summary.get('exception_retirement_summary', 'No exception-retirement summary is recorded yet.')}",
@@ -143,6 +146,7 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Trust normalization summary: {summary.get('trust_normalization_summary', 'No trust-normalization summary is recorded yet.')}",
         f"- Class memory summary: {summary.get('class_memory_summary', 'No class-memory summary is recorded yet.')}",
         f"- Class decay summary: {summary.get('class_decay_summary', 'No class-decay summary is recorded yet.')}",
+        f"- Class reweighting summary: {summary.get('class_reweighting_summary', 'No class reweighting summary is recorded yet.')}",
         f"- Confidence validation: `{summary.get('confidence_validation_status', 'insufficient-data')}` — {summary.get('confidence_calibration_summary', 'No confidence-calibration summary is recorded yet.')}",
         f"- Next recommended run: `{summary.get('next_recommended_run_mode', 'n/a')}`",
         f"- Watch strategy: `{summary.get('watch_strategy', 'manual')}`",
@@ -401,6 +405,133 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
             )
     else:
         lines.append("- No stale class-memory hotspots are recorded in the recent window.")
+    lines.append("")
+    lines.append("## Class Trust Reweighting")
+    lines.append("")
+    lines.append(
+        f"- Reweight direction: {summary.get('primary_target_class_trust_reweight_direction', 'neutral')} "
+        f"({summary.get('primary_target_class_trust_reweight_score', 0.0):.2f})"
+    )
+    lines.append(
+        f"- Support / caution scores: {summary.get('primary_target_weighted_class_support_score', 0.0):.2f} support, "
+        f"{summary.get('primary_target_weighted_class_caution_score', 0.0):.2f} caution"
+    )
+    if summary.get("primary_target_class_trust_reweight_reasons"):
+        lines.append(
+            f"- Why class guidance shifted: {', '.join(summary.get('primary_target_class_trust_reweight_reasons') or [])}"
+        )
+    lines.append(
+        f"- {summary.get('class_reweighting_summary', 'No class reweighting summary is recorded yet.')}"
+    )
+    support_hotspots = summary.get("supporting_class_hotspots") or []
+    if support_hotspots:
+        for hotspot in support_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Supporting class hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('reweight_score', 0.0):.2f} with {hotspot.get('weighted_class_support_score', 0.0):.2f} support"
+            )
+    caution_hotspots = summary.get("caution_class_hotspots") or []
+    if caution_hotspots:
+        for hotspot in caution_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Caution class hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('reweight_score', 0.0):.2f} with {hotspot.get('weighted_class_caution_score', 0.0):.2f} caution"
+            )
+    if not support_hotspots and not caution_hotspots:
+        lines.append("- No strong class reweighting hotspots are recorded in the recent window.")
+    lines.append("")
+    lines.append("## Class Trust Momentum")
+    lines.append("")
+    lines.append(
+        f"- Momentum status: {summary.get('primary_target_class_trust_momentum_status', 'insufficient-data')} "
+        f"({summary.get('primary_target_class_trust_momentum_score', 0.0):.2f})"
+    )
+    lines.append(
+        f"- Transition status: {summary.get('primary_target_class_reweight_transition_status', 'none')} "
+        f"({summary.get('primary_target_class_reweight_transition_reason', 'No class transition reason is recorded yet.')})"
+    )
+    lines.append(
+        f"- Transition window: {summary.get('class_transition_window_runs', 4)} run(s)"
+    )
+    lines.append(
+        f"- {summary.get('class_momentum_summary', 'No class momentum summary is recorded yet.')}"
+    )
+    sustained_hotspots = summary.get("sustained_class_hotspots") or []
+    if sustained_hotspots:
+        for hotspot in sustained_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Sustained class hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('momentum_status', 'building')} at {hotspot.get('momentum_score', 0.0):.2f}"
+            )
+    else:
+        lines.append("- No sustained class-momentum hotspots are recorded in the recent window.")
+    lines.append("")
+    lines.append("## Reweighting Stability")
+    lines.append("")
+    lines.append(
+        f"- Stability status: {summary.get('primary_target_class_reweight_stability_status', 'watch')} "
+        f"({summary.get('class_reweight_stability_summary', 'No reweighting stability summary is recorded yet.')})"
+    )
+    primary_target = summary.get("primary_target") or {}
+    if primary_target.get("recent_class_reweight_path"):
+        lines.append(
+            f"- Recent class reweight path: {primary_target.get('recent_class_reweight_path')}"
+        )
+    oscillating_hotspots = summary.get("oscillating_class_hotspots") or []
+    if oscillating_hotspots:
+        for hotspot in oscillating_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Oscillating class hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('stability_status', 'oscillating')} across {hotspot.get('recent_class_reweight_path', 'no path recorded')}"
+            )
+    else:
+        lines.append("- No oscillating class-momentum hotspots are recorded in the recent window.")
+    lines.append("")
+    lines.append("## Class Transition Health")
+    lines.append("")
+    lines.append(
+        f"- Transition health: {summary.get('primary_target_class_transition_health_status', 'none')} "
+        f"({summary.get('primary_target_class_transition_health_reason', 'No class transition health reason is recorded yet.')})"
+    )
+    lines.append(
+        f"- Transition age: {summary.get('primary_target', {}).get('class_transition_age_runs', 0)} run(s)"
+    )
+    lines.append(
+        f"- Transition age window: {summary.get('class_transition_age_window_runs', 4)} run(s)"
+    )
+    lines.append(
+        f"- {summary.get('class_transition_health_summary', 'No class transition health summary is recorded yet.')}"
+    )
+    if primary_target.get("recent_transition_path"):
+        lines.append(f"- Recent transition path: {primary_target.get('recent_transition_path')}")
+    stalled_transition_hotspots = summary.get("stalled_transition_hotspots") or []
+    if stalled_transition_hotspots:
+        for hotspot in stalled_transition_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Stalled transition hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('health_status', 'stalled')} across {hotspot.get('transition_age_runs', 0)} run(s)"
+            )
+    else:
+        lines.append("- No stalled pending-transition hotspots are recorded in the recent window.")
+    lines.append("")
+    lines.append("## Pending Transition Resolution")
+    lines.append("")
+    lines.append(
+        f"- Resolution status: {summary.get('primary_target_class_transition_resolution_status', 'none')} "
+        f"({summary.get('primary_target_class_transition_resolution_reason', 'No class transition resolution reason is recorded yet.')})"
+    )
+    lines.append(
+        f"- {summary.get('class_transition_resolution_summary', 'No class transition resolution summary is recorded yet.')}"
+    )
+    resolving_transition_hotspots = summary.get("resolving_transition_hotspots") or []
+    if resolving_transition_hotspots:
+        for hotspot in resolving_transition_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Resolving transition hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('resolution_status', 'confirmed')} across {hotspot.get('recent_transition_path', 'no transition path recorded')}"
+            )
+    else:
+        lines.append("- No recent pending-transition resolutions are recorded in the recent window.")
     lines.append("")
     lines.append("## Recommendation Drift")
     lines.append("")
