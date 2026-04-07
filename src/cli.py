@@ -782,6 +782,24 @@ def _print_control_center_summary(snapshot: dict) -> None:
         print(f"  Class pending debt summary: {summary['class_pending_debt_summary']}")
     if summary.get("class_pending_resolution_summary"):
         print(f"  Class pending resolution summary: {summary['class_pending_resolution_summary']}")
+    if summary.get("primary_target_pending_debt_freshness_status"):
+        print(
+            "  Pending debt freshness: "
+            f"{summary.get('primary_target_pending_debt_freshness_status', 'insufficient-data')} "
+            f"({summary.get('primary_target_pending_debt_freshness_reason', 'No pending-debt freshness reason is recorded yet.')})"
+        )
+    if summary.get("pending_debt_freshness_summary"):
+        print(f"  Pending debt freshness summary: {summary['pending_debt_freshness_summary']}")
+    if summary.get("pending_debt_decay_summary"):
+        print(f"  Pending debt decay summary: {summary['pending_debt_decay_summary']}")
+    if summary.get("primary_target_closure_forecast_reweight_direction"):
+        print(
+            "  Closure forecast reweighting: "
+            f"{summary.get('primary_target_closure_forecast_reweight_direction', 'neutral')} "
+            f"({summary.get('primary_target_closure_forecast_reweight_score', 0.0):.2f})"
+        )
+    if summary.get("closure_forecast_reweighting_summary"):
+        print(f"  Closure forecast reweighting summary: {summary['closure_forecast_reweighting_summary']}")
     if summary.get("recommendation_drift_status"):
         print(
             "  Recommendation drift: "

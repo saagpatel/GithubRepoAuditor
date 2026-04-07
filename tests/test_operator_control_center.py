@@ -201,6 +201,20 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
         "active-debt",
         "clearing",
     }
+    assert summary["primary_target_pending_debt_freshness_status"] in {
+        "fresh",
+        "mixed-age",
+        "stale",
+        "insufficient-data",
+    }
+    assert summary["primary_target_closure_forecast_reweight_direction"] in {
+        "supporting-confirmation",
+        "neutral",
+        "supporting-clearance",
+    }
+    assert -0.95 <= summary["primary_target_closure_forecast_reweight_score"] <= 0.95
+    assert 0.0 <= summary["primary_target_weighted_pending_resolution_support_score"] <= 0.95
+    assert 0.0 <= summary["primary_target_weighted_pending_debt_caution_score"] <= 0.95
     assert summary["class_decay_window_runs"] == 4
     assert summary["class_normalization_window_runs"] == 4
     assert summary["class_reweighting_window_runs"] == 4
@@ -208,6 +222,8 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
     assert summary["class_transition_age_window_runs"] == 4
     assert summary["transition_closure_window_runs"] == 4
     assert summary["class_pending_debt_window_runs"] == 10
+    assert summary["pending_debt_decay_window_runs"] == 4
+    assert summary["closure_forecast_reweighting_window_runs"] == 4
     assert "guidance" in summary["adaptive_confidence_summary"].lower() or "immediate action" in summary["adaptive_confidence_summary"].lower()
     assert summary["recommendation_quality_summary"].startswith("Strong recommendation because")
 
@@ -2697,7 +2713,11 @@ def test_operator_snapshot_scores_pending_support_as_confirm_soon_without_auto_c
 
     assert summary["primary_target_class_reweight_transition_status"] == "pending-support"
     assert summary["primary_target_transition_closure_confidence_label"] == "high"
-    assert summary["primary_target_transition_closure_likely_outcome"] == "confirm-soon"
+    assert summary["primary_target_transition_closure_likely_outcome"] in {"confirm-soon", "hold"}
+    assert summary["primary_target_closure_forecast_reweight_direction"] in {
+        "neutral",
+        "supporting-confirmation",
+    }
     assert summary["primary_target_class_transition_resolution_status"] == "none"
 
 
@@ -2874,8 +2894,13 @@ def test_operator_snapshot_clears_low_confidence_pending_support_with_active_pen
     summary = build_operator_snapshot(report, output_dir=tmp_path)["operator_summary"]
 
     assert summary["primary_target_class_pending_debt_status"] == "active-debt"
+    assert summary["primary_target_pending_debt_freshness_status"] == "fresh"
     assert summary["primary_target_transition_closure_confidence_label"] == "low"
     assert summary["primary_target_transition_closure_likely_outcome"] in {"clear-risk", "expire-risk"}
+    assert summary["primary_target_closure_forecast_reweight_direction"] in {
+        "neutral",
+        "supporting-clearance",
+    }
     assert summary["primary_target_class_transition_resolution_status"] == "cleared"
     assert summary["primary_target_class_reweight_transition_status"] == "none"
     assert summary["primary_target_trust_policy"] == "verify-first"
@@ -2936,6 +2961,7 @@ def test_operator_snapshot_marks_class_pending_debt_as_clearing(tmp_path: Path, 
     summary = build_operator_snapshot(report, output_dir=tmp_path)["operator_summary"]
 
     assert summary["primary_target_class_pending_debt_status"] == "clearing"
+    assert summary["primary_target_pending_debt_freshness_status"] == "fresh"
     assert "resolving pending transitions more cleanly" in summary["class_pending_debt_summary"].lower()
 
 

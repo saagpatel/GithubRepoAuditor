@@ -503,7 +503,7 @@ def _operator_class_transition_values(data: dict) -> tuple[str, str, str]:
     return health_status, resolution_status, transition_summary
 
 
-def _operator_transition_closure_values(data: dict) -> tuple[str, str, str, str]:
+def _operator_transition_closure_values(data: dict) -> tuple[str, str, str, str, str]:
     summary = data.get("operator_summary") or {}
     closure_label = (
         summary.get("primary_target_transition_closure_confidence_label", "") or "low"
@@ -511,15 +511,25 @@ def _operator_transition_closure_values(data: dict) -> tuple[str, str, str, str]
     likely_outcome = (
         summary.get("primary_target_transition_closure_likely_outcome", "") or "none"
     ).replace("-", " ").title()
-    pending_debt_status = (
-        summary.get("primary_target_class_pending_debt_status", "") or "none"
+    pending_debt_freshness = (
+        summary.get("primary_target_pending_debt_freshness_status", "") or "insufficient-data"
+    ).replace("-", " ").title()
+    closure_forecast_direction = (
+        summary.get("primary_target_closure_forecast_reweight_direction", "") or "neutral"
     ).replace("-", " ").title()
     closure_summary = (
-        summary.get("transition_closure_confidence_summary")
-        or summary.get("class_pending_debt_summary")
-        or "No transition-closure summary is recorded yet."
+        summary.get("closure_forecast_reweighting_summary")
+        or summary.get("pending_debt_freshness_summary")
+        or summary.get("transition_closure_confidence_summary")
+        or "No closure-forecast summary is recorded yet."
     )
-    return closure_label, likely_outcome, pending_debt_status, closure_summary
+    return (
+        closure_label,
+        likely_outcome,
+        pending_debt_freshness,
+        closure_forecast_direction,
+        closure_summary,
+    )
 
 
 def _operator_calibration_values(data: dict) -> tuple[str, str, str, str]:
@@ -994,7 +1004,13 @@ def _build_dashboard(
     class_reweight_direction, class_reweight_score, class_reweight_reason, class_reweight_summary = _operator_class_reweight_values(data)
     class_momentum_status, class_reweight_stability, class_momentum_summary = _operator_class_momentum_values(data)
     class_transition_health, class_transition_resolution, class_transition_summary = _operator_class_transition_values(data)
-    transition_closure_confidence, transition_likely_outcome, class_pending_debt, transition_closure_summary = _operator_transition_closure_values(data)
+    (
+        transition_closure_confidence,
+        transition_likely_outcome,
+        pending_debt_freshness,
+        closure_forecast_direction,
+        transition_closure_summary,
+    ) = _operator_transition_closure_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
 
     operator_rows = [
@@ -1062,8 +1078,9 @@ def _build_dashboard(
                 ("Transition Summary", class_transition_summary),
                 ("Transition Closure", transition_closure_confidence),
                 ("Transition Likely Outcome", transition_likely_outcome),
-                ("Class Pending Debt", class_pending_debt),
-                ("Transition Closure Summary", transition_closure_summary),
+                ("Pending Debt Freshness", pending_debt_freshness),
+                ("Closure Forecast", closure_forecast_direction),
+                ("Closure Forecast Summary", transition_closure_summary),
                 ("Momentum Summary", class_momentum_summary),
                 ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}"),
                 ("Recommendation Drift", f"{drift_status} — {drift_summary}"),
@@ -3729,7 +3746,13 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
     class_reweight_direction, class_reweight_score, class_reweight_reason, class_reweight_summary = _operator_class_reweight_values(data)
     class_momentum_status, class_reweight_stability, class_momentum_summary = _operator_class_momentum_values(data)
     class_transition_health, class_transition_resolution, class_transition_summary = _operator_class_transition_values(data)
-    transition_closure_confidence, transition_likely_outcome, class_pending_debt, transition_closure_summary = _operator_transition_closure_values(data)
+    (
+        transition_closure_confidence,
+        transition_likely_outcome,
+        pending_debt_freshness,
+        closure_forecast_direction,
+        transition_closure_summary,
+    ) = _operator_transition_closure_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
     summary_rows = [
         ("Headline", (data.get("operator_summary") or {}).get("headline", "Review activity is available below.")),
@@ -3777,8 +3800,9 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
                 ("Transition Summary", class_transition_summary),
                 ("Transition Closure", transition_closure_confidence),
                 ("Transition Likely Outcome", transition_likely_outcome),
-                ("Class Pending Debt", class_pending_debt),
-                ("Transition Closure Summary", transition_closure_summary),
+                ("Pending Debt Freshness", pending_debt_freshness),
+                ("Closure Forecast", closure_forecast_direction),
+                ("Closure Forecast Summary", transition_closure_summary),
                 ("Momentum Summary", class_momentum_summary),
                 ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}"),
                 ("Recommendation Drift", f"{drift_status} — {drift_summary}"),
@@ -4184,7 +4208,13 @@ def _build_executive_summary(
     class_reweight_direction, class_reweight_score, class_reweight_reason, class_reweight_summary = _operator_class_reweight_values(data)
     class_momentum_status, class_reweight_stability, class_momentum_summary = _operator_class_momentum_values(data)
     class_transition_health, class_transition_resolution, class_transition_summary = _operator_class_transition_values(data)
-    transition_closure_confidence, transition_likely_outcome, class_pending_debt, transition_closure_summary = _operator_transition_closure_values(data)
+    (
+        transition_closure_confidence,
+        transition_likely_outcome,
+        pending_debt_freshness,
+        closure_forecast_direction,
+        transition_closure_summary,
+    ) = _operator_transition_closure_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
     recommended_focus = ""
     if data.get("operator_queue"):
@@ -4244,13 +4274,14 @@ def _build_executive_summary(
         narrative_rows.insert(29, ("Transition Summary", class_transition_summary))
         narrative_rows.insert(30, ("Transition Closure", transition_closure_confidence))
         narrative_rows.insert(31, ("Transition Likely Outcome", transition_likely_outcome))
-        narrative_rows.insert(32, ("Class Pending Debt", class_pending_debt))
-        narrative_rows.insert(33, ("Transition Closure Summary", transition_closure_summary))
-        narrative_rows.insert(34, ("Momentum Summary", class_momentum_summary))
-        narrative_rows.insert(35, ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}"))
-        narrative_rows.insert(36, ("Recommendation Drift", f"{drift_status} — {drift_summary}"))
-        narrative_rows.insert(37, ("Adaptive Confidence", adaptive_confidence_summary))
-        narrative_rows.insert(38, ("Confidence Validation", f"{calibration_status} — {calibration_summary}"))
+        narrative_rows.insert(32, ("Pending Debt Freshness", pending_debt_freshness))
+        narrative_rows.insert(33, ("Closure Forecast", closure_forecast_direction))
+        narrative_rows.insert(34, ("Closure Forecast Summary", transition_closure_summary))
+        narrative_rows.insert(35, ("Momentum Summary", class_momentum_summary))
+        narrative_rows.insert(36, ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}"))
+        narrative_rows.insert(37, ("Recommendation Drift", f"{drift_status} — {drift_summary}"))
+        narrative_rows.insert(38, ("Adaptive Confidence", adaptive_confidence_summary))
+        narrative_rows.insert(39, ("Confidence Validation", f"{calibration_status} — {calibration_summary}"))
     _write_key_value_block(ws, 4, 1, narrative_rows, title="Leadership Brief")
 
     write_kpi_card(ws, 10, 1, "Portfolio Grade", data.get("portfolio_grade", "F"))
@@ -4358,24 +4389,26 @@ def _build_executive_summary(
             ws.cell(row=59, column=5, value=transition_closure_confidence)
             ws.cell(row=60, column=4, value="Transition Likely Outcome").font = SUBHEADER_FONT
             ws.cell(row=60, column=5, value=transition_likely_outcome)
-            ws.cell(row=61, column=4, value="Class Pending Debt").font = SUBHEADER_FONT
-            ws.cell(row=61, column=5, value=class_pending_debt)
-            ws.cell(row=62, column=4, value="Transition Closure Summary").font = SUBHEADER_FONT
-            ws.cell(row=62, column=5, value=transition_closure_summary)
-            ws.cell(row=63, column=4, value="Momentum Summary").font = SUBHEADER_FONT
-            ws.cell(row=63, column=5, value=class_momentum_summary)
-            ws.cell(row=64, column=4, value="Exception Learning").font = SUBHEADER_FONT
-            ws.cell(row=64, column=5, value=f"{exception_pattern_status} — {exception_pattern_summary}")
-            ws.cell(row=65, column=4, value="Recommendation Drift").font = SUBHEADER_FONT
-            ws.cell(row=65, column=5, value=f"{drift_status} — {drift_summary}")
-            ws.cell(row=66, column=4, value="Adaptive Confidence").font = SUBHEADER_FONT
-            ws.cell(row=66, column=5, value=adaptive_confidence_summary)
-            ws.cell(row=67, column=4, value="Recommendation Quality").font = SUBHEADER_FONT
-            ws.cell(row=67, column=5, value=recommendation_quality)
-            ws.cell(row=68, column=4, value="Confidence Validation").font = SUBHEADER_FONT
-            ws.cell(row=68, column=5, value=f"{calibration_status} — {calibration_summary}")
-            ws.cell(row=69, column=4, value="Calibration Snapshot").font = SUBHEADER_FONT
-            ws.cell(row=69, column=5, value=f"High-confidence hit rate {high_hit_rate} | {reopened_recommendations}")
+            ws.cell(row=61, column=4, value="Pending Debt Freshness").font = SUBHEADER_FONT
+            ws.cell(row=61, column=5, value=pending_debt_freshness)
+            ws.cell(row=62, column=4, value="Closure Forecast").font = SUBHEADER_FONT
+            ws.cell(row=62, column=5, value=closure_forecast_direction)
+            ws.cell(row=63, column=4, value="Closure Forecast Summary").font = SUBHEADER_FONT
+            ws.cell(row=63, column=5, value=transition_closure_summary)
+            ws.cell(row=64, column=4, value="Momentum Summary").font = SUBHEADER_FONT
+            ws.cell(row=64, column=5, value=class_momentum_summary)
+            ws.cell(row=65, column=4, value="Exception Learning").font = SUBHEADER_FONT
+            ws.cell(row=65, column=5, value=f"{exception_pattern_status} — {exception_pattern_summary}")
+            ws.cell(row=66, column=4, value="Recommendation Drift").font = SUBHEADER_FONT
+            ws.cell(row=66, column=5, value=f"{drift_status} — {drift_summary}")
+            ws.cell(row=67, column=4, value="Adaptive Confidence").font = SUBHEADER_FONT
+            ws.cell(row=67, column=5, value=adaptive_confidence_summary)
+            ws.cell(row=68, column=4, value="Recommendation Quality").font = SUBHEADER_FONT
+            ws.cell(row=68, column=5, value=recommendation_quality)
+            ws.cell(row=69, column=4, value="Confidence Validation").font = SUBHEADER_FONT
+            ws.cell(row=69, column=5, value=f"{calibration_status} — {calibration_summary}")
+            ws.cell(row=70, column=4, value="Calibration Snapshot").font = SUBHEADER_FONT
+            ws.cell(row=70, column=5, value=f"High-confidence hit rate {high_hit_rate} | {reopened_recommendations}")
     preflight = data.get("preflight_summary") or {}
     if preflight and (preflight.get("blocking_errors", 0) or preflight.get("warnings", 0)):
         row_base = 57 if excel_mode == "standard" else 33
@@ -4432,7 +4465,13 @@ def _build_print_pack(
     class_reweight_direction, class_reweight_score, class_reweight_reason, class_reweight_summary = _operator_class_reweight_values(data)
     class_momentum_status, class_reweight_stability, class_momentum_summary = _operator_class_momentum_values(data)
     class_transition_health, class_transition_resolution, class_transition_summary = _operator_class_transition_values(data)
-    transition_closure_confidence, transition_likely_outcome, class_pending_debt, transition_closure_summary = _operator_transition_closure_values(data)
+    (
+        transition_closure_confidence,
+        transition_likely_outcome,
+        pending_debt_freshness,
+        closure_forecast_direction,
+        transition_closure_summary,
+    ) = _operator_transition_closure_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
     ws["A7"] = "This Week"
     ws["B7"] = operator_summary.get("headline", "Review the latest workbook surfaces for change and drift.")
@@ -4517,29 +4556,31 @@ def _build_print_pack(
         ws["B44"] = transition_closure_confidence
         ws["A45"] = "Transition Likely Outcome"
         ws["B45"] = transition_likely_outcome
-        ws["A46"] = "Class Pending Debt"
-        ws["B46"] = class_pending_debt
-        ws["A47"] = "Transition Closure Summary"
-        ws["B47"] = transition_closure_summary
-        ws["A48"] = "Momentum Summary"
-        ws["B48"] = class_momentum_summary
-        ws["A49"] = "Exception Learning"
-        ws["B49"] = f"{exception_pattern_status} — {exception_pattern_summary}"
-        ws["A50"] = "Recommendation Drift"
-        ws["B50"] = f"{drift_status} — {drift_summary}"
-        ws["A51"] = "Adaptive Confidence"
-        ws["B51"] = adaptive_confidence_summary
-        ws["A52"] = "Recommendation Quality"
-        ws["B52"] = recommendation_quality
-        ws["A53"] = "Confidence Validation"
-        ws["B53"] = f"{calibration_status} — {calibration_summary}"
-        ws["A54"] = "Calibration Snapshot"
-        ws["B54"] = f"High-confidence hit rate {high_hit_rate} | {reopened_recommendations}"
-        ws["A56"] = "Top Risks"
-        ws["A56"].font = SECTION_FONT
-        risk_start_row = 56
-        opportunity_header_row = 56
-        page2_row = 62
+        ws["A46"] = "Pending Debt Freshness"
+        ws["B46"] = pending_debt_freshness
+        ws["A47"] = "Closure Forecast"
+        ws["B47"] = closure_forecast_direction
+        ws["A48"] = "Closure Forecast Summary"
+        ws["B48"] = transition_closure_summary
+        ws["A49"] = "Momentum Summary"
+        ws["B49"] = class_momentum_summary
+        ws["A50"] = "Exception Learning"
+        ws["B50"] = f"{exception_pattern_status} — {exception_pattern_summary}"
+        ws["A51"] = "Recommendation Drift"
+        ws["B51"] = f"{drift_status} — {drift_summary}"
+        ws["A52"] = "Adaptive Confidence"
+        ws["B52"] = adaptive_confidence_summary
+        ws["A53"] = "Recommendation Quality"
+        ws["B53"] = recommendation_quality
+        ws["A54"] = "Confidence Validation"
+        ws["B54"] = f"{calibration_status} — {calibration_summary}"
+        ws["A55"] = "Calibration Snapshot"
+        ws["B55"] = f"High-confidence hit rate {high_hit_rate} | {reopened_recommendations}"
+        ws["A57"] = "Top Risks"
+        ws["A57"].font = SECTION_FONT
+        risk_start_row = 57
+        opportunity_header_row = 57
+        page2_row = 63
     else:
         ws["A17"] = "Top Risks"
         ws["A17"].font = SECTION_FONT

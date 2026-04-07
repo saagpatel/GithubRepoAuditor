@@ -356,6 +356,16 @@ def write_markdown_report(
                 f"- Class Pending Debt Audit: {report.operator_summary.get('primary_target_class_pending_debt_status')} "
                 f"({report.operator_summary.get('primary_target_class_pending_debt_reason', 'No class pending-debt reason is recorded yet.')})"
             )
+        if report.operator_summary.get("primary_target_pending_debt_freshness_status"):
+            _w(
+                f"- Pending Debt Freshness: {report.operator_summary.get('primary_target_pending_debt_freshness_status')} "
+                f"({report.operator_summary.get('primary_target_pending_debt_freshness_reason', 'No pending-debt freshness reason is recorded yet.')})"
+            )
+        if report.operator_summary.get("primary_target_closure_forecast_reweight_direction"):
+            _w(
+                f"- Closure Forecast Reweighting: {report.operator_summary.get('primary_target_closure_forecast_reweight_direction')} "
+                f"({report.operator_summary.get('primary_target_closure_forecast_reweight_score', 0.0):.2f})"
+            )
         if report.operator_summary.get("recommendation_drift_status"):
             _w(
                 f"- Recommendation Drift: {report.operator_summary.get('recommendation_drift_status')} "
@@ -389,6 +399,12 @@ def write_markdown_report(
             _w(f"- Class Pending Debt Summary: {report.operator_summary.get('class_pending_debt_summary')}")
         if report.operator_summary.get("class_pending_resolution_summary"):
             _w(f"- Class Pending Resolution Summary: {report.operator_summary.get('class_pending_resolution_summary')}")
+        if report.operator_summary.get("pending_debt_freshness_summary"):
+            _w(f"- Pending Debt Freshness Summary: {report.operator_summary.get('pending_debt_freshness_summary')}")
+        if report.operator_summary.get("pending_debt_decay_summary"):
+            _w(f"- Pending Debt Decay Summary: {report.operator_summary.get('pending_debt_decay_summary')}")
+        if report.operator_summary.get("closure_forecast_reweighting_summary"):
+            _w(f"- Closure Forecast Reweighting Summary: {report.operator_summary.get('closure_forecast_reweighting_summary')}")
         if report.operator_summary.get("recommendation_quality_summary"):
             _w(f"- Recommendation Quality: {report.operator_summary.get('recommendation_quality_summary')}")
         if report.operator_summary.get("confidence_validation_status"):
