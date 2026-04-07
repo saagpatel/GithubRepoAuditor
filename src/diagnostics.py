@@ -8,6 +8,13 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from src.baseline_context import (
+    build_requested_baseline_context,
+    compare_baseline_context,
+    extract_baseline_context,
+    format_mismatch_value,
+    normalize_scoring_profile,
+)
 from src.config import ConfigInspection, inspect_config, validate_config_data
 from src.excel_template import DEFAULT_TEMPLATE_PATH, TEMPLATE_INFO_SHEET, TEMPLATE_SHEETS
 from src.portfolio_intelligence import DEFAULT_PROFILES
@@ -560,6 +567,56 @@ def _add_filesystem_checks(checks: list[DiagnosticCheck], args, output_dir: Path
                 details=f"Latest report: {latest_report.name}",
             )
         )
+        if getattr(args, "repos", None) or getattr(args, "incremental", False):
+            latest_report_inspection = _inspect_json_file(latest_report)
+            if not latest_report_inspection["ok"]:
+                checks.append(
+                    DiagnosticCheck(
+                        key="baseline-context",
+                        category="history-warehouse",
+                        severity="error",
+                        status="error",
+                        summary="The latest audit report could not be read for baseline compatibility.",
+                        details=latest_report_inspection["message"],
+                        recommended_fix="Repair or replace the latest audit report, or run a full audit first.",
+                    )
+                )
+            else:
+                existing_context = extract_baseline_context(latest_report_inspection["data"])
+                if not existing_context:
+                    checks.append(
+                        DiagnosticCheck(
+                            key="baseline-context",
+                            category="history-warehouse",
+                            severity="error",
+                            status="error",
+                            summary="Partial reruns need a baseline report with baseline context.",
+                            details=f"{latest_report.name} does not contain the additive baseline context fields required for safe partial reruns.",
+                            recommended_fix="Run a full audit first so targeted and incremental paths have a compatible baseline.",
+                        )
+                    )
+                else:
+                    requested_context = build_requested_baseline_context(
+                        args,
+                        scoring_profile=normalize_scoring_profile(getattr(args, "scoring_profile", None)),
+                    )
+                    mismatches = compare_baseline_context(requested_context, existing_context, include_size=False)
+                    if mismatches:
+                        details = "; ".join(
+                            f"{item['label']}: existing={format_mismatch_value(item['actual'])} | requested={format_mismatch_value(item['expected'])}"
+                            for item in mismatches
+                        )
+                        checks.append(
+                            DiagnosticCheck(
+                                key="baseline-context",
+                                category="history-warehouse",
+                                severity="error",
+                                status="error",
+                                summary="Partial reruns need a compatible baseline contract.",
+                                details=details,
+                                recommended_fix="Run a full audit first before targeted or incremental reruns.",
+                            )
+                        )
 
     if getattr(args, "incremental", False):
         fingerprint_path = output_dir / FINGERPRINT_FILENAME

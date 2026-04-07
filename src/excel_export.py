@@ -640,9 +640,9 @@ def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None, sc
     c.alignment = WRAP
     ws.row_dimensions[3].height = 30
     ws.freeze_panes = "A5"
-    ws["A4"] = "Portfolio Health"
+    ws["A4"] = "Portfolio Health Snapshot"
     ws["A4"].font = SECTION_FONT
-    ws["O4"] = "Operator Attention"
+    ws["O4"] = "Operator Attention Snapshot"
     ws["O4"].font = SECTION_FONT
 
     # KPI Cards (row 5-6)
@@ -774,6 +774,14 @@ def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None, sc
         if tier in TIER_FILLS:
             cell.fill = TIER_FILLS[tier]
 
+    ws.merge_cells("A9:L10")
+    ws["A9"] = (
+        "Use the left side for portfolio shape and the right side for operator pressure. "
+        "If you only have a minute, read the narrative, scan the queue snapshot, and then open Review Queue."
+    )
+    ws["A9"].font = SUBTITLE_FONT
+    ws["A9"].alignment = WRAP
+
     # Tier Pie Chart
     pie_label_col = 24
     pie_value_col = 25
@@ -796,9 +804,9 @@ def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None, sc
         pt = DataPoint(idx=i)
         pt.graphicalProperties.solidFill = color
         pie.series[0].data_points.append(pt)
-    pie.width = 9
-    pie.height = 7
-    ws.add_chart(pie, "A16")
+    pie.width = 8.4
+    pie.height = 6.5
+    ws.add_chart(pie, "A17")
 
     # Grade Distribution Bar Chart
     grade_dist = Counter(a.get("grade", "F") for a in data.get("audits", []))
@@ -817,12 +825,12 @@ def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None, sc
     bar_cats = Reference(ws, min_col=grade_label_col, min_row=grade_row, max_row=grade_row + 4)
     bar.add_data(bar_data, titles_from_data=False)
     bar.set_categories(bar_cats)
-    bar.width = 9
-    bar.height = 7
-    ws.add_chart(bar, "J16")
+    bar.width = 8.4
+    bar.height = 6.5
+    ws.add_chart(bar, "J17")
 
     # Highlights section
-    highlight_row = 30
+    highlight_row = 31
     ws.cell(row=highlight_row, column=1, value="Highlights").font = SECTION_FONT
 
     best_work = data.get("best_work") or data.get("summary", {}).get("highest_scored", [])
@@ -878,9 +886,9 @@ def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None, sc
         lang_cats = Reference(ws, min_col=lang_label_col, min_row=lang_row, max_row=lang_row + min(7, len(lang_dist) - 1))
         lang_bar.add_data(lang_data, titles_from_data=False)
         lang_bar.set_categories(lang_cats)
-        lang_bar.width = 8.5
-        lang_bar.height = 7
-        ws.add_chart(lang_bar, "A34")
+        lang_bar.width = 8.0
+        lang_bar.height = 6.5
+        ws.add_chart(lang_bar, "A35")
 
     # Scatter chart: Completeness vs Interest
     _build_scatter_on_dashboard(ws, data)
@@ -1878,7 +1886,7 @@ def _build_navigation(
     _clear_worksheet(ws)
     ws.sheet_properties.tabColor = "263238"
     _configure_sheet_view(ws, zoom=125, show_grid_lines=False)
-    ws.freeze_panes = "A11"
+    ws.freeze_panes = "A12"
 
     ws.merge_cells("A1:G1")
     ws["A1"].value = f"GitHub Portfolio Audit: {data['username']}"
@@ -1911,11 +1919,15 @@ def _build_navigation(
     ws["A9"] = "Advanced sheets are hidden by default to keep the core tab set manageable. Use Excel Unhide if you want the deeper diagnostics and supporting analysis tabs."
     ws["A9"].font = SUBTITLE_FONT
     ws["A9"].alignment = WRAP
+    ws.merge_cells("A10:G10")
+    ws["A10"] = "Operating rules: standard mode is the default path, visible sheets stay filter-based, and hidden Data_* sheets remain the workbook contract."
+    ws["A10"].font = SUBTITLE_FONT
+    ws["A10"].alignment = WRAP
 
     groups = [
         (
             "Daily Triage",
-            11,
+            12,
             1,
             [
                 ("Dashboard", "Start here for the big-picture health view and top attention items."),
@@ -1927,7 +1939,7 @@ def _build_navigation(
         ),
         (
             "Portfolio Analysis",
-            11,
+            12,
             5,
             [
                 ("Portfolio Explorer", "Rank repos, compare score quality, and drill from summary into raw facts."),
@@ -1939,7 +1951,7 @@ def _build_navigation(
         ),
         (
             "Executive Readout",
-            20,
+            22,
             1,
             [
                 ("Executive Summary", "Readable leadership summary with what changed and what matters this week."),
@@ -1948,7 +1960,7 @@ def _build_navigation(
         ),
         (
             "Deep Diagnostics",
-            20,
+            22,
             5,
             [
                 ("Security", "Raw security posture, secrets, and dangerous-file findings."),
@@ -3308,6 +3320,10 @@ def _build_review_queue(wb: Workbook, data: dict) -> None:
             ("Headline", (data.get("operator_summary") or {}).get("headline", "Review activity is available below.")),
             ("Queue Counts", _format_lane_counts(counts)),
             ("Total Queue Items", len(queue)),
+            (
+                "Immediate Focus",
+                (ordered_queue[0].get("recommended_action") or ordered_queue[0].get("title", "")) if ordered_queue else "No immediate queue item is open.",
+            ),
             ("Top Issue Family", f"{top_issue_families[0][0]} ({top_issue_families[0][1]})" if top_issue_families else "No material change families"),
             ("Source Run", (data.get("operator_summary") or {}).get("source_run_id", "")),
         ],
@@ -3353,6 +3369,10 @@ def _build_review_queue(wb: Workbook, data: dict) -> None:
         ["Action", "Count"],
         action_rows,
     )
+    ws.merge_cells("A24:H24")
+    ws["A24"] = "Read this table top-down: urgent items first, ready items second, and safe-to-defer rows last."
+    ws["A24"].font = SUBTITLE_FONT
+    ws["A24"].alignment = WRAP
     headers = ["Repo", "Title", "Lane", "Kind", "Priority", "Next Step", "Decision Hint", "Safe To Defer"]
     start_row = 25
     for col, header in enumerate(headers, 1):
@@ -3742,9 +3762,16 @@ def _build_executive_summary(
         ws.cell(row=24, column=5, value=_format_lane_counts(_operator_counts(data)))
         ws.cell(row=25, column=4, value="Source Run").font = SUBHEADER_FONT
         ws.cell(row=25, column=5, value=operator_summary.get("source_run_id", ""))
+        ws.cell(row=26, column=4, value="Decision This Week").font = SUBHEADER_FONT
+        ws.cell(
+            row=26,
+            column=5,
+            value=(data.get("operator_queue", [{}])[0].get("recommended_action") if data.get("operator_queue") else "")
+            or "Start with the top review queue item, then protect the current profile leaders.",
+        )
     preflight = data.get("preflight_summary") or {}
     if preflight and (preflight.get("blocking_errors", 0) or preflight.get("warnings", 0)):
-        row_base = 27
+        row_base = 31
         ws.cell(row=row_base, column=1, value="Preflight Diagnostics").font = SECTION_FONT
         ws.cell(row=row_base + 1, column=1, value="Status").font = SUBHEADER_FONT
         ws.cell(row=row_base + 1, column=2, value=preflight.get("status", "unknown"))
@@ -3793,6 +3820,11 @@ def _build_print_pack(
     ws["B9"] = data.get("campaign_summary", {}).get("action_count", 0)
     ws["A10"] = "Open Review Targets"
     ws["B10"] = len(data.get("review_targets", []))
+    ws["A11"] = "Decision This Week"
+    ws["B11"] = (
+        (data.get("operator_queue", [{}])[0].get("recommended_action") if data.get("operator_queue") else "")
+        or "Review the top queue item first, then confirm whether governance drift changes the immediate plan."
+    )
     ws["A12"] = "Top Risks"
     ws["A12"].font = SECTION_FONT
     top_risks = sorted(data.get("hotspots", []) or [], key=lambda item: item.get("severity", 0), reverse=True)[:5]

@@ -7,7 +7,7 @@ from pathlib import Path
 from src.models import AuditReport
 
 WAREHOUSE_FILENAME = "portfolio-warehouse.db"
-WAREHOUSE_SCHEMA_VERSION = 6
+WAREHOUSE_SCHEMA_VERSION = 7
 
 
 def write_warehouse_snapshot(
@@ -48,6 +48,8 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             repos_audited INTEGER NOT NULL,
             average_score REAL NOT NULL,
             portfolio_baseline_size INTEGER NOT NULL,
+            baseline_signature TEXT NOT NULL DEFAULT '',
+            baseline_context_json TEXT NOT NULL DEFAULT '{}',
             tier_distribution_json TEXT NOT NULL,
             language_distribution_json TEXT NOT NULL,
             lens_summary_json TEXT NOT NULL,
@@ -428,6 +430,8 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     _ensure_column(conn, "audit_runs", "governance_drift_json", "TEXT NOT NULL DEFAULT '[]'")
     _ensure_column(conn, "audit_runs", "governance_summary_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(conn, "audit_runs", "preflight_summary_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(conn, "audit_runs", "baseline_signature", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(conn, "audit_runs", "baseline_context_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(conn, "audit_runs", "review_summary_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(conn, "audit_runs", "review_alerts_json", "TEXT NOT NULL DEFAULT '[]'")
     _ensure_column(conn, "audit_runs", "material_changes_json", "TEXT NOT NULL DEFAULT '[]'")
@@ -460,7 +464,7 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
         """
         INSERT OR REPLACE INTO audit_runs (
             run_id, username, generated_at, schema_version, scoring_profile, run_mode, report_path,
-            total_repos, repos_audited, average_score, portfolio_baseline_size,
+            total_repos, repos_audited, average_score, portfolio_baseline_size, baseline_signature, baseline_context_json,
             tier_distribution_json, language_distribution_json, lens_summary_json,
             security_summary_json, security_governance_preview_json, collections_json, scenario_summary_json,
             campaign_summary_json, writeback_preview_json, writeback_results_json,
@@ -469,7 +473,7 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             governance_history_json, governance_drift_json, governance_summary_json, review_summary_json, review_alerts_json,
             preflight_summary_json, material_changes_json, review_targets_json, review_history_json, watch_state_json,
             operator_summary_json, operator_queue_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             run_id,
@@ -483,6 +487,8 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             report.repos_audited,
             report.average_score,
             report.portfolio_baseline_size,
+            report.baseline_signature,
+            json.dumps(report.baseline_context),
             json.dumps(report.tier_distribution),
             json.dumps(report.language_distribution),
             json.dumps(report.lenses),
@@ -1386,7 +1392,7 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
         rows = conn.execute(
             """
             SELECT run_id, username, generated_at, run_mode, scoring_profile,
-                   portfolio_baseline_size, report_path, preflight_summary_json,
+                   portfolio_baseline_size, baseline_signature, baseline_context_json, report_path, preflight_summary_json,
                    governance_summary_json,
                    review_summary_json, operator_summary_json
             FROM audit_runs
@@ -1408,6 +1414,8 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
                 "run_mode": row["run_mode"],
                 "scoring_profile": row["scoring_profile"],
                 "portfolio_baseline_size": row["portfolio_baseline_size"],
+                "baseline_signature": row["baseline_signature"],
+                "baseline_context": json.loads(row["baseline_context_json"] or "{}"),
                 "report_path": row["report_path"],
                 "preflight_summary": json.loads(row["preflight_summary_json"] or "{}"),
                 "governance_summary": json.loads(row["governance_summary_json"] or "{}"),
@@ -1478,6 +1486,7 @@ def load_latest_operator_state(output_dir: Path, username: str) -> dict | None:
         row = conn.execute(
             """
             SELECT run_id, generated_at, report_path, preflight_summary_json,
+                   baseline_signature, baseline_context_json,
                    governance_summary_json,
                    review_summary_json, review_alerts_json, material_changes_json,
                    review_targets_json, review_history_json, watch_state_json,
@@ -1497,6 +1506,8 @@ def load_latest_operator_state(output_dir: Path, username: str) -> dict | None:
         "run_id": row["run_id"],
         "generated_at": row["generated_at"],
         "report_path": row["report_path"],
+        "baseline_signature": row["baseline_signature"],
+        "baseline_context": json.loads(row["baseline_context_json"] or "{}"),
         "preflight_summary": json.loads(row["preflight_summary_json"] or "{}"),
         "governance_summary": json.loads(row["governance_summary_json"] or "{}"),
         "review_summary": json.loads(row["review_summary_json"] or "{}"),

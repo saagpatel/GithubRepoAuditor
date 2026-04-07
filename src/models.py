@@ -144,7 +144,9 @@ class AuditReport:
     scoring_profile: str = "default"
     run_mode: str = "full"
     portfolio_baseline_size: int = 0
-    schema_version: str = "3.6"
+    baseline_signature: str = ""
+    baseline_context: dict = field(default_factory=dict)
+    schema_version: str = "3.7"
     lenses: dict[str, dict] = field(default_factory=dict)
     hotspots: list[dict] = field(default_factory=list)
     security_posture: dict = field(default_factory=dict)
@@ -189,6 +191,8 @@ class AuditReport:
         scoring_profile: str = "default",
         run_mode: str = "full",
         portfolio_baseline_size: int | None = None,
+        baseline_signature: str = "",
+        baseline_context: dict | None = None,
     ) -> AuditReport:
         """Construct an AuditReport with all derived statistics."""
         now = datetime.now(tz=__import__("datetime").timezone.utc)
@@ -298,6 +302,8 @@ class AuditReport:
             scoring_profile=scoring_profile,
             run_mode=run_mode,
             portfolio_baseline_size=portfolio_baseline_size if portfolio_baseline_size is not None else len(audits),
+            baseline_signature=baseline_signature,
+            baseline_context=baseline_context or {},
             schema_version=REPORT_SCHEMA_VERSION,
             lenses=portfolio_lenses,
             hotspots=portfolio_hotspots,
@@ -345,6 +351,8 @@ class AuditReport:
             "scoring_profile": self.scoring_profile,
             "run_mode": self.run_mode,
             "portfolio_baseline_size": self.portfolio_baseline_size,
+            "baseline_signature": self.baseline_signature,
+            "baseline_context": self.baseline_context,
             "lenses": self.lenses,
             "hotspots": self.hotspots,
             "security_posture": self.security_posture,

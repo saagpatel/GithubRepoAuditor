@@ -102,6 +102,8 @@ pytest
 
 The auditor follows a pipeline architecture: fetch repo list via GitHub API → shallow-clone each repo → run all 12 analyzers in sequence → aggregate scores → generate outputs. Analyzers are pluggable via `--analyzers-dir` for custom extensions. The scoring engine computes completeness and interest independently, applies configurable scoring profiles, and derives letter grades from the combined result. All output writers (Excel, HTML, JSON, Markdown, Notion) are isolated from the analysis layer and consume the same scored result object. Workbook ranking and trend views always use the full filtered portfolio baseline, even for targeted or incremental reruns.
 
+Partial reruns now require a compatible full-baseline report, not just any previous report. The stored baseline contract tracks the audit-affecting portfolio context used to produce the last trustworthy baseline, and targeted or incremental reruns will fail closed if that contract no longer matches the current request.
+
 Before normal runs start, the CLI now performs a shared preflight that checks config validity, token/config readiness for requested integrations, template/workbook availability, output writability, and whether targeted or incremental paths have a usable baseline. `--doctor` runs the broader diagnostics set without auditing repos and writes a machine-readable JSON artifact to `output/diagnostics-<username>-<date>.json`.
 
 For day-to-day operations, `--control-center` is now the clean read-only entrypoint. It reuses the latest report, review state, campaign history, governance drift, and setup health to build one shared operator queue without running a new audit or mutating any external system.
@@ -118,6 +120,8 @@ The workbook now supports two modes:
 Both modes read from the same report + warehouse facts. Python owns the hidden `Data_*` sheets, stable table names, and workbook facts. The template-backed workbook still owns the template shell, named-range bindings, native sparkline placement, and print layout, but the standard workbook path is now the safest default for automated generation and Excel compatibility.
 
 Template mode is also validated during preflight: the committed workbook asset must exist and pass a lightweight shell check before the run will continue.
+
+This workbook boundary is unchanged in the current phase: the project still emits one workbook artifact, visible sheets remain filter-based, and hidden `Data_*` sheets remain the contract surface for workbook facts and downstream bindings.
 
 ## Managed Campaigns and Governance
 

@@ -76,6 +76,8 @@ def write_raw_metadata(report: AuditReport, output_dir: Path) -> Path:
         "scoring_profile": report.scoring_profile,
         "run_mode": report.run_mode,
         "portfolio_baseline_size": report.portfolio_baseline_size,
+        "baseline_signature": report.baseline_signature,
+        "baseline_context": report.baseline_context,
         "lenses": report.lenses,
         "hotspots": report.hotspots,
         "security_posture": report.security_posture,

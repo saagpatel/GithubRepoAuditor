@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import hashlib
-import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from src.analyst_views import build_analyst_context
+from src.baseline_context import build_filter_signature_from_args
 from src.warehouse import (
     load_latest_audit_runs,
     load_review_history,
@@ -30,25 +29,9 @@ class WatchPlan:
     scoring_profile: str
     full_refresh_due: bool = False
 
-
-def build_filter_signature(args, scoring_profile: str) -> str:
-    payload = {
-        "username": getattr(args, "username", ""),
-        "skip_forks": bool(getattr(args, "skip_forks", False)),
-        "skip_archived": bool(getattr(args, "skip_archived", False)),
-        "security_offline": bool(getattr(args, "security_offline", False)),
-        "scorecard": bool(getattr(args, "scorecard", False)),
-        "portfolio_profile": getattr(args, "portfolio_profile", "default"),
-        "collection": getattr(args, "collection", None),
-        "scoring_profile": scoring_profile,
-    }
-    raw = json.dumps(payload, sort_keys=True).encode("utf-8")
-    return hashlib.sha256(raw).hexdigest()
-
-
 def choose_watch_plan(output_dir: Path, args, *, scoring_profile: str) -> WatchPlan:
     strategy = getattr(args, "watch_strategy", "adaptive")
-    signature = build_filter_signature(args, scoring_profile)
+    signature = build_filter_signature_from_args(args, scoring_profile=scoring_profile)
     checkpoint = load_watch_checkpoint(output_dir, getattr(args, "username", ""))
     runs = load_latest_audit_runs(output_dir, getattr(args, "username", ""), limit=20)
     latest = runs[0] if runs else None
@@ -65,7 +48,8 @@ def choose_watch_plan(output_dir: Path, args, *, scoring_profile: str) -> WatchP
     if not latest or not latest_full:
         return WatchPlan("full", "missing-trustworthy-baseline", signature, scoring_profile)
 
-    if checkpoint and checkpoint.get("filter_signature") != signature:
+    checkpoint_signature = (checkpoint or {}).get("filter_signature") or (checkpoint or {}).get("baseline_signature")
+    if checkpoint_signature and checkpoint_signature != signature:
         return WatchPlan("full", "filter-or-profile-changed", signature, scoring_profile)
 
     last_full_at = _parse_ts(latest_full.get("generated_at"))

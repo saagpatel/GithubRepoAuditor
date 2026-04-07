@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 from argparse import Namespace
 
+from src.baseline_context import build_baseline_context
 from src.config import inspect_config
 from src.diagnostics import run_diagnostics
 
@@ -94,3 +96,39 @@ def test_scorecard_with_security_offline_warns(tmp_path):
     args = _make_args(tmp_path, scorecard=True, security_offline=True)
     result = run_diagnostics(args, full=False)
     assert any(check.key == "scorecard-offline" and check.status == "warning" for check in result.checks)
+
+
+def test_targeted_run_with_legacy_report_without_baseline_context_is_error(tmp_path):
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    (output_dir / "audit-report-testuser-2026-03-29.json").write_text(json.dumps({"username": "testuser"}))
+
+    args = _make_args(tmp_path, repos=["repo-a"])
+    result = run_diagnostics(args, full=False)
+
+    assert any(check.key == "baseline-context" and check.status == "error" for check in result.checks)
+
+
+def test_incremental_run_with_mismatched_baseline_context_is_error(tmp_path):
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    report_data = {
+        "username": "testuser",
+        "baseline_signature": "unused",
+        "baseline_context": build_baseline_context(
+            username="testuser",
+            scoring_profile="default",
+            skip_forks=False,
+            skip_archived=False,
+            scorecard=False,
+            security_offline=False,
+            portfolio_baseline_size=4,
+        ),
+    }
+    (output_dir / "audit-report-testuser-2026-03-29.json").write_text(json.dumps(report_data))
+    (output_dir / ".audit-fingerprints.json").write_text("{}")
+
+    args = _make_args(tmp_path, incremental=True, skip_forks=True)
+    result = run_diagnostics(args, full=False)
+
+    assert any(check.key == "baseline-context" and check.status == "error" for check in result.checks)

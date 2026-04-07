@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from argparse import Namespace
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 from src import cli
+from src.baseline_context import build_baseline_context
 from src.models import AuditReport, RepoAudit
 
 
@@ -82,7 +84,7 @@ class FakeParser:
         raise SystemExit(2)
 
 
-def _make_report_dict(sample_metadata) -> dict:
+def _make_report_dict(sample_metadata, *, baseline_size: int = 1, skip_forks: bool = False, skip_archived: bool = False, scorecard: bool = False, security_offline: bool = False, scoring_profile: str = "baseline") -> dict:
     audit = RepoAudit(
         metadata=sample_metadata,
         analyzer_results=[],
@@ -94,9 +96,27 @@ def _make_report_dict(sample_metadata) -> dict:
         [audit],
         [],
         1,
-        scoring_profile="baseline",
+        scoring_profile=scoring_profile,
         run_mode="full",
-        portfolio_baseline_size=1,
+        portfolio_baseline_size=baseline_size,
+        baseline_signature=build_baseline_context(
+            username="testuser",
+            scoring_profile=scoring_profile,
+            skip_forks=skip_forks,
+            skip_archived=skip_archived,
+            scorecard=scorecard,
+            security_offline=security_offline,
+            portfolio_baseline_size=baseline_size,
+        )["baseline_signature"],
+        baseline_context=build_baseline_context(
+            username="testuser",
+            scoring_profile=scoring_profile,
+            skip_forks=skip_forks,
+            skip_archived=skip_archived,
+            scorecard=scorecard,
+            security_offline=security_offline,
+            portfolio_baseline_size=baseline_size,
+        ),
     )
     return report.to_dict()
 
@@ -299,6 +319,168 @@ def test_incremental_noop_regenerates_from_latest_report(monkeypatch, tmp_path, 
     assert calls[0]["client"] is not None
     assert calls[0]["existing_report_path"] == report_path
     assert calls[0]["existing_report_data"]["scoring_profile"] == "baseline"
+
+
+def test_targeted_audit_uses_full_filtered_portfolio_for_baseline(monkeypatch, tmp_path, sample_metadata):
+    args = _make_args(username="testuser", repos=["test-repo"])
+    other_repo = replace(
+        sample_metadata,
+        name="other-repo",
+        full_name="testuser/other-repo",
+        html_url="https://github.com/testuser/other-repo",
+        clone_url="https://github.com/testuser/other-repo.git",
+        language="Rust",
+    )
+    report_data = _make_report_dict(sample_metadata, baseline_size=2)
+    captured: dict[str, object] = {}
+
+    def _record_baseline(repos):
+        captured["baseline_repos"] = [repo.name for repo in repos]
+        return {}
+
+    monkeypatch.setattr(
+        cli,
+        "_portfolio_lang_freq_for_filtered_baseline",
+        _record_baseline,
+    )
+    monkeypatch.setattr(
+        cli,
+        "_analyze_repos",
+        lambda repos, **kwargs: [
+            RepoAudit(
+                metadata=repos[0],
+                analyzer_results=[],
+                overall_score=0.5,
+                completeness_tier="functional",
+            )
+        ],
+    )
+    monkeypatch.setattr(cli, "_write_report_outputs", lambda *a, **k: {
+        "json_path": tmp_path / "audit-report.json",
+        "md_path": tmp_path / "audit.md",
+        "excel_path": tmp_path / "audit.xlsx",
+        "pcc_path": tmp_path / "audit-pcc.json",
+        "raw_path": tmp_path / "raw.json",
+        "warehouse_path": tmp_path / "warehouse.db",
+        "badge_info": "",
+        "notion_info": "",
+        "readme_info": "",
+        "suggestions_info": "",
+        "html_info": "",
+        "pdf_info": "",
+        "review_pack_info": "",
+        "cache_info": "",
+    })
+    monkeypatch.setattr(cli, "_print_output_summary", lambda *a, **k: None)
+    monkeypatch.setattr(cli, "_apply_requested_reconciliation", lambda *a, **k: None)
+
+    cli._run_targeted_audit(
+        args,
+        cli.GitHubClient(token=None, cache=None),
+        tmp_path / "output",
+        all_repos=[sample_metadata, other_repo],
+        errors=[],
+        custom_weights=None,
+        scoring_profile_name="baseline",
+        existing_report_path=tmp_path / "audit-report-testuser-2026-03-29.json",
+        existing_report_data=report_data,
+    )
+
+    assert captured["baseline_repos"] == ["test-repo", "other-repo"]
+
+
+def test_incremental_audit_delegates_changed_repos_to_targeted_path(monkeypatch, tmp_path, sample_metadata):
+    args = _make_args(username="testuser")
+    report_path = tmp_path / "audit-report-testuser-2026-03-29.json"
+    report_path.write_text("{}")
+    changed_repo = replace(
+        sample_metadata,
+        name="changed-repo",
+        full_name="testuser/changed-repo",
+        html_url="https://github.com/testuser/changed-repo",
+        clone_url="https://github.com/testuser/changed-repo.git",
+    )
+    report_data = _make_report_dict(sample_metadata, baseline_size=2)
+    report_data["audits"][0]["metadata"]["name"] = changed_repo.name
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(cli, "_load_latest_report", lambda _output_dir: (report_path, report_data))
+    monkeypatch.setattr(
+        "src.history.load_fingerprints",
+        lambda *_args, **_kwargs: {
+            changed_repo.name: {"pushed_at": "2026-03-19T00:00:00+00:00"},
+            sample_metadata.name: {"pushed_at": sample_metadata.pushed_at.isoformat()},
+        },
+    )
+    monkeypatch.setattr(cli, "_run_targeted_audit", lambda *a, **k: captured.update({"repos": a[0].repos, **k}))
+
+    cli._run_incremental_audit(
+        args,
+        cli.GitHubClient(token=None, cache=None),
+        tmp_path / "output",
+        all_repos=[changed_repo, sample_metadata],
+        errors=[],
+        custom_weights=None,
+        scoring_profile_name="baseline",
+    )
+
+    assert captured["repos"] == [changed_repo.name]
+    assert captured["existing_report_data"]["baseline_context"]["portfolio_baseline_size"] == 2
+
+
+def test_targeted_audit_blocks_without_baseline_context(monkeypatch, tmp_path, sample_metadata):
+    args = _make_args(username="testuser", repos=["test-repo"])
+    report_data = _make_report_dict(sample_metadata)
+    report_data.pop("baseline_context", None)
+    report_data.pop("baseline_signature", None)
+    called = {"analyze": False}
+
+    monkeypatch.setattr(cli, "_analyze_repos", lambda *a, **k: called.update({"analyze": True}) or [])
+
+    cli._run_targeted_audit(
+        args,
+        cli.GitHubClient(token=None, cache=None),
+        tmp_path / "output",
+        all_repos=[sample_metadata],
+        errors=[],
+        custom_weights=None,
+        scoring_profile_name="baseline",
+        existing_report_data=report_data,
+    )
+
+    assert called["analyze"] is False
+
+
+def test_targeted_audit_blocks_on_incompatible_baseline_context(monkeypatch, tmp_path, sample_metadata):
+    args = _make_args(username="testuser", repos=["test-repo"], skip_forks=True)
+    report_data = _make_report_dict(sample_metadata, skip_forks=False)
+    called = {"analyze": False}
+
+    monkeypatch.setattr(cli, "_analyze_repos", lambda *a, **k: called.update({"analyze": True}) or [])
+
+    cli._run_targeted_audit(
+        args,
+        cli.GitHubClient(token=None, cache=None),
+        tmp_path / "output",
+        all_repos=[sample_metadata],
+        errors=[],
+        custom_weights=None,
+        scoring_profile_name="baseline",
+        existing_report_data=report_data,
+    )
+
+    assert called["analyze"] is False
+
+
+def test_report_from_dict_keeps_legacy_reports_readable(sample_metadata):
+    report_data = _make_report_dict(sample_metadata)
+    report_data.pop("baseline_context", None)
+    report_data.pop("baseline_signature", None)
+
+    report = cli._report_from_dict(report_data)
+
+    assert report.baseline_context == {}
+    assert report.baseline_signature == ""
 
 
 def test_regenerate_outputs_from_latest_report_uses_existing_json(monkeypatch, tmp_path, sample_metadata):

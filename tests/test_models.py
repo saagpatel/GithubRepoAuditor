@@ -103,6 +103,8 @@ class TestAuditReport:
             scoring_profile="custom",
             run_mode="targeted",
             portfolio_baseline_size=7,
+            baseline_signature="sig-123",
+            baseline_context={"skip_forks": False},
         )
         assert report.repos_audited == 1
         assert report.average_score == 0.7
@@ -111,7 +113,9 @@ class TestAuditReport:
         assert report.scoring_profile == "custom"
         assert report.run_mode == "targeted"
         assert report.portfolio_baseline_size == 7
-        assert report.schema_version == "3.6"
+        assert report.baseline_signature == "sig-123"
+        assert report.baseline_context == {"skip_forks": False}
+        assert report.schema_version == "3.7"
         assert "ship_readiness" in report.lenses
         assert isinstance(report.security_governance_preview, list)
         assert "showcase" in report.collections
@@ -137,13 +141,17 @@ class TestAuditReport:
             scoring_profile="profile-a",
             run_mode="incremental",
             portfolio_baseline_size=3,
+            baseline_signature="sig-456",
+            baseline_context={"skip_archived": True},
         )
         d = report.to_dict()
         assert d["reconciliation"] is None  # No registry used
         assert d["scoring_profile"] == "profile-a"
         assert d["run_mode"] == "incremental"
         assert d["portfolio_baseline_size"] == 3
-        assert d["schema_version"] == "3.6"
+        assert d["baseline_signature"] == "sig-456"
+        assert d["baseline_context"] == {"skip_archived": True}
+        assert d["schema_version"] == "3.7"
         assert "lenses" in d
         assert "security_governance_preview" in d
         assert "collections" in d

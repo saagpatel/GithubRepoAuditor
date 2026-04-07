@@ -23,6 +23,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from src.analyzers import run_all_analyzers
+from src.baseline_context import (
+    build_baseline_context_from_args,
+    build_watch_state,
+    compare_baseline_context,
+    extract_baseline_context,
+    format_mismatch_value,
+    normalize_scoring_profile,
+)
 from src.cache import ResponseCache
 from src.cli_output import create_progress, print_info, print_status, print_warning
 from src.cloner import clone_workspace
@@ -463,7 +471,7 @@ def _resolve_repo_names(repos_arg: list[str]) -> list[str]:
 
 
 def _normalize_profile_name(profile_name: str | None) -> str:
-    return profile_name or "default"
+    return normalize_scoring_profile(profile_name)
 
 
 def _parse_iso_dt(value: str | None) -> datetime | None:
@@ -554,7 +562,9 @@ def _report_from_dict(data: dict) -> AuditReport:
         scoring_profile=data.get("scoring_profile", "default"),
         run_mode=data.get("run_mode", "full"),
         portfolio_baseline_size=data.get("portfolio_baseline_size", len(data.get("audits", []))),
-        schema_version=data.get("schema_version", "3.6"),
+        baseline_signature=data.get("baseline_signature", ""),
+        baseline_context=data.get("baseline_context", {}),
+        schema_version=data.get("schema_version", "3.7"),
         lenses=data.get("lenses", {}),
         hotspots=data.get("hotspots", []),
         security_posture=data.get("security_posture", {}),
@@ -1230,16 +1240,30 @@ def _write_report_outputs(
     }
 
 
-def _ensure_partial_run_profile_compatible(existing_report_data: dict | None, profile_name: str) -> bool:
+def _ensure_partial_run_baseline_compatible(existing_report_data: dict | None, current_context: dict) -> bool:
     if not existing_report_data:
         return True
-    existing_profile = _normalize_profile_name(existing_report_data.get("scoring_profile"))
-    if existing_profile == profile_name:
+
+    existing_context = extract_baseline_context(existing_report_data)
+    if not existing_context:
+        print_warning(
+            "Latest report does not include baseline context.\n"
+            "  Run a full audit first so targeted and incremental reruns have a trustworthy baseline."
+        )
+        return False
+
+    mismatches = compare_baseline_context(current_context, existing_context)
+    if not mismatches:
         return True
+
+    details = "\n".join(
+        f"  {item['label']}: existing={format_mismatch_value(item['actual'])} | requested={format_mismatch_value(item['expected'])}"
+        for item in mismatches
+    )
     print_warning(
-        "Latest report was generated with a different scoring profile.\n"
-        f"  Existing: {existing_profile} | Requested: {profile_name}\n"
-        "  Run a full audit with the desired scoring profile before doing a partial rerun."
+        "Latest report was generated with an incompatible baseline context.\n"
+        f"{details}\n"
+        "  Run a full audit first before doing a partial rerun."
     )
     return False
 
@@ -1290,8 +1314,6 @@ def _run_targeted_audit(
 
     if existing_report_path is None and existing_report_data is None:
         existing_report_path, existing_report_data = _load_latest_report(output_dir)
-    if not _ensure_partial_run_profile_compatible(existing_report_data, scoring_profile_name):
-        return
 
     filtered_repos = _filter_repos(
         all_repos,
@@ -1306,6 +1328,14 @@ def _run_targeted_audit(
 
     if not targeted_repos:
         print_warning("No repos to audit.")
+        return
+
+    baseline_context = build_baseline_context_from_args(
+        args,
+        scoring_profile=scoring_profile_name,
+        portfolio_baseline_size=len(filtered_repos),
+    )
+    if not _ensure_partial_run_baseline_compatible(existing_report_data, baseline_context):
         return
 
     portfolio_lang_freq = _portfolio_lang_freq_for_filtered_baseline(filtered_repos)
@@ -1342,6 +1372,13 @@ def _run_targeted_audit(
         total_repos,
         scoring_profile=scoring_profile_name,
         run_mode="targeted",
+        portfolio_baseline_size=len(filtered_repos),
+        baseline_signature=baseline_context["baseline_signature"],
+        baseline_context=baseline_context,
+    )
+    report.watch_state = build_watch_state(
+        args,
+        scoring_profile=scoring_profile_name,
         portfolio_baseline_size=len(filtered_repos),
     )
     report.preflight_summary = getattr(args, "_preflight_summary", {})
@@ -1418,8 +1455,6 @@ def _run_incremental_audit(
     existing_report_path, existing_report_data = _load_latest_report(output_dir)
     if not existing_report_path or not existing_report_data:
         print_warning("No previous audit report found. Run a full audit first.")
-        return
-    if not _ensure_partial_run_profile_compatible(existing_report_data, scoring_profile_name):
         return
 
     fingerprints = load_fingerprints(output_dir / ".audit-fingerprints.json")
@@ -1784,6 +1819,11 @@ def main() -> None:
         # Full audit path: score every repo and write all output formats
         if all_audits:
             audits = all_audits
+            baseline_context = build_baseline_context_from_args(
+                args,
+                scoring_profile=scoring_profile_name,
+                portfolio_baseline_size=len(repos),
+            )
             report = AuditReport.from_audits(
                 args.username,
                 audits,
@@ -1791,6 +1831,13 @@ def main() -> None:
                 total_fetched,
                 scoring_profile=scoring_profile_name,
                 run_mode="full",
+                portfolio_baseline_size=len(repos),
+                baseline_signature=baseline_context["baseline_signature"],
+                baseline_context=baseline_context,
+            )
+            report.watch_state = build_watch_state(
+                args,
+                scoring_profile=scoring_profile_name,
                 portfolio_baseline_size=len(repos),
             )
             report.preflight_summary = getattr(args, "_preflight_summary", {})

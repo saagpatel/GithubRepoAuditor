@@ -3,6 +3,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime, timezone
 
+from src.baseline_context import build_baseline_context
 from src.models import AnalyzerResult, RepoMetadata
 from src.scorer import WEIGHTS, score_repo
 from src.warehouse import (
@@ -89,6 +90,16 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     from src.models import AuditReport
 
     report = AuditReport.from_audits("user", [audit], [], 1)
+    report.baseline_context = build_baseline_context(
+        username="user",
+        scoring_profile="default",
+        skip_forks=False,
+        skip_archived=False,
+        scorecard=False,
+        security_offline=False,
+        portfolio_baseline_size=1,
+    )
+    report.baseline_signature = report.baseline_context["baseline_signature"]
     report.campaign_summary = {
         "campaign_type": "promotion-push",
         "label": "Promotion Push",
@@ -217,6 +228,8 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     assert latest_state["actions"]["promotion-push-abc123"]["repo_full_name"] == "user/warehouse-repo"
     assert latest_runs[0]["review_summary"]["review_id"] == "review-1"
     assert latest_runs[0]["governance_summary"]["status"] == "blocked"
+    assert latest_runs[0]["baseline_signature"] == report.baseline_signature
+    assert latest_runs[0]["baseline_context"]["portfolio_baseline_size"] == 1
     assert review_history[0]["review_id"] == "review-1"
     assert watch_checkpoint["filter_signature"] == "abc123"
     assert operator_state["operator_summary"]["headline"] == "Campaign work is ready for review."

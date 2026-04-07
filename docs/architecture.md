@@ -4,6 +4,8 @@ GitHub Repo Auditor is a Python CLI tool that audits a GitHub user's entire repo
 
 Before normal runs start, the CLI now performs a shared preflight. That diagnostics layer validates config shape, GitHub and Notion readiness, workbook/template availability, output-path writability, and whether baseline-dependent paths such as targeted or incremental reruns have the history they need. The dedicated `--doctor` mode runs that broader diagnostics set without auditing repos and writes a machine-readable artifact to `output/diagnostics-<username>-<date>.json`.
 
+Targeted and incremental reruns now rely on a shared baseline contract. A prior report is only considered safe for partial reruns if it was produced under a compatible audit-affecting context: username, scoring profile, skip-forks, skip-archived, scorecard, security-offline, and the filtered portfolio baseline used for scoring. Legacy reports remain readable for viewing and regeneration, but partial reruns fail closed until a fresh full baseline is produced.
+
 The CLI also now has a read-only `--control-center` path. It loads the latest report + warehouse state, normalizes review state when older reports are missing it, and builds one shared triage queue for setup blockers, review work, campaign drift, and governance readiness without running a new audit.
 
 The documented primary command is now `audit`, exposed through the package console script. `python -m src` remains a supported fallback for environments that prefer module execution.
@@ -250,6 +252,7 @@ Important workbook facts:
 - Operator KPI bindings are exposed via workbook named ranges rather than workbook-only calculations.
 - Workbook ranking and trend views must always derive from the full filtered portfolio baseline, even during targeted or incremental reruns.
 - Template mode is validated during preflight so missing or corrupt workbook assets fail before a run starts.
+- The current phase does not change workbook ownership boundaries: one workbook artifact, `standard` as the operational mode, filter-based visible sheets, and additive-only changes to hidden workbook data contracts.
 
 ## Install and Daily Use
 

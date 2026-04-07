@@ -59,7 +59,7 @@ class TestJsonReport:
         assert data["repos_audited"] == 1
         assert "audits" in data
         assert data["audits"][0]["interest_score"] == 0.45
-        assert data["schema_version"] == "3.6"
+        assert data["schema_version"] == "3.7"
         assert "lenses" in data
         assert "security_governance_preview" in data
         assert "campaign_summary" in data

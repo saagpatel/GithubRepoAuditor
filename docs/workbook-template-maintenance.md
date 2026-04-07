@@ -25,6 +25,8 @@ Template mode and standard mode should now project the same visible top-line fac
 If one mode changes the visible operator or executive story, update the other mode's
 tests and verify parity before shipping.
 
+Partial reruns also depend on a compatible full-baseline report. Workbook regeneration can continue from older reports, but targeted or incremental merge paths should only proceed when the stored baseline contract matches the current audit-affecting portfolio context.
+
 ## Template-Stable Tables
 
 These tables are part of the workbook contract:

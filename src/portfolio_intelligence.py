@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from src.models import AnalyzerResult, RepoAudit, RepoMetadata
 from src.security_intelligence import build_security_governance_preview
 
-REPORT_SCHEMA_VERSION = "3.6"
+REPORT_SCHEMA_VERSION = "3.7"
 
 LENS_DEFINITIONS: dict[str, dict[str, str]] = {
     "ship_readiness": {
