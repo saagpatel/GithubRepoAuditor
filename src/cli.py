@@ -713,12 +713,26 @@ def _print_control_center_summary(snapshot: dict) -> None:
             f"{summary.get('primary_target_exception_status', 'none')} "
             f"({summary.get('primary_target_exception_reason', 'No trust-policy exception reason is recorded yet.')})"
         )
+    if summary.get("primary_target_exception_pattern_status") not in {None, "", "none"}:
+        print(
+            "  Exception pattern learning: "
+            f"{summary.get('primary_target_exception_pattern_status', 'none')} "
+            f"({summary.get('primary_target_exception_pattern_reason', 'No exception-pattern reason is recorded yet.')})"
+        )
+    if summary.get("primary_target_trust_recovery_status") not in {None, "", "none"}:
+        print(
+            "  Trust recovery: "
+            f"{summary.get('primary_target_trust_recovery_status', 'none')} "
+            f"({summary.get('primary_target_trust_recovery_reason', 'No trust-recovery reason is recorded yet.')})"
+        )
     if summary.get("recommendation_drift_status"):
         print(
             "  Recommendation drift: "
             f"{summary.get('recommendation_drift_status', 'stable')} "
             f"({summary.get('recommendation_drift_summary', 'No recommendation-drift summary is recorded yet.')})"
         )
+    if summary.get("exception_pattern_summary"):
+        print(f"  Exception pattern summary: {summary['exception_pattern_summary']}")
     if summary.get("recommendation_quality_summary"):
         print(f"  Recommendation quality: {summary['recommendation_quality_summary']}")
     if summary.get("confidence_validation_status"):

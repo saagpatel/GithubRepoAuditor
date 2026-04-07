@@ -137,7 +137,7 @@ For workbook-facing changes, use the canonical release gate:
 make workbook-gate
 ```
 
-That command generates stable sample `standard` and `template` workbooks, validates the visible-sheet and hidden `Data_*` invariants, writes an authoritative `workbook-gate-result.json`, adds a human-readable gate summary, and produces a manual desktop Excel checklist with pending signoff placeholders. The final release step is still opening the generated `standard` workbook in desktop Excel and confirming there is no repair prompt.
+That command generates stable sample `standard` and `template` workbooks, validates the visible-sheet and hidden `Data_*` invariants, writes an authoritative `workbook-gate-result.json`, adds a human-readable gate summary, and produces a manual desktop Excel checklist. The final release step is still opening the generated `standard` workbook in desktop Excel and recording the local signoff outcome with `make workbook-signoff`.
 
 After that manual desktop Excel check, record the outcome back into the gate artifacts:
 
@@ -173,7 +173,7 @@ The daily operator loop is now:
 - Run `make workbook-gate` only when workbook-facing changes are in scope
 - Run `make workbook-signoff ...` after the manual Excel-open check for workbook-facing changes
 
-Scheduled automation stays artifact-first. The weekly workflow now runs the audit, generates a control-center artifact plus a scheduled handoff summary, uploads `output/`, opens or updates one canonical GitHub issue only when blocked or urgent operator findings cross a meaningful threshold, and closes that same issue cleanly when later runs return to a quiet state. The handoff now also calls out whether the queue is getting better, worse, or staying stuck, what was tried most recently, whether that intervention actually helped, whether recovery is only quiet for now or confirmed resolved, whether recent high-confidence guidance has been validating or turning noisy, what trust policy now applies to the live recommendation (`act-now`, `act-with-review`, `verify-first`, or `monitor`), and whether a soft exception or recent policy-flip drift should make the operator treat that recommendation more cautiously.
+Scheduled automation stays artifact-first. The weekly workflow now runs the audit, generates a control-center artifact plus a scheduled handoff summary, uploads `output/`, opens or updates one canonical GitHub issue only when blocked or urgent operator findings cross a meaningful threshold, and closes that same issue cleanly when later runs return to a quiet state. The handoff now also calls out whether the queue is getting better, worse, or staying stuck, what was tried most recently, whether that intervention actually helped, whether recovery is only quiet for now or confirmed resolved, whether recent high-confidence guidance has been validating or turning noisy, what trust policy now applies to the live recommendation (`act-now`, `act-with-review`, `verify-first`, or `monitor`), whether a soft exception or recent policy-flip drift should make the operator treat that recommendation more cautiously, and whether recent soft caution is still earning trust or has become cautious enough to recover toward a stronger policy.
 
 ## Troubleshooting
 

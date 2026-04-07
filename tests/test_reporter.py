@@ -203,9 +203,16 @@ class TestMarkdownReport:
             "next_action_trust_policy_reason": "Blocked work with tuned high confidence should be cleared before new work.",
             "primary_target_exception_status": "none",
             "primary_target_exception_reason": "",
+            "primary_target_exception_pattern_status": "overcautious",
+            "primary_target_exception_pattern_reason": "Recent soft caution was followed by stable recovery without renewed pressure, so the softer posture may now be more cautious than the evidence supports.",
+            "primary_target_trust_recovery_status": "earned",
+            "primary_target_trust_recovery_reason": "Recent stability has earned this target back from verify-first to act-with-review.",
             "recommendation_drift_status": "stable",
             "recommendation_drift_summary": "Recent trust-policy behavior is stable enough that no meaningful recommendation drift is recorded.",
             "policy_flip_hotspots": [],
+            "exception_pattern_summary": "Missing template asset has stayed stable long enough to earn trust back from verify-first to act-with-review.",
+            "false_positive_exception_hotspots": [],
+            "trust_recovery_window_runs": 3,
             "adaptive_confidence_summary": "Calibration is validating well, so the live recommendation was strengthened and is ready for immediate action.",
             "recommendation_quality_summary": "Strong recommendation because the next step is tied directly to the current top target.",
             "confidence_validation_status": "healthy",
@@ -244,6 +251,8 @@ class TestMarkdownReport:
         assert "Operator Control Center" in content
         assert "Missing template asset" in content
         assert "Recommendation Drift:" in content
+        assert "Exception Pattern Learning:" in content
+        assert "Trust Recovery:" in content
         assert "Next Recommended Run" in content
         assert "Watch Strategy" in content
         assert "What Changed" in content

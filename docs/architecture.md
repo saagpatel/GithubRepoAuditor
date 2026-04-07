@@ -14,6 +14,8 @@ The operator summary now also carries confidence calibration derived from recent
 
 Phase 32 adds one more bounded layer on top of that live trust policy: soft trust-policy exceptions plus recommendation-drift auditing. Those exceptions can soften the final trust policy for the current target when the same target keeps reopening, when earlier strong recommendations keep ending unresolved, or when the recent trust-policy path keeps flipping back and forth. The drift audit is explanatory first and centered on policy flips, not generic churn, and it stays artifact-first across control-center, scheduled handoff, Markdown, HTML, and the `standard` workbook callouts.
 
+Phase 33 keeps that same bounded posture, but adds exception-pattern learning plus trust recovery. The operator path now tracks whether recent soft caution has been useful, overcautious, or still too lightly exercised to judge, and it can conservatively recover a target from `verify-first` back to `act-with-review` after a stable stretch under healthy calibration. This remains trust-policy-only: it does not rewrite confidence math, lane semantics, or workbook architecture.
+
 The documented primary command is now `audit`, exposed through the package console script. `python -m src` remains a supported fallback for environments that prefer module execution.
 
 ## Typical Invocation

@@ -71,9 +71,16 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
             "next_action_trust_policy_reason": "Healthy calibration supports a confident next step, with light operator judgment.",
             "primary_target_exception_status": "none",
             "primary_target_exception_reason": "",
+            "primary_target_exception_pattern_status": "candidate",
+            "primary_target_exception_pattern_reason": "This target is stabilizing under healthy calibration, but it has not held steady long enough to earn stronger trust yet.",
+            "primary_target_trust_recovery_status": "candidate",
+            "primary_target_trust_recovery_reason": "This target is stabilizing under healthy calibration, but it has not held steady long enough to earn stronger trust yet.",
             "recommendation_drift_status": "stable",
             "recommendation_drift_summary": "Recent trust-policy behavior is stable enough that no meaningful recommendation drift is recorded.",
             "policy_flip_hotspots": [],
+            "exception_pattern_summary": "RepoC: RepoC drift needs review is stabilizing, but it has not yet earned stronger trust.",
+            "false_positive_exception_hotspots": [],
+            "trust_recovery_window_runs": 3,
             "adaptive_confidence_summary": "Calibration is validating well, so the recommendation can be acted on with light operator review.",
             "recommendation_quality_summary": "Strong recommendation because the next step is tied directly to the current top target.",
             "confidence_validation_status": "healthy",
@@ -113,6 +120,10 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
                 "recommended_action": "Inspect the managed issue before closing the campaign.",
                 "policy_flip_count": 0,
                 "recent_policy_path": "",
+                "trust_recovery_status": "candidate",
+                "trust_recovery_reason": "This target is stabilizing under healthy calibration, but it has not held steady long enough to earn stronger trust yet.",
+                "exception_pattern_status": "recovering",
+                "exception_pattern_reason": "This target is stabilizing under healthy calibration, but it has not held steady long enough to earn stronger trust yet.",
             },
             "next_recommended_run_mode": "incremental",
             "watch_strategy": "adaptive",
@@ -160,6 +171,8 @@ def test_build_scheduled_handoff_writes_artifacts_and_issue_candidate(tmp_path):
     assert "Operator Trust Policy" in markdown
     assert "act-with-review" in markdown
     assert "Trust Policy Exception" in markdown
+    assert "Exception Pattern Learning" in markdown
+    assert "Trust Recovery" in markdown
     assert "Recommendation Drift" in markdown
     assert "Confidence Validation" in markdown
     assert "75%" in markdown

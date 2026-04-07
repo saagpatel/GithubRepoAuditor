@@ -286,9 +286,16 @@ def _make_report(audits=None) -> dict:
             "next_action_trust_policy_reason": "Healthy calibration supports a confident next step, with light operator judgment.",
             "primary_target_exception_status": "none",
             "primary_target_exception_reason": "",
+            "primary_target_exception_pattern_status": "candidate",
+            "primary_target_exception_pattern_reason": "This target is stabilizing under healthy calibration, but it has not held steady long enough to earn stronger trust yet.",
+            "primary_target_trust_recovery_status": "candidate",
+            "primary_target_trust_recovery_reason": "This target is stabilizing under healthy calibration, but it has not held steady long enough to earn stronger trust yet.",
             "recommendation_drift_status": "stable",
             "recommendation_drift_summary": "Recent trust-policy behavior is stable enough that no meaningful recommendation drift is recorded.",
             "policy_flip_hotspots": [],
+            "exception_pattern_summary": "RepoC: Security posture needs attention is stabilizing, but it has not yet earned stronger trust.",
+            "false_positive_exception_hotspots": [],
+            "trust_recovery_window_runs": 3,
             "adaptive_confidence_summary": "Calibration is validating well, so the recommendation can be acted on with light operator review.",
             "recommendation_quality_summary": "Strong recommendation because the next step is tied directly to the current top target.",
             "confidence_validation_status": "healthy",
@@ -329,6 +336,10 @@ def _make_report(audits=None) -> dict:
                 "item_id": "review-target:RepoC",
                 "repo": "RepoC",
                 "title": "Security posture needs attention",
+                "trust_recovery_status": "candidate",
+                "trust_recovery_reason": "This target is stabilizing under healthy calibration, but it has not held steady long enough to earn stronger trust yet.",
+                "exception_pattern_status": "recovering",
+                "exception_pattern_reason": "This target is stabilizing under healthy calibration, but it has not held steady long enough to earn stronger trust yet.",
             },
         },
         "operator_queue": [
@@ -563,7 +574,7 @@ class TestAnalystWorkbookSheets:
         ws = wb["Review Queue"]
         assert ws["A4"].value == "Summary"
         assert ws["E4"].value == "Top 10 To Act On"
-        header_row = next(row for row in range(20, 40) if ws.cell(row=row, column=1).value == "Repo")
+        header_row = next(row for row in range(20, 55) if ws.cell(row=row, column=1).value == "Repo")
         assert header_row > 24
         assert ws.freeze_panes == f"A{header_row + 1}"
 
@@ -601,8 +612,10 @@ class TestAnalystWorkbookSheets:
         assert review_ws["A23"].value == "Trust Policy"
         assert review_ws["A24"].value == "Trust Rationale"
         assert review_ws["A25"].value == "Trust Exception"
-        assert review_ws["A26"].value == "Recommendation Drift"
-        assert review_ws["A27"].value == "Adaptive Confidence"
+        assert review_ws["A26"].value == "Trust Recovery"
+        assert review_ws["A27"].value == "Exception Learning"
+        assert review_ws["A28"].value == "Recommendation Drift"
+        assert review_ws["A29"].value == "Adaptive Confidence"
         assert executive_ws["D29"].value == "Trend"
         assert executive_ws["D32"].value == "Why Top Target"
         assert executive_ws["D33"].value == "Closure Guidance"
@@ -614,9 +627,11 @@ class TestAnalystWorkbookSheets:
         assert executive_ws["D41"].value == "Next Action Confidence"
         assert executive_ws["D42"].value == "Trust Policy"
         assert executive_ws["D43"].value == "Trust Rationale"
-        assert executive_ws["D44"].value == "Adaptive Confidence"
-        assert executive_ws["D45"].value == "Recommendation Quality"
-        assert executive_ws["D46"].value == "Confidence Validation"
+        assert executive_ws["D44"].value == "Trust Recovery"
+        assert executive_ws["D45"].value == "Exception Learning"
+        assert executive_ws["D46"].value == "Adaptive Confidence"
+        assert executive_ws["D47"].value == "Recommendation Quality"
+        assert executive_ws["D48"].value == "Confidence Validation"
         assert print_ws["A17"].value == "Primary Target"
         assert print_ws["A18"].value == "Why Top Target"
         assert print_ws["A19"].value == "What We Tried"
@@ -628,14 +643,18 @@ class TestAnalystWorkbookSheets:
         assert print_ws["A26"].value == "Trust Policy"
         assert print_ws["A27"].value == "Trust Rationale"
         assert print_ws["A28"].value == "Trust Exception"
-        assert print_ws["A29"].value == "Recommendation Drift"
-        assert print_ws["A30"].value == "Adaptive Confidence"
+        assert print_ws["A29"].value == "Trust Recovery"
+        assert print_ws["A30"].value == "Exception Learning"
+        assert print_ws["A31"].value == "Recommendation Drift"
+        assert print_ws["A32"].value == "Adaptive Confidence"
         assert "Why Top Target" in dashboard_values
         assert "Closure Guidance" in dashboard_values
         assert "What We Tried" in dashboard_values
         assert "Recommendation Confidence" in dashboard_values
         assert "Trust Policy" in dashboard_values
         assert "Trust Exception" in dashboard_values
+        assert "Trust Recovery" in dashboard_values
+        assert "Exception Learning" in dashboard_values
         assert "Recommendation Drift" in dashboard_values
 
     def test_campaigns_show_empty_state_when_no_preview_rows(self):

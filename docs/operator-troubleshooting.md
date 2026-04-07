@@ -201,3 +201,11 @@ Phase 32 adds soft trust-policy exceptions and recommendation-drift auditing on 
 - `stable`: recent trust-policy behavior is calm enough that no extra caution is needed
 - `watch`: the current target has started to wobble between trust policies and deserves a lighter touch
 - `drifting`: the current target or recent hotspots have flipped often enough that the recommendation should be treated as less settled
+
+Phase 33 adds one more bounded layer on top of that:
+
+- `useful-caution`: recent softening really was justified because the target stayed unstable, reopened, or remained unresolved
+- `overcautious`: recent softening now looks heavier than the evidence supports because the target stabilized cleanly
+- `candidate`: the target is stabilizing, but it has not held steady long enough to earn stronger trust
+- `earned`: the target has stayed stable long enough that `verify-first` can recover to `act-with-review`
+- `blocked`: trust recovery is still blocked by fresh reopen behavior, policy flips, or calibration noise

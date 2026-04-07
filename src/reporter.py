@@ -272,11 +272,23 @@ def write_markdown_report(
                 f"- Trust Policy Exception: {report.operator_summary.get('primary_target_exception_status')} "
                 f"({report.operator_summary.get('primary_target_exception_reason', 'No trust-policy exception reason is recorded yet.')})"
             )
+        if report.operator_summary.get("primary_target_exception_pattern_status") not in {None, "", "none"}:
+            _w(
+                f"- Exception Pattern Learning: {report.operator_summary.get('primary_target_exception_pattern_status')} "
+                f"({report.operator_summary.get('primary_target_exception_pattern_reason', 'No exception-pattern reason is recorded yet.')})"
+            )
+        if report.operator_summary.get("primary_target_trust_recovery_status") not in {None, "", "none"}:
+            _w(
+                f"- Trust Recovery: {report.operator_summary.get('primary_target_trust_recovery_status')} "
+                f"({report.operator_summary.get('primary_target_trust_recovery_reason', 'No trust-recovery reason is recorded yet.')})"
+            )
         if report.operator_summary.get("recommendation_drift_status"):
             _w(
                 f"- Recommendation Drift: {report.operator_summary.get('recommendation_drift_status')} "
                 f"({report.operator_summary.get('recommendation_drift_summary', 'No recommendation-drift summary is recorded yet.')})"
             )
+        if report.operator_summary.get("exception_pattern_summary"):
+            _w(f"- Exception Pattern Summary: {report.operator_summary.get('exception_pattern_summary')}")
         if report.operator_summary.get("recommendation_quality_summary"):
             _w(f"- Recommendation Quality: {report.operator_summary.get('recommendation_quality_summary')}")
         if report.operator_summary.get("confidence_validation_status"):

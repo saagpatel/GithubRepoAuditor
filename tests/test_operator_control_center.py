@@ -1071,6 +1071,228 @@ def test_operator_snapshot_never_softens_blocked_setup_below_act_with_review(tmp
     assert summary["primary_target_trust_policy"] == "act-with-review"
 
 
+def test_operator_snapshot_recovers_stable_verify_first_target(tmp_path: Path, monkeypatch):
+    report = _make_report(
+        preflight_summary={"status": "ok", "blocking_errors": 0, "warnings": 0, "checks": []},
+        review_targets=[],
+        managed_state_drift=[],
+        governance_drift=[],
+        governance_preview={},
+        rollback_preview={},
+        material_changes=[
+            {
+                "change_key": "high-1",
+                "change_type": "security-change",
+                "repo_name": "RepoC",
+                "severity": 0.9,
+                "title": "RepoC security posture changed",
+                "summary": "critical -> watch",
+                "recommended_next_step": "Review RepoC security posture changed now.",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history",
+        lambda *_args, **_kwargs: [
+            {
+                "generated_at": "2026-04-06T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {
+                        "item_id": "review-change:high-1",
+                        "repo": "RepoC",
+                        "title": "RepoC security posture changed",
+                        "lane": "urgent",
+                        "kind": "review",
+                    },
+                    "primary_target_trust_policy": "verify-first",
+                    "primary_target_exception_status": "softened-for-flip-churn",
+                    "decision_memory_status": "attempted",
+                    "primary_target_last_outcome": "improved",
+                },
+                "operator_queue": [],
+            },
+            {
+                "generated_at": "2026-04-05T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {
+                        "item_id": "review-change:other",
+                        "repo": "RepoX",
+                        "title": "RepoX security posture changed",
+                        "lane": "urgent",
+                        "kind": "review",
+                    },
+                    "primary_target_trust_policy": "act-with-review",
+                    "primary_target_exception_status": "none",
+                    "decision_memory_status": "new",
+                    "primary_target_last_outcome": "improved",
+                },
+                "operator_queue": [],
+            },
+            {
+                "generated_at": "2026-04-04T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {
+                        "item_id": "review-change:high-1",
+                        "repo": "RepoC",
+                        "title": "RepoC security posture changed",
+                        "lane": "urgent",
+                        "kind": "review",
+                    },
+                    "primary_target_trust_policy": "verify-first",
+                    "primary_target_exception_status": "softened-for-flip-churn",
+                    "decision_memory_status": "attempted",
+                    "primary_target_last_outcome": "improved",
+                },
+                "operator_queue": [],
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center._build_confidence_calibration",
+        lambda _history: {
+            "confidence_validation_status": "healthy",
+            "confidence_window_runs": 8,
+            "validated_recommendation_count": 4,
+            "partially_validated_recommendation_count": 1,
+            "unresolved_recommendation_count": 1,
+            "reopened_recommendation_count": 0,
+            "insufficient_future_runs_count": 2,
+            "high_confidence_hit_rate": 0.75,
+            "medium_confidence_hit_rate": 0.5,
+            "low_confidence_caution_rate": 1.0,
+            "recent_validation_outcomes": [],
+            "confidence_calibration_summary": "Recent high-confidence recommendations are validating well.",
+        },
+    )
+
+    snapshot = build_operator_snapshot(report, output_dir=tmp_path)
+    summary = snapshot["operator_summary"]
+
+    assert summary["primary_target_exception_status"] == "softened-for-flip-churn"
+    assert summary["primary_target_trust_recovery_status"] == "earned"
+    assert summary["primary_target_exception_pattern_status"] == "recovering"
+    assert summary["primary_target_trust_policy"] == "act-with-review"
+
+
+def test_operator_snapshot_learns_when_soft_exception_was_overcautious(tmp_path: Path, monkeypatch):
+    report = _make_report(
+        preflight_summary={"status": "ok", "blocking_errors": 0, "warnings": 0, "checks": []},
+        review_targets=[],
+        managed_state_drift=[],
+        governance_drift=[],
+        governance_preview={},
+        rollback_preview={},
+        material_changes=[
+            {
+                "change_key": "high-1",
+                "change_type": "security-change",
+                "repo_name": "RepoC",
+                "severity": 0.9,
+                "title": "RepoC security posture changed",
+                "summary": "critical -> watch",
+                "recommended_next_step": "Review RepoC security posture changed now.",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history",
+        lambda *_args, **_kwargs: [
+            {
+                "generated_at": "2026-04-06T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {
+                        "item_id": "other-target",
+                        "repo": "RepoOther",
+                        "title": "Another target",
+                        "lane": "ready",
+                        "kind": "review",
+                    },
+                    "primary_target_trust_policy": "monitor",
+                    "primary_target_exception_status": "none",
+                    "decision_memory_status": "new",
+                    "primary_target_last_outcome": "no-change",
+                },
+                "operator_queue": [],
+            },
+            {
+                "generated_at": "2026-04-05T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {
+                        "item_id": "other-target-2",
+                        "repo": "RepoOther",
+                        "title": "Another target 2",
+                        "lane": "ready",
+                        "kind": "review",
+                    },
+                    "primary_target_trust_policy": "monitor",
+                    "primary_target_exception_status": "none",
+                    "decision_memory_status": "new",
+                    "primary_target_last_outcome": "no-change",
+                },
+                "operator_queue": [],
+            },
+            {
+                "generated_at": "2026-04-04T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {
+                        "item_id": "other-target-3",
+                        "repo": "RepoOther",
+                        "title": "Another target 3",
+                        "lane": "ready",
+                        "kind": "review",
+                    },
+                    "primary_target_trust_policy": "monitor",
+                    "primary_target_exception_status": "none",
+                    "decision_memory_status": "new",
+                    "primary_target_last_outcome": "no-change",
+                },
+                "operator_queue": [],
+            },
+            {
+                "generated_at": "2026-04-03T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {
+                        "item_id": "review-change:high-1",
+                        "repo": "RepoC",
+                        "title": "RepoC security posture changed",
+                        "lane": "urgent",
+                        "kind": "review",
+                    },
+                    "primary_target_trust_policy": "verify-first",
+                    "primary_target_exception_status": "softened-for-noise",
+                    "decision_memory_status": "attempted",
+                    "primary_target_last_outcome": "improved",
+                },
+                "operator_queue": [],
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center._build_confidence_calibration",
+        lambda _history: {
+            "confidence_validation_status": "noisy",
+            "confidence_window_runs": 8,
+            "validated_recommendation_count": 1,
+            "partially_validated_recommendation_count": 1,
+            "unresolved_recommendation_count": 2,
+            "reopened_recommendation_count": 2,
+            "insufficient_future_runs_count": 1,
+            "high_confidence_hit_rate": 0.4,
+            "medium_confidence_hit_rate": 0.5,
+            "low_confidence_caution_rate": 1.0,
+            "recent_validation_outcomes": [],
+            "confidence_calibration_summary": "Recent high-confidence guidance has missed often enough that operators should verify before overcommitting.",
+        },
+    )
+    monkeypatch.setattr("src.operator_control_center._was_resolved_then_reopened", lambda *_args, **_kwargs: True)
+
+    snapshot = build_operator_snapshot(report, output_dir=tmp_path)
+    summary = snapshot["operator_summary"]
+
+    assert summary["primary_target_exception_pattern_status"] == "overcautious"
+    assert summary["false_positive_exception_hotspots"][0]["label"] == "RepoC: RepoC security posture changed"
+
+
 def test_normalize_review_state_backfills_missing_fields(tmp_path: Path):
     report = normalize_review_state(
         {
