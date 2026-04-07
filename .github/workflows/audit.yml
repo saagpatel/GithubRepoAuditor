@@ -21,7 +21,9 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[config]"
 
       - name: Restore previous audit history
         uses: actions/cache@v4
@@ -34,7 +36,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.AUDIT_TOKEN }}
         run: |
-          python -m src saagpatel --skip-clone
+          audit saagpatel --skip-clone
 
       - name: Check for regressions
         id: check-regressions

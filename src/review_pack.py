@@ -34,6 +34,30 @@ def export_review_pack(
     _w(f"*Generated:* {report_data.get('generated_at', '')[:10]}")
     _w("")
 
+    operator_summary = report_data.get("operator_summary", {})
+    operator_queue = report_data.get("operator_queue", [])
+    if operator_summary or operator_queue:
+        _w("## Operator Control Center")
+        _w("")
+        _w(f"- Headline: {operator_summary.get('headline', 'No operator triage items are currently surfaced.')}")
+        if operator_summary.get("source_run_id"):
+            _w(f"- Source Run: `{operator_summary.get('source_run_id')}`")
+        counts = operator_summary.get("counts", {})
+        _w(
+            f"- Blocked: {counts.get('blocked', 0)} | Urgent: {counts.get('urgent', 0)} | "
+            f"Ready: {counts.get('ready', 0)} | Deferred: {counts.get('deferred', 0)}"
+        )
+        for item in operator_queue[:8]:
+            repo = f"{item.get('repo', '')}: " if item.get("repo") else ""
+            _w(f"- [{item.get('lane_label', item.get('lane', 'ready'))}] {repo}{item.get('title', 'Triage item')}")
+            _w(f"  Why: {item.get('lane_reason', item.get('summary', 'Operator triage item.'))}")
+            _w(f"  Action: {item.get('recommended_action', 'Review the latest state.')}")
+        recent_changes = operator_summary.get("operator_recent_changes", [])
+        for change in recent_changes[:3]:
+            subject = change.get("repo") or change.get("repo_full_name") or change.get("item_id") or "portfolio"
+            _w(f"- Recent: {change.get('generated_at', '')[:10]} {subject} — {change.get('summary', change.get('kind', 'change'))}")
+        _w("")
+
     _w("## Snapshot")
     _w("")
     _w(f"- Avg score: {report_data.get('average_score', 0):.2f}")
@@ -120,6 +144,7 @@ def export_review_pack(
         _w(f"- Campaign: {campaign_summary.get('label', campaign_summary.get('campaign_type', '—'))}")
         _w(f"- Actions: {campaign_summary.get('action_count', 0)}")
         _w(f"- Repos: {campaign_summary.get('repo_count', 0)}")
+        _w(f"- Sync Mode: {report_data.get('writeback_preview', {}).get('sync_mode', 'reconcile')}")
         _w("")
         for item in report_data.get("writeback_preview", {}).get("repos", [])[:8]:
             _w(
@@ -143,6 +168,30 @@ def export_review_pack(
                 f"- {result.get('repo_full_name', '—')}: "
                 f"{result.get('target', '—')} -> {result.get('status', '—')}"
             )
+        _w("")
+
+    if report_data.get("managed_state_drift"):
+        _w("## Managed Drift")
+        _w("")
+        for item in report_data.get("managed_state_drift", [])[:8]:
+            _w(
+                f"- {item.get('repo_full_name', '—')}: "
+                f"{item.get('target', '—')} -> {item.get('drift_state', 'drifted')}"
+            )
+        _w("")
+
+    if report_data.get("governance_results", {}).get("results") or report_data.get("governance_drift"):
+        _w("## Governance Operator State")
+        _w("")
+        governance_summary = report_data.get("governance_summary", {})
+        _w(f"- Headline: {governance_summary.get('headline', 'Governance state is being tracked.')}")
+        _w(f"- Status: {governance_summary.get('status', 'preview')}")
+        _w(f"- Approved: {'yes' if report_data.get('governance_approval') else 'no'}")
+        _w(f"- Needs Re-Approval: {'yes' if governance_summary.get('needs_reapproval') else 'no'}")
+        _w(f"- Drift Count: {governance_summary.get('drift_count', len(report_data.get('governance_drift', []) or []))}")
+        _w(f"- Applied Count: {governance_summary.get('applied_count', len(report_data.get('governance_results', {}).get('results', []) or []))}")
+        for item in governance_summary.get("top_actions", [])[:4]:
+            _w(f"- {item.get('repo', '—')}: {item.get('title', 'Governed control')} [{item.get('operator_state', 'preview')}]")
         _w("")
 
     review_pack_path.write_text("\n".join(lines))

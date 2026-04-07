@@ -2,20 +2,26 @@
 
 GitHub Repo Auditor is a Python CLI tool that audits a GitHub user's entire repository portfolio. It fetches repo metadata from the GitHub REST API, shallow-clones each repo, runs 12 analysis dimensions over the local files, scores them on a dual-axis model (completeness + interest), and writes structured output in JSON, Markdown, Excel, and HTML formats.
 
+Before normal runs start, the CLI now performs a shared preflight. That diagnostics layer validates config shape, GitHub and Notion readiness, workbook/template availability, output-path writability, and whether baseline-dependent paths such as targeted or incremental reruns have the history they need. The dedicated `--doctor` mode runs that broader diagnostics set without auditing repos and writes a machine-readable artifact to `output/diagnostics-<username>-<date>.json`.
+
+The CLI also now has a read-only `--control-center` path. It loads the latest report + warehouse state, normalizes review state when older reports are missing it, and builds one shared triage queue for setup blockers, review work, campaign drift, and governance readiness without running a new audit.
+
+The documented primary command is now `audit`, exposed through the package console script. `python -m src` remains a supported fallback for environments that prefer module execution.
+
 ## Typical Invocation
 
 ```bash
 # Audit all public repos for a user
-python3 -m src.cli saagpatel
+audit saagpatel
 
 # Audit with private repos and Notion sync
-python3 -m src.cli saagpatel --token $GITHUB_TOKEN --notion
+audit saagpatel --token $GITHUB_TOKEN --notion
 
 # Incremental re-audit of recently-changed repos only
-python3 -m src.cli saagpatel --incremental
+audit saagpatel --incremental
 
 # Audit two specific repos with AI narrative
-python3 -m src.cli saagpatel --repos my-app,my-lib --ai-narrative
+audit saagpatel --repos my-app,my-lib --ai-narrative
 ```
 
 ---
@@ -25,11 +31,13 @@ python3 -m src.cli saagpatel --repos my-app,my-lib --ai-narrative
 ```
 github-repo-auditor/
 ├── src/
-│   ├── cli.py                  # argparse entry point — all 22 CLI flags defined here
+│   ├── cli.py                  # argparse entry point — audit, doctor, control-center, and operator flows
 │   ├── github_client.py        # REST API calls: list repos, commit stats, languages, releases
 │   ├── graphql_client.py       # GraphQL bulk queries for batch metadata fetching
 │   ├── cloner.py               # Shallow clone (depth=1) to temp dir + cleanup
 │   ├── models.py               # RepoMetadata, AnalyzerResult, RepoAudit, AuditReport dataclasses
+│   ├── diagnostics.py          # Shared setup/preflight checks + doctor artifact generation
+│   ├── operator_control_center.py # Shared operator triage snapshot + control-center artifacts
 │   ├── scorer.py               # Weighted aggregation, tier classification, grade computation
 │   ├── reporter.py             # JSON + Markdown report writers
 │   ├── cache.py                # ResponseCache: disk-backed GitHub API response cache (1hr TTL)
@@ -70,17 +78,17 @@ github-repo-auditor/
 │       ├── community_profile.py # LICENSE, CONTRIBUTING, issue templates
 │       ├── interest.py         # Tech novelty, project ambition, burst activity
 │       └── security.py         # Hardcoded secrets, exposed env files, risky configs
-├── tests/                      # 249 tests; mirrors src/ layout
+├── tests/                      # Mirrors src/ layout
 │   └── fixtures/               # Small repo-like directory trees for analyzer tests
 ├── config/                     # Scoring profile YAML files (lightweight, comprehensive, ci)
 ├── output/                     # All generated reports land here (gitignored)
 │   └── .cache/                 # Disk-cached GitHub API responses (gitignored)
 ├── scripts/                    # One-off automation scripts
 ├── docs/                       # Architecture and initiative docs
-├── requirements.txt
-├── pyproject.toml
-├── Makefile
-└── .env.example
+├── requirements.txt            # Compatibility mirror of runtime deps in pyproject.toml
+├── pyproject.toml             # Canonical package metadata + dependencies + console script
+├── Makefile                   # Operator/dev entrypoints: install, doctor, audit, control-center, test
+└── .env.example               # Environment template for GitHub, Notion, workbook, and optional AI usage
 ```
 
 ---
@@ -240,6 +248,56 @@ Important workbook facts:
 - New workbook contract tables include `tblTrendMatrix`, `tblPortfolioHistory`, `tblRollups`, and `tblReviewTargets`.
 - Operator KPI bindings are exposed via workbook named ranges rather than workbook-only calculations.
 - Workbook ranking and trend views must always derive from the full filtered portfolio baseline, even during targeted or incremental reruns.
+- Template mode is validated during preflight so missing or corrupt workbook assets fail before a run starts.
+
+## Install and Daily Use
+
+The intended operator path is now:
+
+1. `make install`
+2. Copy `.env.example` to `.env`
+3. Copy `config/examples/audit-config.example.yaml` to `audit-config.yaml`
+4. Add `config/examples/notion-config.example.json` if you plan to use Notion features
+5. Run `audit <username> --doctor`
+6. Run `audit <username>`
+7. Run `audit <username> --control-center`
+
+### Campaign and Governance Lifecycle
+
+Managed campaign work now reconciles against prior managed state rather than assuming every run is a fresh mutation.
+
+- `--campaign-sync-mode reconcile` updates active managed records and closes stale ones.
+- `--campaign-sync-mode append-only` leaves stale managed records open and marks them stale.
+- `--campaign-sync-mode close-missing` closes previously managed records that are no longer present in the current campaign selection.
+
+The report and warehouse persist per-action lifecycle state, reconciliation outcomes, managed-state drift, rollback preview coverage, and campaign history. Governance remains manual and opt-in, but operator surfaces now preserve approval, result, drift, and rollback coverage data when governance context is present.
+
+Governance in this phase is intentionally limited to the current supported GitHub-administered control family. The finish pass hardens trust and clarity around those controls; it does not expand into rulesets, branch protection, or repo-content mutation.
+
+The diagnostics layer is intentionally shared rather than feature-local:
+- normal runs use a lightweight automatic preflight
+- `--preflight-mode strict` upgrades warnings into blockers
+- `--preflight-mode off` skips automatic preflight
+- `--doctor` runs the broader diagnostics set without cloning or auditing repos
+
+Outputs may project the compact `preflight_summary`, but they do not recompute setup logic themselves.
+
+### Operator Control Center
+
+`--control-center` is the CLI-first daily triage front door. It is intentionally read-only and local-authoritative.
+
+- It reads the latest report JSON plus warehouse-backed campaign/governance state.
+- It normalizes review state into the shared contract when older reports are missing those fields.
+- It builds one ordered operator queue with four lanes:
+  - `blocked`
+  - `urgent`
+  - `ready`
+  - `deferred`
+- It writes:
+  - `operator-control-center-<username>-<date>.json`
+  - `operator-control-center-<username>-<date>.md`
+
+The same shared `operator_summary` and `operator_queue` are then projected into Markdown, HTML, Excel, and review-pack surfaces. Those outputs do not maintain separate triage logic.
 
 ### HTML Dashboard
 
@@ -271,4 +329,4 @@ Repos are shallow-cloned (`git clone --depth 1`) to a temporary directory under 
 | Error isolation | Per-analyzer try/except | A malformed repo should never abort the full 100-repo portfolio run |
 | Output primary format | JSON | Machine-readable; feeds PCC import, Notion sync, and Excel generation |
 | Credentials | Environment variables only | Never passed as CLI args; never logged |
-| External dependencies | Minimal (`requests`, `python-dateutil`, `openpyxl`, `radon`, `rich`, `anthropic`) | Keeps installation lightweight; no analysis frameworks |
+| External dependencies | Minimal (`requests`, `python-dateutil`, `openpyxl`, `radon`, `rich`, `anthropic`, `fpdf2`, `pyyaml`) | Keeps installation lightweight while matching current workbook, PDF, and config support |

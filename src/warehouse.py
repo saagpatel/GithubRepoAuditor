@@ -7,7 +7,7 @@ from pathlib import Path
 from src.models import AuditReport
 
 WAREHOUSE_FILENAME = "portfolio-warehouse.db"
-WAREHOUSE_SCHEMA_VERSION = 3
+WAREHOUSE_SCHEMA_VERSION = 6
 
 
 def write_warehouse_snapshot(
@@ -57,7 +57,25 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             scenario_summary_json TEXT NOT NULL,
             campaign_summary_json TEXT NOT NULL DEFAULT '{}',
             writeback_preview_json TEXT NOT NULL DEFAULT '{}',
-            writeback_results_json TEXT NOT NULL DEFAULT '{}'
+            writeback_results_json TEXT NOT NULL DEFAULT '{}',
+            managed_state_drift_json TEXT NOT NULL DEFAULT '[]',
+            rollback_preview_json TEXT NOT NULL DEFAULT '{}',
+            campaign_history_json TEXT NOT NULL DEFAULT '[]',
+            governance_preview_json TEXT NOT NULL DEFAULT '{}',
+            governance_approval_json TEXT NOT NULL DEFAULT '{}',
+            governance_results_json TEXT NOT NULL DEFAULT '{}',
+            governance_history_json TEXT NOT NULL DEFAULT '[]',
+            governance_drift_json TEXT NOT NULL DEFAULT '[]',
+            governance_summary_json TEXT NOT NULL DEFAULT '{}',
+            preflight_summary_json TEXT NOT NULL DEFAULT '{}',
+            review_summary_json TEXT NOT NULL DEFAULT '{}',
+            review_alerts_json TEXT NOT NULL DEFAULT '[]',
+            material_changes_json TEXT NOT NULL DEFAULT '[]',
+            review_targets_json TEXT NOT NULL DEFAULT '[]',
+            review_history_json TEXT NOT NULL DEFAULT '[]',
+            watch_state_json TEXT NOT NULL DEFAULT '{}',
+            operator_summary_json TEXT NOT NULL DEFAULT '{}',
+            operator_queue_json TEXT NOT NULL DEFAULT '[]'
         );
 
         CREATE TABLE IF NOT EXISTS repos (
@@ -220,7 +238,118 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             campaign_type TEXT NOT NULL,
             target TEXT NOT NULL,
             status TEXT NOT NULL,
+            lifecycle_state TEXT NOT NULL DEFAULT 'planned',
+            reconciliation_outcome TEXT NOT NULL DEFAULT 'preview',
+            closed_at TEXT,
+            closed_reason TEXT,
+            reopened_at TEXT,
+            drift_state TEXT,
+            rollback_state TEXT,
             PRIMARY KEY (run_id, action_id, target)
+        );
+
+        CREATE TABLE IF NOT EXISTS campaign_history (
+            run_id TEXT NOT NULL,
+            action_id TEXT NOT NULL,
+            repo_id TEXT NOT NULL,
+            campaign_type TEXT NOT NULL,
+            lifecycle_state TEXT NOT NULL,
+            reconciliation_outcome TEXT NOT NULL,
+            closed_at TEXT,
+            closed_reason TEXT,
+            reopened_at TEXT,
+            supersedes_action_id TEXT,
+            superseded_by_action_id TEXT,
+            drift_state TEXT,
+            rollback_state TEXT,
+            details_json TEXT NOT NULL DEFAULT '{}',
+            PRIMARY KEY (run_id, action_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS campaign_target_snapshots (
+            run_id TEXT NOT NULL,
+            action_id TEXT NOT NULL,
+            repo_id TEXT NOT NULL,
+            target TEXT NOT NULL,
+            status TEXT NOT NULL,
+            external_key TEXT,
+            before_json TEXT NOT NULL DEFAULT '{}',
+            after_json TEXT NOT NULL DEFAULT '{}',
+            expected_json TEXT NOT NULL DEFAULT '{}',
+            details_json TEXT NOT NULL DEFAULT '{}',
+            PRIMARY KEY (run_id, action_id, target)
+        );
+
+        CREATE TABLE IF NOT EXISTS campaign_drift_events (
+            run_id TEXT NOT NULL,
+            action_id TEXT NOT NULL,
+            repo_id TEXT NOT NULL,
+            campaign_type TEXT NOT NULL,
+            target TEXT NOT NULL,
+            drift_state TEXT NOT NULL,
+            details_json TEXT NOT NULL DEFAULT '{}',
+            PRIMARY KEY (run_id, action_id, target, drift_state)
+        );
+
+        CREATE TABLE IF NOT EXISTS campaign_closure_events (
+            run_id TEXT NOT NULL,
+            action_id TEXT NOT NULL,
+            repo_id TEXT NOT NULL,
+            campaign_type TEXT NOT NULL,
+            event_type TEXT NOT NULL,
+            details_json TEXT NOT NULL DEFAULT '{}',
+            PRIMARY KEY (run_id, action_id, event_type)
+        );
+
+        CREATE TABLE IF NOT EXISTS rollback_runs (
+            run_id TEXT PRIMARY KEY,
+            source_run_id TEXT,
+            preview_json TEXT NOT NULL DEFAULT '{}',
+            results_json TEXT NOT NULL DEFAULT '{}',
+            status TEXT NOT NULL DEFAULT 'preview'
+        );
+
+        CREATE TABLE IF NOT EXISTS governance_approvals (
+            source_run_id TEXT PRIMARY KEY,
+            approved_at TEXT NOT NULL,
+            scope TEXT NOT NULL,
+            fingerprint TEXT NOT NULL,
+            action_count INTEGER NOT NULL,
+            applyable_count INTEGER NOT NULL,
+            status TEXT NOT NULL,
+            details_json TEXT NOT NULL DEFAULT '{}'
+        );
+
+        CREATE TABLE IF NOT EXISTS governance_runs (
+            run_id TEXT PRIMARY KEY,
+            source_run_id TEXT NOT NULL,
+            scope TEXT NOT NULL,
+            fingerprint TEXT NOT NULL,
+            status TEXT NOT NULL,
+            summary_json TEXT NOT NULL DEFAULT '{}'
+        );
+
+        CREATE TABLE IF NOT EXISTS governance_action_results (
+            run_id TEXT NOT NULL,
+            action_id TEXT NOT NULL,
+            repo_id TEXT NOT NULL,
+            control_key TEXT NOT NULL,
+            status TEXT NOT NULL,
+            rollback_state TEXT,
+            before_json TEXT NOT NULL DEFAULT '{}',
+            after_json TEXT NOT NULL DEFAULT '{}',
+            details_json TEXT NOT NULL DEFAULT '{}',
+            PRIMARY KEY (run_id, action_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS governance_drift_events (
+            run_id TEXT NOT NULL,
+            action_id TEXT,
+            repo_id TEXT NOT NULL,
+            control_key TEXT,
+            drift_type TEXT NOT NULL,
+            details_json TEXT NOT NULL DEFAULT '{}',
+            PRIMARY KEY (run_id, repo_id, control_key, drift_type)
         );
 
         CREATE TABLE IF NOT EXISTS github_writebacks (
@@ -289,6 +418,31 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     _ensure_column(conn, "audit_runs", "campaign_summary_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(conn, "audit_runs", "writeback_preview_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(conn, "audit_runs", "writeback_results_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(conn, "audit_runs", "managed_state_drift_json", "TEXT NOT NULL DEFAULT '[]'")
+    _ensure_column(conn, "audit_runs", "rollback_preview_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(conn, "audit_runs", "campaign_history_json", "TEXT NOT NULL DEFAULT '[]'")
+    _ensure_column(conn, "audit_runs", "governance_preview_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(conn, "audit_runs", "governance_approval_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(conn, "audit_runs", "governance_results_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(conn, "audit_runs", "governance_history_json", "TEXT NOT NULL DEFAULT '[]'")
+    _ensure_column(conn, "audit_runs", "governance_drift_json", "TEXT NOT NULL DEFAULT '[]'")
+    _ensure_column(conn, "audit_runs", "governance_summary_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(conn, "audit_runs", "preflight_summary_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(conn, "audit_runs", "review_summary_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(conn, "audit_runs", "review_alerts_json", "TEXT NOT NULL DEFAULT '[]'")
+    _ensure_column(conn, "audit_runs", "material_changes_json", "TEXT NOT NULL DEFAULT '[]'")
+    _ensure_column(conn, "audit_runs", "review_targets_json", "TEXT NOT NULL DEFAULT '[]'")
+    _ensure_column(conn, "audit_runs", "review_history_json", "TEXT NOT NULL DEFAULT '[]'")
+    _ensure_column(conn, "audit_runs", "watch_state_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(conn, "audit_runs", "operator_summary_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(conn, "audit_runs", "operator_queue_json", "TEXT NOT NULL DEFAULT '[]'")
+    _ensure_column(conn, "action_runs", "lifecycle_state", "TEXT NOT NULL DEFAULT 'planned'")
+    _ensure_column(conn, "action_runs", "reconciliation_outcome", "TEXT NOT NULL DEFAULT 'preview'")
+    _ensure_column(conn, "action_runs", "closed_at", "TEXT")
+    _ensure_column(conn, "action_runs", "closed_reason", "TEXT")
+    _ensure_column(conn, "action_runs", "reopened_at", "TEXT")
+    _ensure_column(conn, "action_runs", "drift_state", "TEXT")
+    _ensure_column(conn, "action_runs", "rollback_state", "TEXT")
 
 
 def _ensure_column(conn: sqlite3.Connection, table_name: str, column_name: str, column_def: str) -> None:
@@ -309,8 +463,13 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             total_repos, repos_audited, average_score, portfolio_baseline_size,
             tier_distribution_json, language_distribution_json, lens_summary_json,
             security_summary_json, security_governance_preview_json, collections_json, scenario_summary_json,
-            campaign_summary_json, writeback_preview_json, writeback_results_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            campaign_summary_json, writeback_preview_json, writeback_results_json,
+            managed_state_drift_json, rollback_preview_json, campaign_history_json,
+            governance_preview_json, governance_approval_json, governance_results_json,
+            governance_history_json, governance_drift_json, governance_summary_json, review_summary_json, review_alerts_json,
+            preflight_summary_json, material_changes_json, review_targets_json, review_history_json, watch_state_json,
+            operator_summary_json, operator_queue_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             run_id,
@@ -334,6 +493,24 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             json.dumps(report.campaign_summary),
             json.dumps(report.writeback_preview),
             json.dumps(report.writeback_results),
+            json.dumps(report.managed_state_drift),
+            json.dumps(report.rollback_preview),
+            json.dumps(report.campaign_history),
+            json.dumps(report.governance_preview),
+            json.dumps(report.governance_approval),
+            json.dumps(report.governance_results),
+            json.dumps(report.governance_history),
+            json.dumps(report.governance_drift),
+            json.dumps(report.governance_summary),
+            json.dumps(report.review_summary),
+            json.dumps(report.review_alerts),
+            json.dumps(report.preflight_summary),
+            json.dumps(report.material_changes),
+            json.dumps(report.review_targets),
+            json.dumps(report.review_history),
+            json.dumps(report.watch_state),
+            json.dumps(report.operator_summary),
+            json.dumps(report.operator_queue),
         ),
     )
 
@@ -704,8 +881,10 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
         conn.execute(
             """
             INSERT OR REPLACE INTO action_runs (
-                run_id, action_id, repo_id, campaign_type, target, status
-            ) VALUES (?, ?, ?, ?, ?, ?)
+                run_id, action_id, repo_id, campaign_type, target, status,
+                lifecycle_state, reconciliation_outcome, closed_at, closed_reason,
+                reopened_at, drift_state, rollback_state
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 run_id,
@@ -714,6 +893,75 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
                 action_run.get("campaign_type", ""),
                 action_run.get("target", "preview-only"),
                 action_run.get("status", "preview"),
+                action_run.get("lifecycle_state", "planned"),
+                action_run.get("reconciliation_outcome", action_run.get("status", "preview")),
+                action_run.get("closed_at"),
+                action_run.get("closed_reason"),
+                action_run.get("reopened_at"),
+                action_run.get("drift_state"),
+                action_run.get("rollback_state"),
+            ),
+        )
+
+    for history_entry in report.campaign_history:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO campaign_history (
+                run_id, action_id, repo_id, campaign_type, lifecycle_state,
+                reconciliation_outcome, closed_at, closed_reason, reopened_at,
+                supersedes_action_id, superseded_by_action_id, drift_state,
+                rollback_state, details_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                run_id,
+                history_entry.get("action_id", ""),
+                history_entry.get("repo_full_name", ""),
+                history_entry.get("campaign_type", ""),
+                history_entry.get("lifecycle_state", "planned"),
+                history_entry.get("reconciliation_outcome", "preview"),
+                history_entry.get("closed_at"),
+                history_entry.get("closed_reason"),
+                history_entry.get("reopened_at"),
+                history_entry.get("supersedes_action_id"),
+                history_entry.get("superseded_by_action_id"),
+                history_entry.get("drift_state"),
+                history_entry.get("rollback_state"),
+                json.dumps(history_entry),
+            ),
+        )
+
+    for drift in report.managed_state_drift:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO campaign_drift_events (
+                run_id, action_id, repo_id, campaign_type, target, drift_state, details_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                run_id,
+                drift.get("action_id", ""),
+                drift.get("repo_full_name", ""),
+                drift.get("campaign_type", report.campaign_summary.get("campaign_type", "")),
+                drift.get("target", ""),
+                drift.get("drift_state", drift.get("drift_type", "drifted")),
+                json.dumps(drift),
+            ),
+        )
+
+    for item in report.rollback_preview.get("items", []) if isinstance(report.rollback_preview, dict) else []:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO rollback_runs (
+                run_id, source_run_id, preview_json, results_json, status
+            ) VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                f"{run_id}:{item.get('action_id', item.get('repo_full_name', 'rollback'))}:{item.get('target', '')}",
+                run_id,
+                json.dumps(item),
+                "{}",
+                item.get("rollback_state", "preview"),
             ),
         )
 
@@ -736,6 +984,26 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
                     json.dumps(result),
                 ),
             )
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO campaign_target_snapshots (
+                    run_id, action_id, repo_id, target, status, external_key,
+                    before_json, after_json, expected_json, details_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run_id,
+                    result.get("action_id", ""),
+                    result.get("repo_full_name", ""),
+                    target,
+                    result.get("status", "unknown"),
+                    str(result.get("number") or result.get("url") or ""),
+                    json.dumps(result.get("before", {})),
+                    json.dumps(result.get("after", {})),
+                    json.dumps(result.get("expected", {})),
+                    json.dumps(result),
+                ),
+            )
         elif target.startswith("notion"):
             conn.execute(
                 """
@@ -747,6 +1015,26 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
                     run_id,
                     result.get("action_id", ""),
                     result.get("status", "unknown"),
+                    json.dumps(result),
+                ),
+            )
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO campaign_target_snapshots (
+                    run_id, action_id, repo_id, target, status, external_key,
+                    before_json, after_json, expected_json, details_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run_id,
+                    result.get("action_id", ""),
+                    result.get("repo_full_name", ""),
+                    target,
+                    result.get("status", "unknown"),
+                    str(result.get("page_id") or result.get("url") or ""),
+                    json.dumps(result.get("before", {})),
+                    json.dumps(result.get("after", {})),
+                    json.dumps(result.get("expected", {})),
                     json.dumps(result),
                 ),
             )
@@ -766,3 +1054,490 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
                     str(ref_value),
                 ),
             )
+
+    if report.governance_approval:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO governance_approvals (
+                source_run_id, approved_at, scope, fingerprint, action_count,
+                applyable_count, status, details_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                report.governance_approval.get("source_run_id", ""),
+                report.governance_approval.get("approved_at", report.generated_at.isoformat()),
+                report.governance_approval.get("scope", "all"),
+                report.governance_approval.get("fingerprint", ""),
+                report.governance_approval.get("action_count", 0),
+                report.governance_approval.get("applyable_count", 0),
+                report.governance_approval.get("status", "approved"),
+                json.dumps(report.governance_approval),
+            ),
+        )
+
+    if report.governance_results:
+        governance_run_id = f"governance:{run_id}"
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO governance_runs (
+                run_id, source_run_id, scope, fingerprint, status, summary_json
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                governance_run_id,
+                report.governance_results.get("source_run_id", ""),
+                report.governance_results.get("scope", report.governance_approval.get("scope", "all") if isinstance(report.governance_approval, dict) else "all"),
+                report.governance_results.get("fingerprint", ""),
+                report.governance_results.get("mode", "apply"),
+                json.dumps(report.governance_results),
+            ),
+        )
+        for result in report.governance_results.get("results", []):
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO governance_action_results (
+                    run_id, action_id, repo_id, control_key, status, rollback_state,
+                    before_json, after_json, details_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    governance_run_id,
+                    result.get("action_id", ""),
+                    result.get("repo_full_name", ""),
+                    result.get("control_key", ""),
+                    result.get("status", "unknown"),
+                    result.get("rollback_state", "rollback-available" if result.get("rollback_available") else "non-reversible"),
+                    json.dumps(result.get("before", {})),
+                    json.dumps(result.get("after", {})),
+                    json.dumps(result),
+                ),
+            )
+
+    for drift in report.governance_drift:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO governance_drift_events (
+                run_id, action_id, repo_id, control_key, drift_type, details_json
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                f"governance:{run_id}",
+                drift.get("action_id"),
+                drift.get("repo_full_name", drift.get("repo", "")),
+                drift.get("control_key", drift.get("target")),
+                drift.get("drift_type", "drifted"),
+                json.dumps(drift),
+            ),
+        )
+
+
+def _row_dict(cursor: sqlite3.Cursor, row: sqlite3.Row) -> dict:
+    return {description[0]: row[index] for index, description in enumerate(cursor.description)}
+
+
+def _connect(output_dir: Path) -> sqlite3.Connection | None:
+    db_path = output_dir / WAREHOUSE_FILENAME
+    if not db_path.exists():
+        return None
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def load_audit_report_path(output_dir: Path, run_id: str) -> Path | None:
+    conn = _connect(output_dir)
+    if conn is None:
+        return None
+    try:
+        row = conn.execute(
+            "SELECT report_path FROM audit_runs WHERE run_id = ?",
+            (run_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+    if not row or not row["report_path"]:
+        return None
+    return Path(row["report_path"])
+
+
+def load_campaign_run(output_dir: Path, run_id: str) -> dict | None:
+    conn = _connect(output_dir)
+    if conn is None:
+        return None
+    try:
+        row = conn.execute(
+            """
+            SELECT run_id, campaign_type, label, portfolio_profile, collection_name,
+                   writeback_target, mode, generated_at, generated_action_ids_json
+            FROM campaign_runs
+            WHERE run_id = ?
+            """,
+            (run_id,),
+        ).fetchone()
+        if not row:
+            return None
+        action_rows = conn.execute(
+            """
+            SELECT action_id, repo_id, campaign_type, target, status, lifecycle_state,
+                   reconciliation_outcome, closed_at, closed_reason, reopened_at,
+                   drift_state, rollback_state
+            FROM action_runs
+            WHERE run_id = ?
+            ORDER BY repo_id, action_id
+            """,
+            (run_id,),
+        ).fetchall()
+    finally:
+        conn.close()
+    return {
+        "run_id": row["run_id"],
+        "campaign_type": row["campaign_type"],
+        "label": row["label"],
+        "portfolio_profile": row["portfolio_profile"],
+        "collection_name": row["collection_name"],
+        "writeback_target": row["writeback_target"],
+        "mode": row["mode"],
+        "generated_at": row["generated_at"],
+        "generated_action_ids": json.loads(row["generated_action_ids_json"] or "[]"),
+        "action_runs": [dict(item) for item in action_rows],
+    }
+
+
+def load_governance_approval(output_dir: Path, source_run_id: str) -> dict | None:
+    conn = _connect(output_dir)
+    if conn is None:
+        return None
+    try:
+        row = conn.execute(
+            "SELECT details_json FROM governance_approvals WHERE source_run_id = ?",
+            (source_run_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return None
+    return json.loads(row["details_json"] or "{}")
+
+
+def load_governance_history(output_dir: Path, *, source_run_id: str, limit: int = 10) -> list[dict]:
+    conn = _connect(output_dir)
+    if conn is None:
+        return []
+    try:
+        rows = conn.execute(
+            """
+            SELECT summary_json
+            FROM governance_runs
+            WHERE source_run_id = ?
+            ORDER BY run_id DESC
+            LIMIT ?
+            """,
+            (source_run_id, limit),
+        ).fetchall()
+    finally:
+        conn.close()
+    return [json.loads(row["summary_json"] or "{}") for row in rows]
+
+
+def load_campaign_history(output_dir: Path, campaign_type: str, limit: int = 30) -> list[dict]:
+    conn = _connect(output_dir)
+    if conn is None:
+        return []
+    try:
+        rows = conn.execute(
+            """
+            SELECT campaign_history.details_json
+            FROM campaign_history
+            JOIN audit_runs ON audit_runs.run_id = campaign_history.run_id
+            WHERE campaign_history.campaign_type = ?
+            ORDER BY audit_runs.generated_at DESC, campaign_history.repo_id, campaign_history.action_id
+            LIMIT ?
+            """,
+            (campaign_type, limit),
+        ).fetchall()
+    finally:
+        conn.close()
+    return [json.loads(row["details_json"] or "{}") for row in rows]
+
+
+def load_latest_campaign_state(output_dir: Path, campaign_type: str) -> dict:
+    conn = _connect(output_dir)
+    if conn is None:
+        return {"campaign_type": campaign_type, "actions": {}, "run_id": None}
+    try:
+        run_row = conn.execute(
+            """
+            SELECT campaign_runs.run_id
+            FROM campaign_runs
+            JOIN audit_runs ON audit_runs.run_id = campaign_runs.run_id
+            WHERE campaign_runs.campaign_type = ?
+            ORDER BY audit_runs.generated_at DESC
+            LIMIT 1
+            """,
+            (campaign_type,),
+        ).fetchone()
+        if not run_row:
+            return {"campaign_type": campaign_type, "actions": {}, "run_id": None}
+        run_id = run_row["run_id"]
+        history_rows = conn.execute(
+            """
+            SELECT action_id, repo_id, lifecycle_state, reconciliation_outcome, closed_at,
+                   closed_reason, reopened_at, supersedes_action_id, superseded_by_action_id,
+                   drift_state, rollback_state, details_json
+            FROM campaign_history
+            WHERE run_id = ?
+            """,
+            (run_id,),
+        ).fetchall()
+        if not history_rows:
+            history_rows = conn.execute(
+                """
+                SELECT action_id, repo_id, lifecycle_state, reconciliation_outcome, closed_at,
+                       closed_reason, reopened_at, NULL AS supersedes_action_id,
+                       NULL AS superseded_by_action_id, drift_state, rollback_state,
+                       '{}' AS details_json
+                FROM action_runs
+                WHERE run_id = ? AND campaign_type = ?
+                """,
+                (run_id, campaign_type),
+            ).fetchall()
+        snapshot_rows = conn.execute(
+            """
+            SELECT action_id, target, status, external_key, before_json, after_json, expected_json, details_json
+            FROM campaign_target_snapshots
+            WHERE run_id = ?
+            """,
+            (run_id,),
+        ).fetchall()
+        ref_rows = conn.execute(
+            """
+            SELECT action_id, ref_key, ref_value
+            FROM external_refs
+            WHERE run_id = ?
+            """,
+            (run_id,),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    actions: dict[str, dict] = {}
+    for row in history_rows:
+        details = json.loads(row["details_json"] or "{}")
+        actions[row["action_id"]] = {
+            "action_id": row["action_id"],
+            "repo_full_name": row["repo_id"],
+            "campaign_type": campaign_type,
+            "lifecycle_state": row["lifecycle_state"],
+            "reconciliation_outcome": row["reconciliation_outcome"],
+            "closed_at": row["closed_at"],
+            "closed_reason": row["closed_reason"],
+            "reopened_at": row["reopened_at"],
+            "supersedes_action_id": row["supersedes_action_id"],
+            "superseded_by_action_id": row["superseded_by_action_id"],
+            "drift_state": row["drift_state"],
+            "rollback_state": row["rollback_state"],
+            "details": details,
+            "snapshots": {},
+            "external_refs": {},
+        }
+    for row in snapshot_rows:
+        action = actions.setdefault(
+            row["action_id"],
+            {
+                "action_id": row["action_id"],
+                "repo_full_name": "",
+                "campaign_type": campaign_type,
+                "lifecycle_state": "planned",
+                "reconciliation_outcome": "preview",
+                "snapshots": {},
+                "external_refs": {},
+            },
+        )
+        action["snapshots"][row["target"]] = {
+            "status": row["status"],
+            "external_key": row["external_key"],
+            "before": json.loads(row["before_json"] or "{}"),
+            "after": json.loads(row["after_json"] or "{}"),
+            "expected": json.loads(row["expected_json"] or "{}"),
+            "details": json.loads(row["details_json"] or "{}"),
+        }
+    for row in ref_rows:
+        action = actions.setdefault(
+            row["action_id"],
+            {
+                "action_id": row["action_id"],
+                "repo_full_name": "",
+                "campaign_type": campaign_type,
+                "lifecycle_state": "planned",
+                "reconciliation_outcome": "preview",
+                "snapshots": {},
+                "external_refs": {},
+            },
+        )
+        action["external_refs"][row["ref_key"]] = row["ref_value"]
+    return {"campaign_type": campaign_type, "actions": actions, "run_id": run_id}
+
+
+def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> list[dict]:
+    conn = _connect(output_dir)
+    if conn is None:
+        return []
+    try:
+        rows = conn.execute(
+            """
+            SELECT run_id, username, generated_at, run_mode, scoring_profile,
+                   portfolio_baseline_size, report_path, preflight_summary_json,
+                   governance_summary_json,
+                   review_summary_json, operator_summary_json
+            FROM audit_runs
+            WHERE username = ?
+            ORDER BY generated_at DESC
+            LIMIT ?
+            """,
+            (username, limit),
+        ).fetchall()
+    finally:
+        conn.close()
+    results: list[dict] = []
+    for row in rows:
+        results.append(
+            {
+                "run_id": row["run_id"],
+                "username": row["username"],
+                "generated_at": row["generated_at"],
+                "run_mode": row["run_mode"],
+                "scoring_profile": row["scoring_profile"],
+                "portfolio_baseline_size": row["portfolio_baseline_size"],
+                "report_path": row["report_path"],
+                "preflight_summary": json.loads(row["preflight_summary_json"] or "{}"),
+                "governance_summary": json.loads(row["governance_summary_json"] or "{}"),
+                "review_summary": json.loads(row["review_summary_json"] or "{}"),
+                "operator_summary": json.loads(row["operator_summary_json"] or "{}"),
+            }
+        )
+    return results
+
+
+def load_review_history(output_dir: Path, username: str, limit: int = 10) -> list[dict]:
+    conn = _connect(output_dir)
+    if conn is None:
+        return []
+    try:
+        rows = conn.execute(
+            """
+            SELECT review_summary_json
+            FROM audit_runs
+            WHERE username = ?
+              AND review_summary_json IS NOT NULL
+              AND review_summary_json != '{}'
+            ORDER BY generated_at DESC
+            LIMIT ?
+            """,
+            (username, limit),
+        ).fetchall()
+    finally:
+        conn.close()
+    history: list[dict] = []
+    for row in rows:
+        item = json.loads(row["review_summary_json"] or "{}")
+        if item:
+            history.append(item)
+    return history
+
+
+def load_watch_checkpoint(output_dir: Path, username: str) -> dict | None:
+    conn = _connect(output_dir)
+    if conn is None:
+        return None
+    try:
+        row = conn.execute(
+            """
+            SELECT watch_state_json
+            FROM audit_runs
+            WHERE username = ?
+              AND watch_state_json IS NOT NULL
+              AND watch_state_json != '{}'
+            ORDER BY generated_at DESC
+            LIMIT 1
+            """,
+            (username,),
+        ).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return None
+    state = json.loads(row["watch_state_json"] or "{}")
+    return state or None
+
+
+def load_latest_operator_state(output_dir: Path, username: str) -> dict | None:
+    conn = _connect(output_dir)
+    if conn is None:
+        return None
+    try:
+        row = conn.execute(
+            """
+            SELECT run_id, generated_at, report_path, preflight_summary_json,
+                   governance_summary_json,
+                   review_summary_json, review_alerts_json, material_changes_json,
+                   review_targets_json, review_history_json, watch_state_json,
+                   operator_summary_json, operator_queue_json
+            FROM audit_runs
+            WHERE username = ?
+            ORDER BY generated_at DESC
+            LIMIT 1
+            """,
+            (username,),
+        ).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return None
+    return {
+        "run_id": row["run_id"],
+        "generated_at": row["generated_at"],
+        "report_path": row["report_path"],
+        "preflight_summary": json.loads(row["preflight_summary_json"] or "{}"),
+        "governance_summary": json.loads(row["governance_summary_json"] or "{}"),
+        "review_summary": json.loads(row["review_summary_json"] or "{}"),
+        "review_alerts": json.loads(row["review_alerts_json"] or "[]"),
+        "material_changes": json.loads(row["material_changes_json"] or "[]"),
+        "review_targets": json.loads(row["review_targets_json"] or "[]"),
+        "review_history": json.loads(row["review_history_json"] or "[]"),
+        "watch_state": json.loads(row["watch_state_json"] or "{}"),
+        "operator_summary": json.loads(row["operator_summary_json"] or "{}"),
+        "operator_queue": json.loads(row["operator_queue_json"] or "[]"),
+    }
+
+
+def load_recent_operator_changes(output_dir: Path, username: str, limit: int = 20) -> list[dict]:
+    conn = _connect(output_dir)
+    if conn is None:
+        return []
+    try:
+        rows = conn.execute(
+            """
+            SELECT details_json AS payload, 'campaign' AS kind, audit_runs.generated_at
+            FROM campaign_history
+            JOIN audit_runs ON audit_runs.run_id = campaign_history.run_id
+            WHERE audit_runs.username = ?
+              AND campaign_history.reconciliation_outcome IN ('closed', 'reopened', 'drifted')
+            UNION ALL
+            SELECT details_json AS payload, 'governance' AS kind, audit_runs.generated_at
+            FROM governance_drift_events
+            JOIN audit_runs ON audit_runs.run_id = REPLACE(governance_drift_events.run_id, 'governance:', '')
+            WHERE audit_runs.username = ?
+            ORDER BY generated_at DESC
+            LIMIT ?
+            """,
+            (username, username, limit),
+        ).fetchall()
+    finally:
+        conn.close()
+    changes: list[dict] = []
+    for row in rows:
+        payload = json.loads(row["payload"] or "{}")
+        payload["kind"] = row["kind"]
+        payload["generated_at"] = row["generated_at"]
+        changes.append(payload)
+    return changes

@@ -40,6 +40,10 @@ def _sanitize_for_json(obj: object) -> object:
     return obj
 
 
+def _has_preflight_issues(preflight_summary: dict) -> bool:
+    return bool(preflight_summary and (preflight_summary.get("blocking_errors") or preflight_summary.get("warnings")))
+
+
 # ── JSON Report ──────────────────────────────────────────────────────
 
 
@@ -85,10 +89,29 @@ def write_raw_metadata(report: AuditReport, output_dir: Path) -> Path:
         "writeback_results": report.writeback_results,
         "action_runs": report.action_runs,
         "external_refs": report.external_refs,
+        "managed_state_drift": report.managed_state_drift,
+        "rollback_preview": report.rollback_preview,
+        "campaign_history": report.campaign_history,
+        "governance_preview": report.governance_preview,
+        "governance_approval": report.governance_approval,
+        "governance_results": report.governance_results,
+        "governance_history": report.governance_history,
+        "governance_drift": report.governance_drift,
+        "governance_summary": report.governance_summary,
+        "review_summary": report.review_summary,
+        "review_alerts": report.review_alerts,
+        "material_changes": report.material_changes,
+        "review_targets": report.review_targets,
+        "review_history": report.review_history,
+        "watch_state": report.watch_state,
+        "operator_summary": report.operator_summary,
+        "operator_queue": report.operator_queue,
         "tier_distribution": report.tier_distribution,
         "audits": [a.to_dict() for a in report.audits],
         "errors": report.errors,
     }
+    if report.preflight_summary:
+        data["preflight_summary"] = report.preflight_summary
 
     with open(path, "w") as f:
         json.dump(data, f, indent=2)
@@ -161,6 +184,47 @@ def write_markdown_report(
     _w(f"| Errors | {len(report.errors)} |")
     _w(f"| Schema version | {report.schema_version} |")
     _w("")
+
+    if _has_preflight_issues(report.preflight_summary):
+        _w("### Preflight Diagnostics")
+        _w("")
+        _w(
+            f"- Status: **{report.preflight_summary.get('status', 'unknown')}** | "
+            f"Errors: {report.preflight_summary.get('blocking_errors', 0)} | "
+            f"Warnings: {report.preflight_summary.get('warnings', 0)}"
+        )
+        for check in (report.preflight_summary.get("checks") or [])[:5]:
+            _w(f"- {check.get('summary', 'Issue detected')} ({check.get('category', 'setup')})")
+        _w("")
+
+    if report.operator_summary or report.operator_queue:
+        _w("### Operator Control Center")
+        _w("")
+        _w(f"- Headline: {report.operator_summary.get('headline', 'No operator triage items are currently surfaced.')}")
+        if report.operator_summary.get("source_run_id"):
+            _w(f"- Source Run: `{report.operator_summary.get('source_run_id')}`")
+        if report.operator_summary.get("report_reference"):
+            _w(f"- Latest Report: `{report.operator_summary.get('report_reference')}`")
+        if report.operator_summary.get("control_center_reference"):
+            _w(f"- Control Center Artifact: `{report.operator_summary.get('control_center_reference')}`")
+        counts = report.operator_summary.get("counts", {})
+        _w(
+            f"- Blocked: {counts.get('blocked', 0)} | Urgent: {counts.get('urgent', 0)} | "
+            f"Ready: {counts.get('ready', 0)} | Deferred: {counts.get('deferred', 0)}"
+        )
+        for item in report.operator_queue[:6]:
+            repo = f"{item.get('repo')}: " if item.get("repo") else ""
+            _w(f"- [{item.get('lane_label', item.get('lane', 'ready'))}] {repo}{item.get('title', 'Triage item')}")
+            _w(f"  - Why: {item.get('summary', 'No summary available.')}")
+            _w(f"  - Lane Reason: {item.get('lane_reason', 'Operator triage')}")
+            _w(f"  - Next: {item.get('recommended_action', 'Review the latest state.')}")
+        recent_changes = report.operator_summary.get("operator_recent_changes", [])
+        if recent_changes:
+            _w("- Recent Changes:")
+            for change in recent_changes[:3]:
+                subject = change.get("repo") or change.get("repo_full_name") or change.get("item_id") or "portfolio"
+                _w(f"  - {change.get('generated_at', '')[:10]} {subject}: {change.get('summary', change.get('kind', 'change'))}")
+        _w("")
 
     if report.lenses:
         _w("### Decision Lenses")
@@ -244,10 +308,6 @@ def write_markdown_report(
             )
         _w("")
 
-    if report.security_governance_preview:
-        _w("### Security Governance Preview")
-        _w("")
-
     if report.campaign_summary:
         _w("### Campaign Summary")
         _w("")
@@ -256,6 +316,7 @@ def write_markdown_report(
         _w(f"- Repos: {report.campaign_summary.get('repo_count', 0)}")
         _w(f"- Mode: {report.writeback_results.get('mode', 'preview')}")
         _w(f"- Target: {report.writeback_results.get('target', 'preview-only')}")
+        _w(f"- Sync Mode: {report.writeback_preview.get('sync_mode', 'reconcile')}")
         _w("")
 
     if report.writeback_preview.get("repos"):
@@ -283,6 +344,29 @@ def write_markdown_report(
                 f"{result.get('status', '—')} | {detail} |"
             )
         _w("")
+    if report.managed_state_drift:
+        _w("### Managed State Drift")
+        _w("")
+        _w("| Repo | Target | Drift | Details |")
+        _w("|------|--------|-------|---------|")
+        for item in report.managed_state_drift[:12]:
+            _w(
+                f"| {item.get('repo_full_name', '—')} | {item.get('target', '—')} | "
+                f"{item.get('drift_state', '—')} | {json.dumps(item)} |"
+            )
+        _w("")
+
+    if report.rollback_preview.get("items") or report.rollback_preview.get("item_count", 0):
+        _w("### Rollback Preview")
+        _w("")
+        _w(f"- Available: {'yes' if report.rollback_preview.get('available') else 'no'}")
+        _w(f"- Items: {report.rollback_preview.get('item_count', 0)}")
+        _w(f"- Fully reversible: {report.rollback_preview.get('fully_reversible_count', 0)}")
+        _w("")
+
+    if report.security_governance_preview:
+        _w("### Security Governance Preview")
+        _w("")
         _w("| Repo | Priority | Action | Expected Lift | Source |")
         _w("|------|----------|--------|---------------|--------|")
         for item in report.security_governance_preview[:8]:
@@ -290,6 +374,27 @@ def write_markdown_report(
                 f"| {item.get('repo', '—')} | {item.get('priority', '—')} | "
                 f"{item.get('title', '—')} | {item.get('expected_posture_lift', 0):.2f} | "
                 f"{item.get('source', '—')} |"
+            )
+        _w("")
+
+    governance_summary = report.governance_summary or {}
+    if governance_summary or report.governance_results.get("results") or report.governance_drift:
+        _w("### Governance Operator State")
+        _w("")
+        _w(f"- Headline: {governance_summary.get('headline', 'Governance state is being tracked.')}")
+        _w(f"- Status: {governance_summary.get('status', 'preview')}")
+        _w(f"- Approved: {'yes' if report.governance_approval else 'no'}")
+        _w(f"- Needs Re-Approval: {'yes' if governance_summary.get('needs_reapproval') else 'no'}")
+        _w(f"- Drift Count: {governance_summary.get('drift_count', len(report.governance_drift))}")
+        _w(f"- Applyable Count: {governance_summary.get('applyable_count', report.governance_preview.get('applyable_count', 0) if isinstance(report.governance_preview, dict) else 0)}")
+        _w(f"- Applied Count: {governance_summary.get('applied_count', len(report.governance_results.get('results', [])))}")
+        _w(f"- Rollback Available: {governance_summary.get('rollback_available_count', 0)}")
+        if governance_summary.get("approval_age_days") is not None:
+            _w(f"- Approval Age (days): {governance_summary.get('approval_age_days')}")
+        for item in governance_summary.get("top_actions", [])[:4]:
+            _w(
+                f"- {item.get('repo', '—')}: {item.get('title', 'Governed control')} "
+                f"[{item.get('operator_state', 'preview')}]"
             )
         _w("")
 

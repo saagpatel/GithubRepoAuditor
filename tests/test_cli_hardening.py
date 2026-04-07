@@ -43,11 +43,17 @@ def _make_args(**overrides) -> Namespace:
         "campaign": None,
         "writeback_target": None,
         "writeback_apply": False,
+        "campaign_sync_mode": "reconcile",
+        "governance_view": "all",
         "max_actions": 20,
         "auto_archive": False,
         "narrative": False,
         "pdf": False,
         "config": None,
+        "doctor": False,
+        "control_center": False,
+        "triage_view": "all",
+        "preflight_mode": "auto",
         "watch": False,
         "watch_interval": 3600,
         "create_issues": False,
@@ -127,6 +133,7 @@ def test_main_forwards_scoring_profile_to_targeted_audit(monkeypatch, sample_met
     args = _make_args(
         repos=["test-repo"],
         scoring_profile="focus",
+        preflight_mode="off",
     )
     captured: dict[str, object] = {}
 
@@ -146,6 +153,7 @@ def test_main_forwards_scoring_profile_to_incremental_audit(monkeypatch, sample_
     args = _make_args(
         incremental=True,
         scoring_profile="focus",
+        preflight_mode="off",
     )
     captured: dict[str, object] = {}
 
@@ -161,6 +169,88 @@ def test_main_forwards_scoring_profile_to_incremental_audit(monkeypatch, sample_
     assert captured["all_repos"] == [sample_metadata]
 
 
+def test_main_doctor_writes_artifact_and_exits_cleanly(monkeypatch, tmp_path):
+    args = _make_args(doctor=True, output_dir=str(tmp_path))
+    artifact_path = tmp_path / "diagnostics-testuser-2026-03-29.json"
+
+    class _Result:
+        blocking_errors = 0
+
+    monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
+    monkeypatch.setattr("src.diagnostics.run_diagnostics", lambda *a, **k: _Result())
+    monkeypatch.setattr("src.diagnostics.format_diagnostics_report", lambda result: "doctor ok")
+    monkeypatch.setattr("src.diagnostics.write_diagnostics_report", lambda result, output_dir, username: artifact_path)
+
+    cli.main()
+
+
+def test_main_control_center_writes_artifacts_without_audit(monkeypatch, tmp_path, sample_metadata):
+    args = _make_args(control_center=True, output_dir=str(tmp_path))
+    report_path = tmp_path / "audit-report-testuser-2026-03-29.json"
+    report_data = _make_report_dict(sample_metadata)
+    report_path.write_text("{}")
+
+    monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
+    monkeypatch.setattr(cli, "_load_latest_report", lambda _output_dir: (report_path, report_data))
+    monkeypatch.setattr("src.history.find_previous", lambda *_args, **_kwargs: None)
+
+    cli.main()
+
+    json_artifact = tmp_path / "operator-control-center-testuser-2026-03-29.json"
+    md_artifact = tmp_path / "operator-control-center-testuser-2026-03-29.md"
+    assert json_artifact.is_file()
+    assert md_artifact.is_file()
+
+
+def test_main_control_center_requires_latest_report(monkeypatch):
+    args = _make_args(control_center=True)
+
+    monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
+    monkeypatch.setattr(cli, "_load_latest_report", lambda _output_dir: (None, None))
+
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+
+    assert exc.value.code == 2
+
+
+def test_main_auto_preflight_blocks_on_errors(monkeypatch):
+    args = _make_args(repos=["test-repo"], output_dir="missing-baseline-output")
+
+    monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
+
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+
+    assert exc.value.code == 1
+
+
+def test_main_strict_preflight_blocks_on_warnings(monkeypatch):
+    args = _make_args(preflight_mode="strict", token=None)
+
+    monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
+    monkeypatch.setattr("src.diagnostics._resolve_github_token", lambda token: ("", ""))
+
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+
+    assert exc.value.code == 1
+
+
+def test_main_preflight_off_skips_auto_preflight(monkeypatch, sample_metadata):
+    args = _make_args(repos=["test-repo"], preflight_mode="off")
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
+    monkeypatch.setattr(cli, "_load_scoring_profile", lambda name: (None, "default"))
+    monkeypatch.setattr(cli, "_fetch_repo_metadata", lambda *_: ([sample_metadata], []))
+    monkeypatch.setattr(cli, "_run_targeted_audit", lambda *a, **k: captured.update(k))
+
+    cli.main()
+
+    assert captured["all_repos"] == [sample_metadata]
+
+
 def test_incremental_noop_regenerates_from_latest_report(monkeypatch, tmp_path, sample_metadata):
     args = _make_args(username="testuser")
     report_path = tmp_path / "audit-report-testuser-2026-03-29.json"
@@ -171,7 +261,7 @@ def test_incremental_noop_regenerates_from_latest_report(monkeypatch, tmp_path, 
     monkeypatch.setattr(cli, "_load_latest_report", lambda _output_dir: (report_path, report_data))
     monkeypatch.setattr(
         "src.history.load_fingerprints",
-        lambda: {sample_metadata.name: {"pushed_at": sample_metadata.pushed_at.isoformat()}},
+        lambda *_args, **_kwargs: {sample_metadata.name: {"pushed_at": sample_metadata.pushed_at.isoformat()}},
     )
 
     calls: list[dict[str, object]] = []

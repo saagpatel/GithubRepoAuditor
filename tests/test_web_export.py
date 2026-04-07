@@ -69,6 +69,50 @@ def _make_report(**overrides) -> dict:
                 "source": "github",
             }
         ],
+        "writeback_preview": {"sync_mode": "reconcile"},
+        "campaign_summary": {"campaign_type": "security-review", "label": "Security Review", "action_count": 1, "repo_count": 1},
+        "writeback_results": {"mode": "apply", "target": "github", "results": [{"repo_full_name": "user/RepoC", "target": "github-issue", "status": "created"}]},
+        "managed_state_drift": [{"repo_full_name": "user/RepoC", "target": "github-issue", "drift_state": "managed-issue-edited"}],
+        "governance_results": {"results": [{"repo_full_name": "user/RepoC", "status": "applied"}]},
+        "governance_approval": {"status": "approved"},
+        "governance_drift": [{"repo_full_name": "user/RepoC", "drift_type": "already-enabled"}],
+        "governance_summary": {
+            "headline": "Governed control drift needs operator review.",
+            "status": "drifted",
+            "needs_reapproval": False,
+            "drift_count": 1,
+            "applyable_count": 1,
+            "applied_count": 1,
+            "rollback_available_count": 1,
+            "top_actions": [
+                {
+                    "repo": "RepoC",
+                    "title": "Enable CodeQL default setup",
+                    "operator_state": "ready",
+                    "expected_posture_lift": 0.12,
+                    "source": "github",
+                }
+            ],
+        },
+        "operator_summary": {
+            "headline": "There is live drift or high-severity change that needs attention now.",
+            "counts": {"blocked": 0, "urgent": 2, "ready": 1, "deferred": 1},
+        },
+        "operator_queue": [
+            {
+                "item_id": "campaign-drift:repo-c",
+                "kind": "campaign",
+                "lane": "urgent",
+                "priority": 90,
+                "repo": "RepoC",
+                "title": "RepoC drift needs review",
+                "summary": "managed-issue-edited",
+                "recommended_action": "Inspect the managed issue before closing the campaign.",
+                "source_run_id": "testuser:2026-03-29T12:00:00+00:00",
+                "age_days": 0,
+                "links": [],
+            }
+        ],
         "audits": [
             {
                 "metadata": {"name": "RepoA", "html_url": "https://github.com/user/RepoA",
@@ -187,6 +231,33 @@ class TestRenderHtml:
         assert "<!DOCTYPE html>" in html
         assert "Portfolio Dashboard" in html
 
+    def test_html_includes_campaign_and_governance_operator_state(self):
+        html = _render_html(_make_report())
+        assert "Sync mode:" in html
+        assert "Managed drift:" in html
+        assert "Approved:" in html
+        assert "Needs Re-Approval:" in html
+        assert "Governance Operator State" in html
+
+    def test_html_includes_preflight_diagnostics_when_present(self):
+        html = _render_html(
+            _make_report(
+                preflight_summary={
+                    "status": "warning",
+                    "blocking_errors": 0,
+                    "warnings": 2,
+                    "checks": [{"category": "config", "summary": "No audit-config.yaml was found."}],
+                }
+            )
+        )
+        assert "Preflight Diagnostics" in html
+        assert "No audit-config.yaml was found." in html
+
+    def test_html_includes_operator_control_center(self):
+        html = _render_html(_make_report())
+        assert "Operator Control Center" in html
+        assert "RepoC drift needs review" in html
+
     def test_data_embedded_as_json(self):
         html = _render_html(_make_report())
         assert '"username": "testuser"' in html
@@ -254,7 +325,7 @@ class TestRenderHtml:
         assert "Analyst View" in html
         assert "Decision Lenses" in html
         assert "Security Overview" in html
-        assert "Dry-Run Governance" in html
+        assert "Governance Operator State" in html
         assert "Compare" in html
         assert "Scenario Preview" in html
         assert "showcase" in html

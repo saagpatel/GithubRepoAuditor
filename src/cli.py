@@ -242,10 +242,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="Execute live writeback instead of preview-only planning",
     )
     parser.add_argument(
+        "--campaign-sync-mode",
+        choices=["reconcile", "append-only", "close-missing"],
+        default="reconcile",
+        help="How managed campaign records should reconcile against prior state (default: reconcile)",
+    )
+    parser.add_argument(
         "--max-actions",
         type=int,
         default=20,
         help="Maximum managed actions to include in a campaign run (default: 20)",
+    )
+    parser.add_argument(
+        "--governance-view",
+        choices=["all", "ready", "drifted", "approved", "applied"],
+        default="all",
+        help="Filter governance surfaces to a specific operator state (default: all)",
     )
     parser.add_argument(
         "--auto-archive",
@@ -261,6 +273,28 @@ def build_parser() -> argparse.ArgumentParser:
         "--config",
         default=None,
         help="Path to audit-config.yaml (default: ./audit-config.yaml if exists)",
+    )
+    parser.add_argument(
+        "--doctor",
+        action="store_true",
+        help="Run setup diagnostics only and exit without auditing repos",
+    )
+    parser.add_argument(
+        "--control-center",
+        action="store_true",
+        help="Summarize the latest operator state without running a new audit",
+    )
+    parser.add_argument(
+        "--triage-view",
+        choices=["all", "urgent", "ready", "blocked", "deferred"],
+        default="all",
+        help="Filter control-center triage output to one lane (default: all)",
+    )
+    parser.add_argument(
+        "--preflight-mode",
+        choices=["auto", "off", "strict"],
+        default="auto",
+        help="Control automatic setup checks before a run (default: auto)",
     )
     parser.add_argument(
         "--watch",
@@ -520,7 +554,7 @@ def _report_from_dict(data: dict) -> AuditReport:
         scoring_profile=data.get("scoring_profile", "default"),
         run_mode=data.get("run_mode", "full"),
         portfolio_baseline_size=data.get("portfolio_baseline_size", len(data.get("audits", []))),
-        schema_version=data.get("schema_version", "3.2"),
+        schema_version=data.get("schema_version", "3.6"),
         lenses=data.get("lenses", {}),
         hotspots=data.get("hotspots", []),
         security_posture=data.get("security_posture", {}),
@@ -534,6 +568,24 @@ def _report_from_dict(data: dict) -> AuditReport:
         writeback_results=data.get("writeback_results", {}),
         action_runs=data.get("action_runs", []),
         external_refs=data.get("external_refs", {}),
+        managed_state_drift=data.get("managed_state_drift", []),
+        rollback_preview=data.get("rollback_preview", {}),
+        campaign_history=data.get("campaign_history", []),
+        governance_preview=data.get("governance_preview", {}),
+        governance_approval=data.get("governance_approval", {}),
+        governance_results=data.get("governance_results", {}),
+        governance_history=data.get("governance_history", []),
+        governance_drift=data.get("governance_drift", []),
+        governance_summary=data.get("governance_summary", {}),
+        preflight_summary=data.get("preflight_summary", {}),
+        review_summary=data.get("review_summary", {}),
+        review_alerts=data.get("review_alerts", []),
+        material_changes=data.get("material_changes", []),
+        review_targets=data.get("review_targets", []),
+        review_history=data.get("review_history", []),
+        watch_state=data.get("watch_state", {}),
+        operator_summary=data.get("operator_summary", {}),
+        operator_queue=data.get("operator_queue", []),
         reconciliation=reconciliation,
     )
 
@@ -548,6 +600,47 @@ def _load_latest_report(output_dir: Path) -> tuple[Path | None, dict | None]:
         return None, None
     latest = reports[0]
     return latest, json.loads(latest.read_text())
+
+
+def _latest_control_center_paths(output_dir: Path, username: str, generated_at: datetime) -> tuple[Path, Path]:
+    stamp = _date_str(generated_at)
+    return (
+        output_dir / f"operator-control-center-{username}-{stamp}.json",
+        output_dir / f"operator-control-center-{username}-{stamp}.md",
+    )
+
+
+def _print_control_center_summary(snapshot: dict) -> None:
+    summary = snapshot.get("operator_summary", {})
+    queue = snapshot.get("operator_queue", [])
+    recent_changes = snapshot.get("operator_recent_changes", [])
+    print(f"\nOperator Control Center\n  {summary.get('headline', 'No operator triage items are currently surfaced.')}")
+    if summary.get("report_reference"):
+        print(f"  Latest report: {summary['report_reference']}")
+    if summary.get("source_run_id"):
+        print(f"  Source run: {summary['source_run_id']}")
+    lane_labels = [
+        ("blocked", "Blocked"),
+        ("urgent", "Needs Attention Now"),
+        ("ready", "Ready for Manual Action"),
+        ("deferred", "Safe to Defer"),
+    ]
+    for lane, label in lane_labels:
+        items = [item for item in queue if item.get("lane") == lane]
+        if not items:
+            continue
+        print(f"\n{label}")
+        for item in items[:8]:
+            repo = f"{item['repo']}: " if item.get("repo") else ""
+            print(f"  - {repo}{item.get('title', 'Triage item')}")
+            print(f"    {item.get('summary', '')}")
+            print(f"    Why: {item.get('lane_reason', item.get('lane_label', ''))}")
+            print(f"    Next: {item.get('recommended_action', '')}")
+    if recent_changes:
+        print("\nRecently Changed")
+        for item in recent_changes[:5]:
+            subject = item.get("repo") or item.get("repo_full_name") or item.get("item_id") or "portfolio"
+            print(f"  - {item.get('generated_at', '')[:10]} {subject}: {item.get('summary', item.get('kind', 'change'))}")
 
 
 def _fetch_repo_metadata(args, client: GitHubClient) -> tuple[list[RepoMetadata], list[dict]]:
@@ -724,12 +817,55 @@ def _apply_requested_reconciliation(report: AuditReport, args, audits: list[Repo
             )
 
 
-def _apply_ops_writeback(report: AuditReport, args, client: GitHubClient | None) -> None:
+def _apply_governance_view_filter(report: AuditReport, governance_view: str) -> None:
+    if not isinstance(report.governance_preview, dict):
+        report.governance_preview = {}
+    report.governance_preview["selected_view"] = governance_view
+    if governance_view == "all":
+        return
+
+    preview_actions = report.governance_preview.get("actions", []) if isinstance(report.governance_preview, dict) else []
+    result_rows = report.governance_results.get("results", []) if isinstance(report.governance_results, dict) else []
+    drift_rows = report.governance_drift if isinstance(report.governance_drift, list) else []
+
+    if governance_view == "ready":
+        filtered_preview = [item for item in preview_actions if item.get("applyable")]
+        report.governance_preview = {
+            **report.governance_preview,
+            "actions": filtered_preview,
+            "applyable_count": len(filtered_preview),
+            "action_count": len(filtered_preview),
+        }
+        return
+
+    if governance_view == "drifted":
+        report.governance_drift = drift_rows
+        report.governance_results = {
+            **report.governance_results,
+            "results": [item for item in result_rows if item.get("status") == "drifted"],
+        }
+        return
+
+    if governance_view == "approved":
+        if not report.governance_approval:
+            report.governance_preview = {**report.governance_preview, "actions": []}
+            report.governance_results = {**report.governance_results, "results": []}
+        return
+
+    if governance_view == "applied":
+        report.governance_results = {
+            **report.governance_results,
+            "results": [item for item in result_rows if item.get("status") == "applied"],
+        }
+
+
+def _apply_ops_writeback(report: AuditReport, args, client: GitHubClient | None, output_dir: Path) -> None:
     if not args.campaign:
         return
 
     from src.ops_writeback import (
         apply_github_writeback,
+        build_rollback_preview,
         build_action_runs,
         build_campaign_bundle,
         build_campaign_run,
@@ -737,7 +873,9 @@ def _apply_ops_writeback(report: AuditReport, args, client: GitHubClient | None)
         summarize_writeback_results,
     )
     from src.notion_sync import sync_campaign_actions
+    from src.warehouse import load_campaign_history, load_latest_campaign_state
 
+    previous_state = load_latest_campaign_state(output_dir, args.campaign)
     campaign_summary, actions = build_campaign_bundle(
         report.to_dict(),
         campaign_type=args.campaign,
@@ -746,30 +884,43 @@ def _apply_ops_writeback(report: AuditReport, args, client: GitHubClient | None)
         max_actions=args.max_actions,
         writeback_target=args.writeback_target,
     )
+    campaign_summary["sync_mode"] = args.campaign_sync_mode
     report.campaign_summary = campaign_summary
     report.writeback_preview = build_writeback_preview(
         campaign_summary,
         actions,
         writeback_target=args.writeback_target,
         apply=args.writeback_apply,
+        previous_state=previous_state,
+        sync_mode=args.campaign_sync_mode,
     )
 
     results: list[dict] = []
     external_refs: dict[str, dict] = {}
+    managed_state_drift: list[dict] = []
     if args.writeback_apply and args.writeback_target:
         if args.writeback_target in {"github", "all"} and client is not None:
-            github_results, github_refs = apply_github_writeback(client, actions)
+            github_results, github_refs, github_drift, _github_closure_events = apply_github_writeback(
+                client,
+                actions,
+                previous_state=previous_state,
+                sync_mode=args.campaign_sync_mode,
+            )
             results.extend(github_results)
             external_refs.update(github_refs)
+            managed_state_drift.extend(github_drift)
         if args.writeback_target in {"notion", "all"}:
-            notion_results, notion_refs = sync_campaign_actions(
+            notion_results, notion_refs, notion_drift = sync_campaign_actions(
                 actions,
                 campaign_summary,
                 config_dir=Path("config"),
                 apply=True,
+                previous_state=previous_state,
+                sync_mode=args.campaign_sync_mode,
             )
             results.extend(notion_results)
             external_refs.update(notion_refs)
+            managed_state_drift.extend(notion_drift)
 
     report.writeback_results = summarize_writeback_results(
         results,
@@ -781,14 +932,58 @@ def _apply_ops_writeback(report: AuditReport, args, client: GitHubClient | None)
         actions,
         writeback_target=args.writeback_target,
         apply=args.writeback_apply,
+        sync_mode=args.campaign_sync_mode,
     )
     report.action_runs = build_action_runs(
         actions,
         results,
         args.writeback_target,
         args.writeback_apply,
+        previous_state=previous_state,
+        sync_mode=args.campaign_sync_mode,
     )
     report.external_refs = external_refs
+    report.managed_state_drift = managed_state_drift
+    report.rollback_preview = build_rollback_preview(results)
+    historical_entries = load_campaign_history(output_dir, args.campaign, limit=20)
+    report.campaign_history = report.action_runs + historical_entries[:20]
+
+
+def _enrich_report_with_operator_state(
+    report: AuditReport,
+    *,
+    output_dir: Path,
+    diff_dict: dict | None,
+    triage_view: str,
+    portfolio_profile: str,
+    collection: str | None,
+) -> AuditReport:
+    from src.governance_activation import build_governance_summary
+    from src.operator_control_center import build_operator_snapshot, normalize_review_state
+
+    normalized = normalize_review_state(
+        report.to_dict(),
+        output_dir=output_dir,
+        diff_data=diff_dict,
+        portfolio_profile=portfolio_profile,
+        collection_name=collection,
+    )
+    normalized["governance_summary"] = build_governance_summary(normalized)
+    snapshot = build_operator_snapshot(
+        normalized,
+        output_dir=output_dir,
+        triage_view=triage_view,
+    )
+    report.governance_summary = normalized.get("governance_summary", {})
+    report.review_summary = normalized.get("review_summary", {})
+    report.review_alerts = normalized.get("review_alerts", [])
+    report.material_changes = normalized.get("material_changes", [])
+    report.review_targets = normalized.get("review_targets", [])
+    report.review_history = normalized.get("review_history", [])
+    report.watch_state = normalized.get("watch_state", {})
+    report.operator_summary = snapshot.get("operator_summary", {})
+    report.operator_queue = snapshot.get("operator_queue", [])
+    return report
 
 
 # ── Report output orchestration ───────────────────────────────────────
@@ -816,8 +1011,8 @@ def _write_report_outputs(
     )
     from src.warehouse import write_warehouse_snapshot
 
-    _apply_ops_writeback(report, args, client)
-    report_data = report.to_dict()
+    _apply_ops_writeback(report, args, client, output_dir)
+    _apply_governance_view_filter(report, args.governance_view)
     if write_json:
         json_path = write_json_report(report, output_dir)
     elif json_path is None:
@@ -844,6 +1039,18 @@ def _write_report_outputs(
             f"{len([c for c in diff.score_changes if abs(c['delta']) > 0.05])} significant score changes"
         )
 
+    report = _enrich_report_with_operator_state(
+        report,
+        output_dir=output_dir,
+        diff_dict=diff_dict,
+        triage_view=getattr(args, "triage_view", "all"),
+        portfolio_profile=args.portfolio_profile,
+        collection=args.collection,
+    )
+    report_data = report.to_dict()
+    if write_json:
+        json_path = write_json_report(report, output_dir)
+
     trend_data = load_trend_data()
     score_history = load_repo_score_history()
     excel_path = export_excel(
@@ -864,7 +1071,7 @@ def _write_report_outputs(
     if archive and write_json:
         archive_report(json_path)
     if save_fingerprint_data:
-        save_fingerprints(report_data["audits"])
+        save_fingerprints(report_data["audits"], output_dir / ".audit-fingerprints.json")
 
     badge_info = ""
     if args.badges:
@@ -1127,6 +1334,7 @@ def _run_targeted_audit(
         run_mode="targeted",
         portfolio_baseline_size=len(filtered_repos),
     )
+    report.preflight_summary = getattr(args, "_preflight_summary", {})
     _apply_requested_reconciliation(report, args, merged_audits)
 
     outputs = _write_report_outputs(
@@ -1153,6 +1361,8 @@ def _regenerate_outputs_from_latest_report(
     existing_report_data: dict,
 ) -> None:
     report = _report_from_dict(existing_report_data)
+    if getattr(args, "_preflight_summary", {}):
+        report.preflight_summary = getattr(args, "_preflight_summary", {})
     needs_fresh_json = bool(args.campaign)
     outputs = _write_report_outputs(
         report,
@@ -1202,7 +1412,7 @@ def _run_incremental_audit(
     if not _ensure_partial_run_profile_compatible(existing_report_data, scoring_profile_name):
         return
 
-    fingerprints = load_fingerprints()
+    fingerprints = load_fingerprints(output_dir / ".audit-fingerprints.json")
     if not fingerprints:
         print_warning("No fingerprints found. Run a full audit first.")
         print_info(f"Usage: python -m src {args.username}")
@@ -1321,11 +1531,19 @@ def main() -> None:
     args = parser.parse_args()
 
     # Load config file and merge into args (CLI flags take precedence)
-    from src.config import load_config, merge_config_with_args
+    from src.config import inspect_config, merge_config_with_args
+    from src.diagnostics import (
+        format_diagnostics_report,
+        format_preflight_summary,
+        run_diagnostics,
+        should_block_run,
+        write_diagnostics_report,
+    )
 
-    config = load_config(Path(args.config) if args.config else None)
-    if config:
-        merge_config_with_args(args, config)
+    config_inspection = inspect_config(Path(args.config) if args.config else None)
+    if config_inspection.data:
+        merge_config_with_args(args, config_inspection.data)
+    setattr(args, "_preflight_summary", {})
 
     # Validate mutually exclusive registry flags
     if args.registry and args.notion_registry:
@@ -1341,7 +1559,74 @@ def main() -> None:
     if args.writeback_target and not args.campaign:
         parser.error("--writeback-target requires --campaign")
 
-    custom_weights, scoring_profile_name = _load_scoring_profile(args.scoring_profile)
+    if args.doctor:
+        result = run_diagnostics(args, config_inspection=config_inspection, full=True)
+        output_dir = Path(args.output_dir)
+        artifact_path = write_diagnostics_report(result, output_dir, args.username)
+        print(format_diagnostics_report(result))
+        print_info(f"Diagnostics artifact: {artifact_path}")
+        if result.blocking_errors:
+            raise SystemExit(1)
+        return
+
+    if args.control_center:
+        from src.diff import diff_reports
+        from src.governance_activation import build_governance_summary
+        from src.history import find_previous
+        from src.operator_control_center import (
+            build_operator_snapshot,
+            control_center_artifact_payload,
+            normalize_review_state,
+            render_control_center_markdown,
+        )
+
+        output_dir = Path(args.output_dir)
+        report_path, report_data = _load_latest_report(output_dir)
+        if not report_path or not report_data:
+            parser.error("No existing audit report found in output directory")
+
+        diff_dict = None
+        previous_path = find_previous(report_path.name)
+        if previous_path:
+            diff_dict = diff_reports(
+                previous_path,
+                report_path,
+                portfolio_profile=args.portfolio_profile,
+                collection_name=args.collection,
+            ).to_dict()
+
+        report_data["latest_report_path"] = str(report_path)
+        normalized = normalize_review_state(
+            report_data,
+            output_dir=output_dir,
+            diff_data=diff_dict,
+            portfolio_profile=args.portfolio_profile,
+            collection_name=args.collection,
+        )
+        normalized["governance_summary"] = build_governance_summary(normalized)
+        snapshot = build_operator_snapshot(
+            normalized,
+            output_dir=output_dir,
+            triage_view=args.triage_view,
+        )
+        json_artifact, md_artifact = _latest_control_center_paths(
+            output_dir,
+            normalized.get("username", args.username),
+            _parse_iso_dt(normalized.get("generated_at")) or datetime.now(timezone.utc),
+        )
+        snapshot.setdefault("operator_summary", {})["control_center_reference"] = str(json_artifact)
+        json_artifact.write_text(json.dumps(control_center_artifact_payload(normalized, snapshot), indent=2))
+        md_artifact.write_text(
+            render_control_center_markdown(
+                snapshot,
+                normalized.get("username", args.username),
+                normalized.get("generated_at", datetime.now(timezone.utc).isoformat()),
+            )
+        )
+        _print_control_center_summary(snapshot)
+        print_info(f"Control center JSON: {json_artifact}")
+        print_info(f"Control center Markdown: {md_artifact}")
+        return
 
     # ── Improvement campaign workflow (standalone, no audit needed) ────
     if getattr(args, "generate_manifest", False):
@@ -1392,6 +1677,18 @@ def main() -> None:
         return
 
     def _run_once() -> None:
+        if args.preflight_mode != "off":
+            preflight = run_diagnostics(args, config_inspection=config_inspection, full=False)
+            setattr(args, "_preflight_summary", preflight.to_preflight_summary())
+            print_info(format_preflight_summary(preflight))
+            if preflight.status != "ok":
+                for check in [item for item in preflight.checks if item.status != "ok"][:5]:
+                    print_warning(f"{check.summary} ({check.category})")
+            if should_block_run(preflight, args.preflight_mode):
+                raise SystemExit(1)
+
+        custom_weights, scoring_profile_name = _load_scoring_profile(args.scoring_profile)
+
         if not args.token:
             print_warning(
                 "No token provided. Only public repos will be fetched.\n"
@@ -1482,6 +1779,7 @@ def main() -> None:
                 run_mode="full",
                 portfolio_baseline_size=len(repos),
             )
+            report.preflight_summary = getattr(args, "_preflight_summary", {})
             _apply_requested_reconciliation(report, args, audits)
             outputs = _write_report_outputs(report, args, output_dir, client=client, cache=cache)
             _print_output_summary(f"Audited {report.repos_audited} repos for {report.username}", report, outputs)

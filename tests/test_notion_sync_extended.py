@@ -4,12 +4,15 @@ from unittest.mock import MagicMock, patch
 from src.notion_client import query_page_by_title
 from src.notion_sync import _extract_audit_data
 from src.notion_sync import (
+    _build_weekly_review_section_blocks,
+    _managed_section_block_ids,
     _render_quick_wins_markdown,
     _render_audit_highlights,
     _chunk_text,
     check_recommendation_followup,
     FLAG_TO_ACTION,
     ELIGIBLE_TIERS,
+    patch_weekly_review,
     sync_campaign_actions,
 )
 
@@ -80,6 +83,25 @@ class TestRenderAuditHighlights:
         assert "RepoY" in md
         assert "shipped" in md
 
+    def test_includes_operator_control_center_summary(self):
+        report = {
+            "generated_at": "2026-03-29T00:00:00Z",
+            "portfolio_grade": "B",
+            "average_score": 0.72,
+            "tier_distribution": {"shipped": 8, "functional": 4},
+            "operator_summary": {
+                "headline": "There is live drift or high-severity change that needs attention now.",
+                "counts": {"blocked": 1, "urgent": 2, "ready": 3, "deferred": 4},
+            },
+            "operator_queue": [
+                {"repo": "RepoZ", "title": "RepoZ drift needs review", "recommended_action": "Inspect the managed issue."}
+            ],
+        }
+        md = _render_audit_highlights(report, None, [])
+        assert "Operator Control Center" in md
+        assert "Blocked 1" in md
+        assert "RepoZ drift needs review" in md
+
 
 class TestChunkText:
     def test_short_text(self):
@@ -90,6 +112,70 @@ class TestChunkText:
         chunks = _chunk_text(text, 2000)
         assert len(chunks) == 3
         assert len(chunks[0]) == 2000
+
+
+class TestWeeklyReviewManagedSection:
+    def test_detects_existing_managed_section_block_ids(self):
+        blocks = [
+            {"id": "a", "type": "paragraph", "paragraph": {"rich_text": [{"plain_text": "intro"}]}},
+            {"id": "b", "type": "paragraph", "paragraph": {"rich_text": [{"plain_text": "[GHRA-BEGIN-AUDIT-HIGHLIGHTS]"}]}},
+            {"id": "c", "type": "paragraph", "paragraph": {"rich_text": [{"plain_text": "body"}]}},
+            {"id": "d", "type": "paragraph", "paragraph": {"rich_text": [{"plain_text": "[GHRA-END-AUDIT-HIGHLIGHTS]"}]}},
+        ]
+        assert _managed_section_block_ids(blocks) == ["b", "c", "d"]
+
+    def test_builds_weekly_review_section_with_markers(self):
+        blocks = _build_weekly_review_section_blocks("hello world")
+        assert blocks[0]["paragraph"]["rich_text"][0]["text"]["content"] == "[GHRA-BEGIN-AUDIT-HIGHLIGHTS]"
+        assert blocks[-1]["paragraph"]["rich_text"][0]["text"]["content"] == "[GHRA-END-AUDIT-HIGHLIGHTS]"
+
+    def test_patch_weekly_review_replaces_existing_managed_section(self):
+        query_resp = MagicMock()
+        query_resp.status_code = 200
+        query_resp.json.return_value = {"results": [{"id": "weekly-page"}]}
+
+        children_resp = MagicMock()
+        children_resp.status_code = 200
+        children_resp.json.return_value = {
+            "results": [
+                {"id": "old-start", "type": "paragraph", "paragraph": {"rich_text": [{"plain_text": "[GHRA-BEGIN-AUDIT-HIGHLIGHTS]"}]}},
+                {"id": "old-body", "type": "paragraph", "paragraph": {"rich_text": [{"plain_text": "old body"}]}},
+                {"id": "old-end", "type": "paragraph", "paragraph": {"rich_text": [{"plain_text": "[GHRA-END-AUDIT-HIGHLIGHTS]"}]}},
+            ]
+        }
+
+        archive_resp = MagicMock()
+        archive_resp.status_code = 200
+        append_resp = MagicMock()
+        append_resp.status_code = 200
+
+        with patch(
+            "src.notion_sync._notion_request",
+            side_effect=[query_resp, children_resp, archive_resp, archive_resp, archive_resp, append_resp],
+        ) as notion_request:
+            result = patch_weekly_review(
+                {
+                    "generated_at": "2026-03-29T00:00:00Z",
+                    "portfolio_grade": "B",
+                    "average_score": 0.72,
+                    "tier_distribution": {"shipped": 8, "functional": 4},
+                },
+                None,
+                [],
+                "token",
+                {"weekly_reviews_db_id": "weekly-db"},
+            )
+
+        assert result is True
+        archive_calls = notion_request.call_args_list[2:5]
+        assert [call.args[1] for call in archive_calls] == [
+            "/blocks/old-start",
+            "/blocks/old-body",
+            "/blocks/old-end",
+        ]
+        appended_children = notion_request.call_args_list[-1].args[4]["children"]
+        assert appended_children[0]["paragraph"]["rich_text"][0]["text"]["content"] == "[GHRA-BEGIN-AUDIT-HIGHLIGHTS]"
+        assert appended_children[-1]["paragraph"]["rich_text"][0]["text"]["content"] == "[GHRA-END-AUDIT-HIGHLIGHTS]"
 
 
 class TestFlagMapping:
@@ -151,9 +237,10 @@ class TestExtractAuditData:
 class TestCampaignActionSync:
     def test_fails_soft_without_token(self, monkeypatch):
         monkeypatch.setattr("src.notion_sync.get_notion_token", lambda: "")
-        results, refs = sync_campaign_actions([], {"campaign_type": "security-review"}, apply=True)
+        results, refs, drift = sync_campaign_actions([], {"campaign_type": "security-review"}, apply=True)
         assert results[0]["status"] == "skipped"
         assert refs == {}
+        assert drift == []
 
 
 class TestCheckRecommendationFollowup:

@@ -1,0 +1,10 @@
+{
+  "notion_version": "2026-03-11",
+  "events_database_id": "replace-with-events-database-id",
+  "projects_data_source_id": "replace-with-projects-data-source-id",
+  "weekly_reviews_db_id": "replace-with-weekly-reviews-database-id",
+  "audit_history_db_id": "replace-with-audit-history-database-id",
+  "action_requests_data_source_id": "replace-with-action-requests-data-source-id",
+  "campaign_runs_data_source_id": "replace-with-campaign-runs-data-source-id",
+  "recommendation_runs_data_source_id": "replace-with-recommendation-runs-data-source-id"
+}

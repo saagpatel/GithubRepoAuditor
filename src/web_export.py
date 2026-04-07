@@ -134,6 +134,8 @@ def _render_html(
         "<body>",
         _header_section(username, date, repos_audited, grade),
         _kpi_section(report_data),
+        _preflight_section(report_data),
+        _operator_section(report_data),
         _analyst_summary_section(analyst_context),
         _lens_summary_section(report_data),
         _security_overview_section(report_data),
@@ -181,6 +183,67 @@ def _kpi_section(data: dict) -> str:
       <div class="kpi-card"><div class="kpi-label">Shipped</div><div class="kpi-value" style="color:#166534">{shipped}</div></div>
       <div class="kpi-card"><div class="kpi-label">Functional</div><div class="kpi-value" style="color:#1565C0">{functional}</div></div>
       <div class="kpi-card"><div class="kpi-label">Needs Work</div><div class="kpi-value" style="color:#C2410C">{needs_work}</div></div>
+    </div>"""
+
+
+def _preflight_section(data: dict) -> str:
+    summary = data.get("preflight_summary") or {}
+    warnings = summary.get("warnings", 0)
+    errors = summary.get("blocking_errors", 0)
+    if not summary or (warnings == 0 and errors == 0):
+        return ""
+    rows = []
+    for check in (summary.get("checks") or [])[:6]:
+        rows.append(
+            f"<li><strong>{escape(check.get('category', 'setup'))}</strong>: "
+            f"{escape(check.get('summary', 'Issue detected'))}</li>"
+        )
+    return f"""
+    <div class="section">
+      <h2>Preflight Diagnostics</h2>
+      <div class="panel">
+        <div class="meta-line"><strong>Status:</strong> {escape(summary.get('status', 'unknown'))}</div>
+        <div class="meta-line"><strong>Errors:</strong> {errors} | <strong>Warnings:</strong> {warnings}</div>
+        <ul class="bullet-list">{''.join(rows)}</ul>
+      </div>
+    </div>"""
+
+
+def _operator_section(data: dict) -> str:
+    summary = data.get("operator_summary") or {}
+    queue = data.get("operator_queue") or []
+    if not summary and not queue:
+        return ""
+    counts = summary.get("counts", {})
+    rows = []
+    for item in queue[:8]:
+        repo = f"{escape(item.get('repo', ''))}: " if item.get("repo") else ""
+        rows.append(
+            "<li>"
+            f"<strong>[{escape(item.get('lane_label', item.get('lane', 'ready')))}]</strong> {repo}{escape(item.get('title', 'Triage item'))}"
+            f"<br><span class='muted'>{escape(item.get('summary', 'No summary available.'))}</span>"
+            f"<br><span class='muted'><strong>Why this lane:</strong> {escape(item.get('lane_reason', 'Operator triage item.'))}</span>"
+            f"<br><span class='muted'><strong>Next:</strong> {escape(item.get('recommended_action', 'Review the latest state.'))}</span>"
+            "</li>"
+        )
+    recent_changes = summary.get("operator_recent_changes", [])
+    recent_markup = "".join(
+        f"<li>{escape(change.get('generated_at', '')[:10])} "
+        f"{escape(change.get('repo') or change.get('repo_full_name') or change.get('item_id') or 'portfolio')}: "
+        f"{escape(change.get('summary', change.get('kind', 'change')))}</li>"
+        for change in recent_changes[:4]
+    )
+    return f"""
+    <div class="section">
+      <h2>Operator Control Center</h2>
+      <div class="panel">
+        <div class="meta-line"><strong>Headline:</strong> {escape(summary.get('headline', 'No operator triage items are currently surfaced.'))}</div>
+        <div class="meta-line"><strong>Source Run:</strong> {escape(summary.get('source_run_id', 'n/a'))}</div>
+        <div class="meta-line"><strong>Blocked:</strong> {counts.get('blocked', 0)} | <strong>Urgent:</strong> {counts.get('urgent', 0)} | <strong>Ready:</strong> {counts.get('ready', 0)} | <strong>Deferred:</strong> {counts.get('deferred', 0)}</div>
+        <ul class="bullet-list">{''.join(rows) or '<li>No triage items are currently surfaced.</li>'}</ul>
+        <div class="meta-line"><strong>Recently Changed:</strong></div>
+        <ul class="bullet-list">{recent_markup or '<li>No recent operator changes were loaded.</li>'}</ul>
+      </div>
     </div>"""
 
 
@@ -422,6 +485,8 @@ def _campaign_section(report_data: dict) -> str:
           <div class="meta-line"><strong>Campaign:</strong> {escape(summary.get('label', summary.get('campaign_type', '—')))}</div>
           <div class="meta-line"><strong>Actions:</strong> {summary.get('action_count', 0)}</div>
           <div class="meta-line"><strong>Repos:</strong> {summary.get('repo_count', 0)}</div>
+          <div class="meta-line"><strong>Sync mode:</strong> {escape(report_data.get('writeback_preview', {}).get('sync_mode', 'reconcile'))}</div>
+          <div class="meta-line"><strong>Drift:</strong> {len(report_data.get('managed_state_drift', []) or [])}</div>
         </div>
         <div class="panel">
           <table class="compact-table">
@@ -435,7 +500,8 @@ def _campaign_section(report_data: dict) -> str:
 
 def _writeback_results_section(report_data: dict) -> str:
     writeback = report_data.get("writeback_results", {})
-    if not writeback.get("results"):
+    drift_rows = report_data.get("managed_state_drift", []) or []
+    if not writeback.get("results") and not drift_rows:
         return ""
     rows = []
     for result in writeback.get("results", [])[:12]:
@@ -446,11 +512,15 @@ def _writeback_results_section(report_data: dict) -> str:
             f"<td>{escape(result.get('status', '—'))}</td>"
             f"<td>{escape(str(detail))}</td></tr>"
         )
+    drift_markup = ""
+    if drift_rows:
+        drift_markup = f"<div class=\"meta-line\"><strong>Managed drift:</strong> {len(drift_rows)}</div>"
     return f"""
     <div class="section">
       <h2>Writeback Results</h2>
       <div class="meta-line"><strong>Mode:</strong> {escape(writeback.get('mode', 'preview'))} |
       <strong>Target:</strong> {escape(writeback.get('target', 'preview-only'))}</div>
+      {drift_markup}
       <table class="compact-table">
         <thead><tr><th>Repo</th><th>Target</th><th>Status</th><th>Details</th></tr></thead>
         <tbody>{''.join(rows)}</tbody>
@@ -490,24 +560,34 @@ def _scenario_section(analyst_context: dict) -> str:
 
 
 def _governance_section(report_data: dict) -> str:
-    preview = report_data.get("security_governance_preview", [])
-    if not preview:
+    governance_summary = report_data.get("governance_summary", {}) or {}
+    preview = governance_summary.get("top_actions") or report_data.get("security_governance_preview", [])
+    governance_results = report_data.get("governance_results", {}).get("results", [])
+    governance_drift = report_data.get("governance_drift", [])
+    if not preview and not governance_results and not governance_drift:
         return ""
 
     rows = []
     for item in preview[:8]:
         rows.append(
             f"<tr><td>{escape(item.get('repo', ''))}</td>"
-            f"<td>{escape(item.get('priority', 'medium'))}</td>"
+            f"<td>{escape(item.get('operator_state', item.get('priority', 'medium')))}</td>"
             f"<td>{escape(item.get('title', ''))}</td>"
             f"<td class='num'>{item.get('expected_posture_lift', 0):.2f}</td>"
             f"<td>{escape(item.get('source', ''))}</td></tr>"
         )
+    summary = (
+        f"<div class=\"meta-line\"><strong>Headline:</strong> {escape(governance_summary.get('headline', 'Governance state is being tracked.'))}</div>"
+        f"<div class=\"meta-line\"><strong>Status:</strong> {escape(governance_summary.get('status', 'preview'))}</div>"
+        f"<div class=\"meta-line\"><strong>Approved:</strong> {'yes' if report_data.get('governance_approval') else 'no'} | <strong>Needs Re-Approval:</strong> {'yes' if governance_summary.get('needs_reapproval') else 'no'}</div>"
+        f"<div class=\"meta-line\"><strong>Drift Count:</strong> {governance_summary.get('drift_count', len(governance_drift))} | <strong>Applied Results:</strong> {governance_summary.get('applied_count', len(governance_results))} | <strong>Rollback Available:</strong> {governance_summary.get('rollback_available_count', 0)}</div>"
+    )
     return f"""
     <div class="section">
-      <h2>Dry-Run Governance</h2>
+      <h2>Governance Operator State</h2>
+      {summary}
       <table class="compact-table">
-        <thead><tr><th>Repo</th><th>Priority</th><th>Action</th><th>Expected Lift</th><th>Source</th></tr></thead>
+        <thead><tr><th>Repo</th><th>State</th><th>Action</th><th>Expected Lift</th><th>Source</th></tr></thead>
         <tbody>{''.join(rows)}</tbody>
       </table>
     </div>"""
@@ -751,6 +831,9 @@ def _css() -> str:
     .meta-line { margin-bottom: 8px; color: #334155; }
     .pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
     .pill { display: inline-block; padding: 4px 10px; border-radius: 999px; background: #E0F2FE; color: #075985; font-size: 12px; }
+    .bullet-list { margin: 12px 0 0 18px; color: #334155; }
+    .bullet-list li { margin-bottom: 6px; }
+    .muted { color: #64748B; }
     .compact-table { font-size: 12px; }
     .compact-table th, .compact-table td { padding: 6px 8px; }
     .section { padding: 24px 32px; }

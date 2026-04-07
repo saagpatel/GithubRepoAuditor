@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from src.ops_writeback import (
+    apply_github_writeback,
+    build_action_runs,
     build_campaign_bundle,
+    build_rollback_preview,
     build_writeback_preview,
     desired_managed_topics,
     managed_issue_body,
@@ -157,3 +160,171 @@ def test_managed_topics_and_issue_body_include_expected_markers():
     body = managed_issue_body("RepoA", "showcase-publish", [action])
     assert "ghra-action-bundle:showcase-publish:repoa" in body
     assert "Upgrade README" in body
+
+
+class _FakeGitHubClient:
+    def __init__(self):
+        self.topics = {"user/RepoA": ["python"], "user/RepoB": ["ghra-call-security-review"]}
+        self.properties = {"user/RepoA": {}, "user/RepoB": {"portfolio_call": "security-review"}}
+        self.issues = {
+            "user/RepoA": [],
+            "user/RepoB": [
+                {
+                    "number": 7,
+                    "title": managed_issue_title("security-review"),
+                    "body": "<!-- ghra-action-bundle:security-review:repob -->\nold body",
+                    "state": "open",
+                    "html_url": "https://github.com/user/RepoB/issues/7",
+                }
+            ],
+        }
+
+    def get_repo_topics(self, owner: str, repo: str) -> dict:
+        return {"available": True, "topics": list(self.topics.get(f"{owner}/{repo}", []))}
+
+    def replace_repo_topics(self, owner: str, repo: str, topics: list[str]) -> dict:
+        self.topics[f"{owner}/{repo}"] = list(topics)
+        return {"ok": True, "topics": list(topics)}
+
+    def get_repo_custom_property_values(self, owner: str, repo: str) -> dict:
+        return {"available": True, "values": dict(self.properties.get(f"{owner}/{repo}", {}))}
+
+    def update_repo_custom_property_values(self, owner: str, repo: str, properties: dict[str, str]) -> dict:
+        before = dict(self.properties.get(f"{owner}/{repo}", {}))
+        after = {**before, **properties}
+        self.properties[f"{owner}/{repo}"] = after
+        return {"ok": True, "status": "updated", "before": before, "after": after}
+
+    def list_repo_issues(self, owner: str, repo: str, state: str = "open") -> list[dict]:
+        return [dict(item) for item in self.issues.get(f"{owner}/{repo}", [])]
+
+    def create_issue(self, owner: str, repo: str, payload: dict) -> dict:
+        issue = {
+            "number": 11,
+            "title": payload["title"],
+            "body": payload["body"],
+            "state": "open",
+            "html_url": f"https://github.com/{owner}/{repo}/issues/11",
+        }
+        self.issues.setdefault(f"{owner}/{repo}", []).append(issue)
+        return {"ok": True, "number": 11, "html_url": issue["html_url"]}
+
+    def update_issue(self, owner: str, repo: str, issue_number: int, payload: dict) -> dict:
+        for issue in self.issues.get(f"{owner}/{repo}", []):
+            if issue["number"] == issue_number:
+                issue.update(payload)
+                issue["html_url"] = issue.get("html_url", f"https://github.com/{owner}/{repo}/issues/{issue_number}")
+                return {"ok": True, "number": issue_number, "html_url": issue["html_url"]}
+        return {"ok": False, "number": issue_number}
+
+
+def test_apply_github_writeback_reopens_and_detects_drift():
+    _, actions = build_campaign_bundle(
+        _report_data(),
+        campaign_type="security-review",
+        max_actions=5,
+        writeback_target="github",
+    )
+    previous_state = {
+        "actions": {
+            actions[0]["action_id"]: {
+                "action_id": actions[0]["action_id"],
+                "repo_full_name": actions[0]["repo_full_name"],
+                "campaign_type": actions[0]["campaign_type"],
+                "lifecycle_state": "resolved",
+                "snapshots": {
+                    "github-issue": {"external_key": "7"},
+                },
+            }
+        }
+    }
+
+    client = _FakeGitHubClient()
+    results, refs, drift, _closures = apply_github_writeback(
+        client,
+        actions,
+        previous_state=previous_state,
+        sync_mode="reconcile",
+    )
+
+    issue_result = next(item for item in results if item["target"] == "github-issue")
+    assert issue_result["status"] == "updated"
+    assert refs[actions[0]["action_id"]]["github_issue_url"].endswith("/7")
+    assert any(item["drift_state"] == "managed-issue-edited" for item in drift)
+
+
+def test_apply_github_writeback_closes_missing_actions_under_reconcile():
+    _, actions = build_campaign_bundle(
+        _report_data(),
+        campaign_type="promotion-push",
+        max_actions=5,
+        writeback_target="github",
+    )
+    previous_state = {
+        "actions": {
+            "stale-action": {
+                "action_id": "stale-action",
+                "repo_full_name": "user/RepoB",
+                "campaign_type": "security-review",
+                "snapshots": {
+                    "github-issue": {"external_key": "7"},
+                },
+            }
+        }
+    }
+    client = _FakeGitHubClient()
+
+    results, _refs, _drift, closures = apply_github_writeback(
+        client,
+        actions,
+        previous_state=previous_state,
+        sync_mode="reconcile",
+    )
+
+    stale_result = next(item for item in results if item.get("action_id") == "stale-action")
+    assert stale_result["status"] == "closed"
+    assert any(item["action_id"] == "stale-action" and item["lifecycle_state"] == "resolved" for item in closures)
+
+
+def test_build_action_runs_marks_stale_actions_in_append_only_mode():
+    _, actions = build_campaign_bundle(
+        _report_data(),
+        campaign_type="promotion-push",
+        max_actions=5,
+        writeback_target="github",
+    )
+    previous_state = {
+        "actions": {
+            "stale-action": {
+                "action_id": "stale-action",
+                "repo_full_name": "user/RepoB",
+                "campaign_type": "security-review",
+            }
+        }
+    }
+    results = [{"action_id": "stale-action", "repo_full_name": "user/RepoB", "target": "github-issue", "status": "stale"}]
+
+    action_runs = build_action_runs(
+        actions,
+        results,
+        "github",
+        True,
+        previous_state=previous_state,
+        sync_mode="append-only",
+    )
+
+    stale_run = next(item for item in action_runs if item["action_id"] == "stale-action")
+    assert stale_run["lifecycle_state"] == "deferred"
+    assert stale_run["reconciliation_outcome"] == "stale"
+
+
+def test_build_rollback_preview_reports_reversibility():
+    preview = build_rollback_preview(
+        [
+            {"repo_full_name": "user/RepoA", "target": "github-issue", "status": "updated", "before": {"state": "open"}},
+            {"repo_full_name": "user/RepoA", "target": "github-topics", "status": "updated", "before": []},
+        ]
+    )
+
+    assert preview["available"] is True
+    assert preview["item_count"] == 2

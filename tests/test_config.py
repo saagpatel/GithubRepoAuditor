@@ -2,7 +2,7 @@ import argparse
 
 import pytest
 
-from src.config import load_config, merge_config_with_args
+from src.config import inspect_config, load_config, merge_config_with_args, validate_config_data
 
 
 class TestLoadConfig:
@@ -27,6 +27,22 @@ class TestLoadConfig:
     def test_default_path_missing_returns_empty(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         assert load_config() == {}
+
+    def test_inspect_reports_malformed_yaml(self, tmp_path):
+        pytest.importorskip("yaml")
+        cfg = tmp_path / "broken.yaml"
+        cfg.write_text("html: [unterminated\n")
+        inspection = inspect_config(cfg)
+        assert inspection.exists is True
+        assert inspection.data == {}
+        assert inspection.errors
+
+    def test_inspect_reports_non_mapping_root(self, tmp_path):
+        pytest.importorskip("yaml")
+        cfg = tmp_path / "list.yaml"
+        cfg.write_text("- html\n- notion\n")
+        inspection = inspect_config(cfg)
+        assert inspection.errors == ["Config root must be a YAML mapping of option names to values."]
 
 
 class TestMergeConfig:
@@ -80,3 +96,27 @@ class TestMergeConfig:
         args = argparse.Namespace(html=False)
         merge_config_with_args(args, {"nonexistent_key": "value"})
         assert not hasattr(args, "nonexistent_key")
+
+    def test_config_overrides_known_string_defaults(self):
+        args = argparse.Namespace(excel_mode="template", preflight_mode="auto")
+        merge_config_with_args(args, {"excel_mode": "standard", "preflight_mode": "strict"})
+        assert args.excel_mode == "standard"
+        assert args.preflight_mode == "strict"
+
+
+class TestValidateConfigData:
+    def test_flags_unknown_key_as_warning(self):
+        issues = validate_config_data({"mystery_flag": True})
+        assert issues[0]["severity"] == "warning"
+
+    def test_flags_wrong_type_as_error(self):
+        issues = validate_config_data({"watch_interval": "fast"})
+        assert issues[0]["severity"] == "error"
+
+    def test_flags_bad_choice_as_error(self):
+        issues = validate_config_data({"excel_mode": "native"})
+        assert issues[0]["severity"] == "error"
+
+    def test_accepts_new_operator_choices(self):
+        issues = validate_config_data({"preflight_mode": "strict", "triage_view": "urgent"})
+        assert issues == []

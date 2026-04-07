@@ -1,0 +1,38 @@
+# GitHub Repo Auditor — operator example configuration
+# Copy to ./audit-config.yaml and adjust to your daily workflow.
+# CLI flags still override any value here.
+
+# username: saagpatel
+output_dir: output
+
+# Surfaces
+html: true
+badges: true
+review_pack: true
+portfolio_readme: true
+excel_mode: template
+
+# Daily workflow defaults
+incremental: true
+skip_forks: true
+skip_archived: true
+preflight_mode: auto
+portfolio_profile: default
+
+# Optional saved filters
+# collection: showcase
+# scoring_profile: shipping
+
+# Optional enrichment
+# scorecard: true
+# notion_sync: true
+# notion_registry: true
+
+# Optional operator work
+# campaign: security-review
+# campaign_sync_mode: reconcile
+# governance_view: all
+
+# Optional productization helpers
+# narrative: true
+# auto_archive: true

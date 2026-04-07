@@ -28,6 +28,8 @@ SCOPE_TO_KEYS = {
     "code-security": {"enable-code-security"},
 }
 
+REAPPROVAL_DRIFT_TYPES = {"approval-invalidated", "requires-reapproval"}
+
 
 def _action_id(repo_full_name: str, control_key: str) -> str:
     digest = hashlib.sha1(f"{repo_full_name}|{control_key}".encode("utf-8")).hexdigest()[:12]
@@ -68,6 +70,132 @@ def _status_from_analysis(analysis: dict, key: str) -> str | None:
     if isinstance(value, dict):
         return value.get("status")
     return None
+
+
+def _approval_age_days(approved_at: str | None) -> int | None:
+    if not approved_at:
+        return None
+    try:
+        dt = datetime.fromisoformat(approved_at.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return max(0, (datetime.now(timezone.utc) - dt).days)
+
+
+def _normalize_preview_actions(report_data: dict) -> list[dict]:
+    preview = report_data.get("governance_preview", {}) if isinstance(report_data.get("governance_preview"), dict) else {}
+    actions = preview.get("actions", []) or []
+    if actions:
+        return [dict(item) for item in actions]
+
+    normalized: list[dict] = []
+    for item in report_data.get("security_governance_preview", []) or []:
+        normalized.append(
+            {
+                "action_id": item.get("action_id", f"preview:{item.get('repo', '')}:{item.get('title', '')}"),
+                "repo_full_name": item.get("repo_full_name", item.get("repo", "")),
+                "repo": item.get("repo", ""),
+                "title": item.get("title", ""),
+                "priority": item.get("priority", "medium"),
+                "expected_posture_lift": item.get("expected_posture_lift", 0.0),
+                "source": item.get("source", "merged"),
+                "why": item.get("why", ""),
+                "applyable": bool(item.get("applyable", False)),
+                "preview_only": bool(item.get("preview_only", True)),
+                "prerequisites": item.get("prerequisites", []),
+                "archived": bool(item.get("archived", False)),
+            }
+        )
+    return normalized
+
+
+def build_governance_summary(report_data: dict) -> dict:
+    preview = report_data.get("governance_preview", {}) if isinstance(report_data.get("governance_preview"), dict) else {}
+    approval = report_data.get("governance_approval", {}) if isinstance(report_data.get("governance_approval"), dict) else {}
+    results = (report_data.get("governance_results", {}) or {}).get("results", []) if isinstance(report_data.get("governance_results"), dict) else []
+    drift = report_data.get("governance_drift", []) if isinstance(report_data.get("governance_drift"), list) else []
+    preview_actions = _normalize_preview_actions(report_data)
+
+    preview_fingerprint = preview.get("fingerprint")
+    approval_fingerprint = approval.get("fingerprint")
+    fingerprint_mismatch = bool(approval and preview_fingerprint and approval_fingerprint and preview_fingerprint != approval_fingerprint)
+    reapproval_drift = [item for item in drift if item.get("drift_type") in REAPPROVAL_DRIFT_TYPES]
+    needs_reapproval = bool(reapproval_drift or fingerprint_mismatch)
+    approval_age_days = _approval_age_days(approval.get("approved_at"))
+
+    applyable_count = preview.get("applyable_count")
+    if applyable_count is None:
+        applyable_count = sum(1 for item in preview_actions if item.get("applyable"))
+    applied_count = sum(1 for item in results if item.get("status") == "applied")
+    drifted_result_count = sum(1 for item in results if item.get("status") == "drifted")
+    failed_count = sum(1 for item in results if item.get("status") == "failed")
+    rollback_available_count = sum(1 for item in results if item.get("rollback_available"))
+    blocked_count = len(reapproval_drift) + (1 if fingerprint_mismatch and not reapproval_drift else 0)
+    drift_count = len(drift)
+
+    def _action_state(action: dict) -> str:
+        if action.get("preview_only") or action.get("archived"):
+            return "preview-only"
+        if needs_reapproval and action.get("applyable"):
+            return "needs-reapproval"
+        if approval and not fingerprint_mismatch and action.get("applyable"):
+            return "approved"
+        if action.get("applyable"):
+            return "ready"
+        if action.get("prerequisites"):
+            return "blocked"
+        return "tracked"
+
+    summarized_actions = []
+    for item in preview_actions:
+        summarized_actions.append(
+            {
+                **item,
+                "operator_state": _action_state(item),
+            }
+        )
+
+    if needs_reapproval:
+        status = "blocked"
+        headline = "Governed controls need re-approval before the next manual apply step."
+    elif drift_count or drifted_result_count:
+        status = "drifted"
+        headline = "Governed control drift needs operator review."
+    elif applied_count:
+        status = "applied"
+        headline = "Governed controls were applied and are now being tracked."
+    elif approval and applyable_count:
+        status = "approved"
+        headline = "Governed controls are approved and ready when you are."
+    elif applyable_count:
+        status = "ready"
+        headline = "Governed controls are ready for manual review."
+    elif summarized_actions:
+        status = "preview"
+        headline = "Governed controls are being tracked in preview."
+    else:
+        status = "idle"
+        headline = "No governed controls are currently surfaced."
+
+    return {
+        "status": status,
+        "headline": headline,
+        "selected_view": preview.get("selected_view", "all"),
+        "approval_status": approval.get("status", "not-approved" if not approval else "approved"),
+        "approval_age_days": approval_age_days,
+        "needs_reapproval": needs_reapproval,
+        "blocked_count": blocked_count,
+        "drift_count": drift_count,
+        "applyable_count": applyable_count,
+        "applied_count": applied_count,
+        "failed_count": failed_count,
+        "rollback_available_count": rollback_available_count,
+        "fingerprint_mismatch": fingerprint_mismatch,
+        "supported_controls": sorted(SUPPORTED_CONTROL_KEYS),
+        "top_actions": summarized_actions[:12],
+    }
 
 
 def build_governance_actions(report_data: dict, source_run: dict, *, scope: str = "all") -> dict:

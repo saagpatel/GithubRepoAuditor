@@ -111,12 +111,16 @@ class TestAuditReport:
         assert report.scoring_profile == "custom"
         assert report.run_mode == "targeted"
         assert report.portfolio_baseline_size == 7
-        assert report.schema_version == "3.2"
+        assert report.schema_version == "3.6"
         assert "ship_readiness" in report.lenses
         assert isinstance(report.security_governance_preview, list)
         assert "showcase" in report.collections
         assert "default" in report.profiles
         assert report.campaign_summary == {}
+        assert report.managed_state_drift == []
+        assert report.governance_summary == {}
+        assert report.operator_summary == {}
+        assert report.review_targets == []
 
     def test_to_dict_includes_reconciliation(self, sample_metadata):
         audit = RepoAudit(
@@ -139,10 +143,16 @@ class TestAuditReport:
         assert d["scoring_profile"] == "profile-a"
         assert d["run_mode"] == "incremental"
         assert d["portfolio_baseline_size"] == 3
-        assert d["schema_version"] == "3.2"
+        assert d["schema_version"] == "3.6"
         assert "lenses" in d
         assert "security_governance_preview" in d
         assert "collections" in d
         assert "scenario_summary" in d
         assert "campaign_summary" in d
         assert "writeback_results" in d
+        assert "campaign_history" in d
+        assert "governance_summary" in d
+        assert "preflight_summary" in d
+        assert "review_summary" in d
+        assert "operator_summary" in d
+        assert "operator_queue" in d

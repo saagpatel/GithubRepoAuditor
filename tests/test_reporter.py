@@ -5,7 +5,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from src.models import AnalyzerResult, AuditReport, RepoAudit, RepoMetadata
-from src.reporter import _sanitize_for_json, write_json_report, write_markdown_report, write_pcc_export
+from src.reporter import (
+    _sanitize_for_json,
+    write_json_report,
+    write_markdown_report,
+    write_pcc_export,
+    write_raw_metadata,
+)
 
 
 def _make_report() -> AuditReport:
@@ -53,7 +59,7 @@ class TestJsonReport:
         assert data["repos_audited"] == 1
         assert "audits" in data
         assert data["audits"][0]["interest_score"] == 0.45
-        assert data["schema_version"] == "3.2"
+        assert data["schema_version"] == "3.6"
         assert "lenses" in data
         assert "security_governance_preview" in data
         assert "campaign_summary" in data
@@ -126,11 +132,97 @@ class TestMarkdownReport:
                 }
             ],
         }
+        report.managed_state_drift = [
+            {
+                "repo_full_name": "user/test-repo",
+                "target": "github-issue",
+                "drift_state": "managed-issue-edited",
+            }
+        ]
+        report.rollback_preview = {"available": True, "item_count": 1, "fully_reversible_count": 1}
         path = write_markdown_report(report, tmp_path)
         content = path.read_text()
         assert "Campaign Summary" in content
         assert "Next Actions" in content
         assert "Writeback Results" in content
+        assert "Managed State Drift" in content
+        assert "Rollback Preview" in content
+
+    def test_includes_preflight_diagnostics_when_present(self, tmp_path):
+        report = _make_report()
+        report.preflight_summary = {
+            "status": "warning",
+            "blocking_errors": 0,
+            "warnings": 2,
+            "checks": [
+                {"category": "github-auth", "summary": "GitHub token is not configured."},
+            ],
+        }
+        path = write_markdown_report(report, tmp_path)
+        content = path.read_text()
+        assert "Preflight Diagnostics" in content
+        assert "GitHub token is not configured." in content
+
+    def test_includes_operator_control_center_when_present(self, tmp_path):
+        report = _make_report()
+        report.operator_summary = {
+            "headline": "A blocked setup item needs attention.",
+            "counts": {"blocked": 1, "urgent": 1, "ready": 0, "deferred": 0},
+        }
+        report.operator_queue = [
+            {
+                "lane": "blocked",
+                "repo": "",
+                "title": "Missing template asset",
+                "summary": "Template mode cannot load the workbook template.",
+                "recommended_action": "Restore the workbook template before exporting.",
+            }
+        ]
+        path = write_markdown_report(report, tmp_path)
+        content = path.read_text()
+        assert "Operator Control Center" in content
+        assert "Missing template asset" in content
+
+    def test_includes_governance_operator_summary_when_present(self, tmp_path):
+        report = _make_report()
+        report.governance_summary = {
+            "headline": "Governed controls need re-approval before the next manual apply step.",
+            "status": "blocked",
+            "needs_reapproval": True,
+            "drift_count": 1,
+            "applyable_count": 1,
+            "applied_count": 0,
+            "rollback_available_count": 1,
+            "approval_age_days": 3,
+            "top_actions": [
+                {
+                    "repo": "test-repo",
+                    "title": "Enable CodeQL default setup",
+                    "operator_state": "needs-reapproval",
+                }
+            ],
+        }
+        path = write_markdown_report(report, tmp_path)
+        content = path.read_text()
+        assert "Governance Operator State" in content
+        assert "Needs Re-Approval: yes" in content
+        assert "Enable CodeQL default setup [needs-reapproval]" in content
+
+
+class TestRawMetadata:
+    def test_writes_preflight_summary_when_present(self, tmp_path):
+        report = _make_report()
+        report.preflight_summary = {"status": "warning", "warnings": 1, "blocking_errors": 0}
+        path = write_raw_metadata(report, tmp_path)
+        data = json.loads(path.read_text())
+        assert data["preflight_summary"]["status"] == "warning"
+
+    def test_writes_governance_summary_when_present(self, tmp_path):
+        report = _make_report()
+        report.governance_summary = {"status": "ready", "headline": "Governed controls are ready for manual review."}
+        path = write_raw_metadata(report, tmp_path)
+        data = json.loads(path.read_text())
+        assert data["governance_summary"]["status"] == "ready"
 
 
 class TestPccExport:

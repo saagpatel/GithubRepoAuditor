@@ -288,18 +288,20 @@ def sync_campaign_actions(
     *,
     config_dir: Path = Path("config"),
     apply: bool = False,
-) -> tuple[list[dict], dict[str, dict]]:
+    previous_state: dict | None = None,
+    sync_mode: str = "reconcile",
+) -> tuple[list[dict], dict[str, dict], list[dict]]:
     """Create or update managed Notion action and campaign records."""
     if not apply:
-        return [], {}
+        return [], {}, []
 
     token = get_notion_token()
     if not token:
-        return ([{"target": "notion-actions", "status": "skipped", "reason": "no token"}], {})
+        return ([{"target": "notion-actions", "status": "skipped", "reason": "no token"}], {}, [])
 
     config = _load_notion_config(config_dir)
     if not config:
-        return ([{"target": "notion-actions", "status": "skipped", "reason": "no config"}], {})
+        return ([{"target": "notion-actions", "status": "skipped", "reason": "no config"}], {}, [])
 
     action_collection_id, action_is_data_source = _resolve_collection_config(config, "action_requests")
     campaign_collection_id, campaign_is_data_source = _resolve_collection_config(config, "campaign_runs")
@@ -309,6 +311,8 @@ def sync_campaign_actions(
     version = config.get("notion_version", DEFAULT_NOTION_VERSION)
     results: list[dict] = []
     external_refs: dict[str, dict] = {}
+    managed_state_drift: list[dict] = []
+    previous_actions = (previous_state or {}).get("actions", {})
     project_map = {}
     try:
         from src.notion_export import _load_project_map
@@ -327,10 +331,11 @@ def sync_campaign_actions(
                 token=token,
                 version=version,
             )
+            desired_status = "Open"
             properties = {
                 "Name": _title_value(action["title"]),
                 "Source Type": _select_value("Audit"),
-                "Status": _select_value("Planned" if apply else "Draft"),
+                "Status": _select_value(desired_status if apply else "Draft"),
                 "Action ID": _rich_text_value(action["action_id"]),
                 "Campaign": _select_value(action["campaign_type"]),
             }
@@ -342,8 +347,17 @@ def sync_campaign_actions(
 
             if existing:
                 page_id = existing.get("id")
+                previous_status = (
+                    existing.get("properties", {})
+                    .get("Status", {})
+                    .get("select", {})
+                    .get("name")
+                )
                 response = _notion_request("PATCH", f"/pages/{page_id}", token, version, body)
-                status = "updated" if response and response.status_code == 200 else "failed"
+                if response and response.status_code == 200:
+                    status = "reopened" if previous_status in {"Resolved", "Cancelled"} else ("unchanged" if previous_status == desired_status else "updated")
+                else:
+                    status = "failed"
                 url = existing.get("url")
             else:
                 body["parent"] = _notion_parent_for_collection(action_collection_id, use_data_source=action_is_data_source)
@@ -358,13 +372,85 @@ def sync_campaign_actions(
                     "target": "notion-action",
                     "action_id": action["action_id"],
                     "repo_full_name": action["repo_full_name"],
+                    "campaign_type": action["campaign_type"],
                     "status": status,
+                    "page_id": page_id,
                     "url": url,
+                    "expected": {"status": desired_status},
                 }
             )
             if url:
-                external_refs[action["action_id"]] = {"notion_action_url": url}
+                external_refs[action["action_id"]] = {
+                    "notion_action_url": url,
+                    "notion_action_page_id": page_id,
+                }
             time.sleep(REQUEST_DELAY)
+
+        current_action_ids = {action["action_id"] for action in actions}
+        for action_id, previous in previous_actions.items():
+            if action_id in current_action_ids:
+                continue
+            existing = _query_page_by_rich_text_id(
+                action_collection_id,
+                use_data_source=action_is_data_source,
+                property_name="Action ID",
+                property_value=action_id,
+                token=token,
+                version=version,
+            )
+            if sync_mode == "append-only":
+                results.append(
+                    {
+                        "target": "notion-action",
+                        "action_id": action_id,
+                        "repo_full_name": previous.get("repo_full_name", ""),
+                        "campaign_type": previous.get("campaign_type", ""),
+                        "status": "stale",
+                        "reason": "append-only",
+                    }
+                )
+                continue
+            if not existing:
+                managed_state_drift.append(
+                    {
+                        "action_id": action_id,
+                        "repo_full_name": previous.get("repo_full_name", ""),
+                        "campaign_type": previous.get("campaign_type", ""),
+                        "target": "notion-action",
+                        "drift_state": "managed-notion-action-missing",
+                    }
+                )
+                results.append(
+                    {
+                        "target": "notion-action",
+                        "action_id": action_id,
+                        "repo_full_name": previous.get("repo_full_name", ""),
+                        "campaign_type": previous.get("campaign_type", ""),
+                        "status": "drifted",
+                        "drift_state": "managed-notion-action-missing",
+                    }
+                )
+                continue
+            page_id = existing.get("id")
+            response = _notion_request(
+                "PATCH",
+                f"/pages/{page_id}",
+                token,
+                version,
+                {"properties": {"Status": _select_value("Resolved")}},
+            )
+            results.append(
+                {
+                    "target": "notion-action",
+                    "action_id": action_id,
+                    "repo_full_name": previous.get("repo_full_name", ""),
+                    "campaign_type": previous.get("campaign_type", ""),
+                    "status": "closed" if response and response.status_code == 200 else "failed",
+                    "page_id": page_id,
+                    "url": existing.get("url"),
+                    "expected": {"status": "Resolved"},
+                }
+            )
     else:
         results.append({"target": "notion-action", "status": "skipped", "reason": "no action collection config"})
 
@@ -391,7 +477,7 @@ def sync_campaign_actions(
     else:
         results.append({"target": "notion-campaign", "status": "skipped", "reason": "no campaign collection config"})
 
-    return results, external_refs
+    return results, external_refs, managed_state_drift
 
 
 # ── Recommendation Run ──────────────────────────────────────────────
@@ -538,6 +624,9 @@ def create_audit_action_requests(
 
 # ── Weekly Review Patch ─────────────────────────────────────────────
 
+WEEKLY_REVIEW_BEGIN_MARKER = "[GHRA-BEGIN-AUDIT-HIGHLIGHTS]"
+WEEKLY_REVIEW_END_MARKER = "[GHRA-END-AUDIT-HIGHLIGHTS]"
+
 
 def _render_audit_highlights(
     report_data: dict,
@@ -578,7 +667,69 @@ def _render_audit_highlights(
             lines.append(f"  - {w['name']} needs {w['gap']:.3f} to reach {w['next_tier']}")
         lines.append("")
 
+    operator_summary = report_data.get("operator_summary") or {}
+    operator_queue = report_data.get("operator_queue") or []
+    if operator_summary or operator_queue:
+        counts = operator_summary.get("counts", {})
+        lines.append("**Operator Control Center:**")
+        lines.append(
+            "  "
+            f"Blocked {counts.get('blocked', 0)} | "
+            f"Urgent {counts.get('urgent', 0)} | "
+            f"Ready {counts.get('ready', 0)} | "
+            f"Deferred {counts.get('deferred', 0)}"
+        )
+        lines.append(f"  Headline: {operator_summary.get('headline', 'No operator triage items are currently surfaced.')}")
+        for item in operator_queue[:3]:
+            repo = f"{item.get('repo')}: " if item.get("repo") else ""
+            lines.append(f"  - {repo}{item.get('title', 'Triage item')} -> {item.get('recommended_action', 'Review the latest state.')}")
+        lines.append("")
+
     return "\n".join(lines)
+
+
+def _block_plain_text(block: dict) -> str:
+    block_type = block.get("type", "")
+    content = block.get(block_type, {}) if block_type else {}
+    parts: list[str] = []
+    for item in content.get("rich_text", []) or []:
+        text = item.get("plain_text") or item.get("text", {}).get("content", "")
+        if text:
+            parts.append(text)
+    return "".join(parts)
+
+
+def _managed_section_block_ids(blocks: list[dict]) -> list[str]:
+    start_index = None
+    end_index = None
+    for index, block in enumerate(blocks):
+        text = _block_plain_text(block)
+        if text == WEEKLY_REVIEW_BEGIN_MARKER:
+            start_index = index
+        if text == WEEKLY_REVIEW_END_MARKER and start_index is not None:
+            end_index = index
+            break
+    if start_index is None:
+        return []
+    block_slice = blocks[start_index : (end_index + 1 if end_index is not None else len(blocks))]
+    return [block.get("id", "") for block in block_slice if block.get("id")]
+
+
+def _paragraph_block(text: str) -> dict:
+    return {
+        "object": "block",
+        "type": "paragraph",
+        "paragraph": {
+            "rich_text": [{"type": "text", "text": {"content": text}}]
+        },
+    }
+
+
+def _build_weekly_review_section_blocks(highlights: str) -> list[dict]:
+    blocks = [_paragraph_block(WEEKLY_REVIEW_BEGIN_MARKER)]
+    blocks.extend(_paragraph_block(chunk) for chunk in _chunk_text(highlights, 2000))
+    blocks.append(_paragraph_block(WEEKLY_REVIEW_END_MARKER))
+    return blocks
 
 
 def patch_weekly_review(
@@ -588,7 +739,7 @@ def patch_weekly_review(
     token: str,
     config: dict,
 ) -> bool:
-    """Append audit highlights to the most recent weekly review page."""
+    """Replace the managed audit-highlights section on the most recent weekly review page."""
     db_id = config.get("weekly_reviews_db_id", "")
     if not db_id:
         print("  weekly_reviews_db_id not set, skipping.", file=sys.stderr)
@@ -613,25 +764,21 @@ def patch_weekly_review(
 
     page_id = results[0]["id"]
     highlights = _render_audit_highlights(report_data, diff_data, quick_wins)
+    existing_blocks_resp = _notion_request("GET", f"/blocks/{page_id}/children", token, version)
+    if existing_blocks_resp and existing_blocks_resp.status_code == 200:
+        existing_blocks = existing_blocks_resp.json().get("results", [])
+        for block_id in _managed_section_block_ids(existing_blocks):
+            _notion_request("PATCH", f"/blocks/{block_id}", token, version, {"archived": True})
+            time.sleep(REQUEST_DELAY)
 
-    # Append as a new block to the page
-    children = [
-        {
-            "object": "block",
-            "type": "paragraph",
-            "paragraph": {
-                "rich_text": [{"type": "text", "text": {"content": chunk}}]
-            },
-        }
-        for chunk in _chunk_text(highlights, 2000)
-    ]
+    children = _build_weekly_review_section_blocks(highlights)
 
     resp = _notion_request(
         "PATCH", f"/blocks/{page_id}/children", token, version,
         {"children": children},
     )
     if resp and resp.status_code == 200:
-        print(f"  Weekly review patched with audit highlights.", file=sys.stderr)
+        print("  Weekly review updated with managed audit highlights.", file=sys.stderr)
         return True
     if resp:
         print(f"  Failed to patch weekly review: {resp.status_code}", file=sys.stderr)

@@ -1,12 +1,23 @@
-.PHONY: install install-dev test lint format type-check run clean
+.PHONY: install install-dev doctor audit control-center test lint format type-check run clean
 
 PYTHON := python3
+USERNAME ?= saagpatel
+ARGS ?=
 
 install:
-	$(PYTHON) -m pip install -r requirements.txt
+	$(PYTHON) -m pip install -e ".[config]"
 
 install-dev:
-	$(PYTHON) -m pip install -r requirements.txt pytest ruff mypy
+	$(PYTHON) -m pip install -e ".[dev,config]"
+
+doctor:
+	audit $(USERNAME) --doctor $(ARGS)
+
+audit:
+	audit $(USERNAME) $(ARGS)
+
+control-center:
+	audit $(USERNAME) --control-center $(ARGS)
 
 test:
 	$(PYTHON) -m pytest tests/ -v
@@ -21,7 +32,7 @@ type-check:
 	mypy src/ --ignore-missing-imports
 
 run:
-	$(PYTHON) -m src.cli --help
+	audit --help
 
 clean:
 	rm -rf .pytest_cache __pycache__ dist build *.egg-info

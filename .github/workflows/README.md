@@ -17,7 +17,7 @@ Runs every Sunday at 06:00 UTC, or manually via `workflow_dispatch`.
 
 **Steps:**
 1. Installs the package
-2. Runs `python -m src <username> --incremental --html --badges --diff`
+2. Runs `audit <username> --incremental --html --badges --diff`
 3. Uploads the `output/` directory as a build artifact (retained 90 days)
 4. On scheduled runs only: commits the updated output back to the repo
 

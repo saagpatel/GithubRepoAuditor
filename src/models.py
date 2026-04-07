@@ -144,7 +144,7 @@ class AuditReport:
     scoring_profile: str = "default"
     run_mode: str = "full"
     portfolio_baseline_size: int = 0
-    schema_version: str = "3.2"
+    schema_version: str = "3.6"
     lenses: dict[str, dict] = field(default_factory=dict)
     hotspots: list[dict] = field(default_factory=list)
     security_posture: dict = field(default_factory=dict)
@@ -158,6 +158,24 @@ class AuditReport:
     writeback_results: dict = field(default_factory=dict)
     action_runs: list[dict] = field(default_factory=list)
     external_refs: dict[str, dict] = field(default_factory=dict)
+    managed_state_drift: list[dict] = field(default_factory=list)
+    rollback_preview: dict = field(default_factory=dict)
+    campaign_history: list[dict] = field(default_factory=list)
+    governance_preview: dict = field(default_factory=dict)
+    governance_approval: dict = field(default_factory=dict)
+    governance_results: dict = field(default_factory=dict)
+    governance_history: list[dict] = field(default_factory=list)
+    governance_drift: list[dict] = field(default_factory=list)
+    governance_summary: dict = field(default_factory=dict)
+    preflight_summary: dict = field(default_factory=dict)
+    review_summary: dict = field(default_factory=dict)
+    review_alerts: list[dict] = field(default_factory=list)
+    material_changes: list[dict] = field(default_factory=list)
+    review_targets: list[dict] = field(default_factory=list)
+    review_history: list[dict] = field(default_factory=list)
+    watch_state: dict = field(default_factory=dict)
+    operator_summary: dict = field(default_factory=dict)
+    operator_queue: list[dict] = field(default_factory=list)
     reconciliation: object | None = None  # RegistryReconciliation when --registry used
 
     @classmethod
@@ -294,6 +312,24 @@ class AuditReport:
             writeback_results={},
             action_runs=[],
             external_refs={},
+            managed_state_drift=[],
+            rollback_preview={},
+            campaign_history=[],
+            governance_preview={},
+            governance_approval={},
+            governance_results={},
+            governance_history=[],
+            governance_drift=[],
+            governance_summary={},
+            preflight_summary={},
+            review_summary={},
+            review_alerts=[],
+            material_changes=[],
+            review_targets=[],
+            review_history=[],
+            watch_state={},
+            operator_summary={},
+            operator_queue=[],
         )
 
     def to_dict(self) -> dict:
@@ -322,6 +358,24 @@ class AuditReport:
             "writeback_results": self.writeback_results,
             "action_runs": self.action_runs,
             "external_refs": self.external_refs,
+            "managed_state_drift": self.managed_state_drift,
+            "rollback_preview": self.rollback_preview,
+            "campaign_history": self.campaign_history,
+            "governance_preview": self.governance_preview,
+            "governance_approval": self.governance_approval,
+            "governance_results": self.governance_results,
+            "governance_history": self.governance_history,
+            "governance_drift": self.governance_drift,
+            "governance_summary": self.governance_summary,
+            "preflight_summary": self.preflight_summary,
+            "review_summary": self.review_summary,
+            "review_alerts": self.review_alerts,
+            "material_changes": self.material_changes,
+            "review_targets": self.review_targets,
+            "review_history": self.review_history,
+            "watch_state": self.watch_state,
+            "operator_summary": self.operator_summary,
+            "operator_queue": self.operator_queue,
             "tech_stack": self.tech_stack,
             "best_work": self.best_work,
             "tier_distribution": self.tier_distribution,

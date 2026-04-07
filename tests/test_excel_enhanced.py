@@ -227,6 +227,25 @@ def _make_report(audits=None) -> dict:
                 "title": "Security posture needs attention",
             }
         ],
+        "operator_summary": {
+            "headline": "There is live drift or high-severity change that needs attention now.",
+            "counts": {"blocked": 0, "urgent": 2, "ready": 1, "deferred": 0},
+        },
+        "operator_queue": [
+            {
+                "item_id": "review-target:RepoC",
+                "kind": "review",
+                "lane": "urgent",
+                "priority": 83,
+                "repo": "RepoC",
+                "title": "Security posture needs attention",
+                "summary": "Governance approval is ready.",
+                "recommended_action": "Preview governance controls",
+                "source_run_id": "user:2026-03-29T10:00:00+00:00",
+                "age_days": 0,
+                "links": [],
+            }
+        ],
         "governance_preview": {"applyable_count": 1},
         "governance_drift": [{"repo": "RepoC", "control": "secret_scanning"}],
     }

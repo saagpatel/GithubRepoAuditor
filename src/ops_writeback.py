@@ -449,6 +449,8 @@ def build_writeback_preview(
     *,
     writeback_target: str | None,
     apply: bool,
+    previous_state: dict | None = None,
+    sync_mode: str = "reconcile",
 ) -> dict:
     grouped = group_actions_by_repo(actions)
     preview_repos = []
@@ -461,12 +463,21 @@ def build_writeback_preview(
             "notion_action_count": len(repo_actions) if writeback_target in {"notion", "all"} else 0,
             "action_ids": [action["action_id"] for action in repo_actions],
         })
+    current_action_ids = {action["action_id"] for action in actions}
+    stale_actions = [
+        item
+        for item in (previous_state or {}).get("actions", {}).values()
+        if item.get("action_id") not in current_action_ids
+    ]
     return {
         "campaign_type": campaign_summary["campaign_type"],
         "target": writeback_target or "preview-only",
         "mode": "apply" if apply else "preview",
+        "sync_mode": sync_mode,
         "action_count": len(actions),
         "repos": preview_repos,
+        "stale_action_count": len(stale_actions),
+        "stale_repos": sorted({item.get("repo_full_name", "") for item in stale_actions if item.get("repo_full_name")}),
     }
 
 
@@ -480,88 +491,316 @@ def _issue_lookup(issues: list[dict], campaign_type: str, repo_name: str) -> dic
     return None
 
 
-def apply_github_writeback(client, actions: list[dict]) -> tuple[list[dict], dict[str, dict]]:
+def _managed_property_values(action: dict) -> dict[str, str]:
+    return {
+        "portfolio_call": action["campaign_type"],
+        "showcase": "true" if "showcase" in action.get("collections", []) else "false",
+        "archive_candidate": "true" if "archive-soon" in action.get("collections", []) else "false",
+        "security_tier": "high" if action["campaign_type"] == "security-review" else "normal",
+        "next_move": _next_move_slug(action),
+        "primary_lens": action["primary_lens"],
+    }
+
+
+def _managed_issue_drift(issue: dict | None, expected_title: str, expected_body: str) -> list[str]:
+    if not issue:
+        return []
+    changed = []
+    if issue.get("title") != expected_title:
+        changed.append("title")
+    if (issue.get("body") or "") != expected_body:
+        changed.append("body")
+    return changed
+
+
+def _parse_external_key(value: str | None) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _find_issue_by_number(issues: list[dict], number: int | None) -> dict | None:
+    if number is None:
+        return None
+    for issue in issues:
+        if issue.get("number") == number:
+            return issue
+    return None
+
+
+def _result_for_repo(sample: dict, action_ids: list[str], *, target: str, before: object, after: object, expected: dict | None = None) -> dict:
+    return {
+        "action_ids": action_ids,
+        "action_id": sample["action_id"] if len(action_ids) == 1 else None,
+        "repo_full_name": sample["repo_full_name"],
+        "target": target,
+        "before": before,
+        "after": after,
+        "expected": expected or {},
+    }
+
+
+def apply_github_writeback(
+    client,
+    actions: list[dict],
+    *,
+    previous_state: dict | None = None,
+    sync_mode: str = "reconcile",
+) -> tuple[list[dict], dict[str, dict], list[dict], list[dict]]:
     results: list[dict] = []
     external_refs: dict[str, dict] = {}
+    managed_state_drift: list[dict] = []
+    closure_events: list[dict] = []
     grouped = group_actions_by_repo(actions)
+    previous_actions = (previous_state or {}).get("actions", {})
+    current_action_ids = {action["action_id"] for action in actions}
 
     for repo_full_name, repo_actions in grouped.items():
         owner, repo = repo_full_name.split("/", 1)
         sample = repo_actions[0]
+        action_ids = [action["action_id"] for action in repo_actions]
         desired_topics = desired_managed_topics(sample)
         current_topics_info = client.get_repo_topics(owner, repo)
         existing_topics = current_topics_info.get("topics", []) if current_topics_info.get("available") else sample.get("metadata", {}).get("topics", [])
         preserved_topics = [topic for topic in existing_topics if not topic.startswith(MANAGED_TOPIC_PREFIX)]
-        topic_result = {
-            "repo_full_name": repo_full_name,
-            "target": "github-topics",
-            "status": "skipped",
-            "before": existing_topics,
-            "after": preserved_topics + desired_topics,
-        }
+        topic_result = _result_for_repo(
+            sample,
+            action_ids,
+            target="github-topics",
+            before=existing_topics,
+            after=preserved_topics + desired_topics,
+            expected={"managed_topics": desired_topics},
+        )
+        observed_managed_topics = sorted(topic for topic in existing_topics if topic.startswith(MANAGED_TOPIC_PREFIX))
+        if current_topics_info.get("available") and observed_managed_topics != sorted(desired_topics):
+            managed_state_drift.append(
+                {
+                    "action_id": sample["action_id"],
+                    "repo_full_name": repo_full_name,
+                    "campaign_type": sample["campaign_type"],
+                    "target": "github-topics",
+                    "drift_state": "managed-topics-drift",
+                    "expected": desired_topics,
+                    "observed": observed_managed_topics,
+                }
+            )
         if current_topics_info.get("available"):
-            update = client.replace_repo_topics(owner, repo, preserved_topics + desired_topics)
-            topic_result["status"] = "updated" if update.get("ok") else "failed"
-            topic_result["details"] = update
+            if sorted(existing_topics) == sorted(preserved_topics + desired_topics):
+                topic_result["status"] = "unchanged"
+            else:
+                update = client.replace_repo_topics(owner, repo, preserved_topics + desired_topics)
+                topic_result["status"] = "updated" if update.get("ok") else "failed"
+                topic_result["after"] = update.get("topics", preserved_topics + desired_topics)
+                topic_result["details"] = update
+        else:
+            topic_result["status"] = "skipped"
+            topic_result["reason"] = "topics-unavailable"
         results.append(topic_result)
 
-        property_values = {
-            "portfolio_call": sample["campaign_type"],
-            "showcase": "true" if "showcase" in sample.get("collections", []) else "false",
-            "archive_candidate": "true" if "archive-soon" in sample.get("collections", []) else "false",
-            "security_tier": "high" if sample["campaign_type"] == "security-review" else "normal",
-            "next_move": _next_move_slug(sample),
-            "primary_lens": sample["primary_lens"],
+        property_values = _managed_property_values(sample)
+        before_properties = client.get_repo_custom_property_values(owner, repo)
+        current_property_values = before_properties.get("values", {})
+        observed_managed_properties = {
+            key: current_property_values.get(key)
+            for key in property_values
         }
-        property_result = client.update_repo_custom_property_values(owner, repo, property_values)
-        property_result.update({"repo_full_name": repo_full_name, "target": "github-custom-properties"})
+        if before_properties.get("available") and observed_managed_properties != property_values:
+            managed_state_drift.append(
+                {
+                    "action_id": sample["action_id"],
+                    "repo_full_name": repo_full_name,
+                    "campaign_type": sample["campaign_type"],
+                    "target": "github-custom-properties",
+                    "drift_state": "managed-custom-properties-drift",
+                    "expected": property_values,
+                    "observed": observed_managed_properties,
+                }
+            )
+        property_result = _result_for_repo(
+            sample,
+            action_ids,
+            target="github-custom-properties",
+            before=current_property_values,
+            after=property_values,
+            expected=property_values,
+        )
+        if before_properties.get("available") and observed_managed_properties == property_values:
+            property_result["status"] = "unchanged"
+        else:
+            update = client.update_repo_custom_property_values(owner, repo, property_values)
+            property_result["status"] = update.get("status", "updated" if update.get("ok") else "failed")
+            property_result["before"] = update.get("before", current_property_values)
+            property_result["after"] = update.get("after", current_property_values)
+            property_result["details"] = update
         results.append(property_result)
 
         issues = client.list_repo_issues(owner, repo, state="all")
-        existing_issue = _issue_lookup(issues, sample["campaign_type"], sample["repo"])
+        previous_issue_number = None
+        for previous in previous_actions.values():
+            if previous.get("repo_full_name") != repo_full_name:
+                continue
+            snapshot = previous.get("snapshots", {}).get("github-issue", {})
+            previous_issue_number = _parse_external_key(snapshot.get("external_key"))
+            if previous_issue_number is not None:
+                break
+        existing_issue = _find_issue_by_number(issues, previous_issue_number) or _issue_lookup(issues, sample["campaign_type"], sample["repo"])
         issue_body = managed_issue_body(sample["repo"], sample["campaign_type"], repo_actions)
-        if existing_issue:
-            updated = client.update_issue(
-                owner,
-                repo,
-                existing_issue["number"],
+        issue_title = managed_issue_title(sample["campaign_type"])
+        drift_fields = _managed_issue_drift(existing_issue, issue_title, issue_body)
+        if existing_issue is None and any(previous.get("repo_full_name") == repo_full_name for previous in previous_actions.values()):
+            managed_state_drift.append(
                 {
-                    "title": managed_issue_title(sample["campaign_type"]),
-                    "body": issue_body,
-                    "state": "open",
-                },
+                    "action_id": sample["action_id"],
+                    "repo_full_name": repo_full_name,
+                    "campaign_type": sample["campaign_type"],
+                    "target": "github-issue",
+                    "drift_state": "managed-issue-missing",
+                }
             )
-            issue_result = {
-                "repo_full_name": repo_full_name,
-                "target": "github-issue",
-                "status": "updated" if updated.get("ok") else "failed",
-                "number": existing_issue["number"],
-                "url": updated.get("html_url", existing_issue.get("html_url")),
-            }
+        elif drift_fields:
+            managed_state_drift.append(
+                {
+                    "action_id": sample["action_id"],
+                    "repo_full_name": repo_full_name,
+                    "campaign_type": sample["campaign_type"],
+                    "target": "github-issue",
+                    "drift_state": "managed-issue-edited",
+                    "changed_fields": drift_fields,
+                }
+            )
+        issue_result = _result_for_repo(
+            sample,
+            action_ids,
+            target="github-issue",
+            before=existing_issue or {},
+            after={"title": issue_title, "body": issue_body, "state": "open"},
+            expected={"title": issue_title, "body": issue_body, "state": "open"},
+        )
+        if existing_issue:
+            needs_update = (
+                existing_issue.get("title") != issue_title
+                or (existing_issue.get("body") or "") != issue_body
+                or existing_issue.get("state") != "open"
+            )
+            if needs_update:
+                updated = client.update_issue(
+                    owner,
+                    repo,
+                    existing_issue["number"],
+                    {
+                        "title": issue_title,
+                        "body": issue_body,
+                        "state": "open",
+                    },
+                )
+                issue_result["status"] = "reopened" if existing_issue.get("state") == "closed" and updated.get("ok") else ("updated" if updated.get("ok") else "failed")
+                issue_result["number"] = existing_issue["number"]
+                issue_result["url"] = updated.get("html_url", existing_issue.get("html_url"))
+                issue_result["details"] = updated
+            else:
+                issue_result["status"] = "unchanged"
+                issue_result["number"] = existing_issue["number"]
+                issue_result["url"] = existing_issue.get("html_url")
         else:
             created = client.create_issue(
                 owner,
                 repo,
                 {
-                    "title": managed_issue_title(sample["campaign_type"]),
+                    "title": issue_title,
                     "body": issue_body,
                 },
             )
-            issue_result = {
-                "repo_full_name": repo_full_name,
-                "target": "github-issue",
-                "status": "created" if created.get("ok") else "failed",
-                "number": created.get("number"),
-                "url": created.get("html_url"),
-            }
+            issue_result["status"] = "created" if created.get("ok") else "failed"
+            issue_result["number"] = created.get("number")
+            issue_result["url"] = created.get("html_url")
+            issue_result["details"] = created
         results.append(issue_result)
         for action in repo_actions:
             external_refs[action["action_id"]] = {
                 "github_issue_url": issue_result.get("url"),
+                "github_issue_number": issue_result.get("number"),
                 "repo_full_name": repo_full_name,
             }
 
-    return results, external_refs
+    for action_id, previous in previous_actions.items():
+        if action_id in current_action_ids:
+            continue
+        repo_full_name = previous.get("repo_full_name", "")
+        if not repo_full_name:
+            continue
+        event = {
+            "action_id": action_id,
+            "repo_full_name": repo_full_name,
+            "target": "github-issue",
+            "before": {},
+            "after": {"state": "closed"},
+            "expected": {"state": "closed"},
+        }
+        if sync_mode == "append-only":
+            event["status"] = "stale"
+            event["reason"] = "append-only"
+            results.append(event)
+            closure_events.append(
+                {
+                    "action_id": action_id,
+                    "repo_full_name": repo_full_name,
+                    "campaign_type": previous.get("campaign_type", ""),
+                    "lifecycle_state": "deferred",
+                    "reconciliation_outcome": "stale",
+                    "drift_state": "stale",
+                    "rollback_state": "rollback-available",
+                }
+            )
+            continue
+
+        owner, repo = repo_full_name.split("/", 1)
+        issues = client.list_repo_issues(owner, repo, state="all")
+        snapshot = previous.get("snapshots", {}).get("github-issue", {})
+        existing_issue = _find_issue_by_number(issues, _parse_external_key(snapshot.get("external_key"))) or _issue_lookup(issues, previous.get("campaign_type", ""), previous.get("details", {}).get("repo", repo))
+        if not existing_issue:
+            event["status"] = "drifted"
+            event["drift_state"] = "managed-issue-missing"
+            managed_state_drift.append(
+                {
+                    "action_id": action_id,
+                    "repo_full_name": repo_full_name,
+                    "campaign_type": previous.get("campaign_type", ""),
+                    "target": "github-issue",
+                    "drift_state": "managed-issue-missing",
+                }
+            )
+            results.append(event)
+            continue
+
+        event["before"] = existing_issue
+        if existing_issue.get("state") == "closed":
+            event["status"] = "closed"
+            event["number"] = existing_issue.get("number")
+            event["url"] = existing_issue.get("html_url")
+        else:
+            updated = client.update_issue(owner, repo, existing_issue["number"], {"state": "closed"})
+            event["status"] = "closed" if updated.get("ok") else "failed"
+            event["number"] = existing_issue.get("number")
+            event["url"] = updated.get("html_url", existing_issue.get("html_url"))
+            event["details"] = updated
+        results.append(event)
+        closure_events.append(
+            {
+                "action_id": action_id,
+                "repo_full_name": repo_full_name,
+                "campaign_type": previous.get("campaign_type", ""),
+                "lifecycle_state": "resolved" if event["status"] == "closed" else "failed",
+                "reconciliation_outcome": "closed" if event["status"] == "closed" else "failed",
+                "closed_at": datetime.now(timezone.utc).isoformat() if event["status"] == "closed" else None,
+                "closed_reason": "left-campaign-selection",
+                "rollback_state": "rollback-available",
+            }
+        )
+
+    return results, external_refs, managed_state_drift, closure_events
 
 
 def build_campaign_run(
@@ -570,6 +809,7 @@ def build_campaign_run(
     *,
     writeback_target: str | None,
     apply: bool,
+    sync_mode: str = "reconcile",
 ) -> dict:
     return {
         "campaign_type": campaign_summary["campaign_type"],
@@ -578,35 +818,113 @@ def build_campaign_run(
         "collection_name": campaign_summary.get("collection_name"),
         "writeback_target": writeback_target or "preview-only",
         "mode": "apply" if apply else "preview",
+        "sync_mode": sync_mode,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "generated_action_ids": [action["action_id"] for action in actions],
     }
 
 
-def build_action_runs(actions: list[dict], results: list[dict], target: str | None, apply: bool) -> list[dict]:
-    indexed_results = defaultdict(list)
+def _results_for_action(results: list[dict], action_id: str, repo_full_name: str) -> list[dict]:
+    matched = []
     for result in results:
-        repo_full_name = result.get("repo_full_name")
-        if repo_full_name:
-            indexed_results[repo_full_name].append(result)
+        if result.get("action_id") == action_id:
+            matched.append(result)
+            continue
+        if action_id in (result.get("action_ids") or []):
+            matched.append(result)
+            continue
+        if result.get("repo_full_name") == repo_full_name and not result.get("action_id") and not result.get("action_ids"):
+            matched.append(result)
+    return matched
+
+
+def build_action_runs(
+    actions: list[dict],
+    results: list[dict],
+    target: str | None,
+    apply: bool,
+    *,
+    previous_state: dict | None = None,
+    sync_mode: str = "reconcile",
+) -> list[dict]:
+    previous_actions = (previous_state or {}).get("actions", {})
+    current_actions = {action["action_id"]: action for action in actions}
+    ordered_ids = list(current_actions) + [action_id for action_id in previous_actions if action_id not in current_actions]
 
     action_runs = []
-    for action in actions:
-        repo_results = indexed_results.get(action["repo_full_name"], [])
-        status = "preview"
-        if apply:
-            if repo_results and all(result.get("status") not in {"failed", "skipped"} for result in repo_results):
-                status = "applied"
-            elif any(result.get("status") == "failed" for result in repo_results):
-                status = "failed"
+    now = datetime.now(timezone.utc).isoformat()
+    for action_id in ordered_ids:
+        action = current_actions.get(action_id) or previous_actions.get(action_id, {})
+        repo_full_name = action.get("repo_full_name", "")
+        repo_results = _results_for_action(results, action_id, repo_full_name)
+        statuses = [result.get("status") for result in repo_results]
+        lifecycle_state = "planned"
+        reconciliation_outcome = "preview"
+        closed_at = None
+        closed_reason = None
+        reopened_at = None
+        drift_state = next((result.get("drift_state") for result in repo_results if result.get("drift_state")), None)
+        rollback_state = "partial" if any(result.get("before") not in ({}, None, []) for result in repo_results) else "non-reversible"
+
+        if not apply:
+            lifecycle_state = "planned"
+            reconciliation_outcome = "preview"
+        elif any(status == "failed" for status in statuses):
+            lifecycle_state = "failed"
+            reconciliation_outcome = "failed"
+        elif action_id not in current_actions:
+            if any(status == "closed" for status in statuses):
+                lifecycle_state = "resolved"
+                reconciliation_outcome = "closed"
+                closed_at = now
+                closed_reason = "left-campaign-selection"
+            elif sync_mode == "append-only" or any(status == "stale" for status in statuses):
+                lifecycle_state = "deferred"
+                reconciliation_outcome = "stale"
+                drift_state = drift_state or "stale"
+            elif any(status == "drifted" for status in statuses):
+                lifecycle_state = "failed"
+                reconciliation_outcome = "drifted"
             else:
-                status = "skipped"
+                lifecycle_state = "cancelled"
+                reconciliation_outcome = "cancelled"
+                closed_at = now
+                closed_reason = "close-missing"
+        elif any(status == "reopened" for status in statuses):
+            lifecycle_state = "open"
+            reconciliation_outcome = "reopened"
+            reopened_at = now
+        elif any(status == "created" for status in statuses):
+            lifecycle_state = "open"
+            reconciliation_outcome = "created"
+        elif any(status == "updated" for status in statuses):
+            lifecycle_state = "open"
+            reconciliation_outcome = "updated"
+        elif any(status == "drifted" for status in statuses):
+            lifecycle_state = "open"
+            reconciliation_outcome = "drifted"
+        elif any(status == "unchanged" for status in statuses):
+            lifecycle_state = "open"
+            reconciliation_outcome = "unchanged"
+        elif any(status == "skipped" for status in statuses):
+            lifecycle_state = "deferred"
+            reconciliation_outcome = "skipped"
+
         action_runs.append({
-            "action_id": action["action_id"],
-            "repo_full_name": action["repo_full_name"],
-            "campaign_type": action["campaign_type"],
+            "action_id": action_id,
+            "repo_full_name": repo_full_name,
+            "campaign_type": action.get("campaign_type", ""),
             "target": target or "preview-only",
-            "status": status,
+            "status": reconciliation_outcome,
+            "lifecycle_state": lifecycle_state,
+            "reconciliation_outcome": reconciliation_outcome,
+            "closed_at": closed_at,
+            "closed_reason": closed_reason,
+            "reopened_at": reopened_at,
+            "supersedes_action_id": None,
+            "superseded_by_action_id": None,
+            "drift_state": drift_state,
+            "rollback_state": rollback_state,
         })
     return action_runs
 
@@ -620,4 +938,29 @@ def summarize_writeback_results(results: list[dict], target: str | None, apply: 
         "mode": "apply" if apply else "preview",
         "counts": dict(counts),
         "results": results,
+    }
+
+
+def build_rollback_preview(results: list[dict]) -> dict:
+    items = []
+    reversible_targets = {"github-topics", "github-custom-properties", "github-issue", "notion-action"}
+    for result in results:
+        target = result.get("target")
+        if not target:
+            continue
+        has_before = result.get("before") not in ({}, None, [])
+        rollback_state = "fully-reversible" if target in reversible_targets and has_before else ("partial" if target in reversible_targets else "non-reversible")
+        items.append({
+            "action_id": result.get("action_id"),
+            "repo_full_name": result.get("repo_full_name"),
+            "target": target,
+            "status": result.get("status"),
+            "rollback_state": rollback_state,
+        })
+    return {
+        "available": any(item["rollback_state"] != "non-reversible" for item in items),
+        "item_count": len(items),
+        "fully_reversible_count": sum(1 for item in items if item["rollback_state"] == "fully-reversible"),
+        "partial_count": sum(1 for item in items if item["rollback_state"] == "partial"),
+        "items": items,
     }

@@ -33,9 +33,21 @@ It also adds nested provider detail:
 - `providers`
 - `recommendations`
 
-## Dry-Run Governance
+## Governed Controls
 
-Security governance is preview-only in this phase. Recommendations are generated for later writeback, but the tool does not mutate GitHub or Notion yet.
+Security governance is no longer preview-only in the abstract. The tool now supports a bounded, manual, opt-in governed control family:
+
+- enable GitHub code security
+- enable secret scanning
+- enable push protection
+- configure CodeQL default setup
+
+Important boundaries:
+
+- Governed apply remains manual and explicit.
+- Approval can be invalidated when the governance fingerprint drifts.
+- Operator surfaces report ready, approved, applied, drifted, and rollback-coverage state when governance context exists.
+- The tool still does **not** expand governance into rulesets, branch protection, or repo-content mutation in this phase.
 
 Examples:
 
