@@ -294,6 +294,16 @@ def write_markdown_report(
                 f"- Exception Retirement: {report.operator_summary.get('primary_target_exception_retirement_status')} "
                 f"({report.operator_summary.get('primary_target_exception_retirement_reason', 'No exception-retirement reason is recorded yet.')})"
             )
+        if report.operator_summary.get("primary_target_policy_debt_status") not in {None, "", "none"}:
+            _w(
+                f"- Policy Debt Cleanup: {report.operator_summary.get('primary_target_policy_debt_status')} "
+                f"({report.operator_summary.get('primary_target_policy_debt_reason', 'No policy-debt reason is recorded yet.')})"
+            )
+        if report.operator_summary.get("primary_target_class_normalization_status") not in {None, "", "none"}:
+            _w(
+                f"- Class-Level Trust Normalization: {report.operator_summary.get('primary_target_class_normalization_status')} "
+                f"({report.operator_summary.get('primary_target_class_normalization_reason', 'No class-normalization reason is recorded yet.')})"
+            )
         if report.operator_summary.get("recommendation_drift_status"):
             _w(
                 f"- Recommendation Drift: {report.operator_summary.get('recommendation_drift_status')} "
@@ -303,6 +313,10 @@ def write_markdown_report(
             _w(f"- Exception Pattern Summary: {report.operator_summary.get('exception_pattern_summary')}")
         if report.operator_summary.get("exception_retirement_summary"):
             _w(f"- Exception Retirement Summary: {report.operator_summary.get('exception_retirement_summary')}")
+        if report.operator_summary.get("policy_debt_summary"):
+            _w(f"- Policy Debt Summary: {report.operator_summary.get('policy_debt_summary')}")
+        if report.operator_summary.get("trust_normalization_summary"):
+            _w(f"- Trust Normalization Summary: {report.operator_summary.get('trust_normalization_summary')}")
         if report.operator_summary.get("recommendation_quality_summary"):
             _w(f"- Recommendation Quality: {report.operator_summary.get('recommendation_quality_summary')}")
         if report.operator_summary.get("confidence_validation_status"):

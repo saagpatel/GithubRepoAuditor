@@ -739,6 +739,18 @@ def _print_control_center_summary(snapshot: dict) -> None:
             f"{summary.get('primary_target_exception_retirement_status', 'none')} "
             f"({summary.get('primary_target_exception_retirement_reason', 'No exception-retirement reason is recorded yet.')})"
         )
+    if summary.get("primary_target_policy_debt_status") not in {None, "", "none"}:
+        print(
+            "  Policy debt cleanup: "
+            f"{summary.get('primary_target_policy_debt_status', 'none')} "
+            f"({summary.get('primary_target_policy_debt_reason', 'No policy-debt reason is recorded yet.')})"
+        )
+    if summary.get("primary_target_class_normalization_status") not in {None, "", "none"}:
+        print(
+            "  Class-level trust normalization: "
+            f"{summary.get('primary_target_class_normalization_status', 'none')} "
+            f"({summary.get('primary_target_class_normalization_reason', 'No class-normalization reason is recorded yet.')})"
+        )
     if summary.get("recommendation_drift_status"):
         print(
             "  Recommendation drift: "
@@ -749,6 +761,10 @@ def _print_control_center_summary(snapshot: dict) -> None:
         print(f"  Exception pattern summary: {summary['exception_pattern_summary']}")
     if summary.get("exception_retirement_summary"):
         print(f"  Exception retirement summary: {summary['exception_retirement_summary']}")
+    if summary.get("policy_debt_summary"):
+        print(f"  Policy debt summary: {summary['policy_debt_summary']}")
+    if summary.get("trust_normalization_summary"):
+        print(f"  Trust normalization summary: {summary['trust_normalization_summary']}")
     if summary.get("recommendation_quality_summary"):
         print(f"  Recommendation quality: {summary['recommendation_quality_summary']}")
     if summary.get("confidence_validation_status"):

@@ -296,6 +296,55 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
                 f"{hotspot.get('sticky_count', 0)} sticky case(s) across {hotspot.get('exception_count', 0)} exception case(s)"
             )
     lines.append("")
+    lines.append("## Policy Debt Cleanup")
+    lines.append("")
+    lines.append(
+        f"- Policy debt status: {summary.get('primary_target_policy_debt_status', 'none')} "
+        f"({summary.get('primary_target_policy_debt_reason', 'No policy-debt reason is recorded yet.')})"
+    )
+    lines.append(
+        f"- Class retirement / sticky rates: {summary.get('primary_target', {}).get('class_retirement_rate', 0.0):.0%} retired, "
+        f"{summary.get('primary_target', {}).get('class_sticky_rate', 0.0):.0%} sticky"
+    )
+    lines.append(
+        f"- {summary.get('policy_debt_summary', 'No policy-debt summary is recorded yet.')}"
+    )
+    debt_hotspots = summary.get("policy_debt_hotspots") or []
+    if debt_hotspots:
+        for hotspot in debt_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Recent debt hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('match_count', 0)} sticky class signal(s) across {hotspot.get('exception_count', 0)} exception case(s)"
+            )
+    else:
+        lines.append("- No repeated class-level policy debt hotspots are recorded in the recent window.")
+    lines.append("")
+    lines.append("## Class-Level Trust Normalization")
+    lines.append("")
+    lines.append(
+        f"- Normalization status: {summary.get('primary_target_class_normalization_status', 'none')} "
+        f"({summary.get('primary_target_class_normalization_reason', 'No class-normalization reason is recorded yet.')})"
+    )
+    lines.append(
+        f"- Final trust policy after normalization: {summary.get('primary_target_trust_policy', 'monitor')} "
+        f"({summary.get('primary_target_trust_policy_reason', 'No trust-policy reason is recorded yet.')})"
+    )
+    lines.append(
+        f"- Normalization window: {summary.get('class_normalization_window_runs', 4)} run(s)"
+    )
+    lines.append(
+        f"- {summary.get('trust_normalization_summary', 'No trust-normalization summary is recorded yet.')}"
+    )
+    normalized_hotspots = summary.get("normalized_class_hotspots") or []
+    if normalized_hotspots:
+        for hotspot in normalized_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Recent normalization hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('match_count', 0)} normalization signal(s) across {hotspot.get('exception_count', 0)} exception case(s)"
+            )
+    else:
+        lines.append("- No repeated class-level normalization hotspots are recorded in the recent window.")
+    lines.append("")
     lines.append("## Recommendation Drift")
     lines.append("")
     lines.append(
