@@ -387,6 +387,16 @@ def write_markdown_report(
                 f"- Hysteresis Decay Controls: {report.operator_summary.get('primary_target_closure_forecast_decay_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_decay_reason', 'No closure-forecast decay reason is recorded yet.')})"
             )
+        if report.operator_summary.get("primary_target_closure_forecast_refresh_recovery_status"):
+            _w(
+                f"- Closure Forecast Refresh Recovery: {report.operator_summary.get('primary_target_closure_forecast_refresh_recovery_status')} "
+                f"({report.operator_summary.get('primary_target_closure_forecast_refresh_recovery_score', 0.0):.2f})"
+            )
+        if report.operator_summary.get("primary_target_closure_forecast_reacquisition_status"):
+            _w(
+                f"- Reacquisition Controls: {report.operator_summary.get('primary_target_closure_forecast_reacquisition_status')} "
+                f"({report.operator_summary.get('primary_target_closure_forecast_reacquisition_reason', 'No closure-forecast reacquisition reason is recorded yet.')})"
+            )
         if report.operator_summary.get("recommendation_drift_status"):
             _w(
                 f"- Recommendation Drift: {report.operator_summary.get('recommendation_drift_status')} "
@@ -436,6 +446,10 @@ def write_markdown_report(
             _w(f"- Closure Forecast Hysteresis Summary: {report.operator_summary.get('closure_forecast_hysteresis_summary')}")
         if report.operator_summary.get("closure_forecast_decay_summary"):
             _w(f"- Closure Forecast Decay Summary: {report.operator_summary.get('closure_forecast_decay_summary')}")
+        if report.operator_summary.get("closure_forecast_refresh_recovery_summary"):
+            _w(f"- Closure Forecast Refresh Recovery Summary: {report.operator_summary.get('closure_forecast_refresh_recovery_summary')}")
+        if report.operator_summary.get("closure_forecast_reacquisition_summary"):
+            _w(f"- Closure Forecast Reacquisition Summary: {report.operator_summary.get('closure_forecast_reacquisition_summary')}")
         if report.operator_summary.get("recommendation_quality_summary"):
             _w(f"- Recommendation Quality: {report.operator_summary.get('recommendation_quality_summary')}")
         if report.operator_summary.get("confidence_validation_status"):

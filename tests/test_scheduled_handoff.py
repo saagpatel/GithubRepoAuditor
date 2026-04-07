@@ -178,13 +178,22 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
             "primary_target_closure_forecast_decay_reason": "",
             "closure_forecast_freshness_summary": "RepoC: RepoC drift needs review still has useful closure-forecast memory, but some of that signal is aging and should be weighted more cautiously.",
             "closure_forecast_decay_summary": "Recent closure-forecast evidence is still fresh enough that no forecast carry-forward needs to decay yet.",
+            "primary_target_closure_forecast_refresh_recovery_score": 0.16,
+            "primary_target_closure_forecast_refresh_recovery_status": "recovering-confirmation",
+            "primary_target_closure_forecast_reacquisition_status": "pending-confirmation-reacquisition",
+            "primary_target_closure_forecast_reacquisition_reason": "Fresh confirmation-side forecast evidence is returning, but it has not fully re-earned stronger carry-forward yet.",
+            "closure_forecast_refresh_recovery_summary": "Fresh confirmation-side forecast evidence is returning for RepoC: RepoC drift needs review, but it has not fully re-earned stronger carry-forward yet (0.16).",
+            "closure_forecast_reacquisition_summary": "Fresh confirmation-side forecast evidence is returning, but it has not fully re-earned stronger carry-forward yet.",
             "stale_closure_forecast_hotspots": [],
             "fresh_closure_forecast_signal_hotspots": [],
             "closure_forecast_decay_window_runs": 4,
+            "closure_forecast_refresh_window_runs": 4,
             "closure_forecast_transition_window_runs": 4,
             "sustained_confirmation_hotspots": [],
             "sustained_clearance_hotspots": [],
             "oscillating_closure_forecast_hotspots": [],
+            "recovering_confirmation_hotspots": [],
+            "recovering_clearance_hotspots": [],
             "supporting_pending_resolution_hotspots": [],
             "caution_pending_debt_hotspots": [],
             "stalled_transition_hotspots": [],
@@ -248,6 +257,7 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
                 "class_transition_age_runs": 1,
                 "recent_transition_path": "pending-support",
                 "recent_closure_forecast_path": "supporting-confirmation -> neutral",
+                "recent_closure_forecast_refresh_path": "stale confirmation -> fresh confirmation",
             },
             "next_recommended_run_mode": "incremental",
             "watch_strategy": "adaptive",
@@ -316,6 +326,8 @@ def test_build_scheduled_handoff_writes_artifacts_and_issue_candidate(tmp_path):
     assert "Closure Forecast Hysteresis" in markdown
     assert "Closure Forecast Freshness" in markdown
     assert "Hysteresis Decay Controls" in markdown
+    assert "Closure Forecast Refresh Recovery" in markdown
+    assert "Reacquisition Controls" in markdown
     assert "Why class guidance shifted" in markdown
     assert "Recommendation Drift" in markdown
     assert "Confidence Validation" in markdown

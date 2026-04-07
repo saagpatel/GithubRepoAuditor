@@ -833,6 +833,22 @@ def _print_control_center_summary(snapshot: dict) -> None:
         )
     if summary.get("closure_forecast_decay_summary"):
         print(f"  Closure forecast decay summary: {summary['closure_forecast_decay_summary']}")
+    if summary.get("primary_target_closure_forecast_refresh_recovery_status") not in {None, "", "none"}:
+        print(
+            "  Closure forecast refresh recovery: "
+            f"{summary.get('primary_target_closure_forecast_refresh_recovery_status', 'none')} "
+            f"({summary.get('primary_target_closure_forecast_refresh_recovery_score', 0.0):.2f})"
+        )
+    if summary.get("closure_forecast_refresh_recovery_summary"):
+        print(f"  Closure forecast refresh recovery summary: {summary['closure_forecast_refresh_recovery_summary']}")
+    if summary.get("primary_target_closure_forecast_reacquisition_status") not in {None, "", "none"}:
+        print(
+            "  Reacquisition controls: "
+            f"{summary.get('primary_target_closure_forecast_reacquisition_status', 'none')} "
+            f"({summary.get('primary_target_closure_forecast_reacquisition_reason', 'No closure-forecast reacquisition reason is recorded yet.')})"
+        )
+    if summary.get("closure_forecast_reacquisition_summary"):
+        print(f"  Closure forecast reacquisition summary: {summary['closure_forecast_reacquisition_summary']}")
     if summary.get("recommendation_drift_status"):
         print(
             "  Recommendation drift: "

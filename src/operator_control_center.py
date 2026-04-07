@@ -39,6 +39,7 @@ PENDING_DEBT_FRESHNESS_WINDOW_RUNS = 4
 CLASS_CLOSURE_FORECAST_REWEIGHTING_WINDOW_RUNS = 4
 CLASS_CLOSURE_FORECAST_TRANSITION_WINDOW_RUNS = 4
 CLASS_CLOSURE_FORECAST_FRESHNESS_WINDOW_RUNS = 4
+CLASS_CLOSURE_FORECAST_REFRESH_WINDOW_RUNS = 4
 CLASS_MEMORY_RECENCY_WEIGHTS = (1.0, 1.0, 0.7, 0.7, 0.4, 0.4, 0.4, 0.2, 0.2, 0.2)
 GENERIC_RECOMMENDATION_PHRASES = (
     "continue the normal audit/control-center loop",
@@ -511,6 +512,15 @@ def build_operator_snapshot(
         "stale_closure_forecast_hotspots": resolution_trend["stale_closure_forecast_hotspots"],
         "fresh_closure_forecast_signal_hotspots": resolution_trend["fresh_closure_forecast_signal_hotspots"],
         "closure_forecast_decay_window_runs": resolution_trend["closure_forecast_decay_window_runs"],
+        "primary_target_closure_forecast_refresh_recovery_score": resolution_trend["primary_target_closure_forecast_refresh_recovery_score"],
+        "primary_target_closure_forecast_refresh_recovery_status": resolution_trend["primary_target_closure_forecast_refresh_recovery_status"],
+        "primary_target_closure_forecast_reacquisition_status": resolution_trend["primary_target_closure_forecast_reacquisition_status"],
+        "primary_target_closure_forecast_reacquisition_reason": resolution_trend["primary_target_closure_forecast_reacquisition_reason"],
+        "closure_forecast_refresh_recovery_summary": resolution_trend["closure_forecast_refresh_recovery_summary"],
+        "closure_forecast_reacquisition_summary": resolution_trend["closure_forecast_reacquisition_summary"],
+        "closure_forecast_refresh_window_runs": resolution_trend["closure_forecast_refresh_window_runs"],
+        "recovering_confirmation_hotspots": resolution_trend["recovering_confirmation_hotspots"],
+        "recovering_clearance_hotspots": resolution_trend["recovering_clearance_hotspots"],
         "sustained_class_hotspots": resolution_trend["sustained_class_hotspots"],
         "oscillating_class_hotspots": resolution_trend["oscillating_class_hotspots"],
         "decision_memory_status": resolution_trend["decision_memory_status"],
@@ -956,6 +966,8 @@ def _build_operator_handoff(
         primary_target.get("closure_forecast_reweight_effect", "none"),
         resolution_trend.get("primary_target_closure_forecast_freshness_status", "insufficient-data"),
         resolution_trend.get("primary_target_closure_forecast_decay_status", "none"),
+        resolution_trend.get("primary_target_closure_forecast_refresh_recovery_status", "none"),
+        resolution_trend.get("primary_target_closure_forecast_reacquisition_status", "none"),
         resolution_trend.get("primary_target_closure_forecast_momentum_status", "insufficient-data"),
         resolution_trend.get("primary_target_closure_forecast_stability_status", "watch"),
         resolution_trend.get("primary_target_closure_forecast_hysteresis_status", "none"),
@@ -1003,6 +1015,8 @@ def _build_operator_handoff(
         f"{_closure_forecast_freshness_note(resolution_trend)} "
         f"{_closure_forecast_momentum_note(resolution_trend)} "
         f"{_closure_forecast_decay_note(resolution_trend)} "
+        f"{_closure_forecast_refresh_recovery_note(resolution_trend)} "
+        f"{_closure_forecast_reacquisition_note(resolution_trend)} "
         f"{_closure_forecast_hysteresis_note(resolution_trend)} "
         f"{_recommendation_drift_note(resolution_trend)} "
         f"{confidence_calibration.get('confidence_calibration_summary', '')} "
@@ -1384,6 +1398,12 @@ def _build_resolution_trend(
         current_generated_at=current_generated_at,
         confidence_calibration=confidence_calibration,
     )
+    closure_forecast_recovery = _apply_closure_forecast_refresh_recovery_and_reacquisition(
+        resolution_targets,
+        history,
+        current_generated_at=current_generated_at,
+        confidence_calibration=confidence_calibration,
+    )
     new_attention_keys = current_attention_keys - previous_attention_keys
     resolved_attention_count = len(previous_attention_keys - current_attention_keys)
     persisting_attention_count = len(current_attention_keys & previous_attention_keys)
@@ -1573,11 +1593,15 @@ def _build_resolution_trend(
         "primary_target_closure_forecast_momentum_score": closure_forecast_momentum["primary_target_closure_forecast_momentum_score"],
         "primary_target_closure_forecast_momentum_status": closure_forecast_momentum["primary_target_closure_forecast_momentum_status"],
         "primary_target_closure_forecast_stability_status": closure_forecast_momentum["primary_target_closure_forecast_stability_status"],
-        "primary_target_closure_forecast_hysteresis_status": closure_forecast_momentum["primary_target_closure_forecast_hysteresis_status"],
-        "primary_target_closure_forecast_hysteresis_reason": closure_forecast_momentum["primary_target_closure_forecast_hysteresis_reason"],
+        "primary_target_closure_forecast_hysteresis_status": primary_target.get("closure_forecast_hysteresis_status", closure_forecast_momentum["primary_target_closure_forecast_hysteresis_status"]) if primary_target else closure_forecast_momentum["primary_target_closure_forecast_hysteresis_status"],
+        "primary_target_closure_forecast_hysteresis_reason": primary_target.get("closure_forecast_hysteresis_reason", closure_forecast_momentum["primary_target_closure_forecast_hysteresis_reason"]) if primary_target else closure_forecast_momentum["primary_target_closure_forecast_hysteresis_reason"],
         "closure_forecast_momentum_summary": closure_forecast_momentum["closure_forecast_momentum_summary"],
         "closure_forecast_stability_summary": closure_forecast_momentum["closure_forecast_stability_summary"],
-        "closure_forecast_hysteresis_summary": closure_forecast_momentum["closure_forecast_hysteresis_summary"],
+        "closure_forecast_hysteresis_summary": _closure_forecast_hysteresis_summary(
+            primary_target,
+            closure_forecast_momentum["sustained_confirmation_hotspots"],
+            closure_forecast_momentum["sustained_clearance_hotspots"],
+        ) if primary_target else closure_forecast_momentum["closure_forecast_hysteresis_summary"],
         "closure_forecast_transition_window_runs": closure_forecast_momentum["closure_forecast_transition_window_runs"],
         "sustained_confirmation_hotspots": closure_forecast_momentum["sustained_confirmation_hotspots"],
         "sustained_clearance_hotspots": closure_forecast_momentum["sustained_clearance_hotspots"],
@@ -1591,6 +1615,15 @@ def _build_resolution_trend(
         "stale_closure_forecast_hotspots": closure_forecast_decay["stale_closure_forecast_hotspots"],
         "fresh_closure_forecast_signal_hotspots": closure_forecast_decay["fresh_closure_forecast_signal_hotspots"],
         "closure_forecast_decay_window_runs": closure_forecast_decay["closure_forecast_decay_window_runs"],
+        "primary_target_closure_forecast_refresh_recovery_score": closure_forecast_recovery["primary_target_closure_forecast_refresh_recovery_score"],
+        "primary_target_closure_forecast_refresh_recovery_status": closure_forecast_recovery["primary_target_closure_forecast_refresh_recovery_status"],
+        "primary_target_closure_forecast_reacquisition_status": closure_forecast_recovery["primary_target_closure_forecast_reacquisition_status"],
+        "primary_target_closure_forecast_reacquisition_reason": closure_forecast_recovery["primary_target_closure_forecast_reacquisition_reason"],
+        "closure_forecast_refresh_recovery_summary": closure_forecast_recovery["closure_forecast_refresh_recovery_summary"],
+        "closure_forecast_reacquisition_summary": closure_forecast_recovery["closure_forecast_reacquisition_summary"],
+        "closure_forecast_refresh_window_runs": closure_forecast_recovery["closure_forecast_refresh_window_runs"],
+        "recovering_confirmation_hotspots": closure_forecast_recovery["recovering_confirmation_hotspots"],
+        "recovering_clearance_hotspots": closure_forecast_recovery["recovering_clearance_hotspots"],
         "sustained_class_hotspots": class_trust_momentum["sustained_class_hotspots"],
         "oscillating_class_hotspots": class_trust_momentum["oscillating_class_hotspots"],
         "decision_memory_status": decision_memory["decision_memory_status"],
@@ -5036,6 +5069,168 @@ def _apply_closure_forecast_freshness_and_decay(
     }
 
 
+def _apply_closure_forecast_refresh_recovery_and_reacquisition(
+    resolution_targets: list[dict],
+    history: list[dict],
+    *,
+    current_generated_at: str,
+    confidence_calibration: dict,
+) -> dict:
+    if not resolution_targets:
+        return {
+            "primary_target_closure_forecast_refresh_recovery_score": 0.0,
+            "primary_target_closure_forecast_refresh_recovery_status": "none",
+            "primary_target_closure_forecast_reacquisition_status": "none",
+            "primary_target_closure_forecast_reacquisition_reason": "",
+            "closure_forecast_refresh_recovery_summary": "No closure-forecast refresh recovery is recorded because there is no active target.",
+            "closure_forecast_reacquisition_summary": "No closure-forecast reacquisition is recorded because there is no active target.",
+            "closure_forecast_refresh_window_runs": CLASS_CLOSURE_FORECAST_REFRESH_WINDOW_RUNS,
+            "recovering_confirmation_hotspots": [],
+            "recovering_clearance_hotspots": [],
+        }
+
+    current_primary_target = resolution_targets[0]
+    current_bucket = _recommendation_bucket(current_primary_target)
+    closure_forecast_events = _class_closure_forecast_events(
+        history,
+        current_primary_target=current_primary_target,
+        current_generated_at=current_generated_at,
+    )
+    transition_events = _class_transition_events(
+        history,
+        current_primary_target=current_primary_target,
+        current_generated_at=current_generated_at,
+    )
+
+    updated_targets: list[dict] = []
+    for target in resolution_targets:
+        refresh_recovery_score = 0.0
+        refresh_recovery_status = "none"
+        reacquisition_status = "none"
+        reacquisition_reason = ""
+        refresh_path = ""
+        closure_likely_outcome = target.get("transition_closure_likely_outcome", "none")
+        closure_hysteresis_status = target.get("closure_forecast_hysteresis_status", "none")
+        closure_hysteresis_reason = target.get("closure_forecast_hysteresis_reason", "")
+        transition_status = target.get("class_reweight_transition_status", "none")
+        transition_reason = target.get("class_reweight_transition_reason", "")
+        resolution_status = target.get("class_transition_resolution_status", "none")
+        resolution_reason = target.get("class_transition_resolution_reason", "")
+        trust_policy = target.get("trust_policy", "monitor")
+        trust_policy_reason = target.get("trust_policy_reason", "No trust-policy reason is recorded yet.")
+        pending_debt_status = target.get("class_pending_debt_status", "none")
+        pending_debt_reason = target.get("class_pending_debt_reason", "")
+        policy_debt_status = target.get("policy_debt_status", "none")
+        policy_debt_reason = target.get("policy_debt_reason", "")
+        class_normalization_status = target.get("class_normalization_status", "none")
+        class_normalization_reason = target.get("class_normalization_reason", "")
+
+        if _recommendation_bucket(target) == current_bucket:
+            transition_history_meta = _target_class_transition_history(target, transition_events)
+            refresh_meta = _closure_forecast_refresh_recovery_for_target(
+                target,
+                closure_forecast_events,
+                transition_history_meta,
+            )
+            refresh_recovery_score = refresh_meta["closure_forecast_refresh_recovery_score"]
+            refresh_recovery_status = refresh_meta["closure_forecast_refresh_recovery_status"]
+            reacquisition_status = refresh_meta["closure_forecast_reacquisition_status"]
+            reacquisition_reason = refresh_meta["closure_forecast_reacquisition_reason"]
+            refresh_path = refresh_meta["recent_closure_forecast_refresh_path"]
+            (
+                closure_likely_outcome,
+                closure_hysteresis_status,
+                closure_hysteresis_reason,
+                transition_status,
+                transition_reason,
+                resolution_status,
+                resolution_reason,
+                trust_policy,
+                trust_policy_reason,
+                pending_debt_status,
+                pending_debt_reason,
+                policy_debt_status,
+                policy_debt_reason,
+                class_normalization_status,
+                class_normalization_reason,
+            ) = _apply_closure_forecast_reacquisition_control(
+                target,
+                refresh_meta=refresh_meta,
+                transition_history_meta=transition_history_meta,
+                trust_policy=trust_policy,
+                trust_policy_reason=trust_policy_reason,
+                transition_status=transition_status,
+                transition_reason=transition_reason,
+                resolution_status=resolution_status,
+                resolution_reason=resolution_reason,
+                pending_debt_status=pending_debt_status,
+                pending_debt_reason=pending_debt_reason,
+                policy_debt_status=policy_debt_status,
+                policy_debt_reason=policy_debt_reason,
+                class_normalization_status=class_normalization_status,
+                class_normalization_reason=class_normalization_reason,
+                closure_likely_outcome=closure_likely_outcome,
+                closure_hysteresis_status=closure_hysteresis_status,
+                closure_hysteresis_reason=closure_hysteresis_reason,
+            )
+
+        updated_targets.append(
+            {
+                **target,
+                "closure_forecast_refresh_recovery_score": refresh_recovery_score,
+                "closure_forecast_refresh_recovery_status": refresh_recovery_status,
+                "closure_forecast_reacquisition_status": reacquisition_status,
+                "closure_forecast_reacquisition_reason": reacquisition_reason,
+                "recent_closure_forecast_refresh_path": refresh_path,
+                "transition_closure_likely_outcome": closure_likely_outcome,
+                "closure_forecast_hysteresis_status": closure_hysteresis_status,
+                "closure_forecast_hysteresis_reason": closure_hysteresis_reason,
+                "class_reweight_transition_status": transition_status,
+                "class_reweight_transition_reason": transition_reason,
+                "class_transition_resolution_status": resolution_status,
+                "class_transition_resolution_reason": resolution_reason,
+                "class_pending_debt_status": pending_debt_status,
+                "class_pending_debt_reason": pending_debt_reason,
+                "policy_debt_status": policy_debt_status,
+                "policy_debt_reason": policy_debt_reason,
+                "class_normalization_status": class_normalization_status,
+                "class_normalization_reason": class_normalization_reason,
+                "trust_policy": trust_policy,
+                "trust_policy_reason": trust_policy_reason,
+            }
+        )
+
+    resolution_targets[:] = updated_targets
+    primary_target = resolution_targets[0]
+    recovering_confirmation_hotspots = _closure_forecast_refresh_hotspots(
+        resolution_targets,
+        mode="confirmation",
+    )
+    recovering_clearance_hotspots = _closure_forecast_refresh_hotspots(
+        resolution_targets,
+        mode="clearance",
+    )
+    return {
+        "primary_target_closure_forecast_refresh_recovery_score": primary_target.get("closure_forecast_refresh_recovery_score", 0.0),
+        "primary_target_closure_forecast_refresh_recovery_status": primary_target.get("closure_forecast_refresh_recovery_status", "none"),
+        "primary_target_closure_forecast_reacquisition_status": primary_target.get("closure_forecast_reacquisition_status", "none"),
+        "primary_target_closure_forecast_reacquisition_reason": primary_target.get("closure_forecast_reacquisition_reason", ""),
+        "closure_forecast_refresh_recovery_summary": _closure_forecast_refresh_recovery_summary(
+            primary_target,
+            recovering_confirmation_hotspots,
+            recovering_clearance_hotspots,
+        ),
+        "closure_forecast_reacquisition_summary": _closure_forecast_reacquisition_summary(
+            primary_target,
+            recovering_confirmation_hotspots,
+            recovering_clearance_hotspots,
+        ),
+        "closure_forecast_refresh_window_runs": CLASS_CLOSURE_FORECAST_REFRESH_WINDOW_RUNS,
+        "recovering_confirmation_hotspots": recovering_confirmation_hotspots,
+        "recovering_clearance_hotspots": recovering_clearance_hotspots,
+    }
+
+
 def _class_closure_forecast_events(
     history: list[dict],
     *,
@@ -5057,6 +5252,10 @@ def _class_closure_forecast_events(
                 "class_transition_resolution_status": current_primary_target.get("class_transition_resolution_status", "none"),
                 "closure_forecast_reweight_effect": current_primary_target.get("closure_forecast_reweight_effect", "none"),
                 "closure_forecast_hysteresis_status": current_primary_target.get("closure_forecast_hysteresis_status", "none"),
+                "closure_forecast_momentum_status": current_primary_target.get("closure_forecast_momentum_status", "insufficient-data"),
+                "closure_forecast_stability_status": current_primary_target.get("closure_forecast_stability_status", "watch"),
+                "closure_forecast_freshness_status": current_primary_target.get("closure_forecast_freshness_status", "insufficient-data"),
+                "closure_forecast_decay_status": current_primary_target.get("closure_forecast_decay_status", "none"),
             }
         )
     for entry in history[: HISTORY_WINDOW_RUNS - 1]:
@@ -5098,6 +5297,22 @@ def _class_closure_forecast_events(
                 "closure_forecast_hysteresis_status": summary.get(
                     "primary_target_closure_forecast_hysteresis_status",
                     primary_target.get("closure_forecast_hysteresis_status", "none"),
+                ),
+                "closure_forecast_momentum_status": summary.get(
+                    "primary_target_closure_forecast_momentum_status",
+                    primary_target.get("closure_forecast_momentum_status", "insufficient-data"),
+                ),
+                "closure_forecast_stability_status": summary.get(
+                    "primary_target_closure_forecast_stability_status",
+                    primary_target.get("closure_forecast_stability_status", "watch"),
+                ),
+                "closure_forecast_freshness_status": summary.get(
+                    "primary_target_closure_forecast_freshness_status",
+                    primary_target.get("closure_forecast_freshness_status", "insufficient-data"),
+                ),
+                "closure_forecast_decay_status": summary.get(
+                    "primary_target_closure_forecast_decay_status",
+                    primary_target.get("closure_forecast_decay_status", "none"),
                 ),
             }
         )
@@ -5921,6 +6136,307 @@ def _apply_closure_forecast_decay_control(
     )
 
 
+def _closure_forecast_refresh_recovery_for_target(
+    target: dict,
+    closure_forecast_events: list[dict],
+    transition_history_meta: dict,
+) -> dict:
+    class_key = _target_class_key(target)
+    matching_events = [
+        event for event in closure_forecast_events if event.get("class_key") == class_key
+    ][:CLASS_CLOSURE_FORECAST_REFRESH_WINDOW_RUNS]
+    relevant_events = [
+        event for event in matching_events if _closure_forecast_event_has_evidence(event)
+    ]
+    directions = [
+        _normalized_closure_forecast_direction(
+            event.get("closure_forecast_reweight_direction", "neutral"),
+            event.get("closure_forecast_reweight_score", 0.0),
+        )
+        for event in matching_events
+    ]
+    weighted_total = 0.0
+    weight_sum = 0.0
+    for index, event in enumerate(matching_events):
+        weight = (1.0, 0.8, 0.6, 0.4)[min(index, CLASS_CLOSURE_FORECAST_REFRESH_WINDOW_RUNS - 1)]
+        weighted_total += _closure_forecast_refresh_signal_from_event(event) * weight
+        weight_sum += weight
+    refresh_recovery_score = _clamp_round(
+        weighted_total / max(weight_sum, 1.0),
+        lower=-0.95,
+        upper=0.95,
+    )
+    current_direction = directions[0] if directions else "neutral"
+    earlier_majority = _closure_forecast_direction_majority(directions[1:])
+    recent_weakened_side = _recent_closure_forecast_weakened_side(matching_events)
+    freshness_status = target.get("closure_forecast_freshness_status", "insufficient-data")
+    momentum_status = target.get("closure_forecast_momentum_status", "insufficient-data")
+    stability_status = target.get("closure_forecast_stability_status", "watch")
+    local_noise = _target_specific_normalization_noise(target, transition_history_meta)
+
+    if len(relevant_events) < 2 or recent_weakened_side == "none":
+        refresh_recovery_status = "none"
+    elif local_noise and current_direction == "supporting-confirmation":
+        refresh_recovery_status = "blocked"
+    elif (
+        recent_weakened_side == "confirmation"
+        and current_direction == "supporting-clearance"
+    ) or (
+        recent_weakened_side == "clearance"
+        and current_direction == "supporting-confirmation"
+    ) or _closure_forecast_direction_reversing(current_direction, earlier_majority):
+        refresh_recovery_status = "reversing"
+    elif (
+        recent_weakened_side == "confirmation"
+        and current_direction == "supporting-confirmation"
+        and freshness_status == "fresh"
+        and refresh_recovery_score >= 0.25
+        and stability_status != "oscillating"
+    ):
+        refresh_recovery_status = "reacquiring-confirmation"
+    elif (
+        recent_weakened_side == "clearance"
+        and current_direction == "supporting-clearance"
+        and freshness_status == "fresh"
+        and refresh_recovery_score <= -0.25
+        and stability_status != "oscillating"
+    ):
+        refresh_recovery_status = "reacquiring-clearance"
+    elif (
+        recent_weakened_side == "confirmation"
+        and current_direction == "supporting-confirmation"
+        and freshness_status in {"fresh", "mixed-age"}
+        and refresh_recovery_score >= 0.15
+    ):
+        refresh_recovery_status = "recovering-confirmation"
+    elif (
+        recent_weakened_side == "clearance"
+        and current_direction == "supporting-clearance"
+        and freshness_status in {"fresh", "mixed-age"}
+        and refresh_recovery_score <= -0.15
+    ):
+        refresh_recovery_status = "recovering-clearance"
+    else:
+        refresh_recovery_status = "none"
+
+    if local_noise and current_direction == "supporting-confirmation":
+        reacquisition_status = "blocked"
+        reacquisition_reason = (
+            "Local target instability is still preventing positive confirmation-side reacquisition."
+        )
+    elif (
+        refresh_recovery_status == "reacquiring-confirmation"
+        and freshness_status == "fresh"
+        and momentum_status == "sustained-confirmation"
+        and stability_status == "stable"
+        and not local_noise
+    ):
+        reacquisition_status = "reacquired-confirmation"
+        reacquisition_reason = (
+            "Fresh confirmation-side support has stayed strong enough to earn back stronger confirmation forecasting."
+        )
+    elif (
+        refresh_recovery_status == "reacquiring-clearance"
+        and freshness_status == "fresh"
+        and momentum_status == "sustained-clearance"
+        and stability_status == "stable"
+    ):
+        reacquisition_status = "reacquired-clearance"
+        reacquisition_reason = (
+            "Fresh clearance-side pressure has stayed strong enough to earn back stronger clearance forecasting."
+        )
+    elif refresh_recovery_status in {"recovering-confirmation", "reacquiring-confirmation"}:
+        reacquisition_status = "pending-confirmation-reacquisition"
+        reacquisition_reason = (
+            "Fresh confirmation-side forecast evidence is returning, but it has not fully re-earned stronger carry-forward yet."
+        )
+    elif refresh_recovery_status in {"recovering-clearance", "reacquiring-clearance"}:
+        reacquisition_status = "pending-clearance-reacquisition"
+        reacquisition_reason = (
+            "Fresh clearance-side forecast evidence is returning, but it has not fully re-earned stronger carry-forward yet."
+        )
+    else:
+        reacquisition_status = "none"
+        reacquisition_reason = ""
+
+    if refresh_recovery_status == "reversing":
+        reacquisition_reason = (
+            "The fresh recovery attempt is changing direction, so stronger carry-forward stays softened."
+        )
+
+    return {
+        "closure_forecast_refresh_recovery_score": refresh_recovery_score,
+        "closure_forecast_refresh_recovery_status": refresh_recovery_status,
+        "closure_forecast_reacquisition_status": reacquisition_status,
+        "closure_forecast_reacquisition_reason": reacquisition_reason,
+        "recent_closure_forecast_refresh_path": " -> ".join(
+            _closure_forecast_refresh_path_label(event) for event in matching_events if event
+        ),
+        "recent_weakened_side": recent_weakened_side,
+    }
+
+
+def _closure_forecast_refresh_signal_from_event(event: dict) -> float:
+    score = float(event.get("closure_forecast_reweight_score", 0.0) or 0.0)
+    direction = _normalized_closure_forecast_direction(
+        event.get("closure_forecast_reweight_direction", "neutral"),
+        score,
+    )
+    freshness_factor = {
+        "fresh": 1.00,
+        "mixed-age": 0.60,
+        "stale": 0.25,
+        "insufficient-data": 0.10,
+    }.get(event.get("closure_forecast_freshness_status", "insufficient-data"), 0.10)
+    signal_strength = max(abs(score), 0.05) if direction != "neutral" else 0.0
+    if direction == "supporting-confirmation":
+        return signal_strength * freshness_factor
+    if direction == "supporting-clearance":
+        return -signal_strength * freshness_factor
+    return 0.0
+
+
+def _recent_closure_forecast_weakened_side(events: list[dict]) -> str:
+    for event in events:
+        decay_status = event.get("closure_forecast_decay_status", "none") or "none"
+        freshness_status = event.get("closure_forecast_freshness_status", "insufficient-data") or "insufficient-data"
+        hysteresis_status = event.get("closure_forecast_hysteresis_status", "none") or "none"
+        if decay_status == "confirmation-decayed" or (
+            freshness_status in {"stale", "insufficient-data"}
+            and hysteresis_status in {"pending-confirmation", "confirmed-confirmation"}
+        ):
+            return "confirmation"
+        if decay_status == "clearance-decayed" or (
+            freshness_status in {"stale", "insufficient-data"}
+            and hysteresis_status in {"pending-clearance", "confirmed-clearance"}
+        ):
+            return "clearance"
+    return "none"
+
+
+def _closure_forecast_refresh_path_label(event: dict) -> str:
+    direction = _normalized_closure_forecast_direction(
+        event.get("closure_forecast_reweight_direction", "neutral"),
+        event.get("closure_forecast_reweight_score", 0.0),
+    )
+    freshness = event.get("closure_forecast_freshness_status", "insufficient-data") or "insufficient-data"
+    if direction == "supporting-confirmation":
+        return f"{freshness} confirmation"
+    if direction == "supporting-clearance":
+        return f"{freshness} clearance"
+    return "neutral"
+
+
+def _apply_closure_forecast_reacquisition_control(
+    target: dict,
+    *,
+    refresh_meta: dict,
+    transition_history_meta: dict,
+    trust_policy: str,
+    trust_policy_reason: str,
+    transition_status: str,
+    transition_reason: str,
+    resolution_status: str,
+    resolution_reason: str,
+    pending_debt_status: str,
+    pending_debt_reason: str,
+    policy_debt_status: str,
+    policy_debt_reason: str,
+    class_normalization_status: str,
+    class_normalization_reason: str,
+    closure_likely_outcome: str,
+    closure_hysteresis_status: str,
+    closure_hysteresis_reason: str,
+) -> tuple[str, str, str, str, str, str, str, str, str, str, str, str, str, str, str]:
+    refresh_status = refresh_meta.get("closure_forecast_refresh_recovery_status", "none")
+    reacquisition_status = refresh_meta.get("closure_forecast_reacquisition_status", "none")
+    reacquisition_reason = refresh_meta.get("closure_forecast_reacquisition_reason", "")
+    recent_weakened_side = refresh_meta.get("recent_weakened_side", "none")
+    freshness_status = target.get("closure_forecast_freshness_status", "insufficient-data")
+    stability_status = target.get("closure_forecast_stability_status", "watch")
+    decayed_clearance_rate = float(target.get("decayed_clearance_forecast_rate", 0.0) or 0.0)
+    transition_age_runs = int(target.get("class_transition_age_runs", 0) or 0)
+
+    if reacquisition_status == "reacquired-confirmation":
+        closure_likely_outcome = "confirm-soon"
+        closure_hysteresis_status = "confirmed-confirmation"
+        closure_hysteresis_reason = reacquisition_reason
+    elif reacquisition_status == "pending-confirmation-reacquisition":
+        closure_likely_outcome = "hold"
+        if recent_weakened_side == "confirmation":
+            closure_hysteresis_status = "pending-confirmation"
+            closure_hysteresis_reason = reacquisition_reason
+    elif reacquisition_status == "reacquired-clearance":
+        if closure_likely_outcome == "hold":
+            closure_likely_outcome = "clear-risk"
+        elif closure_likely_outcome == "clear-risk" and transition_age_runs >= 3:
+            closure_likely_outcome = "expire-risk"
+        closure_hysteresis_status = "confirmed-clearance"
+        closure_hysteresis_reason = reacquisition_reason
+        if (
+            transition_status in {"pending-support", "pending-caution"}
+            and decayed_clearance_rate >= 0.50
+            and stability_status != "oscillating"
+        ):
+            clear_reason = (
+                "Fresh clearance-side pressure has stayed strong enough to re-earn the earlier forecast-driven clearance posture."
+            )
+            resolution_status = "cleared"
+            resolution_reason = clear_reason
+            transition_status = "none"
+            transition_reason = clear_reason
+            if target.get("class_reweight_transition_status") == "pending-support":
+                reverted_policy = target.get("pre_class_normalization_trust_policy", trust_policy)
+                reverted_reason = target.get("pre_class_normalization_trust_policy_reason", trust_policy_reason)
+                trust_policy = reverted_policy
+                trust_policy_reason = (
+                    clear_reason if reverted_policy == "verify-first" else reverted_reason
+                )
+                class_normalization_status = "candidate"
+                class_normalization_reason = clear_reason
+            else:
+                pending_debt_status = pending_debt_status or "watch"
+                pending_debt_reason = pending_debt_reason or clear_reason
+                policy_debt_status = "watch"
+                policy_debt_reason = clear_reason
+    elif reacquisition_status == "pending-clearance-reacquisition":
+        if recent_weakened_side == "clearance":
+            closure_hysteresis_status = "pending-clearance"
+            closure_hysteresis_reason = reacquisition_reason
+    elif reacquisition_status == "blocked":
+        closure_hysteresis_reason = reacquisition_reason or closure_hysteresis_reason
+    elif refresh_status == "reversing":
+        closure_hysteresis_reason = reacquisition_reason or closure_hysteresis_reason
+
+    if freshness_status in {"stale", "insufficient-data"} and reacquisition_status.startswith("reacquired"):
+        if reacquisition_status == "reacquired-confirmation":
+            closure_likely_outcome = "hold"
+            closure_hysteresis_status = "pending-confirmation"
+        elif closure_likely_outcome == "expire-risk":
+            closure_likely_outcome = "clear-risk"
+        elif closure_likely_outcome == "clear-risk":
+            closure_likely_outcome = "hold"
+            closure_hysteresis_status = "pending-clearance"
+
+    return (
+        closure_likely_outcome,
+        closure_hysteresis_status,
+        closure_hysteresis_reason,
+        transition_status,
+        transition_reason,
+        resolution_status,
+        resolution_reason,
+        trust_policy,
+        trust_policy_reason,
+        pending_debt_status,
+        pending_debt_reason,
+        policy_debt_status,
+        policy_debt_reason,
+        class_normalization_status,
+        class_normalization_reason,
+    )
+
+
 def _closure_forecast_momentum_hotspots(resolution_targets: list[dict], *, mode: str) -> list[dict]:
     grouped: dict[str, dict] = {}
     for target in resolution_targets:
@@ -6192,6 +6708,128 @@ def _closure_forecast_decay_summary(
             "so those older forecast patterns should keep decaying."
         )
     return "No strong closure-forecast freshness trend is dominating the live hysteresis posture yet."
+
+
+def _closure_forecast_refresh_hotspots(resolution_targets: list[dict], *, mode: str) -> list[dict]:
+    grouped: dict[str, dict] = {}
+    for target in resolution_targets:
+        class_key = _target_class_key(target)
+        if not class_key:
+            continue
+        current = {
+            "scope": "class",
+            "label": class_key,
+            "closure_forecast_refresh_recovery_score": target.get("closure_forecast_refresh_recovery_score", 0.0),
+            "closure_forecast_refresh_recovery_status": target.get("closure_forecast_refresh_recovery_status", "none"),
+            "closure_forecast_reacquisition_status": target.get("closure_forecast_reacquisition_status", "none"),
+            "recent_closure_forecast_refresh_path": target.get("recent_closure_forecast_refresh_path", ""),
+        }
+        existing = grouped.get(class_key)
+        if existing is None or abs(current["closure_forecast_refresh_recovery_score"]) > abs(
+            existing["closure_forecast_refresh_recovery_score"]
+        ):
+            grouped[class_key] = current
+
+    hotspots = list(grouped.values())
+    if mode == "confirmation":
+        hotspots = [
+            item
+            for item in hotspots
+            if item.get("closure_forecast_refresh_recovery_status")
+            in {"recovering-confirmation", "reacquiring-confirmation"}
+            or item.get("closure_forecast_reacquisition_status")
+            in {"pending-confirmation-reacquisition", "reacquired-confirmation"}
+        ]
+        hotspots.sort(
+            key=lambda item: (
+                -item.get("closure_forecast_refresh_recovery_score", 0.0),
+                item.get("label", ""),
+            )
+        )
+    else:
+        hotspots = [
+            item
+            for item in hotspots
+            if item.get("closure_forecast_refresh_recovery_status")
+            in {"recovering-clearance", "reacquiring-clearance"}
+            or item.get("closure_forecast_reacquisition_status")
+            in {"pending-clearance-reacquisition", "reacquired-clearance"}
+        ]
+        hotspots.sort(
+            key=lambda item: (
+                item.get("closure_forecast_refresh_recovery_score", 0.0),
+                item.get("label", ""),
+            )
+        )
+    return hotspots[:5]
+
+
+def _closure_forecast_refresh_recovery_summary(
+    primary_target: dict,
+    recovering_confirmation_hotspots: list[dict],
+    recovering_clearance_hotspots: list[dict],
+) -> str:
+    label = _target_label(primary_target) or "The current target"
+    status = primary_target.get("closure_forecast_refresh_recovery_status", "none")
+    score = primary_target.get("closure_forecast_refresh_recovery_score", 0.0)
+    if status == "recovering-confirmation":
+        return f"Fresh confirmation-side forecast evidence is returning for {label}, but it has not fully re-earned stronger carry-forward yet ({score:.2f})."
+    if status == "recovering-clearance":
+        return f"Fresh clearance-side forecast evidence is returning for {label}, but it has not fully re-earned stronger carry-forward yet ({score:.2f})."
+    if status == "reacquiring-confirmation":
+        return f"Fresh confirmation-side support around {label} is strong enough that stronger forecast carry-forward may be earned back soon ({score:.2f})."
+    if status == "reacquiring-clearance":
+        return f"Fresh clearance-side pressure around {label} is strong enough that stronger forecast carry-forward may be earned back soon ({score:.2f})."
+    if status == "reversing":
+        return f"The fresh recovery attempt around {label} is changing direction, so stronger carry-forward stays softened ({score:.2f})."
+    if status == "blocked":
+        return f"Local target instability is still preventing positive confirmation-side reacquisition for {label}."
+    if recovering_confirmation_hotspots:
+        hotspot = recovering_confirmation_hotspots[0]
+        return (
+            f"Confirmation-side refresh recovery is strongest around {hotspot.get('label', 'recent hotspots')}, "
+            "but the current target has not re-earned stronger carry-forward yet."
+        )
+    if recovering_clearance_hotspots:
+        hotspot = recovering_clearance_hotspots[0]
+        return (
+            f"Clearance-side refresh recovery is strongest around {hotspot.get('label', 'recent hotspots')}, "
+            "so those classes are closest to re-earning stronger clearance forecasting."
+        )
+    return "No closure-forecast refresh recovery is strong enough yet to re-earn stronger carry-forward."
+
+
+def _closure_forecast_reacquisition_summary(
+    primary_target: dict,
+    recovering_confirmation_hotspots: list[dict],
+    recovering_clearance_hotspots: list[dict],
+) -> str:
+    label = _target_label(primary_target) or "The current target"
+    status = primary_target.get("closure_forecast_reacquisition_status", "none")
+    reason = primary_target.get("closure_forecast_reacquisition_reason", "")
+    if status == "reacquired-confirmation":
+        return reason or f"Fresh confirmation-side support has stayed strong enough to earn back stronger confirmation forecasting for {label}."
+    if status == "reacquired-clearance":
+        return reason or f"Fresh clearance-side pressure has stayed strong enough to earn back stronger clearance forecasting for {label}."
+    if status == "pending-confirmation-reacquisition":
+        return reason or f"Confirmation-side recovery is visible for {label}, but stronger carry-forward has not been fully re-earned yet."
+    if status == "pending-clearance-reacquisition":
+        return reason or f"Clearance-side recovery is visible for {label}, but stronger carry-forward has not been fully re-earned yet."
+    if status == "blocked":
+        return reason or f"Local target instability is still preventing positive confirmation-side reacquisition for {label}."
+    if recovering_confirmation_hotspots:
+        hotspot = recovering_confirmation_hotspots[0]
+        return (
+            f"Confirmation-side reacquisition is most active around {hotspot.get('label', 'recent hotspots')}, "
+            "but those classes still need fresh, stable follow-through before stronger carry-forward is restored."
+        )
+    if recovering_clearance_hotspots:
+        hotspot = recovering_clearance_hotspots[0]
+        return (
+            f"Clearance-side reacquisition is most active around {hotspot.get('label', 'recent hotspots')}, "
+            "so those classes can only restore stronger clearance posture when fresh pressure keeps holding."
+        )
+    return "No closure-forecast reacquisition is re-earning stronger carry-forward right now."
 
 
 def _target_class_reweight_history(target: dict, reweight_events: list[dict]) -> dict:
@@ -9674,6 +10312,9 @@ def _why_it_matters(
         primary_target.get("closure_forecast_reweight_effect_reason", ""),
         resolution_trend.get("primary_target_closure_forecast_freshness_status", "insufficient-data"),
         resolution_trend.get("primary_target_closure_forecast_decay_status", "none"),
+        resolution_trend.get("primary_target_closure_forecast_refresh_recovery_status", "none"),
+        resolution_trend.get("primary_target_closure_forecast_reacquisition_status", "none"),
+        resolution_trend.get("primary_target_closure_forecast_reacquisition_reason", ""),
     )
     if urgency == "blocked":
         return f"A trustworthy next step is blocked until this is cleared. {trust_sentence} {calibration_sentence}".strip()
@@ -9786,7 +10427,37 @@ def _trust_policy_sentence(
     closure_forecast_reweight_effect_reason: str,
     closure_forecast_freshness_status: str,
     closure_forecast_decay_status: str,
+    closure_forecast_refresh_recovery_status: str,
+    closure_forecast_reacquisition_status: str,
+    closure_forecast_reacquisition_reason: str,
 ) -> str:
+    if closure_forecast_reacquisition_status == "reacquired-confirmation":
+        detail = closure_forecast_reacquisition_reason or reason
+        return f"Trust policy: keep the weaker class posture for now because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: keep the weaker class posture for now because stronger confirmation forecasting was re-earned safely."
+    if closure_forecast_reacquisition_status == "reacquired-clearance":
+        detail = closure_forecast_reacquisition_reason or reason
+        return f"Trust policy: keep the weaker class posture because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: keep the weaker class posture because stronger clearance forecasting was re-earned safely."
+    if closure_forecast_reacquisition_status == "pending-confirmation-reacquisition":
+        detail = closure_forecast_reacquisition_reason or reason
+        return f"Trust policy: keep the weaker class posture for now because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: keep the weaker class posture for now because confirmation-side recovery is visible, but stronger carry-forward has not been fully re-earned yet."
+    if closure_forecast_reacquisition_status == "pending-clearance-reacquisition":
+        detail = closure_forecast_reacquisition_reason or reason
+        return f"Trust policy: keep the weaker class posture because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: keep the weaker class posture because clearance-side recovery is visible, but stronger carry-forward has not been fully re-earned yet."
+    if closure_forecast_reacquisition_status == "blocked":
+        detail = closure_forecast_reacquisition_reason or reason
+        return f"Trust policy: keep the weaker class posture because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: keep the weaker class posture because local target instability is still preventing positive confirmation-side reacquisition."
+    if closure_forecast_refresh_recovery_status == "recovering-confirmation":
+        return "Trust policy: keep the weaker class posture for now because fresh confirmation-side forecast evidence is returning, but it has not fully re-earned stronger carry-forward yet."
+    if closure_forecast_refresh_recovery_status == "recovering-clearance":
+        return "Trust policy: keep the weaker class posture because fresh clearance-side forecast evidence is returning, but it has not fully re-earned stronger carry-forward yet."
+    if closure_forecast_refresh_recovery_status == "reacquiring-confirmation":
+        return "Trust policy: keep the weaker class posture for now because fresh confirmation-side support is getting strong enough to re-earn stronger carry-forward soon."
+    if closure_forecast_refresh_recovery_status == "reacquiring-clearance":
+        return "Trust policy: keep the weaker class posture because fresh clearance-side pressure is getting strong enough to re-earn stronger carry-forward soon."
+    if closure_forecast_refresh_recovery_status == "reversing":
+        return "Trust policy: keep the weaker class posture because the fresh recovery attempt is changing direction and stronger carry-forward should stay softened."
+    if closure_forecast_refresh_recovery_status == "blocked":
+        return "Trust policy: keep the weaker class posture because local target instability is still preventing positive confirmation-side reacquisition."
     if class_transition_resolution_status == "confirmed":
         detail = class_transition_resolution_reason or reason
         return f"Trust policy: keep the stronger class posture because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: keep the stronger class posture because the earlier pending class signal finally confirmed."
@@ -9946,12 +10617,36 @@ def _with_trust_policy_brief(
     closure_forecast_reweight_effect: str,
     closure_forecast_freshness_status: str,
     closure_forecast_decay_status: str,
+    closure_forecast_refresh_recovery_status: str,
+    closure_forecast_reacquisition_status: str,
     closure_forecast_momentum_status: str,
     closure_forecast_stability_status: str,
     closure_forecast_hysteresis_status: str,
 ) -> str:
     if not summary:
         return summary
+    if closure_forecast_reacquisition_status == "reacquired-confirmation":
+        return f"{summary} Trust policy: stronger confirmation forecasting was safely re-earned."
+    if closure_forecast_reacquisition_status == "reacquired-clearance":
+        return f"{summary} Trust policy: stronger clearance forecasting was safely re-earned."
+    if closure_forecast_reacquisition_status == "pending-confirmation-reacquisition":
+        return f"{summary} Trust policy: confirmation-side recovery is visible, but stronger carry-forward has not been fully re-earned yet."
+    if closure_forecast_reacquisition_status == "pending-clearance-reacquisition":
+        return f"{summary} Trust policy: clearance-side recovery is visible, but stronger carry-forward has not been fully re-earned yet."
+    if closure_forecast_reacquisition_status == "blocked":
+        return f"{summary} Trust policy: local target instability is still preventing positive confirmation-side reacquisition."
+    if closure_forecast_refresh_recovery_status == "recovering-confirmation":
+        return f"{summary} Trust policy: fresh confirmation-side forecast evidence is returning, but it has not fully re-earned stronger carry-forward yet."
+    if closure_forecast_refresh_recovery_status == "recovering-clearance":
+        return f"{summary} Trust policy: fresh clearance-side forecast evidence is returning, but it has not fully re-earned stronger carry-forward yet."
+    if closure_forecast_refresh_recovery_status == "reacquiring-confirmation":
+        return f"{summary} Trust policy: fresh confirmation-side support is getting strong enough to re-earn stronger carry-forward soon."
+    if closure_forecast_refresh_recovery_status == "reacquiring-clearance":
+        return f"{summary} Trust policy: fresh clearance-side pressure is getting strong enough to re-earn stronger carry-forward soon."
+    if closure_forecast_refresh_recovery_status == "reversing":
+        return f"{summary} Trust policy: the fresh recovery attempt is changing direction, so stronger carry-forward stays softened."
+    if closure_forecast_refresh_recovery_status == "blocked":
+        return f"{summary} Trust policy: local target instability is still preventing positive confirmation-side reacquisition."
     if class_transition_resolution_status == "confirmed":
         return f"{summary} Trust policy: the earlier pending class signal finally confirmed."
     if class_transition_resolution_status == "cleared":
@@ -10255,6 +10950,22 @@ def _closure_forecast_decay_note(resolution_trend: dict) -> str:
     if status in {None, "", "none"} and not summary:
         return ""
     return f"Hysteresis decay controls: {status} — {summary}".strip()
+
+
+def _closure_forecast_refresh_recovery_note(resolution_trend: dict) -> str:
+    status = resolution_trend.get("primary_target_closure_forecast_refresh_recovery_status", "none")
+    summary = resolution_trend.get("closure_forecast_refresh_recovery_summary", "")
+    if status in {None, "", "none"} and not summary:
+        return ""
+    return f"Closure forecast refresh recovery: {status} — {summary}".strip()
+
+
+def _closure_forecast_reacquisition_note(resolution_trend: dict) -> str:
+    status = resolution_trend.get("primary_target_closure_forecast_reacquisition_status", "none")
+    summary = resolution_trend.get("closure_forecast_reacquisition_summary", "")
+    if status in {None, "", "none"} and not summary:
+        return ""
+    return f"Reacquisition controls: {status} — {summary}".strip()
 
 
 def _closure_forecast_hysteresis_note(resolution_trend: dict) -> str:

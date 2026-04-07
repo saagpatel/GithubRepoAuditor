@@ -245,8 +245,26 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
         "clearance-decayed",
         "blocked",
     }
+    assert summary["primary_target_closure_forecast_refresh_recovery_status"] in {
+        "none",
+        "recovering-confirmation",
+        "recovering-clearance",
+        "reacquiring-confirmation",
+        "reacquiring-clearance",
+        "reversing",
+        "blocked",
+    }
+    assert summary["primary_target_closure_forecast_reacquisition_status"] in {
+        "none",
+        "pending-confirmation-reacquisition",
+        "pending-clearance-reacquisition",
+        "reacquired-confirmation",
+        "reacquired-clearance",
+        "blocked",
+    }
     assert -0.95 <= summary["primary_target_closure_forecast_reweight_score"] <= 0.95
     assert -0.95 <= summary["primary_target_closure_forecast_momentum_score"] <= 0.95
+    assert -0.95 <= summary["primary_target_closure_forecast_refresh_recovery_score"] <= 0.95
     assert 0.0 <= summary["primary_target"]["decayed_confirmation_forecast_rate"] <= 1.0
     assert 0.0 <= summary["primary_target"]["decayed_clearance_forecast_rate"] <= 1.0
     assert 0.0 <= summary["primary_target_weighted_pending_resolution_support_score"] <= 0.95
@@ -262,6 +280,7 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
     assert summary["closure_forecast_reweighting_window_runs"] == 4
     assert summary["closure_forecast_transition_window_runs"] == 4
     assert summary["closure_forecast_decay_window_runs"] == 4
+    assert summary["closure_forecast_refresh_window_runs"] == 4
     assert "guidance" in summary["adaptive_confidence_summary"].lower() or "immediate action" in summary["adaptive_confidence_summary"].lower()
     assert summary["recommendation_quality_summary"].startswith("Strong recommendation because")
 
@@ -3019,6 +3038,309 @@ def test_operator_snapshot_marks_class_pending_debt_as_clearing(tmp_path: Path, 
     assert summary["primary_target_class_pending_debt_status"] == "clearing"
     assert summary["primary_target_pending_debt_freshness_status"] == "fresh"
     assert "resolving pending transitions more cleanly" in summary["class_pending_debt_summary"].lower()
+
+
+def test_operator_snapshot_reacquires_confirmation_forecast_after_decay(tmp_path: Path, monkeypatch):
+    report = _make_report(
+        preflight_summary={"status": "ok", "blocking_errors": 0, "warnings": 0, "checks": []},
+        review_targets=[],
+        managed_state_drift=[],
+        governance_drift=[],
+        governance_preview={},
+        rollback_preview={},
+        material_changes=[
+            {
+                "change_key": "high-1",
+                "change_type": "security-change",
+                "repo_name": "RepoC",
+                "severity": 0.9,
+                "title": "RepoC security posture changed",
+                "summary": "critical -> watch",
+                "recommended_next_step": "Review RepoC security posture changed now.",
+            }
+        ],
+    )
+    history = [
+        {
+            "generated_at": "2026-04-06T12:00:00+00:00",
+            "operator_summary": {
+                "primary_target": {
+                    "item_id": "review-target:RepoC",
+                    "repo": "RepoC",
+                    "title": "RepoC security posture changed",
+                    "lane": "urgent",
+                    "kind": "review",
+                },
+                "primary_target_closure_forecast_reweight_direction": "supporting-confirmation",
+                "primary_target_closure_forecast_reweight_score": 0.44,
+                "primary_target_closure_forecast_momentum_status": "sustained-confirmation",
+                "primary_target_closure_forecast_stability_status": "stable",
+                "primary_target_closure_forecast_hysteresis_status": "pending-confirmation",
+                "primary_target_closure_forecast_freshness_status": "fresh",
+                "primary_target_closure_forecast_decay_status": "none",
+                "primary_target_transition_closure_likely_outcome": "hold",
+                "primary_target_class_reweight_transition_status": "pending-support",
+                "primary_target_class_transition_resolution_status": "none",
+            },
+            "operator_queue": [],
+        },
+        {
+            "generated_at": "2026-04-05T12:00:00+00:00",
+            "operator_summary": {
+                "primary_target": {
+                    "item_id": "review-target:RepoC",
+                    "repo": "RepoC",
+                    "title": "RepoC security posture changed",
+                    "lane": "urgent",
+                    "kind": "review",
+                },
+                "primary_target_closure_forecast_reweight_direction": "supporting-confirmation",
+                "primary_target_closure_forecast_reweight_score": 0.38,
+                "primary_target_closure_forecast_momentum_status": "sustained-confirmation",
+                "primary_target_closure_forecast_stability_status": "stable",
+                "primary_target_closure_forecast_hysteresis_status": "pending-confirmation",
+                "primary_target_closure_forecast_freshness_status": "fresh",
+                "primary_target_closure_forecast_decay_status": "none",
+                "primary_target_transition_closure_likely_outcome": "hold",
+                "primary_target_class_reweight_transition_status": "pending-support",
+                "primary_target_class_transition_resolution_status": "none",
+            },
+            "operator_queue": [],
+        },
+        {
+            "generated_at": "2026-04-04T12:00:00+00:00",
+            "operator_summary": {
+                "primary_target": {
+                    "item_id": "review-target:RepoC",
+                    "repo": "RepoC",
+                    "title": "RepoC security posture changed",
+                    "lane": "urgent",
+                    "kind": "review",
+                },
+                "primary_target_closure_forecast_reweight_direction": "supporting-confirmation",
+                "primary_target_closure_forecast_reweight_score": 0.31,
+                "primary_target_closure_forecast_momentum_status": "building",
+                "primary_target_closure_forecast_stability_status": "watch",
+                "primary_target_closure_forecast_hysteresis_status": "pending-confirmation",
+                "primary_target_closure_forecast_freshness_status": "stale",
+                "primary_target_closure_forecast_decay_status": "confirmation-decayed",
+                "primary_target_transition_closure_likely_outcome": "hold",
+                "primary_target_class_reweight_transition_status": "pending-support",
+                "primary_target_class_transition_resolution_status": "none",
+            },
+            "operator_queue": [],
+        },
+    ]
+    monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
+
+    def _phase43_seed(
+        resolution_targets, _history, *, current_generated_at, confidence_calibration
+    ):
+        resolution_targets[:] = [
+            {
+                **target,
+                "trust_policy": "verify-first",
+                "trust_policy_reason": "The pending class signal is visible, but it has not stayed strong long enough to confirm broader normalization yet.",
+                "class_reweight_transition_status": "pending-support",
+                "class_reweight_transition_reason": "The class signal is visible, but it has not stayed strong long enough to confirm broader normalization yet.",
+                "class_transition_resolution_status": "none",
+                "class_transition_resolution_reason": "",
+                "class_transition_age_runs": 2,
+                "closure_forecast_reweight_score": 0.48,
+                "closure_forecast_reweight_direction": "supporting-confirmation",
+                "closure_forecast_momentum_status": "sustained-confirmation",
+                "closure_forecast_stability_status": "stable",
+                "closure_forecast_hysteresis_status": "none",
+                "closure_forecast_hysteresis_reason": "",
+                "closure_forecast_freshness_status": "fresh",
+                "closure_forecast_freshness_reason": "Recent closure-forecast evidence is still current enough to trust.",
+                "closure_forecast_decay_status": "none",
+                "closure_forecast_decay_reason": "",
+                "decayed_confirmation_forecast_rate": 0.72,
+                "decayed_clearance_forecast_rate": 0.18,
+                "transition_closure_likely_outcome": "hold",
+            }
+            for target in resolution_targets
+        ]
+        return {
+            "primary_target_closure_forecast_freshness_status": "fresh",
+            "primary_target_closure_forecast_freshness_reason": "Recent closure-forecast evidence is still current enough to trust.",
+            "primary_target_closure_forecast_decay_status": "none",
+            "primary_target_closure_forecast_decay_reason": "",
+            "closure_forecast_freshness_summary": "RepoC still has fresh closure-forecast evidence.",
+            "closure_forecast_decay_summary": "No closure-forecast decay is active right now.",
+            "stale_closure_forecast_hotspots": [],
+            "fresh_closure_forecast_signal_hotspots": [],
+            "closure_forecast_decay_window_runs": 4,
+        }
+
+    monkeypatch.setattr(
+        "src.operator_control_center._apply_closure_forecast_freshness_and_decay",
+        _phase43_seed,
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center._target_specific_normalization_noise",
+        lambda *_args, **_kwargs: False,
+    )
+
+    summary = build_operator_snapshot(report, output_dir=tmp_path)["operator_summary"]
+
+    assert summary["primary_target_closure_forecast_refresh_recovery_status"] == "reacquiring-confirmation"
+    assert summary["primary_target_closure_forecast_reacquisition_status"] == "reacquired-confirmation"
+    assert summary["primary_target_transition_closure_likely_outcome"] == "confirm-soon"
+    assert summary["primary_target_closure_forecast_hysteresis_status"] == "confirmed-confirmation"
+
+
+def test_operator_snapshot_reenables_early_clear_when_clearance_is_reacquired(tmp_path: Path, monkeypatch):
+    report = _make_report(
+        preflight_summary={"status": "ok", "blocking_errors": 0, "warnings": 0, "checks": []},
+        review_targets=[],
+        managed_state_drift=[],
+        governance_drift=[],
+        governance_preview={},
+        rollback_preview={},
+        material_changes=[
+            {
+                "change_key": "high-1",
+                "change_type": "security-change",
+                "repo_name": "RepoC",
+                "severity": 0.9,
+                "title": "RepoC security posture changed",
+                "summary": "critical -> watch",
+                "recommended_next_step": "Review RepoC security posture changed now.",
+            }
+        ],
+    )
+    history = [
+        {
+            "generated_at": "2026-04-06T12:00:00+00:00",
+            "operator_summary": {
+                "primary_target": {
+                    "item_id": "review-target:RepoC",
+                    "repo": "RepoC",
+                    "title": "RepoC security posture changed",
+                    "lane": "urgent",
+                    "kind": "review",
+                },
+                "primary_target_closure_forecast_reweight_direction": "supporting-clearance",
+                "primary_target_closure_forecast_reweight_score": -0.42,
+                "primary_target_closure_forecast_momentum_status": "sustained-clearance",
+                "primary_target_closure_forecast_stability_status": "stable",
+                "primary_target_closure_forecast_hysteresis_status": "pending-clearance",
+                "primary_target_closure_forecast_freshness_status": "fresh",
+                "primary_target_closure_forecast_decay_status": "none",
+                "primary_target_transition_closure_likely_outcome": "clear-risk",
+                "primary_target_class_reweight_transition_status": "pending-caution",
+                "primary_target_class_transition_resolution_status": "none",
+            },
+            "operator_queue": [],
+        },
+        {
+            "generated_at": "2026-04-05T12:00:00+00:00",
+            "operator_summary": {
+                "primary_target": {
+                    "item_id": "review-target:RepoC",
+                    "repo": "RepoC",
+                    "title": "RepoC security posture changed",
+                    "lane": "urgent",
+                    "kind": "review",
+                },
+                "primary_target_closure_forecast_reweight_direction": "supporting-clearance",
+                "primary_target_closure_forecast_reweight_score": -0.37,
+                "primary_target_closure_forecast_momentum_status": "sustained-clearance",
+                "primary_target_closure_forecast_stability_status": "stable",
+                "primary_target_closure_forecast_hysteresis_status": "pending-clearance",
+                "primary_target_closure_forecast_freshness_status": "fresh",
+                "primary_target_closure_forecast_decay_status": "none",
+                "primary_target_transition_closure_likely_outcome": "clear-risk",
+                "primary_target_class_reweight_transition_status": "pending-caution",
+                "primary_target_class_transition_resolution_status": "none",
+            },
+            "operator_queue": [],
+        },
+        {
+            "generated_at": "2026-04-04T12:00:00+00:00",
+            "operator_summary": {
+                "primary_target": {
+                    "item_id": "review-target:RepoC",
+                    "repo": "RepoC",
+                    "title": "RepoC security posture changed",
+                    "lane": "urgent",
+                    "kind": "review",
+                },
+                "primary_target_closure_forecast_reweight_direction": "supporting-clearance",
+                "primary_target_closure_forecast_reweight_score": -0.29,
+                "primary_target_closure_forecast_momentum_status": "building",
+                "primary_target_closure_forecast_stability_status": "watch",
+                "primary_target_closure_forecast_hysteresis_status": "pending-clearance",
+                "primary_target_closure_forecast_freshness_status": "stale",
+                "primary_target_closure_forecast_decay_status": "clearance-decayed",
+                "primary_target_transition_closure_likely_outcome": "hold",
+                "primary_target_class_reweight_transition_status": "pending-caution",
+                "primary_target_class_transition_resolution_status": "none",
+            },
+            "operator_queue": [],
+        },
+    ]
+    monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
+
+    def _phase43_seed(
+        resolution_targets, _history, *, current_generated_at, confidence_calibration
+    ):
+        resolution_targets[:] = [
+            {
+                **target,
+                "trust_policy": "verify-first",
+                "trust_policy_reason": "Fresh pending debt is still making the live pending forecast more cautious.",
+                "class_reweight_transition_status": "pending-caution",
+                "class_reweight_transition_reason": "Caution-heavy class evidence is visible, but it has not persisted long enough to confirm yet.",
+                "class_transition_resolution_status": "none",
+                "class_transition_resolution_reason": "",
+                "class_transition_age_runs": 3,
+                "class_pending_debt_status": "active-debt",
+                "class_pending_debt_reason": "This class keeps accumulating unresolved pending states.",
+                "policy_debt_status": "watch",
+                "policy_debt_reason": "",
+                "closure_forecast_reweight_score": -0.46,
+                "closure_forecast_reweight_direction": "supporting-clearance",
+                "closure_forecast_momentum_status": "sustained-clearance",
+                "closure_forecast_stability_status": "stable",
+                "closure_forecast_hysteresis_status": "none",
+                "closure_forecast_hysteresis_reason": "",
+                "closure_forecast_freshness_status": "fresh",
+                "closure_forecast_freshness_reason": "Recent closure-forecast evidence is still current enough to trust.",
+                "closure_forecast_decay_status": "none",
+                "closure_forecast_decay_reason": "",
+                "decayed_confirmation_forecast_rate": 0.15,
+                "decayed_clearance_forecast_rate": 0.78,
+                "transition_closure_likely_outcome": "hold",
+            }
+            for target in resolution_targets
+        ]
+        return {
+            "primary_target_closure_forecast_freshness_status": "fresh",
+            "primary_target_closure_forecast_freshness_reason": "Recent closure-forecast evidence is still current enough to trust.",
+            "primary_target_closure_forecast_decay_status": "none",
+            "primary_target_closure_forecast_decay_reason": "",
+            "closure_forecast_freshness_summary": "RepoC still has fresh closure-forecast evidence.",
+            "closure_forecast_decay_summary": "No closure-forecast decay is active right now.",
+            "stale_closure_forecast_hotspots": [],
+            "fresh_closure_forecast_signal_hotspots": [],
+            "closure_forecast_decay_window_runs": 4,
+        }
+
+    monkeypatch.setattr(
+        "src.operator_control_center._apply_closure_forecast_freshness_and_decay",
+        _phase43_seed,
+    )
+
+    summary = build_operator_snapshot(report, output_dir=tmp_path)["operator_summary"]
+
+    assert summary["primary_target_closure_forecast_refresh_recovery_status"] == "reacquiring-clearance"
+    assert summary["primary_target_closure_forecast_reacquisition_status"] == "reacquired-clearance"
+    assert summary["primary_target_transition_closure_likely_outcome"] in {"clear-risk", "expire-risk"}
+    assert summary["primary_target_class_transition_resolution_status"] == "cleared"
+    assert summary["primary_target_class_reweight_transition_status"] == "none"
 
 
 def test_operator_snapshot_learns_when_soft_exception_was_overcautious(tmp_path: Path, monkeypatch):
