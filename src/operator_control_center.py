@@ -30,6 +30,9 @@ TRUST_RECOVERY_WINDOW_RUNS = 3
 EXCEPTION_RETIREMENT_WINDOW_RUNS = 4
 CLASS_NORMALIZATION_WINDOW_RUNS = 4
 CLASS_MEMORY_FRESHNESS_WINDOW_RUNS = 4
+CLASS_REWEIGHTING_WINDOW_RUNS = 4
+CLASS_TRANSITION_WINDOW_RUNS = 4
+CLASS_PENDING_RESOLUTION_WINDOW_RUNS = 4
 CLASS_MEMORY_RECENCY_WEIGHTS = (1.0, 1.0, 0.7, 0.7, 0.4, 0.4, 0.4, 0.2, 0.2, 0.2)
 GENERIC_RECOMMENDATION_PHRASES = (
     "continue the normal audit/control-center loop",
@@ -426,6 +429,34 @@ def build_operator_snapshot(
         "stale_class_memory_hotspots": resolution_trend["stale_class_memory_hotspots"],
         "fresh_class_signal_hotspots": resolution_trend["fresh_class_signal_hotspots"],
         "class_decay_window_runs": resolution_trend["class_decay_window_runs"],
+        "primary_target_weighted_class_support_score": resolution_trend["primary_target_weighted_class_support_score"],
+        "primary_target_weighted_class_caution_score": resolution_trend["primary_target_weighted_class_caution_score"],
+        "primary_target_class_trust_reweight_score": resolution_trend["primary_target_class_trust_reweight_score"],
+        "primary_target_class_trust_reweight_direction": resolution_trend["primary_target_class_trust_reweight_direction"],
+        "primary_target_class_trust_reweight_reasons": resolution_trend["primary_target_class_trust_reweight_reasons"],
+        "class_reweighting_summary": resolution_trend["class_reweighting_summary"],
+        "supporting_class_hotspots": resolution_trend["supporting_class_hotspots"],
+        "caution_class_hotspots": resolution_trend["caution_class_hotspots"],
+        "class_reweighting_window_runs": resolution_trend["class_reweighting_window_runs"],
+        "primary_target_class_trust_momentum_score": resolution_trend["primary_target_class_trust_momentum_score"],
+        "primary_target_class_trust_momentum_status": resolution_trend["primary_target_class_trust_momentum_status"],
+        "primary_target_class_reweight_stability_status": resolution_trend["primary_target_class_reweight_stability_status"],
+        "primary_target_class_reweight_transition_status": resolution_trend["primary_target_class_reweight_transition_status"],
+        "primary_target_class_reweight_transition_reason": resolution_trend["primary_target_class_reweight_transition_reason"],
+        "class_momentum_summary": resolution_trend["class_momentum_summary"],
+        "class_reweight_stability_summary": resolution_trend["class_reweight_stability_summary"],
+        "class_transition_window_runs": resolution_trend["class_transition_window_runs"],
+        "primary_target_class_transition_health_status": resolution_trend["primary_target_class_transition_health_status"],
+        "primary_target_class_transition_health_reason": resolution_trend["primary_target_class_transition_health_reason"],
+        "primary_target_class_transition_resolution_status": resolution_trend["primary_target_class_transition_resolution_status"],
+        "primary_target_class_transition_resolution_reason": resolution_trend["primary_target_class_transition_resolution_reason"],
+        "class_transition_health_summary": resolution_trend["class_transition_health_summary"],
+        "class_transition_resolution_summary": resolution_trend["class_transition_resolution_summary"],
+        "class_transition_age_window_runs": resolution_trend["class_transition_age_window_runs"],
+        "stalled_transition_hotspots": resolution_trend["stalled_transition_hotspots"],
+        "resolving_transition_hotspots": resolution_trend["resolving_transition_hotspots"],
+        "sustained_class_hotspots": resolution_trend["sustained_class_hotspots"],
+        "oscillating_class_hotspots": resolution_trend["oscillating_class_hotspots"],
         "decision_memory_status": resolution_trend["decision_memory_status"],
         "primary_target_last_seen_at": resolution_trend["primary_target_last_seen_at"],
         "primary_target_last_intervention": resolution_trend["primary_target_last_intervention"],
@@ -585,6 +616,37 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
             f"*Trust Decay Controls:* {summary.get('primary_target_class_decay_status')} — "
             f"{summary.get('primary_target_class_decay_reason', 'No class-decay reason is recorded yet.')}"
         )
+    if summary.get("primary_target_class_trust_reweight_direction"):
+        lines.append(
+            f"*Class Trust Reweighting:* {summary.get('primary_target_class_trust_reweight_direction')} "
+            f"({summary.get('primary_target_class_trust_reweight_score', 0.0):.2f}) — "
+            f"{summary.get('class_reweighting_summary', 'No class reweighting summary is recorded yet.')}"
+        )
+    if summary.get("primary_target_class_trust_reweight_reasons"):
+        lines.append(
+            f"*Why Class Guidance Shifted:* {', '.join(summary.get('primary_target_class_trust_reweight_reasons') or [])}"
+        )
+    if summary.get("primary_target_class_trust_momentum_status"):
+        lines.append(
+            f"*Class Trust Momentum:* {summary.get('primary_target_class_trust_momentum_status')} "
+            f"({summary.get('primary_target_class_trust_momentum_score', 0.0):.2f}) — "
+            f"{summary.get('class_momentum_summary', 'No class momentum summary is recorded yet.')}"
+        )
+    if summary.get("primary_target_class_reweight_stability_status"):
+        lines.append(
+            f"*Reweighting Stability:* {summary.get('primary_target_class_reweight_stability_status')} — "
+            f"{summary.get('class_reweight_stability_summary', 'No reweighting stability summary is recorded yet.')}"
+        )
+    if summary.get("primary_target_class_transition_health_status"):
+        lines.append(
+            f"*Class Transition Health:* {summary.get('primary_target_class_transition_health_status')} — "
+            f"{summary.get('class_transition_health_summary', 'No class transition health summary is recorded yet.')}"
+        )
+    if summary.get("primary_target_class_transition_resolution_status"):
+        lines.append(
+            f"*Pending Transition Resolution:* {summary.get('primary_target_class_transition_resolution_status')} — "
+            f"{summary.get('class_transition_resolution_summary', 'No class transition resolution summary is recorded yet.')}"
+        )
     if summary.get("recommendation_drift_status"):
         lines.append(
             f"*Recommendation Drift:* {summary.get('recommendation_drift_status')} — "
@@ -602,6 +664,16 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
         lines.append(f"*Class Memory Summary:* {summary['class_memory_summary']}")
     if summary.get("class_decay_summary"):
         lines.append(f"*Class Decay Summary:* {summary['class_decay_summary']}")
+    if summary.get("class_reweighting_summary"):
+        lines.append(f"*Class Reweighting Summary:* {summary['class_reweighting_summary']}")
+    if summary.get("class_momentum_summary"):
+        lines.append(f"*Class Momentum Summary:* {summary['class_momentum_summary']}")
+    if summary.get("class_reweight_stability_summary"):
+        lines.append(f"*Reweighting Stability Summary:* {summary['class_reweight_stability_summary']}")
+    if summary.get("class_transition_health_summary"):
+        lines.append(f"*Class Transition Health Summary:* {summary['class_transition_health_summary']}")
+    if summary.get("class_transition_resolution_summary"):
+        lines.append(f"*Pending Transition Resolution Summary:* {summary['class_transition_resolution_summary']}")
     if summary.get("recommendation_quality_summary"):
         lines.append(f"*Recommendation Quality:* {summary['recommendation_quality_summary']}")
     if summary.get("confidence_validation_status"):
@@ -782,6 +854,13 @@ def _build_operator_handoff(
         resolution_trend.get("primary_target_class_normalization_status", "none"),
         resolution_trend.get("primary_target_class_memory_freshness_status", "insufficient-data"),
         resolution_trend.get("primary_target_class_decay_status", "none"),
+        resolution_trend.get("primary_target_class_trust_reweight_direction", "neutral"),
+        primary_target.get("class_trust_reweight_effect", "none"),
+        resolution_trend.get("primary_target_class_trust_momentum_status", "insufficient-data"),
+        resolution_trend.get("primary_target_class_reweight_stability_status", "watch"),
+        resolution_trend.get("primary_target_class_reweight_transition_status", "none"),
+        resolution_trend.get("primary_target_class_transition_health_status", "none"),
+        resolution_trend.get("primary_target_class_transition_resolution_status", "none"),
     )
     escalation_reason = _escalation_reason(queue, setup_health, watch_guidance)
     urgency = _handoff_urgency(queue, setup_health)
@@ -814,6 +893,11 @@ def _build_operator_handoff(
         f"{_class_normalization_note(resolution_trend)} "
         f"{_class_memory_note(resolution_trend)} "
         f"{_class_decay_note(resolution_trend)} "
+        f"{_class_reweighting_note(resolution_trend)} "
+        f"{_class_momentum_note(resolution_trend)} "
+        f"{_class_reweight_stability_note(resolution_trend)} "
+        f"{_class_transition_health_note(resolution_trend)} "
+        f"{_class_transition_resolution_note(resolution_trend)} "
         f"{_recommendation_drift_note(resolution_trend)} "
         f"{confidence_calibration.get('confidence_calibration_summary', '')} "
         f"{confidence.get('adaptive_confidence_summary', '')} "
@@ -1152,6 +1236,24 @@ def _build_resolution_trend(
         current_generated_at=current_generated_at,
         confidence_calibration=confidence_calibration,
     )
+    class_trust_reweighting = _apply_class_trust_reweighting(
+        resolution_targets,
+        history,
+        current_generated_at=current_generated_at,
+        confidence_calibration=confidence_calibration,
+    )
+    class_trust_momentum = _apply_class_trust_momentum(
+        resolution_targets,
+        history,
+        current_generated_at=current_generated_at,
+        confidence_calibration=confidence_calibration,
+    )
+    class_transition_resolution = _apply_class_transition_resolution(
+        resolution_targets,
+        history,
+        current_generated_at=current_generated_at,
+        confidence_calibration=confidence_calibration,
+    )
     new_attention_keys = current_attention_keys - previous_attention_keys
     resolved_attention_count = len(previous_attention_keys - current_attention_keys)
     persisting_attention_count = len(current_attention_keys & previous_attention_keys)
@@ -1276,6 +1378,34 @@ def _build_resolution_trend(
         "stale_class_memory_hotspots": class_memory_decay["stale_class_memory_hotspots"],
         "fresh_class_signal_hotspots": class_memory_decay["fresh_class_signal_hotspots"],
         "class_decay_window_runs": class_memory_decay["class_decay_window_runs"],
+        "primary_target_weighted_class_support_score": class_trust_reweighting["primary_target_weighted_class_support_score"],
+        "primary_target_weighted_class_caution_score": class_trust_reweighting["primary_target_weighted_class_caution_score"],
+        "primary_target_class_trust_reweight_score": class_trust_reweighting["primary_target_class_trust_reweight_score"],
+        "primary_target_class_trust_reweight_direction": class_trust_reweighting["primary_target_class_trust_reweight_direction"],
+        "primary_target_class_trust_reweight_reasons": class_trust_reweighting["primary_target_class_trust_reweight_reasons"],
+        "class_reweighting_summary": class_trust_reweighting["class_reweighting_summary"],
+        "supporting_class_hotspots": class_trust_reweighting["supporting_class_hotspots"],
+        "caution_class_hotspots": class_trust_reweighting["caution_class_hotspots"],
+        "class_reweighting_window_runs": class_trust_reweighting["class_reweighting_window_runs"],
+        "primary_target_class_trust_momentum_score": class_trust_momentum["primary_target_class_trust_momentum_score"],
+        "primary_target_class_trust_momentum_status": class_trust_momentum["primary_target_class_trust_momentum_status"],
+        "primary_target_class_reweight_stability_status": class_trust_momentum["primary_target_class_reweight_stability_status"],
+        "primary_target_class_reweight_transition_status": class_trust_momentum["primary_target_class_reweight_transition_status"],
+        "primary_target_class_reweight_transition_reason": class_trust_momentum["primary_target_class_reweight_transition_reason"],
+        "class_momentum_summary": class_trust_momentum["class_momentum_summary"],
+        "class_reweight_stability_summary": class_trust_momentum["class_reweight_stability_summary"],
+        "class_transition_window_runs": class_trust_momentum["class_transition_window_runs"],
+        "primary_target_class_transition_health_status": class_transition_resolution["primary_target_class_transition_health_status"],
+        "primary_target_class_transition_health_reason": class_transition_resolution["primary_target_class_transition_health_reason"],
+        "primary_target_class_transition_resolution_status": class_transition_resolution["primary_target_class_transition_resolution_status"],
+        "primary_target_class_transition_resolution_reason": class_transition_resolution["primary_target_class_transition_resolution_reason"],
+        "class_transition_health_summary": class_transition_resolution["class_transition_health_summary"],
+        "class_transition_resolution_summary": class_transition_resolution["class_transition_resolution_summary"],
+        "class_transition_age_window_runs": class_transition_resolution["class_transition_age_window_runs"],
+        "stalled_transition_hotspots": class_transition_resolution["stalled_transition_hotspots"],
+        "resolving_transition_hotspots": class_transition_resolution["resolving_transition_hotspots"],
+        "sustained_class_hotspots": class_trust_momentum["sustained_class_hotspots"],
+        "oscillating_class_hotspots": class_trust_momentum["oscillating_class_hotspots"],
         "decision_memory_status": decision_memory["decision_memory_status"],
         "primary_target_last_seen_at": decision_memory["primary_target_last_seen_at"],
         "primary_target_last_intervention": decision_memory["primary_target_last_intervention"],
@@ -1931,6 +2061,1611 @@ def _apply_class_memory_decay(
         "fresh_class_signal_hotspots": fresh_class_signal_hotspots,
         "class_decay_window_runs": CLASS_MEMORY_FRESHNESS_WINDOW_RUNS,
     }
+
+
+def _apply_class_trust_reweighting(
+    resolution_targets: list[dict],
+    history: list[dict],
+    *,
+    current_generated_at: str,
+    confidence_calibration: dict,
+) -> dict:
+    if not resolution_targets:
+        return {
+            "primary_target_weighted_class_support_score": 0.0,
+            "primary_target_weighted_class_caution_score": 0.0,
+            "primary_target_class_trust_reweight_score": 0.0,
+            "primary_target_class_trust_reweight_direction": "neutral",
+            "primary_target_class_trust_reweight_reasons": [],
+            "class_reweighting_summary": "No class trust reweighting is recorded because there is no active target.",
+            "supporting_class_hotspots": [],
+            "caution_class_hotspots": [],
+            "class_reweighting_window_runs": CLASS_REWEIGHTING_WINDOW_RUNS,
+        }
+
+    current_primary_target = resolution_targets[0]
+    current_bucket = _recommendation_bucket(current_primary_target)
+    class_events = _class_normalization_events(
+        history,
+        current_primary_target=current_primary_target,
+        current_generated_at=current_generated_at,
+    )
+    historical_cases = _historical_exception_cases(history)
+
+    updated_targets: list[dict] = []
+    for target in resolution_targets:
+        weighted_class_support_score = 0.0
+        weighted_class_caution_score = 0.0
+        class_trust_reweight_score = 0.0
+        class_trust_reweight_direction = "neutral"
+        class_trust_reweight_reasons: list[str] = []
+        class_trust_reweight_effect = "none"
+        class_trust_reweight_effect_reason = ""
+        final_policy = target.get("trust_policy", "monitor")
+        final_reason = target.get("trust_policy_reason", "No trust-policy reason is recorded yet.")
+        policy_debt_status = target.get("policy_debt_status", "none")
+        policy_debt_reason = target.get("policy_debt_reason", "")
+        class_normalization_status = target.get("class_normalization_status", "none")
+        class_normalization_reason = target.get("class_normalization_reason", "")
+
+        if _recommendation_bucket(target) == current_bucket:
+            history_meta = _target_class_normalization_history(target, class_events, historical_cases)
+            (
+                weighted_class_support_score,
+                weighted_class_caution_score,
+                class_trust_reweight_score,
+                class_trust_reweight_direction,
+                class_trust_reweight_reasons,
+            ) = _class_trust_reweight_scores_for_target(target, history_meta)
+            (
+                class_trust_reweight_effect,
+                class_trust_reweight_effect_reason,
+                final_policy,
+                final_reason,
+                policy_debt_status,
+                policy_debt_reason,
+                class_normalization_status,
+                class_normalization_reason,
+            ) = _class_trust_reweight_for_target(
+                target,
+                history_meta,
+                confidence_calibration,
+                weighted_class_support_score=weighted_class_support_score,
+                weighted_class_caution_score=weighted_class_caution_score,
+                class_trust_reweight_score=class_trust_reweight_score,
+                class_trust_reweight_direction=class_trust_reweight_direction,
+                trust_policy=final_policy,
+                trust_policy_reason=final_reason,
+                policy_debt_status=policy_debt_status,
+                policy_debt_reason=policy_debt_reason,
+                class_normalization_status=class_normalization_status,
+                class_normalization_reason=class_normalization_reason,
+            )
+
+        updated_targets.append(
+            {
+                **target,
+                "weighted_class_support_score": weighted_class_support_score,
+                "weighted_class_caution_score": weighted_class_caution_score,
+                "class_trust_reweight_score": class_trust_reweight_score,
+                "class_trust_reweight_direction": class_trust_reweight_direction,
+                "class_trust_reweight_reasons": class_trust_reweight_reasons,
+                "class_trust_reweight_effect": class_trust_reweight_effect,
+                "class_trust_reweight_effect_reason": class_trust_reweight_effect_reason,
+                "policy_debt_status": policy_debt_status,
+                "policy_debt_reason": policy_debt_reason,
+                "class_normalization_status": class_normalization_status,
+                "class_normalization_reason": class_normalization_reason,
+                "trust_policy": final_policy,
+                "trust_policy_reason": final_reason,
+            }
+        )
+
+    resolution_targets[:] = updated_targets
+    primary_target = resolution_targets[0]
+    supporting_class_hotspots = _class_reweight_hotspots(resolution_targets, mode="supporting")
+    caution_class_hotspots = _class_reweight_hotspots(resolution_targets, mode="caution")
+    return {
+        "primary_target_weighted_class_support_score": primary_target.get("weighted_class_support_score", 0.0),
+        "primary_target_weighted_class_caution_score": primary_target.get("weighted_class_caution_score", 0.0),
+        "primary_target_class_trust_reweight_score": primary_target.get("class_trust_reweight_score", 0.0),
+        "primary_target_class_trust_reweight_direction": primary_target.get("class_trust_reweight_direction", "neutral"),
+        "primary_target_class_trust_reweight_reasons": primary_target.get("class_trust_reweight_reasons", []),
+        "class_reweighting_summary": _class_reweighting_summary(
+            primary_target,
+            supporting_class_hotspots,
+            caution_class_hotspots,
+        ),
+        "supporting_class_hotspots": supporting_class_hotspots,
+        "caution_class_hotspots": caution_class_hotspots,
+        "class_reweighting_window_runs": CLASS_REWEIGHTING_WINDOW_RUNS,
+    }
+
+
+def _class_memory_freshness_multiplier(freshness_status: str) -> float:
+    if freshness_status == "fresh":
+        return 1.00
+    if freshness_status == "mixed-age":
+        return 0.65
+    if freshness_status == "stale":
+        return 0.35
+    return 0.20
+
+
+def _class_trust_reweight_scores_for_target(
+    target: dict,
+    history_meta: dict,
+) -> tuple[float, float, float, str, list[str]]:
+    freshness_status = target.get(
+        "class_memory_freshness_status",
+        history_meta.get("class_memory_freshness_status", "insufficient-data"),
+    )
+    freshness_reason = target.get(
+        "class_memory_freshness_reason",
+        history_meta.get("class_memory_freshness_reason", ""),
+    )
+    freshness_multiplier = _class_memory_freshness_multiplier(freshness_status)
+    decayed_class_retirement_rate = target.get(
+        "decayed_class_retirement_rate",
+        history_meta.get("decayed_class_retirement_rate", 0.0),
+    )
+    decayed_class_sticky_rate = target.get(
+        "decayed_class_sticky_rate",
+        history_meta.get("decayed_class_sticky_rate", 0.0),
+    )
+    local_blocker = _target_specific_normalization_noise(target, history_meta)
+
+    support_adjustment = 0.0
+    caution_adjustment = 0.0
+    if target.get("class_normalization_status") in {"candidate", "applied"}:
+        support_adjustment += 0.10
+    if target.get("trust_recovery_status") in {"candidate", "earned"}:
+        support_adjustment += 0.05
+    if target.get("class_decay_status") == "normalization-decayed":
+        support_adjustment -= 0.10
+    if local_blocker:
+        support_adjustment -= 0.10
+
+    if target.get("policy_debt_status") == "class-debt":
+        caution_adjustment += 0.10
+    if target.get("class_decay_status") == "blocked":
+        caution_adjustment += 0.05
+    if target.get("exception_pattern_status") == "useful-caution":
+        caution_adjustment += 0.05
+    if target.get("class_decay_status") == "policy-debt-decayed":
+        caution_adjustment -= 0.10
+    if target.get("exception_pattern_status") == "overcautious":
+        caution_adjustment -= 0.05
+
+    weighted_class_support_score = _clamp_round(
+        decayed_class_retirement_rate * freshness_multiplier + support_adjustment,
+        lower=0.0,
+        upper=0.95,
+    )
+    weighted_class_caution_score = _clamp_round(
+        decayed_class_sticky_rate * freshness_multiplier + caution_adjustment,
+        lower=0.0,
+        upper=0.95,
+    )
+    class_trust_reweight_score = _clamp_round(
+        weighted_class_support_score - weighted_class_caution_score,
+        lower=-0.95,
+        upper=0.95,
+    )
+    if class_trust_reweight_score >= 0.20:
+        direction = "supporting-normalization"
+    elif class_trust_reweight_score <= -0.20:
+        direction = "supporting-caution"
+    else:
+        direction = "neutral"
+
+    reasons = [reason for reason in (
+        freshness_reason,
+        _class_trust_support_reason(
+            target,
+            decayed_class_retirement_rate=decayed_class_retirement_rate,
+            freshness_multiplier=freshness_multiplier,
+        ),
+        _class_trust_caution_reason(
+            target,
+            decayed_class_sticky_rate=decayed_class_sticky_rate,
+            freshness_multiplier=freshness_multiplier,
+        ),
+        "Local reopen, flip, or blocked-recovery noise still overrides positive class carry-forward."
+        if local_blocker
+        else "",
+    ) if reason]
+    return (
+        weighted_class_support_score,
+        weighted_class_caution_score,
+        class_trust_reweight_score,
+        direction,
+        reasons[:4],
+    )
+
+
+def _class_trust_support_reason(
+    target: dict,
+    *,
+    decayed_class_retirement_rate: float,
+    freshness_multiplier: float,
+) -> str:
+    if target.get("class_normalization_status") in {"candidate", "applied"}:
+        return "Existing class normalization support is still contributing to a stronger posture."
+    if target.get("trust_recovery_status") in {"candidate", "earned"}:
+        return "Trust recovery is reinforcing healthier class behavior."
+    if decayed_class_retirement_rate * freshness_multiplier >= 0.30:
+        return "Fresh retired-like class evidence is still carrying meaningful normalization support."
+    return ""
+
+
+def _class_trust_caution_reason(
+    target: dict,
+    *,
+    decayed_class_sticky_rate: float,
+    freshness_multiplier: float,
+) -> str:
+    if target.get("policy_debt_status") == "class-debt":
+        return "Sticky class caution is still weighing against broader relaxation."
+    if target.get("class_decay_status") == "blocked":
+        return "Local target noise is still blocking healthier class carry-forward."
+    if target.get("exception_pattern_status") == "useful-caution":
+        return "Recent useful-caution history still supports a softer posture."
+    if decayed_class_sticky_rate * freshness_multiplier >= 0.30:
+        return "Fresh sticky class evidence is still carrying meaningful caution."
+    return ""
+
+
+def _class_trust_reweight_for_target(
+    target: dict,
+    history_meta: dict,
+    confidence_calibration: dict,
+    *,
+    weighted_class_support_score: float,
+    weighted_class_caution_score: float,
+    class_trust_reweight_score: float,
+    class_trust_reweight_direction: str,
+    trust_policy: str,
+    trust_policy_reason: str,
+    policy_debt_status: str,
+    policy_debt_reason: str,
+    class_normalization_status: str,
+    class_normalization_reason: str,
+) -> tuple[str, str, str, str, str, str, str, str]:
+    _ = weighted_class_support_score
+    _ = weighted_class_caution_score
+    freshness_status = target.get(
+        "class_memory_freshness_status",
+        history_meta.get("class_memory_freshness_status", "insufficient-data"),
+    )
+    local_noise = _target_specific_normalization_noise(target, history_meta)
+    calibration_status = confidence_calibration.get("confidence_validation_status", "insufficient-data")
+
+    if (
+        local_noise
+        and class_trust_reweight_direction == "supporting-normalization"
+    ):
+        return (
+            "none",
+            "Positive class reweighting is blocked because local reopen, flip, or blocked-recovery noise still overrides class support.",
+            trust_policy,
+            trust_policy_reason,
+            policy_debt_status,
+            policy_debt_reason,
+            class_normalization_status,
+            class_normalization_reason,
+        )
+
+    can_strengthen = freshness_status == "fresh" and not local_noise and calibration_status == "healthy"
+    can_soften = freshness_status in {"fresh", "mixed-age", "stale", "insufficient-data"}
+
+    if (
+        class_normalization_status == "candidate"
+        and class_trust_reweight_score >= 0.20
+        and can_strengthen
+    ):
+        boosted_reason = (
+            "Fresh class support crossed the reweight threshold, so this target inherits a stronger act-with-review posture."
+        )
+        return (
+            "normalization-boosted",
+            boosted_reason,
+            "act-with-review",
+            boosted_reason,
+            policy_debt_status,
+            policy_debt_reason,
+            "applied",
+            boosted_reason,
+        )
+
+    if (
+        class_normalization_status == "applied"
+        and class_trust_reweight_score < 0.10
+        and can_soften
+    ):
+        softened_reason = (
+            "Class normalization stayed visible, but fresh support is no longer strong enough to keep the full stronger posture in place."
+        )
+        reverted_policy = target.get("pre_class_normalization_trust_policy", trust_policy)
+        reverted_reason = target.get("pre_class_normalization_trust_policy_reason", trust_policy_reason)
+        if trust_policy == "act-with-review" and reverted_policy == "verify-first":
+            trust_policy = reverted_policy
+            trust_policy_reason = softened_reason
+        return (
+            "normalization-softened",
+            softened_reason,
+            trust_policy,
+            trust_policy_reason if trust_policy != "verify-first" else softened_reason,
+            policy_debt_status,
+            policy_debt_reason,
+            "candidate",
+            softened_reason,
+        )
+
+    if (
+        policy_debt_status == "watch"
+        and class_trust_reweight_score <= -0.20
+        and freshness_status == "fresh"
+    ):
+        strengthened_reason = "Fresh class caution is still strong enough to keep this class in sticky caution."
+        return (
+            "policy-debt-strengthened",
+            strengthened_reason,
+            trust_policy,
+            trust_policy_reason,
+            "class-debt",
+            strengthened_reason,
+            class_normalization_status,
+            class_normalization_reason,
+        )
+
+    if (
+        policy_debt_status == "class-debt"
+        and class_trust_reweight_score > -0.10
+        and can_soften
+    ):
+        softened_reason = "Class-level caution is fading rather than disappearing all at once, so this class softens from class-debt to watch."
+        return (
+            "policy-debt-softened",
+            softened_reason,
+            trust_policy,
+            trust_policy_reason,
+            "watch",
+            softened_reason,
+            class_normalization_status,
+            class_normalization_reason,
+        )
+
+    return (
+        "none",
+        "",
+        trust_policy,
+        trust_policy_reason,
+        policy_debt_status,
+        policy_debt_reason,
+        class_normalization_status,
+        class_normalization_reason,
+    )
+
+
+def _class_reweight_hotspots(resolution_targets: list[dict], *, mode: str) -> list[dict]:
+    grouped: dict[str, dict] = {}
+    for target in resolution_targets:
+        class_key = _target_class_key(target)
+        if not class_key:
+            continue
+        existing = grouped.get(class_key)
+        current = {
+            "scope": "class",
+            "label": class_key,
+            "direction": target.get("class_trust_reweight_direction", "neutral"),
+            "reweight_score": target.get("class_trust_reweight_score", 0.0),
+            "weighted_class_support_score": target.get("weighted_class_support_score", 0.0),
+            "weighted_class_caution_score": target.get("weighted_class_caution_score", 0.0),
+            "class_memory_freshness_status": target.get("class_memory_freshness_status", "insufficient-data"),
+            "effect": target.get("class_trust_reweight_effect", "none"),
+        }
+        if existing is None or abs(current["reweight_score"]) > abs(existing["reweight_score"]):
+            grouped[class_key] = current
+
+    hotspots = list(grouped.values())
+    if mode == "supporting":
+        hotspots = [item for item in hotspots if item.get("reweight_score", 0.0) >= 0.20]
+        hotspots.sort(
+            key=lambda item: (
+                -item.get("reweight_score", 0.0),
+                -item.get("weighted_class_support_score", 0.0),
+                item.get("label", ""),
+            )
+        )
+    else:
+        hotspots = [item for item in hotspots if item.get("reweight_score", 0.0) <= -0.20]
+        hotspots.sort(
+            key=lambda item: (
+                item.get("reweight_score", 0.0),
+                -item.get("weighted_class_caution_score", 0.0),
+                item.get("label", ""),
+            )
+        )
+    return hotspots[:5]
+
+
+def _class_reweighting_summary(
+    primary_target: dict,
+    supporting_class_hotspots: list[dict],
+    caution_class_hotspots: list[dict],
+) -> str:
+    label = _target_label(primary_target) or "The current target"
+    effect = primary_target.get("class_trust_reweight_effect", "none")
+    direction = primary_target.get("class_trust_reweight_direction", "neutral")
+    score = primary_target.get("class_trust_reweight_score", 0.0)
+    if effect == "normalization-boosted":
+        return f"{label} inherited a stronger posture because fresh class support crossed the reweight threshold ({score:.2f})."
+    if effect == "normalization-softened":
+        return f"{label} kept class normalization visible, but its support weakened enough that the stronger posture was softened ({score:.2f})."
+    if effect == "policy-debt-strengthened":
+        return f"{label} still sits in fresh caution-heavy class evidence, so sticky class caution stayed strong ({score:.2f})."
+    if effect == "policy-debt-softened":
+        return f"{label} still carries class-level caution, but that caution is fading instead of disappearing all at once ({score:.2f})."
+    if direction == "supporting-normalization":
+        return f"Fresh class evidence is consistently improving around {label}, so class guidance is actively leaning toward normalization ({score:.2f})."
+    if direction == "supporting-caution":
+        return f"Recent class evidence around {label} is still caution-heavy enough to keep class trust conservative ({score:.2f})."
+    if supporting_class_hotspots:
+        hotspot = supporting_class_hotspots[0]
+        return (
+            f"Fresh class support is strongest around {hotspot.get('label', 'recent hotspots')}, "
+            "but the current target has not crossed the reweight threshold yet."
+        )
+    if caution_class_hotspots:
+        hotspot = caution_class_hotspots[0]
+        return (
+            f"Fresh class caution is strongest around {hotspot.get('label', 'recent hotspots')}, "
+            "so broader trust relaxation should stay conservative there."
+        )
+    return "Class evidence is informative, but not strong enough to move posture by itself yet."
+
+
+def _apply_class_trust_momentum(
+    resolution_targets: list[dict],
+    history: list[dict],
+    *,
+    current_generated_at: str,
+    confidence_calibration: dict,
+) -> dict:
+    if not resolution_targets:
+        return {
+            "primary_target_class_trust_momentum_score": 0.0,
+            "primary_target_class_trust_momentum_status": "insufficient-data",
+            "primary_target_class_reweight_stability_status": "watch",
+            "primary_target_class_reweight_transition_status": "none",
+            "primary_target_class_reweight_transition_reason": "",
+            "class_momentum_summary": "No class trust momentum is recorded because there is no active target.",
+            "class_reweight_stability_summary": "No class reweighting stability signal is recorded because there is no active target.",
+            "class_transition_window_runs": CLASS_TRANSITION_WINDOW_RUNS,
+            "sustained_class_hotspots": [],
+            "oscillating_class_hotspots": [],
+        }
+
+    current_primary_target = resolution_targets[0]
+    current_bucket = _recommendation_bucket(current_primary_target)
+    reweight_events = _class_reweight_events(
+        history,
+        current_primary_target=current_primary_target,
+        current_generated_at=current_generated_at,
+    )
+
+    updated_targets: list[dict] = []
+    for target in resolution_targets:
+        momentum_score = 0.0
+        momentum_status = "insufficient-data"
+        stability_status = "watch"
+        transition_status = "none"
+        transition_reason = ""
+        recent_path = ""
+        final_policy = target.get("trust_policy", "monitor")
+        final_reason = target.get("trust_policy_reason", "No trust-policy reason is recorded yet.")
+        policy_debt_status = target.get("policy_debt_status", "none")
+        policy_debt_reason = target.get("policy_debt_reason", "")
+        class_normalization_status = target.get("class_normalization_status", "none")
+        class_normalization_reason = target.get("class_normalization_reason", "")
+
+        if _recommendation_bucket(target) == current_bucket:
+            history_meta = _target_class_reweight_history(target, reweight_events)
+            momentum_score = history_meta.get("class_trust_momentum_score", 0.0)
+            momentum_status = history_meta.get("class_trust_momentum_status", "insufficient-data")
+            stability_status = history_meta.get("class_reweight_stability_status", "watch")
+            recent_path = history_meta.get("recent_class_reweight_path", "")
+            (
+                transition_status,
+                transition_reason,
+                final_policy,
+                final_reason,
+                policy_debt_status,
+                policy_debt_reason,
+                class_normalization_status,
+                class_normalization_reason,
+            ) = _class_trust_momentum_for_target(
+                target,
+                history_meta,
+                confidence_calibration,
+                trust_policy=final_policy,
+                trust_policy_reason=final_reason,
+                policy_debt_status=policy_debt_status,
+                policy_debt_reason=policy_debt_reason,
+                class_normalization_status=class_normalization_status,
+                class_normalization_reason=class_normalization_reason,
+            )
+
+        updated_targets.append(
+            {
+                **target,
+                "class_trust_momentum_score": momentum_score,
+                "class_trust_momentum_status": momentum_status,
+                "class_reweight_stability_status": stability_status,
+                "class_reweight_transition_status": transition_status,
+                "class_reweight_transition_reason": transition_reason,
+                "recent_class_reweight_path": recent_path,
+                "policy_debt_status": policy_debt_status,
+                "policy_debt_reason": policy_debt_reason,
+                "class_normalization_status": class_normalization_status,
+                "class_normalization_reason": class_normalization_reason,
+                "trust_policy": final_policy,
+                "trust_policy_reason": final_reason,
+            }
+        )
+
+    resolution_targets[:] = updated_targets
+    primary_target = resolution_targets[0]
+    sustained_class_hotspots = _class_momentum_hotspots(resolution_targets, mode="sustained")
+    oscillating_class_hotspots = _class_momentum_hotspots(resolution_targets, mode="oscillating")
+    return {
+        "primary_target_class_trust_momentum_score": primary_target.get("class_trust_momentum_score", 0.0),
+        "primary_target_class_trust_momentum_status": primary_target.get("class_trust_momentum_status", "insufficient-data"),
+        "primary_target_class_reweight_stability_status": primary_target.get("class_reweight_stability_status", "watch"),
+        "primary_target_class_reweight_transition_status": primary_target.get("class_reweight_transition_status", "none"),
+        "primary_target_class_reweight_transition_reason": primary_target.get("class_reweight_transition_reason", ""),
+        "class_momentum_summary": _class_momentum_summary(
+            primary_target,
+            sustained_class_hotspots,
+            oscillating_class_hotspots,
+        ),
+        "class_reweight_stability_summary": _class_reweight_stability_summary(
+            primary_target,
+            oscillating_class_hotspots,
+        ),
+        "class_transition_window_runs": CLASS_TRANSITION_WINDOW_RUNS,
+        "sustained_class_hotspots": sustained_class_hotspots,
+        "oscillating_class_hotspots": oscillating_class_hotspots,
+    }
+
+
+def _apply_class_transition_resolution(
+    resolution_targets: list[dict],
+    history: list[dict],
+    *,
+    current_generated_at: str,
+    confidence_calibration: dict,
+) -> dict:
+    if not resolution_targets:
+        return {
+            "primary_target_class_transition_health_status": "none",
+            "primary_target_class_transition_health_reason": "",
+            "primary_target_class_transition_resolution_status": "none",
+            "primary_target_class_transition_resolution_reason": "",
+            "class_transition_health_summary": "No class transition health is recorded because there is no active target.",
+            "class_transition_resolution_summary": "No pending transition resolution is recorded because there is no active target.",
+            "class_transition_age_window_runs": CLASS_PENDING_RESOLUTION_WINDOW_RUNS,
+            "stalled_transition_hotspots": [],
+            "resolving_transition_hotspots": [],
+        }
+
+    current_primary_target = resolution_targets[0]
+    current_bucket = _recommendation_bucket(current_primary_target)
+    transition_events = _class_transition_events(
+        history,
+        current_primary_target=current_primary_target,
+        current_generated_at=current_generated_at,
+    )
+
+    updated_targets: list[dict] = []
+    for target in resolution_targets:
+        health_status = "none"
+        health_reason = ""
+        resolution_status = "none"
+        resolution_reason = ""
+        transition_age_runs = 0
+        recent_transition_path = ""
+        final_policy = target.get("trust_policy", "monitor")
+        final_reason = target.get("trust_policy_reason", "No trust-policy reason is recorded yet.")
+        transition_status = target.get("class_reweight_transition_status", "none")
+        transition_reason = target.get("class_reweight_transition_reason", "")
+        policy_debt_status = target.get("policy_debt_status", "none")
+        policy_debt_reason = target.get("policy_debt_reason", "")
+        class_normalization_status = target.get("class_normalization_status", "none")
+        class_normalization_reason = target.get("class_normalization_reason", "")
+
+        if _recommendation_bucket(target) == current_bucket:
+            history_meta = _target_class_transition_history(target, transition_events)
+            transition_age_runs = history_meta["class_transition_age_runs"]
+            recent_transition_path = history_meta["recent_transition_path"]
+            (
+                health_status,
+                health_reason,
+                resolution_status,
+                resolution_reason,
+                transition_status,
+                transition_reason,
+                final_policy,
+                final_reason,
+                policy_debt_status,
+                policy_debt_reason,
+                class_normalization_status,
+                class_normalization_reason,
+            ) = _class_transition_resolution_for_target(
+                target,
+                history_meta,
+                confidence_calibration,
+                trust_policy=final_policy,
+                trust_policy_reason=final_reason,
+                transition_status=transition_status,
+                transition_reason=transition_reason,
+                policy_debt_status=policy_debt_status,
+                policy_debt_reason=policy_debt_reason,
+                class_normalization_status=class_normalization_status,
+                class_normalization_reason=class_normalization_reason,
+            )
+
+        updated_targets.append(
+            {
+                **target,
+                "class_transition_age_runs": transition_age_runs,
+                "class_transition_health_status": health_status,
+                "class_transition_health_reason": health_reason,
+                "class_transition_resolution_status": resolution_status,
+                "class_transition_resolution_reason": resolution_reason,
+                "recent_transition_path": recent_transition_path,
+                "class_reweight_transition_status": transition_status,
+                "class_reweight_transition_reason": transition_reason,
+                "policy_debt_status": policy_debt_status,
+                "policy_debt_reason": policy_debt_reason,
+                "class_normalization_status": class_normalization_status,
+                "class_normalization_reason": class_normalization_reason,
+                "trust_policy": final_policy,
+                "trust_policy_reason": final_reason,
+            }
+        )
+
+    resolution_targets[:] = updated_targets
+    primary_target = resolution_targets[0]
+    stalled_transition_hotspots = _class_transition_hotspots(resolution_targets, mode="stalled")
+    resolving_transition_hotspots = _class_transition_hotspots(resolution_targets, mode="resolving")
+    return {
+        "primary_target_class_transition_health_status": primary_target.get("class_transition_health_status", "none"),
+        "primary_target_class_transition_health_reason": primary_target.get("class_transition_health_reason", ""),
+        "primary_target_class_transition_resolution_status": primary_target.get("class_transition_resolution_status", "none"),
+        "primary_target_class_transition_resolution_reason": primary_target.get("class_transition_resolution_reason", ""),
+        "class_transition_health_summary": _class_transition_health_summary(
+            primary_target,
+            stalled_transition_hotspots,
+        ),
+        "class_transition_resolution_summary": _class_transition_resolution_summary(
+            primary_target,
+            resolving_transition_hotspots,
+            stalled_transition_hotspots,
+        ),
+        "class_transition_age_window_runs": CLASS_PENDING_RESOLUTION_WINDOW_RUNS,
+        "stalled_transition_hotspots": stalled_transition_hotspots,
+        "resolving_transition_hotspots": resolving_transition_hotspots,
+    }
+
+
+def _class_reweight_events(
+    history: list[dict],
+    *,
+    current_primary_target: dict,
+    current_generated_at: str,
+) -> list[dict]:
+    events: list[dict] = []
+    if current_primary_target and current_primary_target.get("trust_policy"):
+        events.append(
+            {
+                "key": _queue_identity(current_primary_target),
+                "class_key": _target_class_key(current_primary_target),
+                "label": _target_label(current_primary_target),
+                "generated_at": current_generated_at or "",
+                "class_trust_reweight_score": current_primary_target.get("class_trust_reweight_score", 0.0),
+                "class_trust_reweight_direction": current_primary_target.get("class_trust_reweight_direction", "neutral"),
+                "policy_debt_status": current_primary_target.get("policy_debt_status", "none"),
+                "class_normalization_status": current_primary_target.get("class_normalization_status", "none"),
+            }
+        )
+    for entry in history[: HISTORY_WINDOW_RUNS - 1]:
+        summary = entry.get("operator_summary") or {}
+        primary_target = summary.get("primary_target") or {}
+        if not primary_target:
+            continue
+        reweight_direction = (
+            summary.get("primary_target_class_trust_reweight_direction")
+            or primary_target.get("class_trust_reweight_direction")
+            or ""
+        )
+        reweight_score = summary.get("primary_target_class_trust_reweight_score")
+        if reweight_score is None:
+            reweight_score = primary_target.get("class_trust_reweight_score")
+        if reweight_score is None and not reweight_direction:
+            continue
+        events.append(
+            {
+                "key": _queue_identity(primary_target),
+                "class_key": _target_class_key(primary_target),
+                "label": _target_label(primary_target),
+                "generated_at": entry.get("generated_at", ""),
+                "class_trust_reweight_score": reweight_score or 0.0,
+                "class_trust_reweight_direction": reweight_direction or "neutral",
+                "policy_debt_status": summary.get("primary_target_policy_debt_status", "none"),
+                "class_normalization_status": summary.get("primary_target_class_normalization_status", "none"),
+            }
+        )
+    return sorted(events, key=lambda item: item.get("generated_at", ""), reverse=True)
+
+
+def _class_transition_events(
+    history: list[dict],
+    *,
+    current_primary_target: dict,
+    current_generated_at: str,
+) -> list[dict]:
+    events: list[dict] = []
+    if current_primary_target and current_primary_target.get("trust_policy"):
+        events.append(
+            {
+                "key": _queue_identity(current_primary_target),
+                "class_key": _target_class_key(current_primary_target),
+                "label": _target_label(current_primary_target),
+                "generated_at": current_generated_at or "",
+                "class_trust_reweight_score": current_primary_target.get("class_trust_reweight_score", 0.0),
+                "class_trust_reweight_direction": current_primary_target.get("class_trust_reweight_direction", "neutral"),
+                "class_trust_momentum_status": current_primary_target.get("class_trust_momentum_status", "insufficient-data"),
+                "class_reweight_stability_status": current_primary_target.get("class_reweight_stability_status", "watch"),
+                "class_reweight_transition_status": current_primary_target.get("class_reweight_transition_status", "none"),
+                "class_reweight_transition_reason": current_primary_target.get("class_reweight_transition_reason", ""),
+            }
+        )
+    historical_events: list[dict] = []
+    for entry in history[: HISTORY_WINDOW_RUNS - 1]:
+        summary = entry.get("operator_summary") or {}
+        primary_target = summary.get("primary_target") or {}
+        if not primary_target:
+            continue
+        historical_events.append(
+            {
+                "key": _queue_identity(primary_target),
+                "class_key": _target_class_key(primary_target),
+                "label": _target_label(primary_target),
+                "generated_at": entry.get("generated_at", ""),
+                "class_trust_reweight_score": summary.get(
+                    "primary_target_class_trust_reweight_score",
+                    primary_target.get("class_trust_reweight_score", 0.0),
+                ),
+                "class_trust_reweight_direction": summary.get(
+                    "primary_target_class_trust_reweight_direction",
+                    primary_target.get("class_trust_reweight_direction", "neutral"),
+                ),
+                "class_trust_momentum_status": summary.get(
+                    "primary_target_class_trust_momentum_status",
+                    primary_target.get("class_trust_momentum_status", "insufficient-data"),
+                ),
+                "class_reweight_stability_status": summary.get(
+                    "primary_target_class_reweight_stability_status",
+                    primary_target.get("class_reweight_stability_status", "watch"),
+                ),
+                "class_reweight_transition_status": summary.get(
+                    "primary_target_class_reweight_transition_status",
+                    primary_target.get("class_reweight_transition_status", "none"),
+                ),
+                "class_reweight_transition_reason": summary.get(
+                    "primary_target_class_reweight_transition_reason",
+                    primary_target.get("class_reweight_transition_reason", ""),
+                ),
+            }
+        )
+    historical_events.sort(key=lambda item: item.get("generated_at", ""), reverse=True)
+    return events + historical_events
+
+
+def _target_class_transition_history(target: dict, transition_events: list[dict]) -> dict:
+    class_key = _target_class_key(target)
+    matching_events = [event for event in transition_events if event.get("class_key") == class_key][
+        : CLASS_PENDING_RESOLUTION_WINDOW_RUNS + 1
+    ]
+    statuses = [event.get("class_reweight_transition_status", "none") or "none" for event in matching_events]
+    scores = [float(event.get("class_trust_reweight_score", 0.0) or 0.0) for event in matching_events]
+    directions = [
+        _normalized_class_reweight_direction(
+            event.get("class_trust_reweight_direction", "neutral"),
+            event.get("class_trust_reweight_score", 0.0),
+        )
+        for event in matching_events
+    ]
+    current_status = statuses[0] if statuses else "none"
+    class_transition_age_runs = 0
+    current_strengthening = False
+    recent_pending_status = "none"
+    recent_pending_age_runs = 0
+    recent_pending_direction = "neutral"
+
+    if current_status in {"pending-support", "pending-caution"}:
+        class_transition_age_runs = _consecutive_transition_runs(statuses, current_status)
+        current_strengthening = _current_transition_strengthening(
+            current_status,
+            scores[:class_transition_age_runs],
+        )
+    elif len(statuses) > 1 and statuses[1] in {"pending-support", "pending-caution"}:
+        recent_pending_status = statuses[1]
+        recent_pending_age_runs = _consecutive_transition_runs(statuses[1:], recent_pending_status)
+        recent_pending_direction = _pending_transition_direction(recent_pending_status)
+        class_transition_age_runs = recent_pending_age_runs
+    elif current_status == "none":
+        class_transition_age_runs = 0
+
+    if current_status in {"pending-support", "pending-caution"}:
+        recent_pending_status = current_status
+        recent_pending_age_runs = class_transition_age_runs
+        recent_pending_direction = _pending_transition_direction(current_status)
+
+    current_direction = directions[0] if directions else "neutral"
+    current_score = scores[0] if scores else 0.0
+    current_neutral = abs(current_score) < 0.10 or current_direction == "neutral"
+    pending_direction = recent_pending_direction if recent_pending_direction != "neutral" else _pending_transition_direction(current_status)
+    current_reversed = (
+        pending_direction != "neutral"
+        and current_direction != "neutral"
+        and current_direction != pending_direction
+    )
+    current_lost_pending_support = False
+    if recent_pending_status == "pending-support" and current_status not in {"pending-support", "confirmed-support"}:
+        current_lost_pending_support = current_score < 0.20 or current_direction != "supporting-normalization"
+    if recent_pending_status == "pending-caution" and current_status not in {"pending-caution", "confirmed-caution"}:
+        current_lost_pending_support = current_score > -0.20 or current_direction != "supporting-caution"
+    return {
+        "class_transition_age_runs": class_transition_age_runs,
+        "recent_transition_path": " -> ".join(statuses),
+        "current_transition_status": current_status,
+        "recent_pending_status": recent_pending_status,
+        "recent_pending_age_runs": recent_pending_age_runs,
+        "current_transition_strengthening": current_strengthening,
+        "current_transition_direction": current_direction,
+        "current_transition_score": current_score,
+        "current_transition_neutral": current_neutral,
+        "current_transition_reversed": current_reversed,
+        "current_lost_pending_support": current_lost_pending_support,
+    }
+
+
+def _consecutive_transition_runs(statuses: list[str], target_status: str) -> int:
+    count = 0
+    for status in statuses:
+        if status != target_status:
+            break
+        count += 1
+    return count
+
+
+def _pending_transition_direction(transition_status: str) -> str:
+    if transition_status == "pending-support":
+        return "supporting-normalization"
+    if transition_status == "pending-caution":
+        return "supporting-caution"
+    return "neutral"
+
+
+def _current_transition_strengthening(transition_status: str, scores: list[float]) -> bool:
+    if not scores:
+        return False
+    if len(scores) == 1:
+        return True
+    current_score = scores[0]
+    previous_score = scores[1]
+    if transition_status == "pending-support":
+        return current_score - previous_score >= 0.05
+    if transition_status == "pending-caution":
+        return previous_score - current_score >= 0.05
+    return False
+
+
+def _target_class_reweight_history(target: dict, reweight_events: list[dict]) -> dict:
+    class_key = _target_class_key(target)
+    matching_events = [event for event in reweight_events if event.get("class_key") == class_key][:CLASS_TRANSITION_WINDOW_RUNS]
+    signals = [_class_signal_from_reweight_event(event) for event in matching_events]
+    relevant_signals = [signal for signal in signals if abs(signal) >= 0.05]
+    weighted_total = 0.0
+    weight_sum = 0.0
+    for index, signal in enumerate(signals):
+        weight = (1.0, 0.8, 0.6, 0.4)[min(index, CLASS_TRANSITION_WINDOW_RUNS - 1)]
+        weighted_total += signal * weight
+        weight_sum += weight
+    momentum_score = _clamp_round(
+        weighted_total / max(weight_sum, 1.0),
+        lower=-0.95,
+        upper=0.95,
+    )
+    directions = [
+        _normalized_class_reweight_direction(
+            event.get("class_trust_reweight_direction", "neutral"),
+            event.get("class_trust_reweight_score", 0.0),
+        )
+        for event in matching_events
+    ]
+    flip_count = _class_direction_flip_count(directions)
+    current_direction = directions[0] if directions else "neutral"
+    earlier_majority = _class_direction_majority(directions[1:])
+    positive_count = sum(1 for signal in relevant_signals if signal > 0)
+    negative_count = sum(1 for signal in relevant_signals if signal < 0)
+
+    if len(relevant_signals) < 2:
+        momentum_status = "insufficient-data"
+    elif flip_count >= 2:
+        momentum_status = "unstable"
+    elif _class_direction_reversing(current_direction, earlier_majority):
+        momentum_status = "reversing"
+    elif positive_count >= 2 and momentum_score >= 0.20:
+        momentum_status = "sustained-support"
+    elif negative_count >= 2 and momentum_score <= -0.20:
+        momentum_status = "sustained-caution"
+    else:
+        momentum_status = "building"
+
+    if flip_count >= 2:
+        stability_status = "oscillating"
+    elif flip_count == 1 or momentum_status in {"building", "insufficient-data", "reversing"}:
+        stability_status = "watch"
+    else:
+        stability_status = "stable"
+
+    return {
+        "class_trust_momentum_score": momentum_score,
+        "class_trust_momentum_status": momentum_status,
+        "class_reweight_stability_status": stability_status,
+        "recent_class_reweight_path": " -> ".join(directions) if directions else "",
+        "class_direction_flip_count": flip_count,
+    }
+
+
+def _class_signal_from_reweight_event(event: dict) -> float:
+    score = float(event.get("class_trust_reweight_score", 0.0) or 0.0)
+    direction = _normalized_class_reweight_direction(
+        event.get("class_trust_reweight_direction", "neutral"),
+        score,
+    )
+    if direction == "supporting-normalization":
+        return abs(score) if abs(score) >= 0.05 else 0.05
+    if direction == "supporting-caution":
+        return -abs(score) if abs(score) >= 0.05 else -0.05
+    return _clamp_round(score, lower=-0.19, upper=0.19)
+
+
+def _normalized_class_reweight_direction(direction: str, score: float) -> str:
+    if direction in {"supporting-normalization", "supporting-caution", "neutral"}:
+        return direction
+    if score >= 0.20:
+        return "supporting-normalization"
+    if score <= -0.20:
+        return "supporting-caution"
+    return "neutral"
+
+
+def _class_direction_flip_count(directions: list[str]) -> int:
+    non_neutral = [direction for direction in directions if direction != "neutral"]
+    if len(non_neutral) < 2:
+        return 0
+    return sum(
+        1 for previous, current in zip(non_neutral, non_neutral[1:]) if current != previous
+    )
+
+
+def _class_direction_majority(directions: list[str]) -> str:
+    support_count = sum(1 for direction in directions if direction == "supporting-normalization")
+    caution_count = sum(1 for direction in directions if direction == "supporting-caution")
+    if support_count > caution_count:
+        return "supporting-normalization"
+    if caution_count > support_count:
+        return "supporting-caution"
+    return "neutral"
+
+
+def _class_direction_reversing(current_direction: str, earlier_majority: str) -> bool:
+    if current_direction == "neutral" or earlier_majority == "neutral":
+        return False
+    return current_direction != earlier_majority
+
+
+def _class_trust_momentum_for_target(
+    target: dict,
+    history_meta: dict,
+    confidence_calibration: dict,
+    *,
+    trust_policy: str,
+    trust_policy_reason: str,
+    policy_debt_status: str,
+    policy_debt_reason: str,
+    class_normalization_status: str,
+    class_normalization_reason: str,
+) -> tuple[str, str, str, str, str, str, str, str]:
+    momentum_status = history_meta.get("class_trust_momentum_status", "insufficient-data")
+    stability_status = history_meta.get("class_reweight_stability_status", "watch")
+    local_noise = _target_specific_normalization_noise(target, history_meta)
+    calibration_status = confidence_calibration.get("confidence_validation_status", "insufficient-data")
+    reweight_effect = target.get("class_trust_reweight_effect", "none")
+
+    if (
+        local_noise
+        and target.get("class_trust_reweight_direction") == "supporting-normalization"
+        and target.get("class_trust_reweight_score", 0.0) >= 0.20
+    ):
+        reverted_policy = target.get("pre_class_normalization_trust_policy", trust_policy)
+        reverted_reason = target.get("pre_class_normalization_trust_policy_reason", trust_policy_reason)
+        blocked_reason = (
+            "Positive class strengthening is blocked because local reopen, flip, or blocked-recovery noise still overrides the class signal."
+        )
+        if reweight_effect == "normalization-boosted":
+            return (
+                "blocked",
+                blocked_reason,
+                reverted_policy,
+                blocked_reason if reverted_policy == "verify-first" else reverted_reason,
+                policy_debt_status,
+                policy_debt_reason,
+                "candidate",
+                blocked_reason,
+            )
+        return (
+            "blocked",
+            blocked_reason,
+            trust_policy,
+            trust_policy_reason,
+            policy_debt_status,
+            policy_debt_reason,
+            class_normalization_status,
+            class_normalization_reason,
+        )
+
+    if reweight_effect == "normalization-boosted":
+        if momentum_status == "sustained-support" and stability_status != "oscillating":
+            confirmed_reason = (
+                "Fresh class support has stayed strong long enough to confirm broader normalization for this target."
+            )
+            return (
+                "confirmed-support",
+                confirmed_reason,
+                trust_policy,
+                confirmed_reason,
+                policy_debt_status,
+                policy_debt_reason,
+                class_normalization_status,
+                confirmed_reason,
+            )
+        pending_reason = (
+            "The class signal is visible, but it has not stayed strong long enough to confirm broader normalization yet."
+        )
+        reverted_policy = target.get("pre_class_normalization_trust_policy", trust_policy)
+        reverted_reason = target.get("pre_class_normalization_trust_policy_reason", trust_policy_reason)
+        return (
+            "pending-support",
+            pending_reason,
+            reverted_policy,
+            pending_reason if reverted_policy == "verify-first" else reverted_reason,
+            policy_debt_status,
+            policy_debt_reason,
+            "candidate",
+            pending_reason,
+        )
+
+    if reweight_effect == "policy-debt-strengthened":
+        if momentum_status == "sustained-caution" and stability_status != "oscillating":
+            confirmed_reason = (
+                "Caution-heavy class evidence has stayed strong long enough to confirm broader class caution."
+            )
+            return (
+                "confirmed-caution",
+                confirmed_reason,
+                trust_policy,
+                trust_policy_reason,
+                policy_debt_status,
+                confirmed_reason,
+                class_normalization_status,
+                class_normalization_reason,
+            )
+        pending_reason = (
+            "The caution-heavy class signal is visible, but it has not stayed strong long enough to confirm sticky class caution yet."
+        )
+        return (
+            "pending-caution",
+            pending_reason,
+            trust_policy,
+            trust_policy_reason,
+            "watch",
+            pending_reason,
+            class_normalization_status,
+            class_normalization_reason,
+        )
+
+    if class_normalization_status == "applied" and momentum_status in {"reversing", "unstable"}:
+        softened_reason = (
+            "Recent class evidence is changing direction, so earlier class normalization is being softened back to candidate."
+        )
+        reverted_policy = target.get("pre_class_normalization_trust_policy", trust_policy)
+        reverted_reason = target.get("pre_class_normalization_trust_policy_reason", trust_policy_reason)
+        if trust_policy == "act-with-review" and reverted_policy == "verify-first":
+            trust_policy = reverted_policy
+            trust_policy_reason = softened_reason
+        else:
+            trust_policy_reason = softened_reason
+        return (
+            "none",
+            softened_reason,
+            trust_policy,
+            trust_policy_reason,
+            policy_debt_status,
+            policy_debt_reason,
+            "candidate",
+            softened_reason,
+        )
+
+    if policy_debt_status == "class-debt" and momentum_status in {"reversing", "unstable"}:
+        softened_reason = (
+            "Recent class evidence is changing direction, so sticky class caution is being softened back to watch."
+        )
+        return (
+            "none",
+            softened_reason,
+            trust_policy,
+            trust_policy_reason,
+            "watch",
+            softened_reason,
+            class_normalization_status,
+            class_normalization_reason,
+        )
+
+    if calibration_status != "healthy" and reweight_effect == "normalization-boosted":
+        blocked_reason = "Positive class strengthening remains visible, but calibration is not healthy enough to confirm it."
+        reverted_policy = target.get("pre_class_normalization_trust_policy", trust_policy)
+        reverted_reason = target.get("pre_class_normalization_trust_policy_reason", trust_policy_reason)
+        return (
+            "blocked",
+            blocked_reason,
+            reverted_policy,
+            blocked_reason if reverted_policy == "verify-first" else reverted_reason,
+            policy_debt_status,
+            policy_debt_reason,
+            "candidate",
+            blocked_reason,
+        )
+
+    return (
+        "none",
+        "",
+        trust_policy,
+        trust_policy_reason,
+        policy_debt_status,
+        policy_debt_reason,
+        class_normalization_status,
+        class_normalization_reason,
+    )
+
+
+def _class_transition_resolution_for_target(
+    target: dict,
+    history_meta: dict,
+    confidence_calibration: dict,
+    *,
+    trust_policy: str,
+    trust_policy_reason: str,
+    transition_status: str,
+    transition_reason: str,
+    policy_debt_status: str,
+    policy_debt_reason: str,
+    class_normalization_status: str,
+    class_normalization_reason: str,
+) -> tuple[str, str, str, str, str, str, str, str, str, str, str, str]:
+    current_transition_status = history_meta.get("current_transition_status", transition_status)
+    transition_age_runs = history_meta.get("class_transition_age_runs", 0)
+    current_strengthening = history_meta.get("current_transition_strengthening", False)
+    current_neutral = history_meta.get("current_transition_neutral", False)
+    current_reversed = history_meta.get("current_transition_reversed", False)
+    current_lost_pending_support = history_meta.get("current_lost_pending_support", False)
+    recent_pending_status = history_meta.get("recent_pending_status", "none")
+    recent_pending_age_runs = history_meta.get("recent_pending_age_runs", 0)
+    local_noise = _target_specific_normalization_noise(target, history_meta)
+    _ = confidence_calibration
+
+    if current_transition_status == "blocked":
+        blocked_reason = transition_reason or (
+            "Local target instability is preventing positive class strengthening."
+        )
+        return (
+            "blocked",
+            blocked_reason,
+            "blocked",
+            blocked_reason,
+            "blocked",
+            blocked_reason,
+            trust_policy,
+            trust_policy_reason,
+            policy_debt_status,
+            policy_debt_reason,
+            class_normalization_status,
+            class_normalization_reason,
+        )
+
+    if current_transition_status in {"confirmed-support", "confirmed-caution"}:
+        confirmed_reason = transition_reason or (
+            "The earlier pending class signal persisted long enough to confirm a broader class posture."
+        )
+        return (
+            "none",
+            "",
+            "confirmed",
+            confirmed_reason,
+            current_transition_status,
+            confirmed_reason,
+            trust_policy,
+            trust_policy_reason,
+            policy_debt_status,
+            policy_debt_reason,
+            class_normalization_status,
+            class_normalization_reason,
+        )
+
+    if current_transition_status in {"pending-support", "pending-caution"}:
+        if (
+            current_transition_status == "pending-support"
+            and local_noise
+        ):
+            blocked_reason = (
+                "Local target instability or non-healthy calibration is preventing this pending class support from confirming."
+            )
+            reverted_policy = target.get("pre_class_normalization_trust_policy", trust_policy)
+            reverted_reason = target.get("pre_class_normalization_trust_policy_reason", trust_policy_reason)
+            return (
+                "blocked",
+                blocked_reason,
+                "blocked",
+                blocked_reason,
+                "blocked",
+                blocked_reason,
+                reverted_policy,
+                blocked_reason if reverted_policy == "verify-first" else reverted_reason,
+                policy_debt_status,
+                policy_debt_reason,
+                "candidate",
+                blocked_reason,
+            )
+
+        if transition_age_runs >= 3 and not current_strengthening:
+            stalled_reason = (
+                "The same pending class signal has lingered without enough strengthening, so it should stay visible but unconfirmed."
+            )
+            return (
+                "stalled",
+                stalled_reason,
+                "none",
+                "",
+                current_transition_status,
+                transition_reason or stalled_reason,
+                trust_policy,
+                trust_policy_reason,
+                policy_debt_status,
+                policy_debt_reason,
+                class_normalization_status,
+                class_normalization_reason,
+            )
+        if transition_age_runs >= 2 and not current_strengthening:
+            holding_reason = (
+                "The pending class signal is still visible, but it is no longer strengthening enough to confirm yet."
+            )
+            return (
+                "holding",
+                holding_reason,
+                "none",
+                "",
+                current_transition_status,
+                transition_reason or holding_reason,
+                trust_policy,
+                trust_policy_reason,
+                policy_debt_status,
+                policy_debt_reason,
+                class_normalization_status,
+                class_normalization_reason,
+            )
+        building_reason = (
+            "The pending class signal is still accumulating in the same direction and may confirm soon."
+        )
+        return (
+            "building",
+            building_reason,
+            "none",
+            "",
+            current_transition_status,
+            transition_reason or building_reason,
+            trust_policy,
+            trust_policy_reason,
+            policy_debt_status,
+            policy_debt_reason,
+            class_normalization_status,
+            class_normalization_reason,
+        )
+
+    if recent_pending_status in {"pending-support", "pending-caution"}:
+        if recent_pending_age_runs >= CLASS_PENDING_RESOLUTION_WINDOW_RUNS and (
+            current_neutral or current_reversed or current_lost_pending_support
+        ):
+            expired_reason = (
+                "The earlier pending class signal lasted through the full resolution window without confirmation and has now aged out."
+            )
+            return (
+                "expired",
+                expired_reason,
+                "expired",
+                expired_reason,
+                "none",
+                expired_reason,
+                trust_policy,
+                trust_policy_reason,
+                policy_debt_status,
+                policy_debt_reason,
+                class_normalization_status,
+                class_normalization_reason,
+            )
+        if current_neutral or current_reversed or current_lost_pending_support:
+            cleared_reason = (
+                "The earlier pending class signal faded before it earned confirmation, so it has been cleared."
+            )
+            return (
+                "none",
+                "",
+                "cleared",
+                cleared_reason,
+                "none",
+                cleared_reason,
+                trust_policy,
+                trust_policy_reason,
+                policy_debt_status,
+                policy_debt_reason,
+                class_normalization_status,
+                class_normalization_reason,
+            )
+
+    return (
+        "none",
+        "",
+        "none",
+        "",
+        current_transition_status,
+        transition_reason,
+        trust_policy,
+        trust_policy_reason,
+        policy_debt_status,
+        policy_debt_reason,
+        class_normalization_status,
+        class_normalization_reason,
+    )
+
+
+def _class_momentum_hotspots(resolution_targets: list[dict], *, mode: str) -> list[dict]:
+    grouped: dict[str, dict] = {}
+    for target in resolution_targets:
+        class_key = _target_class_key(target)
+        if not class_key:
+            continue
+        existing = grouped.get(class_key)
+        current = {
+            "scope": "class",
+            "label": class_key,
+            "momentum_score": target.get("class_trust_momentum_score", 0.0),
+            "momentum_status": target.get("class_trust_momentum_status", "insufficient-data"),
+            "stability_status": target.get("class_reweight_stability_status", "watch"),
+            "recent_class_reweight_path": target.get("recent_class_reweight_path", ""),
+        }
+        if existing is None or abs(current["momentum_score"]) > abs(existing["momentum_score"]):
+            grouped[class_key] = current
+    hotspots = list(grouped.values())
+    if mode == "sustained":
+        hotspots = [
+            item
+            for item in hotspots
+            if item.get("momentum_status") in {"sustained-support", "sustained-caution"}
+        ]
+        hotspots.sort(
+            key=lambda item: (
+                -abs(item.get("momentum_score", 0.0)),
+                item.get("label", ""),
+            )
+        )
+    else:
+        hotspots = [item for item in hotspots if item.get("stability_status") == "oscillating"]
+        hotspots.sort(
+            key=lambda item: (
+                -abs(item.get("momentum_score", 0.0)),
+                item.get("label", ""),
+            )
+        )
+    return hotspots[:5]
+
+
+def _class_transition_hotspots(resolution_targets: list[dict], *, mode: str) -> list[dict]:
+    grouped: dict[str, dict] = {}
+    for target in resolution_targets:
+        class_key = _target_class_key(target)
+        if not class_key:
+            continue
+        existing = grouped.get(class_key)
+        current = {
+            "scope": "class",
+            "label": class_key,
+            "transition_age_runs": target.get("class_transition_age_runs", 0),
+            "health_status": target.get("class_transition_health_status", "none"),
+            "resolution_status": target.get("class_transition_resolution_status", "none"),
+            "recent_transition_path": target.get("recent_transition_path", ""),
+        }
+        if existing is None or current["transition_age_runs"] > existing["transition_age_runs"]:
+            grouped[class_key] = current
+
+    hotspots = list(grouped.values())
+    if mode == "stalled":
+        hotspots = [
+            item
+            for item in hotspots
+            if item.get("health_status") in {"stalled", "expired"}
+        ]
+    else:
+        hotspots = [
+            item
+            for item in hotspots
+            if item.get("resolution_status") in {"confirmed", "cleared", "expired"}
+        ]
+    hotspots.sort(
+        key=lambda item: (
+            -item.get("transition_age_runs", 0),
+            item.get("label", ""),
+        )
+    )
+    return hotspots[:5]
+
+
+def _class_momentum_summary(
+    primary_target: dict,
+    sustained_class_hotspots: list[dict],
+    oscillating_class_hotspots: list[dict],
+) -> str:
+    label = _target_label(primary_target) or "The current target"
+    status = primary_target.get("class_trust_momentum_status", "insufficient-data")
+    transition_status = primary_target.get("class_reweight_transition_status", "none")
+    score = primary_target.get("class_trust_momentum_score", 0.0)
+    if transition_status == "confirmed-support":
+        return f"{label} now has class support that stayed strong long enough to confirm broader normalization ({score:.2f})."
+    if transition_status == "confirmed-caution":
+        return f"{label} now has caution-heavy class evidence that stayed strong long enough to confirm broader caution ({score:.2f})."
+    if transition_status == "pending-support":
+        return f"{label} shows healthier class support, but it has not stayed persistent enough to confirm broader normalization yet ({score:.2f})."
+    if transition_status == "pending-caution":
+        return f"{label} shows caution-heavy class evidence, but it has not stayed persistent enough to confirm sticky class caution yet ({score:.2f})."
+    if transition_status == "blocked":
+        return primary_target.get(
+            "class_reweight_transition_reason",
+            f"{label} still has local target noise blocking positive class strengthening.",
+        )
+    if status == "sustained-support":
+        return f"Fresh class evidence around {label} has stayed strong long enough to support broader normalization ({score:.2f})."
+    if status == "sustained-caution":
+        return f"Caution-heavy class evidence around {label} has stayed strong long enough to support broader caution ({score:.2f})."
+    if status == "building":
+        return f"{label} is trending in one class direction, but the signal has not held long enough to lock in ({score:.2f})."
+    if status == "reversing":
+        return f"Recent class evidence around {label} is changing direction, so earlier class guidance is being softened ({score:.2f})."
+    if status == "unstable":
+        return f"Recent class evidence around {label} is oscillating too much to safely strengthen class posture ({score:.2f})."
+    if sustained_class_hotspots:
+        hotspot = sustained_class_hotspots[0]
+        return (
+            f"Recent class momentum is strongest around {hotspot.get('label', 'recent hotspots')}, "
+            "but the current target has not built enough sustained class direction yet."
+        )
+    if oscillating_class_hotspots:
+        hotspot = oscillating_class_hotspots[0]
+        return (
+            f"Recent class guidance is bouncing most around {hotspot.get('label', 'recent hotspots')}, "
+            "so stronger class shifts there should wait for persistence."
+        )
+    return "Class momentum is still too lightly exercised to say whether recent class guidance is sustained or unstable."
+
+
+def _class_reweight_stability_summary(
+    primary_target: dict,
+    oscillating_class_hotspots: list[dict],
+) -> str:
+    label = _target_label(primary_target) or "The current target"
+    stability_status = primary_target.get("class_reweight_stability_status", "watch")
+    recent_path = primary_target.get("recent_class_reweight_path", "")
+    if stability_status == "oscillating":
+        return f"Class guidance for {label} is bouncing too much to strengthen safely right now: {recent_path or 'no stable path yet'}."
+    if stability_status == "watch":
+        return f"Class guidance for {label} is still settling and should be watched for one more stable stretch: {recent_path or 'signal is still building'}."
+    if recent_path:
+        return f"Class guidance for {label} is stable across the recent path: {recent_path}."
+    if oscillating_class_hotspots:
+        hotspot = oscillating_class_hotspots[0]
+        return (
+            f"Class stability is weakest around {hotspot.get('label', 'recent hotspots')}, "
+            "so broader class strengthening should wait there."
+        )
+    return "Recent class guidance is stable enough that no extra hysteresis warning is needed."
+
+
+def _class_transition_health_summary(
+    primary_target: dict,
+    stalled_transition_hotspots: list[dict],
+) -> str:
+    label = _target_label(primary_target) or "The current target"
+    health_status = primary_target.get("class_transition_health_status", "none")
+    age_runs = primary_target.get("class_transition_age_runs", 0)
+    if health_status == "building":
+        return f"{label} still has a pending class signal that is accumulating and may confirm soon ({age_runs} run(s))."
+    if health_status == "holding":
+        return f"{label} still has a visible pending class signal, but it is no longer getting stronger ({age_runs} run(s))."
+    if health_status == "stalled":
+        return f"{label} has kept the same pending class signal for {age_runs} run(s) without enough strengthening, so it stays unconfirmed."
+    if health_status == "expired":
+        return f"{label} let its pending class signal age out after {age_runs} run(s), so that pending state should no longer influence posture."
+    if health_status == "blocked":
+        return primary_target.get(
+            "class_transition_health_reason",
+            f"{label} still has local target instability blocking positive class strengthening.",
+        )
+    if stalled_transition_hotspots:
+        hotspot = stalled_transition_hotspots[0]
+        return (
+            f"Pending class transitions are stalling most around {hotspot.get('label', 'recent hotspots')}, "
+            "so those pending states should be watched for expiry."
+        )
+    return "No active pending class transition is building or stalling right now."
+
+
+def _class_transition_resolution_summary(
+    primary_target: dict,
+    resolving_transition_hotspots: list[dict],
+    stalled_transition_hotspots: list[dict],
+) -> str:
+    label = _target_label(primary_target) or "The current target"
+    resolution_status = primary_target.get("class_transition_resolution_status", "none")
+    if resolution_status == "confirmed":
+        return f"{label} resolved its earlier pending class transition into a confirmed broader class posture."
+    if resolution_status == "cleared":
+        return f"{label} lost the earlier pending class signal before it earned confirmation, so the pending state was cleared."
+    if resolution_status == "expired":
+        return f"{label} let the earlier pending class signal age out without confirmation, so the pending state expired."
+    if resolution_status == "blocked":
+        return primary_target.get(
+            "class_transition_resolution_reason",
+            f"{label} still has local target instability blocking positive class strengthening.",
+        )
+    if resolving_transition_hotspots:
+        hotspot = resolving_transition_hotspots[0]
+        return (
+            f"Recent pending class transitions are resolving most clearly around {hotspot.get('label', 'recent hotspots')}, "
+            "so those classes are proving whether pending support should confirm or clear."
+        )
+    if stalled_transition_hotspots:
+        hotspot = stalled_transition_hotspots[0]
+        return (
+            f"Pending class transitions are stalling most around {hotspot.get('label', 'recent hotspots')}, "
+            "so those pending states should not linger indefinitely."
+        )
+    return "No pending class transition has just confirmed, cleared, or expired in the recent window."
+
+
+def _clamp_round(value: float, *, lower: float, upper: float) -> float:
+    return round(max(lower, min(upper, value)), 2)
 
 
 def _retirement_policy_events(
@@ -4336,8 +6071,67 @@ def _adaptive_confidence_summary(
     class_normalization_status = primary_target.get("class_normalization_status", "none")
     class_memory_freshness_status = primary_target.get("class_memory_freshness_status", "insufficient-data")
     class_decay_status = primary_target.get("class_decay_status", "none")
+    class_trust_reweight_direction = primary_target.get("class_trust_reweight_direction", "neutral")
+    class_trust_reweight_effect = primary_target.get("class_trust_reweight_effect", "none")
+    class_trust_momentum_status = primary_target.get("class_trust_momentum_status", "insufficient-data")
+    class_reweight_stability_status = primary_target.get("class_reweight_stability_status", "watch")
+    class_reweight_transition_status = primary_target.get("class_reweight_transition_status", "none")
+    class_transition_health_status = primary_target.get("class_transition_health_status", "none")
+    class_transition_resolution_status = primary_target.get("class_transition_resolution_status", "none")
     recovery_confidence_label = primary_target.get("recovery_confidence_label", "low")
     drift_status = primary_target.get("recommendation_drift_status", "")
+    if class_transition_resolution_status == "confirmed":
+        return "The earlier pending class signal persisted long enough to confirm a broader class posture."
+    if class_transition_resolution_status == "cleared":
+        return "The earlier pending class signal faded before it earned confirmation, so it has been cleared."
+    if class_transition_resolution_status == "expired":
+        return "The earlier pending class signal aged out without confirmation, so it no longer changes the live posture."
+    if class_transition_resolution_status == "blocked":
+        return "Local target instability is preventing a pending class transition from confirming."
+    if class_transition_health_status == "stalled":
+        return "The current pending class signal is still visible, but it has lingered without enough strengthening to confirm safely."
+    if class_transition_health_status == "holding":
+        return "The current pending class signal remains visible, but it is no longer getting stronger."
+    if class_transition_health_status == "building":
+        return "The current pending class signal is still accumulating and may confirm if it stays consistent."
+    if class_transition_health_status == "expired":
+        return "An earlier pending class signal aged out, so the weaker class posture stays in place."
+    if class_transition_health_status == "blocked":
+        return "Local target instability is keeping a pending class strengthening attempt blocked."
+    if class_reweight_transition_status == "confirmed-support":
+        return "Fresh class evidence has stayed strong long enough to confirm broader normalization for this target."
+    if class_reweight_transition_status == "confirmed-caution":
+        return "Caution-heavy class evidence has stayed strong long enough to confirm broader caution for this target."
+    if class_reweight_transition_status == "pending-support":
+        return "Healthier class support is visible, but it has not stayed persistent long enough to confirm broader normalization yet."
+    if class_reweight_transition_status == "pending-caution":
+        return "Caution-heavy class evidence is visible, but it has not stayed persistent long enough to confirm sticky class caution yet."
+    if class_reweight_transition_status == "blocked":
+        return "Positive class strengthening is still blocked by local reopen, flip, or blocked-recovery noise."
+    if class_reweight_stability_status == "oscillating":
+        return "Class guidance is bouncing too much to strengthen safely right now, so keep the class signal visible but unconfirmed."
+    if class_trust_momentum_status == "sustained-support":
+        return "Fresh class evidence has stayed strong long enough to confirm broader normalization."
+    if class_trust_momentum_status == "sustained-caution":
+        return "Caution-heavy class evidence has stayed strong long enough to confirm broader caution."
+    if class_trust_momentum_status == "building":
+        return "Class evidence is trending in one direction, but it has not held long enough to lock in yet."
+    if class_trust_momentum_status == "reversing":
+        return "Recent class evidence is changing direction, so earlier class guidance is being softened."
+    if class_trust_momentum_status == "unstable":
+        return "Recent class evidence is oscillating too much to safely strengthen class posture."
+    if class_trust_reweight_effect == "normalization-boosted":
+        return "Fresh class evidence is consistently improving and actively strengthened class guidance for this target."
+    if class_trust_reweight_effect == "normalization-softened":
+        return "Class normalization stayed visible, but fresh class support is no longer strong enough to keep the full stronger posture in place."
+    if class_trust_reweight_effect == "policy-debt-strengthened":
+        return "Fresh class caution is still heavy enough to keep class-level trust conservative."
+    if class_trust_reweight_effect == "policy-debt-softened":
+        return "Class-level caution is fading rather than disappearing all at once, so the class posture softened."
+    if class_trust_reweight_direction == "supporting-normalization":
+        return "Fresh class evidence is consistently improving, but it is not yet strong enough to move the final posture by itself."
+    if class_trust_reweight_direction == "supporting-caution":
+        return "Recent class evidence is still caution-heavy enough to keep class trust conservative."
     if class_decay_status == "normalization-decayed":
         return "Class normalization was pulled back because the class lesson is too old or too lightly refreshed to keep carrying the stronger posture."
     if class_decay_status == "policy-debt-decayed":
@@ -4637,6 +6431,7 @@ def _why_it_matters(
 ) -> str:
     calibration_status = confidence_calibration.get("confidence_validation_status", "insufficient-data")
     calibration_sentence = _confidence_validation_sentence(calibration_status)
+    primary_target = resolution_trend.get("primary_target") or top_item or {}
     trust_sentence = _trust_policy_sentence(
         trust_policy,
         trust_policy_reason,
@@ -4658,6 +6453,13 @@ def _why_it_matters(
         resolution_trend.get("primary_target_class_memory_freshness_reason", ""),
         resolution_trend.get("primary_target_class_decay_status", "none"),
         resolution_trend.get("primary_target_class_decay_reason", ""),
+        resolution_trend.get("primary_target_class_trust_reweight_direction", "neutral"),
+        primary_target.get("class_trust_reweight_effect", "none"),
+        primary_target.get("class_trust_reweight_effect_reason", ""),
+        resolution_trend.get("primary_target_class_transition_health_status", "none"),
+        resolution_trend.get("primary_target_class_transition_health_reason", ""),
+        resolution_trend.get("primary_target_class_transition_resolution_status", "none"),
+        resolution_trend.get("primary_target_class_transition_resolution_reason", ""),
     )
     if urgency == "blocked":
         return f"A trustworthy next step is blocked until this is cleared. {trust_sentence} {calibration_sentence}".strip()
@@ -4756,7 +6558,57 @@ def _trust_policy_sentence(
     class_memory_freshness_reason: str,
     class_decay_status: str,
     class_decay_reason: str,
+    class_trust_reweight_direction: str,
+    class_trust_reweight_effect: str,
+    class_trust_reweight_effect_reason: str,
+    class_transition_health_status: str,
+    class_transition_health_reason: str,
+    class_transition_resolution_status: str,
+    class_transition_resolution_reason: str,
 ) -> str:
+    if class_transition_resolution_status == "confirmed":
+        detail = class_transition_resolution_reason or reason
+        return f"Trust policy: keep the stronger class posture because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: keep the stronger class posture because the earlier pending class signal finally confirmed."
+    if class_transition_resolution_status == "cleared":
+        detail = class_transition_resolution_reason or reason
+        return f"Trust policy: keep the weaker class posture because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: keep the weaker class posture because the earlier pending class signal faded before confirmation."
+    if class_transition_resolution_status == "expired":
+        detail = class_transition_resolution_reason or reason
+        return f"Trust policy: keep the weaker class posture because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: keep the weaker class posture because the earlier pending class signal aged out."
+    if class_transition_resolution_status == "blocked":
+        detail = class_transition_resolution_reason or class_transition_health_reason or reason
+        return f"Trust policy: keep the weaker class posture because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: keep the weaker class posture because local target instability is blocking a pending class transition."
+    if class_transition_health_status == "stalled":
+        detail = class_transition_health_reason or reason
+        return f"Trust policy: keep the weaker class posture because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: keep the weaker class posture because the pending class signal has stalled."
+    if class_transition_health_status == "holding":
+        detail = class_transition_health_reason or reason
+        return f"Trust policy: keep the weaker class posture because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: keep the weaker class posture because the pending class signal is holding but not strengthening."
+    if class_transition_health_status == "building":
+        return "Trust policy: keep the weaker class posture for now because the pending class signal is still building and has not confirmed yet."
+    if class_transition_health_status == "expired":
+        detail = class_transition_health_reason or reason
+        return f"Trust policy: keep the weaker class posture because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: keep the weaker class posture because the earlier pending class signal expired."
+    if class_transition_health_status == "blocked":
+        detail = class_transition_health_reason or reason
+        return f"Trust policy: keep the weaker class posture because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: keep the weaker class posture because local target instability is blocking a pending class transition."
+    if class_trust_reweight_effect == "normalization-boosted":
+        detail = class_trust_reweight_effect_reason or reason
+        return f"Trust policy: act with review because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: act with review because fresh class support crossed the reweight threshold."
+    if class_trust_reweight_effect == "normalization-softened":
+        detail = class_trust_reweight_effect_reason or reason
+        return f"Trust policy: verify first because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: verify first because class normalization weakened after reweighting."
+    if class_trust_reweight_effect == "policy-debt-strengthened":
+        detail = class_trust_reweight_effect_reason or policy_debt_reason or reason
+        return f"Trust policy: verify first because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: verify first because fresh class caution is still heavy enough to matter."
+    if class_trust_reweight_effect == "policy-debt-softened":
+        return "Trust policy: verify first for now, but class-level caution is fading rather than staying fully sticky."
+    if class_trust_reweight_direction == "supporting-normalization":
+        if policy == "act-with-review":
+            return "Trust policy: act with review because fresh class evidence is still leaning healthier and supports the current stronger posture."
+        return "Trust policy: verify first for now because class evidence is improving, but not strongly enough to move posture by itself yet."
+    if class_trust_reweight_direction == "supporting-caution":
+        return "Trust policy: verify first because recent class evidence is still caution-heavy enough to keep class trust conservative."
     if class_decay_status == "normalization-decayed":
         detail = class_decay_reason or class_memory_freshness_reason or reason
         return f"Trust policy: verify first because {detail[0].lower() + detail[1:]}" if detail else "Trust policy: verify first because stale class memory pulled back class-level normalization."
@@ -4831,9 +6683,62 @@ def _with_trust_policy_brief(
     class_normalization_status: str,
     class_memory_freshness_status: str,
     class_decay_status: str,
+    class_trust_reweight_direction: str,
+    class_trust_reweight_effect: str,
+    class_trust_momentum_status: str,
+    class_reweight_stability_status: str,
+    class_reweight_transition_status: str,
+    class_transition_health_status: str,
+    class_transition_resolution_status: str,
 ) -> str:
     if not summary:
         return summary
+    if class_transition_resolution_status == "confirmed":
+        return f"{summary} Trust policy: the earlier pending class signal finally confirmed."
+    if class_transition_resolution_status == "cleared":
+        return f"{summary} Trust policy: the earlier pending class signal faded before confirmation and was cleared."
+    if class_transition_resolution_status == "expired":
+        return f"{summary} Trust policy: the earlier pending class signal aged out and no longer changes posture."
+    if class_transition_resolution_status == "blocked":
+        return f"{summary} Trust policy: local target instability is blocking a pending class transition."
+    if class_transition_health_status == "stalled":
+        return f"{summary} Trust policy: the pending class signal has stalled and should stay visible but unconfirmed."
+    if class_transition_health_status == "holding":
+        return f"{summary} Trust policy: the pending class signal is still visible, but it is no longer getting stronger."
+    if class_transition_health_status == "building":
+        return f"{summary} Trust policy: the pending class signal is still building and may confirm soon."
+    if class_transition_health_status == "expired":
+        return f"{summary} Trust policy: the earlier pending class signal aged out."
+    if class_transition_health_status == "blocked":
+        return f"{summary} Trust policy: local target instability is still blocking a pending class transition."
+    if class_reweight_transition_status == "confirmed-support":
+        return f"{summary} Trust policy: broader normalization is now confirmed by sustained class support."
+    if class_reweight_transition_status == "confirmed-caution":
+        return f"{summary} Trust policy: broader class caution is now confirmed by sustained caution-heavy evidence."
+    if class_reweight_transition_status == "pending-support":
+        return f"{summary} Trust policy: healthier class support is visible, but it has not persisted long enough to confirm yet."
+    if class_reweight_transition_status == "pending-caution":
+        return f"{summary} Trust policy: caution-heavy class evidence is visible, but it has not persisted long enough to confirm yet."
+    if class_reweight_transition_status == "blocked":
+        return f"{summary} Trust policy: positive class strengthening is blocked by local target noise."
+    if class_reweight_stability_status == "oscillating":
+        return f"{summary} Trust policy: class guidance is bouncing too much to strengthen safely right now."
+    if class_trust_momentum_status == "reversing":
+        return f"{summary} Trust policy: recent class evidence is changing direction, so earlier class guidance is softening."
+    if class_trust_momentum_status == "building":
+        return f"{summary} Trust policy: class evidence is trending in one direction, but it has not held long enough to lock in."
+    if class_trust_reweight_effect == "normalization-boosted":
+        return f"{summary} Trust policy: fresh class support strengthened class guidance."
+    if class_trust_reweight_effect == "normalization-softened":
+        return f"{summary} Trust policy: class normalization stayed visible, but its support weakened."
+    if class_trust_reweight_effect == "policy-debt-strengthened":
+        return f"{summary} Trust policy: fresh class caution is still strong enough to matter."
+    if class_trust_reweight_effect == "policy-debt-softened":
+        return f"{summary} Trust policy: class-level caution is fading instead of staying fully sticky."
+    if class_trust_reweight_direction == "supporting-normalization":
+        return f"{summary} Trust policy: class evidence is leaning healthier, but not strongly enough to move posture by itself yet."
+    if class_trust_reweight_direction == "supporting-caution":
+        return f"{summary} Trust policy: recent class evidence is still caution-heavy."
     if class_decay_status == "normalization-decayed":
         return f"{summary} Trust policy: stale class memory pulled back class-level normalization."
     if class_decay_status == "policy-debt-decayed":
@@ -4952,6 +6857,46 @@ def _class_decay_note(resolution_trend: dict) -> str:
     if status in {None, "", "none"}:
         return ""
     return f"Trust decay controls: {status} — {reason}".strip()
+
+
+def _class_reweighting_note(resolution_trend: dict) -> str:
+    direction = resolution_trend.get("primary_target_class_trust_reweight_direction", "neutral")
+    summary = resolution_trend.get("class_reweighting_summary", "")
+    if direction in {None, "", "neutral"} and not summary:
+        return ""
+    return f"Class trust reweighting: {direction} — {summary}".strip()
+
+
+def _class_momentum_note(resolution_trend: dict) -> str:
+    status = resolution_trend.get("primary_target_class_trust_momentum_status", "insufficient-data")
+    summary = resolution_trend.get("class_momentum_summary", "")
+    if status in {None, ""} and not summary:
+        return ""
+    return f"Class trust momentum: {status} — {summary}".strip()
+
+
+def _class_reweight_stability_note(resolution_trend: dict) -> str:
+    status = resolution_trend.get("primary_target_class_reweight_stability_status", "watch")
+    summary = resolution_trend.get("class_reweight_stability_summary", "")
+    if status in {None, ""} and not summary:
+        return ""
+    return f"Reweighting stability: {status} — {summary}".strip()
+
+
+def _class_transition_health_note(resolution_trend: dict) -> str:
+    status = resolution_trend.get("primary_target_class_transition_health_status", "none")
+    summary = resolution_trend.get("class_transition_health_summary", "")
+    if status in {None, "", "none"} and not summary:
+        return ""
+    return f"Class transition health: {status} — {summary}".strip()
+
+
+def _class_transition_resolution_note(resolution_trend: dict) -> str:
+    status = resolution_trend.get("primary_target_class_transition_resolution_status", "none")
+    summary = resolution_trend.get("class_transition_resolution_summary", "")
+    if status in {None, "", "none"} and not summary:
+        return ""
+    return f"Pending transition resolution: {status} — {summary}".strip()
 
 
 def _recommendation_drift_note(resolution_trend: dict) -> str:

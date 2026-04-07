@@ -169,6 +169,38 @@ def _make_report(**overrides) -> dict:
             "primary_target_class_decay_reason": "Local reopen, flip, or blocked-recovery noise still overrides healthier class memory for this target.",
             "class_memory_summary": "RepoC: RepoC drift needs review is leaning on older class evidence that is now being down-weighted so it does not dominate the current trust posture.",
             "class_decay_summary": "RepoC: RepoC drift needs review still has local target noise blocking healthier class memory from changing the live posture.",
+            "primary_target_weighted_class_support_score": 0.18,
+            "primary_target_weighted_class_caution_score": 0.46,
+            "primary_target_class_trust_reweight_score": -0.28,
+            "primary_target_class_trust_reweight_direction": "supporting-caution",
+            "primary_target_class_trust_reweight_reasons": [
+                "Older class evidence is now carrying more of the signal than recent runs, so class-level trust should not lean on it too heavily.",
+                "Sticky class caution is still weighing against broader relaxation.",
+                "Local target noise is still blocking healthier class carry-forward.",
+            ],
+            "class_reweighting_summary": "RepoC: RepoC drift needs review still sits in caution-heavy class evidence, so class trust stays conservative (-0.28).",
+            "supporting_class_hotspots": [],
+            "caution_class_hotspots": [],
+            "class_reweighting_window_runs": 4,
+            "primary_target_class_trust_momentum_score": -0.34,
+            "primary_target_class_trust_momentum_status": "sustained-caution",
+            "primary_target_class_reweight_stability_status": "stable",
+            "primary_target_class_reweight_transition_status": "confirmed-caution",
+            "primary_target_class_reweight_transition_reason": "Caution-heavy class evidence has stayed strong long enough to confirm broader class caution.",
+            "class_momentum_summary": "RepoC: RepoC drift needs review now has caution-heavy class evidence that stayed strong long enough to confirm broader caution (-0.34).",
+            "class_reweight_stability_summary": "Class guidance for RepoC: RepoC drift needs review is stable across the recent path: supporting-caution -> supporting-caution.",
+            "class_transition_window_runs": 4,
+            "primary_target_class_transition_health_status": "none",
+            "primary_target_class_transition_health_reason": "",
+            "primary_target_class_transition_resolution_status": "confirmed",
+            "primary_target_class_transition_resolution_reason": "Caution-heavy class evidence has stayed strong long enough to confirm broader class caution.",
+            "class_transition_health_summary": "No active pending class transition is building or stalling right now.",
+            "class_transition_resolution_summary": "RepoC: RepoC drift needs review resolved its earlier pending class transition into a confirmed broader class posture.",
+            "class_transition_age_window_runs": 4,
+            "stalled_transition_hotspots": [],
+            "resolving_transition_hotspots": [],
+            "sustained_class_hotspots": [],
+            "oscillating_class_hotspots": [],
             "stale_class_memory_hotspots": [],
             "fresh_class_signal_hotspots": [],
             "class_decay_window_runs": 4,
@@ -339,9 +371,20 @@ class TestRenderHtml:
         assert "Class-Level Trust Normalization:" in html
         assert "Class Memory Freshness:" in html
         assert "Trust Decay Controls:" in html
+        assert "Class Trust Reweighting:" in html
+        assert "Why Class Guidance Shifted:" in html
+        assert "Class Trust Momentum:" in html
+        assert "Reweighting Stability:" in html
+        assert "Class Transition Health:" in html
+        assert "Pending Transition Resolution:" in html
         assert "Recommendation Drift:" in html
         assert "Policy Debt Summary:" in html
         assert "Trust Normalization Summary:" in html
+        assert "Class Reweighting Summary:" in html
+        assert "Class Momentum Summary:" in html
+        assert "Reweighting Stability Summary:" in html
+        assert "Class Transition Health Summary:" in html
+        assert "Pending Transition Resolution Summary:" in html
         assert "Why This Confidence Is Actionable:" in html
         assert "Recent Confidence Outcomes:" in html
         assert "RepoC: RepoC drift needs review" in html

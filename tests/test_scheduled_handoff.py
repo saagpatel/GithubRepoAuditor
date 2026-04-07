@@ -103,6 +103,38 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
             "primary_target_class_decay_reason": "",
             "class_memory_summary": "RepoC: RepoC drift needs review still has useful class memory, but part of that signal is aging and should be treated more cautiously.",
             "class_decay_summary": "Fresh class signals are still strong enough that no class-level trust posture needs to decay yet.",
+            "primary_target_weighted_class_support_score": 0.48,
+            "primary_target_weighted_class_caution_score": 0.24,
+            "primary_target_class_trust_reweight_score": 0.24,
+            "primary_target_class_trust_reweight_direction": "supporting-normalization",
+            "primary_target_class_trust_reweight_reasons": [
+                "Class memory is still useful, but it is partly aging: 50% of the weighted signal is recent and the rest is older carry-forward.",
+                "Existing class normalization support is still contributing to a stronger posture.",
+                "Fresh sticky class evidence is still carrying meaningful caution.",
+            ],
+            "class_reweighting_summary": "RepoC: RepoC drift needs review inherited a stronger posture because fresh class support crossed the reweight threshold (0.24).",
+            "supporting_class_hotspots": [],
+            "caution_class_hotspots": [],
+            "class_reweighting_window_runs": 4,
+            "primary_target_class_trust_momentum_score": 0.26,
+            "primary_target_class_trust_momentum_status": "building",
+            "primary_target_class_reweight_stability_status": "watch",
+            "primary_target_class_reweight_transition_status": "pending-support",
+            "primary_target_class_reweight_transition_reason": "The class signal is visible, but it has not stayed strong long enough to confirm broader normalization yet.",
+            "class_momentum_summary": "RepoC: RepoC drift needs review shows healthier class support, but it has not stayed persistent enough to confirm broader normalization yet (0.26).",
+            "class_reweight_stability_summary": "Class guidance for RepoC: RepoC drift needs review is still settling and should be watched for one more stable stretch: supporting-normalization -> neutral.",
+            "class_transition_window_runs": 4,
+            "primary_target_class_transition_health_status": "building",
+            "primary_target_class_transition_health_reason": "The pending class signal is still accumulating in the same direction and may confirm soon.",
+            "primary_target_class_transition_resolution_status": "none",
+            "primary_target_class_transition_resolution_reason": "",
+            "class_transition_health_summary": "RepoC: RepoC drift needs review still has a pending class signal that is accumulating and may confirm soon (1 run(s)).",
+            "class_transition_resolution_summary": "No pending class transition has just confirmed, cleared, or expired in the recent window.",
+            "class_transition_age_window_runs": 4,
+            "stalled_transition_hotspots": [],
+            "resolving_transition_hotspots": [],
+            "sustained_class_hotspots": [],
+            "oscillating_class_hotspots": [],
             "stale_class_memory_hotspots": [],
             "fresh_class_signal_hotspots": [],
             "class_decay_window_runs": 4,
@@ -157,6 +189,8 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
                 "exception_pattern_reason": "This target is stabilizing under healthy calibration, but it has not held steady long enough to earn stronger trust yet.",
                 "class_retirement_rate": 0.50,
                 "class_sticky_rate": 0.25,
+                "class_transition_age_runs": 1,
+                "recent_transition_path": "pending-support",
             },
             "next_recommended_run_mode": "incremental",
             "watch_strategy": "adaptive",
@@ -212,6 +246,12 @@ def test_build_scheduled_handoff_writes_artifacts_and_issue_candidate(tmp_path):
     assert "Class-Level Trust Normalization" in markdown
     assert "Class Memory Freshness" in markdown
     assert "Trust Decay Controls" in markdown
+    assert "Class Trust Reweighting" in markdown
+    assert "Class Trust Momentum" in markdown
+    assert "Reweighting Stability" in markdown
+    assert "Class Transition Health" in markdown
+    assert "Pending Transition Resolution" in markdown
+    assert "Why class guidance shifted" in markdown
     assert "Recommendation Drift" in markdown
     assert "Confidence Validation" in markdown
     assert "75%" in markdown

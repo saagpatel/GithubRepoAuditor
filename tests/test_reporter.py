@@ -236,6 +236,38 @@ class TestMarkdownReport:
             "primary_target_class_decay_reason": "",
             "class_memory_summary": "Missing template asset sits in class evidence that is still fresh enough to trust, so recent class behavior should carry more weight than older lessons.",
             "class_decay_summary": "Fresh class signals are still strongest here, so the current class posture still has enough recent support.",
+            "primary_target_weighted_class_support_score": 0.62,
+            "primary_target_weighted_class_caution_score": 0.18,
+            "primary_target_class_trust_reweight_score": 0.44,
+            "primary_target_class_trust_reweight_direction": "supporting-normalization",
+            "primary_target_class_trust_reweight_reasons": [
+                "Recent class evidence is still current enough to trust, with 70% of the weighted signal coming from the latest 4 runs.",
+                "Existing class normalization support is still contributing to a stronger posture.",
+                "Fresh sticky class evidence is still carrying meaningful caution.",
+            ],
+            "class_reweighting_summary": "Missing template asset inherited a stronger posture because fresh class support crossed the reweight threshold (0.44).",
+            "supporting_class_hotspots": [],
+            "caution_class_hotspots": [],
+            "class_reweighting_window_runs": 4,
+            "primary_target_class_trust_momentum_score": 0.38,
+            "primary_target_class_trust_momentum_status": "sustained-support",
+            "primary_target_class_reweight_stability_status": "stable",
+            "primary_target_class_reweight_transition_status": "confirmed-support",
+            "primary_target_class_reweight_transition_reason": "Fresh class support has stayed strong long enough to confirm broader normalization for this target.",
+            "class_momentum_summary": "Missing template asset now has class support that stayed strong long enough to confirm broader normalization (0.38).",
+            "class_reweight_stability_summary": "Class guidance for Missing template asset is stable across the recent path: supporting-normalization -> supporting-normalization.",
+            "class_transition_window_runs": 4,
+            "primary_target_class_transition_health_status": "none",
+            "primary_target_class_transition_health_reason": "",
+            "primary_target_class_transition_resolution_status": "confirmed",
+            "primary_target_class_transition_resolution_reason": "Fresh class support has stayed strong long enough to confirm broader normalization for this target.",
+            "class_transition_health_summary": "No active pending class transition is building or stalling right now.",
+            "class_transition_resolution_summary": "Missing template asset resolved its earlier pending class transition into a confirmed broader class posture.",
+            "class_transition_age_window_runs": 4,
+            "stalled_transition_hotspots": [],
+            "resolving_transition_hotspots": [],
+            "sustained_class_hotspots": [],
+            "oscillating_class_hotspots": [],
             "stale_class_memory_hotspots": [],
             "fresh_class_signal_hotspots": [],
             "class_decay_window_runs": 4,
@@ -291,6 +323,12 @@ class TestMarkdownReport:
         assert "Class-Level Trust Normalization:" in content
         assert "Class Memory Freshness:" in content
         assert "Trust Decay Controls:" in content
+        assert "Class Trust Reweighting:" in content
+        assert "Why Class Guidance Shifted:" in content
+        assert "Class Trust Momentum:" in content
+        assert "Reweighting Stability:" in content
+        assert "Class Transition Health:" in content
+        assert "Pending Transition Resolution:" in content
         assert "Next Recommended Run" in content
         assert "Watch Strategy" in content
         assert "What Changed" in content
@@ -311,6 +349,11 @@ class TestMarkdownReport:
         assert "Recommendation Quality" in content
         assert "Policy Debt Summary" in content
         assert "Trust Normalization Summary" in content
+        assert "Class Reweighting Summary" in content
+        assert "Class Momentum Summary" in content
+        assert "Reweighting Stability Summary" in content
+        assert "Class Transition Health Summary" in content
+        assert "Pending Transition Resolution Summary" in content
         assert "Confidence Validation" in content
         assert "Recent Confidence Outcomes" in content
 
