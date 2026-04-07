@@ -20,6 +20,10 @@ The workbook template owns:
 - named-range placeholders
 - any Excel-authored native objects already present in the template
 
+Template mode and standard mode should now project the same visible top-line facts.
+If one mode changes the visible operator or executive story, update the other mode's
+tests and verify parity before shipping.
+
 ## Template-Stable Tables
 
 These tables are part of the workbook contract:
@@ -46,6 +50,15 @@ These tables are part of the workbook contract:
 If one of these names or its column order changes, update both:
 - the Python workbook builder
 - the committed workbook template
+
+## Additive Workbook Rollups
+
+These workbook-only hidden tables are additive and may evolve without changing the
+cross-surface operator contract, as long as they continue deriving from shared report
+facts:
+- `tblOperatorQueueData`
+- `tblOperatorRepoRollups`
+- `tblMaterialChangeRollups`
 
 ## Safe Update Workflow
 

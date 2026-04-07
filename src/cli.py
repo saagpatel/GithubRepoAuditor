@@ -610,6 +610,16 @@ def _latest_control_center_paths(output_dir: Path, username: str, generated_at: 
     )
 
 
+def _report_artifact_datetime(report_path: Path | None, fallback: datetime) -> datetime:
+    if report_path:
+        stem = report_path.stem
+        if len(stem) >= 10:
+            parsed = _parse_iso_dt(f"{stem[-10:]}T00:00:00+00:00")
+            if parsed:
+                return parsed
+    return fallback
+
+
 def _print_control_center_summary(snapshot: dict) -> None:
     summary = snapshot.get("operator_summary", {})
     queue = snapshot.get("operator_queue", [])
@@ -1609,10 +1619,14 @@ def main() -> None:
             output_dir=output_dir,
             triage_view=args.triage_view,
         )
+        artifact_generated_at = _report_artifact_datetime(
+            report_path,
+            _parse_iso_dt(normalized.get("generated_at")) or datetime.now(timezone.utc),
+        )
         json_artifact, md_artifact = _latest_control_center_paths(
             output_dir,
             normalized.get("username", args.username),
-            _parse_iso_dt(normalized.get("generated_at")) or datetime.now(timezone.utc),
+            artifact_generated_at,
         )
         snapshot.setdefault("operator_summary", {})["control_center_reference"] = str(json_artifact)
         json_artifact.write_text(json.dumps(control_center_artifact_payload(normalized, snapshot), indent=2))
@@ -1620,7 +1634,7 @@ def main() -> None:
             render_control_center_markdown(
                 snapshot,
                 normalized.get("username", args.username),
-                normalized.get("generated_at", datetime.now(timezone.utc).isoformat()),
+                artifact_generated_at.isoformat(),
             )
         )
         _print_control_center_summary(snapshot)

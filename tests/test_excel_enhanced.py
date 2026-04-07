@@ -8,6 +8,7 @@ import pytest
 from openpyxl import Workbook, load_workbook
 
 from src.excel_export import (
+    _build_dashboard,
     _build_all_repos,
     _build_by_collection,
     _build_trend_summary,
@@ -409,6 +410,9 @@ class TestHotspotsAndDataSheets:
         assert "Data_PortfolioHistory" in wb.sheetnames
         assert "Data_Rollups" in wb.sheetnames
         assert "Data_ReviewTargets" in wb.sheetnames
+        assert "Data_OperatorQueue" in wb.sheetnames
+        assert "Data_OperatorRepoRollups" in wb.sheetnames
+        assert "Data_MaterialChangeRollups" in wb.sheetnames
         assert wb["Data_Repos"].sheet_state == "hidden"
 
     def test_hidden_repo_sheet_has_structured_table(self):
@@ -451,6 +455,45 @@ class TestAnalystWorkbookSheets:
         assert "Governance Controls" in wb.sheetnames
         assert "Governance Audit" in wb.sheetnames
         assert "Print Pack" in wb.sheetnames
+
+    def test_review_queue_has_summary_and_freeze_panes(self):
+        wb = Workbook()
+        _build_review_queue(wb, _make_report())
+        ws = wb["Review Queue"]
+        assert ws["A4"].value == "Summary"
+        assert ws["A20"].value == "Repo"
+        assert ws.freeze_panes == "A21"
+
+    def test_campaigns_show_empty_state_when_no_preview_rows(self):
+        wb = Workbook()
+        report = _make_report()
+        report["campaign_summary"] = {}
+        report["writeback_preview"] = {"repos": []}
+        _build_campaigns(wb, report)
+        ws = wb["Campaigns"]
+        assert "No active campaign rows" in ws["A13"].value
+
+    def test_writeback_audit_shows_empty_state_when_no_results(self):
+        wb = Workbook()
+        report = _make_report()
+        report["writeback_results"] = {"results": []}
+        _build_writeback_audit(wb, report)
+        ws = wb["Writeback Audit"]
+        assert "No writeback results are recorded" in ws["A11"].value
+
+    def test_governance_controls_use_human_readable_state_labels(self):
+        wb = Workbook()
+        _build_governance_controls(wb, _make_report())
+        ws = wb["Governance Controls"]
+        assert ws["C12"].value == "Preview only"
+
+    def test_dashboard_handles_repos_without_actions_or_hotspots(self):
+        wb = Workbook()
+        report = _make_report()
+        report["audits"][0]["action_candidates"] = []
+        report["audits"][0]["hotspots"] = []
+        _build_dashboard(wb, report)
+        assert "Dashboard" in wb.sheetnames
 
     def test_compare_sheet_only_when_diff_present(self):
         wb = Workbook()
@@ -551,3 +594,25 @@ class TestWorkbookModes:
                 "sparkline" in archive.read(name).decode("utf-8", "ignore").lower()
                 for name in worksheet_names
             )
+
+    def test_template_and_standard_modes_match_key_visible_facts(self, tmp_path):
+        report_path = tmp_path / "report.json"
+        report_path.write_text(json.dumps(_make_report()))
+
+        standard_output = export_excel(report_path, tmp_path / "standard.xlsx", excel_mode="standard")
+        template_output = export_excel(
+            report_path,
+            tmp_path / "template.xlsx",
+            excel_mode="template",
+            template_path=DEFAULT_TEMPLATE_PATH,
+        )
+
+        standard_wb = load_workbook(standard_output)
+        template_wb = load_workbook(template_output)
+
+        assert standard_wb["Dashboard"]["A1"].value == template_wb["Dashboard"]["A1"].value
+        assert standard_wb["Review Queue"]["B6"].value == template_wb["Review Queue"]["B6"].value
+        assert standard_wb["Governance Controls"]["B5"].value == template_wb["Governance Controls"]["B5"].value
+        assert standard_wb["Print Pack"]["B9"].value == template_wb["Print Pack"]["B9"].value
+        assert template_wb["Review Queue"]["A4"].value == "Summary"
+        assert template_wb["Review Queue"]["A20"].value == "Repo"

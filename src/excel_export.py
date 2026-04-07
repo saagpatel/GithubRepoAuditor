@@ -60,6 +60,7 @@ from src.excel_styles import (
     color_grade_cell,
     color_pattern_cell,
     color_tier_cell,
+    LEFT,
     style_data_cell,
     style_header_row,
     write_kpi_card,
@@ -163,6 +164,26 @@ def _refresh_pivot_caches_on_load(wb: Workbook) -> None:
                 cache.refreshOnLoad = True
 
 
+def _reorder_workbook_sheets(wb: Workbook) -> None:
+    preferred_order = [
+        "Index",
+        "Dashboard",
+        "Review Queue",
+        "Portfolio Explorer",
+        "Executive Summary",
+        "By Lens",
+        "By Collection",
+        "Trend Summary",
+        "Campaigns",
+        "Governance Controls",
+        "Print Pack",
+    ]
+    order_index = {name: index for index, name in enumerate(preferred_order)}
+    wb._sheets.sort(key=lambda ws: (order_index.get(ws.title, len(preferred_order)), ws.title))
+    if "Index" in wb.sheetnames:
+        wb.active = wb.sheetnames.index("Index")
+
+
 def _review_status_counts(data: dict) -> dict[str, int]:
     counts = {"open": 0, "deferred": 0, "resolved": 0}
     for item in data.get("review_history", []):
@@ -236,6 +257,227 @@ def _collection_memberships(data: dict) -> dict[str, list[str]]:
             repo_name = repo_data["name"] if isinstance(repo_data, dict) else str(repo_data)
             memberships.setdefault(repo_name, []).append(collection_name)
     return memberships
+
+
+def _display_operator_state(value: str | None) -> str:
+    mapping = {
+        "preview-only": "Preview only",
+        "needs-reapproval": "Needs re-approval",
+        "ready": "Ready",
+        "approved": "Approved",
+        "applied": "Applied",
+        "blocked": "Blocked",
+        "drifted": "Drifted",
+        "failed": "Failed",
+    }
+    if not value:
+        return "Unknown"
+    return mapping.get(value, value.replace("-", " ").title())
+
+
+def _severity_rank(value: object) -> float:
+    if isinstance(value, (int, float)):
+        return float(value)
+    mapping = {"critical": 1.0, "high": 0.85, "medium": 0.55, "low": 0.25}
+    return mapping.get(str(value).lower(), 0.0)
+
+
+def _operator_counts(data: dict) -> dict[str, int]:
+    counts = {"blocked": 0, "urgent": 0, "ready": 0, "deferred": 0}
+    operator_summary = data.get("operator_summary") or {}
+    if operator_summary.get("counts"):
+        counts.update({key: int(operator_summary["counts"].get(key, 0) or 0) for key in counts})
+        return counts
+    for item in data.get("operator_queue", []) or []:
+        lane = item.get("lane")
+        if lane in counts:
+            counts[lane] += 1
+    return counts
+
+
+def _format_lane_counts(counts: dict[str, int]) -> str:
+    return (
+        f"{counts.get('blocked', 0)} blocked, "
+        f"{counts.get('urgent', 0)} urgent, "
+        f"{counts.get('ready', 0)} ready, "
+        f"{counts.get('deferred', 0)} deferred"
+    )
+
+
+def _summarize_top_actions(queue: list[dict], *, limit: int = 5) -> list[tuple[str, int]]:
+    action_counts = Counter(
+        (item.get("recommended_action") or item.get("next_step") or "").strip()
+        for item in queue
+        if (item.get("recommended_action") or item.get("next_step"))
+    )
+    return action_counts.most_common(limit)
+
+
+def _summarize_top_issue_families(material_changes: list[dict], *, limit: int = 5) -> list[tuple[str, int]]:
+    issue_counts = Counter()
+    for item in material_changes:
+        change_type = item.get("change_type") or "other"
+        issue_counts[str(change_type).replace("-", " ").title()] += 1
+    return issue_counts.most_common(limit)
+
+
+def _build_workbook_rollups(data: dict) -> tuple[list[list[object]], list[list[object]], list[list[object]]]:
+    queue = data.get("operator_queue", []) or []
+    material_changes = data.get("material_changes", []) or []
+
+    queue_rows: list[list[object]] = []
+    for item in queue:
+        queue_rows.append(
+            [
+                item.get("item_id", ""),
+                item.get("repo", ""),
+                item.get("kind", ""),
+                item.get("lane", ""),
+                item.get("priority", 0),
+                item.get("title", ""),
+                item.get("summary", ""),
+                item.get("recommended_action", ""),
+                item.get("source_run_id", ""),
+                item.get("age_days", 0),
+                json.dumps(item.get("links", [])),
+            ]
+        )
+
+    repo_rollups: dict[str, dict[str, object]] = {}
+    for item in queue:
+        repo = item.get("repo") or "(portfolio)"
+        record = repo_rollups.setdefault(
+            repo,
+            {
+                "blocked": 0,
+                "urgent": 0,
+                "ready": 0,
+                "deferred": 0,
+                "total": 0,
+                "kind_counts": Counter(),
+                "top_priority": 0,
+                "top_title": "",
+                "recommended_action": "",
+            },
+        )
+        lane = item.get("lane", "")
+        if lane in {"blocked", "urgent", "ready", "deferred"}:
+            record[lane] += 1
+        record["total"] += 1
+        record["kind_counts"][item.get("kind", "review")] += 1
+        priority = _severity_rank(item.get("priority", 0))
+        if priority >= float(record["top_priority"]):
+            record["top_priority"] = priority
+            record["top_title"] = item.get("title", "")
+            record["recommended_action"] = item.get("recommended_action", "")
+
+    repo_rows: list[list[object]] = []
+    for repo, record in sorted(
+        repo_rollups.items(),
+        key=lambda item: (
+            -int(item[1]["blocked"]),
+            -int(item[1]["urgent"]),
+            -int(item[1]["ready"]),
+            -int(item[1]["total"]),
+            item[0],
+        ),
+    ):
+        primary_kind = record["kind_counts"].most_common(1)[0][0] if record["kind_counts"] else "review"
+        repo_rows.append(
+            [
+                repo,
+                record["total"],
+                record["blocked"],
+                record["urgent"],
+                record["ready"],
+                record["deferred"],
+                primary_kind,
+                record["top_priority"],
+                record["top_title"],
+                record["recommended_action"],
+            ]
+        )
+
+    material_rollups: dict[tuple[str, str], dict[str, object]] = {}
+    for item in material_changes:
+        repo = item.get("repo") or "(portfolio)"
+        change_type = item.get("change_type") or "other"
+        key = (repo, change_type)
+        record = material_rollups.setdefault(
+            key,
+            {"count": 0, "max_severity": 0.0, "sample_title": ""},
+        )
+        record["count"] += 1
+        severity = _severity_rank(item.get("severity"))
+        if severity >= float(record["max_severity"]):
+            record["max_severity"] = severity
+            record["sample_title"] = item.get("title", "")
+
+    material_rows: list[list[object]] = []
+    for (repo, change_type), record in sorted(
+        material_rollups.items(),
+        key=lambda item: (-int(item[1]["count"]), -float(item[1]["max_severity"]), item[0][0], item[0][1]),
+    ):
+        material_rows.append(
+            [
+                repo,
+                change_type,
+                record["count"],
+                record["max_severity"],
+                record["sample_title"],
+            ]
+        )
+
+    return queue_rows, repo_rows, material_rows
+
+
+def _set_sheet_header(ws, title: str, subtitle: str, *, width: int = 8) -> None:
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=width)
+    ws["A1"] = title
+    ws["A1"].font = TITLE_FONT
+    ws["A1"].alignment = CENTER
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=width)
+    ws["A2"] = subtitle
+    ws["A2"].font = SUBTITLE_FONT
+    ws["A2"].alignment = WRAP
+
+
+def _write_key_value_block(ws, start_row: int, start_col: int, rows: list[tuple[str, object]], *, title: str | None = None) -> int:
+    row = start_row
+    if title:
+        ws.cell(row=row, column=start_col, value=title).font = SECTION_FONT
+        row += 1
+    for label, value in rows:
+        ws.cell(row=row, column=start_col, value=label).font = SUBHEADER_FONT
+        style_data_cell(ws.cell(row=row, column=start_col + 1, value=value), "left")
+        row += 1
+    return row - 1
+
+
+def _write_ranked_list(
+    ws,
+    start_row: int,
+    start_col: int,
+    title: str,
+    headers: list[str],
+    rows: list[list[object]],
+) -> int:
+    ws.cell(row=start_row, column=start_col, value=title).font = SECTION_FONT
+    header_row = start_row + 1
+    for offset, header in enumerate(headers):
+        cell = ws.cell(row=header_row, column=start_col + offset, value=header)
+        cell.fill = SUBHEADER_FILL
+        cell.font = SUBHEADER_FONT
+        cell.alignment = CENTER
+        cell.border = THIN_BORDER
+    ws.row_dimensions[header_row].height = 24
+    for row_index, values in enumerate(rows, header_row + 1):
+        for col_offset, value in enumerate(values):
+            align = "center" if isinstance(value, (int, float)) else "left"
+            style_data_cell(ws.cell(row=row_index, column=start_col + col_offset, value=value), align)
+    if rows:
+        apply_zebra_stripes(ws, header_row + 1, header_row + len(rows), start_col + len(headers) - 1)
+    return header_row + len(rows)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -314,6 +556,7 @@ def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None, sc
     c.font = NARRATIVE_FONT
     c.alignment = WRAP
     ws.row_dimensions[3].height = 30
+    ws.freeze_panes = "A5"
 
     # KPI Cards (row 5-6)
     grade = data.get("portfolio_grade", "?")
@@ -339,6 +582,100 @@ def _build_dashboard(wb: Workbook, data: dict, diff_data: dict | None = None, sc
         if spark:
             cell = ws.cell(row=7, column=3, value=f"Trend: {spark}")
             cell.font = SPARKLINE_FONT
+
+    operator_summary = data.get("operator_summary") or {}
+    governance_summary = data.get("governance_summary") or {}
+    campaign_summary = data.get("campaign_summary") or {}
+    setup_health = operator_summary.get("operator_setup_health") or {}
+    lane_counts = _operator_counts(data)
+
+    _write_key_value_block(
+        ws,
+        5,
+        15,
+        [
+            ("Setup Health", _display_operator_state(setup_health.get("status", "ok"))),
+            ("Operator Headline", operator_summary.get("headline", "Portfolio health is stable.")),
+            ("Queue Counts", _format_lane_counts(lane_counts)),
+            ("Governance", governance_summary.get("headline", "Governance preview is aligned with the latest report.")),
+            (
+                "Campaign State",
+                campaign_summary.get("label")
+                or campaign_summary.get("campaign_type")
+                or "No active managed campaign in this run.",
+            ),
+            ("Source Run", operator_summary.get("source_run_id", "")),
+        ],
+        title="Operator Snapshot",
+    )
+
+    repo_rollups = _build_workbook_rollups(data)[1]
+    top_attention_rows = []
+    for repo, total, blocked, urgent, ready, deferred, _kind, _priority, title, action in repo_rollups[:5]:
+        top_attention_rows.append(
+            [
+                repo,
+                f"B{blocked} / U{urgent} / R{ready}",
+                title or "See detailed queue",
+                action or "Review repo detail",
+            ]
+        )
+    if not top_attention_rows:
+        top_attention_rows.append(["Portfolio", "No open items", "Nothing is currently queued.", "Monitor future audits"])
+    _write_ranked_list(
+        ws,
+        12,
+        15,
+        "Top Attention Items",
+        ["Repo", "Counts", "Why Now", "Next Step"],
+        top_attention_rows,
+    )
+
+    audits_sorted = sorted(data.get("audits", []), key=lambda audit: audit.get("overall_score", 0), reverse=True)
+    top_opportunities: list[list[object]] = []
+    for audit in audits_sorted:
+        action = (audit.get("action_candidates") or [{}])[0]
+        hotspots = audit.get("hotspots") or []
+        best_next_move = action.get("title", "")
+        if not best_next_move and hotspots:
+            best_next_move = hotspots[0].get("recommended_action", "")
+        top_opportunities.append(
+            [
+                audit.get("metadata", {}).get("name", ""),
+                round(audit.get("overall_score", 0), 3),
+                audit.get("completeness_tier", ""),
+                best_next_move,
+            ]
+        )
+        if len(top_opportunities) == 5:
+            break
+    _write_ranked_list(
+        ws,
+        20,
+        15,
+        "Top Opportunities",
+        ["Repo", "Score", "Tier", "Best Next Move"],
+        top_opportunities,
+    )
+
+    bottom_repos = sorted(data.get("audits", []), key=lambda audit: audit.get("overall_score", 0))[:5]
+    laggard_rows = [
+        [
+            audit.get("metadata", {}).get("name", ""),
+            round(audit.get("overall_score", 0), 3),
+            audit.get("completeness_tier", ""),
+            (audit.get("hotspots") or [{}])[0].get("title", "Needs follow-through"),
+        ]
+        for audit in bottom_repos
+    ]
+    _write_ranked_list(
+        ws,
+        28,
+        15,
+        "Top Laggards",
+        ["Repo", "Score", "Tier", "What Is Dragging It Down"],
+        laggard_rows,
+    )
 
     # Portfolio DNA row (row 8) — one colored cell per repo
     dna_row = 8
@@ -1397,88 +1734,123 @@ def _build_action_items(wb: Workbook, data: dict) -> None:
     auto_width(ws, len(headers), full_start + min(len(actions), 100) + 1)
 
 
-def _build_navigation(wb: Workbook, data: dict, *, excel_mode: str = "standard") -> None:
+def _build_navigation(
+    wb: Workbook,
+    data: dict,
+    *,
+    excel_mode: str = "standard",
+    portfolio_profile: str = "default",
+    collection: str | None = None,
+) -> None:
     """Navigation index as the first sheet."""
     ws = wb["Index"] if "Index" in wb.sheetnames else wb.create_sheet("Index", 0)
     _clear_worksheet(ws)
     ws.sheet_properties.tabColor = "263238"
+    ws.freeze_panes = "A10"
 
-    ws.merge_cells("A1:D1")
+    ws.merge_cells("A1:G1")
     ws["A1"].value = f"GitHub Portfolio Audit: {data['username']}"
     ws["A1"].font = TITLE_FONT
+    ws["A1"].alignment = CENTER
 
-    ws.merge_cells("A2:D2")
+    ws.merge_cells("A2:G2")
     ws["A2"].value = f"Last updated: {data['generated_at'][:10]} | {data['repos_audited']} repos | Grade: {data.get('portfolio_grade', '?')}"
     ws["A2"].font = SUBTITLE_FONT
+    ws["A2"].alignment = CENTER
 
-    ws.cell(row=4, column=1, value=f"Workbook Directory ({excel_mode} mode)").font = SECTION_FONT
+    ws.cell(row=4, column=1, value="Start Here").font = SECTION_FONT
+    ws.cell(row=5, column=1, value="Workbook Mode").font = SUBHEADER_FONT
+    ws.cell(row=5, column=2, value=excel_mode)
+    ws.cell(row=5, column=3, value="Profile").font = SUBHEADER_FONT
+    ws.cell(row=5, column=4, value=portfolio_profile)
+    ws.cell(row=6, column=1, value="Collection").font = SUBHEADER_FONT
+    ws.cell(row=6, column=2, value=collection or "all")
+    ws.cell(row=6, column=3, value="Source Run").font = SUBHEADER_FONT
+    ws.cell(row=6, column=4, value=(data.get("operator_summary") or {}).get("source_run_id", ""))
+    ws.cell(row=7, column=1, value="Report Reference").font = SUBHEADER_FONT
+    ws.cell(row=7, column=2, value=(data.get("operator_summary") or {}).get("report_reference", ""))
+    ws.cell(row=7, column=3, value="Operator Headline").font = SUBHEADER_FONT
+    ws.cell(row=7, column=4, value=(data.get("operator_summary") or {}).get("headline", ""))
 
     groups = [
         (
-            "Core",
+            "Daily Triage",
+            10,
+            1,
             [
-                ("Dashboard", "Executive overview — KPI cards, charts, narrative"),
-                ("All Repos", "Master table with scores, grades, badges, and explanations"),
-                ("Portfolio Explorer", "Profile-aware ranking and operator context"),
-                ("By Lens", "Repo rankings split by decision lens"),
-                ("By Collection", "Collection summaries and leaders"),
-                ("Trend Summary", "Portfolio trend rollups and repo trendlines"),
-                ("Scenario Planner", "Profile and collection lift preview"),
-                ("Executive Summary", "Analyst-facing summary surface"),
-                ("Print Pack", "Condensed print-oriented workbook summary"),
+                ("Dashboard", "Start here for the big-picture health view and top attention items."),
+                ("Review Queue", "Use this for blocked, urgent, ready, and safe-to-defer review work."),
+                ("Campaigns", "Check managed campaign state, reopen/closure context, and drift."),
+                ("Governance Controls", "Review governed controls, approval posture, and rollback visibility."),
+                ("Writeback Audit", "See what writeback changed and what is reversible."),
             ],
         ),
         (
-            "Diagnostics",
+            "Portfolio Analysis",
+            10,
+            5,
             [
-                ("Scoring Heatmap", "Color-coded matrix of per-dimension scores"),
-                ("Quick Wins", "Repos closest to the next tier promotion"),
-                ("Badges", "Achievement badges earned and portfolio leaderboard"),
-                ("Tech Stack", "Language proficiency weighted by project quality"),
-                ("Trends", "Historical score and tier trends across audit runs"),
-                ("Tier Breakdown", "Repos grouped by completeness tier"),
-                ("Activity", "Commit patterns, bus factor, release cadence"),
-                ("Registry", "Cross-reference with project registry"),
-                ("Hotspots", "Highest-severity portfolio risks and opportunities"),
-                ("Compare", "Snapshot compare view when diff data exists"),
+                ("Portfolio Explorer", "Rank repos, compare score quality, and drill from summary into raw facts."),
+                ("By Lens", "Compare the portfolio by ship readiness, momentum, security, and fit."),
+                ("By Collection", "Understand collection-level leaders and concentration."),
+                ("Trend Summary", "See portfolio-wide movement and repo trendlines over time."),
+                ("All Repos", "Scan the full inventory with grades, tiers, and supporting evidence."),
             ],
         ),
         (
-            "Operator",
+            "Executive Readout",
+            18,
+            1,
             [
-                ("Review Queue", "Current material changes and next manual steps"),
-                ("Review History", "Recurring review run history"),
-                ("Campaigns", "Managed campaign state"),
-                ("Writeback Audit", "Safe writeback results"),
-                ("Governance Controls", "Governed control preview"),
-                ("Governance Audit", "Governance readiness and drift"),
-                ("Security Controls", "Security controls by repo"),
-                ("Supply Chain", "Supply-chain and scorecard posture"),
-                ("Security Debt", "Dry-run governance recommendations"),
-                ("Score Explainer", "How scoring, grades, and tiers work"),
-                ("Action Items", "Prioritized improvements with effort estimates"),
+                ("Executive Summary", "Readable leadership summary with what changed and what matters this week."),
+                ("Print Pack", "Print-friendly handoff with risks, opportunities, and operator counts in plain language."),
+            ],
+        ),
+        (
+            "Deep Diagnostics",
+            18,
+            5,
+            [
+                ("Security", "Raw security posture, secrets, and dangerous-file findings."),
+                ("Security Controls", "Control coverage and rollout detail by repo."),
+                ("Supply Chain", "Dependency health, scorecard signals, and provider coverage."),
+                ("Scoring Heatmap", "Dimension-by-dimension matrix for detailed score inspection."),
+                ("Hotspots", "Highest-severity risks and opportunities across the portfolio."),
+                ("Review History", "Recurring review history and decision-state ledger."),
+                ("Governance Audit", "Approval, drift, and rollback evidence summary."),
+                ("Score Explainer", "How scores, grades, and tiers are computed."),
+                ("Action Items", "Prioritized improvement ideas with effort context."),
             ],
         ),
     ]
 
-    for col, h in enumerate(["Section", "Sheet", "Description"], 1):
-        ws.cell(row=5, column=col, value=h)
-    style_header_row(ws, 5, 3)
-    row = 6
-    for section, sheets in groups:
+    for section, start_row, start_col, sheets in groups:
+        ws.cell(row=start_row, column=start_col, value=section).font = SECTION_FONT
+        header_row = start_row + 1
+        for offset, header in enumerate(["Sheet", "Use This When", "Go"], 0):
+            cell = ws.cell(row=header_row, column=start_col + offset, value=header)
+            cell.fill = SUBHEADER_FILL
+            cell.font = SUBHEADER_FONT
+            cell.alignment = CENTER
+            cell.border = THIN_BORDER
+        row = header_row + 1
         for name, desc in sheets:
             if name not in wb.sheetnames:
                 continue
-            ws.cell(row=row, column=1, value=section)
-            cell = ws.cell(row=row, column=2, value=name)
-            cell.hyperlink = f"#{name}!A1"
-            cell.font = Font("Calibri", 11, bold=True, color=TEAL, underline="single")
-            ws.cell(row=row, column=3, value=desc)
-            style_data_cell(ws.cell(row=row, column=1))
-            style_data_cell(ws.cell(row=row, column=3))
+            sheet_cell = ws.cell(row=row, column=start_col, value=name)
+            sheet_cell.hyperlink = f"#{name}!A1"
+            sheet_cell.font = Font("Calibri", 11, bold=True, color=TEAL, underline="single")
+            sheet_cell.border = THIN_BORDER
+            sheet_cell.alignment = LEFT
+            style_data_cell(ws.cell(row=row, column=start_col + 1, value=desc), "left")
+            go_cell = ws.cell(row=row, column=start_col + 2, value="Open")
+            go_cell.hyperlink = f"#{name}!A1"
+            go_cell.font = Font("Calibri", 10, bold=True, color=TEAL, underline="single")
+            go_cell.border = THIN_BORDER
+            go_cell.alignment = CENTER
             row += 1
 
-    auto_width(ws, 3, row)
+    auto_width(ws, 7, 30)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -1882,6 +2254,7 @@ def _build_hidden_data_sheets(
     campaign_rows: list[list[object]] = []
     writeback_rows: list[list[object]] = []
     lookup_rows: list[list[object]] = []
+    operator_queue_rows, operator_repo_rollups, material_rollups = _build_workbook_rollups(data)
 
     for audit in audits:
         metadata = audit.get("metadata", {})
@@ -2288,6 +2661,27 @@ def _build_hidden_data_sheets(
     )
     _write_hidden_table_sheet(
         wb,
+        "Data_OperatorQueue",
+        "tblOperatorQueueData",
+        ["Item ID", "Repo", "Kind", "Lane", "Priority", "Title", "Summary", "Recommended Action", "Source Run", "Age Days", "Links"],
+        operator_queue_rows,
+    )
+    _write_hidden_table_sheet(
+        wb,
+        "Data_OperatorRepoRollups",
+        "tblOperatorRepoRollups",
+        ["Repo", "Total Items", "Blocked", "Urgent", "Ready", "Deferred", "Primary Kind", "Top Priority", "Top Title", "Recommended Action"],
+        operator_repo_rollups,
+    )
+    _write_hidden_table_sheet(
+        wb,
+        "Data_MaterialChangeRollups",
+        "tblMaterialChangeRollups",
+        ["Repo", "Change Type", "Count", "Max Severity", "Sample Title"],
+        material_rollups,
+    )
+    _write_hidden_table_sheet(
+        wb,
         "Lookups",
         "tblLookups",
         ["Type", "Key", "Value"],
@@ -2392,46 +2786,94 @@ def _build_campaigns(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Campaigns")
     ws.sheet_properties.tabColor = "7C3AED"
     summary = data.get("campaign_summary", {})
-    ws["A1"] = "Campaigns"
-    ws["A1"].font = TITLE_FONT
-    ws["A2"] = f"Campaign: {summary.get('label', summary.get('campaign_type', '—'))}"
-    ws["A3"] = f"Profile: {summary.get('portfolio_profile', 'default')}"
-    ws["A4"] = f"Collection: {summary.get('collection_name') or 'all'}"
-    ws["A5"] = f"Actions: {summary.get('action_count', 0)}"
-    ws["A6"] = f"Repos: {summary.get('repo_count', 0)}"
+    _set_sheet_header(
+        ws,
+        "Campaigns",
+        "Managed campaign state stays local-authoritative here. This sheet is where you see open work, stale items, and whether there is anything to reconcile.",
+        width=8,
+    )
+    _write_key_value_block(
+        ws,
+        4,
+        1,
+        [
+            ("Campaign", summary.get("label", summary.get("campaign_type", "No active campaign"))),
+            ("Profile", summary.get("portfolio_profile", "default")),
+            ("Collection", summary.get("collection_name") or "all"),
+            ("Actions", summary.get("action_count", 0)),
+            ("Repos", summary.get("repo_count", 0)),
+            ("Sync Mode", data.get("writeback_preview", {}).get("sync_mode", "reconcile")),
+        ],
+        title="Current Campaign State",
+    )
     headers = ["Repo", "Issue", "Topics", "Notion Actions", "Action IDs", "Drift", "Sync Mode"]
-    start_row = 8
+    start_row = 12
     for col, header in enumerate(headers, 1):
         ws.cell(row=start_row, column=col, value=header)
     style_header_row(ws, start_row, len(headers))
+    ws.freeze_panes = "A13"
 
     preview_rows = data.get("writeback_preview", {}).get("repos", [])
+    drift_repo_keys = {
+        drift.get("repo_full_name") or drift.get("repo") or ""
+        for drift in data.get("managed_state_drift", []) or []
+    }
     for row, item in enumerate(preview_rows, start_row + 1):
+        repo_key = item.get("repo_full_name") or item.get("repo") or ""
         ws.cell(row=row, column=1, value=item.get("repo", ""))
         ws.cell(row=row, column=2, value=item.get("issue_title", ""))
         ws.cell(row=row, column=3, value=", ".join(item.get("topics", [])))
         ws.cell(row=row, column=4, value=item.get("notion_action_count", 0))
         ws.cell(row=row, column=5, value=", ".join(item.get("action_ids", [])))
-        ws.cell(row=row, column=6, value="yes" if any(drift.get("repo_full_name") == item.get("repo_full_name") for drift in data.get("managed_state_drift", [])) else "no")
+        ws.cell(row=row, column=6, value="yes" if repo_key in drift_repo_keys else "no")
         ws.cell(row=row, column=7, value=data.get("writeback_preview", {}).get("sync_mode", "reconcile"))
 
     max_row = start_row + len(preview_rows)
     if preview_rows:
         apply_zebra_stripes(ws, start_row + 1, max_row, len(headers))
         _add_table(ws, "tblCampaignView", len(headers), max_row, start_row)
+    else:
+        ws.merge_cells(start_row=start_row + 1, start_column=1, end_row=start_row + 2, end_column=7)
+        ws.cell(
+            row=start_row + 1,
+            column=1,
+            value="No active campaign rows are present in this run. When campaign preview or apply is in use, managed repo rows will appear here with drift and sync context.",
+        ).alignment = WRAP
+        ws.cell(row=start_row + 1, column=1).font = SUBTITLE_FONT
     auto_width(ws, len(headers), max_row)
 
 
 def _build_writeback_audit(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Writeback Audit")
     ws.sheet_properties.tabColor = "B91C1C"
-    headers = ["Repo", "Target", "Status", "Rollback", "URL", "Details"]
-    for col, header in enumerate(headers, 1):
-        ws.cell(row=1, column=col, value=header)
-    style_header_row(ws, 1, len(headers))
-
+    _set_sheet_header(
+        ws,
+        "Writeback Audit",
+        "This sheet summarizes writeback outcomes and rollback confidence without mutating anything by itself.",
+        width=6,
+    )
     results = data.get("writeback_results", {}).get("results", [])
-    for row, result in enumerate(results, 2):
+    rollback_count = sum(1 for result in results if result.get("before") not in ({}, None, []))
+    status_counts = Counter(result.get("status", "unknown") for result in results)
+    _write_key_value_block(
+        ws,
+        4,
+        1,
+        [
+            ("Writeback Rows", len(results)),
+            ("Rollback Ready", rollback_count),
+            ("Created / Updated / Closed", f"{status_counts.get('created', 0)} / {status_counts.get('updated', 0)} / {status_counts.get('closed', 0)}"),
+        ],
+        title="Current Writeback State",
+    )
+    headers = ["Repo", "Target", "Status", "Rollback", "URL", "Details"]
+    start_row = 10
+    for col, header in enumerate(headers, 1):
+        ws.cell(row=start_row, column=col, value=header)
+    style_header_row(ws, start_row, len(headers))
+    ws.freeze_panes = "A11"
+
+    for row, result in enumerate(results, start_row + 1):
         ws.cell(row=row, column=1, value=result.get("repo_full_name", ""))
         ws.cell(row=row, column=2, value=result.get("target", ""))
         ws.cell(row=row, column=3, value=result.get("status", ""))
@@ -2439,10 +2881,18 @@ def _build_writeback_audit(wb: Workbook, data: dict) -> None:
         ws.cell(row=row, column=5, value=result.get("url", ""))
         ws.cell(row=row, column=6, value=json.dumps(result))
 
-    max_row = len(results) + 1
+    max_row = len(results) + start_row
     if results:
-        apply_zebra_stripes(ws, 2, max_row, len(headers))
-        _add_table(ws, "tblWritebackAudit", len(headers), max_row)
+        apply_zebra_stripes(ws, start_row + 1, max_row, len(headers))
+        _add_table(ws, "tblWritebackAudit", len(headers), max_row, start_row=start_row)
+    else:
+        ws.merge_cells(start_row=start_row + 1, start_column=1, end_row=start_row + 2, end_column=6)
+        ws.cell(
+            row=start_row + 1,
+            column=1,
+            value="No writeback results are recorded for this run. Preview-only workflows and audit-only runs will leave this sheet intentionally empty.",
+        ).alignment = WRAP
+        ws.cell(row=start_row + 1, column=1).font = SUBTITLE_FONT
     auto_width(ws, len(headers), max_row)
 
 
@@ -2458,16 +2908,23 @@ def _build_portfolio_explorer(
     context = build_analyst_context(data, profile_name=portfolio_profile, collection_name=collection)
     ws = _get_or_create_sheet(wb, "Portfolio Explorer")
     ws.sheet_properties.tabColor = "1D4ED8"
+    _set_sheet_header(
+        ws,
+        "Portfolio Explorer",
+        "Use this sheet to rank the portfolio, sort by profile-aware score, and drill from summary into repo-level facts.",
+        width=10,
+    )
     headers = [
         "Repo", "Profile Score", "Overall", "Interest", "Tier", "Collections",
         "Security", "Hotspots", "Top Hotspot", "Primary Action",
     ]
+    start_row = 4
     for col, header in enumerate(headers, 1):
-        ws.cell(row=1, column=col, value=header)
-    style_header_row(ws, 1, len(headers))
-    ws.freeze_panes = "B2"
+        ws.cell(row=start_row, column=col, value=header)
+    style_header_row(ws, start_row, len(headers))
+    ws.freeze_panes = "B5"
 
-    for row, entry in enumerate(context["ranked_audits"], 2):
+    for row, entry in enumerate(context["ranked_audits"], start_row + 1):
         audit = entry["audit"]
         top_action = audit.get("action_candidates", [{}])[0].get("title", "") if audit.get("action_candidates") else ""
         values = [
@@ -2485,10 +2942,10 @@ def _build_portfolio_explorer(
         for col, value in enumerate(values, 1):
             style_data_cell(ws.cell(row=row, column=col, value=value), "center" if col in {2, 3, 4, 8} else "left")
 
-    max_row = len(context["ranked_audits"]) + 1
-    if max_row > 1:
-        apply_zebra_stripes(ws, 2, max_row, len(headers))
-        _add_table(ws, "tblPortfolioExplorer", len(headers), max_row)
+    max_row = len(context["ranked_audits"]) + start_row
+    if max_row > start_row:
+        apply_zebra_stripes(ws, start_row + 1, max_row, len(headers))
+        _add_table(ws, "tblPortfolioExplorer", len(headers), max_row, start_row=start_row)
     auto_width(ws, len(headers), max_row)
 
 
@@ -2504,14 +2961,21 @@ def _build_by_lens(
     context = build_analyst_context(data, profile_name=portfolio_profile, collection_name=collection)
     ws = _get_or_create_sheet(wb, "By Lens")
     ws.sheet_properties.tabColor = "0F766E"
+    _set_sheet_header(
+        ws,
+        "By Lens",
+        "Compare the same repos through different decision lenses so you can separate shipped work, risk, momentum, and showcase value.",
+        width=9,
+    )
     lens_headers = ["Ship Readiness", "Maintenance Risk", "Showcase", "Security", "Momentum", "Portfolio Fit"]
     headers = ["Repo", "Profile Score", "Tier"] + lens_headers
+    start_row = 4
     for col, header in enumerate(headers, 1):
-        ws.cell(row=1, column=col, value=header)
-    style_header_row(ws, 1, len(headers))
-    ws.freeze_panes = "B2"
+        ws.cell(row=start_row, column=col, value=header)
+    style_header_row(ws, start_row, len(headers))
+    ws.freeze_panes = "B5"
 
-    for row, entry in enumerate(context["ranked_audits"], 2):
+    for row, entry in enumerate(context["ranked_audits"], start_row + 1):
         lenses = entry["audit"].get("lenses", {})
         values = [
             entry["name"],
@@ -2527,10 +2991,10 @@ def _build_by_lens(
         for col, value in enumerate(values, 1):
             style_data_cell(ws.cell(row=row, column=col, value=value), "center" if col >= 2 else "left")
 
-    max_row = len(context["ranked_audits"]) + 1
-    if max_row > 1:
-        apply_zebra_stripes(ws, 2, max_row, len(headers))
-        _add_table(ws, "tblByLens", len(headers), max_row)
+    max_row = len(context["ranked_audits"]) + start_row
+    if max_row > start_row:
+        apply_zebra_stripes(ws, start_row + 1, max_row, len(headers))
+        _add_table(ws, "tblByLens", len(headers), max_row, start_row=start_row)
     auto_width(ws, len(headers), max_row)
 
 
@@ -2544,12 +3008,20 @@ def _build_by_collection(
 
     ws = _get_or_create_sheet(wb, "By Collection")
     ws.sheet_properties.tabColor = "7C3AED"
+    _set_sheet_header(
+        ws,
+        "By Collection",
+        "Use this sheet to understand which collections are concentrated, which repos lead them, and where your showcase value is clustered.",
+        width=5,
+    )
     headers = ["Collection", "Repos", "Description", "Top Repo", "Top Score"]
+    start_row = 4
     for col, header in enumerate(headers, 1):
-        ws.cell(row=1, column=col, value=header)
-    style_header_row(ws, 1, len(headers))
+        ws.cell(row=start_row, column=col, value=header)
+    style_header_row(ws, start_row, len(headers))
+    ws.freeze_panes = "B5"
 
-    for row, collection_name in enumerate(data.get("collections", {}).keys(), 2):
+    for row, collection_name in enumerate(data.get("collections", {}).keys(), start_row + 1):
         context = build_analyst_context(data, profile_name=portfolio_profile, collection_name=collection_name)
         leaders = context.get("profile_leaderboard", {}).get("leaders", [])
         collection_data = data.get("collections", {}).get(collection_name, {})
@@ -2563,10 +3035,10 @@ def _build_by_collection(
         for col, value in enumerate(values, 1):
             style_data_cell(ws.cell(row=row, column=col, value=value), "center" if col in {2, 5} else "left")
 
-    max_row = len(data.get("collections", {})) + 1
-    if max_row > 1:
-        apply_zebra_stripes(ws, 2, max_row, len(headers))
-        _add_table(ws, "tblByCollection", len(headers), max_row)
+    max_row = len(data.get("collections", {})) + start_row
+    if max_row > start_row:
+        apply_zebra_stripes(ws, start_row + 1, max_row, len(headers))
+        _add_table(ws, "tblByCollection", len(headers), max_row, start_row=start_row)
     auto_width(ws, len(headers), max_row)
 
 
@@ -2580,16 +3052,19 @@ def _build_trend_summary(
     extended_score_history = _extend_score_history_with_current(data, score_history)
     ws = _get_or_create_sheet(wb, "Trend Summary")
     ws.sheet_properties.tabColor = "0EA5E9"
-    ws["A1"] = "Trend Summary"
-    ws["A1"].font = TITLE_FONT
-    ws["A2"] = "Portfolio-wide history and top repo score trends."
-    ws["A2"].font = SUBTITLE_FONT
+    _set_sheet_header(
+        ws,
+        "Trend Summary",
+        "Track portfolio movement over time, then scan the short repo trendlines below to see who is actually improving or drifting.",
+        width=8,
+    )
 
     headers = ["Date", "Average Score", "Repos", "Shipped", "Functional", "Review Emitted", "Campaign Drift", "Governance Drift"]
     start_row = 4
     for col, header in enumerate(headers, 1):
         ws.cell(row=start_row, column=col, value=header)
     style_header_row(ws, start_row, len(headers))
+    ws.freeze_panes = "A5"
 
     for offset, trend in enumerate(extended_trends, 1):
         values = [
@@ -2621,14 +3096,71 @@ def _build_trend_summary(
 def _build_review_queue(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Review Queue")
     ws.sheet_properties.tabColor = "2563EB"
+    _set_sheet_header(
+        ws,
+        "Review Queue",
+        "Start with the summary strip, then use the full queue below when you need row-level facts and decision context.",
+        width=12,
+    )
+    counts = _operator_counts(data)
+    queue = data.get("operator_queue", []) or []
+    material_changes = data.get("material_changes", []) or []
+    _write_key_value_block(
+        ws,
+        4,
+        1,
+        [
+            ("Headline", (data.get("operator_summary") or {}).get("headline", "Review activity is available below.")),
+            ("Queue Counts", _format_lane_counts(counts)),
+            ("Total Queue Items", len(queue)),
+            ("Source Run", (data.get("operator_summary") or {}).get("source_run_id", "")),
+        ],
+        title="Summary",
+    )
+    repo_rollups = _build_workbook_rollups(data)[1]
+    top_repo_rows = [
+        [repo, total, urgent, ready, title]
+        for repo, total, _blocked, urgent, ready, _deferred, _kind, _priority, title, _action in repo_rollups[:5]
+    ] or [["Portfolio", 0, 0, 0, "No open review items."]]
+    _write_ranked_list(
+        ws,
+        4,
+        5,
+        "Top Repos By Issue Volume",
+        ["Repo", "Items", "Urgent", "Ready", "Why"],
+        top_repo_rows,
+    )
+    issue_family_rows = [[label, count] for label, count in _summarize_top_issue_families(material_changes)]
+    if not issue_family_rows:
+        issue_family_rows = [["No material change families", 0]]
+    _write_ranked_list(
+        ws,
+        12,
+        1,
+        "Top Issue Families",
+        ["Issue Family", "Count"],
+        issue_family_rows,
+    )
+    action_rows = [[action, count] for action, count in _summarize_top_actions(queue)]
+    if not action_rows:
+        action_rows = [["No recommended actions", 0]]
+    _write_ranked_list(
+        ws,
+        12,
+        5,
+        "Top Recommended Actions",
+        ["Action", "Count"],
+        action_rows,
+    )
     headers = ["Repo", "Title", "Lane", "Kind", "Priority", "Next Step", "Decision Hint", "Safe To Defer"]
+    start_row = 20
     for col, header in enumerate(headers, 1):
-        ws.cell(row=1, column=col, value=header)
-    style_header_row(ws, 1, len(headers))
+        ws.cell(row=start_row, column=col, value=header)
+    style_header_row(ws, start_row, len(headers))
+    ws.freeze_panes = "A21"
 
-    queue = data.get("operator_queue", [])
     targets = queue or data.get("review_targets", [])
-    for row, item in enumerate(targets, 2):
+    for row, item in enumerate(targets, start_row + 1):
         next_step = item.get("recommended_action", item.get("next_step", ""))
         safe_to_defer = item.get("lane") == "deferred" or item.get("safe_to_defer")
         values = [
@@ -2644,23 +3176,43 @@ def _build_review_queue(wb: Workbook, data: dict) -> None:
         for col, value in enumerate(values, 1):
             style_data_cell(ws.cell(row=row, column=col, value=value), "center" if col in {3, 4, 5, 8} else "left")
 
-    max_row = len(targets) + 1
+    max_row = len(targets) + start_row
     if targets:
-        apply_zebra_stripes(ws, 2, max_row, len(headers))
-        _add_table(ws, "tblReviewQueue", len(headers), max_row)
+        apply_zebra_stripes(ws, start_row + 1, max_row, len(headers))
+        _add_table(ws, "tblReviewQueue", len(headers), max_row, start_row=start_row)
     auto_width(ws, len(headers), max_row)
 
 
 def _build_review_history_sheet(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Review History")
     ws.sheet_properties.tabColor = "1D4ED8"
+    _set_sheet_header(
+        ws,
+        "Review History",
+        "Use this ledger to see which recurring review is active now and how prior review runs were resolved, deferred, or left local-only.",
+        width=7,
+    )
+    active_review = data.get("review_summary") or {}
+    _write_key_value_block(
+        ws,
+        4,
+        1,
+        [
+            ("Current Review", active_review.get("review_id", "—")),
+            ("Current Status", active_review.get("status", "unknown")),
+            ("History Rows", len(data.get("review_history", []) or [])),
+        ],
+        title="Current State",
+    )
     headers = ["Review ID", "Generated", "Changes", "Status", "Decision State", "Sync State", "Emitted"]
+    start_row = 9
     for col, header in enumerate(headers, 1):
-        ws.cell(row=1, column=col, value=header)
-    style_header_row(ws, 1, len(headers))
+        ws.cell(row=start_row, column=col, value=header)
+    style_header_row(ws, start_row, len(headers))
+    ws.freeze_panes = "A10"
 
     history = data.get("review_history", [])
-    for row, item in enumerate(history, 2):
+    for row, item in enumerate(history, start_row + 1):
         values = [
             item.get("review_id", ""),
             item.get("generated_at", ""),
@@ -2673,28 +3225,59 @@ def _build_review_history_sheet(wb: Workbook, data: dict) -> None:
         for col, value in enumerate(values, 1):
             style_data_cell(ws.cell(row=row, column=col, value=value), "center" if col not in {1, 2, 4, 5, 6} else "left")
 
-    max_row = len(history) + 1
+    max_row = len(history) + start_row
     if history:
-        apply_zebra_stripes(ws, 2, max_row, len(headers))
-        _add_table(ws, "tblReviewHistory", len(headers), max_row)
+        apply_zebra_stripes(ws, start_row + 1, max_row, len(headers))
+        _add_table(ws, "tblReviewHistory", len(headers), max_row, start_row=start_row)
     auto_width(ws, len(headers), max_row)
 
 
 def _build_governance_controls(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Governance Controls")
     ws.sheet_properties.tabColor = "7C3AED"
-    headers = ["Repo", "Action", "State", "Expected Lift", "Effort", "Source", "Why"]
-    for col, header in enumerate(headers, 1):
-        ws.cell(row=1, column=col, value=header)
-    style_header_row(ws, 1, len(headers))
-
+    _set_sheet_header(
+        ws,
+        "Governance Controls",
+        "This sheet shows the current governed control family only: readiness, drift, re-approval need, and rollback visibility.",
+        width=7,
+    )
     governance_summary = data.get("governance_summary", {}) or {}
+    _write_key_value_block(
+        ws,
+        4,
+        1,
+        [
+            ("Status", _display_operator_state(governance_summary.get("status", "preview"))),
+            ("Approval", _display_operator_state(governance_summary.get("approval_status", "preview-only"))),
+            ("Needs Re-Approval", "yes" if governance_summary.get("needs_reapproval") else "no"),
+            ("Rollback Available", governance_summary.get("rollback_available_count", 0)),
+            ("Selected View", governance_summary.get("selected_view", data.get("governance_preview", {}).get("selected_view", "all"))),
+        ],
+        title="Governance Snapshot",
+    )
+    headers = ["Repo", "Action", "State", "Expected Lift", "Effort", "Source", "Why"]
+    start_row = 11
+    for col, header in enumerate(headers, 1):
+        ws.cell(row=start_row, column=col, value=header)
+    style_header_row(ws, start_row, len(headers))
+    ws.freeze_panes = "A12"
+
     preview = governance_summary.get("top_actions") or data.get("security_governance_preview", [])
-    for row, item in enumerate(preview, 2):
+    preview_only_source = not governance_summary.get("top_actions")
+    for row, item in enumerate(preview, start_row + 1):
+        operator_state = item.get("operator_state")
+        if not operator_state and preview_only_source:
+            operator_state = "preview-only"
+        if not operator_state and governance_summary.get("status") == "preview":
+            operator_state = "preview-only"
+        if not operator_state and item.get("preview_only"):
+            operator_state = "preview-only"
+        if not operator_state and item.get("applyable") is False:
+            operator_state = "preview-only"
         values = [
             item.get("repo", ""),
             item.get("title", ""),
-            item.get("operator_state", item.get("priority", "medium")),
+            _display_operator_state(operator_state or item.get("priority", "medium")),
             item.get("expected_posture_lift", 0.0),
             item.get("effort", ""),
             item.get("source", ""),
@@ -2703,43 +3286,61 @@ def _build_governance_controls(wb: Workbook, data: dict) -> None:
         for col, value in enumerate(values, 1):
             style_data_cell(ws.cell(row=row, column=col, value=value), "center" if col in {3, 4} else "left")
 
-    max_row = len(preview) + 1
+    max_row = len(preview) + start_row
     if preview:
-        apply_zebra_stripes(ws, 2, max_row, len(headers))
-        _add_table(ws, "tblGovernanceControls", len(headers), max_row)
+        apply_zebra_stripes(ws, start_row + 1, max_row, len(headers))
+        _add_table(ws, "tblGovernanceControls", len(headers), max_row, start_row=start_row)
+    else:
+        ws.merge_cells(start_row=start_row + 1, start_column=1, end_row=start_row + 2, end_column=7)
+        ws.cell(
+            row=start_row + 1,
+            column=1,
+            value="No governed controls are in scope for this run. This can be expected for audit-only runs or when everything is already aligned.",
+        ).alignment = WRAP
+        ws.cell(row=start_row + 1, column=1).font = SUBTITLE_FONT
     auto_width(ws, len(headers), max_row)
 
 
 def _build_governance_audit(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Governance Audit")
     ws.sheet_properties.tabColor = "6D28D9"
+    _set_sheet_header(
+        ws,
+        "Governance Audit",
+        "Evidence summary for approval age, fingerprint drift, rollback coverage, and applied results.",
+        width=3,
+    )
     headers = ["Control", "Value"]
+    start_row = 4
     for col, header in enumerate(headers, 1):
-        ws.cell(row=1, column=col, value=header)
-    style_header_row(ws, 1, len(headers))
+        ws.cell(row=start_row, column=col, value=header)
+    style_header_row(ws, start_row, len(headers))
+    ws.freeze_panes = "A5"
 
     governance_summary = data.get("governance_summary", {}) or {}
     preview_count = governance_summary.get("applyable_count")
     if preview_count is None:
         preview_count = len(data.get("security_governance_preview", []) or [])
     rows = [
-        ["Status", governance_summary.get("status", "preview")],
+        ["Status", _display_operator_state(governance_summary.get("status", "preview"))],
         ["Headline", governance_summary.get("headline", "Governance state is being tracked.")],
-        ["Approved", "yes" if data.get("governance_approval") else "no"],
+        ["Approval Status", _display_operator_state(governance_summary.get("approval_status", "preview-only"))],
         ["Needs Re-Approval", "yes" if governance_summary.get("needs_reapproval") else "no"],
+        ["Approval Age (days)", governance_summary.get("approval_age_days", "—")],
+        ["Fingerprint Mismatch", "yes" if governance_summary.get("fingerprint_mismatch") else "no"],
         ["Applyable Count", preview_count],
         ["Drift Count", governance_summary.get("drift_count", len(data.get("governance_drift", []) or []))],
         ["Applied Count", governance_summary.get("applied_count", len(data.get("governance_results", {}).get("results", []) or []))],
         ["Rollback Available", governance_summary.get("rollback_available_count", 0)],
         ["Selected View", data.get("governance_preview", {}).get("selected_view", "all")],
     ]
-    for row_index, row in enumerate(rows, 2):
+    for row_index, row in enumerate(rows, start_row + 1):
         for col_index, value in enumerate(row, 1):
             style_data_cell(ws.cell(row=row_index, column=col_index, value=value), "center" if col_index == 2 else "left")
 
-    apply_zebra_stripes(ws, 2, len(rows) + 1, len(headers))
-    _add_table(ws, "tblGovernanceAudit", len(headers), len(rows) + 1)
-    auto_width(ws, len(headers), len(rows) + 1)
+    apply_zebra_stripes(ws, start_row + 1, len(rows) + start_row, len(headers))
+    _add_table(ws, "tblGovernanceAudit", len(headers), len(rows) + start_row, start_row=start_row)
+    auto_width(ws, len(headers), len(rows) + start_row)
 
 
 def _build_compare_sheet(
@@ -2861,49 +3462,65 @@ def _build_executive_summary(
     context = build_analyst_context(data, profile_name=portfolio_profile, collection_name=collection)
     ws = _get_or_create_sheet(wb, "Executive Summary")
     ws.sheet_properties.tabColor = NAVY
-    ws.merge_cells("A1:F1")
-    ws["A1"] = "Executive Summary"
-    ws["A1"].font = TITLE_FONT
+    _set_sheet_header(
+        ws,
+        "Executive Summary",
+        f"Profile: {context['profile_name']} | Collection: {context['collection_name'] or 'all'}",
+        width=6,
+    )
+    ws.freeze_panes = "A4"
 
-    write_kpi_card(ws, 3, 1, "Portfolio Grade", data.get("portfolio_grade", "F"))
-    write_kpi_card(ws, 3, 3, "Avg Score", f"{data.get('average_score', 0):.2f}")
-    write_kpi_card(ws, 3, 5, "Profile", context["profile_name"])
+    leaders = context["profile_leaderboard"].get("leaders", [])[:5]
+    critical_repos = data.get("security_posture", {}).get("critical_repos", []) or []
+    operator_summary = data.get("operator_summary") or {}
+    preview = context["scenario_preview"].get("portfolio_projection", {})
+    recommended_focus = ""
+    if data.get("operator_queue"):
+        recommended_focus = data["operator_queue"][0].get("recommended_action", "")
+    elif leaders:
+        recommended_focus = f"Protect momentum around {leaders[0]['name']}"
+    narrative_rows = [
+        ("What Is Going Well", f"{data.get('tier_distribution', {}).get('shipped', 0)} repos are shipped with an average score of {data.get('average_score', 0):.2f}."),
+        ("What Needs Attention", operator_summary.get("headline", "No urgent operator headline is present.")),
+        (
+            "What Changed",
+            f"{len(data.get('material_changes', []) or [])} material changes and {len(data.get('governance_drift', []) or [])} governance drift signals were captured in this run.",
+        ),
+        ("Focus This Week", recommended_focus or "Review the top queue items and protect the highest-value repos first."),
+    ]
+    _write_key_value_block(ws, 4, 1, narrative_rows, title="Leadership Brief")
 
-    ws.cell(row=7, column=1, value="Top Profile Leaders").font = SECTION_FONT
-    for offset, entry in enumerate(context["profile_leaderboard"].get("leaders", [])[:5], 1):
-        ws.cell(row=7 + offset, column=1, value=entry["name"])
-        ws.cell(row=7 + offset, column=2, value=entry["profile_score"])
-        ws.cell(row=7 + offset, column=3, value=entry["tier"])
+    write_kpi_card(ws, 10, 1, "Portfolio Grade", data.get("portfolio_grade", "F"))
+    write_kpi_card(ws, 10, 3, "Avg Score", f"{data.get('average_score', 0):.2f}")
+    write_kpi_card(ws, 10, 5, "Critical Repos", len(critical_repos))
+
+    leader_rows = [[entry["name"], entry["profile_score"], entry["tier"]] for entry in leaders] or [["No leader", 0, "—"]]
+    _write_ranked_list(ws, 14, 1, "Top Profile Leaders", ["Repo", "Profile Score", "Tier"], leader_rows)
 
     if diff_data:
-        ws.cell(row=7, column=5, value="Top Movers").font = SECTION_FONT
-        for offset, change in enumerate(diff_data.get("repo_changes", [])[:5], 1):
-            ws.cell(row=7 + offset, column=5, value=change.get("name", ""))
-            ws.cell(row=7 + offset, column=6, value=change.get("delta", 0.0))
+        mover_rows = [
+            [change.get("name", ""), round(change.get("delta", 0.0), 3), f"{change.get('old_tier', '—')} -> {change.get('new_tier', '—')}"]
+            for change in (diff_data.get("repo_changes", []) or [])[:5]
+        ] or [["No movers", 0.0, "—"]]
+        _write_ranked_list(ws, 14, 5, "Top Movers", ["Repo", "Delta", "Tier Change"], mover_rows)
 
-    preview = context["scenario_preview"].get("portfolio_projection", {})
-    ws.cell(row=15, column=1, value="Scenario Preview").font = SECTION_FONT
-    ws.cell(row=16, column=1, value="Projected Avg Score Delta").font = SUBHEADER_FONT
-    ws.cell(row=16, column=2, value=preview.get("projected_average_score_delta", 0.0))
-    ws.cell(row=17, column=1, value="Projected Promotions").font = SUBHEADER_FONT
-    ws.cell(row=17, column=2, value=preview.get("projected_tier_promotions", 0))
-    operator_summary = data.get("operator_summary") or {}
+    ws.cell(row=22, column=1, value="Scenario Preview").font = SECTION_FONT
+    ws.cell(row=23, column=1, value="Projected Avg Score Delta").font = SUBHEADER_FONT
+    ws.cell(row=23, column=2, value=preview.get("projected_average_score_delta", 0.0))
+    ws.cell(row=24, column=1, value="Projected Promotions").font = SUBHEADER_FONT
+    ws.cell(row=24, column=2, value=preview.get("projected_tier_promotions", 0))
+
     if operator_summary:
-        ws.cell(row=19, column=1, value="Operator Control Center").font = SECTION_FONT
-        ws.cell(row=20, column=1, value="Headline").font = SUBHEADER_FONT
-        ws.cell(row=20, column=2, value=operator_summary.get("headline", ""))
-        counts = operator_summary.get("counts", {})
-        ws.cell(row=21, column=1, value="Blocked / Urgent / Ready / Deferred").font = SUBHEADER_FONT
-        ws.cell(
-            row=21,
-            column=2,
-            value=f"{counts.get('blocked', 0)} / {counts.get('urgent', 0)} / {counts.get('ready', 0)} / {counts.get('deferred', 0)}",
-        )
-        ws.cell(row=22, column=1, value="Source Run").font = SUBHEADER_FONT
-        ws.cell(row=22, column=2, value=operator_summary.get("source_run_id", ""))
+        ws.cell(row=22, column=4, value="Operator Control Center").font = SECTION_FONT
+        ws.cell(row=23, column=4, value="Headline").font = SUBHEADER_FONT
+        ws.cell(row=23, column=5, value=operator_summary.get("headline", ""))
+        ws.cell(row=24, column=4, value="Queue Counts").font = SUBHEADER_FONT
+        ws.cell(row=24, column=5, value=_format_lane_counts(_operator_counts(data)))
+        ws.cell(row=25, column=4, value="Source Run").font = SUBHEADER_FONT
+        ws.cell(row=25, column=5, value=operator_summary.get("source_run_id", ""))
     preflight = data.get("preflight_summary") or {}
     if preflight and (preflight.get("blocking_errors", 0) or preflight.get("warnings", 0)):
-        row_base = 24 if operator_summary else 19
+        row_base = 27
         ws.cell(row=row_base, column=1, value="Preflight Diagnostics").font = SECTION_FONT
         ws.cell(row=row_base + 1, column=1, value="Status").font = SUBHEADER_FONT
         ws.cell(row=row_base + 1, column=2, value=preflight.get("status", "unknown"))
@@ -2911,10 +3528,7 @@ def _build_executive_summary(
         ws.cell(row=row_base + 2, column=2, value=preflight.get("blocking_errors", 0))
         ws.cell(row=row_base + 3, column=1, value="Warnings").font = SUBHEADER_FONT
         ws.cell(row=row_base + 3, column=2, value=preflight.get("warnings", 0))
-        for offset, item in enumerate((preflight.get("checks") or [])[:4], 0):
-            ws.cell(row=row_base + 1 + offset, column=4, value=item.get("category", "setup")).font = SUBHEADER_FONT
-            ws.cell(row=row_base + 1 + offset, column=5, value=item.get("summary", "Issue detected"))
-    auto_width(ws, 6, 28)
+    auto_width(ws, 6, 32)
 
 
 def _build_print_pack(
@@ -2927,10 +3541,15 @@ def _build_print_pack(
 ) -> None:
     ws = _get_or_create_sheet(wb, "Print Pack")
     ws.sheet_properties.tabColor = "CA8A04"
-    ws["A1"] = "Print Pack"
-    ws["A1"].font = TITLE_FONT
-    ws["A2"] = f"Profile: {portfolio_profile}"
-    ws["A3"] = f"Collection: {collection or 'all'}"
+    _set_sheet_header(
+        ws,
+        "Print Pack",
+        f"Profile: {portfolio_profile} | Collection: {collection or 'all'}",
+        width=6,
+    )
+    ws.freeze_panes = "A5"
+    ws["A4"] = "Page 1: Portfolio Status"
+    ws["A4"].font = SECTION_FONT
     ws["A5"] = "Portfolio Grade"
     ws["B5"] = data.get("portfolio_grade", "F")
     ws["A6"] = "Average Score"
@@ -2943,16 +3562,43 @@ def _build_print_pack(
     if operator_summary:
         counts = operator_summary.get("counts", {})
         ws["A9"] = "Blocked / Urgent / Ready / Deferred"
-        ws["B9"] = f"{counts.get('blocked', 0)} / {counts.get('urgent', 0)} / {counts.get('ready', 0)} / {counts.get('deferred', 0)}"
-    ws["A10"] = "Top Material Changes"
-    ws["A10"].font = SECTION_FONT
-    for offset, item in enumerate((data.get("material_changes") or [])[:8], 1):
-        ws.cell(row=10 + offset, column=1, value=item.get("change_type", ""))
-        ws.cell(row=10 + offset, column=2, value=item.get("repo", ""))
-        ws.cell(row=10 + offset, column=3, value=item.get("severity", 0.0))
-        ws.cell(row=10 + offset, column=4, value=item.get("title", ""))
+        ws["B9"] = _format_lane_counts(counts)
+    ws["A11"] = "Top Risks"
+    ws["A11"].font = SECTION_FONT
+    top_risks = sorted(data.get("hotspots", []) or [], key=lambda item: item.get("severity", 0), reverse=True)[:5]
+    for offset, item in enumerate(top_risks, 1):
+        ws.cell(row=11 + offset, column=1, value=item.get("repo", ""))
+        ws.cell(row=11 + offset, column=2, value=item.get("category", ""))
+        ws.cell(row=11 + offset, column=3, value=round(item.get("severity", 0.0), 3))
+        ws.cell(row=11 + offset, column=4, value=item.get("title", ""))
+    ws["E11"] = "Top Opportunities"
+    ws["E11"].font = SECTION_FONT
+    top_opportunities = sorted(data.get("audits", []), key=lambda audit: audit.get("overall_score", 0), reverse=True)[:5]
+    for offset, audit in enumerate(top_opportunities, 1):
+        ws.cell(row=11 + offset, column=5, value=audit.get("metadata", {}).get("name", ""))
+        ws.cell(row=11 + offset, column=6, value=(audit.get("action_candidates") or [{}])[0].get("title", ""))
+    ws["A19"] = "Page 2: Changes and Governance"
+    ws["A19"].font = SECTION_FONT
+    ws["A20"] = "Top Material Change Families"
+    ws["A20"].font = SUBHEADER_FONT
+    change_rows = [[label, count] for label, count in _summarize_top_issue_families(data.get("material_changes", []) or [], limit=6)]
+    for offset, (label, count) in enumerate(change_rows, 1):
+        ws.cell(row=20 + offset, column=1, value=label)
+        ws.cell(row=20 + offset, column=2, value=count)
+    ws["D20"] = "Governance Highlights"
+    ws["D20"].font = SUBHEADER_FONT
+    governance_summary = data.get("governance_summary", {}) or {}
+    governance_rows = [
+        ("Status", _display_operator_state(governance_summary.get("status", "preview"))),
+        ("Needs Re-Approval", "yes" if governance_summary.get("needs_reapproval") else "no"),
+        ("Drift Count", governance_summary.get("drift_count", len(data.get("governance_drift", []) or []))),
+        ("Rollback Available", governance_summary.get("rollback_available_count", 0)),
+    ]
+    for offset, (label, value) in enumerate(governance_rows, 1):
+        ws.cell(row=20 + offset, column=4, value=label)
+        ws.cell(row=20 + offset, column=5, value=value)
     if diff_data:
-        row = 21
+        row = 27
         ws.cell(row=row, column=1, value="Compare Snapshot").font = SECTION_FONT
         ws.cell(row=row + 1, column=1, value="Average Score Delta")
         ws.cell(row=row + 1, column=2, value=diff_data.get("average_score_delta", 0.0))
@@ -2960,7 +3606,7 @@ def _build_print_pack(
         ws.cell(row=row + 2, column=2, value=len(diff_data.get("repo_changes", []) or []))
     preflight = data.get("preflight_summary") or {}
     if preflight and (preflight.get("blocking_errors", 0) or preflight.get("warnings", 0)):
-        row = 26
+        row = 31
         ws.cell(row=row, column=1, value="Preflight Diagnostics").font = SECTION_FONT
         ws.cell(row=row + 1, column=1, value="Status")
         ws.cell(row=row + 1, column=2, value=preflight.get("status", "unknown"))
@@ -2969,8 +3615,9 @@ def _build_print_pack(
         ws.cell(row=row + 3, column=1, value="Warnings")
         ws.cell(row=row + 3, column=2, value=preflight.get("warnings", 0))
     ws.page_setup.orientation = "landscape"
-    ws.print_area = "A1:F30"
-    auto_width(ws, 6, 30)
+    ws.print_area = "A1:F36"
+    ws.print_title_rows = "1:4"
+    auto_width(ws, 6, 36)
 
 
 def _build_template_sparkline_specs(
@@ -3088,7 +3735,13 @@ def _build_excel_workbook(
     _build_score_explainer(wb)
     _build_action_items(wb, data)
     _build_hidden_data_sheets(wb, data, trend_data, score_history)
-    _build_navigation(wb, data, excel_mode=excel_mode)
+    _build_navigation(
+        wb,
+        data,
+        excel_mode=excel_mode,
+        portfolio_profile=portfolio_profile,
+        collection=collection,
+    )
     _apply_workbook_named_ranges(
         wb,
         data,
@@ -3096,6 +3749,7 @@ def _build_excel_workbook(
         collection=collection,
         excel_mode=excel_mode,
     )
+    _reorder_workbook_sheets(wb)
     _refresh_pivot_caches_on_load(wb)
     wb.calculation.fullCalcOnLoad = True
     wb.calculation.forceFullCalc = True
