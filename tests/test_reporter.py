@@ -332,12 +332,19 @@ class TestMarkdownReport:
             "primary_target_closure_forecast_persistence_reset_status": "none",
             "primary_target_closure_forecast_persistence_reset_reason": "",
             "closure_forecast_persistence_reset_summary": "Reacquired posture for Missing template asset is aging enough that it can keep holding, but it should no longer stay indefinitely at sustained strength.",
+            "primary_target_closure_forecast_reset_refresh_recovery_score": 0.18,
+            "primary_target_closure_forecast_reset_refresh_recovery_status": "recovering-confirmation-reset",
+            "primary_target_closure_forecast_reset_reentry_status": "pending-confirmation-reentry",
+            "primary_target_closure_forecast_reset_reentry_reason": "Fresh confirmation-side evidence is returning after a reset, but it has not yet re-earned re-entry.",
+            "closure_forecast_reset_refresh_recovery_summary": "Fresh confirmation-side evidence is returning for Missing template asset after a reset, but it has not yet re-earned re-entry (0.18).",
+            "closure_forecast_reset_reentry_summary": "Fresh confirmation-side evidence is returning after a reset, but it has not yet re-earned re-entry.",
             "stale_closure_forecast_hotspots": [],
             "fresh_closure_forecast_signal_hotspots": [],
             "closure_forecast_decay_window_runs": 4,
             "closure_forecast_refresh_window_runs": 4,
             "closure_forecast_reacquisition_window_runs": 4,
             "closure_forecast_reacquisition_decay_window_runs": 4,
+            "closure_forecast_reset_refresh_window_runs": 4,
             "closure_forecast_transition_window_runs": 4,
             "sustained_confirmation_hotspots": [],
             "sustained_clearance_hotspots": [],
@@ -349,6 +356,8 @@ class TestMarkdownReport:
             "recovery_churn_hotspots": [],
             "stale_reacquisition_hotspots": [],
             "fresh_reacquisition_signal_hotspots": [],
+            "recovering_from_confirmation_reset_hotspots": [],
+            "recovering_from_clearance_reset_hotspots": [],
             "supporting_pending_resolution_hotspots": [],
             "caution_pending_debt_hotspots": [],
             "stalled_transition_hotspots": [],
@@ -465,8 +474,12 @@ class TestMarkdownReport:
         assert "Recovery Churn Summary" in content
         assert "Reacquisition Freshness:" in content
         assert "Persistence Reset Controls:" in content
+        assert "Reset Refresh Recovery:" in content
+        assert "Reset Re-entry Controls:" in content
         assert "Reacquisition Freshness Summary" in content
         assert "Persistence Reset Summary" in content
+        assert "Reset Refresh Recovery Summary" in content
+        assert "Reset Re-entry Summary" in content
         assert "Closure Forecast Reacquisition Summary" in content
         assert "Class Pending Debt Summary" in content
         assert "Confidence Validation" in content

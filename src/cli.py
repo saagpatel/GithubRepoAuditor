@@ -882,6 +882,22 @@ def _print_control_center_summary(snapshot: dict) -> None:
         )
     if summary.get("closure_forecast_persistence_reset_summary"):
         print(f"  Persistence reset summary: {summary['closure_forecast_persistence_reset_summary']}")
+    if summary.get("primary_target_closure_forecast_reset_refresh_recovery_status") not in {None, "", "none"}:
+        print(
+            "  Reset refresh recovery: "
+            f"{summary.get('primary_target_closure_forecast_reset_refresh_recovery_status', 'none')} "
+            f"({summary.get('primary_target_closure_forecast_reset_refresh_recovery_score', 0.0):.2f})"
+        )
+    if summary.get("closure_forecast_reset_refresh_recovery_summary"):
+        print(f"  Reset refresh recovery summary: {summary['closure_forecast_reset_refresh_recovery_summary']}")
+    if summary.get("primary_target_closure_forecast_reset_reentry_status") not in {None, "", "none"}:
+        print(
+            "  Reset re-entry controls: "
+            f"{summary.get('primary_target_closure_forecast_reset_reentry_status', 'none')} "
+            f"({summary.get('primary_target_closure_forecast_reset_reentry_reason', 'No reset re-entry reason is recorded yet.')})"
+        )
+    if summary.get("closure_forecast_reset_reentry_summary"):
+        print(f"  Reset re-entry summary: {summary['closure_forecast_reset_reentry_summary']}")
     if summary.get("recommendation_drift_status"):
         print(
             "  Recommendation drift: "

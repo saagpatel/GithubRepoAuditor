@@ -522,10 +522,12 @@ def _operator_transition_closure_values(data: dict) -> tuple[str, str, str, str,
         or "insufficient-data"
     ).replace("-", " ").title()
     closure_forecast_recovery = (
-        summary.get("primary_target_closure_forecast_persistence_reset_status", "") or "none"
+        summary.get("primary_target_closure_forecast_reset_reentry_status", "") or "none"
     ).replace("-", " ").title()
     closure_summary = (
-        summary.get("closure_forecast_persistence_reset_summary")
+        summary.get("closure_forecast_reset_reentry_summary")
+        or summary.get("closure_forecast_reset_refresh_recovery_summary")
+        or summary.get("closure_forecast_persistence_reset_summary")
         or summary.get("closure_forecast_reacquisition_freshness_summary")
         or summary.get("closure_forecast_reacquisition_persistence_summary")
         or summary.get("closure_forecast_recovery_churn_summary")
@@ -1103,7 +1105,7 @@ def _build_dashboard(
                 ("Pending Debt Freshness", pending_debt_freshness),
                 ("Closure Forecast", closure_forecast_direction),
                 ("Reacquisition Freshness", closure_forecast_freshness),
-                ("Persistence Reset", closure_forecast_recovery),
+                ("Reset Re-entry", closure_forecast_recovery),
                 ("Closure Forecast Summary", transition_closure_summary),
                 ("Momentum Summary", class_momentum_summary),
                 ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}"),
@@ -3829,7 +3831,7 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
                 ("Pending Debt Freshness", pending_debt_freshness),
                 ("Closure Forecast", closure_forecast_direction),
                 ("Reacquisition Freshness", closure_forecast_freshness),
-                ("Persistence Reset", closure_forecast_recovery),
+                ("Reset Re-entry", closure_forecast_recovery),
                 ("Closure Forecast Summary", transition_closure_summary),
                 ("Momentum Summary", class_momentum_summary),
                 ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}"),
@@ -4307,7 +4309,7 @@ def _build_executive_summary(
         narrative_rows.insert(32, ("Pending Debt Freshness", pending_debt_freshness))
         narrative_rows.insert(33, ("Closure Forecast", closure_forecast_direction))
         narrative_rows.insert(34, ("Reacquisition Freshness", closure_forecast_freshness))
-        narrative_rows.insert(35, ("Persistence Reset", closure_forecast_recovery))
+        narrative_rows.insert(35, ("Reset Re-entry", closure_forecast_recovery))
         narrative_rows.insert(36, ("Closure Forecast Summary", transition_closure_summary))
         narrative_rows.insert(37, ("Momentum Summary", class_momentum_summary))
         narrative_rows.insert(38, ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}"))
@@ -4427,7 +4429,7 @@ def _build_executive_summary(
             ws.cell(row=62, column=5, value=closure_forecast_direction)
             ws.cell(row=63, column=4, value="Reacquisition Freshness").font = SUBHEADER_FONT
             ws.cell(row=63, column=5, value=closure_forecast_freshness)
-            ws.cell(row=64, column=4, value="Persistence Reset").font = SUBHEADER_FONT
+            ws.cell(row=64, column=4, value="Reset Re-entry").font = SUBHEADER_FONT
             ws.cell(row=64, column=5, value=closure_forecast_recovery)
             ws.cell(row=65, column=4, value="Closure Forecast Summary").font = SUBHEADER_FONT
             ws.cell(row=65, column=5, value=transition_closure_summary)
@@ -4600,7 +4602,7 @@ def _build_print_pack(
         ws["B47"] = closure_forecast_direction
         ws["A48"] = "Reacquisition Freshness"
         ws["B48"] = closure_forecast_freshness
-        ws["A49"] = "Persistence Reset"
+        ws["A49"] = "Reset Re-entry"
         ws["B49"] = closure_forecast_recovery
         ws["A50"] = "Closure Forecast Summary"
         ws["B50"] = transition_closure_summary

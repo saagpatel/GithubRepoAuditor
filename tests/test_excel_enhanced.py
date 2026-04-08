@@ -416,6 +416,12 @@ def _make_report(audits=None) -> dict:
             "primary_target_closure_forecast_persistence_reset_status": "none",
             "primary_target_closure_forecast_persistence_reset_reason": "",
             "closure_forecast_persistence_reset_summary": "Reacquired posture for RepoC: Security posture needs attention is aging enough that it can keep holding, but it should no longer stay indefinitely at sustained strength.",
+            "primary_target_closure_forecast_reset_refresh_recovery_score": 0.18,
+            "primary_target_closure_forecast_reset_refresh_recovery_status": "recovering-confirmation-reset",
+            "primary_target_closure_forecast_reset_reentry_status": "pending-confirmation-reentry",
+            "primary_target_closure_forecast_reset_reentry_reason": "Fresh confirmation-side evidence is returning after a reset, but it has not yet re-earned re-entry.",
+            "closure_forecast_reset_refresh_recovery_summary": "Fresh confirmation-side evidence is returning for RepoC: Security posture needs attention after a reset, but it has not yet re-earned re-entry (0.18).",
+            "closure_forecast_reset_reentry_summary": "Fresh confirmation-side evidence is returning after a reset, but it has not yet re-earned re-entry.",
             "stale_closure_forecast_hotspots": [],
             "fresh_closure_forecast_signal_hotspots": [],
             "closure_forecast_decay_window_runs": 4,
@@ -786,7 +792,7 @@ class TestAnalystWorkbookSheets:
         assert review_ws["A43"].value == "Pending Debt Freshness"
         assert review_ws["A44"].value == "Closure Forecast"
         assert review_ws["A45"].value == "Reacquisition Freshness"
-        assert review_ws["A46"].value == "Persistence Reset"
+        assert review_ws["A46"].value == "Reset Re-entry"
         assert review_ws["A47"].value == "Closure Forecast Summary"
         assert review_ws["A48"].value == "Momentum Summary"
         assert review_ws["A49"].value == "Exception Learning"
@@ -823,7 +829,7 @@ class TestAnalystWorkbookSheets:
         assert executive_ws["D61"].value == "Pending Debt Freshness"
         assert executive_ws["D62"].value == "Closure Forecast"
         assert executive_ws["D63"].value == "Reacquisition Freshness"
-        assert executive_ws["D64"].value == "Persistence Reset"
+        assert executive_ws["D64"].value == "Reset Re-entry"
         assert executive_ws["D65"].value == "Closure Forecast Summary"
         assert executive_ws["D66"].value == "Momentum Summary"
         assert executive_ws["D67"].value == "Exception Learning"
@@ -862,7 +868,7 @@ class TestAnalystWorkbookSheets:
         assert print_ws["A46"].value == "Pending Debt Freshness"
         assert print_ws["A47"].value == "Closure Forecast"
         assert print_ws["A48"].value == "Reacquisition Freshness"
-        assert print_ws["A49"].value == "Persistence Reset"
+        assert print_ws["A49"].value == "Reset Re-entry"
         assert print_ws["A50"].value == "Closure Forecast Summary"
         assert print_ws["A51"].value == "Momentum Summary"
         assert print_ws["A52"].value == "Exception Learning"
@@ -891,7 +897,7 @@ class TestAnalystWorkbookSheets:
         assert "Pending Debt Freshness" in dashboard_values
         assert "Closure Forecast" in dashboard_values
         assert "Reacquisition Freshness" in dashboard_values
-        assert "Persistence Reset" in dashboard_values
+        assert "Reset Re-entry" in dashboard_values
         assert "Exception Learning" in dashboard_values
         assert "Recommendation Drift" in dashboard_values
 
