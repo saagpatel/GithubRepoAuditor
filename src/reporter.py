@@ -428,6 +428,17 @@ def write_markdown_report(
                 f"- Reset Re-entry Controls: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_reason', 'No reset re-entry reason is recorded yet.')})"
             )
+        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_persistence_status"):
+            _w(
+                f"- Reset Re-entry Persistence: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_persistence_status')} "
+                f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_persistence_score', 0.0):.2f}; "
+                f"{report.operator_summary.get('primary_target_closure_forecast_reset_reentry_age_runs', 0)} run(s))"
+            )
+        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_churn_status"):
+            _w(
+                f"- Reset Re-entry Churn Controls: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_churn_status')} "
+                f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_churn_reason', 'No reset re-entry churn reason is recorded yet.')})"
+            )
         if report.operator_summary.get("recommendation_drift_status"):
             _w(
                 f"- Recommendation Drift: {report.operator_summary.get('recommendation_drift_status')} "
@@ -493,6 +504,10 @@ def write_markdown_report(
             _w(f"- Reset Refresh Recovery Summary: {report.operator_summary.get('closure_forecast_reset_refresh_recovery_summary')}")
         if report.operator_summary.get("closure_forecast_reset_reentry_summary"):
             _w(f"- Reset Re-entry Summary: {report.operator_summary.get('closure_forecast_reset_reentry_summary')}")
+        if report.operator_summary.get("closure_forecast_reset_reentry_persistence_summary"):
+            _w(f"- Reset Re-entry Persistence Summary: {report.operator_summary.get('closure_forecast_reset_reentry_persistence_summary')}")
+        if report.operator_summary.get("closure_forecast_reset_reentry_churn_summary"):
+            _w(f"- Reset Re-entry Churn Summary: {report.operator_summary.get('closure_forecast_reset_reentry_churn_summary')}")
         if report.operator_summary.get("recommendation_quality_summary"):
             _w(f"- Recommendation Quality: {report.operator_summary.get('recommendation_quality_summary')}")
         if report.operator_summary.get("confidence_validation_status"):

@@ -205,6 +205,15 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
             "primary_target_closure_forecast_reset_reentry_reason": "Fresh confirmation-side evidence is returning after a reset, but it has not yet re-earned re-entry.",
             "closure_forecast_reset_refresh_recovery_summary": "Fresh confirmation-side evidence is returning for RepoC: RepoC drift needs review after a reset, but it has not yet re-earned re-entry (0.18).",
             "closure_forecast_reset_reentry_summary": "Fresh confirmation-side evidence is returning after a reset, but it has not yet re-earned re-entry.",
+            "primary_target_closure_forecast_reset_reentry_age_runs": 1,
+            "primary_target_closure_forecast_reset_reentry_persistence_score": 0.24,
+            "primary_target_closure_forecast_reset_reentry_persistence_status": "just-reentered",
+            "primary_target_closure_forecast_reset_reentry_persistence_reason": "Stronger closure-forecast posture has re-entered after reset, but it has not yet proved it can hold.",
+            "closure_forecast_reset_reentry_persistence_summary": "RepoC: RepoC drift needs review has only just re-entered stronger closure-forecast posture after reset, so it is still fragile (0.24; 1 run).",
+            "primary_target_closure_forecast_reset_reentry_churn_score": 0.18,
+            "primary_target_closure_forecast_reset_reentry_churn_status": "none",
+            "primary_target_closure_forecast_reset_reentry_churn_reason": "",
+            "closure_forecast_reset_reentry_churn_summary": "No meaningful reset re-entry churn is active right now.",
             "stale_closure_forecast_hotspots": [],
             "fresh_closure_forecast_signal_hotspots": [],
             "closure_forecast_decay_window_runs": 4,
@@ -222,6 +231,9 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
             "recovery_churn_hotspots": [],
             "stale_reacquisition_hotspots": [],
             "fresh_reacquisition_signal_hotspots": [],
+            "just_reentered_hotspots": [],
+            "holding_reset_reentry_hotspots": [],
+            "reset_reentry_churn_hotspots": [],
             "supporting_pending_resolution_hotspots": [],
             "caution_pending_debt_hotspots": [],
             "stalled_transition_hotspots": [],
@@ -358,6 +370,8 @@ def test_build_scheduled_handoff_writes_artifacts_and_issue_candidate(tmp_path):
     assert "Hysteresis Decay Controls" in markdown
     assert "Closure Forecast Refresh Recovery" in markdown
     assert "Reacquisition Controls" in markdown
+    assert "Reset Re-entry Persistence" in markdown
+    assert "Reset Re-entry Churn Controls" in markdown
     assert "Reacquisition Persistence" in markdown
     assert "Recovery Churn Controls" in markdown
     assert "Reacquisition Freshness" in markdown

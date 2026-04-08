@@ -309,12 +309,30 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
         "reentered-clearance",
         "blocked",
     }
+    assert summary["primary_target_closure_forecast_reset_reentry_persistence_status"] in {
+        "none",
+        "just-reentered",
+        "holding-confirmation-reentry",
+        "holding-clearance-reentry",
+        "sustained-confirmation-reentry",
+        "sustained-clearance-reentry",
+        "reversing",
+        "insufficient-data",
+    }
+    assert summary["primary_target_closure_forecast_reset_reentry_churn_status"] in {
+        "none",
+        "watch",
+        "churn",
+        "blocked",
+    }
     assert -0.95 <= summary["primary_target_closure_forecast_reweight_score"] <= 0.95
     assert -0.95 <= summary["primary_target_closure_forecast_momentum_score"] <= 0.95
     assert -0.95 <= summary["primary_target_closure_forecast_refresh_recovery_score"] <= 0.95
     assert -0.95 <= summary["primary_target_closure_forecast_reacquisition_persistence_score"] <= 0.95
     assert -0.95 <= summary["primary_target_closure_forecast_reset_refresh_recovery_score"] <= 0.95
+    assert -0.95 <= summary["primary_target_closure_forecast_reset_reentry_persistence_score"] <= 0.95
     assert 0.0 <= summary["primary_target_closure_forecast_recovery_churn_score"] <= 0.95
+    assert 0.0 <= summary["primary_target_closure_forecast_reset_reentry_churn_score"] <= 0.95
     assert 0.0 <= summary["primary_target"]["decayed_confirmation_forecast_rate"] <= 1.0
     assert 0.0 <= summary["primary_target"]["decayed_clearance_forecast_rate"] <= 1.0
     assert 0.0 <= summary["primary_target_weighted_pending_resolution_support_score"] <= 0.95
@@ -332,6 +350,7 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
     assert summary["closure_forecast_decay_window_runs"] == 4
     assert summary["closure_forecast_refresh_window_runs"] == 4
     assert summary["closure_forecast_reacquisition_window_runs"] == 4
+    assert summary["closure_forecast_reset_reentry_window_runs"] == 4
     assert "guidance" in summary["adaptive_confidence_summary"].lower() or "immediate action" in summary["adaptive_confidence_summary"].lower()
     assert summary["recommendation_quality_summary"].startswith("Strong recommendation because")
 
@@ -4159,6 +4178,8 @@ def test_operator_snapshot_sets_pending_confirmation_reentry_after_confirmation_
 
     assert summary["primary_target_closure_forecast_reset_refresh_recovery_status"] == "recovering-confirmation-reset"
     assert summary["primary_target_closure_forecast_reset_reentry_status"] == "pending-confirmation-reentry"
+    assert summary["primary_target_closure_forecast_reset_reentry_persistence_status"] in {"none", "insufficient-data"}
+    assert summary["primary_target_closure_forecast_reset_reentry_churn_status"] == "none"
     assert summary["primary_target_closure_forecast_reacquisition_status"] == "pending-confirmation-reacquisition"
     assert summary["primary_target_transition_closure_likely_outcome"] == "hold"
     assert summary["primary_target_closure_forecast_hysteresis_status"] == "pending-confirmation"
@@ -4288,6 +4309,8 @@ def test_operator_snapshot_reenters_confirmation_after_fresh_follow_through(
 
     assert summary["primary_target_closure_forecast_reset_refresh_recovery_status"] == "reentering-confirmation"
     assert summary["primary_target_closure_forecast_reset_reentry_status"] == "reentered-confirmation"
+    assert summary["primary_target_closure_forecast_reset_reentry_persistence_status"] == "just-reentered"
+    assert summary["primary_target_closure_forecast_reset_reentry_churn_status"] == "none"
     assert summary["primary_target_closure_forecast_reacquisition_status"] == "reacquired-confirmation"
     assert summary["primary_target_transition_closure_likely_outcome"] == "confirm-soon"
     assert summary["primary_target_closure_forecast_hysteresis_status"] == "confirmed-confirmation"
@@ -4420,9 +4443,266 @@ def test_operator_snapshot_reenters_clearance_after_fresh_follow_through(
 
     assert summary["primary_target_closure_forecast_reset_refresh_recovery_status"] == "reentering-clearance"
     assert summary["primary_target_closure_forecast_reset_reentry_status"] == "reentered-clearance"
+    assert summary["primary_target_closure_forecast_reset_reentry_persistence_status"] == "just-reentered"
+    assert summary["primary_target_closure_forecast_reset_reentry_churn_status"] == "none"
     assert summary["primary_target_closure_forecast_reacquisition_status"] == "reacquired-clearance"
     assert summary["primary_target_transition_closure_likely_outcome"] == "clear-risk"
     assert summary["primary_target_closure_forecast_hysteresis_status"] == "confirmed-clearance"
+
+
+def test_operator_snapshot_holds_reset_reentry_when_follow_through_stays_aligned(
+    tmp_path: Path,
+    monkeypatch,
+):
+    report = _make_report(
+        preflight_summary={"status": "ok", "blocking_errors": 0, "warnings": 0, "checks": []},
+        review_targets=[],
+        managed_state_drift=[],
+        governance_drift=[],
+        governance_preview={},
+        rollback_preview={},
+        material_changes=[
+            {
+                "change_key": "high-1",
+                "change_type": "security-change",
+                "repo_name": "RepoC",
+                "severity": 0.9,
+                "title": "RepoC security posture changed",
+                "summary": "critical -> watch",
+                "recommended_next_step": "Review RepoC security posture changed now.",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history",
+        lambda *_args, **_kwargs: [
+            {
+                "generated_at": "2026-04-06T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {
+                        "item_id": "review-target:RepoC",
+                        "repo": "RepoC",
+                        "title": "RepoC security posture changed",
+                        "lane": "urgent",
+                        "kind": "review",
+                    },
+                    "primary_target_closure_forecast_reweight_direction": "supporting-confirmation",
+                    "primary_target_closure_forecast_reweight_score": 0.36,
+                    "primary_target_closure_forecast_momentum_status": "sustained-confirmation",
+                    "primary_target_closure_forecast_stability_status": "stable",
+                    "primary_target_closure_forecast_reacquisition_freshness_status": "fresh",
+                    "primary_target_closure_forecast_reset_refresh_recovery_status": "reentering-confirmation",
+                    "primary_target_closure_forecast_reset_reentry_status": "reentered-confirmation",
+                    "primary_target_transition_closure_likely_outcome": "confirm-soon",
+                },
+                "operator_queue": [],
+            }
+        ],
+    )
+
+    def _phase47_seed(
+        resolution_targets, _history, *, current_generated_at, confidence_calibration
+    ):
+        resolution_targets[:] = [
+            {
+                **target,
+                "closure_forecast_reweight_score": 0.42,
+                "closure_forecast_reweight_direction": "supporting-confirmation",
+                "closure_forecast_momentum_status": "sustained-confirmation",
+                "closure_forecast_stability_status": "stable",
+                "closure_forecast_reacquisition_freshness_status": "fresh",
+                "closure_forecast_hysteresis_status": "confirmed-confirmation",
+                "closure_forecast_hysteresis_reason": "Fresh confirmation-side follow-through has re-earned re-entry into stronger confirmation-side reacquisition.",
+                "closure_forecast_reset_refresh_recovery_score": 0.33,
+                "closure_forecast_reset_refresh_recovery_status": "reentering-confirmation",
+                "closure_forecast_reset_reentry_status": "reentered-confirmation",
+                "closure_forecast_reset_reentry_reason": "Fresh confirmation-side follow-through has re-earned re-entry into stronger confirmation-side reacquisition.",
+                "recent_reset_refresh_path": "confirmation-reset -> fresh confirmation -> fresh confirmation",
+                "closure_forecast_reacquisition_status": "reacquired-confirmation",
+                "closure_forecast_reacquisition_reason": "Fresh confirmation-side follow-through has re-earned re-entry into stronger confirmation-side reacquisition.",
+                "transition_closure_likely_outcome": "confirm-soon",
+                "class_reweight_transition_status": "pending-support",
+                "class_reweight_transition_reason": "The pending confirmation posture is still the live weaker state before re-entry follow-through holds.",
+                "class_transition_resolution_status": "none",
+                "class_transition_resolution_reason": "",
+            }
+            for target in resolution_targets
+        ]
+        return {
+            "primary_target_closure_forecast_reset_refresh_recovery_score": 0.33,
+            "primary_target_closure_forecast_reset_refresh_recovery_status": "reentering-confirmation",
+            "primary_target_closure_forecast_reset_reentry_status": "reentered-confirmation",
+            "primary_target_closure_forecast_reset_reentry_reason": "Fresh confirmation-side follow-through has re-earned re-entry into stronger confirmation-side reacquisition.",
+            "closure_forecast_reset_refresh_recovery_summary": "Fresh confirmation-side support is strong enough that RepoC may re-enter confirmation-side reacquisition soon (0.33).",
+            "closure_forecast_reset_reentry_summary": "Fresh confirmation-side follow-through has re-earned re-entry into stronger confirmation-side reacquisition.",
+            "closure_forecast_reset_refresh_window_runs": 4,
+            "recovering_from_confirmation_reset_hotspots": [],
+            "recovering_from_clearance_reset_hotspots": [],
+        }
+
+    monkeypatch.setattr(
+        "src.operator_control_center._apply_reacquisition_reset_refresh_recovery_and_reentry",
+        _phase47_seed,
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center._target_specific_normalization_noise",
+        lambda *_args, **_kwargs: False,
+    )
+
+    summary = build_operator_snapshot(report, output_dir=tmp_path)["operator_summary"]
+
+    assert summary["primary_target_closure_forecast_reset_reentry_persistence_status"] == "holding-confirmation-reentry"
+    assert summary["primary_target_closure_forecast_reset_reentry_churn_status"] == "none"
+    assert summary["primary_target_transition_closure_likely_outcome"] == "confirm-soon"
+    assert summary["primary_target_closure_forecast_hysteresis_status"] == "confirmed-confirmation"
+
+
+def test_operator_snapshot_softens_reset_reentry_when_reentry_starts_churning(
+    tmp_path: Path,
+    monkeypatch,
+):
+    report = _make_report(
+        preflight_summary={"status": "ok", "blocking_errors": 0, "warnings": 0, "checks": []},
+        review_targets=[],
+        managed_state_drift=[],
+        governance_drift=[],
+        governance_preview={},
+        rollback_preview={},
+        material_changes=[
+            {
+                "change_key": "high-1",
+                "change_type": "security-change",
+                "repo_name": "RepoC",
+                "severity": 0.9,
+                "title": "RepoC security posture changed",
+                "summary": "critical -> watch",
+                "recommended_next_step": "Review RepoC security posture changed now.",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history",
+        lambda *_args, **_kwargs: [
+            {
+                "generated_at": "2026-04-06T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {
+                        "item_id": "review-target:RepoC",
+                        "repo": "RepoC",
+                        "title": "RepoC security posture changed",
+                        "lane": "urgent",
+                        "kind": "review",
+                    },
+                    "primary_target_closure_forecast_reweight_direction": "supporting-confirmation",
+                    "primary_target_closure_forecast_reweight_score": 0.24,
+                    "primary_target_closure_forecast_momentum_status": "reversing",
+                    "primary_target_closure_forecast_stability_status": "oscillating",
+                    "primary_target_closure_forecast_reacquisition_freshness_status": "mixed-age",
+                    "primary_target_closure_forecast_reset_refresh_recovery_status": "reentering-confirmation",
+                    "primary_target_closure_forecast_reset_reentry_status": "reentered-confirmation",
+                    "primary_target_transition_closure_likely_outcome": "confirm-soon",
+                },
+                "operator_queue": [],
+            },
+            {
+                "generated_at": "2026-04-05T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {
+                        "item_id": "review-target:RepoC",
+                        "repo": "RepoC",
+                        "title": "RepoC security posture changed",
+                        "lane": "urgent",
+                        "kind": "review",
+                    },
+                    "primary_target_closure_forecast_reweight_direction": "supporting-clearance",
+                    "primary_target_closure_forecast_reweight_score": -0.22,
+                    "primary_target_closure_forecast_momentum_status": "reversing",
+                    "primary_target_closure_forecast_stability_status": "oscillating",
+                    "primary_target_closure_forecast_reacquisition_freshness_status": "mixed-age",
+                    "primary_target_closure_forecast_reset_refresh_recovery_status": "reentering-clearance",
+                    "primary_target_closure_forecast_reset_reentry_status": "reentered-clearance",
+                    "primary_target_transition_closure_likely_outcome": "clear-risk",
+                },
+                "operator_queue": [],
+            },
+            {
+                "generated_at": "2026-04-04T12:00:00+00:00",
+                "operator_summary": {
+                    "primary_target": {
+                        "item_id": "review-target:RepoC",
+                        "repo": "RepoC",
+                        "title": "RepoC security posture changed",
+                        "lane": "urgent",
+                        "kind": "review",
+                    },
+                    "primary_target_closure_forecast_reweight_direction": "supporting-confirmation",
+                    "primary_target_closure_forecast_reweight_score": 0.21,
+                    "primary_target_closure_forecast_momentum_status": "building",
+                    "primary_target_closure_forecast_stability_status": "watch",
+                    "primary_target_closure_forecast_reacquisition_freshness_status": "fresh",
+                    "primary_target_closure_forecast_reset_refresh_recovery_status": "reentering-confirmation",
+                    "primary_target_closure_forecast_reset_reentry_status": "reentered-confirmation",
+                    "primary_target_transition_closure_likely_outcome": "confirm-soon",
+                },
+                "operator_queue": [],
+            },
+        ],
+    )
+
+    def _phase47_seed(
+        resolution_targets, _history, *, current_generated_at, confidence_calibration
+    ):
+        resolution_targets[:] = [
+            {
+                **target,
+                "closure_forecast_reweight_score": 0.28,
+                "closure_forecast_reweight_direction": "supporting-confirmation",
+                "closure_forecast_momentum_status": "reversing",
+                "closure_forecast_stability_status": "oscillating",
+                "closure_forecast_reacquisition_freshness_status": "mixed-age",
+                "closure_forecast_hysteresis_status": "confirmed-confirmation",
+                "closure_forecast_hysteresis_reason": "Fresh confirmation-side follow-through had briefly re-earned re-entry into stronger confirmation-side reacquisition.",
+                "closure_forecast_reset_refresh_recovery_score": 0.28,
+                "closure_forecast_reset_refresh_recovery_status": "reentering-confirmation",
+                "closure_forecast_reset_reentry_status": "reentered-confirmation",
+                "closure_forecast_reset_reentry_reason": "Fresh confirmation-side follow-through had briefly re-earned re-entry into stronger confirmation-side reacquisition.",
+                "recent_reset_refresh_path": "confirmation-reset -> fresh confirmation -> mixed-age confirmation",
+                "closure_forecast_reacquisition_status": "reacquired-confirmation",
+                "closure_forecast_reacquisition_reason": "Fresh confirmation-side follow-through had briefly re-earned re-entry into stronger confirmation-side reacquisition.",
+                "transition_closure_likely_outcome": "confirm-soon",
+                "class_reweight_transition_status": "pending-support",
+                "class_reweight_transition_reason": "The pending confirmation posture remains active beneath the briefly restored posture.",
+                "class_transition_resolution_status": "none",
+                "class_transition_resolution_reason": "",
+            }
+            for target in resolution_targets
+        ]
+        return {
+            "primary_target_closure_forecast_reset_refresh_recovery_score": 0.28,
+            "primary_target_closure_forecast_reset_refresh_recovery_status": "reentering-confirmation",
+            "primary_target_closure_forecast_reset_reentry_status": "reentered-confirmation",
+            "primary_target_closure_forecast_reset_reentry_reason": "Fresh confirmation-side follow-through had briefly re-earned re-entry into stronger confirmation-side reacquisition.",
+            "closure_forecast_reset_refresh_recovery_summary": "Fresh confirmation-side support is strong enough that RepoC may re-enter confirmation-side reacquisition soon (0.28).",
+            "closure_forecast_reset_reentry_summary": "Fresh confirmation-side follow-through had briefly re-earned re-entry into stronger confirmation-side reacquisition.",
+            "closure_forecast_reset_refresh_window_runs": 4,
+            "recovering_from_confirmation_reset_hotspots": [],
+            "recovering_from_clearance_reset_hotspots": [],
+        }
+
+    monkeypatch.setattr(
+        "src.operator_control_center._apply_reacquisition_reset_refresh_recovery_and_reentry",
+        _phase47_seed,
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center._target_specific_normalization_noise",
+        lambda *_args, **_kwargs: False,
+    )
+
+    summary = build_operator_snapshot(report, output_dir=tmp_path)["operator_summary"]
+
+    assert summary["primary_target_closure_forecast_reset_reentry_churn_status"] == "churn"
+    assert summary["primary_target_transition_closure_likely_outcome"] == "hold"
+    assert summary["primary_target_closure_forecast_hysteresis_status"] == "pending-confirmation"
 
 
 def test_operator_snapshot_learns_when_soft_exception_was_overcautious(tmp_path: Path, monkeypatch):
