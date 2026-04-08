@@ -265,6 +265,12 @@ def _make_report(**overrides) -> dict:
             "primary_target_closure_forecast_persistence_reset_status": "none",
             "primary_target_closure_forecast_persistence_reset_reason": "",
             "closure_forecast_persistence_reset_summary": "Reacquired posture for RepoC: RepoC drift needs review is aging enough that it can keep holding, but it should no longer stay indefinitely at sustained strength.",
+            "primary_target_closure_forecast_reset_refresh_recovery_score": 0.18,
+            "primary_target_closure_forecast_reset_refresh_recovery_status": "recovering-confirmation-reset",
+            "primary_target_closure_forecast_reset_reentry_status": "pending-confirmation-reentry",
+            "primary_target_closure_forecast_reset_reentry_reason": "Fresh confirmation-side evidence is returning after a reset, but it has not yet re-earned re-entry.",
+            "closure_forecast_reset_refresh_recovery_summary": "Fresh confirmation-side evidence is returning for RepoC: RepoC drift needs review after a reset, but it has not yet re-earned re-entry (0.18).",
+            "closure_forecast_reset_reentry_summary": "Fresh confirmation-side evidence is returning after a reset, but it has not yet re-earned re-entry.",
             "stale_closure_forecast_hotspots": [],
             "fresh_closure_forecast_signal_hotspots": [],
             "closure_forecast_decay_window_runs": 4,
@@ -478,6 +484,8 @@ class TestRenderHtml:
         assert "Recovery Churn Controls:" in html
         assert "Reacquisition Freshness:" in html
         assert "Persistence Reset Controls:" in html
+        assert "Reset Refresh Recovery:" in html
+        assert "Reset Re-entry Controls:" in html
         assert "Recommendation Drift:" in html
         assert "Policy Debt Summary:" in html
         assert "Trust Normalization Summary:" in html
@@ -499,6 +507,8 @@ class TestRenderHtml:
         assert "Recovery Churn Summary:" in html
         assert "Reacquisition Freshness Summary:" in html
         assert "Persistence Reset Summary:" in html
+        assert "Reset Refresh Recovery Summary:" in html
+        assert "Reset Re-entry Summary:" in html
         assert "Closure Forecast Reacquisition Summary:" in html
         assert "Why This Confidence Is Actionable:" in html
         assert "Recent Confidence Outcomes:" in html
