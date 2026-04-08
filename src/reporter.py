@@ -408,6 +408,16 @@ def write_markdown_report(
                 f"- Recovery Churn Controls: {report.operator_summary.get('primary_target_closure_forecast_recovery_churn_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_recovery_churn_reason', 'No recovery-churn reason is recorded yet.')})"
             )
+        if report.operator_summary.get("primary_target_closure_forecast_reacquisition_freshness_status"):
+            _w(
+                f"- Reacquisition Freshness: {report.operator_summary.get('primary_target_closure_forecast_reacquisition_freshness_status')} "
+                f"({report.operator_summary.get('primary_target_closure_forecast_reacquisition_freshness_reason', 'No reacquisition-freshness reason is recorded yet.')})"
+            )
+        if report.operator_summary.get("primary_target_closure_forecast_persistence_reset_status"):
+            _w(
+                f"- Persistence Reset Controls: {report.operator_summary.get('primary_target_closure_forecast_persistence_reset_status')} "
+                f"({report.operator_summary.get('primary_target_closure_forecast_persistence_reset_reason', 'No persistence-reset reason is recorded yet.')})"
+            )
         if report.operator_summary.get("recommendation_drift_status"):
             _w(
                 f"- Recommendation Drift: {report.operator_summary.get('recommendation_drift_status')} "
@@ -465,6 +475,10 @@ def write_markdown_report(
             _w(f"- Reacquisition Persistence Summary: {report.operator_summary.get('closure_forecast_reacquisition_persistence_summary')}")
         if report.operator_summary.get("closure_forecast_recovery_churn_summary"):
             _w(f"- Recovery Churn Summary: {report.operator_summary.get('closure_forecast_recovery_churn_summary')}")
+        if report.operator_summary.get("closure_forecast_reacquisition_freshness_summary"):
+            _w(f"- Reacquisition Freshness Summary: {report.operator_summary.get('closure_forecast_reacquisition_freshness_summary')}")
+        if report.operator_summary.get("closure_forecast_persistence_reset_summary"):
+            _w(f"- Persistence Reset Summary: {report.operator_summary.get('closure_forecast_persistence_reset_summary')}")
         if report.operator_summary.get("recommendation_quality_summary"):
             _w(f"- Recommendation Quality: {report.operator_summary.get('recommendation_quality_summary')}")
         if report.operator_summary.get("confidence_validation_status"):

@@ -866,6 +866,22 @@ def _print_control_center_summary(snapshot: dict) -> None:
         )
     if summary.get("closure_forecast_recovery_churn_summary"):
         print(f"  Recovery churn summary: {summary['closure_forecast_recovery_churn_summary']}")
+    if summary.get("primary_target_closure_forecast_reacquisition_freshness_status") not in {None, "", "insufficient-data"}:
+        print(
+            "  Reacquisition freshness: "
+            f"{summary.get('primary_target_closure_forecast_reacquisition_freshness_status', 'insufficient-data')} "
+            f"({summary.get('primary_target_closure_forecast_reacquisition_freshness_reason', 'No reacquisition-freshness reason is recorded yet.')})"
+        )
+    if summary.get("closure_forecast_reacquisition_freshness_summary"):
+        print(f"  Reacquisition freshness summary: {summary['closure_forecast_reacquisition_freshness_summary']}")
+    if summary.get("primary_target_closure_forecast_persistence_reset_status") not in {None, "", "none"}:
+        print(
+            "  Persistence reset controls: "
+            f"{summary.get('primary_target_closure_forecast_persistence_reset_status', 'none')} "
+            f"({summary.get('primary_target_closure_forecast_persistence_reset_reason', 'No persistence-reset reason is recorded yet.')})"
+        )
+    if summary.get("closure_forecast_persistence_reset_summary"):
+        print(f"  Persistence reset summary: {summary['closure_forecast_persistence_reset_summary']}")
     if summary.get("recommendation_drift_status"):
         print(
             "  Recommendation drift: "

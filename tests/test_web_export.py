@@ -259,11 +259,18 @@ def _make_report(**overrides) -> dict:
             "primary_target_closure_forecast_recovery_churn_status": "watch",
             "primary_target_closure_forecast_recovery_churn_reason": "Recovery is wobbling and may lose its restored strength soon.",
             "closure_forecast_recovery_churn_summary": "Recovery for RepoC: RepoC drift needs review is wobbling enough that restored forecast strength may soften soon (0.22).",
+            "primary_target_closure_forecast_reacquisition_freshness_status": "mixed-age",
+            "primary_target_closure_forecast_reacquisition_freshness_reason": "Reacquired closure-forecast memory is still useful, but it is partly aging: 50% of the weighted signal is recent and the rest is older carry-forward.",
+            "closure_forecast_reacquisition_freshness_summary": "RepoC: RepoC drift needs review still has useful reacquired closure-forecast memory, but the restored posture is no longer getting fully fresh reinforcement.",
+            "primary_target_closure_forecast_persistence_reset_status": "none",
+            "primary_target_closure_forecast_persistence_reset_reason": "",
+            "closure_forecast_persistence_reset_summary": "Reacquired posture for RepoC: RepoC drift needs review is aging enough that it can keep holding, but it should no longer stay indefinitely at sustained strength.",
             "stale_closure_forecast_hotspots": [],
             "fresh_closure_forecast_signal_hotspots": [],
             "closure_forecast_decay_window_runs": 4,
             "closure_forecast_refresh_window_runs": 4,
             "closure_forecast_reacquisition_window_runs": 4,
+            "closure_forecast_reacquisition_decay_window_runs": 4,
             "closure_forecast_transition_window_runs": 4,
             "sustained_confirmation_hotspots": [],
             "sustained_clearance_hotspots": [],
@@ -273,6 +280,8 @@ def _make_report(**overrides) -> dict:
             "just_reacquired_hotspots": [],
             "holding_reacquisition_hotspots": [],
             "recovery_churn_hotspots": [],
+            "stale_reacquisition_hotspots": [],
+            "fresh_reacquisition_signal_hotspots": [],
             "supporting_pending_resolution_hotspots": [],
             "caution_pending_debt_hotspots": [],
             "stalled_transition_hotspots": [],
@@ -467,6 +476,8 @@ class TestRenderHtml:
         assert "Reacquisition Controls:" in html
         assert "Reacquisition Persistence:" in html
         assert "Recovery Churn Controls:" in html
+        assert "Reacquisition Freshness:" in html
+        assert "Persistence Reset Controls:" in html
         assert "Recommendation Drift:" in html
         assert "Policy Debt Summary:" in html
         assert "Trust Normalization Summary:" in html
@@ -486,6 +497,8 @@ class TestRenderHtml:
         assert "Closure Forecast Refresh Recovery Summary:" in html
         assert "Reacquisition Persistence Summary:" in html
         assert "Recovery Churn Summary:" in html
+        assert "Reacquisition Freshness Summary:" in html
+        assert "Persistence Reset Summary:" in html
         assert "Closure Forecast Reacquisition Summary:" in html
         assert "Why This Confidence Is Actionable:" in html
         assert "Recent Confidence Outcomes:" in html

@@ -164,6 +164,8 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Closure forecast reacquisition summary: {summary.get('closure_forecast_reacquisition_summary', 'No closure-forecast reacquisition summary is recorded yet.')}",
         f"- Reacquisition persistence summary: {summary.get('closure_forecast_reacquisition_persistence_summary', 'No reacquisition-persistence summary is recorded yet.')}",
         f"- Recovery churn summary: {summary.get('closure_forecast_recovery_churn_summary', 'No recovery-churn summary is recorded yet.')}",
+        f"- Reacquisition freshness summary: {summary.get('closure_forecast_reacquisition_freshness_summary', 'No reacquisition-freshness summary is recorded yet.')}",
+        f"- Persistence reset summary: {summary.get('closure_forecast_persistence_reset_summary', 'No persistence-reset summary is recorded yet.')}",
         f"- Confidence validation: `{summary.get('confidence_validation_status', 'insufficient-data')}` — {summary.get('confidence_calibration_summary', 'No confidence-calibration summary is recorded yet.')}",
         f"- Next recommended run: `{summary.get('next_recommended_run_mode', 'n/a')}`",
         f"- Watch strategy: `{summary.get('watch_strategy', 'manual')}`",
@@ -889,6 +891,46 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
             )
     else:
         lines.append("- No recovery-churn hotspots are recorded in the recent window.")
+    lines.append("")
+    lines.append("## Reacquisition Freshness")
+    lines.append("")
+    lines.append(
+        f"- Reacquisition freshness: {summary.get('primary_target_closure_forecast_reacquisition_freshness_status', 'insufficient-data')} "
+        f"({summary.get('primary_target_closure_forecast_reacquisition_freshness_reason', 'No reacquisition-freshness reason is recorded yet.')})"
+    )
+    lines.append(
+        f"- {summary.get('closure_forecast_reacquisition_freshness_summary', 'No reacquisition-freshness summary is recorded yet.')}"
+    )
+    fresh_reacquisition_signal_hotspots = summary.get("fresh_reacquisition_signal_hotspots") or []
+    stale_reacquisition_hotspots = summary.get("stale_reacquisition_hotspots") or []
+    if fresh_reacquisition_signal_hotspots:
+        for hotspot in fresh_reacquisition_signal_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Fresh reacquisition hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('closure_forecast_reacquisition_freshness_status', 'fresh')} with "
+                f"{hotspot.get('decayed_reacquired_confirmation_rate', 0.0):.0%} confirmation-like and "
+                f"{hotspot.get('decayed_reacquired_clearance_rate', 0.0):.0%} clearance-like signal"
+            )
+    elif stale_reacquisition_hotspots:
+        for hotspot in stale_reacquisition_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Stale reacquisition hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('closure_forecast_reacquisition_freshness_status', 'stale')} with "
+                f"{hotspot.get('decayed_reacquired_confirmation_rate', 0.0):.0%} confirmation-like and "
+                f"{hotspot.get('decayed_reacquired_clearance_rate', 0.0):.0%} clearance-like signal"
+            )
+    else:
+        lines.append("- No reacquisition-freshness hotspots are recorded in the recent window.")
+    lines.append("")
+    lines.append("## Persistence Reset Controls")
+    lines.append("")
+    lines.append(
+        f"- Persistence reset: {summary.get('primary_target_closure_forecast_persistence_reset_status', 'none')} "
+        f"({summary.get('primary_target_closure_forecast_persistence_reset_reason', 'No persistence-reset reason is recorded yet.')})"
+    )
+    lines.append(
+        f"- {summary.get('closure_forecast_persistence_reset_summary', 'No persistence-reset summary is recorded yet.')}"
+    )
     lines.append("")
     lines.append("## Closure Forecast Hysteresis")
     lines.append("")
