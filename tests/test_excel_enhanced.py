@@ -410,11 +410,18 @@ def _make_report(audits=None) -> dict:
             "primary_target_closure_forecast_recovery_churn_status": "watch",
             "primary_target_closure_forecast_recovery_churn_reason": "Recovery is wobbling and may lose its restored strength soon.",
             "closure_forecast_recovery_churn_summary": "Recovery for RepoC: Security posture needs attention is wobbling enough that restored forecast strength may soften soon (0.22).",
+            "primary_target_closure_forecast_reacquisition_freshness_status": "mixed-age",
+            "primary_target_closure_forecast_reacquisition_freshness_reason": "Reacquired closure-forecast memory is still useful, but it is partly aging: 50% of the weighted signal is recent and the rest is older carry-forward.",
+            "closure_forecast_reacquisition_freshness_summary": "RepoC: Security posture needs attention still has useful reacquired closure-forecast memory, but the restored posture is no longer getting fully fresh reinforcement.",
+            "primary_target_closure_forecast_persistence_reset_status": "none",
+            "primary_target_closure_forecast_persistence_reset_reason": "",
+            "closure_forecast_persistence_reset_summary": "Reacquired posture for RepoC: Security posture needs attention is aging enough that it can keep holding, but it should no longer stay indefinitely at sustained strength.",
             "stale_closure_forecast_hotspots": [],
             "fresh_closure_forecast_signal_hotspots": [],
             "closure_forecast_decay_window_runs": 4,
             "closure_forecast_refresh_window_runs": 4,
             "closure_forecast_reacquisition_window_runs": 4,
+            "closure_forecast_reacquisition_decay_window_runs": 4,
             "closure_forecast_transition_window_runs": 4,
             "sustained_confirmation_hotspots": [],
             "sustained_clearance_hotspots": [],
@@ -424,6 +431,8 @@ def _make_report(audits=None) -> dict:
             "just_reacquired_hotspots": [],
             "holding_reacquisition_hotspots": [],
             "recovery_churn_hotspots": [],
+            "stale_reacquisition_hotspots": [],
+            "fresh_reacquisition_signal_hotspots": [],
             "supporting_pending_resolution_hotspots": [],
             "caution_pending_debt_hotspots": [],
             "stalled_transition_hotspots": [],
@@ -776,8 +785,8 @@ class TestAnalystWorkbookSheets:
         assert review_ws["A42"].value == "Transition Likely Outcome"
         assert review_ws["A43"].value == "Pending Debt Freshness"
         assert review_ws["A44"].value == "Closure Forecast"
-        assert review_ws["A45"].value == "Forecast Persistence"
-        assert review_ws["A46"].value == "Recovery Churn"
+        assert review_ws["A45"].value == "Reacquisition Freshness"
+        assert review_ws["A46"].value == "Persistence Reset"
         assert review_ws["A47"].value == "Closure Forecast Summary"
         assert review_ws["A48"].value == "Momentum Summary"
         assert review_ws["A49"].value == "Exception Learning"
@@ -813,8 +822,8 @@ class TestAnalystWorkbookSheets:
         assert executive_ws["D60"].value == "Transition Likely Outcome"
         assert executive_ws["D61"].value == "Pending Debt Freshness"
         assert executive_ws["D62"].value == "Closure Forecast"
-        assert executive_ws["D63"].value == "Forecast Persistence"
-        assert executive_ws["D64"].value == "Recovery Churn"
+        assert executive_ws["D63"].value == "Reacquisition Freshness"
+        assert executive_ws["D64"].value == "Persistence Reset"
         assert executive_ws["D65"].value == "Closure Forecast Summary"
         assert executive_ws["D66"].value == "Momentum Summary"
         assert executive_ws["D67"].value == "Exception Learning"
@@ -852,8 +861,8 @@ class TestAnalystWorkbookSheets:
         assert print_ws["A45"].value == "Transition Likely Outcome"
         assert print_ws["A46"].value == "Pending Debt Freshness"
         assert print_ws["A47"].value == "Closure Forecast"
-        assert print_ws["A48"].value == "Forecast Persistence"
-        assert print_ws["A49"].value == "Recovery Churn"
+        assert print_ws["A48"].value == "Reacquisition Freshness"
+        assert print_ws["A49"].value == "Persistence Reset"
         assert print_ws["A50"].value == "Closure Forecast Summary"
         assert print_ws["A51"].value == "Momentum Summary"
         assert print_ws["A52"].value == "Exception Learning"
@@ -881,8 +890,8 @@ class TestAnalystWorkbookSheets:
         assert "Transition Likely Outcome" in dashboard_values
         assert "Pending Debt Freshness" in dashboard_values
         assert "Closure Forecast" in dashboard_values
-        assert "Forecast Persistence" in dashboard_values
-        assert "Recovery Churn" in dashboard_values
+        assert "Reacquisition Freshness" in dashboard_values
+        assert "Persistence Reset" in dashboard_values
         assert "Exception Learning" in dashboard_values
         assert "Recommendation Drift" in dashboard_values
 
