@@ -271,6 +271,15 @@ def _make_report(**overrides) -> dict:
             "primary_target_closure_forecast_reset_reentry_reason": "Fresh confirmation-side evidence is returning after a reset, but it has not yet re-earned re-entry.",
             "closure_forecast_reset_refresh_recovery_summary": "Fresh confirmation-side evidence is returning for RepoC: RepoC drift needs review after a reset, but it has not yet re-earned re-entry (0.18).",
             "closure_forecast_reset_reentry_summary": "Fresh confirmation-side evidence is returning after a reset, but it has not yet re-earned re-entry.",
+            "primary_target_closure_forecast_reset_reentry_age_runs": 1,
+            "primary_target_closure_forecast_reset_reentry_persistence_score": 0.24,
+            "primary_target_closure_forecast_reset_reentry_persistence_status": "just-reentered",
+            "primary_target_closure_forecast_reset_reentry_persistence_reason": "Stronger closure-forecast posture has re-entered after reset, but it has not yet proved it can hold.",
+            "closure_forecast_reset_reentry_persistence_summary": "RepoC: RepoC drift needs review has only just re-entered stronger closure-forecast posture after reset, so it is still fragile (0.24; 1 run).",
+            "primary_target_closure_forecast_reset_reentry_churn_score": 0.18,
+            "primary_target_closure_forecast_reset_reentry_churn_status": "none",
+            "primary_target_closure_forecast_reset_reentry_churn_reason": "",
+            "closure_forecast_reset_reentry_churn_summary": "No meaningful reset re-entry churn is active right now.",
             "stale_closure_forecast_hotspots": [],
             "fresh_closure_forecast_signal_hotspots": [],
             "closure_forecast_decay_window_runs": 4,
@@ -288,6 +297,9 @@ def _make_report(**overrides) -> dict:
             "recovery_churn_hotspots": [],
             "stale_reacquisition_hotspots": [],
             "fresh_reacquisition_signal_hotspots": [],
+            "just_reentered_hotspots": [],
+            "holding_reset_reentry_hotspots": [],
+            "reset_reentry_churn_hotspots": [],
             "supporting_pending_resolution_hotspots": [],
             "caution_pending_debt_hotspots": [],
             "stalled_transition_hotspots": [],
@@ -486,6 +498,8 @@ class TestRenderHtml:
         assert "Persistence Reset Controls:" in html
         assert "Reset Refresh Recovery:" in html
         assert "Reset Re-entry Controls:" in html
+        assert "Reset Re-entry Persistence:" in html
+        assert "Reset Re-entry Churn Controls:" in html
         assert "Recommendation Drift:" in html
         assert "Policy Debt Summary:" in html
         assert "Trust Normalization Summary:" in html
@@ -509,6 +523,8 @@ class TestRenderHtml:
         assert "Persistence Reset Summary:" in html
         assert "Reset Refresh Recovery Summary:" in html
         assert "Reset Re-entry Summary:" in html
+        assert "Reset Re-entry Persistence Summary:" in html
+        assert "Reset Re-entry Churn Summary:" in html
         assert "Closure Forecast Reacquisition Summary:" in html
         assert "Why This Confidence Is Actionable:" in html
         assert "Recent Confidence Outcomes:" in html
