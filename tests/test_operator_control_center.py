@@ -583,6 +583,27 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
         "clearance-reset",
         "blocked",
     }
+    assert summary[
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status"
+    ] in {
+        "none",
+        "recovering-confirmation-rebuild-reentry-rererestore-reset",
+        "recovering-clearance-rebuild-reentry-rererestore-reset",
+        "rerererestoring-confirmation-rebuild-reentry",
+        "rerererestoring-clearance-rebuild-reentry",
+        "reversing",
+        "blocked",
+    }
+    assert summary[
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status"
+    ] in {
+        "none",
+        "pending-confirmation-rebuild-reentry-rerererestore",
+        "pending-clearance-rebuild-reentry-rerererestore",
+        "rerererestored-confirmation-rebuild-reentry",
+        "rerererestored-clearance-rebuild-reentry",
+        "blocked",
+    }
     assert summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_persistence_status"] in {
         "none",
         "just-restored",
@@ -614,6 +635,7 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
     assert -0.95 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_score"] <= 0.95
     assert -0.95 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_score"] <= 0.95
     assert -0.95 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score"] <= 0.95
+    assert -0.95 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_score"] <= 0.95
     assert 0.0 <= summary["primary_target_closure_forecast_recovery_churn_score"] <= 0.95
     assert 0.0 <= summary["primary_target_closure_forecast_reset_reentry_churn_score"] <= 0.95
     assert 0.0 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_churn_score"] <= 0.95
@@ -649,6 +671,7 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
     assert summary["closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_window_runs"] == 4
     assert summary["closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_window_runs"] == 4
     assert summary["closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_decay_window_runs"] == 4
+    assert summary["closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_window_runs"] == 4
     assert summary["class_normalization_window_runs"] == 4
     assert summary["class_reweighting_window_runs"] == 4
     assert summary["class_transition_window_runs"] == 4
@@ -6058,6 +6081,99 @@ def test_rebuild_reentry_restore_refresh_rerestored_clearance_reenables_clear_po
     assert updates["closure_forecast_reset_reentry_rebuild_reentry_restore_status"] == "restored-clearance-rebuild-reentry"
     assert updates["class_transition_resolution_status"] == "cleared"
     assert updates["closure_forecast_reset_reentry_rebuild_reentry_restore_persistence_status"] == "none"
+
+
+def test_rererestore_refresh_pending_confirmation_rerererestore_holds_weaker_posture():
+    updates = operator_control_center._apply_reset_reentry_rebuild_reentry_restore_rererestore_refresh_rerererestore_control(
+        {
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status": "mixed-age",
+            "decayed_rererestored_rebuild_reentry_clearance_rate": 0.18,
+            "closure_forecast_stability_status": "watch",
+            "class_transition_age_runs": 1,
+        },
+        refresh_meta={
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status": "recovering-confirmation-rebuild-reentry-rererestore-reset",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status": "pending-confirmation-rebuild-reentry-rerererestore",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_reason": "Fresh confirmation-side evidence is returning after stronger re-re-restored posture softened or reset, but it has not yet re-re-re-restored stronger posture.",
+            "recent_rererestore_reset_side": "confirmation",
+        },
+        transition_history_meta={"recent_pending_status": "none"},
+        closure_likely_outcome="hold",
+        closure_hysteresis_status="pending-confirmation",
+        closure_hysteresis_reason="The confirmation-leaning forecast is visible, but it has not stayed persistent enough to trust fully yet.",
+        transition_status="none",
+        transition_reason="",
+        resolution_status="none",
+        resolution_reason="",
+        reentry_status="pending-confirmation-rebuild-reentry",
+        reentry_reason="Re-re-restored confirmation posture has not yet been re-re-re-restored.",
+        restore_status="pending-confirmation-rebuild-reentry-restore",
+        restore_reason="Restore posture is still weaker while re-re-re-restore is pending.",
+        rerestore_status="pending-confirmation-rebuild-reentry-rerestore",
+        rerestore_reason="Rerestore posture is still weaker while re-re-re-restore is pending.",
+        rererestore_status="pending-confirmation-rebuild-reentry-rererestore",
+        rererestore_reason="Fresh confirmation-side evidence is returning after stronger re-re-restored posture softened or reset, but it has not yet re-re-re-restored stronger posture.",
+        rererestore_age_runs=2,
+        rererestore_persistence_score=0.28,
+        rererestore_persistence_status="holding-confirmation-rebuild-reentry-rererestore",
+        rererestore_persistence_reason="Confirmation-side re-re-restored posture has stayed aligned long enough to keep the stronger rerestored forecast in place.",
+        rererestore_churn_score=0.0,
+        rererestore_churn_status="none",
+        rererestore_churn_reason="",
+    )
+
+    assert updates["transition_closure_likely_outcome"] == "hold"
+    assert updates["closure_forecast_hysteresis_status"] == "pending-confirmation"
+    assert updates["closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status"] == "pending-confirmation-rebuild-reentry-rererestore"
+    assert updates["closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status"] == "none"
+
+
+def test_rererestore_refresh_rerererestored_clearance_reenables_clear_posture():
+    updates = operator_control_center._apply_reset_reentry_rebuild_reentry_restore_rererestore_refresh_rerererestore_control(
+        {
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status": "fresh",
+            "decayed_rererestored_rebuild_reentry_clearance_rate": 0.61,
+            "closure_forecast_stability_status": "stable",
+            "class_transition_age_runs": 3,
+        },
+        refresh_meta={
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status": "rerererestoring-clearance-rebuild-reentry",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status": "rerererestored-clearance-rebuild-reentry",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_reason": "Fresh clearance-side pressure has re-re-re-restored stronger re-re-restored posture.",
+            "recent_rererestore_reset_side": "clearance",
+        },
+        transition_history_meta={"recent_pending_status": "pending-caution"},
+        closure_likely_outcome="clear-risk",
+        closure_hysteresis_status="pending-clearance",
+        closure_hysteresis_reason="Clearance pressure is visible, but it has not stayed persistent enough to trust fully yet.",
+        transition_status="pending-caution",
+        transition_reason="Earlier clear was withdrawn when re-re-restored posture aged out.",
+        resolution_status="none",
+        resolution_reason="",
+        reentry_status="pending-clearance-rebuild-reentry",
+        reentry_reason="Re-re-restored clearance posture has not yet been re-re-re-restored.",
+        restore_status="pending-clearance-rebuild-reentry-restore",
+        restore_reason="Restore posture is still weaker while re-re-re-restore is pending.",
+        rerestore_status="pending-clearance-rebuild-reentry-rerestore",
+        rerestore_reason="Rerestore posture is still weaker while re-re-re-restore is pending.",
+        rererestore_status="pending-clearance-rebuild-reentry-rererestore",
+        rererestore_reason="Fresh clearance-side evidence is returning after stronger re-re-restored posture softened or reset, but it has not yet re-re-re-restored stronger posture.",
+        rererestore_age_runs=2,
+        rererestore_persistence_score=0.31,
+        rererestore_persistence_status="holding-clearance-rebuild-reentry-rererestore",
+        rererestore_persistence_reason="Clearance-side re-re-restored posture has stayed aligned long enough to keep the stronger rerestored caution in place.",
+        rererestore_churn_score=0.0,
+        rererestore_churn_status="none",
+        rererestore_churn_reason="",
+    )
+
+    assert updates["transition_closure_likely_outcome"] == "expire-risk"
+    assert updates["closure_forecast_hysteresis_status"] == "confirmed-clearance"
+    assert updates["closure_forecast_reset_reentry_rebuild_reentry_status"] == "reentered-clearance-rebuild"
+    assert updates["closure_forecast_reset_reentry_rebuild_reentry_restore_status"] == "restored-clearance-rebuild-reentry"
+    assert updates["closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_status"] == "rerestored-clearance-rebuild-reentry"
+    assert updates["closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status"] == "rererestored-clearance-rebuild-reentry"
+    assert updates["class_transition_resolution_status"] == "cleared"
 
 
 def test_operator_snapshot_learns_when_soft_exception_was_overcautious(tmp_path: Path, monkeypatch):

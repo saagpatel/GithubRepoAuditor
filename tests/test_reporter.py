@@ -446,6 +446,15 @@ class TestMarkdownReport:
             "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_status": "confirmation-softened",
             "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_reason": "Re-re-restored confirmation-side rebuilt re-entry is aging and has been stepped down from sustained strength.",
             "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_summary": "Missing template asset has softened its re-re-restored confirmation-side rebuilt re-entry posture because the supporting signal is aging.",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_score": 0.33,
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status": "recovering-confirmation-rebuild-reentry-rererestore-reset",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status": "pending-confirmation-rebuild-reentry-rerererestore",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_reason": "Fresh confirmation-side evidence is returning after stronger re-re-restored posture softened or reset, but it has not yet re-re-re-restored stronger posture.",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_summary": "Fresh confirmation-side evidence is returning for Missing template asset after stronger re-re-restored posture softened, but it has not yet re-re-re-restored stronger posture (0.33).",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_summary": "Missing template asset is recovering after stronger re-re-restored posture softened, but it still needs more fresh follow-through before it is re-re-re-restored.",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_window_runs": 4,
+            "recovering_from_confirmation_rebuild_reentry_rererestore_reset_hotspots": [],
+            "recovering_from_clearance_rebuild_reentry_rererestore_reset_hotspots": [],
             "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_summary": "Fresh confirmation-side evidence is returning for Missing template asset after stronger rerestored posture softened, but it has not yet re-re-restored stronger posture (0.34).",
             "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_summary": "Missing template asset is recovering after stronger rerestored posture softened, but it still needs more fresh follow-through before it is re-re-restored.",
             "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_window_runs": 4,
@@ -674,6 +683,8 @@ class TestMarkdownReport:
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Churn Controls:" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness:" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Controls:" in content
+        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery:" in content
+        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Controls:" in content
         assert "Reset Re-entry Rebuild Persistence:" in content
         assert "Reset Re-entry Rebuild Churn Controls:" in content
         assert "Reset Re-entry Persistence Summary" in content
@@ -705,6 +716,8 @@ class TestMarkdownReport:
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Persistence Summary" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Churn Summary" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness Summary" in content
+        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery Summary" in content
+        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Summary" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Summary" in content
         assert "Reset Re-entry Rebuild Persistence Summary" in content
         assert "Reset Re-entry Rebuild Churn Summary" in content

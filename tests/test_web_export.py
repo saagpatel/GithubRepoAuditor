@@ -405,6 +405,15 @@ def _make_report(**overrides) -> dict:
                 }
             ],
             "confidence_calibration_summary": "Confidence is still useful, but recent outcomes are mixed: 50% high-confidence hit rate, 67% medium-confidence hit rate, and 1 reopened outcome(s).",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_score": 0.32,
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status": "recovering-confirmation-rebuild-reentry-rererestore-reset",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status": "pending-confirmation-rebuild-reentry-rerererestore",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_reason": "Fresh confirmation-side evidence is returning after stronger re-re-restored posture softened or reset, but it has not yet re-re-re-restored stronger posture.",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_summary": "Fresh confirmation-side evidence is returning for RepoC: RepoC drift needs review after stronger re-re-restored posture softened, but it has not yet re-re-re-restored stronger posture (0.32).",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_summary": "RepoC: RepoC drift needs review is recovering after stronger re-re-restored posture softened, but it still needs more fresh follow-through before it is re-re-re-restored.",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_window_runs": 4,
+            "recovering_from_confirmation_rebuild_reentry_rererestore_reset_hotspots": [],
+            "recovering_from_clearance_rebuild_reentry_rererestore_reset_hotspots": [],
             "primary_target": {"repo": "RepoC", "title": "RepoC drift needs review"},
         },
         "operator_queue": [
@@ -589,6 +598,8 @@ class TestRenderHtml:
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Churn Controls:" in html
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness:" in html
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Controls:" in html
+        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery:" in html
+        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Controls:" in html
         assert "Reset Re-entry Rebuild Persistence:" in html
         assert "Reset Re-entry Rebuild Churn Controls:" in html
         assert "Recommendation Drift:" in html
@@ -643,6 +654,8 @@ class TestRenderHtml:
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Persistence Summary:" in html
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Churn Summary:" in html
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness Summary:" in html
+        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery Summary:" in html
+        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Summary:" in html
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Summary:" in html
         assert "Reset Re-entry Rebuild Persistence Summary:" in html
         assert "Reset Re-entry Rebuild Churn Summary:" in html
