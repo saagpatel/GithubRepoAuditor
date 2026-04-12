@@ -6,6 +6,13 @@
 
 GitHub Repo Auditor is a portfolio audit and operator tool for developers with a lot of repositories. It clones every repo on your GitHub account, runs 12 analyzers across completeness and interest dimensions, assigns letter grades and achievement badges, preserves historical state, and generates actionable dashboards you can actually use to decide what to work on next. Built for developers who ship fast, start often, and need a system to manage the sprawl.
 
+Today the project is best understood as a GitHub portfolio operating system:
+
+- it tells you which repos are healthy, drifting, blocked, or safe to ignore for now
+- it gives you one workbook-first weekly review flow instead of a pile of disconnected reports
+- it tracks whether recommended follow-through is actually happening and whether that improvement is holding up over time
+- it keeps JSON, Markdown, HTML, workbook, and control-center outputs aligned so you do not have to switch mental models between surfaces
+
 ## What This Project Is Today
 
 This project started as a repo auditing tool and has grown into a portfolio operating system for GitHub work.
@@ -18,9 +25,29 @@ Today it can:
 - keep historical state in SQLite so you can compare runs, detect regressions, and support incremental and watch-mode workflows
 - provide a read-only `--control-center` workflow that turns the latest audit state into a practical queue of what needs attention now, what is blocked, and what can safely wait
 - support workbook-based review with a stable `standard` mode, optional `template` mode, and a workbook release gate for changes that touch Excel surfaces
+- build repo drilldowns and weekly review packs that mirror the same story across workbook, HTML, and Markdown
+- track follow-through, escalation, recovery, rebuild, reacquisition, and confidence step-down so the operator loop can show not just what to do next, but whether it is actually working
 - sync selected audit and campaign signals into Notion when that integration is enabled
 
 If you are new here, the simplest way to think about it is: this project tells you which repos are healthy, which ones are drifting, and what to look at next.
+
+## How It Helps Right Now
+
+If you already have a lot of repos, the hard part is usually not gathering data. The hard part is deciding:
+
+- which projects are healthy enough to leave alone
+- which ones are close enough to finishing that they deserve focus
+- which recommendations were already attempted
+- whether a repo is actually recovering or only looks calmer for the moment
+- what one thing is worth doing this week
+
+This project helps with that by turning raw repo inspection into a practical review loop:
+
+- `--doctor` catches setup, config, workbook, and baseline issues before you waste time on a run
+- the main audit gives you a full portfolio snapshot
+- the workbook gives you the big-picture and one-repo drilldown views
+- `--control-center` gives you a read-only action queue from the latest state
+- the follow-through and review-pack layers tell you whether earlier recommendations are still active, recovering, softening, or resolved
 
 ## 5-Minute Review
 
@@ -48,6 +75,8 @@ Then open the workbook and move in this order:
 - `Repo Detail`
 - `Executive Summary`
 
+If one repo needs a deeper decision, use `Repo Detail`. If you want the short shareable operator story, use the weekly review pack and `Executive Summary`.
+
 ## Features
 
 - **12 Analyzers** — README quality, test coverage, CI/CD, dependency freshness, commit patterns, bus factor, code complexity, security controls, license, build readiness, GraphQL signals, and more
@@ -55,6 +84,10 @@ Then open the workbook and move in this order:
 - **Letter Grades + Tier Classification** — A–F grades with Shipped / Functional / WIP / Skeleton / Abandoned tiers; 15 achievement badges ("Fully Tested", "CI Champion", "Zero Debt", etc.)
 - **Quick Wins Engine** — For each repo, shows exactly which single action moves it to the next tier and how far it is from getting there
 - **Multiple Dashboard Outputs** — Flagship Excel workbook with a stable `standard` mode and optional `template` mode, interactive HTML dashboard with scatter chart and tech radar, portfolio README, shields.io badges
+- **Workbook-First Operator Review** — Clear reading order through `Dashboard`, `Run Changes`, `Review Queue`, `Portfolio Explorer`, `Repo Detail`, and `Executive Summary`
+- **Control Center Queue** — Read-only daily triage that groups work into `Blocked`, `Needs Attention Now`, `Ready for Manual Action`, and `Safe to Defer`
+- **Follow-Through Story** — Tracks whether recommendations were untouched, attempted, waiting on evidence, stale, recovering, rebuilding, re-acquired, softening, or retired so the weekly review loop stays honest
+- **Repo Drilldowns + Weekly Review Packs** — One-repo briefings and weekly summaries that mirror the same action story across Markdown, HTML, and workbook
 - **Notion Integration** — Pushes audit signals into your Notion operating system: completeness cards, managed campaign records, and lifecycle-aware review sync
 - **History & Regression Detection** — Archives every run to SQLite, auto-diffs between runs, detects score regressions, and flags archive candidates
 - **AI Narrative** — Optional Claude-powered portfolio analysis that reads the audit data and writes a human-readable summary
@@ -138,6 +171,7 @@ That gives you:
 - a full audit with the main report artifacts
 - an HTML dashboard and workbook-friendly output
 - a read-only operator queue that helps you decide what to work on next
+- a clean weekly-review path that lets you go from big-picture portfolio read to one-repo decision without switching formats
 
 ### First-Run Flow
 
@@ -240,6 +274,7 @@ The daily operator loop is now:
 - Run `audit <github-username>` or `audit <github-username> --watch --watch-strategy adaptive`
 - Run `audit <github-username> --control-center`
 - Review the handoff fields: what changed, why it matters, what to do next, whether the queue is improving or worsening, what was tried for the top target, whether it is only quieting down or now counts as confirmed resolved, and whether recent confidence has actually been validating
+- Open the workbook and review it in this order: `Dashboard`, `Run Changes`, `Review Queue`, `Portfolio Explorer`, `Repo Detail`, `Executive Summary`
 - Clear anything in `Blocked` first
 - Use the reported primary target as the single next thing to close before taking on newly ready work
 - Review `Needs Attention Now` for drift and high-severity changes
@@ -249,6 +284,8 @@ The daily operator loop is now:
 - Run `make workbook-signoff ...` after the manual Excel-open check for workbook-facing changes
 
 Scheduled automation stays artifact-first. The weekly workflow now runs the audit, generates a control-center artifact plus a scheduled handoff summary, uploads `output/`, opens or updates one canonical GitHub issue only when blocked or urgent operator findings cross a meaningful threshold, and closes that same issue cleanly when later runs return to a quiet state. The handoff now also calls out whether the queue is getting better, worse, or staying stuck, what was tried most recently, whether that intervention actually helped, whether recovery is only quiet for now or confirmed resolved, whether recent high-confidence guidance has been validating or turning noisy, what trust policy now applies to the live recommendation (`act-now`, `act-with-review`, `verify-first`, or `monitor`), whether a soft exception or recent policy-flip drift should make the operator treat that recommendation more cautiously, and whether recent soft caution is still earning trust or has become cautious enough to recover toward a stronger policy.
+
+In newer follow-through phases, that same weekly story also carries whether a recommendation is escalating, recovering, rebuilding, re-acquiring confidence, or aging back down. The important product principle is still the same: workbook, HTML, Markdown, and review-pack surfaces should tell the same story in different formats.
 
 ## Troubleshooting
 
