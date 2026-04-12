@@ -158,6 +158,8 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Reset re-entry rebuild controls: `{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_status', 'none')}` — {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reason', 'No reset re-entry rebuild reason is recorded yet.')}",
         f"- Reset re-entry rebuild freshness: `{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_freshness_status', 'insufficient-data')}` — {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_freshness_reason', 'No reset re-entry rebuild freshness reason is recorded yet.')}",
         f"- Reset re-entry rebuild reset controls: `{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reset_status', 'none')}` — {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reset_reason', 'No reset re-entry rebuild reset reason is recorded yet.')}",
+        f"- Reset re-entry rebuild refresh recovery: `{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_refresh_recovery_status', 'none')}` ({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_refresh_recovery_score', 0.0):.2f})",
+        f"- Reset re-entry rebuild re-entry controls: `{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_status', 'none')}` — {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_reason', 'No reset re-entry rebuild re-entry reason is recorded yet.')}",
         f"- Reset re-entry rebuild persistence: `{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_persistence_status', 'none')}` ({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_persistence_score', 0.0):.2f}; {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_age_runs', 0)} run(s))",
         f"- Reset re-entry rebuild churn controls: `{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_churn_status', 'none')}` — {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_churn_reason', 'No reset re-entry rebuild churn reason is recorded yet.')}",
         f"- Recommendation drift: `{summary.get('recommendation_drift_status', 'stable')}` — {summary.get('recommendation_drift_summary', 'No recommendation-drift summary is recorded yet.')}",
@@ -189,6 +191,8 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Reset re-entry rebuild summary: {summary.get('closure_forecast_reset_reentry_rebuild_summary', 'No reset re-entry rebuild summary is recorded yet.')}",
         f"- Reset re-entry rebuild freshness summary: {summary.get('closure_forecast_reset_reentry_rebuild_freshness_summary', 'No reset re-entry rebuild-freshness summary is recorded yet.')}",
         f"- Reset re-entry rebuild reset summary: {summary.get('closure_forecast_reset_reentry_rebuild_reset_summary', 'No reset re-entry rebuild-reset summary is recorded yet.')}",
+        f"- Reset re-entry rebuild refresh recovery summary: {summary.get('closure_forecast_reset_reentry_rebuild_refresh_recovery_summary', 'No reset re-entry rebuild-refresh-recovery summary is recorded yet.')}",
+        f"- Reset re-entry rebuild re-entry summary: {summary.get('closure_forecast_reset_reentry_rebuild_reentry_summary', 'No reset re-entry rebuild re-entry summary is recorded yet.')}",
         f"- Reset re-entry rebuild persistence summary: {summary.get('closure_forecast_reset_reentry_rebuild_persistence_summary', 'No reset re-entry rebuild-persistence summary is recorded yet.')}",
         f"- Reset re-entry rebuild churn summary: {summary.get('closure_forecast_reset_reentry_rebuild_churn_summary', 'No reset re-entry rebuild-churn summary is recorded yet.')}",
         f"- Confidence validation: `{summary.get('confidence_validation_status', 'insufficient-data')}` — {summary.get('confidence_calibration_summary', 'No confidence-calibration summary is recorded yet.')}",
@@ -1178,6 +1182,54 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     )
     lines.append(
         f"- {summary.get('closure_forecast_reset_reentry_rebuild_reset_summary', 'No reset re-entry rebuild-reset summary is recorded yet.')}"
+    )
+    lines.append("")
+    lines.append("## Reset Re-entry Rebuild Refresh Recovery")
+    lines.append("")
+    lines.append(
+        f"- Reset re-entry rebuild refresh recovery: {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_refresh_recovery_status', 'none')} "
+        f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_refresh_recovery_score', 0.0):.2f})"
+    )
+    if primary_target.get("recent_reset_reentry_rebuild_refresh_path"):
+        lines.append(
+            f"- Recent reset re-entry rebuild refresh path: {primary_target.get('recent_reset_reentry_rebuild_refresh_path')}"
+        )
+    lines.append(
+        f"- {summary.get('closure_forecast_reset_reentry_rebuild_refresh_recovery_summary', 'No reset re-entry rebuild-refresh-recovery summary is recorded yet.')}"
+    )
+    recovering_from_confirmation_rebuild_reset_hotspots = summary.get(
+        "recovering_from_confirmation_rebuild_reset_hotspots"
+    ) or []
+    recovering_from_clearance_rebuild_reset_hotspots = summary.get(
+        "recovering_from_clearance_rebuild_reset_hotspots"
+    ) or []
+    if recovering_from_confirmation_rebuild_reset_hotspots:
+        for hotspot in recovering_from_confirmation_rebuild_reset_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Confirmation rebuild recovery hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('closure_forecast_reset_reentry_rebuild_refresh_recovery_status', 'recovering-confirmation-rebuild-reset')} at "
+                f"{hotspot.get('closure_forecast_reset_reentry_rebuild_refresh_recovery_score', 0.0):.2f} across "
+                f"{hotspot.get('recent_reset_reentry_rebuild_refresh_path', 'no rebuild refresh path recorded')}"
+            )
+    elif recovering_from_clearance_rebuild_reset_hotspots:
+        for hotspot in recovering_from_clearance_rebuild_reset_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Clearance rebuild recovery hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('closure_forecast_reset_reentry_rebuild_refresh_recovery_status', 'recovering-clearance-rebuild-reset')} at "
+                f"{hotspot.get('closure_forecast_reset_reentry_rebuild_refresh_recovery_score', 0.0):.2f} across "
+                f"{hotspot.get('recent_reset_reentry_rebuild_refresh_path', 'no rebuild refresh path recorded')}"
+            )
+    else:
+        lines.append("- No rebuilt refresh-recovery hotspots are recorded in the recent window.")
+    lines.append("")
+    lines.append("## Reset Re-entry Rebuild Re-entry Controls")
+    lines.append("")
+    lines.append(
+        f"- Reset re-entry rebuild re-entry: {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_status', 'none')} "
+        f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_reason', 'No reset re-entry rebuild re-entry reason is recorded yet.')})"
+    )
+    lines.append(
+        f"- {summary.get('closure_forecast_reset_reentry_rebuild_reentry_summary', 'No reset re-entry rebuild re-entry summary is recorded yet.')}"
     )
     lines.append("")
     lines.append("## Reset Re-entry Rebuild Persistence")

@@ -987,6 +987,28 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry rebuild reset summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reset_summary']}"
         )
+    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_refresh_recovery_status") not in {None, "", "none"}:
+        print(
+            "  Reset re-entry rebuild refresh recovery: "
+            f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_refresh_recovery_status', 'none')} "
+            f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_refresh_recovery_score', 0.0):.2f})"
+        )
+    if summary.get("closure_forecast_reset_reentry_rebuild_refresh_recovery_summary"):
+        print(
+            "  Reset re-entry rebuild refresh recovery summary: "
+            f"{summary['closure_forecast_reset_reentry_rebuild_refresh_recovery_summary']}"
+        )
+    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_status") not in {None, "", "none"}:
+        print(
+            "  Reset re-entry rebuild re-entry controls: "
+            f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_status', 'none')} "
+            f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_reason', 'No reset re-entry rebuild re-entry reason is recorded yet.')})"
+        )
+    if summary.get("closure_forecast_reset_reentry_rebuild_reentry_summary"):
+        print(
+            "  Reset re-entry rebuild re-entry summary: "
+            f"{summary['closure_forecast_reset_reentry_rebuild_reentry_summary']}"
+        )
     if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_persistence_status") not in {None, "", "none"}:
         print(
             "  Reset re-entry rebuild persistence: "
