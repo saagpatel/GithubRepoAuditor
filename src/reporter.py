@@ -17,6 +17,10 @@ from src.report_enrichment import (
     build_follow_through_recovery_memory_reset_summary,
     build_follow_through_recovery_persistence_status_label,
     build_follow_through_recovery_persistence_summary,
+    build_follow_through_recovery_reacquisition_status_label,
+    build_follow_through_recovery_reacquisition_summary,
+    build_follow_through_recovery_rebuild_strength_status_label,
+    build_follow_through_recovery_rebuild_strength_summary,
     build_follow_through_recovery_status_label,
     build_follow_through_recovery_summary,
     build_follow_through_relapse_churn_status_label,
@@ -297,6 +301,14 @@ def write_markdown_report(
             f"{item.get('follow_through_recovery_memory_reset_summary', 'No follow-through recovery memory reset signal is currently surfaced.')}"
         )
         _w(
+            f"  - Recovery Rebuild Strength: {item.get('follow_through_recovery_rebuild_strength', 'None')} — "
+            f"{item.get('follow_through_recovery_rebuild_strength_summary', 'No follow-through recovery rebuild-strength signal is currently surfaced.')}"
+        )
+        _w(
+            f"  - Recovery Reacquisition: {item.get('follow_through_recovery_reacquisition', 'None')} — "
+            f"{item.get('follow_through_recovery_reacquisition_summary', 'No follow-through recovery reacquisition signal is currently surfaced.')}"
+        )
+        _w(
             f"  - Next Checkpoint: {item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}"
         )
     if not weekly_pack.get("top_attention"):
@@ -397,6 +409,25 @@ def write_markdown_report(
     if not weekly_pack.get("top_fresh_recovery_items") and not weekly_pack.get("top_softening_recovery_items") and not weekly_pack.get("top_reset_recovery_items") and not weekly_pack.get("top_rebuilding_recovery_items"):
         _w("- No recovery-freshness or memory-reset hotspots are currently surfaced.")
     _w("")
+    _w("### Follow-Through Recovery Rebuild and Reacquisition")
+    _w("")
+    _w(f"- Recovery Rebuild Strength: {weekly_pack.get('follow_through_recovery_rebuild_strength_summary', 'No follow-through recovery rebuild-strength signal is currently surfaced.')}")
+    _w(f"- Recovery Reacquisition: {weekly_pack.get('follow_through_recovery_reacquisition_summary', 'No follow-through recovery reacquisition signal is currently surfaced.')}")
+    for item in weekly_pack.get("top_rebuilding_recovery_strength_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        _w(f"- Rebuilding After Reset: {label} — {item.get('follow_through_recovery_rebuild_strength_summary', 'No follow-through recovery rebuild-strength signal is currently surfaced.')}")
+    for item in weekly_pack.get("top_reacquiring_recovery_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        _w(f"- Near Reacquisition: {label} — {item.get('follow_through_recovery_reacquisition_summary', 'No follow-through recovery reacquisition signal is currently surfaced.')}")
+    for item in weekly_pack.get("top_reacquired_recovery_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        _w(f"- Reacquired: {label} — {item.get('follow_through_recovery_reacquisition_summary', 'No follow-through recovery reacquisition signal is currently surfaced.')}")
+    for item in weekly_pack.get("top_fragile_reacquisition_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        _w(f"- Fragile Reacquisition: {label} — {item.get('follow_through_recovery_reacquisition_summary', 'No follow-through recovery reacquisition signal is currently surfaced.')}")
+    if not weekly_pack.get("top_rebuilding_recovery_strength_items") and not weekly_pack.get("top_reacquiring_recovery_items") and not weekly_pack.get("top_reacquired_recovery_items") and not weekly_pack.get("top_fragile_reacquisition_items"):
+        _w("- No rebuild-strength or reacquisition hotspots are currently surfaced.")
+    _w("")
     _w("### Top Repo Drilldowns")
     _w("")
     for briefing in weekly_pack.get("repo_briefings", [])[:3]:
@@ -412,6 +443,8 @@ def write_markdown_report(
         _w(f"- Recovery / Retirement: {briefing.get('recovery_line', 'None: No follow-through recovery or escalation-retirement signal is currently surfaced.')}")
         _w(f"- Recovery Persistence: {briefing.get('recovery_persistence_line', 'None: No follow-through recovery persistence signal is currently surfaced.')}")
         _w(f"- Relapse Churn: {briefing.get('relapse_churn_line', 'None: No relapse churn is currently surfaced.')}")
+        _w(f"- Recovery Rebuild Strength: {briefing.get('recovery_rebuild_strength_line', 'None: No follow-through recovery rebuild-strength signal is currently surfaced.')}")
+        _w(f"- Recovery Reacquisition: {briefing.get('recovery_reacquisition_line', 'None: No follow-through recovery reacquisition signal is currently surfaced.')}")
         _w(f"- What Would Count As Progress: {briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
         _w("")
 
@@ -456,6 +489,10 @@ def write_markdown_report(
             _w(f"- Follow-Through Recovery Freshness: {report.operator_summary.get('follow_through_recovery_freshness_summary')}")
         if report.operator_summary.get("follow_through_recovery_memory_reset_summary"):
             _w(f"- Follow-Through Recovery Memory Reset: {report.operator_summary.get('follow_through_recovery_memory_reset_summary')}")
+        if report.operator_summary.get("follow_through_recovery_rebuild_strength_summary"):
+            _w(f"- Follow-Through Recovery Rebuild Strength: {report.operator_summary.get('follow_through_recovery_rebuild_strength_summary')}")
+        if report.operator_summary.get("follow_through_recovery_reacquisition_summary"):
+            _w(f"- Follow-Through Recovery Reacquisition: {report.operator_summary.get('follow_through_recovery_reacquisition_summary')}")
         primary_target = report.operator_summary.get("primary_target") or {}
         if primary_target:
             repo = f"{primary_target.get('repo')}: " if primary_target.get("repo") else ""
@@ -1043,6 +1080,14 @@ def write_markdown_report(
             _w(
                 f"  - Recovery Memory Reset: {build_follow_through_recovery_memory_reset_status_label(item)} — "
                 f"{build_follow_through_recovery_memory_reset_summary(item)}"
+            )
+            _w(
+                f"  - Recovery Rebuild Strength: {build_follow_through_recovery_rebuild_strength_status_label(item)} — "
+                f"{build_follow_through_recovery_rebuild_strength_summary(item)}"
+            )
+            _w(
+                f"  - Recovery Reacquisition: {build_follow_through_recovery_reacquisition_status_label(item)} — "
+                f"{build_follow_through_recovery_reacquisition_summary(item)}"
             )
             _w(f"  - Next Checkpoint: {build_follow_through_checkpoint(item)}")
             links = item.get("links") or []

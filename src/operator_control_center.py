@@ -1464,6 +1464,23 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         "rebuilding": 0,
         "insufficient-evidence": 0,
     }
+    recovery_rebuild_strength_counts = {
+        "none": 0,
+        "just-rebuilding": 0,
+        "building": 0,
+        "holding-rebuild": 0,
+        "fragile-rebuild": 0,
+        "insufficient-evidence": 0,
+    }
+    recovery_reacquisition_counts = {
+        "none": 0,
+        "reacquiring": 0,
+        "just-reacquired": 0,
+        "holding-reacquired": 0,
+        "reacquired": 0,
+        "fragile-reacquisition": 0,
+        "insufficient-evidence": 0,
+    }
     top_unattempted_items: list[dict] = []
     top_stale_follow_through_items: list[dict] = []
     top_overdue_follow_through_items: list[dict] = []
@@ -1479,6 +1496,10 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
     top_softening_recovery_items: list[dict] = []
     top_reset_recovery_items: list[dict] = []
     top_rebuilding_recovery_items: list[dict] = []
+    top_rebuilding_recovery_strength_items: list[dict] = []
+    top_reacquiring_recovery_items: list[dict] = []
+    top_reacquired_recovery_items: list[dict] = []
+    top_fragile_reacquisition_items: list[dict] = []
     for item in queue:
         status = item.get("follow_through_status", "unknown")
         if status not in status_counts:
@@ -1516,6 +1537,14 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         if recovery_memory_reset_status not in recovery_memory_reset_counts:
             recovery_memory_reset_status = "insufficient-evidence"
         recovery_memory_reset_counts[recovery_memory_reset_status] += 1
+        recovery_rebuild_strength_status = item.get("follow_through_recovery_rebuild_strength_status", "none")
+        if recovery_rebuild_strength_status not in recovery_rebuild_strength_counts:
+            recovery_rebuild_strength_status = "insufficient-evidence"
+        recovery_rebuild_strength_counts[recovery_rebuild_strength_status] += 1
+        recovery_reacquisition_status = item.get("follow_through_recovery_reacquisition_status", "none")
+        if recovery_reacquisition_status not in recovery_reacquisition_counts:
+            recovery_reacquisition_status = "insufficient-evidence"
+        recovery_reacquisition_counts[recovery_reacquisition_status] += 1
         compact_item = {
             "item_id": item.get("item_id", ""),
             "repo": item.get("repo", ""),
@@ -1550,6 +1579,13 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
             "follow_through_recovery_memory_reset_status": recovery_memory_reset_status,
             "follow_through_recovery_memory_reset_summary": item.get("follow_through_recovery_memory_reset_summary", ""),
             "follow_through_recovery_memory_reset_reason": item.get("follow_through_recovery_memory_reset_reason", ""),
+            "follow_through_recovery_rebuild_strength_age_runs": item.get("follow_through_recovery_rebuild_strength_age_runs", 0),
+            "follow_through_recovery_rebuild_strength_status": recovery_rebuild_strength_status,
+            "follow_through_recovery_rebuild_strength_summary": item.get("follow_through_recovery_rebuild_strength_summary", ""),
+            "follow_through_recovery_rebuild_strength_reason": item.get("follow_through_recovery_rebuild_strength_reason", ""),
+            "follow_through_recovery_reacquisition_status": recovery_reacquisition_status,
+            "follow_through_recovery_reacquisition_summary": item.get("follow_through_recovery_reacquisition_summary", ""),
+            "follow_through_recovery_reacquisition_reason": item.get("follow_through_recovery_reacquisition_reason", ""),
         }
         if status == "untouched" and len(top_unattempted_items) < 5:
             top_unattempted_items.append(compact_item)
@@ -1587,6 +1623,23 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
             top_reset_recovery_items.append(compact_item)
         if recovery_memory_reset_status == "rebuilding" and len(top_rebuilding_recovery_items) < 5:
             top_rebuilding_recovery_items.append(compact_item)
+        if (
+            recovery_rebuild_strength_status in {"just-rebuilding", "building", "holding-rebuild"}
+            and len(top_rebuilding_recovery_strength_items) < 5
+        ):
+            top_rebuilding_recovery_strength_items.append(compact_item)
+        if recovery_reacquisition_status == "reacquiring" and len(top_reacquiring_recovery_items) < 5:
+            top_reacquiring_recovery_items.append(compact_item)
+        if (
+            recovery_reacquisition_status in {"just-reacquired", "holding-reacquired", "reacquired"}
+            and len(top_reacquired_recovery_items) < 5
+        ):
+            top_reacquired_recovery_items.append(compact_item)
+        if (
+            recovery_reacquisition_status == "fragile-reacquisition"
+            and len(top_fragile_reacquisition_items) < 5
+        ):
+            top_fragile_reacquisition_items.append(compact_item)
     status_counts["resolved"] += resolution_trend.get("confirmed_resolved_count", 0)
     follow_through_checkpoint_summary = _follow_through_checkpoint_summary(
         status_counts,
@@ -1628,6 +1681,17 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         top_reset_recovery_items,
         top_rebuilding_recovery_items,
     )
+    follow_through_recovery_rebuild_strength_summary = _follow_through_recovery_rebuild_strength_summary(
+        recovery_rebuild_strength_counts,
+        top_rebuilding_recovery_strength_items,
+        top_fragile_reacquisition_items,
+    )
+    follow_through_recovery_reacquisition_summary = _follow_through_recovery_reacquisition_summary(
+        recovery_reacquisition_counts,
+        top_reacquiring_recovery_items,
+        top_reacquired_recovery_items,
+        top_fragile_reacquisition_items,
+    )
     return {
         "repeat_urgent_count": repeat_urgent_count,
         "stale_item_count": stale_item_count,
@@ -1657,11 +1721,17 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
             recovery_freshness_counts=recovery_freshness_counts,
             recovery_decay_counts=recovery_decay_counts,
             recovery_memory_reset_counts=recovery_memory_reset_counts,
+            recovery_rebuild_strength_counts=recovery_rebuild_strength_counts,
+            recovery_reacquisition_counts=recovery_reacquisition_counts,
             top_fresh_recovery_items=top_fresh_recovery_items,
             top_stale_recovery_items=top_stale_recovery_items,
             top_softening_recovery_items=top_softening_recovery_items,
             top_reset_recovery_items=top_reset_recovery_items,
             top_rebuilding_recovery_items=top_rebuilding_recovery_items,
+            top_rebuilding_recovery_strength_items=top_rebuilding_recovery_strength_items,
+            top_reacquiring_recovery_items=top_reacquiring_recovery_items,
+            top_reacquired_recovery_items=top_reacquired_recovery_items,
+            top_fragile_reacquisition_items=top_fragile_reacquisition_items,
         ),
         "follow_through_status_counts": status_counts,
         "follow_through_checkpoint_counts": checkpoint_counts,
@@ -1672,6 +1742,8 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         "follow_through_recovery_freshness_counts": recovery_freshness_counts,
         "follow_through_recovery_decay_counts": recovery_decay_counts,
         "follow_through_recovery_memory_reset_counts": recovery_memory_reset_counts,
+        "follow_through_recovery_rebuild_strength_counts": recovery_rebuild_strength_counts,
+        "follow_through_recovery_reacquisition_counts": recovery_reacquisition_counts,
         "top_unattempted_items": top_unattempted_items,
         "top_stale_follow_through_items": top_stale_follow_through_items,
         "top_overdue_follow_through_items": top_overdue_follow_through_items,
@@ -1687,6 +1759,10 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         "top_softening_recovery_items": top_softening_recovery_items,
         "top_reset_recovery_items": top_reset_recovery_items,
         "top_rebuilding_recovery_items": top_rebuilding_recovery_items,
+        "top_rebuilding_recovery_strength_items": top_rebuilding_recovery_strength_items,
+        "top_reacquiring_recovery_items": top_reacquiring_recovery_items,
+        "top_reacquired_recovery_items": top_reacquired_recovery_items,
+        "top_fragile_reacquisition_items": top_fragile_reacquisition_items,
         "follow_through_checkpoint_summary": follow_through_checkpoint_summary,
         "follow_through_escalation_summary": follow_through_escalation_summary,
         "follow_through_recovery_summary": follow_through_recovery_summary,
@@ -1699,6 +1775,8 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
             top_stale_recovery_items,
         ),
         "follow_through_recovery_memory_reset_summary": follow_through_recovery_memory_reset_summary,
+        "follow_through_recovery_rebuild_strength_summary": follow_through_recovery_rebuild_strength_summary,
+        "follow_through_recovery_reacquisition_summary": follow_through_recovery_reacquisition_summary,
     }
 
 
@@ -2902,6 +2980,35 @@ def _project_queue_follow_through(
             follow_through_recovery_freshness_status=follow_through_recovery_freshness_status,
             follow_through_recovery_decay_status=follow_through_recovery_decay_status,
         )
+        (
+            follow_through_recovery_rebuild_strength_age_runs,
+            follow_through_recovery_rebuild_strength_status,
+            follow_through_recovery_rebuild_strength_reason,
+            follow_through_recovery_rebuild_strength_summary,
+        ) = _follow_through_recovery_rebuild_strength_projection(
+            item,
+            prior_matches,
+            follow_through_recovery_status=follow_through_recovery_status,
+            follow_through_recovery_persistence_status=follow_through_recovery_persistence_status,
+            follow_through_relapse_churn_status=follow_through_relapse_churn_status,
+            follow_through_recovery_freshness_status=follow_through_recovery_freshness_status,
+            follow_through_recovery_decay_status=follow_through_recovery_decay_status,
+            follow_through_recovery_memory_reset_status=follow_through_recovery_memory_reset_status,
+        )
+        (
+            follow_through_recovery_reacquisition_status,
+            follow_through_recovery_reacquisition_reason,
+            follow_through_recovery_reacquisition_summary,
+        ) = _follow_through_recovery_reacquisition_projection(
+            item,
+            prior_matches,
+            follow_through_recovery_persistence_status=follow_through_recovery_persistence_status,
+            follow_through_relapse_churn_status=follow_through_relapse_churn_status,
+            follow_through_recovery_freshness_status=follow_through_recovery_freshness_status,
+            follow_through_recovery_decay_status=follow_through_recovery_decay_status,
+            follow_through_recovery_memory_reset_status=follow_through_recovery_memory_reset_status,
+            follow_through_recovery_rebuild_strength_status=follow_through_recovery_rebuild_strength_status,
+        )
         follow_through_summary = _follow_through_item_summary(
             item,
             memory,
@@ -2944,6 +3051,13 @@ def _project_queue_follow_through(
                 "follow_through_recovery_memory_reset_status": follow_through_recovery_memory_reset_status,
                 "follow_through_recovery_memory_reset_summary": follow_through_recovery_memory_reset_summary,
                 "follow_through_recovery_memory_reset_reason": follow_through_recovery_memory_reset_reason,
+                "follow_through_recovery_rebuild_strength_age_runs": follow_through_recovery_rebuild_strength_age_runs,
+                "follow_through_recovery_rebuild_strength_status": follow_through_recovery_rebuild_strength_status,
+                "follow_through_recovery_rebuild_strength_summary": follow_through_recovery_rebuild_strength_summary,
+                "follow_through_recovery_rebuild_strength_reason": follow_through_recovery_rebuild_strength_reason,
+                "follow_through_recovery_reacquisition_status": follow_through_recovery_reacquisition_status,
+                "follow_through_recovery_reacquisition_summary": follow_through_recovery_reacquisition_summary,
+                "follow_through_recovery_reacquisition_reason": follow_through_recovery_reacquisition_reason,
             }
         )
     return enriched_queue
@@ -3726,6 +3840,137 @@ def _follow_through_recovery_memory_reset_projection(
     if has_recent_reset and follow_through_recovery_status in {"recovering", "retiring-watch"}:
         return "rebuilding", f"{label} had older recovery confidence reset earlier and is now starting to accumulate calmer evidence again.", f"{label} is rebuilding recovery memory after a prior reset."
     return "none", f"{label} still has enough fresh calmer support that no recovery-memory reset needs to be surfaced yet.", f"{label} is not currently showing a recovery-memory reset."
+
+
+def _follow_through_recovery_rebuild_strength_projection(
+    item: dict,
+    prior_matches: list[dict],
+    *,
+    follow_through_recovery_status: str,
+    follow_through_recovery_persistence_status: str,
+    follow_through_relapse_churn_status: str,
+    follow_through_recovery_freshness_status: str,
+    follow_through_recovery_decay_status: str,
+    follow_through_recovery_memory_reset_status: str,
+) -> tuple[int, str, str, str]:
+    label = _target_label(item)
+    prior_window = list(prior_matches[: HISTORY_WINDOW_RUNS - 1])
+    current_entry = {
+        **item,
+        "follow_through_recovery_status": follow_through_recovery_status,
+        "follow_through_recovery_persistence_status": follow_through_recovery_persistence_status,
+        "follow_through_relapse_churn_status": follow_through_relapse_churn_status,
+        "follow_through_recovery_freshness_status": follow_through_recovery_freshness_status,
+        "follow_through_recovery_decay_status": follow_through_recovery_decay_status,
+        "follow_through_recovery_memory_reset_status": follow_through_recovery_memory_reset_status,
+    }
+    recent_window = [current_entry, *prior_window]
+
+    rebuild_path_streak = 0
+    for entry in recent_window:
+        reset_status = str(entry.get("follow_through_recovery_memory_reset_status", "none") or "none")
+        if reset_status == "rebuilding":
+            rebuild_path_streak += 1
+            continue
+        break
+
+    if follow_through_recovery_memory_reset_status == "none":
+        return 0, "none", f"{label} does not currently have an active post-reset rebuild path.", f"{label} is not currently rebuilding recovery confidence after reset."
+    if follow_through_recovery_memory_reset_status == "insufficient-evidence":
+        return 1, "insufficient-evidence", f"{label} may be starting to calm again after reset, but the history is still too thin to tell whether this is a real rebuild.", f"{label} may be rebuilding after reset, but there is not enough history yet to judge rebuild strength."
+    if follow_through_recovery_memory_reset_status != "rebuilding":
+        return 0, "none", f"{label} is not currently in the rebuilding phase of recovery-memory reset.", f"{label} is not currently rebuilding after reset."
+
+    if (
+        follow_through_recovery_status == "insufficient-evidence"
+        or follow_through_recovery_freshness_status == "insufficient-evidence"
+        or follow_through_recovery_decay_status == "insufficient-evidence"
+    ):
+        return 1, "insufficient-evidence", f"{label} is trying to rebuild calmer support after reset, but the available evidence is still too thin to judge whether that rebuild is real.", f"{label} is rebuilding after reset, but there is not enough evidence yet to judge its strength."
+
+    if (
+        follow_through_relapse_churn_status in {"fragile", "churn", "blocked"}
+        or follow_through_recovery_persistence_status == "fragile-recovery"
+        or follow_through_recovery_freshness_status in {"mixed-age", "stale"}
+        or follow_through_recovery_decay_status in {"softening", "aging", "fragile-aging", "expired"}
+    ):
+        age_runs = max(1, rebuild_path_streak)
+        return age_runs, "fragile-rebuild", f"{label} is rebuilding after reset, but mixed-age support or recovery wobble is still making that calmer path fragile.", f"{label} is rebuilding after reset, but the rebuild still looks fragile rather than re-earned."
+
+    if rebuild_path_streak >= 3:
+        return rebuild_path_streak, "holding-rebuild", f"{label} has rebuilt calmer support across {rebuild_path_streak} consecutive run(s) after reset without fresh reset pressure returning.", f"{label} is rebuilding well enough after reset that the calmer posture is starting to hold."
+    if rebuild_path_streak >= 2:
+        return rebuild_path_streak, "building", f"{label} is adding another calmer confirmation run after reset, but the rebuilt posture has not held long enough to be trusted as stable yet.", f"{label} is actively strengthening its calmer support after reset, but it is not stable yet."
+    return max(1, rebuild_path_streak), "just-rebuilding", f"{label} has only one calmer confirmation run after reset, so the rebuild is just starting and still needs more proof.", f"{label} has only just started rebuilding calmer support after reset."
+
+
+def _follow_through_recovery_reacquisition_projection(
+    item: dict,
+    prior_matches: list[dict],
+    *,
+    follow_through_recovery_persistence_status: str,
+    follow_through_relapse_churn_status: str,
+    follow_through_recovery_freshness_status: str,
+    follow_through_recovery_decay_status: str,
+    follow_through_recovery_memory_reset_status: str,
+    follow_through_recovery_rebuild_strength_status: str,
+) -> tuple[str, str, str]:
+    label = _target_label(item)
+    prior_window = list(prior_matches[: HISTORY_WINDOW_RUNS - 1])
+    recent_window = [
+        {
+            **item,
+            "follow_through_recovery_reacquisition_status": "",
+        },
+        *prior_window,
+    ]
+
+    current_is_candidate = (
+        follow_through_recovery_memory_reset_status == "rebuilding"
+        and follow_through_recovery_rebuild_strength_status in {"building", "holding-rebuild"}
+        and follow_through_recovery_persistence_status in {
+            "holding-recovery",
+            "holding-retiring-watch",
+            "sustained-retiring-watch",
+            "sustained-retired",
+        }
+        and follow_through_recovery_freshness_status in {"fresh", "holding-fresh"}
+    )
+
+    prior_reacquisition_streak = 0
+    for entry in recent_window[1:]:
+        prior_status = str(entry.get("follow_through_recovery_reacquisition_status", "none") or "none")
+        if prior_status in {"reacquiring", "just-reacquired", "holding-reacquired", "reacquired"}:
+            prior_reacquisition_streak += 1
+            continue
+        break
+
+    if follow_through_recovery_rebuild_strength_status == "none":
+        return "none", f"{label} does not currently have a post-reset rebuild path that is close to re-earning stronger calmer support.", f"{label} has not started re-acquiring stronger calmer support yet."
+    if (
+        follow_through_recovery_rebuild_strength_status == "insufficient-evidence"
+        or follow_through_recovery_memory_reset_status == "insufficient-evidence"
+    ):
+        return "insufficient-evidence", f"{label} may be rebuilding after reset, but there is not enough evidence yet to judge whether stronger calmer support is being re-acquired.", f"{label} may be rebuilding after reset, but there is not enough evidence yet to judge reacquisition."
+    if (
+        follow_through_recovery_rebuild_strength_status == "fragile-rebuild"
+        or follow_through_relapse_churn_status in {"fragile", "churn", "blocked"}
+        or follow_through_recovery_freshness_status in {"mixed-age", "stale"}
+        or follow_through_recovery_decay_status in {"softening", "aging", "fragile-aging", "expired"}
+    ):
+        return "fragile-reacquisition", f"{label} is rebuilding after reset, but wobble or aging support still makes the would-be re-acquisition too fragile to trust as re-earned.", f"{label} is rebuilding after reset, but the stronger calmer posture still looks too fragile to call re-acquired."
+    if not current_is_candidate:
+        return "none", f"{label} is rebuilding after reset, but it has not yet crossed the threshold where stronger calmer support looks close to being re-earned.", f"{label} is rebuilding after reset, but it has not started re-acquiring a stronger calmer posture yet."
+
+    if follow_through_recovery_rebuild_strength_status == "building":
+        return "reacquiring", f"{label} is close to re-earning stronger calmer support after reset, but the rebuilt posture has not crossed the hold threshold yet.", f"{label} is close to re-acquiring stronger calmer support, but it still needs another confirming run."
+
+    reacquisition_age = prior_reacquisition_streak + 1
+    if reacquisition_age >= 3:
+        return "reacquired", f"{label} has kept its stronger post-reset calmer posture through the full reacquisition window, so that rebuilt support now looks genuinely re-earned.", f"{label} has re-acquired stronger calmer support and it is now holding across the full confirmation window."
+    if reacquisition_age >= 2:
+        return "holding-reacquired", f"{label} re-earned stronger calmer support after reset and has now held that restored posture for {reacquisition_age} consecutive run(s), but it is not fully durable yet.", f"{label} has re-acquired stronger calmer support and it is actively holding."
+    return "just-reacquired", f"{label} has just crossed back into stronger calmer support after reset, but it still has only one confirmation run in the re-acquired posture.", f"{label} has only just re-acquired stronger calmer support after reset."
 
 
 def _follow_through_item_summary(
@@ -33724,11 +33969,17 @@ def _follow_through_summary(
     recovery_freshness_counts: dict[str, int] | None = None,
     recovery_decay_counts: dict[str, int] | None = None,
     recovery_memory_reset_counts: dict[str, int] | None = None,
+    recovery_rebuild_strength_counts: dict[str, int] | None = None,
+    recovery_reacquisition_counts: dict[str, int] | None = None,
     top_fresh_recovery_items: list[dict] | None = None,
     top_stale_recovery_items: list[dict] | None = None,
     top_softening_recovery_items: list[dict] | None = None,
     top_reset_recovery_items: list[dict] | None = None,
     top_rebuilding_recovery_items: list[dict] | None = None,
+    top_rebuilding_recovery_strength_items: list[dict] | None = None,
+    top_reacquiring_recovery_items: list[dict] | None = None,
+    top_reacquired_recovery_items: list[dict] | None = None,
+    top_fragile_reacquisition_items: list[dict] | None = None,
 ) -> str:
     status_counts = status_counts or {}
     checkpoint_counts = checkpoint_counts or {}
@@ -33749,11 +34000,17 @@ def _follow_through_summary(
     recovery_freshness_counts = recovery_freshness_counts or {}
     recovery_decay_counts = recovery_decay_counts or {}
     recovery_memory_reset_counts = recovery_memory_reset_counts or {}
+    recovery_rebuild_strength_counts = recovery_rebuild_strength_counts or {}
+    recovery_reacquisition_counts = recovery_reacquisition_counts or {}
     top_fresh_recovery_items = top_fresh_recovery_items or []
     top_stale_recovery_items = top_stale_recovery_items or []
     top_softening_recovery_items = top_softening_recovery_items or []
     top_reset_recovery_items = top_reset_recovery_items or []
     top_rebuilding_recovery_items = top_rebuilding_recovery_items or []
+    top_rebuilding_recovery_strength_items = top_rebuilding_recovery_strength_items or []
+    top_reacquiring_recovery_items = top_reacquiring_recovery_items or []
+    top_reacquired_recovery_items = top_reacquired_recovery_items or []
+    top_fragile_reacquisition_items = top_fragile_reacquisition_items or []
     legacy_summary = ""
     if repeat_urgent_count or stale_item_count:
         legacy_summary = (
@@ -33843,6 +34100,34 @@ def _follow_through_summary(
         return (
             f"{recovery_memory_reset_counts.get('rebuilding', 0)} item(s) are rebuilding recovery confidence after an earlier reset, "
             f"and {label} is the clearest calmer path that is earning back fresher support."
+        )
+    if top_fragile_reacquisition_items:
+        top_item = top_fragile_reacquisition_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_reacquisition_counts.get('fragile-reacquisition', 0)} item(s) are trying to re-earn stronger calmer support after reset, "
+            f"but {label} is the clearest place where that rebuilt posture still looks too fragile to trust."
+        )
+    if top_reacquired_recovery_items:
+        top_item = top_reacquired_recovery_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_reacquisition_counts.get('just-reacquired', 0) + recovery_reacquisition_counts.get('holding-reacquired', 0) + recovery_reacquisition_counts.get('reacquired', 0)} item(s) have re-earned stronger calmer support after reset, "
+            f"and {label} is the clearest re-acquired recovery path."
+        )
+    if top_reacquiring_recovery_items:
+        top_item = top_reacquiring_recovery_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_reacquisition_counts.get('reacquiring', 0)} item(s) are close to re-earning stronger calmer support after reset, "
+            f"and {label} is the clearest near-reacquisition path."
+        )
+    if top_rebuilding_recovery_strength_items:
+        top_item = top_rebuilding_recovery_strength_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_rebuild_strength_counts.get('just-rebuilding', 0) + recovery_rebuild_strength_counts.get('building', 0) + recovery_rebuild_strength_counts.get('holding-rebuild', 0)} item(s) are rebuilding calmer support after reset, "
+            f"and {label} is the clearest rebuild-strength hotspot."
         )
     if top_fresh_recovery_items:
         top_item = top_fresh_recovery_items[0]
@@ -34135,6 +34420,61 @@ def _follow_through_recovery_memory_reset_summary(
             f"{recovery_memory_reset_counts.get('insufficient-evidence', 0)} item(s) may be calming down, but there is not enough history yet to judge whether older recovery confidence should reset or rebuild."
         )
     return "No follow-through recovery memory reset signal is currently surfaced."
+
+
+def _follow_through_recovery_rebuild_strength_summary(
+    recovery_rebuild_strength_counts: dict[str, int],
+    top_rebuilding_recovery_strength_items: list[dict],
+    top_fragile_reacquisition_items: list[dict],
+) -> str:
+    if top_fragile_reacquisition_items:
+        top_item = top_fragile_reacquisition_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_rebuild_strength_counts.get('fragile-rebuild', 0)} item(s) are rebuilding after reset, but {label} is the clearest place where that calmer path still looks fragile."
+        )
+    if top_rebuilding_recovery_strength_items:
+        top_item = top_rebuilding_recovery_strength_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_rebuild_strength_counts.get('just-rebuilding', 0) + recovery_rebuild_strength_counts.get('building', 0) + recovery_rebuild_strength_counts.get('holding-rebuild', 0)} item(s) are actively rebuilding calmer support after reset, and {label} is the clearest rebuild-strength hotspot."
+        )
+    if recovery_rebuild_strength_counts.get("insufficient-evidence", 0):
+        return (
+            f"{recovery_rebuild_strength_counts.get('insufficient-evidence', 0)} item(s) may be rebuilding after reset, but there is not enough history yet to judge how strong that rebuild really is."
+        )
+    return "No follow-through recovery rebuild-strength signal is currently surfaced."
+
+
+def _follow_through_recovery_reacquisition_summary(
+    recovery_reacquisition_counts: dict[str, int],
+    top_reacquiring_recovery_items: list[dict],
+    top_reacquired_recovery_items: list[dict],
+    top_fragile_reacquisition_items: list[dict],
+) -> str:
+    if top_fragile_reacquisition_items:
+        top_item = top_fragile_reacquisition_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_reacquisition_counts.get('fragile-reacquisition', 0)} item(s) are close to re-earning stronger calmer support after reset, but {label} is the clearest place where that re-acquisition still looks fragile."
+        )
+    if top_reacquired_recovery_items:
+        top_item = top_reacquired_recovery_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_reacquisition_counts.get('just-reacquired', 0) + recovery_reacquisition_counts.get('holding-reacquired', 0) + recovery_reacquisition_counts.get('reacquired', 0)} item(s) have re-earned stronger calmer support after reset, and {label} is the clearest re-acquired path."
+        )
+    if top_reacquiring_recovery_items:
+        top_item = top_reacquiring_recovery_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_reacquisition_counts.get('reacquiring', 0)} item(s) are close to re-earning stronger calmer support after reset, and {label} is the clearest near-reacquisition path."
+        )
+    if recovery_reacquisition_counts.get("insufficient-evidence", 0):
+        return (
+            f"{recovery_reacquisition_counts.get('insufficient-evidence', 0)} item(s) may be rebuilding after reset, but there is not enough history yet to judge whether stronger calmer support has really been re-acquired."
+        )
+    return "No follow-through recovery reacquisition signal is currently surfaced."
 
 
 def _handoff_urgency(queue: list[dict], setup_health: dict) -> str:
