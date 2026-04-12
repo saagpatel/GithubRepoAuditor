@@ -13,9 +13,15 @@ from urllib.parse import urlparse
 
 from src.analyst_views import build_analyst_context
 from src.report_enrichment import (
+    build_last_movement_label,
+    build_queue_pressure_summary,
     build_run_change_counts,
     build_run_change_summary,
     build_score_explanation,
+    build_top_recommendation_summary,
+    build_trust_actionability_summary,
+    no_baseline_summary,
+    no_linked_artifact_summary,
 )
 from src.sparkline import sparkline as render_sparkline
 
@@ -140,6 +146,7 @@ def _render_html(
         _kpi_section(report_data),
         _preflight_section(report_data),
         _operator_section(report_data),
+        _top_attention_section(report_data),
         _analyst_summary_section(analyst_context),
         _lens_summary_section(report_data),
         _security_overview_section(report_data),
@@ -219,16 +226,26 @@ def _operator_section(data: dict) -> str:
     queue = data.get("operator_queue") or []
     if not summary and not queue:
         return ""
+    queue_pressure_summary = build_queue_pressure_summary(data)
+    top_recommendation_summary = build_top_recommendation_summary(data)
+    trust_actionability_summary = build_trust_actionability_summary(data)
+    run_change_summary = data.get("run_change_summary") or build_run_change_summary(None)
     counts = summary.get("counts", {})
     rows = []
     for item in queue[:8]:
         repo = f"{escape(item.get('repo', ''))}: " if item.get("repo") else ""
+        links = item.get("links") or []
+        artifact = links[0].get("url", "") if links else ""
+        artifact_label = artifact or no_linked_artifact_summary()
+        last_movement = build_last_movement_label(item, data.get("review_summary") or {})
         rows.append(
             "<li>"
             f"<strong>[{escape(item.get('lane_label', item.get('lane', 'ready')))}]</strong> {repo}{escape(item.get('title', 'Triage item'))}"
             f"<br><span class='muted'>{escape(item.get('summary', 'No summary available.'))}</span>"
             f"<br><span class='muted'><strong>Why this lane:</strong> {escape(item.get('lane_reason', 'Operator triage item.'))}</span>"
             f"<br><span class='muted'><strong>Next:</strong> {escape(item.get('recommended_action', 'Review the latest state.'))}</span>"
+            f"<br><span class='muted'><strong>Last movement:</strong> {escape(last_movement)}</span>"
+            f"<br><span class='muted'><strong>Artifact:</strong> {escape(artifact_label)}</span>"
             "</li>"
         )
     recent_changes = summary.get("operator_recent_changes", [])
@@ -250,6 +267,10 @@ def _operator_section(data: dict) -> str:
       <h2>Operator Control Center</h2>
       <div class="panel">
         <div class="meta-line"><strong>Headline:</strong> {escape(summary.get('headline', 'No operator triage items are currently surfaced.'))}</div>
+        <div class="meta-line"><strong>Run Changes:</strong> {escape(run_change_summary)}</div>
+        <div class="meta-line"><strong>Queue Pressure:</strong> {escape(queue_pressure_summary)}</div>
+        <div class="meta-line"><strong>Trust / Actionability:</strong> {escape(trust_actionability_summary)}</div>
+        <div class="meta-line"><strong>Top Recommendation:</strong> {escape(top_recommendation_summary)}</div>
         <div class="meta-line"><strong>Source Run:</strong> {escape(summary.get('source_run_id', 'n/a'))}</div>
         <div class="meta-line"><strong>Next Recommended Run:</strong> {escape(summary.get('next_recommended_run_mode', 'n/a'))}</div>
         <div class="meta-line"><strong>Watch Strategy:</strong> {escape(summary.get('watch_strategy', 'manual'))}</div>
@@ -412,6 +433,31 @@ def _operator_section(data: dict) -> str:
         <ul class="bullet-list">{''.join(rows) or '<li>No triage items are currently surfaced.</li>'}</ul>
         <div class="meta-line"><strong>Recently Changed:</strong></div>
         <ul class="bullet-list">{recent_markup or '<li>No recent operator changes were loaded.</li>'}</ul>
+      </div>
+    </div>"""
+
+
+def _top_attention_section(data: dict) -> str:
+    queue = data.get("operator_queue") or []
+    if not queue:
+        return ""
+
+    rows = []
+    for item in queue[:3]:
+        repo = f"{escape(item.get('repo', ''))}: " if item.get("repo") else ""
+        rows.append(
+            "<li>"
+            f"<strong>{repo}{escape(item.get('title', 'Triage item'))}</strong>"
+            f"<br><span class='muted'><strong>Why it matters:</strong> {escape(item.get('lane_reason') or item.get('summary') or 'Operator attention is still needed.')}</span>"
+            f"<br><span class='muted'><strong>What to do next:</strong> {escape(item.get('recommended_action') or item.get('next_step') or 'Review the latest state.')}</span>"
+            "</li>"
+        )
+
+    return f"""
+    <div class="section">
+      <h2>Top Attention / Next Action</h2>
+      <div class="panel">
+        <ul class="bullet-list">{''.join(rows)}</ul>
       </div>
     </div>"""
 
@@ -642,9 +688,11 @@ def _run_changes_section(report_data: dict, diff_data: dict | None) -> str:
     return f"""
     <div class="section">
       <h2>Run Changes</h2>
-      <div class="analyst-grid">
+        <div class="analyst-grid">
         <div class="panel">
           <div class="meta-line"><strong>Summary:</strong> {escape(summary)}</div>
+          <div class="meta-line"><strong>Why It Matters:</strong> {escape(build_queue_pressure_summary(report_data, diff_data))}</div>
+          <div class="meta-line"><strong>What To Do Next:</strong> {escape(build_top_recommendation_summary(report_data))}</div>
           <div class="meta-line"><strong>Improving:</strong> {counts.get('score_improvements', 0)} | <strong>Regressing:</strong> {counts.get('score_regressions', 0)}</div>
           <div class="meta-line"><strong>Promotions:</strong> {counts.get('tier_promotions', 0)} | <strong>Demotions:</strong> {counts.get('tier_demotions', 0)}</div>
           <div class="meta-line"><strong>Security / Governance:</strong> {counts.get('security_changes', 0)} / {counts.get('collection_changes', 0)}</div>
@@ -652,7 +700,7 @@ def _run_changes_section(report_data: dict, diff_data: dict | None) -> str:
         <div class="panel">
           <table class="compact-table">
             <thead><tr><th>Repo</th><th>Delta</th><th>Tier Change</th></tr></thead>
-            <tbody>{''.join(detail_rows) or "<tr><td colspan='3'>No prior run comparison is available yet.</td></tr>"}</tbody>
+            <tbody>{''.join(detail_rows) or f"<tr><td colspan='3'>{escape(no_baseline_summary())}</td></tr>"}</tbody>
           </table>
         </div>
       </div>

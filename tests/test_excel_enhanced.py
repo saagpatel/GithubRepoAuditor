@@ -40,6 +40,13 @@ from src.excel_export import (
     export_excel,
 )
 from src.excel_template import DEFAULT_TEMPLATE_PATH, TEMPLATE_INFO_SHEET
+from src.report_enrichment import (
+    build_queue_pressure_summary,
+    build_top_recommendation_summary,
+    build_trust_actionability_summary,
+    no_baseline_summary,
+    no_linked_artifact_summary,
+)
 
 
 def _make_audit(name: str, score: float, grade: str = "C", tier: str = "functional", **kwargs) -> dict:
@@ -814,6 +821,10 @@ class TestAnalystWorkbookSheets:
         _build_repo_detail(wb, _make_report())
         ws = wb["Repo Detail"]
         assert "Choose one repo" in str(ws["A3"].value)
+        assert ws["A13"].value == "Current State"
+        assert ws["E13"].value == "Why This Repo Looks This Way"
+        assert ws["F20"].value == "What Changed"
+        assert ws["F25"].value == "What To Do Next"
         assert ws["A4"].value == "Select Repo"
         assert ws["B4"].value == "RepoA"
         assert ws.data_validations.dataValidation
@@ -874,7 +885,7 @@ class TestAnalystWorkbookSheets:
         wb = Workbook()
         _build_run_changes(wb, _make_report(), None)
         ws = wb["Run Changes"]
-        assert "No prior baseline was available" in str(ws["B5"].value)
+        assert no_baseline_summary() == str(ws["B5"].value)
 
     def test_review_queue_has_summary_and_freeze_panes(self):
         wb = Workbook()
@@ -883,9 +894,13 @@ class TestAnalystWorkbookSheets:
         assert "Work this page in lane order" in str(ws["A3"].value)
         assert ws["A4"].value == "Summary"
         assert ws["E4"].value == "Top 10 To Act On"
-        header_row = next(row for row in range(20, 65) if ws.cell(row=row, column=1).value == "Repo")
+        header_row = next(row for row in range(20, 80) if ws.cell(row=row, column=1).value == "Repo")
         assert header_row > 24
         assert ws.freeze_panes == f"A{header_row + 1}"
+        assert no_linked_artifact_summary() in {
+            ws.cell(row=row, column=9).value
+            for row in range(header_row + 1, header_row + 10)
+        }
 
     def test_core_sheets_expose_consistent_navigation_strip(self, tmp_path):
         report_path = tmp_path / "report.json"
@@ -935,86 +950,144 @@ class TestAnalystWorkbookSheets:
             if cell is not None
         ]
 
-        assert review_ws["A10"].value == "Trend"
-        assert "stable" in str(review_ws["B10"].value).lower()
-        assert review_ws["A13"].value == "Why Top Target"
-        assert "urgent review work" in str(review_ws["B13"].value).lower()
-        assert review_ws["A14"].value == "Closure Guidance"
-        assert review_ws["A15"].value == "Aging Pressure"
-        assert review_ws["A16"].value == "What We Tried"
-        assert review_ws["A17"].value == "Last Outcome"
-        assert review_ws["A18"].value == "Resolution Evidence"
-        assert review_ws["A20"].value == "Recommendation Confidence"
-        assert review_ws["A21"].value == "Confidence Rationale"
-        assert review_ws["A22"].value == "Next Action Confidence"
-        assert review_ws["A23"].value == "Trust Policy"
-        assert review_ws["A24"].value == "Trust Rationale"
-        assert review_ws["A25"].value == "Trust Exception"
-        assert review_ws["A26"].value == "Trust Recovery"
-        assert review_ws["A27"].value == "Recovery Confidence"
-        assert review_ws["A28"].value == "Exception Retirement"
-        assert review_ws["A29"].value == "Retirement Summary"
-        assert review_ws["A30"].value == "Policy Debt"
-        assert review_ws["A31"].value == "Class Normalization"
-        assert review_ws["A32"].value == "Class Memory"
-        assert review_ws["A33"].value == "Trust Decay"
-        assert review_ws["A34"].value == "Class Reweighting"
-        assert review_ws["A35"].value == "Class Reweighting Why"
-        assert review_ws["A36"].value == "Class Momentum"
-        assert review_ws["A37"].value == "Reweight Stability"
-        assert review_ws["A38"].value == "Transition Health"
-        assert review_ws["A39"].value == "Transition Resolution"
-        assert review_ws["A40"].value == "Transition Summary"
-        assert review_ws["A41"].value == "Transition Closure"
-        assert review_ws["A42"].value == "Transition Likely Outcome"
-        assert review_ws["A43"].value == "Pending Debt Freshness"
-        assert review_ws["A44"].value == "Closure Forecast"
-        assert review_ws["A45"].value == "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence"
-        assert review_ws["A46"].value == "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls"
-        assert review_ws["A47"].value == "Closure Forecast Summary"
-        assert review_ws["A48"].value == "Momentum Summary"
-        assert review_ws["A49"].value == "Exception Learning"
-        assert review_ws["A50"].value == "Recommendation Drift"
-        assert review_ws["A51"].value == "Adaptive Confidence"
-        assert executive_ws["D29"].value == "Trend"
-        assert executive_ws["D32"].value == "Why Top Target"
-        assert executive_ws["D33"].value == "Closure Guidance"
-        assert executive_ws["D35"].value == "What We Tried"
-        assert executive_ws["D36"].value == "Last Outcome"
-        assert executive_ws["D37"].value == "Resolution Evidence"
-        assert executive_ws["D39"].value == "Recommendation Confidence"
-        assert executive_ws["D40"].value == "Confidence Rationale"
-        assert executive_ws["D41"].value == "Next Action Confidence"
-        assert executive_ws["D42"].value == "Trust Policy"
-        assert executive_ws["D43"].value == "Trust Rationale"
-        assert executive_ws["D44"].value == "Trust Recovery"
-        assert executive_ws["D45"].value == "Recovery Confidence"
-        assert executive_ws["D46"].value == "Exception Retirement"
-        assert executive_ws["D47"].value == "Retirement Summary"
-        assert executive_ws["D48"].value == "Policy Debt"
-        assert executive_ws["D49"].value == "Class Normalization"
-        assert executive_ws["D50"].value == "Class Memory"
-        assert executive_ws["D51"].value == "Trust Decay"
-        assert executive_ws["D52"].value == "Class Reweighting"
-        assert executive_ws["D53"].value == "Class Reweighting Why"
-        assert executive_ws["D54"].value == "Class Momentum"
-        assert executive_ws["D55"].value == "Reweight Stability"
-        assert executive_ws["D56"].value == "Transition Health"
-        assert executive_ws["D57"].value == "Transition Resolution"
-        assert executive_ws["D58"].value == "Transition Summary"
-        assert executive_ws["D59"].value == "Transition Closure"
-        assert executive_ws["D60"].value == "Transition Likely Outcome"
-        assert executive_ws["D61"].value == "Pending Debt Freshness"
-        assert executive_ws["D62"].value == "Closure Forecast"
-        assert executive_ws["D63"].value == "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence"
-        assert executive_ws["D64"].value == "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls"
-        assert executive_ws["D65"].value == "Closure Forecast Summary"
-        assert executive_ws["D66"].value == "Momentum Summary"
-        assert executive_ws["D67"].value == "Exception Learning"
-        assert executive_ws["D68"].value == "Recommendation Drift"
-        assert executive_ws["D69"].value == "Adaptive Confidence"
-        assert executive_ws["D70"].value == "Recommendation Quality"
-        assert executive_ws["D71"].value == "Confidence Validation"
+        review_labels = [
+            review_ws.cell(row=row, column=1).value
+            for row in range(10, 60)
+            if review_ws.cell(row=row, column=1).value is not None
+        ]
+        assert "Trend" in review_labels
+        assert "Why Top Target" in review_labels
+        assert "Closure Guidance" in review_labels
+        assert "Aging Pressure" in review_labels
+        assert "What We Tried" in review_labels
+        assert "Last Outcome" in review_labels
+        assert "Resolution Evidence" in review_labels
+        assert "Recommendation Confidence" in review_labels
+        assert "Confidence Rationale" in review_labels
+        assert "Next Action Confidence" in review_labels
+        assert "Trust Policy" in review_labels
+        assert "Trust Rationale" in review_labels
+        assert "Trust Exception" in review_labels
+        assert "Trust Recovery" in review_labels
+        assert "Recovery Confidence" in review_labels
+        assert "Exception Retirement" in review_labels
+        assert "Retirement Summary" in review_labels
+        assert "Policy Debt" in review_labels
+        assert "Class Normalization" in review_labels
+        assert "Class Memory" in review_labels
+        assert "Trust Decay" in review_labels
+        assert "Class Reweighting" in review_labels
+        assert "Class Reweighting Why" in review_labels
+        assert "Class Momentum" in review_labels
+        assert "Reweight Stability" in review_labels
+        assert "Transition Health" in review_labels
+        assert "Transition Resolution" in review_labels
+        assert "Transition Summary" in review_labels
+        assert "Transition Closure" in review_labels
+        assert "Transition Likely Outcome" in review_labels
+        assert "Pending Debt Freshness" in review_labels
+        assert "Closure Forecast" in review_labels
+        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence" in review_labels
+        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls" in review_labels
+        assert "Closure Forecast Summary" in review_labels
+        assert "Momentum Summary" in review_labels
+        assert "Exception Learning" in review_labels
+        assert "Recommendation Drift" in review_labels
+        assert "Adaptive Confidence" in review_labels
+        review_values = [
+            review_ws.cell(row=row, column=2).value
+            for row in range(10, 60)
+            if review_ws.cell(row=row, column=2).value is not None
+        ]
+        assert any("stable" in str(value).lower() for value in review_values)
+        assert any("urgent review work" in str(value).lower() for value in review_values)
+        executive_labels = [
+            executive_ws.cell(row=row, column=4).value
+            for row in range(20, 75)
+            if executive_ws.cell(row=row, column=4).value is not None
+        ]
+        assert "Trend" in executive_labels
+        assert "Why Top Target" in executive_labels
+
+    def test_dashboard_and_executive_summary_share_operator_story_lines(self):
+        wb = Workbook()
+        report = _make_report()
+        _build_dashboard(wb, report, excel_mode="standard")
+        _build_executive_summary(wb, report, None, portfolio_profile="default", collection="showcase", excel_mode="standard")
+        _build_print_pack(wb, report, None, portfolio_profile="default", collection="showcase", excel_mode="standard")
+
+        dashboard_ws = wb["Dashboard"]
+        executive_ws = wb["Executive Summary"]
+        print_ws = wb["Print Pack"]
+
+        dashboard_values = {
+            cell
+            for row in dashboard_ws.iter_rows(min_row=1, max_row=80, min_col=1, max_col=25, values_only=True)
+            for cell in row
+            if cell is not None
+        }
+        executive_values = {
+            cell
+            for row in executive_ws.iter_rows(min_row=1, max_row=90, min_col=1, max_col=20, values_only=True)
+            for cell in row
+            if cell is not None
+        }
+
+        queue_summary = build_queue_pressure_summary(report)
+        top_recommendation = build_top_recommendation_summary(report)
+        trust_summary = build_trust_actionability_summary(report)
+
+        assert queue_summary in dashboard_values
+        assert top_recommendation in dashboard_values
+        assert trust_summary in dashboard_values
+        assert queue_summary in executive_values
+        assert top_recommendation in executive_values
+        assert trust_summary in executive_values
+        executive_labels = {
+            executive_ws.cell(row=row, column=4).value
+            for row in range(20, 80)
+            if executive_ws.cell(row=row, column=4).value is not None
+        }
+        for expected_label in {
+            "Closure Guidance",
+            "What We Tried",
+            "Last Outcome",
+            "Resolution Evidence",
+            "Recommendation Confidence",
+            "Confidence Rationale",
+            "Next Action Confidence",
+            "Trust Policy",
+            "Trust Rationale",
+            "Trust Recovery",
+            "Recovery Confidence",
+            "Exception Retirement",
+            "Retirement Summary",
+            "Policy Debt",
+            "Class Normalization",
+            "Class Memory",
+            "Trust Decay",
+            "Class Reweighting",
+            "Class Reweighting Why",
+            "Class Momentum",
+            "Reweight Stability",
+            "Transition Health",
+            "Transition Resolution",
+            "Transition Summary",
+            "Transition Closure",
+            "Transition Likely Outcome",
+            "Pending Debt Freshness",
+            "Closure Forecast",
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence",
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls",
+            "Closure Forecast Summary",
+            "Momentum Summary",
+            "Exception Learning",
+            "Recommendation Drift",
+            "Adaptive Confidence",
+            "Recommendation Quality",
+            "Confidence Validation",
+        }:
+            assert expected_label in executive_labels
         assert print_ws["A17"].value == "Primary Target"
         assert print_ws["A18"].value == "Why Top Target"
         assert print_ws["A19"].value == "What We Tried"

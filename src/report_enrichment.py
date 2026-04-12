@@ -23,6 +23,14 @@ DIMENSION_LABELS = {
     "security": "Security",
 }
 
+NO_BASELINE_SUMMARY = (
+    "No prior baseline was available, so this view shows the current run summary and operator pressure without before/after deltas."
+)
+NO_HISTORY_SUMMARY = (
+    "No history is recorded yet, so this view is using the current run only."
+)
+NO_LINKED_ARTIFACT_SUMMARY = "No linked artifact available yet."
+
 
 def _metadata(audit: Any) -> dict[str, Any]:
     metadata = getattr(audit, "metadata", None)
@@ -31,6 +39,16 @@ def _metadata(audit: Any) -> dict[str, Any]:
     if hasattr(metadata, "to_dict"):
         return metadata.to_dict()
     return metadata
+
+
+def _mapping(value: Any) -> dict[str, Any]:
+    if value is None:
+        return {}
+    if isinstance(value, dict):
+        return value
+    if hasattr(value, "to_dict"):
+        return value.to_dict()
+    return {}
 
 
 def _overall_score(audit: Any) -> float:
@@ -155,7 +173,7 @@ def build_run_change_counts(diff_data: dict | None) -> dict[str, int]:
 
 def build_run_change_summary(diff_data: dict | None) -> str:
     if not diff_data:
-        return "No prior run comparison is available yet."
+        return NO_BASELINE_SUMMARY
 
     counts = build_run_change_counts(diff_data)
     return (
@@ -165,3 +183,89 @@ def build_run_change_summary(diff_data: dict | None) -> str:
         f"{counts['tier_promotions']} promotions, "
         f"and {counts['tier_demotions']} demotions were recorded."
     )
+
+
+def no_baseline_summary() -> str:
+    return NO_BASELINE_SUMMARY
+
+
+def no_history_summary() -> str:
+    return NO_HISTORY_SUMMARY
+
+
+def no_linked_artifact_summary() -> str:
+    return NO_LINKED_ARTIFACT_SUMMARY
+
+
+def build_queue_pressure_summary(report_data: Any, diff_data: dict | None = None) -> str:
+    data = _mapping(report_data)
+    operator_summary = _mapping(data.get("operator_summary"))
+    counts = _mapping(operator_summary.get("counts"))
+    if counts:
+        return (
+            f"{counts.get('blocked', 0)} blocked, "
+            f"{counts.get('urgent', 0)} urgent, "
+            f"{counts.get('ready', 0)} ready, and "
+            f"{counts.get('deferred', 0)} deferred item(s) are currently in the queue."
+        )
+
+    run_change_counts = data.get("run_change_counts") or build_run_change_counts(diff_data)
+    return (
+        f"{run_change_counts.get('score_improvements', 0)} improving, "
+        f"{run_change_counts.get('score_regressions', 0)} regressing, "
+        f"{run_change_counts.get('tier_promotions', 0)} promoted, and "
+        f"{run_change_counts.get('tier_demotions', 0)} demoted."
+    )
+
+
+def build_top_recommendation_summary(report_data: Any) -> str:
+    data = _mapping(report_data)
+    operator_summary = _mapping(data.get("operator_summary"))
+    if operator_summary.get("what_to_do_next"):
+        return str(operator_summary.get("what_to_do_next"))
+
+    queue = list(data.get("operator_queue") or [])
+    if queue:
+        first = _mapping(queue[0])
+        action = (
+            first.get("recommended_action")
+            or first.get("next_step")
+            or first.get("title")
+            or "Review the latest operator item."
+        )
+        repo = first.get("repo") or first.get("repo_name")
+        if repo and repo not in str(action):
+            return f"{repo}: {action}"
+        return str(action)
+
+    return "Continue the normal operator review loop."
+
+
+def build_trust_actionability_summary(report_data: Any) -> str:
+    data = _mapping(report_data)
+    operator_summary = _mapping(data.get("operator_summary"))
+    trust_policy = operator_summary.get("primary_target_trust_policy")
+    trust_reason = operator_summary.get("primary_target_trust_policy_reason")
+    if trust_policy and trust_reason:
+        return f"{trust_policy} — {trust_reason}"
+    if trust_policy:
+        return str(trust_policy)
+    if trust_reason:
+        return str(trust_reason)
+    return "No trust-policy guidance is recorded yet."
+
+
+def build_last_movement_label(item: dict[str, Any], review_summary: dict[str, Any] | None = None) -> str:
+    updated_at = item.get("updated_at")
+    if updated_at:
+        return f"Updated {str(updated_at)[:10]}"
+    created_at = item.get("created_at")
+    if created_at:
+        return f"Opened {str(created_at)[:10]}"
+    source_run_id = item.get("source_run_id")
+    if source_run_id:
+        return f"Seen in run {str(source_run_id).split(':')[-1]}"
+    generated_at = _mapping(review_summary).get("generated_at")
+    if generated_at:
+        return f"Seen in run {str(generated_at)[:10]}"
+    return "Current run"
