@@ -391,6 +391,21 @@ class TestMarkdownReport:
             "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reason": "Fresh confirmation-side evidence is returning after rebuilt re-entry was softened or reset, but it has not yet restored stronger rebuilt re-entry posture.",
             "closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_summary": "Fresh confirmation-side evidence is returning for Missing template asset after rebuilt re-entry softened, but it has not yet restored stronger rebuilt re-entry posture (0.29).",
             "closure_forecast_reset_reentry_rebuild_reentry_restore_summary": "Missing template asset is recovering after rebuilt re-entry softened, but stronger rebuilt re-entry posture still needs more fresh follow-through before it is restored.",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_age_runs": 1,
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_persistence_score": 0.21,
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_persistence_status": "just-restored",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_persistence_reason": "Stronger rebuilt re-entry posture has been restored, but it has not yet proved it can hold.",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_persistence_summary": "Missing template asset has only just restored stronger rebuilt re-entry posture, so it is still fragile (0.21; 1 run).",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_churn_score": 0.0,
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_churn_status": "none",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_churn_reason": "",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_churn_summary": "No meaningful restored rebuilt re-entry churn is active right now.",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_status": "mixed-age",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_reason": "Restored rebuilt re-entry memory is still useful, but it is partly aging: 50% of the weighted signal is recent and the rest is older carry-forward.",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_summary": "Missing template asset still has useful restored rebuilt re-entry memory, but the restored posture is no longer getting fully fresh reinforcement.",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reset_status": "none",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reset_reason": "",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_reset_summary": "Restored rebuilt re-entry posture for Missing template asset is aging enough that it can keep holding, but it should no longer stay indefinitely at sustained strength.",
             "primary_target_closure_forecast_reset_reentry_rebuild_age_runs": 1,
             "primary_target_closure_forecast_reset_reentry_rebuild_persistence_score": 0.29,
             "primary_target_closure_forecast_reset_reentry_rebuild_persistence_status": "just-rebuilt",
@@ -404,8 +419,13 @@ class TestMarkdownReport:
             "just_reentered_rebuild_hotspots": [],
             "holding_reset_reentry_rebuild_hotspots": [],
             "holding_reset_reentry_rebuild_reentry_hotspots": [],
+            "just_restored_rebuild_reentry_hotspots": [],
+            "holding_reset_reentry_rebuild_reentry_restore_hotspots": [],
             "reset_reentry_rebuild_churn_hotspots": [],
             "reset_reentry_rebuild_reentry_churn_hotspots": [],
+            "reset_reentry_rebuild_reentry_restore_churn_hotspots": [],
+            "stale_reset_reentry_rebuild_reentry_restore_hotspots": [],
+            "fresh_reset_reentry_rebuild_reentry_restore_signal_hotspots": [],
             "recovering_from_confirmation_rebuild_reset_hotspots": [],
             "recovering_from_clearance_rebuild_reset_hotspots": [],
             "recovering_from_confirmation_rebuild_reentry_reset_hotspots": [],
@@ -422,6 +442,7 @@ class TestMarkdownReport:
             "closure_forecast_reset_reentry_rebuild_decay_window_runs": 4,
             "closure_forecast_reset_reentry_rebuild_reentry_decay_window_runs": 4,
             "closure_forecast_reset_reentry_rebuild_reentry_refresh_window_runs": 4,
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_window_runs": 4,
             "stale_closure_forecast_hotspots": [],
             "fresh_closure_forecast_signal_hotspots": [],
             "closure_forecast_decay_window_runs": 4,
@@ -581,6 +602,8 @@ class TestMarkdownReport:
         assert "Reset Re-entry Rebuild Re-Entry Reset Controls:" in content
         assert "Reset Re-entry Rebuild Re-Entry Refresh Recovery:" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Controls:" in content
+        assert "Reset Re-entry Rebuild Re-Entry Restore Freshness:" in content
+        assert "Reset Re-entry Rebuild Re-Entry Restore Reset Controls:" in content
         assert "Reset Re-entry Rebuild Persistence:" in content
         assert "Reset Re-entry Rebuild Churn Controls:" in content
         assert "Reset Re-entry Persistence Summary" in content
@@ -599,6 +622,8 @@ class TestMarkdownReport:
         assert "Reset Re-entry Rebuild Re-Entry Reset Summary" in content
         assert "Reset Re-entry Rebuild Re-Entry Refresh Recovery Summary" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Summary" in content
+        assert "Reset Re-entry Rebuild Re-Entry Restore Freshness Summary" in content
+        assert "Reset Re-entry Rebuild Re-Entry Restore Reset Summary" in content
         assert "Reset Re-entry Rebuild Persistence Summary" in content
         assert "Reset Re-entry Rebuild Churn Summary" in content
         assert "Reacquisition Freshness Summary" in content

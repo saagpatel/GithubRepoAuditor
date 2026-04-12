@@ -1071,6 +1071,28 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry rebuild re-entry restore summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_summary']}"
         )
+    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_status") not in {None, "", "insufficient-data"}:
+        print(
+            "  Reset re-entry rebuild re-entry restore freshness: "
+            f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_status', 'insufficient-data')} "
+            f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_reason', 'No reset re-entry rebuild re-entry restore freshness reason is recorded yet.')})"
+        )
+    if summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_summary"):
+        print(
+            "  Reset re-entry rebuild re-entry restore freshness summary: "
+            f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_summary']}"
+        )
+    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reset_status") not in {None, "", "none"}:
+        print(
+            "  Reset re-entry rebuild re-entry restore reset controls: "
+            f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reset_status', 'none')} "
+            f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reset_reason', 'No reset re-entry rebuild re-entry restore reset reason is recorded yet.')})"
+        )
+    if summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_reset_summary"):
+        print(
+            "  Reset re-entry rebuild re-entry restore reset summary: "
+            f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_reset_summary']}"
+        )
     if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_persistence_status") not in {None, "", "none"}:
         print(
             "  Reset re-entry rebuild persistence: "
