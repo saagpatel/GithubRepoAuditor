@@ -66,6 +66,10 @@ from src.report_enrichment import (
     build_follow_through_checkpoint_status_label,
     build_follow_through_escalation_status_label,
     build_follow_through_escalation_summary,
+    build_follow_through_reacquisition_consolidation_status_label,
+    build_follow_through_reacquisition_consolidation_summary,
+    build_follow_through_reacquisition_durability_status_label,
+    build_follow_through_reacquisition_durability_summary,
     build_follow_through_recovery_freshness_status_label,
     build_follow_through_recovery_freshness_summary,
     build_follow_through_recovery_memory_reset_status_label,
@@ -372,14 +376,21 @@ def _operator_follow_through_freshness_details(data: dict) -> tuple[str, str, st
     return freshness, memory_reset, top_label, top_summary, rebuild_label
 
 
-def _operator_follow_through_rebuild_details(data: dict) -> tuple[str, str, str, str, str, str]:
+def _operator_follow_through_rebuild_details(data: dict) -> tuple[str, str, str, str, str, str, str, str, str, str, str, str, str]:
     summary = data.get("operator_summary") or {}
     rebuild_strength = summary.get("follow_through_recovery_rebuild_strength_summary", "") or "No follow-through recovery rebuild-strength signal is currently surfaced."
     reacquisition = summary.get("follow_through_recovery_reacquisition_summary", "") or "No follow-through recovery reacquisition signal is currently surfaced."
+    durability = summary.get("follow_through_recovery_reacquisition_durability_summary", "") or "No follow-through reacquisition durability signal is currently surfaced."
+    confidence = summary.get("follow_through_recovery_reacquisition_consolidation_summary", "") or "No follow-through reacquisition confidence-consolidation signal is currently surfaced."
     top_rebuilding = list(summary.get("top_rebuilding_recovery_strength_items") or [])
     top_reacquiring = list(summary.get("top_reacquiring_recovery_items") or [])
     top_reacquired = list(summary.get("top_reacquired_recovery_items") or [])
     top_fragile = list(summary.get("top_fragile_reacquisition_items") or [])
+    top_just = list(summary.get("top_just_reacquired_items") or [])
+    top_holding = list(summary.get("top_holding_reacquired_items") or [])
+    top_durable = list(summary.get("top_durable_reacquired_items") or [])
+    top_softening = list(summary.get("top_softening_reacquired_items") or [])
+    top_fragile_confidence = list(summary.get("top_fragile_reacquisition_confidence_items") or [])
     rebuilding_item = top_rebuilding[0] if top_rebuilding else {}
     rebuilding_label = (
         f"{rebuilding_item.get('repo')}: {rebuilding_item.get('title')}"
@@ -404,7 +415,51 @@ def _operator_follow_through_rebuild_details(data: dict) -> tuple[str, str, str,
         if fragile_item.get("repo")
         else fragile_item.get("title", "")
     ) or "No fragile reacquisition hotspot"
-    return rebuild_strength, reacquisition, rebuilding_label, reacquiring_label, reacquired_label, fragile_label
+    just_item = top_just[0] if top_just else {}
+    just_label = (
+        f"{just_item.get('repo')}: {just_item.get('title')}"
+        if just_item.get("repo")
+        else just_item.get("title", "")
+    ) or "No newly re-acquired hotspot"
+    holding_item = top_holding[0] if top_holding else {}
+    holding_label = (
+        f"{holding_item.get('repo')}: {holding_item.get('title')}"
+        if holding_item.get("repo")
+        else holding_item.get("title", "")
+    ) or "No holding re-acquisition hotspot"
+    durable_item = top_durable[0] if top_durable else {}
+    durable_label = (
+        f"{durable_item.get('repo')}: {durable_item.get('title')}"
+        if durable_item.get("repo")
+        else durable_item.get("title", "")
+    ) or "No durable re-acquisition hotspot"
+    softening_item = top_softening[0] if top_softening else {}
+    softening_label = (
+        f"{softening_item.get('repo')}: {softening_item.get('title')}"
+        if softening_item.get("repo")
+        else softening_item.get("title", "")
+    ) or "No softening re-acquisition hotspot"
+    fragile_confidence_item = top_fragile_confidence[0] if top_fragile_confidence else {}
+    fragile_confidence_label = (
+        f"{fragile_confidence_item.get('repo')}: {fragile_confidence_item.get('title')}"
+        if fragile_confidence_item.get("repo")
+        else fragile_confidence_item.get("title", "")
+    ) or "No fragile re-acquisition confidence hotspot"
+    return (
+        rebuild_strength,
+        reacquisition,
+        durability,
+        confidence,
+        rebuilding_label,
+        reacquiring_label,
+        reacquired_label,
+        fragile_label,
+        just_label,
+        holding_label,
+        durable_label,
+        softening_label,
+        fragile_confidence_label,
+    )
 
 
 def _operator_trend_values(data: dict) -> tuple[str, str, str, str]:
@@ -997,6 +1052,13 @@ def _build_workbook_rollups(data: dict) -> tuple[list[list[object]], list[list[o
                 item.get("follow_through_recovery_reacquisition_status", ""),
                 item.get("follow_through_recovery_reacquisition_summary", ""),
                 item.get("follow_through_recovery_reacquisition_reason", ""),
+                item.get("follow_through_recovery_reacquisition_durability_age_runs", 0),
+                item.get("follow_through_recovery_reacquisition_durability_status", ""),
+                item.get("follow_through_recovery_reacquisition_durability_summary", ""),
+                item.get("follow_through_recovery_reacquisition_durability_reason", ""),
+                item.get("follow_through_recovery_reacquisition_consolidation_status", ""),
+                item.get("follow_through_recovery_reacquisition_consolidation_summary", ""),
+                item.get("follow_through_recovery_reacquisition_consolidation_reason", ""),
             ]
         )
 
@@ -1345,26 +1407,17 @@ def _build_dashboard(
     (
         follow_through_rebuild_strength,
         follow_through_reacquisition,
+        follow_through_reacquisition_durability,
+        follow_through_reacquisition_confidence,
         follow_through_rebuild_strength_hotspot,
         follow_through_reacquiring_hotspot,
         follow_through_reacquired_hotspot,
         follow_through_fragile_reacquisition_hotspot,
-    ) = _operator_follow_through_rebuild_details(data)
-    (
-        follow_through_rebuild_strength,
-        follow_through_reacquisition,
-        follow_through_rebuild_strength_hotspot,
-        follow_through_reacquiring_hotspot,
-        follow_through_reacquired_hotspot,
-        follow_through_fragile_reacquisition_hotspot,
-    ) = _operator_follow_through_rebuild_details(data)
-    (
-        follow_through_rebuild_strength,
-        follow_through_reacquisition,
-        follow_through_rebuild_strength_hotspot,
-        follow_through_reacquiring_hotspot,
-        follow_through_reacquired_hotspot,
-        follow_through_fragile_reacquisition_hotspot,
+        follow_through_just_reacquired_hotspot,
+        follow_through_holding_reacquired_hotspot,
+        follow_through_durable_reacquired_hotspot,
+        follow_through_softening_reacquired_hotspot,
+        follow_through_fragile_reacquisition_confidence_hotspot,
     ) = _operator_follow_through_rebuild_details(data)
     trend_status, trend_summary, primary_target, resolution_counts = _operator_trend_values(data)
     primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
@@ -1427,6 +1480,10 @@ def _build_dashboard(
         ("Relapse Churn", follow_through_relapse_churn),
         ("Recovery Freshness", follow_through_recovery_freshness),
         ("Recovery Memory Reset", follow_through_recovery_memory_reset),
+        ("Recovery Rebuild Strength", follow_through_rebuild_strength),
+        ("Recovery Reacquisition", follow_through_reacquisition),
+        ("Reacquisition Durability", follow_through_reacquisition_durability),
+        ("Reacquisition Confidence", follow_through_reacquisition_confidence),
         ("Next Action", next_action),
         ("Top Recommendation", top_recommendation_summary),
     ]
@@ -1442,6 +1499,15 @@ def _build_dashboard(
                 ("Freshness Hotspot", follow_through_recovery_freshness_hotspot),
                 ("Freshness Detail", follow_through_recovery_freshness_hotspot_summary),
                 ("Rebuild Hotspot", follow_through_recovery_rebuild_hotspot),
+                ("Rebuild Strength Hotspot", follow_through_rebuild_strength_hotspot),
+                ("Reacquiring Hotspot", follow_through_reacquiring_hotspot),
+                ("Reacquired Hotspot", follow_through_reacquired_hotspot),
+                ("Fragile Reacquisition Hotspot", follow_through_fragile_reacquisition_hotspot),
+                ("Just Reacquired Hotspot", follow_through_just_reacquired_hotspot),
+                ("Holding Reacquired Hotspot", follow_through_holding_reacquired_hotspot),
+                ("Durable Reacquired Hotspot", follow_through_durable_reacquired_hotspot),
+                ("Softening Reacquired Hotspot", follow_through_softening_reacquired_hotspot),
+                ("Fragile Reacquisition Confidence Hotspot", follow_through_fragile_reacquisition_confidence_hotspot),
             ]
         )
     operator_rows.extend(
@@ -3249,7 +3315,7 @@ def _set_internal_hyperlink(cell, sheet_name: str, *, target_cell: str = "A1", d
 
 def _repo_detail_lookup_formula(column_index: int, fallback: str, *, allow_blank: bool = False) -> str:
     escaped_fallback = fallback.replace('"', '""')
-    lookup = f"VLOOKUP($B$4,Data_RepoDetail!$A:$BA,{column_index},FALSE)"
+    lookup = f"VLOOKUP($B$4,Data_RepoDetail!$A:$BE,{column_index},FALSE)"
     if allow_blank:
         return f'=IFERROR({lookup},"{escaped_fallback}")'
     return f'=IFERROR(IF({lookup}="","{escaped_fallback}",{lookup}),"{escaped_fallback}")'
@@ -3354,6 +3420,10 @@ def _repo_detail_rows(data: dict, score_history: dict[str, list[float]] | None) 
             briefing.get("what_to_do_next", {}).get("recovery_rebuild_strength_summary", "No follow-through recovery rebuild-strength signal is currently surfaced."),
             briefing.get("what_to_do_next", {}).get("recovery_reacquisition", "None"),
             briefing.get("what_to_do_next", {}).get("recovery_reacquisition_summary", "No follow-through recovery reacquisition signal is currently surfaced."),
+            briefing.get("what_to_do_next", {}).get("reacquisition_durability", "None"),
+            briefing.get("what_to_do_next", {}).get("reacquisition_durability_summary", "No follow-through reacquisition durability signal is currently surfaced."),
+            briefing.get("what_to_do_next", {}).get("reacquisition_confidence", "None"),
+            briefing.get("what_to_do_next", {}).get("reacquisition_confidence_summary", "No follow-through reacquisition confidence-consolidation signal is currently surfaced."),
             briefing.get("what_to_do_next", {}).get("what_would_count_as_progress", "Use the next run or linked artifact to confirm whether the recommendation moved."),
         ])
 
@@ -3933,6 +4003,13 @@ def _build_hidden_data_sheets(
             "Follow-Through Recovery Reacquisition Status",
             "Follow-Through Recovery Reacquisition Summary",
             "Follow-Through Recovery Reacquisition Reason",
+            "Follow-Through Recovery Reacquisition Durability Age Runs",
+            "Follow-Through Recovery Reacquisition Durability Status",
+            "Follow-Through Recovery Reacquisition Durability Summary",
+            "Follow-Through Recovery Reacquisition Durability Reason",
+            "Follow-Through Recovery Reacquisition Consolidation Status",
+            "Follow-Through Recovery Reacquisition Consolidation Summary",
+            "Follow-Through Recovery Reacquisition Consolidation Reason",
         ],
         operator_queue_rows,
     )
@@ -4005,6 +4082,10 @@ def _build_hidden_data_sheets(
             "Recovery Rebuild Strength Summary",
             "Recovery Reacquisition",
             "Recovery Reacquisition Summary",
+            "Reacquisition Durability",
+            "Reacquisition Durability Summary",
+            "Reacquisition Confidence",
+            "Reacquisition Confidence Summary",
             "What Would Count As Progress",
         ],
         repo_detail_rows,
@@ -4529,7 +4610,7 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
         ws.add_data_validation(dv)
     ws["D4"] = "GitHub"
     ws["D4"].font = SUBHEADER_FONT
-    ws["E4"] = '=IFERROR(IF(VLOOKUP($B$4,Data_RepoDetail!$A:$AQ,2,FALSE)="","Repo URL unavailable",HYPERLINK(VLOOKUP($B$4,Data_RepoDetail!$A:$AQ,2,FALSE),"Open Repo")),"Repo URL unavailable")'
+    ws["E4"] = '=IFERROR(IF(VLOOKUP($B$4,Data_RepoDetail!$A:$BE,2,FALSE)="","Repo URL unavailable",HYPERLINK(VLOOKUP($B$4,Data_RepoDetail!$A:$BE,2,FALSE),"Open Repo")),"Repo URL unavailable")'
     ws["E4"].font = Font("Calibri", 10, bold=True, color=TEAL, underline="single")
 
     summary_fields = [
@@ -4634,7 +4715,11 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
         ("Recovery Rebuild Strength Summary", 48, "No follow-through recovery rebuild-strength signal is currently surfaced."),
         ("Recovery Reacquisition", 49, "None"),
         ("Recovery Reacquisition Summary", 50, "No follow-through recovery reacquisition signal is currently surfaced."),
-        ("Progress Checkpoint", 51, "Use the next run or linked artifact to confirm whether the recommendation moved."),
+        ("Reacquisition Durability", 51, "None"),
+        ("Reacquisition Durability Summary", 52, "No follow-through reacquisition durability signal is currently surfaced."),
+        ("Reacquisition Confidence", 53, "None"),
+        ("Reacquisition Confidence Summary", 54, "No follow-through reacquisition confidence-consolidation signal is currently surfaced."),
+        ("Progress Checkpoint", 55, "Use the next run or linked artifact to confirm whether the recommendation moved."),
         ("Action Candidate 2", 28, "No second action candidate recorded yet."),
         ("Action Candidate 3", 29, "No third action candidate recorded yet."),
     ]
@@ -4643,13 +4728,14 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
         ws.cell(row=row, column=6, value=label).font = SUBHEADER_FONT
         style_data_cell(ws.cell(row=row, column=7, value=_repo_detail_lookup_formula(column_index, fallback)), "left")
 
-    ws["A50"] = "Use Score Explainer"
-    _set_internal_hyperlink(ws["B50"], "Score Explainer", display="Open Score Explainer")
-    ws["D50"] = "Go To Explorer"
-    _set_internal_hyperlink(ws["E50"], "Portfolio Explorer", display="Open Explorer")
-    ws["F50"] = "Go To Queue"
-    _set_internal_hyperlink(ws["G50"], "Review Queue", display="Open Review Queue")
-    auto_width(ws, 8, 50)
+    nav_row = 26 + len(handoff_rows)
+    ws.cell(row=nav_row, column=1, value="Use Score Explainer")
+    _set_internal_hyperlink(ws.cell(row=nav_row, column=2), "Score Explainer", display="Open Score Explainer")
+    ws.cell(row=nav_row, column=4, value="Go To Explorer")
+    _set_internal_hyperlink(ws.cell(row=nav_row, column=5), "Portfolio Explorer", display="Open Explorer")
+    ws.cell(row=nav_row, column=6, value="Go To Queue")
+    _set_internal_hyperlink(ws.cell(row=nav_row, column=7), "Review Queue", display="Open Review Queue")
+    auto_width(ws, 8, nav_row)
 
 
 def _build_run_changes(wb: Workbook, data: dict, diff_data: dict | None) -> None:
@@ -4946,6 +5032,10 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
         "Rebuild Summary",
         "Recovery Reacquisition",
         "Reacquisition Summary",
+        "Reacquisition Durability",
+        "Durability Summary",
+        "Reacquisition Confidence",
+        "Confidence Summary",
         "Open Artifact",
         "Safe To Defer",
     ]
@@ -4991,17 +5081,21 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
             build_follow_through_recovery_rebuild_strength_summary(item),
             build_follow_through_recovery_reacquisition_status_label(item),
             build_follow_through_recovery_reacquisition_summary(item),
+            build_follow_through_reacquisition_durability_status_label(item),
+            build_follow_through_reacquisition_durability_summary(item),
+            build_follow_through_reacquisition_consolidation_status_label(item),
+            build_follow_through_reacquisition_consolidation_summary(item),
             "Open linked artifact" if primary_link else no_linked_artifact_summary(),
             "yes" if safe_to_defer else "no",
         ]
         for col, value in enumerate(values, 1):
-            align = "center" if col in {3, 4, 5, 11, 12, 14, 16, 18, 20, 22, 24, 26, 29} else "left"
+            align = "center" if col in {3, 4, 5, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 33} else "left"
             style_data_cell(ws.cell(row=row, column=col, value=value), align)
         repo_cell = ws.cell(row=row, column=1)
         if item.get("repo_url"):
             repo_cell.hyperlink = item.get("repo_url")
             repo_cell.font = Font("Calibri", 10, color=TEAL, underline="single")
-        artifact_cell = ws.cell(row=row, column=24)
+        artifact_cell = ws.cell(row=row, column=32)
         if primary_link:
             artifact_cell.hyperlink = primary_link
             artifact_cell.font = Font("Calibri", 10, color=TEAL, underline="single")
@@ -5350,10 +5444,17 @@ def _build_executive_summary(
     (
         follow_through_rebuild_strength,
         follow_through_reacquisition,
+        follow_through_reacquisition_durability,
+        follow_through_reacquisition_confidence,
         follow_through_rebuild_strength_hotspot,
         follow_through_reacquiring_hotspot,
         follow_through_reacquired_hotspot,
         follow_through_fragile_reacquisition_hotspot,
+        follow_through_just_reacquired_hotspot,
+        follow_through_holding_reacquired_hotspot,
+        follow_through_durable_reacquired_hotspot,
+        follow_through_softening_reacquired_hotspot,
+        follow_through_fragile_reacquisition_confidence_hotspot,
     ) = _operator_follow_through_rebuild_details(data)
     trend_status, trend_summary, primary_target, resolution_counts = _operator_trend_values(data)
     primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
@@ -5429,6 +5530,8 @@ def _build_executive_summary(
         ("Recovery Memory Reset", follow_through_recovery_memory_reset),
         ("Recovery Rebuild Strength", follow_through_rebuild_strength),
         ("Recovery Reacquisition", follow_through_reacquisition),
+        ("Reacquisition Durability", follow_through_reacquisition_durability),
+        ("Reacquisition Confidence", follow_through_reacquisition_confidence),
         ("Trust Summary", trust_actionability_summary),
         ("Top Recommendation", top_recommendation),
         ("Biggest Opportunity", biggest_opportunity),
@@ -5449,41 +5552,46 @@ def _build_executive_summary(
         narrative_rows.insert(16, ("Reacquiring Hotspot", follow_through_reacquiring_hotspot))
         narrative_rows.insert(17, ("Reacquired Hotspot", follow_through_reacquired_hotspot))
         narrative_rows.insert(18, ("Fragile Reacquisition Hotspot", follow_through_fragile_reacquisition_hotspot))
-        narrative_rows.insert(19, ("Closure Guidance", closure_guidance))
-        narrative_rows.insert(20, ("What We Tried", last_intervention))
-        narrative_rows.insert(21, ("Resolution Evidence", resolution_evidence))
-        narrative_rows.insert(21, ("Recommendation Confidence", primary_confidence))
-        narrative_rows.insert(22, ("Confidence Rationale", confidence_reason))
-        narrative_rows.insert(23, ("Trust Policy", trust_policy))
-        narrative_rows.insert(24, ("Trust Rationale", trust_policy_reason))
-        narrative_rows.insert(25, ("Trust Exception", f"{exception_status} — {exception_reason}"))
-        narrative_rows.insert(26, ("Trust Recovery", f"{trust_recovery_status} — {trust_recovery_reason}"))
-        narrative_rows.insert(27, ("Recovery Confidence", recovery_confidence))
-        narrative_rows.insert(25, ("Exception Retirement", f"{retirement_status} — {retirement_reason}"))
-        narrative_rows.insert(26, ("Retirement Summary", retirement_summary))
-        narrative_rows.insert(27, ("Policy Debt", f"{policy_debt_status} — {policy_debt_reason}"))
-        narrative_rows.insert(28, ("Class Normalization", f"{class_normalization_status} — {trust_normalization_summary}"))
-        narrative_rows.insert(29, ("Class Memory", f"{class_memory_status} — {class_memory_reason}"))
-        narrative_rows.insert(30, ("Trust Decay", f"{class_decay_status} — {class_decay_summary}"))
-        narrative_rows.insert(31, ("Class Reweighting", f"{class_reweight_direction} ({class_reweight_score}) — {class_reweight_summary}"))
-        narrative_rows.insert(32, ("Class Reweighting Why", class_reweight_reason))
-        narrative_rows.insert(33, ("Class Momentum", class_momentum_status))
-        narrative_rows.insert(34, ("Reweight Stability", class_reweight_stability))
-        narrative_rows.insert(35, ("Transition Health", class_transition_health))
-        narrative_rows.insert(36, ("Transition Resolution", class_transition_resolution))
-        narrative_rows.insert(35, ("Transition Summary", class_transition_summary))
-        narrative_rows.insert(36, ("Transition Closure", transition_closure_confidence))
-        narrative_rows.insert(37, ("Transition Likely Outcome", transition_likely_outcome))
-        narrative_rows.insert(38, ("Pending Debt Freshness", pending_debt_freshness))
-        narrative_rows.insert(39, ("Closure Forecast", closure_forecast_direction))
-        narrative_rows.insert(39, ("Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence", reset_reentry_rebuild_reentry_restore_rerererestore_persistence))
-        narrative_rows.insert(40, ("Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls", reset_reentry_rebuild_reentry_restore_rerererestore_churn))
-        narrative_rows.insert(41, ("Closure Forecast Summary", transition_closure_summary))
-        narrative_rows.insert(42, ("Momentum Summary", class_momentum_summary))
-        narrative_rows.insert(43, ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}"))
-        narrative_rows.insert(44, ("Recommendation Drift", f"{drift_status} — {drift_summary}"))
-        narrative_rows.insert(45, ("Adaptive Confidence", adaptive_confidence_summary))
-        narrative_rows.insert(46, ("Confidence Validation", f"{calibration_status} — {calibration_summary}"))
+        narrative_rows.insert(19, ("Just Reacquired Hotspot", follow_through_just_reacquired_hotspot))
+        narrative_rows.insert(20, ("Holding Reacquired Hotspot", follow_through_holding_reacquired_hotspot))
+        narrative_rows.insert(21, ("Durable Reacquired Hotspot", follow_through_durable_reacquired_hotspot))
+        narrative_rows.insert(22, ("Softening Reacquired Hotspot", follow_through_softening_reacquired_hotspot))
+        narrative_rows.insert(23, ("Fragile Reacquisition Confidence Hotspot", follow_through_fragile_reacquisition_confidence_hotspot))
+        narrative_rows.insert(24, ("Closure Guidance", closure_guidance))
+        narrative_rows.insert(25, ("What We Tried", last_intervention))
+        narrative_rows.insert(26, ("Recommendation Confidence", primary_confidence))
+        narrative_rows.insert(27, ("Resolution Evidence", resolution_evidence))
+        narrative_rows.insert(28, ("Confidence Rationale", confidence_reason))
+        narrative_rows.insert(29, ("Trust Policy", trust_policy))
+        narrative_rows.insert(30, ("Trust Rationale", trust_policy_reason))
+        narrative_rows.insert(31, ("Trust Exception", f"{exception_status} — {exception_reason}"))
+        narrative_rows.insert(32, ("Trust Recovery", f"{trust_recovery_status} — {trust_recovery_reason}"))
+        narrative_rows.insert(33, ("Recovery Confidence", recovery_confidence))
+        narrative_rows.insert(34, ("Exception Retirement", f"{retirement_status} — {retirement_reason}"))
+        narrative_rows.insert(35, ("Retirement Summary", retirement_summary))
+        narrative_rows.insert(36, ("Policy Debt", f"{policy_debt_status} — {policy_debt_reason}"))
+        narrative_rows.insert(37, ("Class Normalization", f"{class_normalization_status} — {trust_normalization_summary}"))
+        narrative_rows.insert(38, ("Class Memory", f"{class_memory_status} — {class_memory_reason}"))
+        narrative_rows.insert(39, ("Trust Decay", f"{class_decay_status} — {class_decay_summary}"))
+        narrative_rows.insert(40, ("Class Reweighting", f"{class_reweight_direction} ({class_reweight_score}) — {class_reweight_summary}"))
+        narrative_rows.insert(41, ("Class Reweighting Why", class_reweight_reason))
+        narrative_rows.insert(42, ("Class Momentum", class_momentum_status))
+        narrative_rows.insert(43, ("Reweight Stability", class_reweight_stability))
+        narrative_rows.insert(44, ("Transition Health", class_transition_health))
+        narrative_rows.insert(45, ("Transition Summary", class_transition_summary))
+        narrative_rows.insert(46, ("Transition Closure", transition_closure_confidence))
+        narrative_rows.insert(47, ("Transition Resolution", class_transition_resolution))
+        narrative_rows.insert(48, ("Transition Likely Outcome", transition_likely_outcome))
+        narrative_rows.insert(49, ("Pending Debt Freshness", pending_debt_freshness))
+        narrative_rows.insert(50, ("Closure Forecast", closure_forecast_direction))
+        narrative_rows.insert(51, ("Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence", reset_reentry_rebuild_reentry_restore_rerererestore_persistence))
+        narrative_rows.insert(52, ("Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls", reset_reentry_rebuild_reentry_restore_rerererestore_churn))
+        narrative_rows.insert(53, ("Closure Forecast Summary", transition_closure_summary))
+        narrative_rows.insert(54, ("Momentum Summary", class_momentum_summary))
+        narrative_rows.insert(55, ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}"))
+        narrative_rows.insert(56, ("Recommendation Drift", f"{drift_status} — {drift_summary}"))
+        narrative_rows.insert(57, ("Adaptive Confidence", adaptive_confidence_summary))
+        narrative_rows.insert(58, ("Confidence Validation", f"{calibration_status} — {calibration_summary}"))
     _write_key_value_block(ws, 4, 1, narrative_rows, title="Leadership Brief")
 
     write_kpi_card(ws, 10, 1, "Portfolio Grade", data.get("portfolio_grade", "F"))
@@ -5727,10 +5835,17 @@ def _build_print_pack(
     (
         follow_through_rebuild_strength,
         follow_through_reacquisition,
+        follow_through_reacquisition_durability,
+        follow_through_reacquisition_confidence,
         follow_through_rebuild_strength_hotspot,
         follow_through_reacquiring_hotspot,
         follow_through_reacquired_hotspot,
         follow_through_fragile_reacquisition_hotspot,
+        follow_through_just_reacquired_hotspot,
+        follow_through_holding_reacquired_hotspot,
+        follow_through_durable_reacquired_hotspot,
+        follow_through_softening_reacquired_hotspot,
+        follow_through_fragile_reacquisition_confidence_hotspot,
     ) = _operator_follow_through_rebuild_details(data)
     trend_status, trend_summary, primary_target, resolution_counts = _operator_trend_values(data)
     primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
@@ -5784,7 +5899,7 @@ def _build_print_pack(
     ws["B15"] = next_action or weekly_pack.get("what_to_do_this_week", build_top_recommendation_summary(data))
     ws["A16"] = "Follow-Through"
     ws["B16"] = (
-        f"{trend_summary} {follow_through} Next checkpoint: {follow_through_checkpoint} Escalation: {follow_through_escalation} Recovery: {follow_through_recovery} Persistence: {follow_through_recovery_persistence} Churn: {follow_through_relapse_churn} Freshness: {follow_through_recovery_freshness} Reset: {follow_through_recovery_memory_reset} Rebuild strength: {follow_through_rebuild_strength} Reacquisition: {follow_through_reacquisition} Focus hotspot: {follow_through_hotspot}. Escalation hotspot: {follow_through_escalation_hotspot}. Recovery hotspot: {follow_through_relapsing_hotspot}. Retiring watch hotspot: {follow_through_retiring_hotspot}. Churn hotspot: {follow_through_churn_hotspot}. Freshness hotspot: {follow_through_recovery_freshness_hotspot}. Rebuild hotspot: {follow_through_recovery_rebuild_hotspot}. Rebuild-strength hotspot: {follow_through_rebuild_strength_hotspot}. Reacquiring hotspot: {follow_through_reacquiring_hotspot}. Reacquired hotspot: {follow_through_reacquired_hotspot}. Fragile reacquisition hotspot: {follow_through_fragile_reacquisition_hotspot}".strip()
+        f"{trend_summary} {follow_through} Next checkpoint: {follow_through_checkpoint} Escalation: {follow_through_escalation} Recovery: {follow_through_recovery} Persistence: {follow_through_recovery_persistence} Churn: {follow_through_relapse_churn} Freshness: {follow_through_recovery_freshness} Reset: {follow_through_recovery_memory_reset} Rebuild strength: {follow_through_rebuild_strength} Reacquisition: {follow_through_reacquisition} Durability: {follow_through_reacquisition_durability} Confidence: {follow_through_reacquisition_confidence} Focus hotspot: {follow_through_hotspot}. Escalation hotspot: {follow_through_escalation_hotspot}. Recovery hotspot: {follow_through_relapsing_hotspot}. Retiring watch hotspot: {follow_through_retiring_hotspot}. Churn hotspot: {follow_through_churn_hotspot}. Freshness hotspot: {follow_through_recovery_freshness_hotspot}. Rebuild hotspot: {follow_through_recovery_rebuild_hotspot}. Rebuild-strength hotspot: {follow_through_rebuild_strength_hotspot}. Reacquiring hotspot: {follow_through_reacquiring_hotspot}. Reacquired hotspot: {follow_through_reacquired_hotspot}. Fragile reacquisition hotspot: {follow_through_fragile_reacquisition_hotspot}. Just reacquired hotspot: {follow_through_just_reacquired_hotspot}. Holding reacquired hotspot: {follow_through_holding_reacquired_hotspot}. Durable reacquired hotspot: {follow_through_durable_reacquired_hotspot}. Softening reacquired hotspot: {follow_through_softening_reacquired_hotspot}. Fragile reacquisition confidence hotspot: {follow_through_fragile_reacquisition_confidence_hotspot}".strip()
     )
     if excel_mode == "standard":
         ws["A17"] = "Primary Target"
@@ -5805,89 +5920,93 @@ def _build_print_pack(
         ws["B24"] = follow_through_rebuild_strength
         ws["A25"] = "Recovery Reacquisition"
         ws["B25"] = follow_through_reacquisition
-        ws["A26"] = "What We Tried"
-        ws["B26"] = last_intervention
-        ws["A27"] = "Last Outcome"
-        ws["B27"] = last_outcome
-        ws["A28"] = "Resolution Evidence"
-        ws["B28"] = resolution_evidence
-        ws["A29"] = "Recovery Counts"
-        ws["B29"] = recovery_counts
-        ws["A30"] = "Recommendation Confidence"
-        ws["B30"] = primary_confidence
-        ws["A31"] = "Confidence Rationale"
-        ws["B31"] = confidence_reason
-        ws["A32"] = "Next Action Confidence"
-        ws["B32"] = next_action_confidence
-        ws["A33"] = "Trust Policy"
-        ws["B33"] = trust_policy
-        ws["A34"] = "Trust Rationale"
-        ws["B34"] = trust_policy_reason
-        ws["A35"] = "Trust Exception"
-        ws["B35"] = f"{exception_status} — {exception_reason}"
-        ws["A36"] = "Trust Recovery"
-        ws["B36"] = f"{trust_recovery_status} — {trust_recovery_reason}"
-        ws["A37"] = "Recovery Confidence"
-        ws["B37"] = recovery_confidence
-        ws["A38"] = "Exception Retirement"
-        ws["B38"] = f"{retirement_status} — {retirement_reason}"
-        ws["A39"] = "Retirement Summary"
-        ws["B39"] = retirement_summary
-        ws["A40"] = "Policy Debt"
-        ws["B40"] = f"{policy_debt_status} — {policy_debt_reason}"
-        ws["A41"] = "Class Normalization"
-        ws["B41"] = f"{class_normalization_status} — {trust_normalization_summary}"
-        ws["A42"] = "Class Memory"
-        ws["B42"] = f"{class_memory_status} — {class_memory_reason}"
-        ws["A43"] = "Trust Decay"
-        ws["B43"] = f"{class_decay_status} — {class_decay_summary}"
-        ws["A44"] = "Class Reweighting"
-        ws["B44"] = f"{class_reweight_direction} ({class_reweight_score}) — {class_reweight_summary}"
-        ws["A45"] = "Class Reweighting Why"
-        ws["B45"] = class_reweight_reason
-        ws["A46"] = "Class Momentum"
-        ws["B46"] = class_momentum_status
-        ws["A47"] = "Reweight Stability"
-        ws["B47"] = class_reweight_stability
-        ws["A48"] = "Transition Health"
-        ws["B48"] = class_transition_health
-        ws["A49"] = "Transition Resolution"
-        ws["B49"] = class_transition_resolution
-        ws["A50"] = "Transition Summary"
-        ws["B50"] = class_transition_summary
-        ws["A51"] = "Transition Closure"
-        ws["B51"] = transition_closure_confidence
-        ws["A52"] = "Transition Likely Outcome"
-        ws["B52"] = transition_likely_outcome
-        ws["A53"] = "Pending Debt Freshness"
-        ws["B53"] = pending_debt_freshness
-        ws["A54"] = "Closure Forecast"
-        ws["B54"] = closure_forecast_direction
-        ws["A55"] = "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence"
-        ws["B55"] = reset_reentry_rebuild_reentry_restore_rerererestore_persistence
-        ws["A56"] = "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls"
-        ws["B56"] = reset_reentry_rebuild_reentry_restore_rerererestore_churn
-        ws["A57"] = "Closure Forecast Summary"
-        ws["B57"] = transition_closure_summary
-        ws["A58"] = "Momentum Summary"
-        ws["B58"] = class_momentum_summary
-        ws["A59"] = "Exception Learning"
-        ws["B59"] = f"{exception_pattern_status} — {exception_pattern_summary}"
-        ws["A60"] = "Recommendation Drift"
-        ws["B60"] = f"{drift_status} — {drift_summary}"
-        ws["A61"] = "Adaptive Confidence"
-        ws["B61"] = adaptive_confidence_summary
-        ws["A62"] = "Recommendation Quality"
-        ws["B62"] = recommendation_quality
-        ws["A63"] = "Confidence Validation"
-        ws["B63"] = f"{calibration_status} — {calibration_summary}"
-        ws["A64"] = "Calibration Snapshot"
-        ws["B64"] = f"High-confidence hit rate {high_hit_rate} | {reopened_recommendations}"
-        ws["A66"] = "Top Attention"
-        ws["A66"].font = SECTION_FONT
-        risk_start_row = 66
-        opportunity_header_row = 66
-        page2_row = 72
+        ws["A26"] = "Reacquisition Durability"
+        ws["B26"] = follow_through_reacquisition_durability
+        ws["A27"] = "Reacquisition Confidence"
+        ws["B27"] = follow_through_reacquisition_confidence
+        ws["A28"] = "What We Tried"
+        ws["B28"] = last_intervention
+        ws["A29"] = "Last Outcome"
+        ws["B29"] = last_outcome
+        ws["A30"] = "Resolution Evidence"
+        ws["B30"] = resolution_evidence
+        ws["A31"] = "Recovery Counts"
+        ws["B31"] = recovery_counts
+        ws["A32"] = "Recommendation Confidence"
+        ws["B32"] = primary_confidence
+        ws["A33"] = "Confidence Rationale"
+        ws["B33"] = confidence_reason
+        ws["A34"] = "Next Action Confidence"
+        ws["B34"] = next_action_confidence
+        ws["A35"] = "Trust Policy"
+        ws["B35"] = trust_policy
+        ws["A36"] = "Trust Rationale"
+        ws["B36"] = trust_policy_reason
+        ws["A37"] = "Trust Exception"
+        ws["B37"] = f"{exception_status} — {exception_reason}"
+        ws["A38"] = "Trust Recovery"
+        ws["B38"] = f"{trust_recovery_status} — {trust_recovery_reason}"
+        ws["A39"] = "Recovery Confidence"
+        ws["B39"] = recovery_confidence
+        ws["A40"] = "Exception Retirement"
+        ws["B40"] = f"{retirement_status} — {retirement_reason}"
+        ws["A41"] = "Retirement Summary"
+        ws["B41"] = retirement_summary
+        ws["A42"] = "Policy Debt"
+        ws["B42"] = f"{policy_debt_status} — {policy_debt_reason}"
+        ws["A43"] = "Class Normalization"
+        ws["B43"] = f"{class_normalization_status} — {trust_normalization_summary}"
+        ws["A44"] = "Class Memory"
+        ws["B44"] = f"{class_memory_status} — {class_memory_reason}"
+        ws["A45"] = "Trust Decay"
+        ws["B45"] = f"{class_decay_status} — {class_decay_summary}"
+        ws["A46"] = "Class Reweighting"
+        ws["B46"] = f"{class_reweight_direction} ({class_reweight_score}) — {class_reweight_summary}"
+        ws["A47"] = "Class Reweighting Why"
+        ws["B47"] = class_reweight_reason
+        ws["A48"] = "Class Momentum"
+        ws["B48"] = class_momentum_status
+        ws["A49"] = "Reweight Stability"
+        ws["B49"] = class_reweight_stability
+        ws["A50"] = "Transition Health"
+        ws["B50"] = class_transition_health
+        ws["A51"] = "Transition Resolution"
+        ws["B51"] = class_transition_resolution
+        ws["A52"] = "Transition Summary"
+        ws["B52"] = class_transition_summary
+        ws["A53"] = "Transition Closure"
+        ws["B53"] = transition_closure_confidence
+        ws["A54"] = "Transition Likely Outcome"
+        ws["B54"] = transition_likely_outcome
+        ws["A55"] = "Pending Debt Freshness"
+        ws["B55"] = pending_debt_freshness
+        ws["A56"] = "Closure Forecast"
+        ws["B56"] = closure_forecast_direction
+        ws["A57"] = "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence"
+        ws["B57"] = reset_reentry_rebuild_reentry_restore_rerererestore_persistence
+        ws["A58"] = "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls"
+        ws["B58"] = reset_reentry_rebuild_reentry_restore_rerererestore_churn
+        ws["A59"] = "Closure Forecast Summary"
+        ws["B59"] = transition_closure_summary
+        ws["A60"] = "Momentum Summary"
+        ws["B60"] = class_momentum_summary
+        ws["A61"] = "Exception Learning"
+        ws["B61"] = f"{exception_pattern_status} — {exception_pattern_summary}"
+        ws["A62"] = "Recommendation Drift"
+        ws["B62"] = f"{drift_status} — {drift_summary}"
+        ws["A63"] = "Adaptive Confidence"
+        ws["B63"] = adaptive_confidence_summary
+        ws["A64"] = "Recommendation Quality"
+        ws["B64"] = recommendation_quality
+        ws["A65"] = "Confidence Validation"
+        ws["B65"] = f"{calibration_status} — {calibration_summary}"
+        ws["A66"] = "Calibration Snapshot"
+        ws["B66"] = f"High-confidence hit rate {high_hit_rate} | {reopened_recommendations}"
+        ws["A68"] = "Top Attention"
+        ws["A68"].font = SECTION_FONT
+        risk_start_row = 68
+        opportunity_header_row = 68
+        page2_row = 74
     else:
         ws["A17"] = "Top Attention"
         ws["A17"].font = SECTION_FONT

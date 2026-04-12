@@ -712,6 +712,13 @@ class TestRenderHtml:
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Summary:" in html
         assert "Reset Re-entry Rebuild Persistence Summary:" in html
         assert "Reset Re-entry Rebuild Churn Summary:" in html
+        assert "Follow-Through Reacquisition Durability:" in html
+        assert "Follow-Through Reacquisition Confidence:" in html
+        assert "Just Reacquired" in html
+        assert "Holding Reacquired" in html
+        assert "Durable Reacquired" in html
+        assert "Softening Reacquired" in html
+        assert "Fragile Reacquisition Confidence" in html
         assert "Closure Forecast Reacquisition Summary:" in html
         assert "Why This Confidence Is Actionable:" in html
         assert "Recent Confidence Outcomes:" in html
@@ -786,11 +793,14 @@ class TestRenderHtml:
         assert "Follow-Through Recovery and Escalation Retirement" in html
         assert "Follow-Through Recovery Persistence" in html
         assert "Follow-Through Relapse Churn" in html
+        assert "Follow-Through Reacquisition Durability and Confidence" in html
         assert "Checkpoint Timing" in html
         assert "Escalation" in html
         assert "Recovery / Retirement" in html
         assert "Recovery Persistence" in html
         assert "Relapse Churn" in html
+        assert "Reacquisition Durability" in html
+        assert "Reacquisition Confidence" in html
         assert "Last movement:" in html
         assert no_linked_artifact_summary() in html
 

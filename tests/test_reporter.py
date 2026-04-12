@@ -656,11 +656,14 @@ class TestMarkdownReport:
         assert "Follow-Through Aging and Escalation" in content
         assert "Follow-Through Recovery and Escalation Retirement" in content
         assert "Follow-Through Recovery Persistence and Relapse Churn" in content
+        assert "Follow-Through Reacquisition Durability and Confidence" in content
         assert "Checkpoint Timing" in content
         assert "Escalation" in content
         assert "Recovery / Retirement" in content
         assert "Recovery Persistence" in content
         assert "Relapse Churn" in content
+        assert "Reacquisition Durability" in content
+        assert "Reacquisition Confidence" in content
         assert "Accountability" in content
         assert "Primary Target" in content
         assert "Why This Is The Top Target" in content
@@ -760,6 +763,9 @@ class TestMarkdownReport:
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Churn Summary" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness Summary" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery Summary" in content
+        assert "Reacquisition Durability:" in content
+        assert "Reacquisition Confidence:" in content
+        assert "No reacquisition durability or confidence-consolidation hotspots are currently surfaced." in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Summary" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence Summary" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Summary" in content

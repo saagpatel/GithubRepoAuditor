@@ -11,6 +11,10 @@ from src.report_enrichment import (
     build_follow_through_checkpoint_status_label,
     build_follow_through_escalation_status_label,
     build_follow_through_escalation_summary,
+    build_follow_through_reacquisition_consolidation_status_label,
+    build_follow_through_reacquisition_consolidation_summary,
+    build_follow_through_reacquisition_durability_status_label,
+    build_follow_through_reacquisition_durability_summary,
     build_follow_through_recovery_freshness_status_label,
     build_follow_through_recovery_freshness_summary,
     build_follow_through_recovery_memory_reset_status_label,
@@ -309,6 +313,14 @@ def write_markdown_report(
             f"{item.get('follow_through_recovery_reacquisition_summary', 'No follow-through recovery reacquisition signal is currently surfaced.')}"
         )
         _w(
+            f"  - Reacquisition Durability: {item.get('follow_through_reacquisition_durability', 'None')} — "
+            f"{item.get('follow_through_reacquisition_durability_summary', 'No follow-through reacquisition durability signal is currently surfaced.')}"
+        )
+        _w(
+            f"  - Reacquisition Confidence: {item.get('follow_through_reacquisition_confidence', 'None')} — "
+            f"{item.get('follow_through_reacquisition_confidence_summary', 'No follow-through reacquisition confidence-consolidation signal is currently surfaced.')}"
+        )
+        _w(
             f"  - Next Checkpoint: {item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}"
         )
     if not weekly_pack.get("top_attention"):
@@ -428,6 +440,28 @@ def write_markdown_report(
     if not weekly_pack.get("top_rebuilding_recovery_strength_items") and not weekly_pack.get("top_reacquiring_recovery_items") and not weekly_pack.get("top_reacquired_recovery_items") and not weekly_pack.get("top_fragile_reacquisition_items"):
         _w("- No rebuild-strength or reacquisition hotspots are currently surfaced.")
     _w("")
+    _w("### Follow-Through Reacquisition Durability and Confidence")
+    _w("")
+    _w(f"- Reacquisition Durability: {weekly_pack.get('follow_through_reacquisition_durability_summary', 'No follow-through reacquisition durability signal is currently surfaced.')}")
+    _w(f"- Reacquisition Confidence: {weekly_pack.get('follow_through_reacquisition_consolidation_summary', 'No follow-through reacquisition confidence-consolidation signal is currently surfaced.')}")
+    for item in weekly_pack.get("top_just_reacquired_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        _w(f"- Just Reacquired: {label} — {item.get('follow_through_recovery_reacquisition_durability_summary', 'No follow-through reacquisition durability signal is currently surfaced.')}")
+    for item in weekly_pack.get("top_holding_reacquired_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        _w(f"- Holding Reacquired: {label} — {item.get('follow_through_recovery_reacquisition_durability_summary', 'No follow-through reacquisition durability signal is currently surfaced.')}")
+    for item in weekly_pack.get("top_durable_reacquired_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        _w(f"- Durable Reacquired: {label} — {item.get('follow_through_recovery_reacquisition_durability_summary', 'No follow-through reacquisition durability signal is currently surfaced.')}")
+    for item in weekly_pack.get("top_softening_reacquired_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        _w(f"- Softening Reacquired: {label} — {item.get('follow_through_recovery_reacquisition_durability_summary', 'No follow-through reacquisition durability signal is currently surfaced.')}")
+    for item in weekly_pack.get("top_fragile_reacquisition_confidence_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        _w(f"- Fragile Reacquisition Confidence: {label} — {item.get('follow_through_recovery_reacquisition_consolidation_summary', 'No follow-through reacquisition confidence-consolidation signal is currently surfaced.')}")
+    if not weekly_pack.get("top_just_reacquired_items") and not weekly_pack.get("top_holding_reacquired_items") and not weekly_pack.get("top_durable_reacquired_items") and not weekly_pack.get("top_softening_reacquired_items") and not weekly_pack.get("top_fragile_reacquisition_confidence_items"):
+        _w("- No reacquisition durability or confidence-consolidation hotspots are currently surfaced.")
+    _w("")
     _w("### Top Repo Drilldowns")
     _w("")
     for briefing in weekly_pack.get("repo_briefings", [])[:3]:
@@ -445,6 +479,8 @@ def write_markdown_report(
         _w(f"- Relapse Churn: {briefing.get('relapse_churn_line', 'None: No relapse churn is currently surfaced.')}")
         _w(f"- Recovery Rebuild Strength: {briefing.get('recovery_rebuild_strength_line', 'None: No follow-through recovery rebuild-strength signal is currently surfaced.')}")
         _w(f"- Recovery Reacquisition: {briefing.get('recovery_reacquisition_line', 'None: No follow-through recovery reacquisition signal is currently surfaced.')}")
+        _w(f"- Reacquisition Durability: {briefing.get('reacquisition_durability_line', 'None: No follow-through reacquisition durability signal is currently surfaced.')}")
+        _w(f"- Reacquisition Confidence: {briefing.get('reacquisition_confidence_line', 'None: No follow-through reacquisition confidence-consolidation signal is currently surfaced.')}")
         _w(f"- What Would Count As Progress: {briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
         _w("")
 
@@ -493,6 +529,10 @@ def write_markdown_report(
             _w(f"- Follow-Through Recovery Rebuild Strength: {report.operator_summary.get('follow_through_recovery_rebuild_strength_summary')}")
         if report.operator_summary.get("follow_through_recovery_reacquisition_summary"):
             _w(f"- Follow-Through Recovery Reacquisition: {report.operator_summary.get('follow_through_recovery_reacquisition_summary')}")
+        if report.operator_summary.get("follow_through_recovery_reacquisition_durability_summary"):
+            _w(f"- Follow-Through Reacquisition Durability: {report.operator_summary.get('follow_through_recovery_reacquisition_durability_summary')}")
+        if report.operator_summary.get("follow_through_recovery_reacquisition_consolidation_summary"):
+            _w(f"- Follow-Through Reacquisition Confidence: {report.operator_summary.get('follow_through_recovery_reacquisition_consolidation_summary')}")
         primary_target = report.operator_summary.get("primary_target") or {}
         if primary_target:
             repo = f"{primary_target.get('repo')}: " if primary_target.get("repo") else ""
@@ -1088,6 +1128,14 @@ def write_markdown_report(
             _w(
                 f"  - Recovery Reacquisition: {build_follow_through_recovery_reacquisition_status_label(item)} — "
                 f"{build_follow_through_recovery_reacquisition_summary(item)}"
+            )
+            _w(
+                f"  - Reacquisition Durability: {build_follow_through_reacquisition_durability_status_label(item)} — "
+                f"{build_follow_through_reacquisition_durability_summary(item)}"
+            )
+            _w(
+                f"  - Reacquisition Confidence: {build_follow_through_reacquisition_consolidation_status_label(item)} — "
+                f"{build_follow_through_reacquisition_consolidation_summary(item)}"
             )
             _w(f"  - Next Checkpoint: {build_follow_through_checkpoint(item)}")
             links = item.get("links") or []

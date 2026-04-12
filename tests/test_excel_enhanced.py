@@ -1002,9 +1002,13 @@ class TestAnalystWorkbookSheets:
         assert ws.cell(row=header_row, column=25).value == "Rebuild Summary"
         assert ws.cell(row=header_row, column=26).value == "Recovery Reacquisition"
         assert ws.cell(row=header_row, column=27).value == "Reacquisition Summary"
-        assert ws.cell(row=header_row, column=28).value == "Open Artifact"
+        assert ws.cell(row=header_row, column=28).value == "Reacquisition Durability"
+        assert ws.cell(row=header_row, column=29).value == "Durability Summary"
+        assert ws.cell(row=header_row, column=30).value == "Reacquisition Confidence"
+        assert ws.cell(row=header_row, column=31).value == "Confidence Summary"
+        assert ws.cell(row=header_row, column=32).value == "Open Artifact"
         assert no_linked_artifact_summary() in {
-            ws.cell(row=row, column=28).value
+            ws.cell(row=row, column=32).value
             for row in range(header_row + 1, header_row + 10)
         }
         assert "RepoC has recent follow-up recorded and is now waiting for confirming evidence." in {
@@ -1033,6 +1037,14 @@ class TestAnalystWorkbookSheets:
         }
         assert "Reset Watch" in {
             ws.cell(row=row, column=22).value
+            for row in range(header_row + 1, header_row + 10)
+        }
+        assert "None" in {
+            ws.cell(row=row, column=28).value
+            for row in range(header_row + 1, header_row + 10)
+        }
+        assert "None" in {
+            ws.cell(row=row, column=30).value
             for row in range(header_row + 1, header_row + 10)
         }
         assert "None" in {
@@ -1160,7 +1172,7 @@ class TestAnalystWorkbookSheets:
 
         dashboard_values = {
             cell
-            for row in dashboard_ws.iter_rows(min_row=1, max_row=80, min_col=1, max_col=25, values_only=True)
+            for row in dashboard_ws.iter_rows(min_row=1, max_row=110, min_col=1, max_col=25, values_only=True)
             for cell in row
             if cell is not None
         }
@@ -1186,8 +1198,8 @@ class TestAnalystWorkbookSheets:
         assert print_ws["B8"].value == weekly_pack["queue_pressure_summary"]
         assert print_ws["B9"].value == weekly_pack["run_change_summary"]
         assert print_ws["B10"].value == weekly_pack["what_to_do_this_week"]
-        assert print_ws["A66"].value == "Top Attention"
-        assert print_ws["E66"].value == "Top Repo Drilldowns"
+        assert print_ws["A68"].value == "Top Attention"
+        assert print_ws["E68"].value == "Top Repo Drilldowns"
         executive_labels = {
             cell
             for row in executive_ws.iter_rows(min_row=20, max_row=90, min_col=1, max_col=20, values_only=True)
@@ -1199,6 +1211,8 @@ class TestAnalystWorkbookSheets:
             "Escalation",
             "Recovery Rebuild Strength",
             "Recovery Reacquisition",
+            "Reacquisition Durability",
+            "Reacquisition Confidence",
             "What We Tried",
             "Last Outcome",
             "Resolution Evidence",
@@ -1246,42 +1260,47 @@ class TestAnalystWorkbookSheets:
         assert print_ws["A23"].value == "Recovery Memory Reset"
         assert print_ws["A24"].value == "Recovery Rebuild Strength"
         assert print_ws["A25"].value == "Recovery Reacquisition"
-        assert print_ws["A26"].value == "What We Tried"
-        assert print_ws["A27"].value == "Last Outcome"
-        assert print_ws["A28"].value == "Resolution Evidence"
-        assert print_ws["A29"].value == "Recovery Counts"
-        assert print_ws["A30"].value == "Recommendation Confidence"
-        assert print_ws["A31"].value == "Confidence Rationale"
-        assert print_ws["A32"].value == "Next Action Confidence"
-        assert print_ws["A33"].value == "Trust Policy"
-        assert print_ws["A34"].value == "Trust Rationale"
-        assert print_ws["A35"].value == "Trust Exception"
-        assert print_ws["A36"].value == "Trust Recovery"
-        assert print_ws["A37"].value == "Recovery Confidence"
-        assert print_ws["A38"].value == "Exception Retirement"
-        assert print_ws["A39"].value == "Retirement Summary"
-        assert print_ws["A40"].value == "Policy Debt"
-        assert print_ws["A41"].value == "Class Normalization"
-        assert print_ws["A42"].value == "Class Memory"
-        assert print_ws["A43"].value == "Trust Decay"
-        assert print_ws["A44"].value == "Class Reweighting"
-        assert print_ws["A45"].value == "Class Reweighting Why"
-        assert print_ws["A46"].value == "Class Momentum"
-        assert print_ws["A47"].value == "Reweight Stability"
-        assert print_ws["A48"].value == "Transition Health"
-        assert print_ws["A49"].value == "Transition Resolution"
-        assert print_ws["A50"].value == "Transition Summary"
-        assert print_ws["A51"].value == "Transition Closure"
-        assert print_ws["A52"].value == "Transition Likely Outcome"
-        assert print_ws["A53"].value == "Pending Debt Freshness"
-        assert print_ws["A54"].value == "Closure Forecast"
-        assert print_ws["A55"].value == "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence"
-        assert print_ws["A56"].value == "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls"
-        assert print_ws["A57"].value == "Closure Forecast Summary"
-        assert print_ws["A58"].value == "Momentum Summary"
-        assert print_ws["A59"].value == "Exception Learning"
-        assert print_ws["A60"].value == "Recommendation Drift"
-        assert print_ws["A61"].value == "Adaptive Confidence"
+        assert print_ws["A26"].value == "Reacquisition Durability"
+        assert print_ws["A27"].value == "Reacquisition Confidence"
+        assert print_ws["A28"].value == "What We Tried"
+        assert print_ws["A29"].value == "Last Outcome"
+        assert print_ws["A30"].value == "Resolution Evidence"
+        assert print_ws["A31"].value == "Recovery Counts"
+        assert print_ws["A32"].value == "Recommendation Confidence"
+        assert print_ws["A33"].value == "Confidence Rationale"
+        assert print_ws["A34"].value == "Next Action Confidence"
+        assert print_ws["A35"].value == "Trust Policy"
+        assert print_ws["A36"].value == "Trust Rationale"
+        assert print_ws["A37"].value == "Trust Exception"
+        assert print_ws["A38"].value == "Trust Recovery"
+        assert print_ws["A39"].value == "Recovery Confidence"
+        assert print_ws["A40"].value == "Exception Retirement"
+        assert print_ws["A41"].value == "Retirement Summary"
+        assert print_ws["A42"].value == "Policy Debt"
+        assert print_ws["A43"].value == "Class Normalization"
+        assert print_ws["A44"].value == "Class Memory"
+        assert print_ws["A45"].value == "Trust Decay"
+        assert print_ws["A46"].value == "Class Reweighting"
+        assert print_ws["A47"].value == "Class Reweighting Why"
+        assert print_ws["A48"].value == "Class Momentum"
+        assert print_ws["A49"].value == "Reweight Stability"
+        assert print_ws["A50"].value == "Transition Health"
+        assert print_ws["A51"].value == "Transition Resolution"
+        assert print_ws["A52"].value == "Transition Summary"
+        assert print_ws["A53"].value == "Transition Closure"
+        assert print_ws["A54"].value == "Transition Likely Outcome"
+        assert print_ws["A55"].value == "Pending Debt Freshness"
+        assert print_ws["A56"].value == "Closure Forecast"
+        assert print_ws["A57"].value == "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence"
+        assert print_ws["A58"].value == "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls"
+        assert print_ws["A59"].value == "Closure Forecast Summary"
+        assert print_ws["A60"].value == "Momentum Summary"
+        assert print_ws["A61"].value == "Exception Learning"
+        assert print_ws["A62"].value == "Recommendation Drift"
+        assert print_ws["A63"].value == "Adaptive Confidence"
+        assert print_ws["A64"].value == "Recommendation Quality"
+        assert print_ws["A65"].value == "Confidence Validation"
+        assert print_ws["A66"].value == "Calibration Snapshot"
         assert "Why Top Target" in dashboard_values
         assert "Closure Guidance" in dashboard_values
         assert "What We Tried" in dashboard_values
@@ -1546,7 +1565,7 @@ class TestWorkbookModes:
         wb = load_workbook(output)
         ws = wb["Review Queue"]
         header_row = next(row for row in range(20, 70) if ws.cell(row=row, column=1).value == "Repo")
-        assert ws.auto_filter.ref == f"A{header_row}:AC{header_row + 1}"
+        assert ws.auto_filter.ref == f"A{header_row}:AG{header_row + 1}"
         assert not ws.tables
 
     def test_visible_sheets_use_filters_while_hidden_data_sheets_keep_tables(self, tmp_path):

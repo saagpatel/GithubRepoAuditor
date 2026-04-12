@@ -1286,6 +1286,116 @@ def test_project_queue_follow_through_marks_repeated_recovery_flips_as_churn():
     assert "churning between calmer and escalated states" in item["follow_through_relapse_churn_summary"]
 
 
+def test_follow_through_reacquisition_durability_progresses_from_new_to_durable():
+    item = {"repo": "RepoD", "title": "RepoD drift needs review"}
+
+    age_runs, status, reason, summary = operator_control_center._follow_through_reacquisition_durability_projection(
+        item,
+        [],
+        follow_through_recovery_reacquisition_status="just-reacquired",
+        follow_through_relapse_churn_status="none",
+        follow_through_recovery_freshness_status="fresh",
+        follow_through_recovery_decay_status="none",
+        follow_through_recovery_memory_reset_status="rebuilding",
+    )
+    assert age_runs == 1
+    assert status == "just-reacquired"
+    assert "too new to treat as durable" in reason
+    assert "still needs more confirmation" in summary
+
+    age_runs, status, reason, summary = operator_control_center._follow_through_reacquisition_durability_projection(
+        item,
+        [{"follow_through_recovery_reacquisition_status": "just-reacquired"}],
+        follow_through_recovery_reacquisition_status="holding-reacquired",
+        follow_through_relapse_churn_status="none",
+        follow_through_recovery_freshness_status="fresh",
+        follow_through_recovery_decay_status="none",
+        follow_through_recovery_memory_reset_status="rebuilding",
+    )
+    assert age_runs == 2
+    assert status == "consolidating"
+    assert "still consolidating rather than stable" in reason
+    assert "now consolidating it" in summary
+
+    age_runs, status, reason, summary = operator_control_center._follow_through_reacquisition_durability_projection(
+        item,
+        [
+            {"follow_through_recovery_reacquisition_durability_status": "holding-reacquired"},
+            {"follow_through_recovery_reacquisition_durability_status": "holding-reacquired"},
+        ],
+        follow_through_recovery_reacquisition_status="reacquired",
+        follow_through_relapse_churn_status="none",
+        follow_through_recovery_freshness_status="holding-fresh",
+        follow_through_recovery_decay_status="none",
+        follow_through_recovery_memory_reset_status="rebuilding",
+    )
+    assert age_runs == 3
+    assert status == "durable-reacquired"
+    assert "durable enough to trust" in reason
+    assert "durably re-established calmer posture" in summary
+
+
+def test_follow_through_reacquisition_durability_softens_when_reacquisition_wobbles():
+    item = {"repo": "RepoD", "title": "RepoD drift needs review"}
+
+    age_runs, status, reason, summary = operator_control_center._follow_through_reacquisition_durability_projection(
+        item,
+        [{"follow_through_recovery_reacquisition_status": "holding-reacquired"}],
+        follow_through_recovery_reacquisition_status="fragile-reacquisition",
+        follow_through_relapse_churn_status="fragile",
+        follow_through_recovery_freshness_status="mixed-age",
+        follow_through_recovery_decay_status="softening",
+        follow_through_recovery_memory_reset_status="reset-watch",
+    )
+    assert age_runs == 1
+    assert status == "softening"
+    assert "already softening under weaker freshness or wobble" in reason
+    assert "already softening again" in summary
+
+
+def test_follow_through_reacquisition_consolidation_tracks_holding_durable_and_reversing_states():
+    item = {"repo": "RepoD", "title": "RepoD drift needs review"}
+
+    status, reason, summary = operator_control_center._follow_through_reacquisition_consolidation_projection(
+        item,
+        [{"follow_through_recovery_reacquisition_durability_status": "holding-reacquired"}],
+        follow_through_recovery_reacquisition_status="holding-reacquired",
+        follow_through_recovery_reacquisition_durability_status="holding-reacquired",
+        follow_through_relapse_churn_status="none",
+        follow_through_recovery_freshness_status="fresh",
+        follow_through_recovery_decay_status="none",
+    )
+    assert status == "holding-confidence"
+    assert "restored confidence is now consolidating cleanly" in reason
+    assert "restored calmer confidence is now holding" in summary
+
+    status, reason, summary = operator_control_center._follow_through_reacquisition_consolidation_projection(
+        item,
+        [],
+        follow_through_recovery_reacquisition_status="reacquired",
+        follow_through_recovery_reacquisition_durability_status="durable-reacquired",
+        follow_through_relapse_churn_status="none",
+        follow_through_recovery_freshness_status="fresh",
+        follow_through_recovery_decay_status="none",
+    )
+    assert status == "durable-confidence"
+    assert "safely consolidated" in reason
+    assert "now looks durable" in summary
+
+    status, reason, summary = operator_control_center._follow_through_reacquisition_consolidation_projection(
+        item,
+        [{"follow_through_recovery_reacquisition_consolidation_status": "holding-confidence"}],
+        follow_through_recovery_reacquisition_status="holding-reacquired",
+        follow_through_recovery_reacquisition_durability_status="holding-reacquired",
+        follow_through_relapse_churn_status="fragile",
+        follow_through_recovery_freshness_status="mixed-age",
+        follow_through_recovery_decay_status="softening",
+    )
+    assert status == "reversing"
+    assert "already pushing that confidence back down" in reason
+    assert "already reversing" in summary
+
+
 def test_operator_snapshot_marks_quiet_recovery_as_improving(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(
         "src.operator_control_center.load_operator_state_history",
