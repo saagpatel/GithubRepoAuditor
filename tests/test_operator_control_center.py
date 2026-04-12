@@ -524,6 +524,27 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
         "clearance-reset",
         "blocked",
     }
+    assert summary[
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_status"
+    ] in {
+        "none",
+        "recovering-confirmation-rebuild-reentry-rerestore-reset",
+        "recovering-clearance-rebuild-reentry-rerestore-reset",
+        "rererestoring-confirmation-rebuild-reentry",
+        "rererestoring-clearance-rebuild-reentry",
+        "reversing",
+        "blocked",
+    }
+    assert summary[
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status"
+    ] in {
+        "none",
+        "pending-confirmation-rebuild-reentry-rererestore",
+        "pending-clearance-rebuild-reentry-rererestore",
+        "rererestored-confirmation-rebuild-reentry",
+        "rererestored-clearance-rebuild-reentry",
+        "blocked",
+    }
     assert summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_persistence_status"] in {
         "none",
         "just-restored",
@@ -553,6 +574,7 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
     assert -0.95 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_score"] <= 0.95
     assert -0.95 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_persistence_score"] <= 0.95
     assert -0.95 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_score"] <= 0.95
+    assert -0.95 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_score"] <= 0.95
     assert 0.0 <= summary["primary_target_closure_forecast_recovery_churn_score"] <= 0.95
     assert 0.0 <= summary["primary_target_closure_forecast_reset_reentry_churn_score"] <= 0.95
     assert 0.0 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_churn_score"] <= 0.95
@@ -582,6 +604,7 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
     assert summary["closure_forecast_reset_reentry_rebuild_reentry_restore_window_runs"] == 4
     assert summary["closure_forecast_reset_reentry_rebuild_reentry_restore_decay_window_runs"] == 4
     assert summary["closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_window_runs"] == 4
+    assert summary["closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_window_runs"] == 4
     assert summary["class_normalization_window_runs"] == 4
     assert summary["class_reweighting_window_runs"] == 4
     assert summary["class_transition_window_runs"] == 4
