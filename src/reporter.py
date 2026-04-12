@@ -9,10 +9,12 @@ from src.models import AuditReport, RepoAudit
 from src.report_enrichment import (
     build_last_movement_label,
     build_queue_pressure_summary,
+    build_repo_briefing,
     build_run_change_counts,
     build_run_change_summary,
     build_top_recommendation_summary,
     build_trust_actionability_summary,
+    build_weekly_review_pack,
     no_linked_artifact_summary,
 )
 
@@ -211,10 +213,12 @@ def write_markdown_report(
             _w(f"- {check.get('summary', 'Issue detected')} ({check.get('category', 'setup')})")
         _w("")
 
+    report_dict = report.to_dict()
     run_change_counts = report.run_change_counts or build_run_change_counts(diff_data)
-    queue_pressure_summary = build_queue_pressure_summary(report.to_dict(), diff_data)
-    top_recommendation_summary = build_top_recommendation_summary(report.to_dict())
-    trust_actionability_summary = build_trust_actionability_summary(report.to_dict())
+    queue_pressure_summary = build_queue_pressure_summary(report_dict, diff_data)
+    top_recommendation_summary = build_top_recommendation_summary(report_dict)
+    trust_actionability_summary = build_trust_actionability_summary(report_dict)
+    weekly_pack = build_weekly_review_pack(report_dict, diff_data)
     _w("### Run Changes")
     _w("")
     _w(f"- Summary: {report.run_change_summary or build_run_change_summary(diff_data)}")
@@ -229,6 +233,37 @@ def write_markdown_report(
         f"{run_change_counts.get('new_repos', 0)} new repos"
     )
     _w("")
+
+    _w("## Weekly Review Pack")
+    _w("")
+    _w(f"- Portfolio Headline: {weekly_pack.get('portfolio_headline', 'No weekly headline is recorded yet.')}")
+    _w(f"- Run Changes: {weekly_pack.get('run_change_summary', build_run_change_summary(diff_data))}")
+    _w(f"- Queue Pressure: {weekly_pack.get('queue_pressure_summary', queue_pressure_summary)}")
+    _w(f"- Trust / Actionability: {weekly_pack.get('trust_actionability_summary', trust_actionability_summary)}")
+    _w(f"- What To Do This Week: {weekly_pack.get('what_to_do_this_week', top_recommendation_summary)}")
+    _w("")
+    _w("### Top Attention")
+    _w("")
+    for item in weekly_pack.get("top_attention", [])[:5]:
+        _w(
+            f"- [{item.get('lane', 'ready')}] {item.get('repo', 'Portfolio')}: {item.get('title', 'Operator attention item')}"
+        )
+        _w(f"  - What Changed: {item.get('last_movement', 'Current run')}")
+        _w(f"  - Why It Matters: {item.get('why', 'Operator pressure is active.')}")
+        _w(f"  - What To Do Next: {item.get('next_step', 'Review the latest state.')}")
+    if not weekly_pack.get("top_attention"):
+        _w("- No urgent attention items are currently surfaced.")
+    _w("")
+    _w("### Top Repo Drilldowns")
+    _w("")
+    for briefing in weekly_pack.get("repo_briefings", [])[:3]:
+        _w(f"#### {briefing.get('headline', briefing.get('repo', 'Repo briefing'))}")
+        _w("")
+        _w(f"- Current State: {briefing.get('current_state_line', 'No current-state summary is recorded yet.')}")
+        _w(f"- What Changed: {briefing.get('what_changed_line', 'No change summary is recorded yet.')}")
+        _w(f"- Why It Matters: {briefing.get('why_it_matters_line', 'No explanation summary is recorded yet.')}")
+        _w(f"- What To Do Next: {briefing.get('what_to_do_next_line', 'No next action is recorded yet.')}")
+        _w("")
 
     if report.operator_summary or report.operator_queue:
         _w("### Operator Control Center")
@@ -1101,8 +1136,30 @@ def write_markdown_report(
     sorted_audits = sorted(report.audits, key=lambda a: a.overall_score, reverse=True)
     for audit in sorted_audits:
         m = audit.metadata
+        briefing = build_repo_briefing(audit.to_dict(), report_dict, diff_data)
         _w("<details>")
-        _w(f"<summary>{m.name} — {audit.overall_score:.2f} ({audit.completeness_tier})</summary>")
+        _w(f"<summary>{briefing.get('headline', f'{m.name} — {audit.overall_score:.2f} ({audit.completeness_tier})')}</summary>")
+        _w("")
+        _w("**Current State**")
+        _w(f"- {briefing.get('current_state_line', 'No current-state summary is recorded yet.')}")
+        _w(f"- URL: {m.html_url}")
+        _w(f"- Description: {briefing.get('current_state', {}).get('description', m.description or 'No description recorded yet.')}")
+        _w("")
+        _w("**What Changed**")
+        _w(f"- {briefing.get('what_changed', {}).get('last_movement', 'No change timing is recorded yet.')}")
+        _w(f"- {briefing.get('what_changed', {}).get('recent_change_summary', 'No recent change summary is recorded yet.')}")
+        _w(f"- Hotspot context: {briefing.get('what_changed', {}).get('top_hotspot_context', 'No hotspot context is recorded yet.')}")
+        _w("")
+        _w("**Why It Matters**")
+        _w(f"- Strongest drivers: {briefing.get('why_this_repo_looks_this_way', {}).get('strongest_drivers', 'No strong positive drivers recorded yet.')}")
+        _w(f"- Biggest drags: {briefing.get('why_this_repo_looks_this_way', {}).get('biggest_drags', 'No major drag factors recorded yet.')}")
+        _w(f"- Next tier gap: {briefing.get('why_this_repo_looks_this_way', {}).get('next_tier_gap', 'No next-tier gap is recorded yet.')}")
+        _w("")
+        _w("**What To Do Next**")
+        _w(f"- Next best action: {briefing.get('what_to_do_next', {}).get('next_best_action', 'No clear next action is recorded yet.')}")
+        _w(f"- Rationale: {briefing.get('what_to_do_next', {}).get('rationale', 'No action rationale is recorded yet.')}")
+        if briefing.get("what_to_do_next", {}).get("top_action_candidates"):
+            _w(f"- Other good candidates: {', '.join(briefing.get('what_to_do_next', {}).get('top_action_candidates', [])[:3])}")
         _w("")
         _w("| Dimension | Score | Key Findings |")
         _w("|-----------|-------|-------------|")
@@ -1110,7 +1167,6 @@ def write_markdown_report(
             findings = ", ".join(r.findings[:2]) if r.findings else "—"
             _w(f"| {r.dimension} | {r.score:.2f} | {findings} |")
         _w("")
-        _w(f"**URL:** {m.html_url}  ")
         _w(f"**Language:** {m.language or '—'} | "
            f"**Size:** {m.size_kb} KB | "
            f"**Stars:** {m.stars} | "
@@ -1133,15 +1189,10 @@ def write_markdown_report(
                 )
         if audit.score_explanation:
             _w("")
-            _w("**Why This Score Looks This Way:**")
-            if audit.score_explanation.get("top_positive_drivers"):
-                _w(f"- Strongest drivers: {', '.join(audit.score_explanation.get('top_positive_drivers', [])[:3])}")
-            if audit.score_explanation.get("top_negative_drivers"):
-                _w(f"- Biggest drags: {', '.join(audit.score_explanation.get('top_negative_drivers', [])[:3])}")
-            if audit.score_explanation.get("next_tier_gap_summary"):
-                _w(f"- Next tier gap: {audit.score_explanation.get('next_tier_gap_summary')}")
-            if audit.score_explanation.get("next_best_action"):
-                _w(f"- Next best action: {audit.score_explanation.get('next_best_action')}")
+            _w("**Repo Briefing Summary:**")
+            _w(f"- What Changed: {briefing.get('what_changed_line', 'No change summary is recorded yet.')}")
+            _w(f"- Why It Matters: {briefing.get('why_it_matters_line', 'No explanation summary is recorded yet.')}")
+            _w(f"- What To Do Next: {briefing.get('what_to_do_next_line', 'No next action is recorded yet.')}")
         if audit.security_posture:
             _w("")
             _w("**Security Posture:**")

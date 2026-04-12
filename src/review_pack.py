@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from src.analyst_views import build_analyst_context
+from src.report_enrichment import build_weekly_review_pack
 
 
 def export_review_pack(
@@ -26,12 +27,40 @@ def export_review_pack(
 
     lines: list[str] = []
     _w = lines.append
+    weekly_pack = build_weekly_review_pack(report_data, diff_data)
 
     _w(f"# Review Pack: {username}")
     _w("")
     _w(f"*Profile:* {context['profile_name']}  ")
     _w(f"*Collection:* {context['collection_name'] or 'all'}  ")
     _w(f"*Generated:* {report_data.get('generated_at', '')[:10]}")
+    _w("")
+
+    _w("## Weekly Review Pack")
+    _w("")
+    _w(f"- Portfolio Headline: {weekly_pack.get('portfolio_headline', 'No weekly headline is recorded yet.')}")
+    _w(f"- Run Changes: {weekly_pack.get('run_change_summary', 'No run-change summary is recorded yet.')}")
+    _w(f"- Queue Pressure: {weekly_pack.get('queue_pressure_summary', 'No queue-pressure summary is recorded yet.')}")
+    _w(f"- Trust / Actionability: {weekly_pack.get('trust_actionability_summary', 'No trust summary is recorded yet.')}")
+    _w(f"- What To Do This Week: {weekly_pack.get('what_to_do_this_week', 'Continue the normal operator review loop.')}")
+    _w("")
+    _w("### Top Attention")
+    _w("")
+    for item in weekly_pack.get("top_attention", [])[:5]:
+        _w(f"- [{item.get('lane', 'ready')}] {item.get('repo', 'Portfolio')}: {item.get('title', 'Operator attention item')}")
+        _w(f"  Why: {item.get('why', 'Operator pressure is active.')}")
+        _w(f"  Action: {item.get('next_step', 'Review the latest state.')}")
+    if not weekly_pack.get("top_attention"):
+        _w("- No urgent attention items are currently surfaced.")
+    _w("")
+    _w("### Top Repo Drilldowns")
+    _w("")
+    for briefing in weekly_pack.get("repo_briefings", [])[:3]:
+        _w(f"- {briefing.get('headline', briefing.get('repo', 'Repo briefing'))}")
+        _w(f"  Current State: {briefing.get('current_state_line', 'No current-state summary is recorded yet.')}")
+        _w(f"  What Changed: {briefing.get('what_changed_line', 'No change summary is recorded yet.')}")
+        _w(f"  Why It Matters: {briefing.get('why_it_matters_line', 'No explanation summary is recorded yet.')}")
+        _w(f"  What To Do Next: {briefing.get('what_to_do_next_line', 'No next action is recorded yet.')}")
     _w("")
 
     operator_summary = report_data.get("operator_summary", {})

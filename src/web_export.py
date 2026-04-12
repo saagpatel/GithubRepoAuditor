@@ -15,11 +15,13 @@ from src.analyst_views import build_analyst_context
 from src.report_enrichment import (
     build_last_movement_label,
     build_queue_pressure_summary,
+    build_repo_briefing,
     build_run_change_counts,
     build_run_change_summary,
     build_score_explanation,
     build_top_recommendation_summary,
     build_trust_actionability_summary,
+    build_weekly_review_pack,
     no_baseline_summary,
     no_linked_artifact_summary,
 )
@@ -146,6 +148,7 @@ def _render_html(
         _kpi_section(report_data),
         _preflight_section(report_data),
         _operator_section(report_data),
+        _weekly_review_pack_section(report_data, diff_data),
         _top_attention_section(report_data),
         _analyst_summary_section(analyst_context),
         _lens_summary_section(report_data),
@@ -155,6 +158,7 @@ def _render_html(
         '<div id="tooltip" class="tooltip"></div>',
         '</div>',
         _repo_table(analyst_context, score_history),
+        _repo_drilldown_section(report_data, diff_data),
         _portfolio_trends_section(trend_data or []),
         _run_changes_section(report_data, diff_data),
         _compare_section(diff_data),
@@ -462,6 +466,52 @@ def _top_attention_section(data: dict) -> str:
     </div>"""
 
 
+def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> str:
+    weekly_pack = build_weekly_review_pack(report_data, diff_data)
+    attention_rows = []
+    for item in weekly_pack.get("top_attention", [])[:5]:
+        attention_rows.append(
+            "<li>"
+            f"<strong>{escape(item.get('repo', 'Portfolio'))}:</strong> {escape(item.get('title', 'Operator attention item'))}"
+            f"<br><span class='muted'><strong>What Changed:</strong> {escape(item.get('last_movement', 'Current run'))}</span>"
+            f"<br><span class='muted'><strong>Why It Matters:</strong> {escape(item.get('why', 'Operator pressure is active.'))}</span>"
+            f"<br><span class='muted'><strong>What To Do Next:</strong> {escape(item.get('next_step', 'Review the latest state.'))}</span>"
+            "</li>"
+        )
+    repo_cards = []
+    for briefing in weekly_pack.get("repo_briefings", [])[:3]:
+        repo_cards.append(
+            f"""
+            <div class="panel">
+              <h3><a href="#{escape(briefing.get('anchor', 'repo'), quote=True)}">{escape(briefing.get('headline', briefing.get('repo', 'Repo briefing')))}</a></h3>
+              <div class="meta-line"><strong>Current State:</strong> {escape(briefing.get('current_state_line', 'No current-state summary is recorded yet.'))}</div>
+              <div class="meta-line"><strong>What Changed:</strong> {escape(briefing.get('what_changed_line', 'No change summary is recorded yet.'))}</div>
+              <div class="meta-line"><strong>Why It Matters:</strong> {escape(briefing.get('why_it_matters_line', 'No explanation summary is recorded yet.'))}</div>
+              <div class="meta-line"><strong>What To Do Next:</strong> {escape(briefing.get('what_to_do_next_line', 'No next action is recorded yet.'))}</div>
+            </div>
+            """
+        )
+    return f"""
+    <div class="section">
+      <h2>Weekly Review Pack</h2>
+      <div class="analyst-grid">
+        <div class="panel">
+          <div class="meta-line"><strong>Portfolio Headline:</strong> {escape(weekly_pack.get('portfolio_headline', 'No weekly headline is recorded yet.'))}</div>
+          <div class="meta-line"><strong>Run Changes:</strong> {escape(weekly_pack.get('run_change_summary', build_run_change_summary(diff_data)))}</div>
+          <div class="meta-line"><strong>Queue Pressure:</strong> {escape(weekly_pack.get('queue_pressure_summary', build_queue_pressure_summary(report_data, diff_data)))}</div>
+          <div class="meta-line"><strong>Trust / Actionability:</strong> {escape(weekly_pack.get('trust_actionability_summary', build_trust_actionability_summary(report_data)))}</div>
+          <div class="meta-line"><strong>What To Do This Week:</strong> {escape(weekly_pack.get('what_to_do_this_week', build_top_recommendation_summary(report_data)))}</div>
+          <h3>Top Attention</h3>
+          <ul class="bullet-list">{''.join(attention_rows) or '<li>No urgent attention items are currently surfaced.</li>'}</ul>
+        </div>
+        <div class="panel">
+          <h3>Top Repo Drilldowns</h3>
+          {''.join(repo_cards) or "<div class='meta-line'>No repo drilldowns are recorded yet.</div>"}
+        </div>
+      </div>
+    </div>"""
+
+
 def _intervention_label(intervention: dict) -> str:
     if not intervention:
         return "No intervention evidence is recorded yet."
@@ -577,7 +627,6 @@ def _repo_table(analyst_context: dict, score_history: dict[str, list[float]] | N
         m = a.get("metadata", {})
         explanation = a.get("score_explanation") or build_score_explanation(a)
         name = m.get("name", "")
-        url = m.get("html_url", "")
         grade = a.get("grade", "F")
         score = a.get("overall_score", 0)
         interest = a.get("interest_score", 0)
@@ -599,12 +648,12 @@ def _repo_table(analyst_context: dict, score_history: dict[str, list[float]] | N
         safe_desc = escape(desc)
         safe_tier = escape(tier)
         safe_collections = escape(collections)
-        safe_url = _safe_href(url)
         next_action = escape(explanation.get("next_best_action", "") or "")
         score_note = escape(explanation.get("next_tier_gap_summary", "") or "")
         next_action_markup = f'<br><span class="muted"><strong>Next:</strong> {next_action}</span>' if next_action else ""
         score_note_markup = f'<br><span class="muted"><strong>Gap:</strong> {score_note}</span>' if score_note else ""
-        link = f'<a href="{safe_url}" target="_blank" rel="noopener noreferrer">{safe_name}</a>' if safe_url else safe_name
+        repo_anchor = build_repo_briefing(a, {"audits": [a]}, None).get("anchor", f"repo-{escape(name.lower(), quote=True)}")
+        link = f'<a href="#{escape(repo_anchor, quote=True)}">{safe_name}</a>'
         rows.append(
             f'<tr data-tier="{escape(tier, quote=True)}" '
             f'data-grade="{escape(grade, quote=True)}" '
@@ -669,6 +718,39 @@ def _repo_table(analyst_context: dict, score_history: dict[str, list[float]] | N
         </tr></thead>
         <tbody>{''.join(rows)}</tbody>
       </table>
+    </div>"""
+
+
+def _repo_drilldown_section(report_data: dict, diff_data: dict | None) -> str:
+    audits = sorted(report_data.get("audits", []) or [], key=lambda audit: audit.get("overall_score", 0.0), reverse=True)
+    cards = []
+    for audit in audits:
+        briefing = build_repo_briefing(audit, report_data, diff_data)
+        current_state = briefing.get("current_state", {})
+        why = briefing.get("why_this_repo_looks_this_way", {})
+        changed = briefing.get("what_changed", {})
+        next_steps = briefing.get("what_to_do_next", {})
+        cards.append(
+            f"""
+            <div class="panel" id="{escape(briefing.get('anchor', 'repo'), quote=True)}">
+              <h3>{escape(briefing.get('headline', briefing.get('repo', 'Repo briefing')))}</h3>
+              <div class="meta-line"><strong>Current State:</strong> {escape(briefing.get('current_state_line', 'No current-state summary is recorded yet.'))}</div>
+              <div class="meta-line"><strong>Description:</strong> {escape(current_state.get('description', 'No description recorded yet.'))}</div>
+              <div class="meta-line"><strong>Why This Repo Looks This Way:</strong> Strongest drivers: {escape(why.get('strongest_drivers', 'No strong positive drivers recorded yet.'))}. Biggest drags: {escape(why.get('biggest_drags', 'No major drag factors recorded yet.'))}. Next tier gap: {escape(why.get('next_tier_gap', 'No next-tier gap is recorded yet.'))}</div>
+              <div class="meta-line"><strong>What Changed:</strong> {escape(changed.get('last_movement', 'No change timing is recorded yet.'))} {escape(changed.get('recent_change_summary', 'No recent change summary is recorded yet.'))}</div>
+              <div class="meta-line"><strong>Hotspot Context:</strong> {escape(changed.get('top_hotspot_context', 'No hotspot context is recorded yet.'))}</div>
+              <div class="meta-line"><strong>What To Do Next:</strong> {escape(next_steps.get('next_best_action', 'No clear next action is recorded yet.'))}</div>
+              <div class="meta-line"><strong>Rationale:</strong> {escape(next_steps.get('rationale', 'No action rationale is recorded yet.'))}</div>
+              <div class="meta-line"><strong>Linked Artifact:</strong> {escape(next_steps.get('linked_artifact', no_linked_artifact_summary()))}</div>
+            </div>
+            """
+        )
+    return f"""
+    <div class="section">
+      <h2>Repo Drilldowns</h2>
+      <div class="analyst-grid">
+        {''.join(cards) or "<div class='panel'>No repo drilldown content is recorded yet.</div>"}
+      </div>
     </div>"""
 
 

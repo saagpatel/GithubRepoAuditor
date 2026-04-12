@@ -638,6 +638,10 @@ class TestMarkdownReport:
         assert "Recovery Churn Controls:" in content
         assert "Next Recommended Run" in content
         assert "Watch Strategy" in content
+        assert "Weekly Review Pack" in content
+        assert "Top Repo Drilldowns" in content
+        assert "What To Do This Week" in content
+        assert "Current State" in content
         assert "What Changed" in content
         assert "What To Do Next" in content
         assert "Queue Pressure" in content
