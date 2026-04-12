@@ -784,9 +784,13 @@ class TestRenderHtml:
         assert "Next Checkpoint" in html
         assert "Follow-Through Aging and Escalation" in html
         assert "Follow-Through Recovery and Escalation Retirement" in html
+        assert "Follow-Through Recovery Persistence" in html
+        assert "Follow-Through Relapse Churn" in html
         assert "Checkpoint Timing" in html
         assert "Escalation" in html
         assert "Recovery / Retirement" in html
+        assert "Recovery Persistence" in html
+        assert "Relapse Churn" in html
         assert "Last movement:" in html
         assert no_linked_artifact_summary() in html
 
