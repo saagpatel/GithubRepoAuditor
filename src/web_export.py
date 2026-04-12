@@ -14,7 +14,6 @@ from urllib.parse import urlparse
 from src.analyst_views import build_analyst_context
 from src.sparkline import sparkline as render_sparkline
 
-
 # ── Color constants (matching Excel design system) ──────────────────
 
 TIER_COLORS_CSS = {

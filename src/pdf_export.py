@@ -8,7 +8,6 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-
 # ── FPDF subclass ──────────────────────────────────────────────────────
 
 def _make_pdf_class():

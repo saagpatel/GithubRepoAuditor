@@ -1,5 +1,5 @@
-import pytest
 from unittest.mock import MagicMock
+
 from src.issue_creator import create_audit_issues
 
 

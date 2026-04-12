@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import requests
 
-from src.github_client import GitHubClient, REST_API_VERSION
+from src.github_client import REST_API_VERSION, GitHubClient
 
 
 class _MemoryCache:

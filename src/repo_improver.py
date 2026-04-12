@@ -10,7 +10,10 @@ import base64
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from src.github_client import GitHubClient
 
 logger = logging.getLogger(__name__)
 

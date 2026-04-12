@@ -17,8 +17,6 @@ try:
         TextColumn,
         TimeElapsedColumn,
     )
-    from rich.table import Table
-
     HAS_RICH = True
 except ImportError:
     HAS_RICH = False

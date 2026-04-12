@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.models import AnalyzerResult, RepoAudit
+from src.models import RepoAudit
 
 # Badge definitions: (name, check_fn, action_hint)
 # check_fn receives (score_map, details_map, audit)

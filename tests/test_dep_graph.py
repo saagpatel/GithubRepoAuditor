@@ -1,8 +1,6 @@
 """Tests for src/dep_graph.py — cross-repo dependency graph."""
 from __future__ import annotations
 
-import pytest
-
 from src.dep_graph import build_dependency_graph, find_vulnerability_impact
 
 

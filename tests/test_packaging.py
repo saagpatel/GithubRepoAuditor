@@ -8,7 +8,6 @@ import pytest
 
 from src.config import inspect_config
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 

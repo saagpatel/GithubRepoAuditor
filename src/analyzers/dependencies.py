@@ -84,8 +84,8 @@ class DependenciesAnalyzer(BaseAnalyzer):
         # Libyears freshness (optional — requires network for registry queries)
         if found_manifests:
             try:
-                from src.libyears import compute_libyears
                 from src.cache import ResponseCache
+                from src.libyears import compute_libyears
                 cache = ResponseCache(ttl=86400)  # 24hr for registries
                 libyears_data = compute_libyears(repo_path, found_manifests, cache)
                 details.update(libyears_data)

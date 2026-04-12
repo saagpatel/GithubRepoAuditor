@@ -5,7 +5,6 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
-
 HISTORY_DIR = Path("output/history")
 
 

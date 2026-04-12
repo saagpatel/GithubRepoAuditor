@@ -1,42 +1,41 @@
 from __future__ import annotations
 
 import json
-import zipfile
 import xml.etree.ElementTree as ET
-from pathlib import Path
+import zipfile
 
 import pytest
 from openpyxl import Workbook, load_workbook
 
 from src.excel_export import (
-    _build_dashboard,
-    _build_all_repos,
+    RADAR_DIMS,
+    RADAR_LABELS,
     _build_action_items,
+    _build_all_repos,
     _build_by_collection,
-    _build_trend_summary,
-    _build_trends,
-    _build_score_explainer,
-    _build_repo_profiles,
-    _build_security,
-    _build_security_debt,
+    _build_by_lens,
+    _build_campaigns,
     _build_changes,
+    _build_compare_sheet,
+    _build_dashboard,
+    _build_executive_summary,
+    _build_governance_audit,
+    _build_governance_controls,
     _build_hidden_data_sheets,
     _build_hotspots,
     _build_portfolio_explorer,
-    _build_by_lens,
-    _build_compare_sheet,
-    _build_scenario_planner,
-    _build_executive_summary,
     _build_print_pack,
-    _build_campaigns,
+    _build_repo_profiles,
     _build_review_history_sheet,
     _build_review_queue,
-    _build_governance_controls,
-    _build_governance_audit,
+    _build_scenario_planner,
+    _build_score_explainer,
+    _build_security,
+    _build_security_debt,
+    _build_trend_summary,
+    _build_trends,
     _build_writeback_audit,
     export_excel,
-    RADAR_DIMS,
-    RADAR_LABELS,
 )
 from src.excel_template import DEFAULT_TEMPLATE_PATH, TEMPLATE_INFO_SHEET
 
@@ -993,7 +992,11 @@ class TestAnalystWorkbookSheets:
         assert wb["Trends"].freeze_panes == "B4"
 
     def test_creates_security_phase_sheets(self):
-        from src.excel_export import _build_security_controls, _build_supply_chain, _build_security_debt
+        from src.excel_export import (
+            _build_security_controls,
+            _build_security_debt,
+            _build_supply_chain,
+        )
 
         wb = Workbook()
         _build_security_controls(wb, _make_report())

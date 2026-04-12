@@ -1,6 +1,8 @@
 """Create GitHub Issues from audit quick wins."""
 from __future__ import annotations
+
 import sys
+
 from src.github_client import GitHubClient
 
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.web_export import export_html_dashboard, _render_html, _portfolio_trends_section
+from src.web_export import _render_html, export_html_dashboard
 
 
 def _make_report(**overrides) -> dict:

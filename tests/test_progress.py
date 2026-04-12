@@ -1,10 +1,7 @@
 """Tests for audit progress persistence (save/load/clear)."""
 from __future__ import annotations
 
-import json
 from pathlib import Path
-
-import pytest
 
 from src.progress import PROGRESS_FILE, clear_progress, load_progress, save_progress
 

@@ -6,7 +6,6 @@ from pathlib import Path
 import pytest
 
 from src.analyzers import load_custom_analyzers
-from src.analyzers.base import BaseAnalyzer
 from src.models import AnalyzerResult, RepoMetadata
 
 

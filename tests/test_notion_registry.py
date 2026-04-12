@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.notion_registry import _extract_title, _extract_select, _normalize_status
+from src.notion_registry import _extract_select, _extract_title, _normalize_status
 
 
 class TestExtractTitle:

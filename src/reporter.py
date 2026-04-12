@@ -832,7 +832,7 @@ def write_markdown_report(
     sorted_audits = sorted(report.audits, key=lambda a: a.overall_score, reverse=True)
     for audit in sorted_audits:
         m = audit.metadata
-        _w(f"<details>")
+        _w("<details>")
         _w(f"<summary>{m.name} — {audit.overall_score:.2f} ({audit.completeness_tier})</summary>")
         _w("")
         _w("| Dimension | Score | Key Findings |")

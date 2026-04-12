@@ -4,7 +4,6 @@ import argparse
 import json
 from pathlib import Path
 
-
 ISSUE_LABEL = "scheduled-audit-handoff"
 
 

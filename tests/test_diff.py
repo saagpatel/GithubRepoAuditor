@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from src.diff import diff_reports, format_diff_markdown, print_diff_summary
 

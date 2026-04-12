@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -2756,7 +2755,6 @@ def _class_trust_reweight_for_target(
             "Class normalization stayed visible, but fresh support is no longer strong enough to keep the full stronger posture in place."
         )
         reverted_policy = target.get("pre_class_normalization_trust_policy", trust_policy)
-        reverted_reason = target.get("pre_class_normalization_trust_policy_reason", trust_policy_reason)
         if trust_policy == "act-with-review" and reverted_policy == "verify-first":
             trust_policy = reverted_policy
             trust_policy_reason = softened_reason
@@ -3373,14 +3371,10 @@ def _apply_pending_debt_freshness_and_closure_forecast_reweighting(
         closure_forecast_reweight_effect_reason = ""
         transition_closure_likely_outcome = target.get("transition_closure_likely_outcome", "none")
         transition_closure_confidence_label = target.get("transition_closure_confidence_label", "low")
-        transition_closure_confidence_score = target.get("transition_closure_confidence_score", 0.05)
-        transition_closure_confidence_reasons = target.get("transition_closure_confidence_reasons", [])
         transition_status = target.get("class_reweight_transition_status", "none")
         transition_reason = target.get("class_reweight_transition_reason", "")
         resolution_status = target.get("class_transition_resolution_status", "none")
         resolution_reason = target.get("class_transition_resolution_reason", "")
-        health_status = target.get("class_transition_health_status", "none")
-        health_reason = target.get("class_transition_health_reason", "")
         trust_policy = target.get("trust_policy", "monitor")
         trust_policy_reason = target.get("trust_policy_reason", "No trust-policy reason is recorded yet.")
         pending_debt_status = target.get("class_pending_debt_status", "none")
@@ -4299,7 +4293,6 @@ def _closure_forecast_reweight_scores_for_target(
         "stale": 0.35,
         "insufficient-data": 0.20,
     }.get(freshness_status, 0.20)
-    transition_direction = _pending_transition_direction(transition_status)
     transition_score_delta = float(transition_history_meta.get("transition_score_delta", 0.0) or 0.0)
     health_status = target.get("class_transition_health_status", "none")
     likely_outcome = target.get("transition_closure_likely_outcome", "none")
@@ -4861,7 +4854,6 @@ def _apply_closure_forecast_momentum_and_hysteresis(
         current_primary_target=current_primary_target,
         current_generated_at=current_generated_at,
     )
-    historical_transition_events = transition_events[1:]
     closure_forecast_events = _class_closure_forecast_events(
         history,
         current_primary_target=current_primary_target,
@@ -8986,7 +8978,6 @@ def _apply_closure_forecast_hysteresis_control(
     freshness_status = target.get("pending_debt_freshness_status", "insufficient-data")
     local_noise = _target_specific_normalization_noise(target, transition_history_meta)
     transition_age_runs = int(target.get("class_transition_age_runs", 0) or 0)
-    current_strengthening = transition_history_meta.get("current_transition_strengthening", False)
     recent_pending_status = transition_history_meta.get("recent_pending_status", "none")
     reweight_effect = target.get("closure_forecast_reweight_effect", "none")
 
@@ -9290,7 +9281,6 @@ def _apply_closure_forecast_decay_control(
     class_normalization_reason: str,
 ) -> tuple[str, str, str, str, str, str, str, str, str, str, str, str, str, str, str, str, str]:
     freshness_status = freshness_meta.get("closure_forecast_freshness_status", "insufficient-data")
-    decayed_confirmation_rate = float(freshness_meta.get("decayed_confirmation_forecast_rate", 0.0) or 0.0)
     decayed_clearance_rate = float(freshness_meta.get("decayed_clearance_forecast_rate", 0.0) or 0.0)
     local_noise = _target_specific_normalization_noise(target, transition_history_meta)
     direction = target.get("closure_forecast_reweight_direction", "neutral")
@@ -10414,7 +10404,6 @@ def _closure_forecast_recovery_churn_for_target(
         churn_score = float(flip_count) * 0.20
         stability_status = target.get("closure_forecast_stability_status", "watch")
         momentum_status = target.get("closure_forecast_momentum_status", "insufficient-data")
-        freshness_status = target.get("closure_forecast_freshness_status", "insufficient-data")
         if stability_status == "oscillating":
             churn_score += 0.15
         if momentum_status == "reversing":
@@ -10658,7 +10647,6 @@ def _apply_reacquisition_freshness_reset_control(
         freshness_meta.get("decayed_reacquired_clearance_rate", 0.0) or 0.0
     )
     churn_status = target.get("closure_forecast_recovery_churn_status", "none")
-    transition_age_runs = int(target.get("class_transition_age_runs", 0) or 0)
     recent_pending_status = transition_history_meta.get("recent_pending_status", "none")
     current_side = _closure_forecast_reacquisition_side_from_status(persistence_status)
     if current_side == "none":

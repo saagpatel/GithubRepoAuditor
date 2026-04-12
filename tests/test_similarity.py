@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from src.similarity import classify_similarity, compute_file_hashes, find_similar_repos
 
 

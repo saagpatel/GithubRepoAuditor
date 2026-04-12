@@ -1,21 +1,15 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from src.badge_export import (
-    ELIGIBLE_TIERS,
-    GRADE_COLORS,
-    TIER_COLORS,
+    _endpoint_badge_url,
+    _load_gist_id,
     _make_shield_json,
+    _save_gist_id,
     _shields_escape,
     _static_badge_url,
-    _endpoint_badge_url,
     _write_badges_markdown,
-    _write_portfolio_badges,
-    _write_repo_badges,
-    _load_gist_id,
-    _save_gist_id,
     export_badges,
 )
 

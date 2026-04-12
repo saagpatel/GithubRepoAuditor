@@ -1,14 +1,10 @@
 """Tests for OSV.dev vulnerability checking."""
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from src.vuln_check import (
-    ECOSYSTEM_MAP,
     check_vulnerabilities,
     format_vuln_summary,
 )

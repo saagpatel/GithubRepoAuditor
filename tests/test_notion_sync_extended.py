@@ -1,17 +1,18 @@
 from __future__ import annotations
+
 from unittest.mock import MagicMock, patch
 
 from src.notion_client import query_page_by_title
-from src.notion_sync import _extract_audit_data
 from src.notion_sync import (
-    _build_weekly_review_section_blocks,
-    _managed_section_block_ids,
-    _render_quick_wins_markdown,
-    _render_audit_highlights,
-    _chunk_text,
-    check_recommendation_followup,
-    FLAG_TO_ACTION,
     ELIGIBLE_TIERS,
+    FLAG_TO_ACTION,
+    _build_weekly_review_section_blocks,
+    _chunk_text,
+    _extract_audit_data,
+    _managed_section_block_ids,
+    _render_audit_highlights,
+    _render_quick_wins_markdown,
+    check_recommendation_followup,
     patch_weekly_review,
     sync_campaign_actions,
 )

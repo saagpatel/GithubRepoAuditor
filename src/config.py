@@ -1,8 +1,8 @@
 """Config file support — loads audit-config.yaml and merges with CLI args."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 
 

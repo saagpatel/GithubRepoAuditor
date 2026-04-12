@@ -12,19 +12,47 @@ from pathlib import Path
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.chart import BarChart, BubbleChart, PieChart, RadarChart, Reference, ScatterChart
-from openpyxl.chart.series import Series as BubbleSeries
 from openpyxl.chart.label import DataLabelList
 from openpyxl.chart.series import DataPoint
+from openpyxl.chart.series import Series as BubbleSeries
 from openpyxl.drawing.line import LineProperties
 from openpyxl.formatting.rule import ColorScaleRule, DataBarRule, IconSetRule
 from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
+from openpyxl.workbook.defined_name import DefinedName
 from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.worksheet.hyperlink import Hyperlink
 from openpyxl.worksheet.table import Table, TableStyleInfo
-from openpyxl.workbook.defined_name import DefinedName
 
-from src.sparkline import sparkline as render_sparkline
+from src.excel_styles import (
+    CENTER,
+    GRADE_COLORS,
+    HEATMAP_AMBER,
+    HEATMAP_GREEN,
+    HEATMAP_RED,
+    LEFT,
+    NARRATIVE_FONT,
+    NAVY,
+    SECTION_FONT,
+    SPARKLINE_FONT,
+    SUBHEADER_FILL,
+    SUBHEADER_FONT,
+    SUBTITLE_FONT,
+    TEAL,
+    THIN_BORDER,
+    TIER_FILLS,
+    TITLE_FONT,
+    WHITE,
+    WRAP,
+    apply_zebra_stripes,
+    auto_width,
+    color_grade_cell,
+    color_pattern_cell,
+    color_tier_cell,
+    style_data_cell,
+    style_header_row,
+    write_kpi_card,
+)
 from src.excel_template import (
     DEFAULT_TEMPLATE_PATH,
     TEMPLATE_INFO_SHEET,
@@ -34,38 +62,7 @@ from src.excel_template import (
     inject_native_sparklines,
     resolve_template_path,
 )
-
-from src.excel_styles import (
-    CENTER,
-    GRADE_COLORS,
-    HEATMAP_AMBER,
-    HEATMAP_GREEN,
-    HEATMAP_RED,
-    NAVY,
-    PATTERN_COLORS,
-    SECTION_FONT,
-    SLATE,
-    SUBHEADER_FILL,
-    SUBHEADER_FONT,
-    SUBTITLE_FONT,
-    TEAL,
-    THIN_BORDER,
-    TIER_FILLS,
-    TITLE_FONT,
-    WRAP,
-    WHITE,
-    NARRATIVE_FONT,
-    SPARKLINE_FONT,
-    apply_zebra_stripes,
-    auto_width,
-    color_grade_cell,
-    color_pattern_cell,
-    color_tier_cell,
-    LEFT,
-    style_data_cell,
-    style_header_row,
-    write_kpi_card,
-)
+from src.sparkline import sparkline as render_sparkline
 
 # Tier display order
 TIER_ORDER = ["shipped", "functional", "wip", "skeleton", "abandoned"]
@@ -1516,7 +1513,6 @@ def _build_all_repos(wb: Workbook, data: dict, score_history: dict[str, list[flo
             values.append("—")
 
         # Why This Grade
-        from src.scorer import WEIGHTS as _W
         if dim_scores:
             sorted_dims = sorted(dim_scores.items(), key=lambda x: x[1])[:2]
             g = audit.get("grade", "F")
@@ -1973,7 +1969,7 @@ def _build_tier_breakdown(wb: Workbook, data: dict) -> None:
             continue
         tier_audits.sort(key=lambda a: a.get("overall_score", 0), reverse=True)
 
-        from src.excel_styles import TIER_FILLS, TIER_FONT
+        from src.excel_styles import TIER_FILLS
         ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=6)
         h = ws.cell(row=current_row, column=1, value=f"{tier.upper()} ({len(tier_audits)} repos)")
         h.font = XFont(bold=True, size=13, color=WHITE)
@@ -2130,7 +2126,7 @@ def _build_reconciliation(wb: Workbook, data: dict) -> None:
 
 def _build_score_explainer(wb: Workbook) -> None:
     """Static reference sheet explaining the scoring system."""
-    from src.scorer import WEIGHTS, GRADE_THRESHOLDS, COMPLETENESS_TIERS, INTEREST_TIERS
+    from src.scorer import COMPLETENESS_TIERS, GRADE_THRESHOLDS, WEIGHTS
 
     ws = _get_or_create_sheet(wb, "Score Explainer")
     ws.sheet_properties.tabColor = "37474F"

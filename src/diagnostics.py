@@ -4,7 +4,7 @@ import json
 import os
 import subprocess
 import zipfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -18,7 +18,6 @@ from src.baseline_context import (
 from src.config import ConfigInspection, inspect_config, validate_config_data
 from src.excel_template import DEFAULT_TEMPLATE_PATH, TEMPLATE_INFO_SHEET, TEMPLATE_SHEETS
 from src.portfolio_intelligence import DEFAULT_PROFILES
-
 
 NOTION_CONFIG_PATH = Path("config") / "notion-config.json"
 FINGERPRINT_FILENAME = ".audit-fingerprints.json"

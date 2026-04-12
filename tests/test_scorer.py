@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 from src.models import AnalyzerResult, RepoMetadata
-from src.scorer import score_repo, WEIGHTS, INTEREST_TIERS
+from src.scorer import WEIGHTS, score_repo
 
 
 def _make_results(scores: dict[str, float]) -> list[AnalyzerResult]:

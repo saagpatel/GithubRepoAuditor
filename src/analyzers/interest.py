@@ -198,7 +198,6 @@ def _score_ambition(repo_path: Path, metadata: RepoMetadata) -> tuple[float, dic
         score += 0.05
 
     # Real external dependencies (>5)
-    dep_count = sum(metadata.languages.values()) > 0  # has code
     # Use the already-known dep count from dependencies analyzer if available
     # Fallback: check for manifest files
     for manifest in ("package.json", "Cargo.toml", "pyproject.toml", "go.mod"):

@@ -1,10 +1,10 @@
 from src.cli_output import (
     HAS_RICH,
     create_progress,
-    print_status,
-    print_warning,
     print_info,
+    print_status,
     print_success,
+    print_warning,
 )
 
 

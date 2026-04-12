@@ -1,15 +1,10 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from src.analyzers.interest import (
     InterestAnalyzer,
     _score_commit_bursts,
     _score_description,
     _score_recency,
-    _burst_coefficient,
-    _count_assets,
-    _estimate_loc,
 )
 from src.models import RepoMetadata
 
