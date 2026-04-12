@@ -861,8 +861,8 @@ class TestAnalystWorkbookSheets:
         assert review_ws["A42"].value == "Transition Likely Outcome"
         assert review_ws["A43"].value == "Pending Debt Freshness"
         assert review_ws["A44"].value == "Closure Forecast"
-        assert review_ws["A45"].value == "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness"
-        assert review_ws["A46"].value == "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Controls"
+        assert review_ws["A45"].value == "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery"
+        assert review_ws["A46"].value == "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Controls"
         assert review_ws["A47"].value == "Closure Forecast Summary"
         assert review_ws["A48"].value == "Momentum Summary"
         assert review_ws["A49"].value == "Exception Learning"
@@ -898,8 +898,8 @@ class TestAnalystWorkbookSheets:
         assert executive_ws["D60"].value == "Transition Likely Outcome"
         assert executive_ws["D61"].value == "Pending Debt Freshness"
         assert executive_ws["D62"].value == "Closure Forecast"
-        assert executive_ws["D63"].value == "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness"
-        assert executive_ws["D64"].value == "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Controls"
+        assert executive_ws["D63"].value == "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery"
+        assert executive_ws["D64"].value == "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Controls"
         assert executive_ws["D65"].value == "Closure Forecast Summary"
         assert executive_ws["D66"].value == "Momentum Summary"
         assert executive_ws["D67"].value == "Exception Learning"
@@ -937,8 +937,8 @@ class TestAnalystWorkbookSheets:
         assert print_ws["A45"].value == "Transition Likely Outcome"
         assert print_ws["A46"].value == "Pending Debt Freshness"
         assert print_ws["A47"].value == "Closure Forecast"
-        assert print_ws["A48"].value == "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness"
-        assert print_ws["A49"].value == "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Controls"
+        assert print_ws["A48"].value == "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery"
+        assert print_ws["A49"].value == "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Controls"
         assert print_ws["A50"].value == "Closure Forecast Summary"
         assert print_ws["A51"].value == "Momentum Summary"
         assert print_ws["A52"].value == "Exception Learning"
@@ -966,8 +966,8 @@ class TestAnalystWorkbookSheets:
         assert "Transition Likely Outcome" in dashboard_values
         assert "Pending Debt Freshness" in dashboard_values
         assert "Closure Forecast" in dashboard_values
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness" in dashboard_values
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Controls" in dashboard_values
+        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery" in dashboard_values
+        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Controls" in dashboard_values
         assert "Exception Learning" in dashboard_values
         assert "Recommendation Drift" in dashboard_values
 
