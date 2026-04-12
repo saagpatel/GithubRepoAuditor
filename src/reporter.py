@@ -1159,6 +1159,14 @@ def write_markdown_report(
                 f"  - Reacquisition Confidence: {build_follow_through_reacquisition_consolidation_status_label(item)} — "
                 f"{build_follow_through_reacquisition_consolidation_summary(item)}"
             )
+            _w(
+                f"  - Reacquisition Softening Decay: {build_follow_through_reacquisition_softening_decay_status_label(item)} — "
+                f"{build_follow_through_reacquisition_softening_decay_summary(item)}"
+            )
+            _w(
+                f"  - Reacquisition Confidence Retirement: {build_follow_through_reacquisition_confidence_retirement_status_label(item)} — "
+                f"{build_follow_through_reacquisition_confidence_retirement_summary(item)}"
+            )
             _w(f"  - Next Checkpoint: {build_follow_through_checkpoint(item)}")
             links = item.get("links") or []
             artifact = links[0].get("url", "") if links else ""

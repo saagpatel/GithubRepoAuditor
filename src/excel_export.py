@@ -66,10 +66,14 @@ from src.report_enrichment import (
     build_follow_through_checkpoint_status_label,
     build_follow_through_escalation_status_label,
     build_follow_through_escalation_summary,
+    build_follow_through_reacquisition_confidence_retirement_status_label,
+    build_follow_through_reacquisition_confidence_retirement_summary,
     build_follow_through_reacquisition_consolidation_status_label,
     build_follow_through_reacquisition_consolidation_summary,
     build_follow_through_reacquisition_durability_status_label,
     build_follow_through_reacquisition_durability_summary,
+    build_follow_through_reacquisition_softening_decay_status_label,
+    build_follow_through_reacquisition_softening_decay_summary,
     build_follow_through_recovery_freshness_status_label,
     build_follow_through_recovery_freshness_summary,
     build_follow_through_recovery_memory_reset_status_label,
@@ -459,6 +463,40 @@ def _operator_follow_through_rebuild_details(data: dict) -> tuple[str, str, str,
         durable_label,
         softening_label,
         fragile_confidence_label,
+    )
+
+
+def _operator_follow_through_reacquisition_retirement_details(data: dict) -> tuple[str, str, str, str, str]:
+    summary = data.get("operator_summary") or {}
+    softening_decay = summary.get("follow_through_reacquisition_softening_decay_summary", "") or "No reacquisition softening-decay signal is currently surfaced."
+    confidence_retirement = summary.get("follow_through_reacquisition_confidence_retirement_summary", "") or "No reacquisition confidence-retirement signal is currently surfaced."
+    top_softening = list(summary.get("top_softening_reacquisition_items") or [])
+    top_revalidation = list(summary.get("top_revalidation_needed_reacquisition_items") or [])
+    top_retired = list(summary.get("top_retired_reacquisition_confidence_items") or [])
+    softening_item = top_softening[0] if top_softening else {}
+    softening_label = (
+        f"{softening_item.get('repo')}: {softening_item.get('title')}"
+        if softening_item.get("repo")
+        else softening_item.get("title", "")
+    ) or "No reacquisition softening hotspot"
+    revalidation_item = top_revalidation[0] if top_revalidation else {}
+    revalidation_label = (
+        f"{revalidation_item.get('repo')}: {revalidation_item.get('title')}"
+        if revalidation_item.get("repo")
+        else revalidation_item.get("title", "")
+    ) or "No reacquisition revalidation hotspot"
+    retired_item = top_retired[0] if top_retired else {}
+    retired_label = (
+        f"{retired_item.get('repo')}: {retired_item.get('title')}"
+        if retired_item.get("repo")
+        else retired_item.get("title", "")
+    ) or "No retired re-acquisition confidence hotspot"
+    return (
+        softening_decay,
+        confidence_retirement,
+        softening_label,
+        revalidation_label,
+        retired_label,
     )
 
 
@@ -1059,6 +1097,13 @@ def _build_workbook_rollups(data: dict) -> tuple[list[list[object]], list[list[o
                 item.get("follow_through_recovery_reacquisition_consolidation_status", ""),
                 item.get("follow_through_recovery_reacquisition_consolidation_summary", ""),
                 item.get("follow_through_recovery_reacquisition_consolidation_reason", ""),
+                item.get("follow_through_reacquisition_softening_decay_age_runs", 0),
+                item.get("follow_through_reacquisition_softening_decay_status", ""),
+                item.get("follow_through_reacquisition_softening_decay_summary", ""),
+                item.get("follow_through_reacquisition_softening_decay_reason", ""),
+                item.get("follow_through_reacquisition_confidence_retirement_status", ""),
+                item.get("follow_through_reacquisition_confidence_retirement_summary", ""),
+                item.get("follow_through_reacquisition_confidence_retirement_reason", ""),
             ]
         )
 
@@ -1419,6 +1464,13 @@ def _build_dashboard(
         follow_through_softening_reacquired_hotspot,
         follow_through_fragile_reacquisition_confidence_hotspot,
     ) = _operator_follow_through_rebuild_details(data)
+    (
+        follow_through_reacquisition_softening_decay,
+        follow_through_reacquisition_confidence_retirement,
+        follow_through_reacquisition_softening_hotspot,
+        follow_through_reacquisition_revalidation_hotspot,
+        follow_through_reacquisition_retired_confidence_hotspot,
+    ) = _operator_follow_through_reacquisition_retirement_details(data)
     trend_status, trend_summary, primary_target, resolution_counts = _operator_trend_values(data)
     primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
     last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
@@ -1484,6 +1536,8 @@ def _build_dashboard(
         ("Recovery Reacquisition", follow_through_reacquisition),
         ("Reacquisition Durability", follow_through_reacquisition_durability),
         ("Reacquisition Confidence", follow_through_reacquisition_confidence),
+        ("Reacquisition Softening Decay", follow_through_reacquisition_softening_decay),
+        ("Reacquisition Confidence Retirement", follow_through_reacquisition_confidence_retirement),
         ("Next Action", next_action),
         ("Top Recommendation", top_recommendation_summary),
     ]
@@ -1508,6 +1562,9 @@ def _build_dashboard(
                 ("Durable Reacquired Hotspot", follow_through_durable_reacquired_hotspot),
                 ("Softening Reacquired Hotspot", follow_through_softening_reacquired_hotspot),
                 ("Fragile Reacquisition Confidence Hotspot", follow_through_fragile_reacquisition_confidence_hotspot),
+                ("Reacquisition Softening Hotspot", follow_through_reacquisition_softening_hotspot),
+                ("Revalidation Needed Hotspot", follow_through_reacquisition_revalidation_hotspot),
+                ("Retired Confidence Hotspot", follow_through_reacquisition_retired_confidence_hotspot),
             ]
         )
     operator_rows.extend(
@@ -3315,7 +3372,7 @@ def _set_internal_hyperlink(cell, sheet_name: str, *, target_cell: str = "A1", d
 
 def _repo_detail_lookup_formula(column_index: int, fallback: str, *, allow_blank: bool = False) -> str:
     escaped_fallback = fallback.replace('"', '""')
-    lookup = f"VLOOKUP($B$4,Data_RepoDetail!$A:$BE,{column_index},FALSE)"
+    lookup = f"VLOOKUP($B$4,Data_RepoDetail!$A:$BI,{column_index},FALSE)"
     if allow_blank:
         return f'=IFERROR({lookup},"{escaped_fallback}")'
     return f'=IFERROR(IF({lookup}="","{escaped_fallback}",{lookup}),"{escaped_fallback}")'
@@ -3424,6 +3481,10 @@ def _repo_detail_rows(data: dict, score_history: dict[str, list[float]] | None) 
             briefing.get("what_to_do_next", {}).get("reacquisition_durability_summary", "No follow-through reacquisition durability signal is currently surfaced."),
             briefing.get("what_to_do_next", {}).get("reacquisition_confidence", "None"),
             briefing.get("what_to_do_next", {}).get("reacquisition_confidence_summary", "No follow-through reacquisition confidence-consolidation signal is currently surfaced."),
+            briefing.get("what_to_do_next", {}).get("reacquisition_softening_decay", "None"),
+            briefing.get("what_to_do_next", {}).get("reacquisition_softening_decay_summary", "No reacquisition softening-decay signal is currently surfaced."),
+            briefing.get("what_to_do_next", {}).get("reacquisition_confidence_retirement", "None"),
+            briefing.get("what_to_do_next", {}).get("reacquisition_confidence_retirement_summary", "No reacquisition confidence-retirement signal is currently surfaced."),
             briefing.get("what_to_do_next", {}).get("what_would_count_as_progress", "Use the next run or linked artifact to confirm whether the recommendation moved."),
         ])
 
@@ -4010,6 +4071,13 @@ def _build_hidden_data_sheets(
             "Follow-Through Recovery Reacquisition Consolidation Status",
             "Follow-Through Recovery Reacquisition Consolidation Summary",
             "Follow-Through Recovery Reacquisition Consolidation Reason",
+            "Follow-Through Reacquisition Softening Decay Age Runs",
+            "Follow-Through Reacquisition Softening Decay Status",
+            "Follow-Through Reacquisition Softening Decay Summary",
+            "Follow-Through Reacquisition Softening Decay Reason",
+            "Follow-Through Reacquisition Confidence Retirement Status",
+            "Follow-Through Reacquisition Confidence Retirement Summary",
+            "Follow-Through Reacquisition Confidence Retirement Reason",
         ],
         operator_queue_rows,
     )
@@ -4086,6 +4154,10 @@ def _build_hidden_data_sheets(
             "Reacquisition Durability Summary",
             "Reacquisition Confidence",
             "Reacquisition Confidence Summary",
+            "Reacquisition Softening Decay",
+            "Reacquisition Softening Decay Summary",
+            "Reacquisition Confidence Retirement",
+            "Reacquisition Confidence Retirement Summary",
             "What Would Count As Progress",
         ],
         repo_detail_rows,
@@ -4719,7 +4791,11 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
         ("Reacquisition Durability Summary", 52, "No follow-through reacquisition durability signal is currently surfaced."),
         ("Reacquisition Confidence", 53, "None"),
         ("Reacquisition Confidence Summary", 54, "No follow-through reacquisition confidence-consolidation signal is currently surfaced."),
-        ("Progress Checkpoint", 55, "Use the next run or linked artifact to confirm whether the recommendation moved."),
+        ("Reacquisition Softening Decay", 55, "None"),
+        ("Reacquisition Softening Decay Summary", 56, "No reacquisition softening-decay signal is currently surfaced."),
+        ("Reacquisition Confidence Retirement", 57, "None"),
+        ("Reacquisition Confidence Retirement Summary", 58, "No reacquisition confidence-retirement signal is currently surfaced."),
+        ("Progress Checkpoint", 59, "Use the next run or linked artifact to confirm whether the recommendation moved."),
         ("Action Candidate 2", 28, "No second action candidate recorded yet."),
         ("Action Candidate 3", 29, "No third action candidate recorded yet."),
     ]
@@ -5036,6 +5112,10 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
         "Durability Summary",
         "Reacquisition Confidence",
         "Confidence Summary",
+        "Reacquisition Softening",
+        "Softening Summary",
+        "Confidence Retirement",
+        "Retirement Summary",
         "Open Artifact",
         "Safe To Defer",
     ]
@@ -5085,17 +5165,21 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
             build_follow_through_reacquisition_durability_summary(item),
             build_follow_through_reacquisition_consolidation_status_label(item),
             build_follow_through_reacquisition_consolidation_summary(item),
+            build_follow_through_reacquisition_softening_decay_status_label(item),
+            build_follow_through_reacquisition_softening_decay_summary(item),
+            build_follow_through_reacquisition_confidence_retirement_status_label(item),
+            build_follow_through_reacquisition_confidence_retirement_summary(item),
             "Open linked artifact" if primary_link else no_linked_artifact_summary(),
             "yes" if safe_to_defer else "no",
         ]
         for col, value in enumerate(values, 1):
-            align = "center" if col in {3, 4, 5, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 33} else "left"
+            align = "center" if col in {3, 4, 5, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 37} else "left"
             style_data_cell(ws.cell(row=row, column=col, value=value), align)
         repo_cell = ws.cell(row=row, column=1)
         if item.get("repo_url"):
             repo_cell.hyperlink = item.get("repo_url")
             repo_cell.font = Font("Calibri", 10, color=TEAL, underline="single")
-        artifact_cell = ws.cell(row=row, column=32)
+        artifact_cell = ws.cell(row=row, column=36)
         if primary_link:
             artifact_cell.hyperlink = primary_link
             artifact_cell.font = Font("Calibri", 10, color=TEAL, underline="single")
@@ -5456,6 +5540,13 @@ def _build_executive_summary(
         follow_through_softening_reacquired_hotspot,
         follow_through_fragile_reacquisition_confidence_hotspot,
     ) = _operator_follow_through_rebuild_details(data)
+    (
+        follow_through_reacquisition_softening_decay,
+        follow_through_reacquisition_confidence_retirement,
+        follow_through_reacquisition_softening_hotspot,
+        follow_through_reacquisition_revalidation_hotspot,
+        follow_through_reacquisition_retired_confidence_hotspot,
+    ) = _operator_follow_through_reacquisition_retirement_details(data)
     trend_status, trend_summary, primary_target, resolution_counts = _operator_trend_values(data)
     primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
     last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
@@ -5532,6 +5623,8 @@ def _build_executive_summary(
         ("Recovery Reacquisition", follow_through_reacquisition),
         ("Reacquisition Durability", follow_through_reacquisition_durability),
         ("Reacquisition Confidence", follow_through_reacquisition_confidence),
+        ("Reacquisition Softening Decay", follow_through_reacquisition_softening_decay),
+        ("Reacquisition Confidence Retirement", follow_through_reacquisition_confidence_retirement),
         ("Trust Summary", trust_actionability_summary),
         ("Top Recommendation", top_recommendation),
         ("Biggest Opportunity", biggest_opportunity),
@@ -5557,32 +5650,35 @@ def _build_executive_summary(
         narrative_rows.insert(21, ("Durable Reacquired Hotspot", follow_through_durable_reacquired_hotspot))
         narrative_rows.insert(22, ("Softening Reacquired Hotspot", follow_through_softening_reacquired_hotspot))
         narrative_rows.insert(23, ("Fragile Reacquisition Confidence Hotspot", follow_through_fragile_reacquisition_confidence_hotspot))
-        narrative_rows.insert(24, ("Closure Guidance", closure_guidance))
-        narrative_rows.insert(25, ("What We Tried", last_intervention))
-        narrative_rows.insert(26, ("Recommendation Confidence", primary_confidence))
-        narrative_rows.insert(27, ("Resolution Evidence", resolution_evidence))
-        narrative_rows.insert(28, ("Confidence Rationale", confidence_reason))
-        narrative_rows.insert(29, ("Trust Policy", trust_policy))
-        narrative_rows.insert(30, ("Trust Rationale", trust_policy_reason))
-        narrative_rows.insert(31, ("Trust Exception", f"{exception_status} — {exception_reason}"))
-        narrative_rows.insert(32, ("Trust Recovery", f"{trust_recovery_status} — {trust_recovery_reason}"))
-        narrative_rows.insert(33, ("Recovery Confidence", recovery_confidence))
-        narrative_rows.insert(34, ("Exception Retirement", f"{retirement_status} — {retirement_reason}"))
-        narrative_rows.insert(35, ("Retirement Summary", retirement_summary))
-        narrative_rows.insert(36, ("Policy Debt", f"{policy_debt_status} — {policy_debt_reason}"))
-        narrative_rows.insert(37, ("Class Normalization", f"{class_normalization_status} — {trust_normalization_summary}"))
-        narrative_rows.insert(38, ("Class Memory", f"{class_memory_status} — {class_memory_reason}"))
-        narrative_rows.insert(39, ("Trust Decay", f"{class_decay_status} — {class_decay_summary}"))
-        narrative_rows.insert(40, ("Class Reweighting", f"{class_reweight_direction} ({class_reweight_score}) — {class_reweight_summary}"))
-        narrative_rows.insert(41, ("Class Reweighting Why", class_reweight_reason))
-        narrative_rows.insert(42, ("Class Momentum", class_momentum_status))
-        narrative_rows.insert(43, ("Reweight Stability", class_reweight_stability))
-        narrative_rows.insert(44, ("Transition Health", class_transition_health))
-        narrative_rows.insert(45, ("Transition Summary", class_transition_summary))
-        narrative_rows.insert(46, ("Transition Closure", transition_closure_confidence))
-        narrative_rows.insert(47, ("Transition Resolution", class_transition_resolution))
-        narrative_rows.insert(48, ("Transition Likely Outcome", transition_likely_outcome))
-        narrative_rows.insert(49, ("Pending Debt Freshness", pending_debt_freshness))
+        narrative_rows.insert(24, ("Reacquisition Softening Hotspot", follow_through_reacquisition_softening_hotspot))
+        narrative_rows.insert(25, ("Revalidation Needed Hotspot", follow_through_reacquisition_revalidation_hotspot))
+        narrative_rows.insert(26, ("Retired Confidence Hotspot", follow_through_reacquisition_retired_confidence_hotspot))
+        narrative_rows.insert(27, ("Closure Guidance", closure_guidance))
+        narrative_rows.insert(28, ("What We Tried", last_intervention))
+        narrative_rows.insert(29, ("Recommendation Confidence", primary_confidence))
+        narrative_rows.insert(30, ("Resolution Evidence", resolution_evidence))
+        narrative_rows.insert(31, ("Confidence Rationale", confidence_reason))
+        narrative_rows.insert(32, ("Trust Policy", trust_policy))
+        narrative_rows.insert(33, ("Trust Rationale", trust_policy_reason))
+        narrative_rows.insert(34, ("Trust Exception", f"{exception_status} — {exception_reason}"))
+        narrative_rows.insert(35, ("Trust Recovery", f"{trust_recovery_status} — {trust_recovery_reason}"))
+        narrative_rows.insert(36, ("Recovery Confidence", recovery_confidence))
+        narrative_rows.insert(37, ("Exception Retirement", f"{retirement_status} — {retirement_reason}"))
+        narrative_rows.insert(38, ("Retirement Summary", retirement_summary))
+        narrative_rows.insert(39, ("Policy Debt", f"{policy_debt_status} — {policy_debt_reason}"))
+        narrative_rows.insert(40, ("Class Normalization", f"{class_normalization_status} — {trust_normalization_summary}"))
+        narrative_rows.insert(41, ("Class Memory", f"{class_memory_status} — {class_memory_reason}"))
+        narrative_rows.insert(42, ("Trust Decay", f"{class_decay_status} — {class_decay_summary}"))
+        narrative_rows.insert(43, ("Class Reweighting", f"{class_reweight_direction} ({class_reweight_score}) — {class_reweight_summary}"))
+        narrative_rows.insert(44, ("Class Reweighting Why", class_reweight_reason))
+        narrative_rows.insert(45, ("Class Momentum", class_momentum_status))
+        narrative_rows.insert(46, ("Reweight Stability", class_reweight_stability))
+        narrative_rows.insert(47, ("Transition Health", class_transition_health))
+        narrative_rows.insert(48, ("Transition Summary", class_transition_summary))
+        narrative_rows.insert(49, ("Transition Closure", transition_closure_confidence))
+        narrative_rows.insert(50, ("Transition Resolution", class_transition_resolution))
+        narrative_rows.insert(51, ("Transition Likely Outcome", transition_likely_outcome))
+        narrative_rows.insert(52, ("Pending Debt Freshness", pending_debt_freshness))
         narrative_rows.insert(50, ("Closure Forecast", closure_forecast_direction))
         narrative_rows.insert(51, ("Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence", reset_reentry_rebuild_reentry_restore_rerererestore_persistence))
         narrative_rows.insert(52, ("Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls", reset_reentry_rebuild_reentry_restore_rerererestore_churn))
@@ -5847,6 +5943,13 @@ def _build_print_pack(
         follow_through_softening_reacquired_hotspot,
         follow_through_fragile_reacquisition_confidence_hotspot,
     ) = _operator_follow_through_rebuild_details(data)
+    (
+        follow_through_reacquisition_softening_decay,
+        follow_through_reacquisition_confidence_retirement,
+        follow_through_reacquisition_softening_hotspot,
+        follow_through_reacquisition_revalidation_hotspot,
+        follow_through_reacquisition_retired_confidence_hotspot,
+    ) = _operator_follow_through_reacquisition_retirement_details(data)
     trend_status, trend_summary, primary_target, resolution_counts = _operator_trend_values(data)
     primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
     last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
@@ -5899,7 +6002,7 @@ def _build_print_pack(
     ws["B15"] = next_action or weekly_pack.get("what_to_do_this_week", build_top_recommendation_summary(data))
     ws["A16"] = "Follow-Through"
     ws["B16"] = (
-        f"{trend_summary} {follow_through} Next checkpoint: {follow_through_checkpoint} Escalation: {follow_through_escalation} Recovery: {follow_through_recovery} Persistence: {follow_through_recovery_persistence} Churn: {follow_through_relapse_churn} Freshness: {follow_through_recovery_freshness} Reset: {follow_through_recovery_memory_reset} Rebuild strength: {follow_through_rebuild_strength} Reacquisition: {follow_through_reacquisition} Durability: {follow_through_reacquisition_durability} Confidence: {follow_through_reacquisition_confidence} Focus hotspot: {follow_through_hotspot}. Escalation hotspot: {follow_through_escalation_hotspot}. Recovery hotspot: {follow_through_relapsing_hotspot}. Retiring watch hotspot: {follow_through_retiring_hotspot}. Churn hotspot: {follow_through_churn_hotspot}. Freshness hotspot: {follow_through_recovery_freshness_hotspot}. Rebuild hotspot: {follow_through_recovery_rebuild_hotspot}. Rebuild-strength hotspot: {follow_through_rebuild_strength_hotspot}. Reacquiring hotspot: {follow_through_reacquiring_hotspot}. Reacquired hotspot: {follow_through_reacquired_hotspot}. Fragile reacquisition hotspot: {follow_through_fragile_reacquisition_hotspot}. Just reacquired hotspot: {follow_through_just_reacquired_hotspot}. Holding reacquired hotspot: {follow_through_holding_reacquired_hotspot}. Durable reacquired hotspot: {follow_through_durable_reacquired_hotspot}. Softening reacquired hotspot: {follow_through_softening_reacquired_hotspot}. Fragile reacquisition confidence hotspot: {follow_through_fragile_reacquisition_confidence_hotspot}".strip()
+        f"{trend_summary} {follow_through} Next checkpoint: {follow_through_checkpoint} Escalation: {follow_through_escalation} Recovery: {follow_through_recovery} Persistence: {follow_through_recovery_persistence} Churn: {follow_through_relapse_churn} Freshness: {follow_through_recovery_freshness} Reset: {follow_through_recovery_memory_reset} Rebuild strength: {follow_through_rebuild_strength} Reacquisition: {follow_through_reacquisition} Durability: {follow_through_reacquisition_durability} Confidence: {follow_through_reacquisition_confidence} Softening decay: {follow_through_reacquisition_softening_decay} Confidence retirement: {follow_through_reacquisition_confidence_retirement} Focus hotspot: {follow_through_hotspot}. Escalation hotspot: {follow_through_escalation_hotspot}. Recovery hotspot: {follow_through_relapsing_hotspot}. Retiring watch hotspot: {follow_through_retiring_hotspot}. Churn hotspot: {follow_through_churn_hotspot}. Freshness hotspot: {follow_through_recovery_freshness_hotspot}. Rebuild hotspot: {follow_through_recovery_rebuild_hotspot}. Rebuild-strength hotspot: {follow_through_rebuild_strength_hotspot}. Reacquiring hotspot: {follow_through_reacquiring_hotspot}. Reacquired hotspot: {follow_through_reacquired_hotspot}. Fragile reacquisition hotspot: {follow_through_fragile_reacquisition_hotspot}. Just reacquired hotspot: {follow_through_just_reacquired_hotspot}. Holding reacquired hotspot: {follow_through_holding_reacquired_hotspot}. Durable reacquired hotspot: {follow_through_durable_reacquired_hotspot}. Softening reacquired hotspot: {follow_through_softening_reacquired_hotspot}. Fragile reacquisition confidence hotspot: {follow_through_fragile_reacquisition_confidence_hotspot}. Reacquisition softening hotspot: {follow_through_reacquisition_softening_hotspot}. Revalidation hotspot: {follow_through_reacquisition_revalidation_hotspot}. Retired confidence hotspot: {follow_through_reacquisition_retired_confidence_hotspot}".strip()
     )
     if excel_mode == "standard":
         ws["A17"] = "Primary Target"
@@ -5924,89 +6027,93 @@ def _build_print_pack(
         ws["B26"] = follow_through_reacquisition_durability
         ws["A27"] = "Reacquisition Confidence"
         ws["B27"] = follow_through_reacquisition_confidence
-        ws["A28"] = "What We Tried"
-        ws["B28"] = last_intervention
-        ws["A29"] = "Last Outcome"
-        ws["B29"] = last_outcome
-        ws["A30"] = "Resolution Evidence"
-        ws["B30"] = resolution_evidence
-        ws["A31"] = "Recovery Counts"
-        ws["B31"] = recovery_counts
-        ws["A32"] = "Recommendation Confidence"
-        ws["B32"] = primary_confidence
-        ws["A33"] = "Confidence Rationale"
-        ws["B33"] = confidence_reason
-        ws["A34"] = "Next Action Confidence"
-        ws["B34"] = next_action_confidence
-        ws["A35"] = "Trust Policy"
-        ws["B35"] = trust_policy
-        ws["A36"] = "Trust Rationale"
-        ws["B36"] = trust_policy_reason
-        ws["A37"] = "Trust Exception"
-        ws["B37"] = f"{exception_status} — {exception_reason}"
-        ws["A38"] = "Trust Recovery"
-        ws["B38"] = f"{trust_recovery_status} — {trust_recovery_reason}"
-        ws["A39"] = "Recovery Confidence"
-        ws["B39"] = recovery_confidence
-        ws["A40"] = "Exception Retirement"
-        ws["B40"] = f"{retirement_status} — {retirement_reason}"
-        ws["A41"] = "Retirement Summary"
-        ws["B41"] = retirement_summary
-        ws["A42"] = "Policy Debt"
-        ws["B42"] = f"{policy_debt_status} — {policy_debt_reason}"
-        ws["A43"] = "Class Normalization"
-        ws["B43"] = f"{class_normalization_status} — {trust_normalization_summary}"
-        ws["A44"] = "Class Memory"
-        ws["B44"] = f"{class_memory_status} — {class_memory_reason}"
-        ws["A45"] = "Trust Decay"
-        ws["B45"] = f"{class_decay_status} — {class_decay_summary}"
-        ws["A46"] = "Class Reweighting"
-        ws["B46"] = f"{class_reweight_direction} ({class_reweight_score}) — {class_reweight_summary}"
-        ws["A47"] = "Class Reweighting Why"
-        ws["B47"] = class_reweight_reason
-        ws["A48"] = "Class Momentum"
-        ws["B48"] = class_momentum_status
-        ws["A49"] = "Reweight Stability"
-        ws["B49"] = class_reweight_stability
-        ws["A50"] = "Transition Health"
-        ws["B50"] = class_transition_health
-        ws["A51"] = "Transition Resolution"
-        ws["B51"] = class_transition_resolution
-        ws["A52"] = "Transition Summary"
-        ws["B52"] = class_transition_summary
-        ws["A53"] = "Transition Closure"
-        ws["B53"] = transition_closure_confidence
-        ws["A54"] = "Transition Likely Outcome"
-        ws["B54"] = transition_likely_outcome
-        ws["A55"] = "Pending Debt Freshness"
-        ws["B55"] = pending_debt_freshness
-        ws["A56"] = "Closure Forecast"
-        ws["B56"] = closure_forecast_direction
-        ws["A57"] = "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence"
-        ws["B57"] = reset_reentry_rebuild_reentry_restore_rerererestore_persistence
-        ws["A58"] = "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls"
-        ws["B58"] = reset_reentry_rebuild_reentry_restore_rerererestore_churn
-        ws["A59"] = "Closure Forecast Summary"
-        ws["B59"] = transition_closure_summary
-        ws["A60"] = "Momentum Summary"
-        ws["B60"] = class_momentum_summary
-        ws["A61"] = "Exception Learning"
-        ws["B61"] = f"{exception_pattern_status} — {exception_pattern_summary}"
-        ws["A62"] = "Recommendation Drift"
-        ws["B62"] = f"{drift_status} — {drift_summary}"
-        ws["A63"] = "Adaptive Confidence"
-        ws["B63"] = adaptive_confidence_summary
-        ws["A64"] = "Recommendation Quality"
-        ws["B64"] = recommendation_quality
-        ws["A65"] = "Confidence Validation"
-        ws["B65"] = f"{calibration_status} — {calibration_summary}"
-        ws["A66"] = "Calibration Snapshot"
-        ws["B66"] = f"High-confidence hit rate {high_hit_rate} | {reopened_recommendations}"
-        ws["A68"] = "Top Attention"
-        ws["A68"].font = SECTION_FONT
-        risk_start_row = 68
-        opportunity_header_row = 68
-        page2_row = 74
+        ws["A28"] = "Reacquisition Softening Decay"
+        ws["B28"] = follow_through_reacquisition_softening_decay
+        ws["A29"] = "Reacquisition Confidence Retirement"
+        ws["B29"] = follow_through_reacquisition_confidence_retirement
+        ws["A30"] = "What We Tried"
+        ws["B30"] = last_intervention
+        ws["A31"] = "Last Outcome"
+        ws["B31"] = last_outcome
+        ws["A32"] = "Resolution Evidence"
+        ws["B32"] = resolution_evidence
+        ws["A33"] = "Recovery Counts"
+        ws["B33"] = recovery_counts
+        ws["A34"] = "Recommendation Confidence"
+        ws["B34"] = primary_confidence
+        ws["A35"] = "Confidence Rationale"
+        ws["B35"] = confidence_reason
+        ws["A36"] = "Next Action Confidence"
+        ws["B36"] = next_action_confidence
+        ws["A37"] = "Trust Policy"
+        ws["B37"] = trust_policy
+        ws["A38"] = "Trust Rationale"
+        ws["B38"] = trust_policy_reason
+        ws["A39"] = "Trust Exception"
+        ws["B39"] = f"{exception_status} — {exception_reason}"
+        ws["A40"] = "Trust Recovery"
+        ws["B40"] = f"{trust_recovery_status} — {trust_recovery_reason}"
+        ws["A41"] = "Recovery Confidence"
+        ws["B41"] = recovery_confidence
+        ws["A42"] = "Exception Retirement"
+        ws["B42"] = f"{retirement_status} — {retirement_reason}"
+        ws["A43"] = "Retirement Summary"
+        ws["B43"] = retirement_summary
+        ws["A44"] = "Policy Debt"
+        ws["B44"] = f"{policy_debt_status} — {policy_debt_reason}"
+        ws["A45"] = "Class Normalization"
+        ws["B45"] = f"{class_normalization_status} — {trust_normalization_summary}"
+        ws["A46"] = "Class Memory"
+        ws["B46"] = f"{class_memory_status} — {class_memory_reason}"
+        ws["A47"] = "Trust Decay"
+        ws["B47"] = f"{class_decay_status} — {class_decay_summary}"
+        ws["A48"] = "Class Reweighting"
+        ws["B48"] = f"{class_reweight_direction} ({class_reweight_score}) — {class_reweight_summary}"
+        ws["A49"] = "Class Reweighting Why"
+        ws["B49"] = class_reweight_reason
+        ws["A50"] = "Class Momentum"
+        ws["B50"] = class_momentum_status
+        ws["A51"] = "Reweight Stability"
+        ws["B51"] = class_reweight_stability
+        ws["A52"] = "Transition Health"
+        ws["B52"] = class_transition_health
+        ws["A53"] = "Transition Resolution"
+        ws["B53"] = class_transition_resolution
+        ws["A54"] = "Transition Summary"
+        ws["B54"] = class_transition_summary
+        ws["A55"] = "Transition Closure"
+        ws["B55"] = transition_closure_confidence
+        ws["A56"] = "Transition Likely Outcome"
+        ws["B56"] = transition_likely_outcome
+        ws["A57"] = "Pending Debt Freshness"
+        ws["B57"] = pending_debt_freshness
+        ws["A58"] = "Closure Forecast"
+        ws["B58"] = closure_forecast_direction
+        ws["A59"] = "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence"
+        ws["B59"] = reset_reentry_rebuild_reentry_restore_rerererestore_persistence
+        ws["A60"] = "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls"
+        ws["B60"] = reset_reentry_rebuild_reentry_restore_rerererestore_churn
+        ws["A61"] = "Closure Forecast Summary"
+        ws["B61"] = transition_closure_summary
+        ws["A62"] = "Momentum Summary"
+        ws["B62"] = class_momentum_summary
+        ws["A63"] = "Exception Learning"
+        ws["B63"] = f"{exception_pattern_status} — {exception_pattern_summary}"
+        ws["A64"] = "Recommendation Drift"
+        ws["B64"] = f"{drift_status} — {drift_summary}"
+        ws["A65"] = "Adaptive Confidence"
+        ws["B65"] = adaptive_confidence_summary
+        ws["A66"] = "Recommendation Quality"
+        ws["B66"] = recommendation_quality
+        ws["A67"] = "Confidence Validation"
+        ws["B67"] = f"{calibration_status} — {calibration_summary}"
+        ws["A68"] = "Calibration Snapshot"
+        ws["B68"] = f"High-confidence hit rate {high_hit_rate} | {reopened_recommendations}"
+        ws["A70"] = "Top Attention"
+        ws["A70"].font = SECTION_FONT
+        risk_start_row = 70
+        opportunity_header_row = 70
+        page2_row = 76
     else:
         ws["A17"] = "Top Attention"
         ws["A17"].font = SECTION_FONT
