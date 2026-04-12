@@ -768,6 +768,9 @@ class TestRenderHtml:
         assert "Why It Matters" in html
         assert "What To Do Next" in html
         assert "Follow-Through" in html
+        assert "Review-to-Action Follow-Through" in html
+        assert "What Would Count As Progress" in html
+        assert "Next Checkpoint" in html
         assert "Last movement:" in html
         assert no_linked_artifact_summary() in html
 

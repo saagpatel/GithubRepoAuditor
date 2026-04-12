@@ -280,6 +280,21 @@ def _operator_follow_through_value(data: dict) -> str:
     return summary.get("follow_through_summary", "") or "No follow-through signal is recorded yet."
 
 
+def _operator_follow_through_details(data: dict) -> tuple[str, str, str]:
+    summary = data.get("operator_summary") or {}
+    follow_through = summary.get("follow_through_summary", "") or "No follow-through signal is recorded yet."
+    checkpoint = summary.get("follow_through_checkpoint_summary", "") or "Use the next run or linked artifact to confirm whether the recommendation moved."
+    top_stale = list(summary.get("top_stale_follow_through_items") or [])
+    top_unattempted = list(summary.get("top_unattempted_items") or [])
+    top_item = top_stale[0] if top_stale else (top_unattempted[0] if top_unattempted else {})
+    top_label = (
+        f"{top_item.get('repo')}: {top_item.get('title')}"
+        if top_item.get("repo")
+        else top_item.get("title", "")
+    ) or "No outstanding follow-through hotspot"
+    return follow_through, checkpoint, top_label
+
+
 def _operator_trend_values(data: dict) -> tuple[str, str, str, str]:
     summary = data.get("operator_summary") or {}
     trend_status = summary.get("trend_status", "") or "stable"
@@ -832,6 +847,11 @@ def _build_workbook_rollups(data: dict) -> tuple[list[list[object]], list[list[o
                 item.get("source_run_id", ""),
                 item.get("age_days", 0),
                 json.dumps(item.get("links", [])),
+                item.get("follow_through_status", ""),
+                item.get("follow_through_summary", ""),
+                item.get("follow_through_last_touch", ""),
+                item.get("follow_through_next_checkpoint", ""),
+                item.get("follow_through_evidence_hint", ""),
             ]
         )
 
@@ -1155,7 +1175,7 @@ def _build_dashboard(
     lane_counts = _operator_counts(data)
     next_mode, watch_strategy, watch_decision = _operator_watch_values(data)
     what_changed, why_it_matters, next_action = _operator_handoff_values(data)
-    follow_through = _operator_follow_through_value(data)
+    follow_through, follow_through_checkpoint, follow_through_hotspot = _operator_follow_through_details(data)
     trend_status, trend_summary, primary_target, resolution_counts = _operator_trend_values(data)
     primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
     last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
@@ -1210,6 +1230,7 @@ def _build_dashboard(
         ("What Changed", what_changed),
         ("Why It Matters", why_it_matters),
         ("Follow-Through", follow_through),
+        ("Next Checkpoint", follow_through_checkpoint),
         ("Next Action", next_action),
         ("Top Recommendation", top_recommendation_summary),
     ]
@@ -1233,6 +1254,7 @@ def _build_dashboard(
         operator_rows.extend(
             [
                 ("Why Top Target", primary_target_reason),
+                ("Follow-Through Hotspot", follow_through_hotspot),
                 ("Closure Guidance", closure_guidance),
                 ("Aging Pressure", aging_pressure),
                 ("What We Tried", last_intervention),
@@ -2488,7 +2510,7 @@ def _build_navigation(
     )
     next_mode, watch_strategy, watch_decision = _operator_watch_values(data)
     what_changed, why_it_matters, next_action = _operator_handoff_values(data)
-    follow_through = _operator_follow_through_value(data)
+    follow_through, follow_through_checkpoint, follow_through_hotspot = _operator_follow_through_details(data)
 
     ws.cell(row=4, column=1, value="Start Here").font = SECTION_FONT
     ws.cell(row=5, column=1, value="Workbook Mode").font = SUBHEADER_FONT
@@ -3012,7 +3034,7 @@ def _set_internal_hyperlink(cell, sheet_name: str, *, target_cell: str = "A1", d
 
 def _repo_detail_lookup_formula(column_index: int, fallback: str, *, allow_blank: bool = False) -> str:
     escaped_fallback = fallback.replace('"', '""')
-    lookup = f"VLOOKUP($B$4,Data_RepoDetail!$A:$AD,{column_index},FALSE)"
+    lookup = f"VLOOKUP($B$4,Data_RepoDetail!$A:$AI,{column_index},FALSE)"
     if allow_blank:
         return f'=IFERROR({lookup},"{escaped_fallback}")'
     return f'=IFERROR(IF({lookup}="","{escaped_fallback}",{lookup}),"{escaped_fallback}")'
@@ -3097,6 +3119,10 @@ def _repo_detail_rows(data: dict, score_history: dict[str, list[float]] | None) 
             action_titles[1] if len(action_titles) > 1 else "No second action candidate recorded yet.",
             action_titles[2] if len(action_titles) > 2 else "No third action candidate recorded yet.",
             briefing.get("what_changed", {}).get("last_movement", _repo_detail_last_movement(scores)),
+            briefing.get("what_changed", {}).get("recent_change_summary", "No recent change summary is recorded yet."),
+            briefing.get("what_to_do_next", {}).get("follow_through_status", "Unknown"),
+            briefing.get("what_to_do_next", {}).get("follow_through_summary", "No follow-through evidence is recorded yet."),
+            briefing.get("what_to_do_next", {}).get("what_would_count_as_progress", "Use the next run or linked artifact to confirm whether the recommendation moved."),
         ])
 
         ranked_dimensions = sorted(
@@ -3625,7 +3651,24 @@ def _build_hidden_data_sheets(
         wb,
         "Data_OperatorQueue",
         "tblOperatorQueueData",
-        ["Item ID", "Repo", "Kind", "Lane", "Priority", "Title", "Summary", "Recommended Action", "Source Run", "Age Days", "Links"],
+        [
+            "Item ID",
+            "Repo",
+            "Kind",
+            "Lane",
+            "Priority",
+            "Title",
+            "Summary",
+            "Recommended Action",
+            "Source Run",
+            "Age Days",
+            "Links",
+            "Follow-Through Status",
+            "Follow-Through Summary",
+            "Follow-Through Last Touch",
+            "Follow-Through Next Checkpoint",
+            "Follow-Through Evidence Hint",
+        ],
         operator_queue_rows,
     )
     _write_hidden_table_sheet(
@@ -3677,6 +3720,10 @@ def _build_hidden_data_sheets(
             "Top Action 2",
             "Top Action 3",
             "Last Movement",
+            "Recent Change Summary",
+            "Follow-Through Status",
+            "Follow-Through Summary",
+            "What Would Count As Progress",
         ],
         repo_detail_rows,
     )
@@ -4200,7 +4247,7 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
         ws.add_data_validation(dv)
     ws["D4"] = "GitHub"
     ws["D4"].font = SUBHEADER_FONT
-    ws["E4"] = '=IFERROR(IF(VLOOKUP($B$4,Data_RepoDetail!$A:$AD,2,FALSE)="","Repo URL unavailable",HYPERLINK(VLOOKUP($B$4,Data_RepoDetail!$A:$AD,2,FALSE),"Open Repo")),"Repo URL unavailable")'
+    ws["E4"] = '=IFERROR(IF(VLOOKUP($B$4,Data_RepoDetail!$A:$AI,2,FALSE)="","Repo URL unavailable",HYPERLINK(VLOOKUP($B$4,Data_RepoDetail!$A:$AI,2,FALSE),"Open Repo")),"Repo URL unavailable")'
     ws["E4"].font = Font("Calibri", 10, bold=True, color=TEAL, underline="single")
 
     summary_fields = [
@@ -4283,18 +4330,27 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
 
     ws["F25"] = "What To Do Next"
     ws["F25"].font = SECTION_FONT
-    for idx in range(1, 4):
-        row = 25 + idx
-        ws.cell(row=row, column=6, value=f"Action {idx}").font = SUBHEADER_FONT
-        style_data_cell(ws.cell(row=row, column=7, value=_repo_detail_lookup_formula(26 + idx, "No action candidate recorded yet.")), "left")
+    handoff_rows = [
+        ("Recommended Action", 22, "No clear next action is recorded yet."),
+        ("Why This Action", 23, "No action rationale is recorded yet."),
+        ("Follow-Through Status", 32, "Unknown"),
+        ("Follow-Through Summary", 33, "No follow-through evidence is recorded yet."),
+        ("Progress Checkpoint", 34, "Use the next run or linked artifact to confirm whether the recommendation moved."),
+        ("Action Candidate 2", 28, "No second action candidate recorded yet."),
+        ("Action Candidate 3", 29, "No third action candidate recorded yet."),
+    ]
+    for offset, (label, column_index, fallback) in enumerate(handoff_rows, 1):
+        row = 25 + offset
+        ws.cell(row=row, column=6, value=label).font = SUBHEADER_FONT
+        style_data_cell(ws.cell(row=row, column=7, value=_repo_detail_lookup_formula(column_index, fallback)), "left")
 
-    ws["A30"] = "Use Score Explainer"
-    _set_internal_hyperlink(ws["B30"], "Score Explainer", display="Open Score Explainer")
-    ws["D30"] = "Go To Explorer"
-    _set_internal_hyperlink(ws["E30"], "Portfolio Explorer", display="Open Explorer")
-    ws["F30"] = "Go To Queue"
-    _set_internal_hyperlink(ws["G30"], "Review Queue", display="Open Review Queue")
-    auto_width(ws, 8, 31)
+    ws["A35"] = "Use Score Explainer"
+    _set_internal_hyperlink(ws["B35"], "Score Explainer", display="Open Score Explainer")
+    ws["D35"] = "Go To Explorer"
+    _set_internal_hyperlink(ws["E35"], "Portfolio Explorer", display="Open Explorer")
+    ws["F35"] = "Go To Queue"
+    _set_internal_hyperlink(ws["G35"], "Review Queue", display="Open Review Queue")
+    auto_width(ws, 8, 35)
 
 
 def _build_run_changes(wb: Workbook, data: dict, diff_data: dict | None) -> None:
@@ -4572,6 +4628,8 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
         "Why This Is Here",
         "What To Do Next",
         "Last Movement",
+        "Follow-Through",
+        "Next Checkpoint",
         "Open Artifact",
         "Safe To Defer",
     ]
@@ -4598,17 +4656,19 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
             why_this_is_here,
             next_step,
             last_movement,
+            item.get("follow_through_summary", "No follow-through evidence is recorded yet."),
+            item.get("follow_through_next_checkpoint", "Use the next run or linked artifact to confirm whether the recommendation moved."),
             "Open linked artifact" if primary_link else no_linked_artifact_summary(),
             "yes" if safe_to_defer else "no",
         ]
         for col, value in enumerate(values, 1):
-            align = "center" if col in {3, 4, 5, 10} else "left"
+            align = "center" if col in {3, 4, 5, 12} else "left"
             style_data_cell(ws.cell(row=row, column=col, value=value), align)
         repo_cell = ws.cell(row=row, column=1)
         if item.get("repo_url"):
             repo_cell.hyperlink = item.get("repo_url")
             repo_cell.font = Font("Calibri", 10, color=TEAL, underline="single")
-        artifact_cell = ws.cell(row=row, column=9)
+        artifact_cell = ws.cell(row=row, column=11)
         if primary_link:
             artifact_cell.hyperlink = primary_link
             artifact_cell.font = Font("Calibri", 10, color=TEAL, underline="single")
@@ -4932,7 +4992,7 @@ def _build_executive_summary(
     preview = context["scenario_preview"].get("portfolio_projection", {})
     next_mode, watch_strategy, watch_decision = _operator_watch_values(data)
     what_changed, why_it_matters, next_action = _operator_handoff_values(data)
-    follow_through = _operator_follow_through_value(data)
+    follow_through, follow_through_checkpoint, follow_through_hotspot = _operator_follow_through_details(data)
     trend_status, trend_summary, primary_target, resolution_counts = _operator_trend_values(data)
     primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
     last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
@@ -4998,6 +5058,7 @@ def _build_executive_summary(
         ("What Changed", what_changed or change_summary),
         ("Why It Matters", why_it_matters),
         ("Follow-Through", follow_through),
+        ("Next Checkpoint", follow_through_checkpoint),
         ("Trust Summary", trust_actionability_summary),
         ("Top Recommendation", top_recommendation),
         ("Biggest Opportunity", biggest_opportunity),
@@ -5006,33 +5067,34 @@ def _build_executive_summary(
     if excel_mode == "standard":
         narrative_rows.insert(5, ("Trend", f"{trend_status} — {trend_summary}"))
         narrative_rows.insert(6, ("Why Top Target", primary_target_reason))
-        narrative_rows.insert(7, ("Closure Guidance", closure_guidance))
-        narrative_rows.insert(8, ("What We Tried", last_intervention))
-        narrative_rows.insert(9, ("Resolution Evidence", resolution_evidence))
-        narrative_rows.insert(10, ("Recommendation Confidence", primary_confidence))
-        narrative_rows.insert(11, ("Confidence Rationale", confidence_reason))
-        narrative_rows.insert(12, ("Trust Policy", trust_policy))
-        narrative_rows.insert(13, ("Trust Rationale", trust_policy_reason))
-        narrative_rows.insert(14, ("Trust Exception", f"{exception_status} — {exception_reason}"))
-        narrative_rows.insert(15, ("Trust Recovery", f"{trust_recovery_status} — {trust_recovery_reason}"))
-        narrative_rows.insert(16, ("Recovery Confidence", recovery_confidence))
-        narrative_rows.insert(17, ("Exception Retirement", f"{retirement_status} — {retirement_reason}"))
-        narrative_rows.insert(18, ("Retirement Summary", retirement_summary))
-        narrative_rows.insert(19, ("Policy Debt", f"{policy_debt_status} — {policy_debt_reason}"))
-        narrative_rows.insert(20, ("Class Normalization", f"{class_normalization_status} — {trust_normalization_summary}"))
-        narrative_rows.insert(21, ("Class Memory", f"{class_memory_status} — {class_memory_reason}"))
-        narrative_rows.insert(22, ("Trust Decay", f"{class_decay_status} — {class_decay_summary}"))
-        narrative_rows.insert(23, ("Class Reweighting", f"{class_reweight_direction} ({class_reweight_score}) — {class_reweight_summary}"))
-        narrative_rows.insert(24, ("Class Reweighting Why", class_reweight_reason))
-        narrative_rows.insert(25, ("Class Momentum", class_momentum_status))
-        narrative_rows.insert(26, ("Reweight Stability", class_reweight_stability))
-        narrative_rows.insert(27, ("Transition Health", class_transition_health))
-        narrative_rows.insert(28, ("Transition Resolution", class_transition_resolution))
-        narrative_rows.insert(29, ("Transition Summary", class_transition_summary))
-        narrative_rows.insert(30, ("Transition Closure", transition_closure_confidence))
-        narrative_rows.insert(31, ("Transition Likely Outcome", transition_likely_outcome))
-        narrative_rows.insert(32, ("Pending Debt Freshness", pending_debt_freshness))
-        narrative_rows.insert(33, ("Closure Forecast", closure_forecast_direction))
+        narrative_rows.insert(7, ("Follow-Through Hotspot", follow_through_hotspot))
+        narrative_rows.insert(8, ("Closure Guidance", closure_guidance))
+        narrative_rows.insert(9, ("What We Tried", last_intervention))
+        narrative_rows.insert(10, ("Resolution Evidence", resolution_evidence))
+        narrative_rows.insert(11, ("Recommendation Confidence", primary_confidence))
+        narrative_rows.insert(12, ("Confidence Rationale", confidence_reason))
+        narrative_rows.insert(13, ("Trust Policy", trust_policy))
+        narrative_rows.insert(14, ("Trust Rationale", trust_policy_reason))
+        narrative_rows.insert(15, ("Trust Exception", f"{exception_status} — {exception_reason}"))
+        narrative_rows.insert(16, ("Trust Recovery", f"{trust_recovery_status} — {trust_recovery_reason}"))
+        narrative_rows.insert(17, ("Recovery Confidence", recovery_confidence))
+        narrative_rows.insert(18, ("Exception Retirement", f"{retirement_status} — {retirement_reason}"))
+        narrative_rows.insert(19, ("Retirement Summary", retirement_summary))
+        narrative_rows.insert(20, ("Policy Debt", f"{policy_debt_status} — {policy_debt_reason}"))
+        narrative_rows.insert(21, ("Class Normalization", f"{class_normalization_status} — {trust_normalization_summary}"))
+        narrative_rows.insert(22, ("Class Memory", f"{class_memory_status} — {class_memory_reason}"))
+        narrative_rows.insert(23, ("Trust Decay", f"{class_decay_status} — {class_decay_summary}"))
+        narrative_rows.insert(24, ("Class Reweighting", f"{class_reweight_direction} ({class_reweight_score}) — {class_reweight_summary}"))
+        narrative_rows.insert(25, ("Class Reweighting Why", class_reweight_reason))
+        narrative_rows.insert(26, ("Class Momentum", class_momentum_status))
+        narrative_rows.insert(27, ("Reweight Stability", class_reweight_stability))
+        narrative_rows.insert(28, ("Transition Health", class_transition_health))
+        narrative_rows.insert(29, ("Transition Resolution", class_transition_resolution))
+        narrative_rows.insert(30, ("Transition Summary", class_transition_summary))
+        narrative_rows.insert(31, ("Transition Closure", transition_closure_confidence))
+        narrative_rows.insert(32, ("Transition Likely Outcome", transition_likely_outcome))
+        narrative_rows.insert(33, ("Pending Debt Freshness", pending_debt_freshness))
+        narrative_rows.insert(34, ("Closure Forecast", closure_forecast_direction))
         narrative_rows.insert(34, ("Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence", reset_reentry_rebuild_reentry_restore_rerererestore_persistence))
         narrative_rows.insert(35, ("Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls", reset_reentry_rebuild_reentry_restore_rerererestore_churn))
         narrative_rows.insert(36, ("Closure Forecast Summary", transition_closure_summary))
@@ -5227,7 +5289,7 @@ def _build_print_pack(
     counts = operator_summary.get("counts", {})
     next_mode, watch_strategy, watch_decision = _operator_watch_values(data)
     what_changed, why_it_matters, next_action = _operator_handoff_values(data)
-    follow_through = _operator_follow_through_value(data)
+    follow_through, follow_through_checkpoint, follow_through_hotspot = _operator_follow_through_details(data)
     trend_status, trend_summary, primary_target, resolution_counts = _operator_trend_values(data)
     primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
     last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
@@ -5279,7 +5341,11 @@ def _build_print_pack(
     ws["A15"] = "Decision This Week"
     ws["B15"] = next_action or weekly_pack.get("what_to_do_this_week", build_top_recommendation_summary(data))
     ws["A16"] = "Follow-Through"
-    ws["B16"] = follow_through if excel_mode != "standard" else f"{trend_summary} {follow_through}".strip()
+    ws["B16"] = (
+        follow_through
+        if excel_mode != "standard"
+        else f"{trend_summary} {follow_through} Next checkpoint: {follow_through_checkpoint} Focus hotspot: {follow_through_hotspot}".strip()
+    )
     if excel_mode == "standard":
         ws["A17"] = "Primary Target"
         ws["B17"] = primary_target

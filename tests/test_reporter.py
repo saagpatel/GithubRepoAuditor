@@ -639,17 +639,20 @@ class TestMarkdownReport:
         assert "Next Recommended Run" in content
         assert "Watch Strategy" in content
         assert "Weekly Review Pack" in content
+        assert "Review-to-Action Follow-Through" in content
         assert "Top Repo Drilldowns" in content
         assert "What To Do This Week" in content
         assert "Current State" in content
         assert "What Changed" in content
         assert "What To Do Next" in content
+        assert "What Would Count As Progress" in content
         assert "Queue Pressure" in content
         assert "Trust / Actionability" in content
         assert "Top Recommendation" in content
         assert "Top Attention" in content
         assert "Trend" in content
         assert "Follow-Through" in content
+        assert "Next Checkpoint" in content
         assert "Accountability" in content
         assert "Primary Target" in content
         assert "Why This Is The Top Target" in content
