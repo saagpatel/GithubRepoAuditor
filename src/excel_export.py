@@ -500,7 +500,9 @@ def _operator_class_transition_values(data: dict) -> tuple[str, str, str]:
     return health_status, resolution_status, transition_summary
 
 
-def _operator_transition_closure_values(data: dict) -> tuple[str, str, str, str, str, str, str]:
+def _operator_transition_closure_values(
+    data: dict,
+) -> tuple[str, str, str, str, str, str, str, str, str]:
     summary = data.get("operator_summary") or {}
     closure_label = (
         summary.get("primary_target_transition_closure_confidence_label", "") or "low"
@@ -528,8 +530,24 @@ def _operator_transition_closure_values(data: dict) -> tuple[str, str, str, str,
         )
         or "none"
     ).replace("-", " ").title()
+    reset_reentry_rebuild_reentry_restore_rerererestore_persistence = (
+        summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status",
+            "",
+        )
+        or "none"
+    ).replace("-", " ").title()
+    reset_reentry_rebuild_reentry_restore_rerererestore_churn = (
+        summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status",
+            "",
+        )
+        or "none"
+    ).replace("-", " ").title()
     closure_summary = (
-        summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_summary")
+        summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_summary")
+        or summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_summary")
+        or summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_summary")
         or summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_summary")
         or summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_summary")
         or summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_summary")
@@ -588,6 +606,8 @@ def _operator_transition_closure_values(data: dict) -> tuple[str, str, str, str,
         closure_forecast_direction,
         reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery,
         reset_reentry_rebuild_reentry_restore_rerererestore,
+        reset_reentry_rebuild_reentry_restore_rerererestore_persistence,
+        reset_reentry_rebuild_reentry_restore_rerererestore_churn,
         closure_summary,
     )
 
@@ -1071,6 +1091,8 @@ def _build_dashboard(
         closure_forecast_direction,
         reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery,
         reset_reentry_rebuild_reentry_restore_rerererestore,
+        reset_reentry_rebuild_reentry_restore_rerererestore_persistence,
+        reset_reentry_rebuild_reentry_restore_rerererestore_churn,
         transition_closure_summary,
     ) = _operator_transition_closure_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
@@ -1142,8 +1164,8 @@ def _build_dashboard(
                 ("Transition Likely Outcome", transition_likely_outcome),
                 ("Pending Debt Freshness", pending_debt_freshness),
                 ("Closure Forecast", closure_forecast_direction),
-                ("Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery", reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery),
-                ("Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Controls", reset_reentry_rebuild_reentry_restore_rerererestore),
+                ("Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence", reset_reentry_rebuild_reentry_restore_rerererestore_persistence),
+                ("Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls", reset_reentry_rebuild_reentry_restore_rerererestore_churn),
                 ("Closure Forecast Summary", transition_closure_summary),
                 ("Momentum Summary", class_momentum_summary),
                 ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}"),
@@ -3816,6 +3838,8 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
         closure_forecast_direction,
         reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery,
         reset_reentry_rebuild_reentry_restore_rerererestore,
+        reset_reentry_rebuild_reentry_restore_rerererestore_persistence,
+        reset_reentry_rebuild_reentry_restore_rerererestore_churn,
         transition_closure_summary,
     ) = _operator_transition_closure_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
@@ -3867,8 +3891,8 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
                 ("Transition Likely Outcome", transition_likely_outcome),
                 ("Pending Debt Freshness", pending_debt_freshness),
                 ("Closure Forecast", closure_forecast_direction),
-                ("Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery", reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery),
-                ("Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Controls", reset_reentry_rebuild_reentry_restore_rerererestore),
+                ("Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence", reset_reentry_rebuild_reentry_restore_rerererestore_persistence),
+                ("Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls", reset_reentry_rebuild_reentry_restore_rerererestore_churn),
                 ("Closure Forecast Summary", transition_closure_summary),
                 ("Momentum Summary", class_momentum_summary),
                 ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}"),
@@ -4282,6 +4306,8 @@ def _build_executive_summary(
         closure_forecast_direction,
         reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery,
         reset_reentry_rebuild_reentry_restore_rerererestore,
+        reset_reentry_rebuild_reentry_restore_rerererestore_persistence,
+        reset_reentry_rebuild_reentry_restore_rerererestore_churn,
         transition_closure_summary,
     ) = _operator_transition_closure_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
@@ -4345,8 +4371,8 @@ def _build_executive_summary(
         narrative_rows.insert(31, ("Transition Likely Outcome", transition_likely_outcome))
         narrative_rows.insert(32, ("Pending Debt Freshness", pending_debt_freshness))
         narrative_rows.insert(33, ("Closure Forecast", closure_forecast_direction))
-        narrative_rows.insert(34, ("Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery", reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery))
-        narrative_rows.insert(35, ("Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Controls", reset_reentry_rebuild_reentry_restore_rerererestore))
+        narrative_rows.insert(34, ("Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence", reset_reentry_rebuild_reentry_restore_rerererestore_persistence))
+        narrative_rows.insert(35, ("Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls", reset_reentry_rebuild_reentry_restore_rerererestore_churn))
         narrative_rows.insert(36, ("Closure Forecast Summary", transition_closure_summary))
         narrative_rows.insert(37, ("Momentum Summary", class_momentum_summary))
         narrative_rows.insert(38, ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}"))
@@ -4464,10 +4490,10 @@ def _build_executive_summary(
             ws.cell(row=61, column=5, value=pending_debt_freshness)
             ws.cell(row=62, column=4, value="Closure Forecast").font = SUBHEADER_FONT
             ws.cell(row=62, column=5, value=closure_forecast_direction)
-            ws.cell(row=63, column=4, value="Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery").font = SUBHEADER_FONT
-            ws.cell(row=63, column=5, value=reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery)
-            ws.cell(row=64, column=4, value="Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Controls").font = SUBHEADER_FONT
-            ws.cell(row=64, column=5, value=reset_reentry_rebuild_reentry_restore_rerererestore)
+            ws.cell(row=63, column=4, value="Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence").font = SUBHEADER_FONT
+            ws.cell(row=63, column=5, value=reset_reentry_rebuild_reentry_restore_rerererestore_persistence)
+            ws.cell(row=64, column=4, value="Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls").font = SUBHEADER_FONT
+            ws.cell(row=64, column=5, value=reset_reentry_rebuild_reentry_restore_rerererestore_churn)
             ws.cell(row=65, column=4, value="Closure Forecast Summary").font = SUBHEADER_FONT
             ws.cell(row=65, column=5, value=transition_closure_summary)
             ws.cell(row=66, column=4, value="Momentum Summary").font = SUBHEADER_FONT
@@ -4547,6 +4573,8 @@ def _build_print_pack(
         closure_forecast_direction,
         reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery,
         reset_reentry_rebuild_reentry_restore_rerererestore,
+        reset_reentry_rebuild_reentry_restore_rerererestore_persistence,
+        reset_reentry_rebuild_reentry_restore_rerererestore_churn,
         transition_closure_summary,
     ) = _operator_transition_closure_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
@@ -4637,10 +4665,10 @@ def _build_print_pack(
         ws["B46"] = pending_debt_freshness
         ws["A47"] = "Closure Forecast"
         ws["B47"] = closure_forecast_direction
-        ws["A48"] = "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery"
-        ws["B48"] = reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery
-        ws["A49"] = "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Controls"
-        ws["B49"] = reset_reentry_rebuild_reentry_restore_rerererestore
+        ws["A48"] = "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence"
+        ws["B48"] = reset_reentry_rebuild_reentry_restore_rerererestore_persistence
+        ws["A49"] = "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls"
+        ws["B49"] = reset_reentry_rebuild_reentry_restore_rerererestore_churn
         ws["A50"] = "Closure Forecast Summary"
         ws["B50"] = transition_closure_summary
         ws["A51"] = "Momentum Summary"

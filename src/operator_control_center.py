@@ -60,6 +60,7 @@ CLASS_RESET_REENTRY_REBUILD_REENTRY_RESTORE_RERESTORE_REFRESH_WINDOW_RUNS = 4
 CLASS_RESET_REENTRY_REBUILD_REENTRY_RESTORE_RERERESTORE_WINDOW_RUNS = 4
 CLASS_RESET_REENTRY_REBUILD_REENTRY_RESTORE_RERERESTORE_FRESHNESS_WINDOW_RUNS = 4
 CLASS_RESET_REENTRY_REBUILD_REENTRY_RESTORE_RERERESTORE_REFRESH_WINDOW_RUNS = 4
+CLASS_RESET_REENTRY_REBUILD_REENTRY_RESTORE_RERERERESTORE_WINDOW_RUNS = 4
 CLASS_MEMORY_RECENCY_WEIGHTS = (1.0, 1.0, 0.7, 0.7, 0.4, 0.4, 0.4, 0.2, 0.2, 0.2)
 GENERIC_RECOMMENDATION_PHRASES = (
     "continue the normal audit/control-center loop",
@@ -755,6 +756,19 @@ def build_operator_snapshot(
         "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_window_runs": resolution_trend["closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_window_runs"],
         "recovering_from_confirmation_rebuild_reentry_rererestore_reset_hotspots": resolution_trend["recovering_from_confirmation_rebuild_reentry_rererestore_reset_hotspots"],
         "recovering_from_clearance_rebuild_reentry_rererestore_reset_hotspots": resolution_trend["recovering_from_clearance_rebuild_reentry_rererestore_reset_hotspots"],
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs": resolution_trend["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs"],
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score": resolution_trend["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score"],
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status": resolution_trend["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status"],
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason": resolution_trend["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason"],
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_summary": resolution_trend["closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_summary"],
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_window_runs": resolution_trend["closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_window_runs"],
+        "just_rerererestored_rebuild_reentry_hotspots": resolution_trend["just_rerererestored_rebuild_reentry_hotspots"],
+        "holding_reset_reentry_rebuild_reentry_restore_rerererestore_hotspots": resolution_trend["holding_reset_reentry_rebuild_reentry_restore_rerererestore_hotspots"],
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_score": resolution_trend["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_score"],
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status": resolution_trend["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status"],
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason": resolution_trend["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason"],
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_summary": resolution_trend["closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_summary"],
+        "reset_reentry_rebuild_reentry_restore_rerererestore_churn_hotspots": resolution_trend["reset_reentry_rebuild_reentry_restore_rerererestore_churn_hotspots"],
         "stale_reset_reentry_rebuild_reentry_restore_hotspots": resolution_trend["stale_reset_reentry_rebuild_reentry_restore_hotspots"],
         "fresh_reset_reentry_rebuild_reentry_restore_signal_hotspots": resolution_trend["fresh_reset_reentry_rebuild_reentry_restore_signal_hotspots"],
         "closure_forecast_reset_reentry_rebuild_reentry_restore_decay_window_runs": resolution_trend["closure_forecast_reset_reentry_rebuild_reentry_restore_decay_window_runs"],
@@ -1292,6 +1306,8 @@ def _build_operator_handoff(
         f"{_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_note(resolution_trend)} "
         f"{_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_note(resolution_trend)} "
         f"{_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_note(resolution_trend)} "
+        f"{_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_note(resolution_trend)} "
+        f"{_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_note(resolution_trend)} "
         f"{_closure_forecast_reset_reentry_rebuild_persistence_note(resolution_trend)} "
         f"{_closure_forecast_reset_reentry_rebuild_churn_note(resolution_trend)} "
         f"{_closure_forecast_hysteresis_note(resolution_trend)} "
@@ -1807,6 +1823,12 @@ def _build_resolution_trend(
         current_generated_at=current_generated_at,
         confidence_calibration=confidence_calibration,
     )
+    reset_reentry_rebuild_reentry_restore_rerererestore_persistence = _apply_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_and_churn(
+        resolution_targets,
+        history,
+        current_generated_at=current_generated_at,
+        confidence_calibration=confidence_calibration,
+    )
     new_attention_keys = current_attention_keys - previous_attention_keys
     resolved_attention_count = len(previous_attention_keys - current_attention_keys)
     persisting_attention_count = len(current_attention_keys & previous_attention_keys)
@@ -2241,6 +2263,19 @@ def _build_resolution_trend(
         "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_window_runs": reset_reentry_rebuild_reentry_restore_rererestore_recovery["closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_window_runs"],
         "recovering_from_confirmation_rebuild_reentry_rererestore_reset_hotspots": reset_reentry_rebuild_reentry_restore_rererestore_recovery["recovering_from_confirmation_rebuild_reentry_rererestore_reset_hotspots"],
         "recovering_from_clearance_rebuild_reentry_rererestore_reset_hotspots": reset_reentry_rebuild_reentry_restore_rererestore_recovery["recovering_from_clearance_rebuild_reentry_rererestore_reset_hotspots"],
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs": primary_target.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs", reset_reentry_rebuild_reentry_restore_rerererestore_persistence["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs"]) if primary_target else reset_reentry_rebuild_reentry_restore_rerererestore_persistence["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs"],
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score": primary_target.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score", reset_reentry_rebuild_reentry_restore_rerererestore_persistence["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score"]) if primary_target else reset_reentry_rebuild_reentry_restore_rerererestore_persistence["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score"],
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status": primary_target.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status", reset_reentry_rebuild_reentry_restore_rerererestore_persistence["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status"]) if primary_target else reset_reentry_rebuild_reentry_restore_rerererestore_persistence["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status"],
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason": primary_target.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason", reset_reentry_rebuild_reentry_restore_rerererestore_persistence["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason"]) if primary_target else reset_reentry_rebuild_reentry_restore_rerererestore_persistence["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason"],
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_summary": reset_reentry_rebuild_reentry_restore_rerererestore_persistence["closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_summary"],
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_window_runs": reset_reentry_rebuild_reentry_restore_rerererestore_persistence["closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_window_runs"],
+        "just_rerererestored_rebuild_reentry_hotspots": reset_reentry_rebuild_reentry_restore_rerererestore_persistence["just_rerererestored_rebuild_reentry_hotspots"],
+        "holding_reset_reentry_rebuild_reentry_restore_rerererestore_hotspots": reset_reentry_rebuild_reentry_restore_rerererestore_persistence["holding_reset_reentry_rebuild_reentry_restore_rerererestore_hotspots"],
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_score": primary_target.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_score", reset_reentry_rebuild_reentry_restore_rerererestore_persistence["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_score"]) if primary_target else reset_reentry_rebuild_reentry_restore_rerererestore_persistence["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_score"],
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status": primary_target.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status", reset_reentry_rebuild_reentry_restore_rerererestore_persistence["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status"]) if primary_target else reset_reentry_rebuild_reentry_restore_rerererestore_persistence["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status"],
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason": primary_target.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason", reset_reentry_rebuild_reentry_restore_rerererestore_persistence["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason"]) if primary_target else reset_reentry_rebuild_reentry_restore_rerererestore_persistence["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason"],
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_summary": reset_reentry_rebuild_reentry_restore_rerererestore_persistence["closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_summary"],
+        "reset_reentry_rebuild_reentry_restore_rerererestore_churn_hotspots": reset_reentry_rebuild_reentry_restore_rerererestore_persistence["reset_reentry_rebuild_reentry_restore_rerererestore_churn_hotspots"],
         "stale_reset_reentry_rebuild_reentry_restore_hotspots": reset_reentry_rebuild_reentry_restore_freshness_decay["stale_reset_reentry_rebuild_reentry_restore_hotspots"],
         "fresh_reset_reentry_rebuild_reentry_restore_signal_hotspots": reset_reentry_rebuild_reentry_restore_freshness_decay["fresh_reset_reentry_rebuild_reentry_restore_signal_hotspots"],
         "closure_forecast_reset_reentry_rebuild_reentry_restore_decay_window_runs": reset_reentry_rebuild_reentry_restore_freshness_decay["closure_forecast_reset_reentry_rebuild_reentry_restore_decay_window_runs"],
@@ -24809,6 +24844,877 @@ def _apply_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_an
     }
 
 
+def _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_side_from_persistence_status(
+    status: str,
+) -> str:
+    if status in {
+        "just-rerererestored",
+        "holding-confirmation-rebuild-reentry-rerererestore",
+        "sustained-confirmation-rebuild-reentry-rerererestore",
+    }:
+        return "confirmation"
+    if status in {
+        "holding-clearance-rebuild-reentry-rerererestore",
+        "sustained-clearance-rebuild-reentry-rerererestore",
+    }:
+        return "clearance"
+    return "none"
+
+
+def _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_side_from_status(
+    status: str,
+) -> str:
+    if status in {
+        "pending-confirmation-rebuild-reentry-rerererestore",
+        "rerererestored-confirmation-rebuild-reentry",
+    }:
+        return "confirmation"
+    if status in {
+        "pending-clearance-rebuild-reentry-rerererestore",
+        "rerererestored-clearance-rebuild-reentry",
+    }:
+        return "clearance"
+    return "none"
+
+
+def _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_side_from_event(
+    event: dict,
+) -> str:
+    side = _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_side_from_persistence_status(
+        event.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status",
+            "none",
+        )
+    )
+    if side != "none":
+        return side
+    side = _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_side_from_status(
+        event.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status",
+            "none",
+        )
+    )
+    if side != "none":
+        return side
+    return _closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_side_from_refresh_recovery_status(
+        event.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status",
+            "none",
+        )
+    )
+
+
+def _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_text(
+    text: str,
+) -> str:
+    if not text:
+        return ""
+    transformed = text
+    for old, new in (
+        ("Re-re-restored", "Re-re-re-restored"),
+        ("re-re-restored", "re-re-re-restored"),
+        ("rererestored", "rerererestored"),
+        ("rererestoring", "rerererestoring"),
+        ("rererestore", "rerererestore"),
+        ("Rerestored", "Re-re-restored"),
+        ("rerestored", "re-re-restored"),
+        ("Re-re-restore", "Re-re-re-restore"),
+        ("re-re-restore", "re-re-re-restore"),
+    ):
+        transformed = transformed.replace(old, new)
+    return transformed
+
+
+def _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status_to_rererestore_status(
+    status: str,
+) -> str:
+    return {
+        "pending-confirmation-rebuild-reentry-rerererestore": "pending-confirmation-rebuild-reentry-rererestore",
+        "pending-clearance-rebuild-reentry-rerererestore": "pending-clearance-rebuild-reentry-rererestore",
+        "rerererestored-confirmation-rebuild-reentry": "rererestored-confirmation-rebuild-reentry",
+        "rerererestored-clearance-rebuild-reentry": "rererestored-clearance-rebuild-reentry",
+        "blocked": "blocked",
+        "none": "none",
+    }.get(status, "none")
+
+
+def _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status_to_rererestore_status(
+    status: str,
+) -> str:
+    return {
+        "just-rerererestored": "just-rererestored",
+        "holding-confirmation-rebuild-reentry-rerererestore": "holding-confirmation-rebuild-reentry-rererestore",
+        "holding-clearance-rebuild-reentry-rerererestore": "holding-clearance-rebuild-reentry-rererestore",
+        "sustained-confirmation-rebuild-reentry-rerererestore": "sustained-confirmation-rebuild-reentry-rererestore",
+        "sustained-clearance-rebuild-reentry-rerererestore": "sustained-clearance-rebuild-reentry-rererestore",
+        "reversing": "reversing",
+        "insufficient-data": "insufficient-data",
+        "none": "none",
+    }.get(status, "none")
+
+
+def _closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_status_to_rerestore_refresh_status(
+    status: str,
+) -> str:
+    return {
+        "recovering-confirmation-rebuild-reentry-rererestore-reset": "recovering-confirmation-rebuild-reentry-rerestore-reset",
+        "recovering-clearance-rebuild-reentry-rererestore-reset": "recovering-clearance-rebuild-reentry-rerestore-reset",
+        "rerererestoring-confirmation-rebuild-reentry": "rererestoring-confirmation-rebuild-reentry",
+        "rerererestoring-clearance-rebuild-reentry": "rererestoring-clearance-rebuild-reentry",
+        "reversing": "reversing",
+        "blocked": "blocked",
+        "none": "none",
+    }.get(status, "none")
+
+
+def _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status_from_rererestore_status(
+    status: str,
+) -> str:
+    return {
+        "just-rererestored": "just-rerererestored",
+        "holding-confirmation-rebuild-reentry-rererestore": "holding-confirmation-rebuild-reentry-rerererestore",
+        "holding-clearance-rebuild-reentry-rererestore": "holding-clearance-rebuild-reentry-rerererestore",
+        "sustained-confirmation-rebuild-reentry-rererestore": "sustained-confirmation-rebuild-reentry-rerererestore",
+        "sustained-clearance-rebuild-reentry-rererestore": "sustained-clearance-rebuild-reentry-rerererestore",
+        "reversing": "reversing",
+        "insufficient-data": "insufficient-data",
+        "none": "none",
+    }.get(status, "none")
+
+
+def _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_translate_target_for_persistence(
+    target: dict,
+) -> dict:
+    return {
+        **target,
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status": _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status_to_rererestore_status(
+            target.get(
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status",
+                "none",
+            )
+        ),
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status_to_rererestore_status(
+            target.get(
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status",
+                "none",
+            )
+        ),
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status": target.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status",
+            "none",
+        ),
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_status": _closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_status_to_rerestore_refresh_status(
+            target.get(
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status",
+                "none",
+            )
+        ),
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_status": target.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status",
+            "insufficient-data",
+        ),
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_status": target.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_status",
+            "none",
+        ),
+    }
+
+
+def _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_translate_event_for_persistence(
+    event: dict,
+) -> dict:
+    translated = (
+        _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_translate_target_for_persistence(
+            event
+        )
+    )
+    translated["closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status"] = _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status_to_rererestore_status(
+        event.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status",
+            "none",
+        )
+    )
+    translated["closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status"] = _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status_to_rererestore_status(
+        event.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status",
+            "none",
+        )
+    )
+    translated["closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status"] = event.get(
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status",
+        "none",
+    )
+    return translated
+
+
+def _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_for_target(
+    target: dict,
+    closure_forecast_events: list[dict],
+    transition_history_meta: dict,
+) -> dict:
+    translated_target = _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_translate_target_for_persistence(
+        target
+    )
+    translated_events = [
+        _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_translate_event_for_persistence(
+            event
+        )
+        for event in closure_forecast_events
+    ]
+    persistence_meta = _closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_for_target(
+        translated_target,
+        translated_events,
+        transition_history_meta,
+    )
+    return {
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs": persistence_meta.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs",
+            0,
+        ),
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score": persistence_meta.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score",
+            0.0,
+        ),
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status": _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status_from_rererestore_status(
+            persistence_meta.get(
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status",
+                "none",
+            )
+        ),
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason": _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_text(
+            persistence_meta.get(
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason",
+                "",
+            )
+        ),
+        "recent_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_path": _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_text(
+            persistence_meta.get(
+                "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path",
+                "",
+            )
+        ),
+    }
+
+
+def _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_for_target(
+    target: dict,
+    closure_forecast_events: list[dict],
+    transition_history_meta: dict,
+) -> dict:
+    translated_target = _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_translate_target_for_persistence(
+        target
+    )
+    translated_events = [
+        _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_translate_event_for_persistence(
+            event
+        )
+        for event in closure_forecast_events
+    ]
+    churn_meta = _closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_for_target(
+        translated_target,
+        translated_events,
+        transition_history_meta,
+    )
+    return {
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_score": churn_meta.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_score",
+            0.0,
+        ),
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status": churn_meta.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status",
+            "none",
+        ),
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason": _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_text(
+            churn_meta.get(
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_reason",
+                "",
+            )
+        ),
+        "recent_reset_reentry_rebuild_reentry_restore_rerererestore_churn_path": _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_text(
+            churn_meta.get(
+                "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path",
+                "",
+            )
+        ),
+    }
+
+
+def _apply_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_and_churn_control(
+    target: dict,
+    *,
+    persistence_meta: dict,
+    churn_meta: dict,
+    transition_history_meta: dict,
+    closure_likely_outcome: str,
+    closure_hysteresis_status: str,
+    closure_hysteresis_reason: str,
+    transition_status: str,
+    transition_reason: str,
+    resolution_status: str,
+    resolution_reason: str,
+    reentry_status: str,
+    reentry_reason: str,
+    restore_status: str,
+    restore_reason: str,
+    rerestore_status: str,
+    rerestore_reason: str,
+    rererestore_status: str,
+    rererestore_reason: str,
+) -> dict:
+    translated_target = _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_translate_target_for_persistence(
+        target
+    )
+    translated_persistence_meta = {
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status_to_rererestore_status(
+            persistence_meta.get(
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status",
+                "none",
+            )
+        ),
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": persistence_meta.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason",
+            "",
+        ),
+    }
+    translated_churn_meta = {
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status": churn_meta.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status",
+            "none",
+        ),
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_reason": churn_meta.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason",
+            "",
+        ),
+    }
+    return _apply_reset_reentry_rebuild_reentry_restore_rererestore_persistence_and_churn_control(
+        translated_target,
+        persistence_meta=translated_persistence_meta,
+        churn_meta=translated_churn_meta,
+        transition_history_meta=transition_history_meta,
+        closure_likely_outcome=closure_likely_outcome,
+        closure_hysteresis_status=closure_hysteresis_status,
+        closure_hysteresis_reason=closure_hysteresis_reason,
+        transition_status=transition_status,
+        transition_reason=transition_reason,
+        resolution_status=resolution_status,
+        resolution_reason=resolution_reason,
+        reentry_status=reentry_status,
+        reentry_reason=reentry_reason,
+        restore_status=restore_status,
+        restore_reason=restore_reason,
+        rerestore_status=rerestore_status,
+        rerestore_reason=rerestore_reason,
+        rererestore_status=rererestore_status,
+        rererestore_reason=rererestore_reason,
+    )
+
+
+def _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_hotspots(
+    resolution_targets: list[dict],
+    *,
+    mode: str,
+) -> list[dict]:
+    grouped: dict[str, dict] = {}
+    for target in resolution_targets:
+        class_key = _target_class_key(target)
+        if not class_key:
+            continue
+        current = {
+            "scope": "class",
+            "label": class_key,
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs": target.get(
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs",
+                0,
+            ),
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score": target.get(
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score",
+                0.0,
+            ),
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status": target.get(
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status",
+                "none",
+            ),
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_score": target.get(
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_score",
+                0.0,
+            ),
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status": target.get(
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status",
+                "none",
+            ),
+            "recent_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_path": target.get(
+                "recent_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_path",
+                "",
+            ),
+            "recent_reset_reentry_rebuild_reentry_restore_rerererestore_churn_path": target.get(
+                "recent_reset_reentry_rebuild_reentry_restore_rerererestore_churn_path",
+                "",
+            ),
+        }
+        existing = grouped.get(class_key)
+        if existing is None or abs(
+            current[
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score"
+            ]
+        ) > abs(
+            existing[
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score"
+            ]
+        ):
+            grouped[class_key] = current
+    hotspots = list(grouped.values())
+    if mode == "just-rerererestored":
+        hotspots = [
+            item
+            for item in hotspots
+            if item.get(
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status"
+            )
+            == "just-rerererestored"
+        ]
+        hotspots.sort(
+            key=lambda item: (
+                -item.get(
+                    "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs",
+                    0,
+                ),
+                -abs(
+                    item.get(
+                        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score",
+                        0.0,
+                    )
+                ),
+                item.get("label", ""),
+            )
+        )
+    elif mode == "holding":
+        hotspots = [
+            item
+            for item in hotspots
+            if item.get(
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status"
+            )
+            in {
+                "holding-confirmation-rebuild-reentry-rerererestore",
+                "holding-clearance-rebuild-reentry-rerererestore",
+                "sustained-confirmation-rebuild-reentry-rerererestore",
+                "sustained-clearance-rebuild-reentry-rerererestore",
+            }
+        ]
+        hotspots.sort(
+            key=lambda item: (
+                -item.get(
+                    "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs",
+                    0,
+                ),
+                -abs(
+                    item.get(
+                        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score",
+                        0.0,
+                    )
+                ),
+                item.get("label", ""),
+            )
+        )
+    else:
+        hotspots = [
+            item
+            for item in hotspots
+            if item.get(
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status"
+            )
+            in {"watch", "churn", "blocked"}
+        ]
+        hotspots.sort(
+            key=lambda item: (
+                -item.get(
+                    "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_score",
+                    0.0,
+                ),
+                -item.get(
+                    "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs",
+                    0,
+                ),
+                item.get("label", ""),
+            )
+        )
+    return hotspots[:5]
+
+
+def _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_summary(
+    primary_target: dict,
+    just_rerererestored_rebuild_reentry_hotspots: list[dict],
+    holding_reset_reentry_rebuild_reentry_restore_rerererestore_hotspots: list[dict],
+) -> str:
+    label = _target_label(primary_target) or "The current target"
+    status = primary_target.get(
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status",
+        "none",
+    )
+    age_runs = primary_target.get(
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs",
+        0,
+    )
+    score = primary_target.get(
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score",
+        0.0,
+    )
+    if status == "just-rerererestored":
+        return (
+            f"{label} has only just re-re-re-restored stronger re-re-restored posture, so it is still fragile ({score:.2f}; {age_runs} run)."
+        )
+    if status == "holding-confirmation-rebuild-reentry-rerererestore":
+        return (
+            f"Confirmation-side re-re-re-restored posture for {label} has held long enough to keep the stronger re-re-restored forecast in place ({score:.2f}; {age_runs} runs)."
+        )
+    if status == "holding-clearance-rebuild-reentry-rerererestore":
+        return (
+            f"Clearance-side re-re-re-restored posture for {label} has held long enough to keep the stronger re-re-restored caution in place ({score:.2f}; {age_runs} runs)."
+        )
+    if status == "sustained-confirmation-rebuild-reentry-rerererestore":
+        return (
+            f"Confirmation-side re-re-re-restored posture for {label} is now holding with enough follow-through to trust the stronger re-re-restored forecast more ({score:.2f}; {age_runs} runs)."
+        )
+    if status == "sustained-clearance-rebuild-reentry-rerererestore":
+        return (
+            f"Clearance-side re-re-re-restored posture for {label} is now holding with enough follow-through to trust the stronger re-re-restored caution more ({score:.2f}; {age_runs} runs)."
+        )
+    if status == "reversing":
+        return (
+            f"The re-re-re-restored rebuilt re-entry posture for {label} is already weakening, so it is being softened again ({score:.2f})."
+        )
+    if status == "insufficient-data":
+        return (
+            f"Re-re-re-restored rebuilt re-entry for {label} is still too lightly exercised to say whether the stronger posture can hold."
+        )
+    if just_rerererestored_rebuild_reentry_hotspots:
+        hotspot = just_rerererestored_rebuild_reentry_hotspots[0]
+        return (
+            f"Newly re-re-re-restored posture is most fragile around {hotspot.get('label', 'recent hotspots')}, "
+            "so those classes still need follow-through before the stronger re-re-restored posture can be trusted."
+        )
+    if holding_reset_reentry_rebuild_reentry_restore_rerererestore_hotspots:
+        hotspot = holding_reset_reentry_rebuild_reentry_restore_rerererestore_hotspots[0]
+        return (
+            f"Re-re-re-restored posture is holding most cleanly around {hotspot.get('label', 'recent hotspots')}, "
+            "so those classes are closest to keeping the stronger re-re-restored posture safely."
+        )
+    return "No re-re-re-restored rebuilt re-entry posture is active enough yet to judge whether it can hold."
+
+
+def _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_summary(
+    primary_target: dict,
+    reset_reentry_rebuild_reentry_restore_rerererestore_churn_hotspots: list[dict],
+) -> str:
+    label = _target_label(primary_target) or "The current target"
+    status = primary_target.get(
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status",
+        "none",
+    )
+    score = primary_target.get(
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_score",
+        0.0,
+    )
+    if status == "watch":
+        return (
+            f"Re-re-re-restored rebuilt re-entry for {label} is wobbling enough that stronger re-re-restored posture may soften soon ({score:.2f})."
+        )
+    if status == "churn":
+        return (
+            f"Re-re-re-restored rebuilt re-entry for {label} is flipping enough that stronger re-re-restored posture should be softened quickly ({score:.2f})."
+        )
+    if status == "blocked":
+        return primary_target.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason",
+            f"Local target instability is preventing positive confirmation-side re-re-re-restored hold for {label}.",
+        )
+    if reset_reentry_rebuild_reentry_restore_rerererestore_churn_hotspots:
+        hotspot = reset_reentry_rebuild_reentry_restore_rerererestore_churn_hotspots[0]
+        return (
+            f"Re-re-re-restored rebuilt re-entry churn is highest around {hotspot.get('label', 'recent hotspots')}, "
+            "so stronger re-re-restored posture there should soften quickly if the wobble continues."
+        )
+    return "No meaningful re-re-re-restored rebuilt re-entry churn is active right now."
+
+
+def _apply_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_and_churn(
+    resolution_targets: list[dict],
+    history: list[dict],
+    *,
+    current_generated_at: str,
+    confidence_calibration: dict,
+) -> dict:
+    if not resolution_targets:
+        return {
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs": 0,
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score": 0.0,
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status": "none",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason": "",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_summary": "No reset re-entry rebuild re-entry restore re-re-re-restore persistence is recorded because there is no active target.",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_window_runs": CLASS_RESET_REENTRY_REBUILD_REENTRY_RESTORE_RERERERESTORE_WINDOW_RUNS,
+            "just_rerererestored_rebuild_reentry_hotspots": [],
+            "holding_reset_reentry_rebuild_reentry_restore_rerererestore_hotspots": [],
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_score": 0.0,
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status": "none",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason": "",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_summary": "No reset re-entry rebuild re-entry restore re-re-re-restore churn is recorded because there is no active target.",
+            "reset_reentry_rebuild_reentry_restore_rerererestore_churn_hotspots": [],
+        }
+
+    current_primary_target = resolution_targets[0]
+    current_bucket = _recommendation_bucket(current_primary_target)
+    closure_forecast_events = _class_closure_forecast_events(
+        history,
+        current_primary_target=current_primary_target,
+        current_generated_at=current_generated_at,
+    )
+    transition_events = _class_transition_events(
+        history,
+        current_primary_target=current_primary_target,
+        current_generated_at=current_generated_at,
+    )
+
+    updated_targets: list[dict] = []
+    for target in resolution_targets:
+        persistence_age_runs = 0
+        persistence_score = 0.0
+        persistence_status = "none"
+        persistence_reason = ""
+        persistence_path = ""
+        churn_score = 0.0
+        churn_status = "none"
+        churn_reason = ""
+        churn_path = ""
+        closure_likely_outcome = target.get("transition_closure_likely_outcome", "none")
+        closure_hysteresis_status = target.get("closure_forecast_hysteresis_status", "none")
+        closure_hysteresis_reason = target.get("closure_forecast_hysteresis_reason", "")
+        transition_status = target.get("class_reweight_transition_status", "none")
+        transition_reason = target.get("class_reweight_transition_reason", "")
+        resolution_status = target.get("class_transition_resolution_status", "none")
+        resolution_reason = target.get("class_transition_resolution_reason", "")
+        reentry_status = target.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_status",
+            "none",
+        )
+        reentry_reason = target.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_reason",
+            "",
+        )
+        restore_status = target.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_status",
+            "none",
+        )
+        restore_reason = target.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_reason",
+            "",
+        )
+        rerestore_status = target.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_status",
+            "none",
+        )
+        rerestore_reason = target.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reason",
+            "",
+        )
+        rererestore_status = target.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status",
+            "none",
+        )
+        rererestore_reason = target.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reason",
+            "",
+        )
+
+        if _recommendation_bucket(target) == current_bucket:
+            transition_history_meta = _target_class_transition_history(
+                target,
+                transition_events,
+            )
+            persistence_meta = _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_for_target(
+                target,
+                closure_forecast_events,
+                transition_history_meta,
+            )
+            churn_meta = _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_for_target(
+                target,
+                closure_forecast_events,
+                transition_history_meta,
+            )
+            persistence_age_runs = persistence_meta[
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs"
+            ]
+            persistence_score = persistence_meta[
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score"
+            ]
+            persistence_status = persistence_meta[
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status"
+            ]
+            persistence_reason = persistence_meta[
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason"
+            ]
+            persistence_path = persistence_meta[
+                "recent_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_path"
+            ]
+            churn_score = churn_meta[
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_score"
+            ]
+            churn_status = churn_meta[
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status"
+            ]
+            churn_reason = churn_meta[
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason"
+            ]
+            churn_path = churn_meta[
+                "recent_reset_reentry_rebuild_reentry_restore_rerererestore_churn_path"
+            ]
+            control_updates = _apply_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_and_churn_control(
+                target,
+                persistence_meta=persistence_meta,
+                churn_meta=churn_meta,
+                transition_history_meta=transition_history_meta,
+                closure_likely_outcome=closure_likely_outcome,
+                closure_hysteresis_status=closure_hysteresis_status,
+                closure_hysteresis_reason=closure_hysteresis_reason,
+                transition_status=transition_status,
+                transition_reason=transition_reason,
+                resolution_status=resolution_status,
+                resolution_reason=resolution_reason,
+                reentry_status=reentry_status,
+                reentry_reason=reentry_reason,
+                restore_status=restore_status,
+                restore_reason=restore_reason,
+                rerestore_status=rerestore_status,
+                rerestore_reason=rerestore_reason,
+                rererestore_status=rererestore_status,
+                rererestore_reason=rererestore_reason,
+            )
+            closure_likely_outcome = control_updates["transition_closure_likely_outcome"]
+            closure_hysteresis_status = control_updates["closure_forecast_hysteresis_status"]
+            closure_hysteresis_reason = control_updates["closure_forecast_hysteresis_reason"]
+            transition_status = control_updates["class_reweight_transition_status"]
+            transition_reason = control_updates["class_reweight_transition_reason"]
+            resolution_status = control_updates["class_transition_resolution_status"]
+            resolution_reason = control_updates["class_transition_resolution_reason"]
+            reentry_status = control_updates[
+                "closure_forecast_reset_reentry_rebuild_reentry_status"
+            ]
+            reentry_reason = control_updates[
+                "closure_forecast_reset_reentry_rebuild_reentry_reason"
+            ]
+            restore_status = control_updates[
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_status"
+            ]
+            restore_reason = control_updates[
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_reason"
+            ]
+            rerestore_status = control_updates[
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_status"
+            ]
+            rerestore_reason = control_updates[
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reason"
+            ]
+            rererestore_status = control_updates[
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status"
+            ]
+            rererestore_reason = control_updates[
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reason"
+            ]
+
+        updated_targets.append(
+            {
+                **target,
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs": persistence_age_runs,
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score": persistence_score,
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status": persistence_status,
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason": persistence_reason,
+                "recent_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_path": persistence_path,
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_score": churn_score,
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status": churn_status,
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason": churn_reason,
+                "recent_reset_reentry_rebuild_reentry_restore_rerererestore_churn_path": churn_path,
+                "transition_closure_likely_outcome": closure_likely_outcome,
+                "closure_forecast_hysteresis_status": closure_hysteresis_status,
+                "closure_forecast_hysteresis_reason": closure_hysteresis_reason,
+                "class_reweight_transition_status": transition_status,
+                "class_reweight_transition_reason": transition_reason,
+                "class_transition_resolution_status": resolution_status,
+                "class_transition_resolution_reason": resolution_reason,
+                "closure_forecast_reset_reentry_rebuild_reentry_status": reentry_status,
+                "closure_forecast_reset_reentry_rebuild_reentry_reason": reentry_reason,
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_status": restore_status,
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_reason": restore_reason,
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_status": rerestore_status,
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reason": rerestore_reason,
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status": rererestore_status,
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reason": rererestore_reason,
+            }
+        )
+
+    resolution_targets[:] = updated_targets
+    primary_target = resolution_targets[0]
+    just_rerererestored_rebuild_reentry_hotspots = (
+        _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_hotspots(
+            resolution_targets,
+            mode="just-rerererestored",
+        )
+    )
+    holding_reset_reentry_rebuild_reentry_restore_rerererestore_hotspots = (
+        _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_hotspots(
+            resolution_targets,
+            mode="holding",
+        )
+    )
+    reset_reentry_rebuild_reentry_restore_rerererestore_churn_hotspots = (
+        _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_hotspots(
+            resolution_targets,
+            mode="churn",
+        )
+    )
+    return {
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs": primary_target.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs",
+            0,
+        ),
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score": primary_target.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score",
+            0.0,
+        ),
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status": primary_target.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status",
+            "none",
+        ),
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason": primary_target.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason",
+            "",
+        ),
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_summary": _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_summary(
+            primary_target,
+            just_rerererestored_rebuild_reentry_hotspots,
+            holding_reset_reentry_rebuild_reentry_restore_rerererestore_hotspots,
+        ),
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_window_runs": CLASS_RESET_REENTRY_REBUILD_REENTRY_RESTORE_RERERERESTORE_WINDOW_RUNS,
+        "just_rerererestored_rebuild_reentry_hotspots": just_rerererestored_rebuild_reentry_hotspots,
+        "holding_reset_reentry_rebuild_reentry_restore_rerererestore_hotspots": holding_reset_reentry_rebuild_reentry_restore_rerererestore_hotspots,
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_score": primary_target.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_score",
+            0.0,
+        ),
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status": primary_target.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status",
+            "none",
+        ),
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason": primary_target.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason",
+            "",
+        ),
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_summary": _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_summary(
+            primary_target,
+            reset_reentry_rebuild_reentry_restore_rerererestore_churn_hotspots,
+        ),
+        "reset_reentry_rebuild_reentry_restore_rerererestore_churn_hotspots": reset_reentry_rebuild_reentry_restore_rerererestore_churn_hotspots,
+    }
+
+
 def _class_closure_forecast_events(
     history: list[dict],
     *,
@@ -25002,6 +25908,14 @@ def _class_closure_forecast_events(
                 ),
                 "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status": current_primary_target.get(
                     "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status",
+                    "none",
+                ),
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status": current_primary_target.get(
+                    "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status",
+                    "none",
+                ),
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status": current_primary_target.get(
+                    "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status",
                     "none",
                 ),
             }
@@ -25346,6 +26260,20 @@ def _class_closure_forecast_events(
                     "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status",
                     primary_target.get(
                         "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status",
+                        "none",
+                    ),
+                ),
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status": summary.get(
+                    "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status",
+                    primary_target.get(
+                        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status",
+                        "none",
+                    ),
+                ),
+                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status": summary.get(
+                    "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status",
+                    primary_target.get(
+                        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status",
                         "none",
                     ),
                 ),
@@ -32872,6 +33800,42 @@ def _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_note(
         return ""
     return (
         f"Reset re-entry rebuild re-entry restore re-re-re-restore controls: {status} — {summary}"
+    ).strip()
+
+
+def _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_note(
+    resolution_trend: dict,
+) -> str:
+    status = resolution_trend.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status",
+        "none",
+    )
+    summary = resolution_trend.get(
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_summary",
+        "",
+    )
+    if status in {None, "", "none"} and not summary:
+        return ""
+    return (
+        f"Reset re-entry rebuild re-entry restore re-re-re-restore persistence: {status} — {summary}"
+    ).strip()
+
+
+def _closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_note(
+    resolution_trend: dict,
+) -> str:
+    status = resolution_trend.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status",
+        "none",
+    )
+    summary = resolution_trend.get(
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_summary",
+        "",
+    )
+    if status in {None, "", "none"} and not summary:
+        return ""
+    return (
+        f"Reset re-entry rebuild re-entry restore re-re-re-restore churn controls: {status} — {summary}"
     ).strip()
 
 
