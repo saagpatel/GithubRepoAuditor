@@ -904,6 +904,8 @@ def test_project_queue_follow_through_marks_calmer_post_escalation_items_as_reco
     assert item["follow_through_recovery_status"] == "recovering"
     assert item["follow_through_recovery_age_runs"] == 1
     assert "recovering from recent escalation" in item["follow_through_recovery_summary"]
+    assert item["follow_through_recovery_persistence_status"] == "just-recovering"
+    assert item["follow_through_relapse_churn_status"] == "blocked"
 
 
 def test_project_queue_follow_through_marks_one_quiet_run_as_retiring_watch():
@@ -962,6 +964,8 @@ def test_project_queue_follow_through_marks_one_quiet_run_as_retiring_watch():
     assert item["follow_through_status"] == "resolved"
     assert item["follow_through_recovery_status"] == "retiring-watch"
     assert "one more quiet run" in item["follow_through_recovery_summary"]
+    assert item["follow_through_recovery_persistence_status"] == "holding-retiring-watch"
+    assert item["follow_through_relapse_churn_status"] == "none"
 
 
 def test_project_queue_follow_through_marks_two_quiet_runs_as_retired():
@@ -1032,6 +1036,8 @@ def test_project_queue_follow_through_marks_two_quiet_runs_as_retired():
     assert item["follow_through_recovery_status"] == "retired"
     assert item["follow_through_recovery_age_runs"] == 2
     assert "retired its recent escalation" in item["follow_through_recovery_summary"]
+    assert item["follow_through_recovery_persistence_status"] == "sustained-retiring-watch"
+    assert item["follow_through_relapse_churn_status"] == "none"
 
 
 def test_project_queue_follow_through_marks_relapses_after_quiet_runs():
@@ -1095,6 +1101,189 @@ def test_project_queue_follow_through_marks_relapses_after_quiet_runs():
     item = enriched[0]
     assert item["follow_through_recovery_status"] == "relapsing"
     assert "counts as a relapse" in item["follow_through_recovery_reason"]
+    assert item["follow_through_recovery_persistence_status"] == "none"
+    assert item["follow_through_relapse_churn_status"] == "fragile"
+
+
+def test_project_queue_follow_through_marks_multi_run_retired_states_as_sustained_retired():
+    queue = [
+        {
+            "item_id": "campaign-drift:campaign-1:github-issue",
+            "lane": "deferred",
+            "age_days": 0,
+            "repo": "RepoD",
+            "title": "RepoD drift needs review",
+            "summary": "Drift has stayed quiet.",
+            "recommended_action": "Keep watching the managed issue.",
+            "source_run_id": "testuser:2026-03-31T12:00:00+00:00",
+        }
+    ]
+    key = operator_control_center._queue_identity(queue[0])
+    recent_runs = [
+        {"items": {key: queue[0]}, "has_attention": False},
+        {
+            "items": {
+                key: {
+                    "lane": "deferred",
+                    "age_days": 0,
+                    "follow_through_status": "resolved",
+                    "follow_through_checkpoint_status": "satisfied",
+                    "follow_through_escalation_status": "resolved-watch",
+                    "follow_through_recovery_status": "retired",
+                }
+            },
+            "has_attention": False,
+        },
+        {
+            "items": {
+                key: {
+                    "lane": "deferred",
+                    "age_days": 0,
+                    "follow_through_status": "resolved",
+                    "follow_through_checkpoint_status": "satisfied",
+                    "follow_through_escalation_status": "resolved-watch",
+                    "follow_through_recovery_status": "retired",
+                }
+            },
+            "has_attention": False,
+        },
+        {
+            "items": {
+                key: {
+                    "lane": "urgent",
+                    "age_days": 7,
+                    "follow_through_status": "stale-follow-through",
+                    "follow_through_checkpoint_status": "overdue",
+                    "follow_through_escalation_status": "escalate-now",
+                }
+            },
+            "has_attention": True,
+        },
+    ]
+    resolution_trend = {
+        "decision_memory_map": {
+            key: {
+                "decision_memory_status": "attempted",
+                "last_seen_at": "2026-03-31T12:00:00+00:00",
+                "last_outcome": "improved",
+                "last_intervention": {
+                    "recorded_at": "2026-03-31T11:00:00+00:00",
+                    "event_type": "issue-updated",
+                    "outcome": "improved",
+                    "title": "RepoD drift needs review",
+                },
+            }
+        }
+    }
+
+    enriched = operator_control_center._project_queue_follow_through(
+        queue,
+        recent_runs=recent_runs,
+        resolution_trend=resolution_trend,
+        current_generated_at="2026-03-31T12:00:00+00:00",
+    )
+
+    item = enriched[0]
+    assert item["follow_through_recovery_status"] == "retired"
+    assert item["follow_through_recovery_persistence_status"] == "sustained-retired"
+    assert item["follow_through_recovery_persistence_age_runs"] == 3
+    assert item["follow_through_relapse_churn_status"] == "none"
+
+
+def test_project_queue_follow_through_marks_repeated_recovery_flips_as_churn():
+    queue = [
+        {
+            "item_id": "campaign-drift:campaign-1:github-issue",
+            "lane": "urgent",
+            "age_days": 1,
+            "repo": "RepoD",
+            "title": "RepoD drift needs review",
+            "summary": "Drift is still open.",
+            "recommended_action": "Inspect the managed issue again.",
+            "source_run_id": "testuser:2026-03-31T12:00:00+00:00",
+        }
+    ]
+    key = operator_control_center._queue_identity(queue[0])
+    recent_runs = [
+        {"items": {key: queue[0]}, "has_attention": True},
+        {
+            "items": {
+                key: {
+                    "lane": "deferred",
+                    "age_days": 0,
+                    "follow_through_status": "resolved",
+                    "follow_through_checkpoint_status": "satisfied",
+                    "follow_through_escalation_status": "resolved-watch",
+                    "follow_through_recovery_status": "retiring-watch",
+                }
+            },
+            "has_attention": False,
+        },
+        {
+            "items": {
+                key: {
+                    "lane": "urgent",
+                    "age_days": 7,
+                    "follow_through_status": "stale-follow-through",
+                    "follow_through_checkpoint_status": "overdue",
+                    "follow_through_escalation_status": "escalate-now",
+                }
+            },
+            "has_attention": True,
+        },
+        {
+            "items": {
+                key: {
+                    "lane": "deferred",
+                    "age_days": 0,
+                    "follow_through_status": "resolved",
+                    "follow_through_checkpoint_status": "satisfied",
+                    "follow_through_escalation_status": "resolved-watch",
+                    "follow_through_recovery_status": "retiring-watch",
+                }
+            },
+            "has_attention": False,
+        },
+        {
+            "items": {
+                key: {
+                    "lane": "urgent",
+                    "age_days": 7,
+                    "follow_through_status": "stale-follow-through",
+                    "follow_through_checkpoint_status": "overdue",
+                    "follow_through_escalation_status": "escalate-now",
+                }
+            },
+            "has_attention": True,
+        },
+    ]
+    resolution_trend = {
+        "decision_memory_map": {
+            key: {
+                "decision_memory_status": "attempted",
+                "last_seen_at": "2026-03-31T12:00:00+00:00",
+                "last_outcome": "no-change",
+                "last_intervention": {
+                    "recorded_at": "2026-03-31T10:00:00+00:00",
+                    "event_type": "issue-updated",
+                    "outcome": "no-change",
+                    "title": "RepoD drift needs review",
+                },
+            }
+        }
+    }
+
+    enriched = operator_control_center._project_queue_follow_through(
+        queue,
+        recent_runs=recent_runs,
+        resolution_trend=resolution_trend,
+        current_generated_at="2026-03-31T12:00:00+00:00",
+    )
+
+    item = enriched[0]
+    assert item["follow_through_recovery_status"] == "relapsing"
+    assert item["follow_through_relapse_churn_status"] == "churn"
+    assert "churning between calmer and escalated states" in item["follow_through_relapse_churn_summary"]
 
 
 def test_operator_snapshot_marks_quiet_recovery_as_improving(tmp_path: Path, monkeypatch):

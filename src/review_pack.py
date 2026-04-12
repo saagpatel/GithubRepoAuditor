@@ -63,6 +63,14 @@ def export_review_pack(
             f"  Recovery / Retirement: {item.get('follow_through_recovery', 'None')} — "
             f"{item.get('follow_through_recovery_summary', 'No follow-through recovery or escalation-retirement signal is currently surfaced.')}"
         )
+        _w(
+            f"  Recovery Persistence: {item.get('follow_through_recovery_persistence', 'None')} — "
+            f"{item.get('follow_through_recovery_persistence_summary', 'No follow-through recovery persistence signal is currently surfaced.')}"
+        )
+        _w(
+            f"  Relapse Churn: {item.get('follow_through_relapse_churn', 'None')} — "
+            f"{item.get('follow_through_relapse_churn_summary', 'No relapse churn is currently surfaced.')}"
+        )
         _w(f"  Next Checkpoint: {item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
     if not weekly_pack.get("top_attention"):
         _w("- No urgent attention items are currently surfaced.")
@@ -102,6 +110,20 @@ def export_review_pack(
         label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
         _w(f"- Relapsing: {label} — {item.get('follow_through_recovery_summary', 'No follow-through recovery or escalation-retirement signal is currently surfaced.')}")
     _w("")
+    _w("### Follow-Through Recovery Persistence and Relapse Churn")
+    _w("")
+    _w(f"- Recovery Persistence: {weekly_pack.get('follow_through_recovery_persistence_summary', 'No follow-through recovery persistence signal is currently surfaced.')}")
+    _w(f"- Relapse Churn: {weekly_pack.get('follow_through_relapse_churn_summary', 'No relapse churn is currently surfaced.')}")
+    for item in weekly_pack.get("top_fragile_recovery_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        _w(f"- Fragile Recovery: {label} — {item.get('follow_through_recovery_persistence_summary', 'No follow-through recovery persistence signal is currently surfaced.')}")
+    for item in weekly_pack.get("top_sustained_recovery_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        _w(f"- Sustained Recovery: {label} — {item.get('follow_through_recovery_persistence_summary', 'No follow-through recovery persistence signal is currently surfaced.')}")
+    for item in weekly_pack.get("top_churn_follow_through_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        _w(f"- Churn Hotspot: {label} — {item.get('follow_through_relapse_churn_summary', 'No relapse churn is currently surfaced.')}")
+    _w("")
     _w("### Top Repo Drilldowns")
     _w("")
     for briefing in weekly_pack.get("repo_briefings", [])[:3]:
@@ -114,6 +136,8 @@ def export_review_pack(
         _w(f"  Checkpoint Timing: {briefing.get('checkpoint_timing_line', 'Unknown')}")
         _w(f"  Escalation: {briefing.get('escalation_line', 'Unknown: No stronger follow-through escalation is currently surfaced.')}")
         _w(f"  Recovery / Retirement: {briefing.get('recovery_line', 'None: No follow-through recovery or escalation-retirement signal is currently surfaced.')}")
+        _w(f"  Recovery Persistence: {briefing.get('recovery_persistence_line', 'None: No follow-through recovery persistence signal is currently surfaced.')}")
+        _w(f"  Relapse Churn: {briefing.get('relapse_churn_line', 'None: No relapse churn is currently surfaced.')}")
         _w(f"  What Would Count As Progress: {briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
     _w("")
 

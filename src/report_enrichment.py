@@ -35,6 +35,8 @@ NO_FOLLOW_THROUGH_SUMMARY = "No follow-through evidence is recorded yet."
 NO_FOLLOW_THROUGH_CHECKPOINT = "Use the next run or linked artifact to confirm whether the recommendation moved."
 NO_FOLLOW_THROUGH_ESCALATION = "No stronger follow-through escalation is currently surfaced."
 NO_FOLLOW_THROUGH_RECOVERY = "No follow-through recovery or escalation-retirement signal is currently surfaced."
+NO_FOLLOW_THROUGH_RECOVERY_PERSISTENCE = "No follow-through recovery persistence signal is currently surfaced."
+NO_FOLLOW_THROUGH_RELAPSE_CHURN = "No relapse churn is currently surfaced."
 
 
 def _metadata(audit: Any) -> dict[str, Any]:
@@ -337,6 +339,10 @@ def build_repo_briefing(
     follow_through_escalation_summary = build_follow_through_escalation_summary(handoff_source)
     follow_through_recovery = build_follow_through_recovery_status_label(handoff_source)
     follow_through_recovery_summary = build_follow_through_recovery_summary(handoff_source)
+    follow_through_recovery_persistence = build_follow_through_recovery_persistence_status_label(handoff_source)
+    follow_through_recovery_persistence_summary = build_follow_through_recovery_persistence_summary(handoff_source)
+    follow_through_relapse_churn = build_follow_through_relapse_churn_status_label(handoff_source)
+    follow_through_relapse_churn_summary = build_follow_through_relapse_churn_summary(handoff_source)
     follow_through_resurfacing_reason = build_follow_through_resurfacing_reason(handoff_source)
     return {
         "repo": repo_name,
@@ -375,6 +381,10 @@ def build_repo_briefing(
             "escalation_summary": follow_through_escalation_summary,
             "recovery_retirement": follow_through_recovery,
             "recovery_retirement_summary": follow_through_recovery_summary,
+            "recovery_persistence": follow_through_recovery_persistence,
+            "recovery_persistence_summary": follow_through_recovery_persistence_summary,
+            "relapse_churn": follow_through_relapse_churn,
+            "relapse_churn_summary": follow_through_relapse_churn_summary,
             "what_would_count_as_progress": follow_through_checkpoint,
         },
         "what_to_do_next_line": f"{recommended_action} {next_best_action_rationale}".strip(),
@@ -383,6 +393,8 @@ def build_repo_briefing(
         "checkpoint_timing_line": follow_through_checkpoint_timing,
         "escalation_line": f"{follow_through_escalation}: {follow_through_escalation_summary}",
         "recovery_line": f"{follow_through_recovery}: {follow_through_recovery_summary}",
+        "recovery_persistence_line": f"{follow_through_recovery_persistence}: {follow_through_recovery_persistence_summary}",
+        "relapse_churn_line": f"{follow_through_relapse_churn}: {follow_through_relapse_churn_summary}",
         "resurfacing_reason_line": follow_through_resurfacing_reason,
     }
 
@@ -440,6 +452,10 @@ def build_weekly_review_pack(
                 "follow_through_escalation_summary": build_follow_through_escalation_summary(mapped),
                 "follow_through_recovery": build_follow_through_recovery_status_label(mapped),
                 "follow_through_recovery_summary": build_follow_through_recovery_summary(mapped),
+                "follow_through_recovery_persistence": build_follow_through_recovery_persistence_status_label(mapped),
+                "follow_through_recovery_persistence_summary": build_follow_through_recovery_persistence_summary(mapped),
+                "follow_through_relapse_churn": build_follow_through_relapse_churn_status_label(mapped),
+                "follow_through_relapse_churn_summary": build_follow_through_relapse_churn_summary(mapped),
             }
         )
     top_recommendation = build_top_recommendation_summary(data)
@@ -465,6 +481,12 @@ def build_weekly_review_pack(
         "follow_through_recovery_summary": str(
             operator_summary.get("follow_through_recovery_summary") or NO_FOLLOW_THROUGH_RECOVERY
         ),
+        "follow_through_recovery_persistence_summary": str(
+            operator_summary.get("follow_through_recovery_persistence_summary") or NO_FOLLOW_THROUGH_RECOVERY_PERSISTENCE
+        ),
+        "follow_through_relapse_churn_summary": str(
+            operator_summary.get("follow_through_relapse_churn_summary") or NO_FOLLOW_THROUGH_RELAPSE_CHURN
+        ),
         "top_unattempted_items": list(operator_summary.get("top_unattempted_items") or []),
         "top_stale_follow_through_items": list(operator_summary.get("top_stale_follow_through_items") or []),
         "top_overdue_follow_through_items": list(operator_summary.get("top_overdue_follow_through_items") or []),
@@ -472,6 +494,9 @@ def build_weekly_review_pack(
         "top_recovering_follow_through_items": list(operator_summary.get("top_recovering_follow_through_items") or []),
         "top_retiring_follow_through_items": list(operator_summary.get("top_retiring_follow_through_items") or []),
         "top_relapsing_follow_through_items": list(operator_summary.get("top_relapsing_follow_through_items") or []),
+        "top_fragile_recovery_items": list(operator_summary.get("top_fragile_recovery_items") or []),
+        "top_sustained_recovery_items": list(operator_summary.get("top_sustained_recovery_items") or []),
+        "top_churn_follow_through_items": list(operator_summary.get("top_churn_follow_through_items") or []),
     }
 
 
@@ -549,6 +574,14 @@ def no_follow_through_recovery() -> str:
     return NO_FOLLOW_THROUGH_RECOVERY
 
 
+def no_follow_through_recovery_persistence() -> str:
+    return NO_FOLLOW_THROUGH_RECOVERY_PERSISTENCE
+
+
+def no_follow_through_relapse_churn() -> str:
+    return NO_FOLLOW_THROUGH_RELAPSE_CHURN
+
+
 def build_follow_through_status_label(value: Any) -> str:
     mapped = _mapping(value)
     status = str(mapped.get("follow_through_status", value if isinstance(value, str) else "") or "unknown")
@@ -622,6 +655,46 @@ def build_follow_through_recovery_status_label(value: Any) -> str:
 def build_follow_through_recovery_summary(value: Any) -> str:
     mapped = _mapping(value)
     return str(mapped.get("follow_through_recovery_summary") or NO_FOLLOW_THROUGH_RECOVERY)
+
+
+def build_follow_through_recovery_persistence_status_label(value: Any) -> str:
+    mapped = _mapping(value)
+    status = str(mapped.get("follow_through_recovery_persistence_status", value if isinstance(value, str) else "") or "none")
+    labels = {
+        "none": "None",
+        "just-recovering": "Just Recovering",
+        "holding-recovery": "Holding Recovery",
+        "holding-retiring-watch": "Holding Retiring Watch",
+        "sustained-retiring-watch": "Sustained Retiring Watch",
+        "sustained-retired": "Sustained Retired",
+        "fragile-recovery": "Fragile Recovery",
+        "insufficient-evidence": "Insufficient Evidence",
+    }
+    return labels.get(status, status.replace("-", " ").title())
+
+
+def build_follow_through_recovery_persistence_summary(value: Any) -> str:
+    mapped = _mapping(value)
+    return str(mapped.get("follow_through_recovery_persistence_summary") or NO_FOLLOW_THROUGH_RECOVERY_PERSISTENCE)
+
+
+def build_follow_through_relapse_churn_status_label(value: Any) -> str:
+    mapped = _mapping(value)
+    status = str(mapped.get("follow_through_relapse_churn_status", value if isinstance(value, str) else "") or "none")
+    labels = {
+        "none": "None",
+        "watch": "Watch",
+        "fragile": "Fragile",
+        "churn": "Churn",
+        "blocked": "Blocked",
+        "insufficient-evidence": "Insufficient Evidence",
+    }
+    return labels.get(status, status.replace("-", " ").title())
+
+
+def build_follow_through_relapse_churn_summary(value: Any) -> str:
+    mapped = _mapping(value)
+    return str(mapped.get("follow_through_relapse_churn_summary") or NO_FOLLOW_THROUGH_RELAPSE_CHURN)
 
 
 def build_follow_through_resurfacing_reason(value: Any) -> str:

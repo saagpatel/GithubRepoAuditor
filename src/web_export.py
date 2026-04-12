@@ -17,8 +17,12 @@ from src.report_enrichment import (
     build_follow_through_checkpoint_status_label,
     build_follow_through_escalation_status_label,
     build_follow_through_escalation_summary,
+    build_follow_through_recovery_persistence_status_label,
+    build_follow_through_recovery_persistence_summary,
     build_follow_through_recovery_status_label,
     build_follow_through_recovery_summary,
+    build_follow_through_relapse_churn_status_label,
+    build_follow_through_relapse_churn_summary,
     build_follow_through_status_label,
     build_follow_through_summary,
     build_last_movement_label,
@@ -261,6 +265,8 @@ def _operator_section(data: dict) -> str:
             f"<br><span class='muted'><strong>Checkpoint timing:</strong> {escape(build_follow_through_checkpoint_status_label(item))}</span>"
             f"<br><span class='muted'><strong>Escalation:</strong> {escape(build_follow_through_escalation_status_label(item))} — {escape(build_follow_through_escalation_summary(item))}</span>"
             f"<br><span class='muted'><strong>Recovery / Retirement:</strong> {escape(build_follow_through_recovery_status_label(item))} — {escape(build_follow_through_recovery_summary(item))}</span>"
+            f"<br><span class='muted'><strong>Recovery Persistence:</strong> {escape(build_follow_through_recovery_persistence_status_label(item))} — {escape(build_follow_through_recovery_persistence_summary(item))}</span>"
+            f"<br><span class='muted'><strong>Relapse Churn:</strong> {escape(build_follow_through_relapse_churn_status_label(item))} — {escape(build_follow_through_relapse_churn_summary(item))}</span>"
             f"<br><span class='muted'><strong>Next checkpoint:</strong> {escape(build_follow_through_checkpoint(item))}</span>"
             f"<br><span class='muted'><strong>Artifact:</strong> {escape(artifact_label)}</span>"
             "</li>"
@@ -301,6 +307,8 @@ def _operator_section(data: dict) -> str:
         <div class="meta-line"><strong>Next Checkpoint:</strong> {escape(summary.get('follow_through_checkpoint_summary', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</div>
         <div class="meta-line"><strong>Escalation:</strong> {escape(summary.get('follow_through_escalation_summary', 'No stronger follow-through escalation is currently surfaced.'))}</div>
         <div class="meta-line"><strong>Recovery / Retirement:</strong> {escape(summary.get('follow_through_recovery_summary', 'No follow-through recovery or escalation-retirement signal is currently surfaced.'))}</div>
+        <div class="meta-line"><strong>Recovery Persistence:</strong> {escape(summary.get('follow_through_recovery_persistence_summary', 'No follow-through recovery persistence signal is currently surfaced.'))}</div>
+        <div class="meta-line"><strong>Relapse Churn:</strong> {escape(summary.get('follow_through_relapse_churn_summary', 'No relapse churn is currently surfaced.'))}</div>
         <div class="meta-line"><strong>Primary Target:</strong> {escape(primary_target_label or 'No active target')}</div>
         <div class="meta-line"><strong>Why This Is The Top Target:</strong> {escape(summary.get('primary_target_reason', 'No target rationale is recorded yet.'))}</div>
         <div class="meta-line"><strong>What Counts As Done:</strong> {escape(summary.get('primary_target_done_criteria', 'No done-state guidance is recorded yet.'))}</div>
@@ -504,6 +512,8 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
             f"<br><span class='muted'><strong>Checkpoint Timing:</strong> {escape(item.get('follow_through_checkpoint_timing', 'Unknown'))}</span>"
             f"<br><span class='muted'><strong>Escalation:</strong> {escape(item.get('follow_through_escalation', 'Unknown'))} — {escape(item.get('follow_through_escalation_summary', 'No stronger follow-through escalation is currently surfaced.'))}</span>"
             f"<br><span class='muted'><strong>Recovery / Retirement:</strong> {escape(item.get('follow_through_recovery', 'None'))} — {escape(item.get('follow_through_recovery_summary', 'No follow-through recovery or escalation-retirement signal is currently surfaced.'))}</span>"
+            f"<br><span class='muted'><strong>Recovery Persistence:</strong> {escape(item.get('follow_through_recovery_persistence', 'None'))} — {escape(item.get('follow_through_recovery_persistence_summary', 'No follow-through recovery persistence signal is currently surfaced.'))}</span>"
+            f"<br><span class='muted'><strong>Relapse Churn:</strong> {escape(item.get('follow_through_relapse_churn', 'None'))} — {escape(item.get('follow_through_relapse_churn_summary', 'No relapse churn is currently surfaced.'))}</span>"
             f"<br><span class='muted'><strong>Next Checkpoint:</strong> {escape(item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</span>"
             "</li>"
         )
@@ -531,6 +541,18 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
     for item in weekly_pack.get("top_relapsing_follow_through_items", [])[:3]:
         label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
         relapsing_rows.append(f"<li>{escape(label)} — {escape(item.get('follow_through_recovery_summary', 'No follow-through recovery or escalation-retirement signal is currently surfaced.'))}</li>")
+    fragile_rows = []
+    for item in weekly_pack.get("top_fragile_recovery_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        fragile_rows.append(f"<li>{escape(label)} — {escape(item.get('follow_through_recovery_persistence_summary', 'No follow-through recovery persistence signal is currently surfaced.'))}</li>")
+    sustained_rows = []
+    for item in weekly_pack.get("top_sustained_recovery_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        sustained_rows.append(f"<li>{escape(label)} — {escape(item.get('follow_through_recovery_persistence_summary', 'No follow-through recovery persistence signal is currently surfaced.'))}</li>")
+    churn_rows = []
+    for item in weekly_pack.get("top_churn_follow_through_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        churn_rows.append(f"<li>{escape(label)} — {escape(item.get('follow_through_relapse_churn_summary', 'No relapse churn is currently surfaced.'))}</li>")
     repo_cards = []
     for briefing in weekly_pack.get("repo_briefings", [])[:3]:
         repo_cards.append(
@@ -545,6 +567,8 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
               <div class="meta-line"><strong>Checkpoint Timing:</strong> {escape(briefing.get('checkpoint_timing_line', 'Unknown'))}</div>
               <div class="meta-line"><strong>Escalation:</strong> {escape(briefing.get('escalation_line', 'Unknown: No stronger follow-through escalation is currently surfaced.'))}</div>
               <div class="meta-line"><strong>Recovery / Retirement:</strong> {escape(briefing.get('recovery_line', 'None: No follow-through recovery or escalation-retirement signal is currently surfaced.'))}</div>
+              <div class="meta-line"><strong>Recovery Persistence:</strong> {escape(briefing.get('recovery_persistence_line', 'None: No follow-through recovery persistence signal is currently surfaced.'))}</div>
+              <div class="meta-line"><strong>Relapse Churn:</strong> {escape(briefing.get('relapse_churn_line', 'None: No relapse churn is currently surfaced.'))}</div>
               <div class="meta-line"><strong>What Would Count As Progress:</strong> {escape(briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</div>
             </div>
             """
@@ -563,6 +587,8 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
           <div class="meta-line"><strong>Next Checkpoint:</strong> {escape(weekly_pack.get('follow_through_checkpoint_summary', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</div>
           <div class="meta-line"><strong>Follow-Through Aging and Escalation:</strong> {escape(weekly_pack.get('follow_through_escalation_summary', 'No stronger follow-through escalation is currently surfaced.'))}</div>
           <div class="meta-line"><strong>Follow-Through Recovery and Escalation Retirement:</strong> {escape(weekly_pack.get('follow_through_recovery_summary', 'No follow-through recovery or escalation-retirement signal is currently surfaced.'))}</div>
+          <div class="meta-line"><strong>Follow-Through Recovery Persistence:</strong> {escape(weekly_pack.get('follow_through_recovery_persistence_summary', 'No follow-through recovery persistence signal is currently surfaced.'))}</div>
+          <div class="meta-line"><strong>Follow-Through Relapse Churn:</strong> {escape(weekly_pack.get('follow_through_relapse_churn_summary', 'No relapse churn is currently surfaced.'))}</div>
           <h3>Still Untouched</h3>
           <ul class="bullet-list">{''.join(untouched_rows) or '<li>No untouched follow-through hotspots are currently surfaced.</li>'}</ul>
           <h3>Stale Follow-Through</h3>
@@ -577,6 +603,12 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
           <ul class="bullet-list">{''.join(retiring_rows) or '<li>No retirement-watch follow-through items are currently surfaced.</li>'}</ul>
           <h3>Relapsing</h3>
           <ul class="bullet-list">{''.join(relapsing_rows) or '<li>No relapsing follow-through items are currently surfaced.</li>'}</ul>
+          <h3>Fragile Recovery</h3>
+          <ul class="bullet-list">{''.join(fragile_rows) or '<li>No fragile recovery items are currently surfaced.</li>'}</ul>
+          <h3>Sustained Recovery</h3>
+          <ul class="bullet-list">{''.join(sustained_rows) or '<li>No sustained recovery items are currently surfaced.</li>'}</ul>
+          <h3>Relapse Churn</h3>
+          <ul class="bullet-list">{''.join(churn_rows) or '<li>No relapse-churn hotspots are currently surfaced.</li>'}</ul>
           <h3>Top Attention</h3>
           <ul class="bullet-list">{''.join(attention_rows) or '<li>No urgent attention items are currently surfaced.</li>'}</ul>
         </div>
