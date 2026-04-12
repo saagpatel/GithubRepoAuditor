@@ -412,6 +412,15 @@ class TestMarkdownReport:
             "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reason": "Fresh confirmation-side evidence is returning after restored rebuilt re-entry softened or reset, but it has not yet re-restored stronger restored posture.",
             "closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_summary": "Fresh confirmation-side evidence is returning for Missing template asset after restored rebuilt re-entry softened, but it has not yet re-restored stronger restored posture (0.31).",
             "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_summary": "Missing template asset is recovering after restored rebuilt re-entry softened, but stronger restored posture still needs more fresh follow-through before it is re-restored.",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_age_runs": 1,
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_score": 0.18,
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_status": "just-rerestored",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_reason": "Stronger restored rebuilt re-entry posture has been re-restored, but it has not yet proved it can hold.",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_summary": "Missing template asset has only just re-restored stronger restored rebuilt re-entry posture, so it is still fragile (0.18; 1 run).",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_score": 0.0,
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_status": "none",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_reason": "",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_summary": "No meaningful re-restored rebuilt re-entry churn is active right now.",
             "primary_target_closure_forecast_reset_reentry_rebuild_age_runs": 1,
             "primary_target_closure_forecast_reset_reentry_rebuild_persistence_score": 0.29,
             "primary_target_closure_forecast_reset_reentry_rebuild_persistence_status": "just-rebuilt",
@@ -427,9 +436,12 @@ class TestMarkdownReport:
             "holding_reset_reentry_rebuild_reentry_hotspots": [],
             "just_restored_rebuild_reentry_hotspots": [],
             "holding_reset_reentry_rebuild_reentry_restore_hotspots": [],
+            "just_rerestored_rebuild_reentry_hotspots": [],
+            "holding_reset_reentry_rebuild_reentry_restore_rerestore_hotspots": [],
             "reset_reentry_rebuild_churn_hotspots": [],
             "reset_reentry_rebuild_reentry_churn_hotspots": [],
             "reset_reentry_rebuild_reentry_restore_churn_hotspots": [],
+            "reset_reentry_rebuild_reentry_restore_rerestore_churn_hotspots": [],
             "stale_reset_reentry_rebuild_reentry_restore_hotspots": [],
             "fresh_reset_reentry_rebuild_reentry_restore_signal_hotspots": [],
             "recovering_from_confirmation_rebuild_reset_hotspots": [],
@@ -612,6 +624,8 @@ class TestMarkdownReport:
         assert "Reset Re-entry Rebuild Re-Entry Restore Reset Controls:" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Refresh Recovery:" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Controls:" in content
+        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Persistence:" in content
+        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Churn Controls:" in content
         assert "Reset Re-entry Rebuild Persistence:" in content
         assert "Reset Re-entry Rebuild Churn Controls:" in content
         assert "Reset Re-entry Persistence Summary" in content
@@ -634,6 +648,8 @@ class TestMarkdownReport:
         assert "Reset Re-entry Rebuild Re-Entry Restore Reset Summary" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Refresh Recovery Summary" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Summary" in content
+        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Persistence Summary" in content
+        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Churn Summary" in content
         assert "Reset Re-entry Rebuild Persistence Summary" in content
         assert "Reset Re-entry Rebuild Churn Summary" in content
         assert "Reacquisition Freshness Summary" in content
