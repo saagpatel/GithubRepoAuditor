@@ -44,6 +44,8 @@ NO_FOLLOW_THROUGH_RECOVERY_REBUILD_STRENGTH = "No follow-through recovery rebuil
 NO_FOLLOW_THROUGH_RECOVERY_REACQUISITION = "No follow-through recovery reacquisition signal is currently surfaced."
 NO_FOLLOW_THROUGH_REACQUISITION_DURABILITY = "No follow-through reacquisition durability signal is currently surfaced."
 NO_FOLLOW_THROUGH_REACQUISITION_CONSOLIDATION = "No follow-through reacquisition confidence-consolidation signal is currently surfaced."
+NO_FOLLOW_THROUGH_REACQUISITION_SOFTENING_DECAY = "No reacquisition softening-decay signal is currently surfaced."
+NO_FOLLOW_THROUGH_REACQUISITION_CONFIDENCE_RETIREMENT = "No reacquisition confidence-retirement signal is currently surfaced."
 
 
 def _metadata(audit: Any) -> dict[str, Any]:
@@ -364,6 +366,10 @@ def build_repo_briefing(
     follow_through_reacquisition_durability_summary = build_follow_through_reacquisition_durability_summary(handoff_source)
     follow_through_reacquisition_consolidation = build_follow_through_reacquisition_consolidation_status_label(handoff_source)
     follow_through_reacquisition_consolidation_summary = build_follow_through_reacquisition_consolidation_summary(handoff_source)
+    follow_through_reacquisition_softening_decay = build_follow_through_reacquisition_softening_decay_status_label(handoff_source)
+    follow_through_reacquisition_softening_decay_summary = build_follow_through_reacquisition_softening_decay_summary(handoff_source)
+    follow_through_reacquisition_confidence_retirement = build_follow_through_reacquisition_confidence_retirement_status_label(handoff_source)
+    follow_through_reacquisition_confidence_retirement_summary = build_follow_through_reacquisition_confidence_retirement_summary(handoff_source)
     follow_through_resurfacing_reason = build_follow_through_resurfacing_reason(handoff_source)
     return {
         "repo": repo_name,
@@ -420,6 +426,10 @@ def build_repo_briefing(
             "reacquisition_durability_summary": follow_through_reacquisition_durability_summary,
             "reacquisition_confidence": follow_through_reacquisition_consolidation,
             "reacquisition_confidence_summary": follow_through_reacquisition_consolidation_summary,
+            "reacquisition_softening_decay": follow_through_reacquisition_softening_decay,
+            "reacquisition_softening_decay_summary": follow_through_reacquisition_softening_decay_summary,
+            "reacquisition_confidence_retirement": follow_through_reacquisition_confidence_retirement,
+            "reacquisition_confidence_retirement_summary": follow_through_reacquisition_confidence_retirement_summary,
             "what_would_count_as_progress": follow_through_checkpoint,
         },
         "what_to_do_next_line": f"{recommended_action} {next_best_action_rationale}".strip(),
@@ -437,6 +447,8 @@ def build_repo_briefing(
         "recovery_reacquisition_line": f"{follow_through_recovery_reacquisition}: {follow_through_recovery_reacquisition_summary}",
         "reacquisition_durability_line": f"{follow_through_reacquisition_durability}: {follow_through_reacquisition_durability_summary}",
         "reacquisition_confidence_line": f"{follow_through_reacquisition_consolidation}: {follow_through_reacquisition_consolidation_summary}",
+        "reacquisition_softening_decay_line": f"{follow_through_reacquisition_softening_decay}: {follow_through_reacquisition_softening_decay_summary}",
+        "reacquisition_confidence_retirement_line": f"{follow_through_reacquisition_confidence_retirement}: {follow_through_reacquisition_confidence_retirement_summary}",
         "resurfacing_reason_line": follow_through_resurfacing_reason,
     }
 
@@ -512,6 +524,10 @@ def build_weekly_review_pack(
                 "follow_through_reacquisition_durability_summary": build_follow_through_reacquisition_durability_summary(mapped),
                 "follow_through_reacquisition_confidence": build_follow_through_reacquisition_consolidation_status_label(mapped),
                 "follow_through_reacquisition_confidence_summary": build_follow_through_reacquisition_consolidation_summary(mapped),
+                "follow_through_reacquisition_softening_decay": build_follow_through_reacquisition_softening_decay_status_label(mapped),
+                "follow_through_reacquisition_softening_decay_summary": build_follow_through_reacquisition_softening_decay_summary(mapped),
+                "follow_through_reacquisition_confidence_retirement": build_follow_through_reacquisition_confidence_retirement_status_label(mapped),
+                "follow_through_reacquisition_confidence_retirement_summary": build_follow_through_reacquisition_confidence_retirement_summary(mapped),
             }
         )
     top_recommendation = build_top_recommendation_summary(data)
@@ -568,6 +584,14 @@ def build_weekly_review_pack(
             operator_summary.get("follow_through_recovery_reacquisition_consolidation_summary")
             or NO_FOLLOW_THROUGH_REACQUISITION_CONSOLIDATION
         ),
+        "follow_through_reacquisition_softening_decay_summary": str(
+            operator_summary.get("follow_through_reacquisition_softening_decay_summary")
+            or NO_FOLLOW_THROUGH_REACQUISITION_SOFTENING_DECAY
+        ),
+        "follow_through_reacquisition_confidence_retirement_summary": str(
+            operator_summary.get("follow_through_reacquisition_confidence_retirement_summary")
+            or NO_FOLLOW_THROUGH_REACQUISITION_CONFIDENCE_RETIREMENT
+        ),
         "top_unattempted_items": list(operator_summary.get("top_unattempted_items") or []),
         "top_stale_follow_through_items": list(operator_summary.get("top_stale_follow_through_items") or []),
         "top_overdue_follow_through_items": list(operator_summary.get("top_overdue_follow_through_items") or []),
@@ -592,6 +616,9 @@ def build_weekly_review_pack(
         "top_durable_reacquired_items": list(operator_summary.get("top_durable_reacquired_items") or []),
         "top_softening_reacquired_items": list(operator_summary.get("top_softening_reacquired_items") or []),
         "top_fragile_reacquisition_confidence_items": list(operator_summary.get("top_fragile_reacquisition_confidence_items") or []),
+        "top_softening_reacquisition_items": list(operator_summary.get("top_softening_reacquisition_items") or []),
+        "top_revalidation_needed_reacquisition_items": list(operator_summary.get("top_revalidation_needed_reacquisition_items") or []),
+        "top_retired_reacquisition_confidence_items": list(operator_summary.get("top_retired_reacquisition_confidence_items") or []),
     }
 
 
@@ -703,6 +730,14 @@ def no_follow_through_reacquisition_durability() -> str:
 
 def no_follow_through_reacquisition_consolidation() -> str:
     return NO_FOLLOW_THROUGH_REACQUISITION_CONSOLIDATION
+
+
+def no_follow_through_reacquisition_softening_decay() -> str:
+    return NO_FOLLOW_THROUGH_REACQUISITION_SOFTENING_DECAY
+
+
+def no_follow_through_reacquisition_confidence_retirement() -> str:
+    return NO_FOLLOW_THROUGH_REACQUISITION_CONFIDENCE_RETIREMENT
 
 
 def build_follow_through_status_label(value: Any) -> str:
@@ -978,6 +1013,56 @@ def build_follow_through_reacquisition_consolidation_summary(value: Any) -> str:
     return str(
         mapped.get("follow_through_recovery_reacquisition_consolidation_summary")
         or NO_FOLLOW_THROUGH_REACQUISITION_CONSOLIDATION
+    )
+
+
+def build_follow_through_reacquisition_softening_decay_status_label(value: Any) -> str:
+    mapped = _mapping(value)
+    status = str(
+        mapped.get("follow_through_reacquisition_softening_decay_status", value if isinstance(value, str) else "")
+        or "none"
+    )
+    labels = {
+        "none": "None",
+        "softening-watch": "Softening Watch",
+        "step-down": "Step-Down",
+        "revalidation-needed": "Revalidation Needed",
+        "retired-softening": "Retired Softening",
+        "insufficient-evidence": "Insufficient Evidence",
+    }
+    return labels.get(status, status.replace("-", " ").title())
+
+
+def build_follow_through_reacquisition_softening_decay_summary(value: Any) -> str:
+    mapped = _mapping(value)
+    return str(
+        mapped.get("follow_through_reacquisition_softening_decay_summary")
+        or NO_FOLLOW_THROUGH_REACQUISITION_SOFTENING_DECAY
+    )
+
+
+def build_follow_through_reacquisition_confidence_retirement_status_label(value: Any) -> str:
+    mapped = _mapping(value)
+    status = str(
+        mapped.get("follow_through_reacquisition_confidence_retirement_status", value if isinstance(value, str) else "")
+        or "none"
+    )
+    labels = {
+        "none": "None",
+        "watch-retirement": "Watch Retirement",
+        "retiring-confidence": "Retiring Confidence",
+        "retired-confidence": "Retired Confidence",
+        "revalidation-needed": "Revalidation Needed",
+        "insufficient-evidence": "Insufficient Evidence",
+    }
+    return labels.get(status, status.replace("-", " ").title())
+
+
+def build_follow_through_reacquisition_confidence_retirement_summary(value: Any) -> str:
+    mapped = _mapping(value)
+    return str(
+        mapped.get("follow_through_reacquisition_confidence_retirement_summary")
+        or NO_FOLLOW_THROUGH_REACQUISITION_CONFIDENCE_RETIREMENT
     )
 
 

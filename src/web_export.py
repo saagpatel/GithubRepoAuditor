@@ -17,10 +17,14 @@ from src.report_enrichment import (
     build_follow_through_checkpoint_status_label,
     build_follow_through_escalation_status_label,
     build_follow_through_escalation_summary,
+    build_follow_through_reacquisition_confidence_retirement_status_label,
+    build_follow_through_reacquisition_confidence_retirement_summary,
     build_follow_through_reacquisition_consolidation_status_label,
     build_follow_through_reacquisition_consolidation_summary,
     build_follow_through_reacquisition_durability_status_label,
     build_follow_through_reacquisition_durability_summary,
+    build_follow_through_reacquisition_softening_decay_status_label,
+    build_follow_through_reacquisition_softening_decay_summary,
     build_follow_through_recovery_freshness_status_label,
     build_follow_through_recovery_freshness_summary,
     build_follow_through_recovery_memory_reset_status_label,
@@ -285,6 +289,8 @@ def _operator_section(data: dict) -> str:
             f"<br><span class='muted'><strong>Recovery Reacquisition:</strong> {escape(build_follow_through_recovery_reacquisition_status_label(item))} — {escape(build_follow_through_recovery_reacquisition_summary(item))}</span>"
             f"<br><span class='muted'><strong>Reacquisition Durability:</strong> {escape(build_follow_through_reacquisition_durability_status_label(item))} — {escape(build_follow_through_reacquisition_durability_summary(item))}</span>"
             f"<br><span class='muted'><strong>Reacquisition Confidence:</strong> {escape(build_follow_through_reacquisition_consolidation_status_label(item))} — {escape(build_follow_through_reacquisition_consolidation_summary(item))}</span>"
+            f"<br><span class='muted'><strong>Reacquisition Softening Decay:</strong> {escape(build_follow_through_reacquisition_softening_decay_status_label(item))} — {escape(build_follow_through_reacquisition_softening_decay_summary(item))}</span>"
+            f"<br><span class='muted'><strong>Reacquisition Confidence Retirement:</strong> {escape(build_follow_through_reacquisition_confidence_retirement_status_label(item))} — {escape(build_follow_through_reacquisition_confidence_retirement_summary(item))}</span>"
             f"<br><span class='muted'><strong>Next checkpoint:</strong> {escape(build_follow_through_checkpoint(item))}</span>"
             f"<br><span class='muted'><strong>Artifact:</strong> {escape(artifact_label)}</span>"
             "</li>"
@@ -333,6 +339,8 @@ def _operator_section(data: dict) -> str:
         <div class="meta-line"><strong>Recovery Reacquisition:</strong> {escape(summary.get('follow_through_recovery_reacquisition_summary', 'No follow-through recovery reacquisition signal is currently surfaced.'))}</div>
         <div class="meta-line"><strong>Reacquisition Durability:</strong> {escape(summary.get('follow_through_recovery_reacquisition_durability_summary', 'No follow-through reacquisition durability signal is currently surfaced.'))}</div>
         <div class="meta-line"><strong>Reacquisition Confidence:</strong> {escape(summary.get('follow_through_recovery_reacquisition_consolidation_summary', 'No follow-through reacquisition confidence-consolidation signal is currently surfaced.'))}</div>
+        <div class="meta-line"><strong>Reacquisition Softening Decay:</strong> {escape(summary.get('follow_through_reacquisition_softening_decay_summary', 'No reacquisition softening-decay signal is currently surfaced.'))}</div>
+        <div class="meta-line"><strong>Reacquisition Confidence Retirement:</strong> {escape(summary.get('follow_through_reacquisition_confidence_retirement_summary', 'No reacquisition confidence-retirement signal is currently surfaced.'))}</div>
         <div class="meta-line"><strong>Primary Target:</strong> {escape(primary_target_label or 'No active target')}</div>
         <div class="meta-line"><strong>Why This Is The Top Target:</strong> {escape(summary.get('primary_target_reason', 'No target rationale is recorded yet.'))}</div>
         <div class="meta-line"><strong>What Counts As Done:</strong> {escape(summary.get('primary_target_done_criteria', 'No done-state guidance is recorded yet.'))}</div>
@@ -506,6 +514,8 @@ def _top_attention_section(data: dict) -> str:
             f"<br><span class='muted'><strong>Checkpoint timing:</strong> {escape(build_follow_through_checkpoint_status_label(item))}</span>"
             f"<br><span class='muted'><strong>Escalation:</strong> {escape(build_follow_through_escalation_status_label(item))} — {escape(build_follow_through_escalation_summary(item))}</span>"
             f"<br><span class='muted'><strong>Recovery / Retirement:</strong> {escape(build_follow_through_recovery_status_label(item))} — {escape(build_follow_through_recovery_summary(item))}</span>"
+            f"<br><span class='muted'><strong>Reacquisition Softening Decay:</strong> {escape(build_follow_through_reacquisition_softening_decay_status_label(item))} — {escape(build_follow_through_reacquisition_softening_decay_summary(item))}</span>"
+            f"<br><span class='muted'><strong>Reacquisition Confidence Retirement:</strong> {escape(build_follow_through_reacquisition_confidence_retirement_status_label(item))} — {escape(build_follow_through_reacquisition_confidence_retirement_summary(item))}</span>"
             "</li>"
         )
 
@@ -635,6 +645,18 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
     for item in weekly_pack.get("top_fragile_reacquisition_confidence_items", [])[:3]:
         label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
         fragile_reacquisition_confidence_rows.append(f"<li>{escape(label)} — {escape(item.get('follow_through_recovery_reacquisition_consolidation_summary', 'No follow-through reacquisition confidence-consolidation signal is currently surfaced.'))}</li>")
+    softening_reacquisition_rows = []
+    for item in weekly_pack.get("top_softening_reacquisition_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        softening_reacquisition_rows.append(f"<li>{escape(label)} — {escape(item.get('follow_through_reacquisition_softening_decay_summary', 'No reacquisition softening-decay signal is currently surfaced.'))}</li>")
+    revalidation_needed_reacquisition_rows = []
+    for item in weekly_pack.get("top_revalidation_needed_reacquisition_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        revalidation_needed_reacquisition_rows.append(f"<li>{escape(label)} — {escape(item.get('follow_through_reacquisition_confidence_retirement_summary', 'No reacquisition confidence-retirement signal is currently surfaced.'))}</li>")
+    retired_confidence_reacquisition_rows = []
+    for item in weekly_pack.get("top_retired_reacquisition_confidence_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        retired_confidence_reacquisition_rows.append(f"<li>{escape(label)} — {escape(item.get('follow_through_reacquisition_confidence_retirement_summary', 'No reacquisition confidence-retirement signal is currently surfaced.'))}</li>")
     repo_cards = []
     for briefing in weekly_pack.get("repo_briefings", [])[:3]:
         repo_cards.append(
@@ -657,6 +679,8 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
               <div class="meta-line"><strong>Recovery Reacquisition:</strong> {escape(briefing.get('recovery_reacquisition_line', 'None: No follow-through recovery reacquisition signal is currently surfaced.'))}</div>
               <div class="meta-line"><strong>Reacquisition Durability:</strong> {escape(briefing.get('reacquisition_durability_line', 'None: No follow-through reacquisition durability signal is currently surfaced.'))}</div>
               <div class="meta-line"><strong>Reacquisition Confidence:</strong> {escape(briefing.get('reacquisition_confidence_line', 'None: No follow-through reacquisition confidence-consolidation signal is currently surfaced.'))}</div>
+              <div class="meta-line"><strong>Reacquisition Softening Decay:</strong> {escape(briefing.get('reacquisition_softening_decay_line', 'None: No reacquisition softening-decay signal is currently surfaced.'))}</div>
+              <div class="meta-line"><strong>Reacquisition Confidence Retirement:</strong> {escape(briefing.get('reacquisition_confidence_retirement_line', 'None: No reacquisition confidence-retirement signal is currently surfaced.'))}</div>
               <div class="meta-line"><strong>What Would Count As Progress:</strong> {escape(briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</div>
             </div>
             """
@@ -684,6 +708,9 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
           <h3>Follow-Through Reacquisition Durability and Confidence</h3>
           <div class="meta-line"><strong>Follow-Through Reacquisition Durability:</strong> {escape(weekly_pack.get('follow_through_reacquisition_durability_summary', 'No follow-through reacquisition durability signal is currently surfaced.'))}</div>
           <div class="meta-line"><strong>Follow-Through Reacquisition Confidence:</strong> {escape(weekly_pack.get('follow_through_reacquisition_consolidation_summary', 'No follow-through reacquisition confidence-consolidation signal is currently surfaced.'))}</div>
+          <h3>Follow-Through Reacquisition Softening and Confidence Retirement</h3>
+          <div class="meta-line"><strong>Reacquisition Softening Decay:</strong> {escape(weekly_pack.get('follow_through_reacquisition_softening_decay_summary', 'No reacquisition softening-decay signal is currently surfaced.'))}</div>
+          <div class="meta-line"><strong>Reacquisition Confidence Retirement:</strong> {escape(weekly_pack.get('follow_through_reacquisition_confidence_retirement_summary', 'No reacquisition confidence-retirement signal is currently surfaced.'))}</div>
           <h3>Still Untouched</h3>
           <ul class="bullet-list">{''.join(untouched_rows) or '<li>No untouched follow-through hotspots are currently surfaced.</li>'}</ul>
           <h3>Stale Follow-Through</h3>
@@ -730,6 +757,12 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
           <ul class="bullet-list">{''.join(softening_reacquired_rows) or '<li>No softening re-acquisition hotspots are currently surfaced.</li>'}</ul>
           <h3>Fragile Reacquisition Confidence</h3>
           <ul class="bullet-list">{''.join(fragile_reacquisition_confidence_rows) or '<li>No fragile re-acquisition confidence hotspots are currently surfaced.</li>'}</ul>
+          <h3>Softening Reacquisition</h3>
+          <ul class="bullet-list">{''.join(softening_reacquisition_rows) or '<li>No reacquisition softening hotspots are currently surfaced.</li>'}</ul>
+          <h3>Revalidation Needed</h3>
+          <ul class="bullet-list">{''.join(revalidation_needed_reacquisition_rows) or '<li>No reacquisition revalidation hotspots are currently surfaced.</li>'}</ul>
+          <h3>Retired Confidence</h3>
+          <ul class="bullet-list">{''.join(retired_confidence_reacquisition_rows) or '<li>No retired re-acquisition confidence hotspots are currently surfaced.</li>'}</ul>
           <h3>Top Attention</h3>
           <ul class="bullet-list">{''.join(attention_rows) or '<li>No urgent attention items are currently surfaced.</li>'}</ul>
         </div>
