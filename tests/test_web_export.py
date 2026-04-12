@@ -111,6 +111,7 @@ def _make_report(**overrides) -> dict:
             "what_to_do_next": "Inspect the managed issue before closing the campaign.",
             "trend_summary": "The queue is stable but still sticky: 1 attention item is persisting from the last run.",
             "follow_through_summary": "1 urgent item repeated in the recent window.",
+            "follow_through_recovery_summary": "1 item is recovering from recent escalation, but it still needs another calmer run before the stronger resurfacing retires.",
             "accountability_summary": "The top target is still open because the same urgent drift item keeps surviving recent cycles.",
             "primary_target_reason": "This stays on top because urgent drift has persisted and should be cleared before lower-pressure work.",
             "primary_target_done_criteria": "Inspect the drift, reconcile it, and confirm the item no longer returns as urgent on the next run.",
@@ -448,6 +449,16 @@ def _make_report(**overrides) -> dict:
                 "source_run_id": "testuser:2026-03-29T12:00:00+00:00",
                 "age_days": 0,
                 "links": [],
+                "follow_through_status": "waiting-on-evidence",
+                "follow_through_age_runs": 1,
+                "follow_through_checkpoint_status": "due-soon",
+                "follow_through_summary": "RepoC has recent follow-up recorded and is now waiting for confirming evidence.",
+                "follow_through_next_checkpoint": "Wait for the next run to confirm the pressure falls.",
+                "follow_through_escalation_status": "watch",
+                "follow_through_escalation_summary": "RepoC is not late yet, but it should stay visible until the next checkpoint lands.",
+                "follow_through_recovery_age_runs": 1,
+                "follow_through_recovery_status": "recovering",
+                "follow_through_recovery_summary": "RepoC is recovering from recent escalation, but the lower-pressure state still needs to hold.",
             }
         ],
         "audits": [
@@ -772,8 +783,10 @@ class TestRenderHtml:
         assert "What Would Count As Progress" in html
         assert "Next Checkpoint" in html
         assert "Follow-Through Aging and Escalation" in html
+        assert "Follow-Through Recovery and Escalation Retirement" in html
         assert "Checkpoint Timing" in html
         assert "Escalation" in html
+        assert "Recovery / Retirement" in html
         assert "Last movement:" in html
         assert no_linked_artifact_summary() in html
 

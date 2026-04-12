@@ -59,6 +59,10 @@ def export_review_pack(
             f"  Escalation: {item.get('follow_through_escalation', 'Unknown')} — "
             f"{item.get('follow_through_escalation_summary', 'No stronger follow-through escalation is currently surfaced.')}"
         )
+        _w(
+            f"  Recovery / Retirement: {item.get('follow_through_recovery', 'None')} — "
+            f"{item.get('follow_through_recovery_summary', 'No follow-through recovery or escalation-retirement signal is currently surfaced.')}"
+        )
         _w(f"  Next Checkpoint: {item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
     if not weekly_pack.get("top_attention"):
         _w("- No urgent attention items are currently surfaced.")
@@ -85,6 +89,19 @@ def export_review_pack(
     _w("")
     _w(f"- Summary: {weekly_pack.get('follow_through_escalation_summary', 'No stronger follow-through escalation is currently surfaced.')}")
     _w("")
+    _w("### Follow-Through Recovery and Escalation Retirement")
+    _w("")
+    _w(f"- Summary: {weekly_pack.get('follow_through_recovery_summary', 'No follow-through recovery or escalation-retirement signal is currently surfaced.')}")
+    for item in weekly_pack.get("top_recovering_follow_through_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        _w(f"- Recovering: {label} — {item.get('follow_through_recovery_summary', 'No follow-through recovery or escalation-retirement signal is currently surfaced.')}")
+    for item in weekly_pack.get("top_retiring_follow_through_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        _w(f"- Retiring Watch: {label} — {item.get('follow_through_recovery_summary', 'No follow-through recovery or escalation-retirement signal is currently surfaced.')}")
+    for item in weekly_pack.get("top_relapsing_follow_through_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        _w(f"- Relapsing: {label} — {item.get('follow_through_recovery_summary', 'No follow-through recovery or escalation-retirement signal is currently surfaced.')}")
+    _w("")
     _w("### Top Repo Drilldowns")
     _w("")
     for briefing in weekly_pack.get("repo_briefings", [])[:3]:
@@ -96,6 +113,7 @@ def export_review_pack(
         _w(f"  Follow-Through: {briefing.get('follow_through_line', 'No follow-through evidence is recorded yet.')}")
         _w(f"  Checkpoint Timing: {briefing.get('checkpoint_timing_line', 'Unknown')}")
         _w(f"  Escalation: {briefing.get('escalation_line', 'Unknown: No stronger follow-through escalation is currently surfaced.')}")
+        _w(f"  Recovery / Retirement: {briefing.get('recovery_line', 'None: No follow-through recovery or escalation-retirement signal is currently surfaced.')}")
         _w(f"  What Would Count As Progress: {briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
     _w("")
 

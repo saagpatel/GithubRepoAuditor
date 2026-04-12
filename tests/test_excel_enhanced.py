@@ -597,6 +597,16 @@ def _make_report(audits=None) -> dict:
                 "aging_status": "watch",
                 "newly_stale": False,
                 "links": [],
+                "follow_through_status": "waiting-on-evidence",
+                "follow_through_age_runs": 1,
+                "follow_through_checkpoint_status": "due-soon",
+                "follow_through_summary": "RepoC has recent follow-up recorded and is now waiting for confirming evidence.",
+                "follow_through_next_checkpoint": "Wait for the next run to confirm the pressure falls.",
+                "follow_through_escalation_status": "watch",
+                "follow_through_escalation_summary": "RepoC is not late yet, but it should stay visible until the next checkpoint lands.",
+                "follow_through_recovery_age_runs": 1,
+                "follow_through_recovery_status": "recovering",
+                "follow_through_recovery_summary": "RepoC is recovering from recent escalation, but the lower-pressure state still needs to hold.",
             }
         ],
         "governance_preview": {"applyable_count": 1},
@@ -831,6 +841,8 @@ class TestAnalystWorkbookSheets:
         assert ws["F30"].value == "Checkpoint Timing"
         assert ws["F31"].value == "Escalation"
         assert ws["F32"].value == "Escalation Summary"
+        assert ws["F33"].value == "Recovery / Retirement"
+        assert ws["F34"].value == "Recovery Summary"
         assert ws["A4"].value == "Select Repo"
         assert ws["B4"].value == "RepoA"
         assert ws.data_validations.dataValidation
@@ -873,6 +885,7 @@ class TestAnalystWorkbookSheets:
         assert "No briefing detail recorded yet." in str(ws["F18"].value)
         assert "Unknown" in str(ws["G28"].value)
         assert "Unknown" in str(ws["G30"].value)
+        assert "No follow-through recovery or escalation-retirement signal is currently surfaced." in str(ws["G34"].value)
         assert "No clear next action is recorded yet." in str(ws["G26"].value)
 
     def test_run_changes_surfaces_summary(self):
@@ -910,16 +923,22 @@ class TestAnalystWorkbookSheets:
         assert ws.cell(row=header_row, column=11).value == "Checkpoint Timing"
         assert ws.cell(row=header_row, column=12).value == "Escalation"
         assert ws.cell(row=header_row, column=13).value == "Escalation Summary"
+        assert ws.cell(row=header_row, column=14).value == "Recovery / Retirement"
+        assert ws.cell(row=header_row, column=15).value == "Recovery Summary"
         assert no_linked_artifact_summary() in {
-            ws.cell(row=row, column=14).value
+            ws.cell(row=row, column=16).value
             for row in range(header_row + 1, header_row + 10)
         }
-        assert "No follow-through evidence is recorded yet." in {
+        assert "RepoC has recent follow-up recorded and is now waiting for confirming evidence." in {
             ws.cell(row=row, column=9).value
             for row in range(header_row + 1, header_row + 10)
         }
-        assert "Unknown" in {
+        assert "Due Soon" in {
             ws.cell(row=row, column=11).value
+            for row in range(header_row + 1, header_row + 10)
+        }
+        assert "Recovering" in {
+            ws.cell(row=row, column=14).value
             for row in range(header_row + 1, header_row + 10)
         }
 
@@ -1061,8 +1080,8 @@ class TestAnalystWorkbookSheets:
         assert print_ws["B8"].value == weekly_pack["queue_pressure_summary"]
         assert print_ws["B9"].value == weekly_pack["run_change_summary"]
         assert print_ws["B10"].value == weekly_pack["what_to_do_this_week"]
-        assert print_ws["A59"].value == "Top Attention"
-        assert print_ws["E59"].value == "Top Repo Drilldowns"
+        assert print_ws["A60"].value == "Top Attention"
+        assert print_ws["E60"].value == "Top Repo Drilldowns"
         executive_labels = {
             cell
             for row in executive_ws.iter_rows(min_row=20, max_row=90, min_col=1, max_col=20, values_only=True)
@@ -1112,41 +1131,43 @@ class TestAnalystWorkbookSheets:
             assert expected_label in executive_labels
         assert print_ws["A17"].value == "Primary Target"
         assert print_ws["A18"].value == "Why Top Target"
-        assert print_ws["A19"].value == "What We Tried"
-        assert print_ws["A20"].value == "Last Outcome"
-        assert print_ws["A21"].value == "Resolution Evidence"
-        assert print_ws["A23"].value == "Recommendation Confidence"
-        assert print_ws["A24"].value == "Confidence Rationale"
-        assert print_ws["A25"].value == "Next Action Confidence"
-        assert print_ws["A26"].value == "Trust Policy"
-        assert print_ws["A27"].value == "Trust Rationale"
-        assert print_ws["A28"].value == "Trust Exception"
-        assert print_ws["A29"].value == "Trust Recovery"
-        assert print_ws["A30"].value == "Recovery Confidence"
-        assert print_ws["A31"].value == "Exception Retirement"
-        assert print_ws["A32"].value == "Retirement Summary"
-        assert print_ws["A33"].value == "Policy Debt"
-        assert print_ws["A34"].value == "Class Normalization"
-        assert print_ws["A35"].value == "Class Memory"
-        assert print_ws["A36"].value == "Trust Decay"
-        assert print_ws["A37"].value == "Class Reweighting"
-        assert print_ws["A38"].value == "Class Reweighting Why"
-        assert print_ws["A39"].value == "Class Momentum"
-        assert print_ws["A40"].value == "Reweight Stability"
-        assert print_ws["A41"].value == "Transition Health"
-        assert print_ws["A42"].value == "Transition Resolution"
-        assert print_ws["A43"].value == "Transition Summary"
-        assert print_ws["A44"].value == "Transition Closure"
-        assert print_ws["A45"].value == "Transition Likely Outcome"
-        assert print_ws["A46"].value == "Pending Debt Freshness"
-        assert print_ws["A47"].value == "Closure Forecast"
-        assert print_ws["A48"].value == "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence"
-        assert print_ws["A49"].value == "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls"
-        assert print_ws["A50"].value == "Closure Forecast Summary"
-        assert print_ws["A51"].value == "Momentum Summary"
-        assert print_ws["A52"].value == "Exception Learning"
-        assert print_ws["A53"].value == "Recommendation Drift"
-        assert print_ws["A54"].value == "Adaptive Confidence"
+        assert print_ws["A19"].value == "Recovery / Retirement"
+        assert print_ws["A20"].value == "What We Tried"
+        assert print_ws["A21"].value == "Last Outcome"
+        assert print_ws["A22"].value == "Resolution Evidence"
+        assert print_ws["A23"].value == "Recovery Counts"
+        assert print_ws["A24"].value == "Recommendation Confidence"
+        assert print_ws["A25"].value == "Confidence Rationale"
+        assert print_ws["A26"].value == "Next Action Confidence"
+        assert print_ws["A27"].value == "Trust Policy"
+        assert print_ws["A28"].value == "Trust Rationale"
+        assert print_ws["A29"].value == "Trust Exception"
+        assert print_ws["A30"].value == "Trust Recovery"
+        assert print_ws["A31"].value == "Recovery Confidence"
+        assert print_ws["A32"].value == "Exception Retirement"
+        assert print_ws["A33"].value == "Retirement Summary"
+        assert print_ws["A34"].value == "Policy Debt"
+        assert print_ws["A35"].value == "Class Normalization"
+        assert print_ws["A36"].value == "Class Memory"
+        assert print_ws["A37"].value == "Trust Decay"
+        assert print_ws["A38"].value == "Class Reweighting"
+        assert print_ws["A39"].value == "Class Reweighting Why"
+        assert print_ws["A40"].value == "Class Momentum"
+        assert print_ws["A41"].value == "Reweight Stability"
+        assert print_ws["A42"].value == "Transition Health"
+        assert print_ws["A43"].value == "Transition Resolution"
+        assert print_ws["A44"].value == "Transition Summary"
+        assert print_ws["A45"].value == "Transition Closure"
+        assert print_ws["A46"].value == "Transition Likely Outcome"
+        assert print_ws["A47"].value == "Pending Debt Freshness"
+        assert print_ws["A48"].value == "Closure Forecast"
+        assert print_ws["A49"].value == "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence"
+        assert print_ws["A50"].value == "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls"
+        assert print_ws["A51"].value == "Closure Forecast Summary"
+        assert print_ws["A52"].value == "Momentum Summary"
+        assert print_ws["A53"].value == "Exception Learning"
+        assert print_ws["A54"].value == "Recommendation Drift"
+        assert print_ws["A55"].value == "Adaptive Confidence"
         assert "Why Top Target" in dashboard_values
         assert "Closure Guidance" in dashboard_values
         assert "What We Tried" in dashboard_values
@@ -1383,6 +1404,7 @@ class TestWorkbookModes:
         assert standard_wb["Print Pack"]["B8"].value == template_wb["Print Pack"]["B8"].value
         assert standard_wb["Print Pack"]["B9"].value == template_wb["Print Pack"]["B9"].value
         assert standard_wb["Print Pack"]["B10"].value == template_wb["Print Pack"]["B10"].value
+        assert standard_wb["Print Pack"]["B16"].value == template_wb["Print Pack"]["B16"].value
         assert template_wb["Review Queue"]["A4"].value == "Summary"
         template_header_row = next(
             row for row in range(15, 45) if template_wb["Review Queue"].cell(row=row, column=1).value == "Repo"
@@ -1410,7 +1432,7 @@ class TestWorkbookModes:
         wb = load_workbook(output)
         ws = wb["Review Queue"]
         header_row = next(row for row in range(20, 70) if ws.cell(row=row, column=1).value == "Repo")
-        assert ws.auto_filter.ref == f"A{header_row}:O{header_row + 1}"
+        assert ws.auto_filter.ref == f"A{header_row}:Q{header_row + 1}"
         assert not ws.tables
 
     def test_visible_sheets_use_filters_while_hidden_data_sheets_keep_tables(self, tmp_path):

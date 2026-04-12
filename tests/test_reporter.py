@@ -654,8 +654,10 @@ class TestMarkdownReport:
         assert "Follow-Through" in content
         assert "Next Checkpoint" in content
         assert "Follow-Through Aging and Escalation" in content
+        assert "Follow-Through Recovery and Escalation Retirement" in content
         assert "Checkpoint Timing" in content
         assert "Escalation" in content
+        assert "Recovery / Retirement" in content
         assert "Accountability" in content
         assert "Primary Target" in content
         assert "Why This Is The Top Target" in content
