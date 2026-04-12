@@ -653,6 +653,9 @@ class TestMarkdownReport:
         assert "Trend" in content
         assert "Follow-Through" in content
         assert "Next Checkpoint" in content
+        assert "Follow-Through Aging and Escalation" in content
+        assert "Checkpoint Timing" in content
+        assert "Escalation" in content
         assert "Accountability" in content
         assert "Primary Target" in content
         assert "Why This Is The Top Target" in content

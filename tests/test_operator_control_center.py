@@ -753,8 +753,99 @@ def test_operator_snapshot_adds_follow_through_from_recent_history(tmp_path: Pat
     assert summary["stale_item_count"] >= 1
     assert summary["oldest_open_item_days"] >= 8
     assert "urgent item" in summary["follow_through_summary"]
+    assert summary["follow_through_checkpoint_counts"]["overdue"] >= 1
+    assert summary["follow_through_escalation_counts"]["escalate-now"] >= 1
     assert summary["persisting_attention_count"] >= 1
     assert summary["trend_status"] == "worsening"
+
+
+def test_project_queue_follow_through_marks_overdue_untouched_items_for_escalation():
+    queue = [
+        {
+            "item_id": "campaign-drift:campaign-1:github-issue",
+            "lane": "urgent",
+            "age_days": 8,
+            "repo": "RepoD",
+            "title": "RepoD drift needs review",
+            "summary": "Drift is still open.",
+            "recommended_action": "Inspect the managed issue.",
+            "source_run_id": "testuser:2026-03-29T12:00:00+00:00",
+        }
+    ]
+    key = operator_control_center._queue_identity(queue[0])
+    recent_runs = [
+        {"items": {key: queue[0]}, "has_attention": True},
+        {"items": {key: {"lane": "urgent", "age_days": 7}}, "has_attention": True},
+        {"items": {key: {"lane": "urgent", "age_days": 6}}, "has_attention": True},
+    ]
+    resolution_trend = {
+        "decision_memory_map": {
+            key: {
+                "decision_memory_status": "persisting",
+                "last_seen_at": "2026-03-29T12:00:00+00:00",
+                "last_outcome": "no-change",
+            }
+        }
+    }
+
+    enriched = operator_control_center._project_queue_follow_through(
+        queue,
+        recent_runs=recent_runs,
+        resolution_trend=resolution_trend,
+        current_generated_at="2026-03-29T12:00:00+00:00",
+    )
+
+    item = enriched[0]
+    assert item["follow_through_status"] == "stale-follow-through"
+    assert item["follow_through_age_runs"] == 3
+    assert item["follow_through_checkpoint_status"] == "overdue"
+    assert item["follow_through_escalation_status"] == "escalate-now"
+    assert "resurfaced now" in item["follow_through_escalation_summary"]
+
+
+def test_project_queue_follow_through_keeps_recent_waiting_items_on_watch():
+    queue = [
+        {
+            "item_id": "campaign-drift:campaign-1:github-issue",
+            "lane": "urgent",
+            "age_days": 1,
+            "repo": "RepoD",
+            "title": "RepoD drift needs review",
+            "summary": "Drift is still open.",
+            "recommended_action": "Inspect the managed issue.",
+            "source_run_id": "testuser:2026-03-29T12:00:00+00:00",
+        }
+    ]
+    key = operator_control_center._queue_identity(queue[0])
+    recent_runs = [{"items": {key: queue[0]}, "has_attention": True}]
+    resolution_trend = {
+        "decision_memory_map": {
+            key: {
+                "decision_memory_status": "attempted",
+                "last_seen_at": "2026-03-29T12:00:00+00:00",
+                "last_outcome": "no-change",
+                "last_intervention": {
+                    "recorded_at": "2026-03-29T10:00:00+00:00",
+                    "event_type": "issue-updated",
+                    "outcome": "no-change",
+                    "title": "RepoD drift needs review",
+                },
+            }
+        }
+    }
+
+    enriched = operator_control_center._project_queue_follow_through(
+        queue,
+        recent_runs=recent_runs,
+        resolution_trend=resolution_trend,
+        current_generated_at="2026-03-29T12:00:00+00:00",
+    )
+
+    item = enriched[0]
+    assert item["follow_through_status"] == "waiting-on-evidence"
+    assert item["follow_through_checkpoint_status"] == "due-soon"
+    assert item["follow_through_escalation_status"] == "watch"
+    assert "stay on watch" in item["follow_through_escalation_reason"]
 
 
 def test_operator_snapshot_marks_quiet_recovery_as_improving(tmp_path: Path, monkeypatch):

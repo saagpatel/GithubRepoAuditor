@@ -407,9 +407,14 @@ def build_operator_snapshot(
         "quiet_streak_runs": follow_through["quiet_streak_runs"],
         "follow_through_summary": follow_through["follow_through_summary"],
         "follow_through_status_counts": follow_through["follow_through_status_counts"],
+        "follow_through_checkpoint_counts": follow_through["follow_through_checkpoint_counts"],
+        "follow_through_escalation_counts": follow_through["follow_through_escalation_counts"],
         "top_unattempted_items": follow_through["top_unattempted_items"],
         "top_stale_follow_through_items": follow_through["top_stale_follow_through_items"],
+        "top_overdue_follow_through_items": follow_through["top_overdue_follow_through_items"],
+        "top_escalation_items": follow_through["top_escalation_items"],
         "follow_through_checkpoint_summary": follow_through["follow_through_checkpoint_summary"],
+        "follow_through_escalation_summary": follow_through["follow_through_escalation_summary"],
         "trend_status": resolution_trend["trend_status"],
         "new_attention_count": resolution_trend["new_attention_count"],
         "resolved_attention_count": resolution_trend["resolved_attention_count"],
@@ -1358,31 +1363,71 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         "resolved": 0,
         "unknown": 0,
     }
+    checkpoint_counts = {
+        "not-due": 0,
+        "due-soon": 0,
+        "overdue": 0,
+        "satisfied": 0,
+        "unknown": 0,
+    }
+    escalation_counts = {
+        "none": 0,
+        "watch": 0,
+        "nudge": 0,
+        "escalate-now": 0,
+        "resolved-watch": 0,
+        "unknown": 0,
+    }
     top_unattempted_items: list[dict] = []
     top_stale_follow_through_items: list[dict] = []
+    top_overdue_follow_through_items: list[dict] = []
+    top_escalation_items: list[dict] = []
     for item in queue:
         status = item.get("follow_through_status", "unknown")
         if status not in status_counts:
             status = "unknown"
         status_counts[status] += 1
+        checkpoint_status = item.get("follow_through_checkpoint_status", "unknown")
+        if checkpoint_status not in checkpoint_counts:
+            checkpoint_status = "unknown"
+        checkpoint_counts[checkpoint_status] += 1
+        escalation_status = item.get("follow_through_escalation_status", "unknown")
+        if escalation_status not in escalation_counts:
+            escalation_status = "unknown"
+        escalation_counts[escalation_status] += 1
         compact_item = {
             "item_id": item.get("item_id", ""),
             "repo": item.get("repo", ""),
             "title": item.get("title", ""),
             "lane": item.get("lane", ""),
             "follow_through_status": status,
+            "follow_through_age_runs": item.get("follow_through_age_runs", 0),
+            "follow_through_checkpoint_status": checkpoint_status,
             "follow_through_summary": item.get("follow_through_summary", ""),
             "follow_through_next_checkpoint": item.get("follow_through_next_checkpoint", ""),
+            "follow_through_escalation_status": escalation_status,
+            "follow_through_escalation_summary": item.get("follow_through_escalation_summary", ""),
+            "follow_through_escalation_reason": item.get("follow_through_escalation_reason", ""),
         }
         if status == "untouched" and len(top_unattempted_items) < 5:
             top_unattempted_items.append(compact_item)
         if status == "stale-follow-through" and len(top_stale_follow_through_items) < 5:
             top_stale_follow_through_items.append(compact_item)
+        if checkpoint_status == "overdue" and len(top_overdue_follow_through_items) < 5:
+            top_overdue_follow_through_items.append(compact_item)
+        if escalation_status in {"escalate-now", "nudge"} and len(top_escalation_items) < 5:
+            top_escalation_items.append(compact_item)
     status_counts["resolved"] += resolution_trend.get("confirmed_resolved_count", 0)
     follow_through_checkpoint_summary = _follow_through_checkpoint_summary(
         status_counts,
         top_unattempted_items,
         top_stale_follow_through_items,
+    )
+    follow_through_escalation_summary = _follow_through_escalation_summary(
+        checkpoint_counts,
+        escalation_counts,
+        top_overdue_follow_through_items,
+        top_escalation_items,
     )
     return {
         "repeat_urgent_count": repeat_urgent_count,
@@ -1395,13 +1440,22 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
             oldest_open_item_days,
             quiet_streak_runs,
             status_counts=status_counts,
+            checkpoint_counts=checkpoint_counts,
+            escalation_counts=escalation_counts,
             top_unattempted_items=top_unattempted_items,
             top_stale_follow_through_items=top_stale_follow_through_items,
+            top_overdue_follow_through_items=top_overdue_follow_through_items,
+            top_escalation_items=top_escalation_items,
         ),
         "follow_through_status_counts": status_counts,
+        "follow_through_checkpoint_counts": checkpoint_counts,
+        "follow_through_escalation_counts": escalation_counts,
         "top_unattempted_items": top_unattempted_items,
         "top_stale_follow_through_items": top_stale_follow_through_items,
+        "top_overdue_follow_through_items": top_overdue_follow_through_items,
+        "top_escalation_items": top_escalation_items,
         "follow_through_checkpoint_summary": follow_through_checkpoint_summary,
+        "follow_through_escalation_summary": follow_through_escalation_summary,
     }
 
 
@@ -2486,6 +2540,7 @@ def _project_queue_follow_through(
             for snapshot in recent_runs
             if (snapshot.get("items", {}).get(key) or {}).get("lane") in ATTENTION_LANES
         )
+        follow_through_age_runs = appearance_count
         follow_through_status = _queue_item_follow_through_status(
             item,
             memory,
@@ -2502,6 +2557,32 @@ def _project_queue_follow_through(
             memory,
             follow_through_status=follow_through_status,
         )
+        follow_through_checkpoint_status = _follow_through_checkpoint_status(
+            item,
+            memory,
+            follow_through_status=follow_through_status,
+            follow_through_age_runs=follow_through_age_runs,
+            earliest_age_days=earliest_age_days,
+            current_generated_at=current_generated_at,
+        )
+        follow_through_escalation_status = _follow_through_escalation_status(
+            follow_through_status=follow_through_status,
+            follow_through_checkpoint_status=follow_through_checkpoint_status,
+            follow_through_age_runs=follow_through_age_runs,
+        )
+        follow_through_escalation_reason = _follow_through_escalation_reason(
+            item,
+            memory,
+            follow_through_status=follow_through_status,
+            follow_through_checkpoint_status=follow_through_checkpoint_status,
+            follow_through_age_runs=follow_through_age_runs,
+        )
+        follow_through_escalation_summary = _follow_through_escalation_item_summary(
+            item,
+            follow_through_checkpoint_status=follow_through_checkpoint_status,
+            follow_through_escalation_status=follow_through_escalation_status,
+            follow_through_escalation_reason=follow_through_escalation_reason,
+        )
         follow_through_summary = _follow_through_item_summary(
             item,
             memory,
@@ -2514,10 +2595,15 @@ def _project_queue_follow_through(
             {
                 **item,
                 "follow_through_status": follow_through_status,
+                "follow_through_age_runs": follow_through_age_runs,
+                "follow_through_checkpoint_status": follow_through_checkpoint_status,
                 "follow_through_summary": follow_through_summary,
                 "follow_through_last_touch": follow_through_last_touch,
                 "follow_through_next_checkpoint": follow_through_next_checkpoint,
                 "follow_through_evidence_hint": follow_through_evidence_hint,
+                "follow_through_escalation_status": follow_through_escalation_status,
+                "follow_through_escalation_summary": follow_through_escalation_summary,
+                "follow_through_escalation_reason": follow_through_escalation_reason,
             }
         )
     return enriched_queue
@@ -2635,6 +2721,110 @@ def _follow_through_next_checkpoint(
     if evidence:
         return f"Review the latest evidence before changing the next action: {evidence}"
     return "Review the latest history or artifact before assuming this item moved."
+
+
+def _follow_through_checkpoint_status(
+    _item: dict,
+    memory: dict,
+    *,
+    follow_through_status: str,
+    follow_through_age_runs: int,
+    earliest_age_days: int,
+    current_generated_at: str,
+) -> str:
+    latest_event = memory.get("last_intervention") or {}
+    recent_follow_up = _is_recent_follow_through(latest_event, current_generated_at)
+    if follow_through_status == "resolved":
+        return "satisfied"
+    if follow_through_status == "stale-follow-through":
+        return "overdue"
+    if follow_through_status == "untouched":
+        return "overdue" if follow_through_age_runs >= 2 or earliest_age_days > 7 else "due-soon"
+    if follow_through_status == "attempted":
+        if recent_follow_up and follow_through_age_runs <= 1 and earliest_age_days <= 7:
+            return "due-soon"
+        return "overdue"
+    if follow_through_status == "waiting-on-evidence":
+        if recent_follow_up and follow_through_age_runs <= 2 and earliest_age_days <= 7:
+            return "due-soon"
+        return "overdue"
+    return "unknown"
+
+
+def _follow_through_escalation_status(
+    *,
+    follow_through_status: str,
+    follow_through_checkpoint_status: str,
+    follow_through_age_runs: int,
+) -> str:
+    if follow_through_status == "unknown":
+        return "unknown"
+    if follow_through_status == "resolved":
+        return "none" if follow_through_age_runs <= 1 else "resolved-watch"
+    if follow_through_status == "stale-follow-through" or follow_through_checkpoint_status == "overdue":
+        return "escalate-now"
+    if follow_through_status == "untouched":
+        if follow_through_age_runs >= 3:
+            return "escalate-now"
+        if follow_through_age_runs == 2:
+            return "nudge"
+        return "watch"
+    if follow_through_status == "attempted":
+        return "nudge"
+    if follow_through_status == "waiting-on-evidence":
+        return "watch" if follow_through_age_runs <= 1 else "nudge"
+    return "none"
+
+
+def _follow_through_escalation_reason(
+    item: dict,
+    memory: dict,
+    *,
+    follow_through_status: str,
+    follow_through_checkpoint_status: str,
+    follow_through_age_runs: int,
+) -> str:
+    label = _target_label(item)
+    latest_event = memory.get("last_intervention") or {}
+    recent_follow_up = latest_event.get("recorded_at") or memory.get("last_seen_at") or ""
+    if follow_through_status == "resolved":
+        if follow_through_age_runs <= 1:
+            return f"{label} looks calmer after recent follow-through and does not need extra escalation yet."
+        return f"{label} looks calmer, but it still needs one more quiet read before it can fully fade from follow-through watch."
+    if follow_through_status == "stale-follow-through":
+        return f"{label} has stayed open long enough after earlier follow-up that the handoff now looks overdue and should be escalated."
+    if follow_through_checkpoint_status == "overdue":
+        return f"{label} is past its expected checkpoint window, so it should be resurfaced more strongly now."
+    if follow_through_status == "untouched":
+        if follow_through_age_runs == 1:
+            return f"{label} is newly surfaced and should get a visible follow-up before the next review."
+        return f"{label} is still active with no recorded follow-up after {follow_through_age_runs} run(s), so it is moving from watch into a nudge state."
+    if follow_through_status == "attempted":
+        return f"{label} has recorded follow-up, but the pressure is still active{f' since {str(recent_follow_up)[:10]}' if recent_follow_up else ''}, so it should be nudged again if it does not settle."
+    if follow_through_status == "waiting-on-evidence":
+        return f"{label} has recent follow-up in flight and should stay on watch until the next run confirms quieter pressure."
+    return f"{label} does not have enough timing evidence yet to support a stronger follow-through escalation."
+
+
+def _follow_through_escalation_item_summary(
+    item: dict,
+    *,
+    follow_through_checkpoint_status: str,
+    follow_through_escalation_status: str,
+    follow_through_escalation_reason: str,
+) -> str:
+    label = _target_label(item)
+    if follow_through_escalation_status == "escalate-now":
+        return f"{label} should be resurfaced now because its follow-through checkpoint is {follow_through_checkpoint_status}. {follow_through_escalation_reason}"
+    if follow_through_escalation_status == "nudge":
+        return f"{label} should be nudged again soon because the follow-through is still active without settling. {follow_through_escalation_reason}"
+    if follow_through_escalation_status == "watch":
+        return f"{label} is not late yet, but it should stay visible until the next checkpoint lands."
+    if follow_through_escalation_status == "resolved-watch":
+        return f"{label} looks calmer, but it should stay on resolved watch until one more quiet run confirms it."
+    if follow_through_escalation_status == "none":
+        return f"{label} does not currently need stronger follow-through escalation."
+    return f"{label} does not yet have enough timing evidence to support a clearer escalation call."
 
 
 def _follow_through_item_summary(
@@ -32615,12 +32805,20 @@ def _follow_through_summary(
     quiet_streak_runs: int,
     *,
     status_counts: dict[str, int] | None = None,
+    checkpoint_counts: dict[str, int] | None = None,
+    escalation_counts: dict[str, int] | None = None,
     top_unattempted_items: list[dict] | None = None,
     top_stale_follow_through_items: list[dict] | None = None,
+    top_overdue_follow_through_items: list[dict] | None = None,
+    top_escalation_items: list[dict] | None = None,
 ) -> str:
     status_counts = status_counts or {}
+    checkpoint_counts = checkpoint_counts or {}
+    escalation_counts = escalation_counts or {}
     top_unattempted_items = top_unattempted_items or []
     top_stale_follow_through_items = top_stale_follow_through_items or []
+    top_overdue_follow_through_items = top_overdue_follow_through_items or []
+    top_escalation_items = top_escalation_items or []
     legacy_summary = ""
     if repeat_urgent_count or stale_item_count:
         legacy_summary = (
@@ -32634,6 +32832,12 @@ def _follow_through_summary(
             f"{status_counts.get('stale-follow-through', 0)} item(s) now look stalled after earlier review-to-action handoff, "
             f"and {label} is the strongest case to close or escalate next."
         )
+        if checkpoint_counts.get("overdue", 0) or escalation_counts.get("escalate-now", 0):
+            detailed = (
+                f"{detailed} "
+                f"{checkpoint_counts.get('overdue', 0)} item(s) are now overdue and "
+                f"{escalation_counts.get('escalate-now', 0)} item(s) are in escalate-now."
+            )
         return f"{legacy_summary} {detailed}".strip() if legacy_summary else detailed
     if top_unattempted_items:
         top_item = top_unattempted_items[0]
@@ -32642,7 +32846,27 @@ def _follow_through_summary(
             f"{status_counts.get('untouched', 0)} surfaced item(s) still have no recorded follow-through, "
             f"and {label} is the clearest place to start."
         )
+        if checkpoint_counts.get("overdue", 0) or escalation_counts.get("escalate-now", 0):
+            detailed = (
+                f"{detailed} "
+                f"{checkpoint_counts.get('overdue', 0)} item(s) are overdue and "
+                f"{escalation_counts.get('escalate-now', 0)} item(s) now need stronger resurfacing."
+            )
         return f"{legacy_summary} {detailed}".strip() if legacy_summary else detailed
+    if top_overdue_follow_through_items:
+        top_item = top_overdue_follow_through_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{checkpoint_counts.get('overdue', 0)} item(s) are now overdue for visible follow-through, "
+            f"and {label} is the top resurfacing hotspot."
+        )
+    if top_escalation_items:
+        top_item = top_escalation_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{escalation_counts.get('escalate-now', 0)} item(s) now need stronger follow-through resurfacing, "
+            f"and {label} is the clearest escalation target."
+        )
     if status_counts.get("waiting-on-evidence", 0):
         return (
             f"{status_counts.get('waiting-on-evidence', 0)} item(s) have recent follow-up recorded and are now waiting for later evidence to confirm movement."
@@ -32688,6 +32912,39 @@ def _follow_through_checkpoint_summary(
     if status_counts.get("resolved", 0):
         return "Some items already look calmer, so the next checkpoint is whether that calmer state holds for another run."
     return "Use the next run or linked artifact to confirm whether the current recommendation actually moved."
+
+
+def _follow_through_escalation_summary(
+    checkpoint_counts: dict[str, int],
+    escalation_counts: dict[str, int],
+    top_overdue_follow_through_items: list[dict],
+    top_escalation_items: list[dict],
+) -> str:
+    if top_overdue_follow_through_items:
+        top_item = top_overdue_follow_through_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{checkpoint_counts.get('overdue', 0)} item(s) are now overdue for follow-through, and {label} should be resurfaced first."
+        )
+    if top_escalation_items:
+        top_item = top_escalation_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{escalation_counts.get('escalate-now', 0)} item(s) are in escalate-now and {label} is the clearest next escalation target."
+        )
+    if escalation_counts.get("nudge", 0):
+        return (
+            f"{escalation_counts.get('nudge', 0)} item(s) are no longer fresh enough to just watch and should be nudged again soon."
+        )
+    if escalation_counts.get("watch", 0):
+        return (
+            f"{escalation_counts.get('watch', 0)} item(s) are still within their early checkpoint window and should stay visible on watch."
+        )
+    if escalation_counts.get("resolved-watch", 0):
+        return (
+            f"{escalation_counts.get('resolved-watch', 0)} item(s) look calmer but still need one more quiet run before they can fully fade from follow-through watch."
+        )
+    return "No stronger follow-through escalation is currently surfaced."
 
 
 def _handoff_urgency(queue: list[dict], setup_health: dict) -> str:

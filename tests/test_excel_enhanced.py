@@ -828,6 +828,9 @@ class TestAnalystWorkbookSheets:
         assert ws["F25"].value == "What To Do Next"
         assert ws["F28"].value == "Follow-Through Status"
         assert ws["F29"].value == "Follow-Through Summary"
+        assert ws["F30"].value == "Checkpoint Timing"
+        assert ws["F31"].value == "Escalation"
+        assert ws["F32"].value == "Escalation Summary"
         assert ws["A4"].value == "Select Repo"
         assert ws["B4"].value == "RepoA"
         assert ws.data_validations.dataValidation
@@ -869,6 +872,7 @@ class TestAnalystWorkbookSheets:
         assert "No description recorded yet." in str(ws["B11"].value)
         assert "No briefing detail recorded yet." in str(ws["F18"].value)
         assert "Unknown" in str(ws["G28"].value)
+        assert "Unknown" in str(ws["G30"].value)
         assert "No clear next action is recorded yet." in str(ws["G26"].value)
 
     def test_run_changes_surfaces_summary(self):
@@ -903,12 +907,19 @@ class TestAnalystWorkbookSheets:
         assert ws.freeze_panes == f"A{header_row + 1}"
         assert ws.cell(row=header_row, column=9).value == "Follow-Through"
         assert ws.cell(row=header_row, column=10).value == "Next Checkpoint"
+        assert ws.cell(row=header_row, column=11).value == "Checkpoint Timing"
+        assert ws.cell(row=header_row, column=12).value == "Escalation"
+        assert ws.cell(row=header_row, column=13).value == "Escalation Summary"
         assert no_linked_artifact_summary() in {
-            ws.cell(row=row, column=11).value
+            ws.cell(row=row, column=14).value
             for row in range(header_row + 1, header_row + 10)
         }
         assert "No follow-through evidence is recorded yet." in {
             ws.cell(row=row, column=9).value
+            for row in range(header_row + 1, header_row + 10)
+        }
+        assert "Unknown" in {
+            ws.cell(row=row, column=11).value
             for row in range(header_row + 1, header_row + 10)
         }
 
@@ -1053,12 +1064,14 @@ class TestAnalystWorkbookSheets:
         assert print_ws["A59"].value == "Top Attention"
         assert print_ws["E59"].value == "Top Repo Drilldowns"
         executive_labels = {
-            executive_ws.cell(row=row, column=4).value
-            for row in range(20, 80)
-            if executive_ws.cell(row=row, column=4).value is not None
+            cell
+            for row in executive_ws.iter_rows(min_row=20, max_row=90, min_col=1, max_col=20, values_only=True)
+            for cell in row
+            if isinstance(cell, str)
         }
         for expected_label in {
             "Closure Guidance",
+            "Escalation",
             "What We Tried",
             "Last Outcome",
             "Resolution Evidence",
@@ -1397,7 +1410,7 @@ class TestWorkbookModes:
         wb = load_workbook(output)
         ws = wb["Review Queue"]
         header_row = next(row for row in range(20, 70) if ws.cell(row=row, column=1).value == "Repo")
-        assert ws.auto_filter.ref == f"A{header_row}:L{header_row + 1}"
+        assert ws.auto_filter.ref == f"A{header_row}:O{header_row + 1}"
         assert not ws.tables
 
     def test_visible_sheets_use_filters_while_hidden_data_sheets_keep_tables(self, tmp_path):
