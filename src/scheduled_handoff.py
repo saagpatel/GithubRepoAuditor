@@ -170,6 +170,8 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Reset re-entry rebuild re-entry restore reset controls: `{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reset_status', 'none')}` — {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reset_reason', 'No reset re-entry rebuild re-entry restore reset reason is recorded yet.')}",
         f"- Reset re-entry rebuild re-entry restore refresh recovery: `{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_status', 'none')}` — {summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_summary', 'No reset re-entry rebuild re-entry restore refresh recovery summary is recorded yet.')}",
         f"- Reset re-entry rebuild re-entry restore re-restore controls: `{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_status', 'none')}` — {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reason', 'No reset re-entry rebuild re-entry restore re-restore reason is recorded yet.')}",
+        f"- Reset re-entry rebuild re-entry restore re-restore persistence: `{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_status', 'none')}` ({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_score', 0.0):.2f}; {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_age_runs', 0)} run(s))",
+        f"- Reset re-entry rebuild re-entry restore re-restore churn controls: `{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_status', 'none')}` — {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_reason', 'No reset re-entry rebuild re-entry restore re-restore churn reason is recorded yet.')}",
         f"- Reset re-entry rebuild persistence: `{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_persistence_status', 'none')}` ({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_persistence_score', 0.0):.2f}; {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_age_runs', 0)} run(s))",
         f"- Reset re-entry rebuild churn controls: `{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_churn_status', 'none')}` — {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_churn_reason', 'No reset re-entry rebuild churn reason is recorded yet.')}",
         f"- Recommendation drift: `{summary.get('recommendation_drift_status', 'stable')}` — {summary.get('recommendation_drift_summary', 'No recommendation-drift summary is recorded yet.')}",
@@ -1495,6 +1497,35 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     )
     lines.append(
         f"- {summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_summary', 'No reset re-entry rebuild re-entry restore re-restore summary is recorded yet.')}"
+    )
+    lines.append("")
+    lines.append("## Reset Re-entry Rebuild Re-Entry Restore Re-Restore Persistence")
+    lines.append("")
+    lines.append(
+        f"- Reset re-entry rebuild re-entry restore re-restore persistence: {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_status', 'none')} "
+        f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_score', 0.0):.2f}; "
+        f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_age_runs', 0)} run(s))"
+    )
+    if primary_target.get("recent_reset_reentry_rebuild_reentry_restore_rerestore_persistence_path"):
+        lines.append(
+            f"- Recent reset re-entry rebuild re-entry restore re-restore persistence path: {primary_target.get('recent_reset_reentry_rebuild_reentry_restore_rerestore_persistence_path')}"
+        )
+    lines.append(
+        f"- {summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_summary', 'No reset re-entry rebuild re-entry restore re-restore persistence summary is recorded yet.')}"
+    )
+    lines.append("")
+    lines.append("## Reset Re-entry Rebuild Re-Entry Restore Re-Restore Churn Controls")
+    lines.append("")
+    lines.append(
+        f"- Reset re-entry rebuild re-entry restore re-restore churn controls: {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_status', 'none')} "
+        f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_reason', 'No reset re-entry rebuild re-entry restore re-restore churn reason is recorded yet.')})"
+    )
+    if primary_target.get("recent_reset_reentry_rebuild_reentry_restore_rerestore_churn_path"):
+        lines.append(
+            f"- Recent reset re-entry rebuild re-entry restore re-restore churn path: {primary_target.get('recent_reset_reentry_rebuild_reentry_restore_rerestore_churn_path')}"
+        )
+    lines.append(
+        f"- {summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_summary', 'No reset re-entry rebuild re-entry restore re-restore churn summary is recorded yet.')}"
     )
     lines.append("")
     lines.append("## Reset Re-entry Rebuild Persistence")

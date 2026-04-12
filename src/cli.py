@@ -1115,6 +1115,29 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry rebuild re-entry restore re-restore summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_summary']}"
         )
+    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_status") not in {None, "", "none"}:
+        print(
+            "  Reset re-entry rebuild re-entry restore re-restore persistence: "
+            f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_status', 'none')} "
+            f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_score', 0.0):.2f}; "
+            f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_age_runs', 0)} run(s))"
+        )
+    if summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_summary"):
+        print(
+            "  Reset re-entry rebuild re-entry restore re-restore persistence summary: "
+            f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_summary']}"
+        )
+    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_status") not in {None, "", "none"}:
+        print(
+            "  Reset re-entry rebuild re-entry restore re-restore churn controls: "
+            f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_status', 'none')} "
+            f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_reason', 'No reset re-entry rebuild re-entry restore re-restore churn reason is recorded yet.')})"
+        )
+    if summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_summary"):
+        print(
+            "  Reset re-entry rebuild re-entry restore re-restore churn summary: "
+            f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_summary']}"
+        )
     if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_persistence_status") not in {None, "", "none"}:
         print(
             "  Reset re-entry rebuild persistence: "
