@@ -4355,8 +4355,12 @@ def test_operator_snapshot_reenters_clearance_after_fresh_follow_through(
                     "primary_target_closure_forecast_reweight_direction": "supporting-clearance",
                     "primary_target_closure_forecast_reweight_score": -0.34,
                     "primary_target_closure_forecast_reacquisition_freshness_status": "fresh",
+                    "primary_target_closure_forecast_reset_reentry_status": "reentered-clearance",
+                    "primary_target_closure_forecast_reset_reentry_persistence_status": "holding-clearance-reentry",
+                    "primary_target_closure_forecast_reset_reentry_churn_status": "none",
                     "primary_target_closure_forecast_persistence_reset_status": "none",
-                    "primary_target_transition_closure_likely_outcome": "hold",
+                    "primary_target_closure_forecast_hysteresis_status": "confirmed-clearance",
+                    "primary_target_transition_closure_likely_outcome": "clear-risk",
                     "primary_target_class_reweight_transition_status": "pending-caution",
                 },
                 "operator_queue": [],
@@ -4443,8 +4447,10 @@ def test_operator_snapshot_reenters_clearance_after_fresh_follow_through(
 
     assert summary["primary_target_closure_forecast_reset_refresh_recovery_status"] == "reentering-clearance"
     assert summary["primary_target_closure_forecast_reset_reentry_status"] == "reentered-clearance"
-    assert summary["primary_target_closure_forecast_reset_reentry_persistence_status"] == "just-reentered"
+    assert summary["primary_target_closure_forecast_reset_reentry_persistence_status"] == "holding-clearance-reentry"
     assert summary["primary_target_closure_forecast_reset_reentry_churn_status"] == "none"
+    assert summary["primary_target_closure_forecast_reset_reentry_freshness_status"] == "fresh"
+    assert summary["primary_target_closure_forecast_reset_reentry_reset_status"] == "none"
     assert summary["primary_target_closure_forecast_reacquisition_status"] == "reacquired-clearance"
     assert summary["primary_target_transition_closure_likely_outcome"] == "clear-risk"
     assert summary["primary_target_closure_forecast_hysteresis_status"] == "confirmed-clearance"

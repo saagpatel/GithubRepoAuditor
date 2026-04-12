@@ -921,6 +921,28 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry churn summary: "
             f"{summary['closure_forecast_reset_reentry_churn_summary']}"
         )
+    if summary.get("primary_target_closure_forecast_reset_reentry_freshness_status") not in {None, "", "none"}:
+        print(
+            "  Reset re-entry freshness: "
+            f"{summary.get('primary_target_closure_forecast_reset_reentry_freshness_status', 'insufficient-data')} "
+            f"({summary.get('primary_target_closure_forecast_reset_reentry_freshness_reason', 'No reset re-entry freshness reason is recorded yet.')})"
+        )
+    if summary.get("closure_forecast_reset_reentry_freshness_summary"):
+        print(
+            "  Reset re-entry freshness summary: "
+            f"{summary['closure_forecast_reset_reentry_freshness_summary']}"
+        )
+    if summary.get("primary_target_closure_forecast_reset_reentry_reset_status") not in {None, "", "none"}:
+        print(
+            "  Reset re-entry reset controls: "
+            f"{summary.get('primary_target_closure_forecast_reset_reentry_reset_status', 'none')} "
+            f"({summary.get('primary_target_closure_forecast_reset_reentry_reset_reason', 'No reset re-entry reset reason is recorded yet.')})"
+        )
+    if summary.get("closure_forecast_reset_reentry_reset_summary"):
+        print(
+            "  Reset re-entry reset summary: "
+            f"{summary['closure_forecast_reset_reentry_reset_summary']}"
+        )
     if summary.get("recommendation_drift_status"):
         print(
             "  Recommendation drift: "

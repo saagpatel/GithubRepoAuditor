@@ -439,6 +439,16 @@ def write_markdown_report(
                 f"- Reset Re-entry Churn Controls: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_churn_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_churn_reason', 'No reset re-entry churn reason is recorded yet.')})"
             )
+        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_freshness_status"):
+            _w(
+                f"- Reset Re-entry Freshness: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_freshness_status')} "
+                f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_freshness_reason', 'No reset re-entry freshness reason is recorded yet.')})"
+            )
+        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_reset_status"):
+            _w(
+                f"- Reset Re-entry Reset Controls: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_reset_status')} "
+                f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_reset_reason', 'No reset re-entry reset reason is recorded yet.')})"
+            )
         if report.operator_summary.get("recommendation_drift_status"):
             _w(
                 f"- Recommendation Drift: {report.operator_summary.get('recommendation_drift_status')} "
@@ -508,6 +518,10 @@ def write_markdown_report(
             _w(f"- Reset Re-entry Persistence Summary: {report.operator_summary.get('closure_forecast_reset_reentry_persistence_summary')}")
         if report.operator_summary.get("closure_forecast_reset_reentry_churn_summary"):
             _w(f"- Reset Re-entry Churn Summary: {report.operator_summary.get('closure_forecast_reset_reentry_churn_summary')}")
+        if report.operator_summary.get("closure_forecast_reset_reentry_freshness_summary"):
+            _w(f"- Reset Re-entry Freshness Summary: {report.operator_summary.get('closure_forecast_reset_reentry_freshness_summary')}")
+        if report.operator_summary.get("closure_forecast_reset_reentry_reset_summary"):
+            _w(f"- Reset Re-entry Reset Summary: {report.operator_summary.get('closure_forecast_reset_reentry_reset_summary')}")
         if report.operator_summary.get("recommendation_quality_summary"):
             _w(f"- Recommendation Quality: {report.operator_summary.get('recommendation_quality_summary')}")
         if report.operator_summary.get("confidence_validation_status"):
