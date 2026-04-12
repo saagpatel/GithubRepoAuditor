@@ -220,9 +220,16 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
             "primary_target_closure_forecast_reset_reentry_reset_status": "none",
             "primary_target_closure_forecast_reset_reentry_reset_reason": "",
             "closure_forecast_reset_reentry_reset_summary": "Reset re-entry posture for RepoC: RepoC drift needs review is aging enough that it can keep holding, but it should no longer stay indefinitely at sustained strength.",
+            "primary_target_closure_forecast_reset_reentry_refresh_recovery_score": 0.31,
+            "primary_target_closure_forecast_reset_reentry_refresh_recovery_status": "rebuilding-confirmation-reentry",
+            "primary_target_closure_forecast_reset_reentry_rebuild_status": "pending-confirmation-rebuild",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reason": "Fresh confirmation-side evidence is rebuilding after the reset re-entry aged out, but it has not yet fully re-earned stronger posture.",
+            "closure_forecast_reset_reentry_refresh_recovery_summary": "Fresh confirmation-side evidence is rebuilding for RepoC: RepoC drift needs review after reset re-entry aged out (0.31).",
+            "closure_forecast_reset_reentry_rebuild_summary": "RepoC: RepoC drift needs review is rebuilding confirmation-side reset re-entry, but it has not fully re-earned stronger posture yet.",
             "stale_reset_reentry_hotspots": [],
             "fresh_reset_reentry_signal_hotspots": [],
             "closure_forecast_reset_reentry_decay_window_runs": 4,
+            "closure_forecast_reset_reentry_refresh_window_runs": 4,
             "stale_closure_forecast_hotspots": [],
             "fresh_closure_forecast_signal_hotspots": [],
             "closure_forecast_decay_window_runs": 4,
@@ -243,6 +250,8 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
             "just_reentered_hotspots": [],
             "holding_reset_reentry_hotspots": [],
             "reset_reentry_churn_hotspots": [],
+            "recovering_from_confirmation_reentry_reset_hotspots": [],
+            "recovering_from_clearance_reentry_reset_hotspots": [],
             "supporting_pending_resolution_hotspots": [],
             "caution_pending_debt_hotspots": [],
             "stalled_transition_hotspots": [],
@@ -383,6 +392,8 @@ def test_build_scheduled_handoff_writes_artifacts_and_issue_candidate(tmp_path):
     assert "Reset Re-entry Churn Controls" in markdown
     assert "Reset Re-entry Freshness" in markdown
     assert "Reset Re-entry Reset Controls" in markdown
+    assert "Reset Re-entry Refresh Recovery" in markdown
+    assert "Reset Re-entry Rebuild Controls" in markdown
     assert "Reacquisition Persistence" in markdown
     assert "Recovery Churn Controls" in markdown
     assert "Reacquisition Freshness" in markdown
@@ -391,6 +402,8 @@ def test_build_scheduled_handoff_writes_artifacts_and_issue_candidate(tmp_path):
     assert "Reset Re-entry Controls" in markdown
     assert "Reset Re-entry Freshness" in markdown
     assert "Reset Re-entry Reset Controls" in markdown
+    assert "Reset Re-entry Refresh Recovery" in markdown
+    assert "Reset Re-entry Rebuild Controls" in markdown
     assert "Why class guidance shifted" in markdown
     assert "Recommendation Drift" in markdown
     assert "Confidence Validation" in markdown
