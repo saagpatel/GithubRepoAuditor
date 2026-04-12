@@ -1499,6 +1499,22 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         "reversing": 0,
         "insufficient-evidence": 0,
     }
+    reacquisition_softening_decay_counts = {
+        "none": 0,
+        "softening-watch": 0,
+        "step-down": 0,
+        "revalidation-needed": 0,
+        "retired-softening": 0,
+        "insufficient-evidence": 0,
+    }
+    reacquisition_confidence_retirement_counts = {
+        "none": 0,
+        "watch-retirement": 0,
+        "retiring-confidence": 0,
+        "retired-confidence": 0,
+        "revalidation-needed": 0,
+        "insufficient-evidence": 0,
+    }
     top_unattempted_items: list[dict] = []
     top_stale_follow_through_items: list[dict] = []
     top_overdue_follow_through_items: list[dict] = []
@@ -1523,6 +1539,9 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
     top_durable_reacquired_items: list[dict] = []
     top_softening_reacquired_items: list[dict] = []
     top_fragile_reacquisition_confidence_items: list[dict] = []
+    top_softening_reacquisition_items: list[dict] = []
+    top_revalidation_needed_reacquisition_items: list[dict] = []
+    top_retired_reacquisition_confidence_items: list[dict] = []
     for item in queue:
         status = item.get("follow_through_status", "unknown")
         if status not in status_counts:
@@ -1582,6 +1601,20 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         if recovery_reacquisition_consolidation_status not in recovery_reacquisition_consolidation_counts:
             recovery_reacquisition_consolidation_status = "insufficient-evidence"
         recovery_reacquisition_consolidation_counts[recovery_reacquisition_consolidation_status] += 1
+        reacquisition_softening_decay_status = item.get(
+            "follow_through_reacquisition_softening_decay_status",
+            "none",
+        )
+        if reacquisition_softening_decay_status not in reacquisition_softening_decay_counts:
+            reacquisition_softening_decay_status = "insufficient-evidence"
+        reacquisition_softening_decay_counts[reacquisition_softening_decay_status] += 1
+        reacquisition_confidence_retirement_status = item.get(
+            "follow_through_reacquisition_confidence_retirement_status",
+            "none",
+        )
+        if reacquisition_confidence_retirement_status not in reacquisition_confidence_retirement_counts:
+            reacquisition_confidence_retirement_status = "insufficient-evidence"
+        reacquisition_confidence_retirement_counts[reacquisition_confidence_retirement_status] += 1
         compact_item = {
             "item_id": item.get("item_id", ""),
             "repo": item.get("repo", ""),
@@ -1643,6 +1676,28 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
             ),
             "follow_through_recovery_reacquisition_consolidation_reason": item.get(
                 "follow_through_recovery_reacquisition_consolidation_reason",
+                "",
+            ),
+            "follow_through_reacquisition_softening_decay_age_runs": item.get(
+                "follow_through_reacquisition_softening_decay_age_runs",
+                0,
+            ),
+            "follow_through_reacquisition_softening_decay_status": reacquisition_softening_decay_status,
+            "follow_through_reacquisition_softening_decay_summary": item.get(
+                "follow_through_reacquisition_softening_decay_summary",
+                "",
+            ),
+            "follow_through_reacquisition_softening_decay_reason": item.get(
+                "follow_through_reacquisition_softening_decay_reason",
+                "",
+            ),
+            "follow_through_reacquisition_confidence_retirement_status": reacquisition_confidence_retirement_status,
+            "follow_through_reacquisition_confidence_retirement_summary": item.get(
+                "follow_through_reacquisition_confidence_retirement_summary",
+                "",
+            ),
+            "follow_through_reacquisition_confidence_retirement_reason": item.get(
+                "follow_through_reacquisition_confidence_retirement_reason",
                 "",
             ),
         }
@@ -1724,6 +1779,21 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
             and len(top_fragile_reacquisition_confidence_items) < 5
         ):
             top_fragile_reacquisition_confidence_items.append(compact_item)
+        if (
+            reacquisition_softening_decay_status in {"softening-watch", "step-down", "revalidation-needed"}
+            and len(top_softening_reacquisition_items) < 5
+        ):
+            top_softening_reacquisition_items.append(compact_item)
+        if (
+            reacquisition_softening_decay_status == "revalidation-needed"
+            or reacquisition_confidence_retirement_status == "revalidation-needed"
+        ) and len(top_revalidation_needed_reacquisition_items) < 5:
+            top_revalidation_needed_reacquisition_items.append(compact_item)
+        if (
+            reacquisition_confidence_retirement_status == "retired-confidence"
+            and len(top_retired_reacquisition_confidence_items) < 5
+        ):
+            top_retired_reacquisition_confidence_items.append(compact_item)
     status_counts["resolved"] += resolution_trend.get("confirmed_resolved_count", 0)
     follow_through_checkpoint_summary = _follow_through_checkpoint_summary(
         status_counts,
@@ -1790,6 +1860,16 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         top_softening_reacquired_items,
         top_fragile_reacquisition_confidence_items,
     )
+    follow_through_reacquisition_softening_decay_summary = _follow_through_reacquisition_softening_decay_summary(
+        reacquisition_softening_decay_counts,
+        top_softening_reacquisition_items,
+        top_revalidation_needed_reacquisition_items,
+    )
+    follow_through_reacquisition_confidence_retirement_summary = _follow_through_reacquisition_confidence_retirement_summary(
+        reacquisition_confidence_retirement_counts,
+        top_revalidation_needed_reacquisition_items,
+        top_retired_reacquisition_confidence_items,
+    )
     return {
         "repeat_urgent_count": repeat_urgent_count,
         "stale_item_count": stale_item_count,
@@ -1823,6 +1903,8 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
             recovery_reacquisition_counts=recovery_reacquisition_counts,
             recovery_reacquisition_durability_counts=recovery_reacquisition_durability_counts,
             recovery_reacquisition_consolidation_counts=recovery_reacquisition_consolidation_counts,
+            reacquisition_softening_decay_counts=reacquisition_softening_decay_counts,
+            reacquisition_confidence_retirement_counts=reacquisition_confidence_retirement_counts,
             top_fresh_recovery_items=top_fresh_recovery_items,
             top_stale_recovery_items=top_stale_recovery_items,
             top_softening_recovery_items=top_softening_recovery_items,
@@ -1837,6 +1919,9 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
             top_durable_reacquired_items=top_durable_reacquired_items,
             top_softening_reacquired_items=top_softening_reacquired_items,
             top_fragile_reacquisition_confidence_items=top_fragile_reacquisition_confidence_items,
+            top_softening_reacquisition_items=top_softening_reacquisition_items,
+            top_revalidation_needed_reacquisition_items=top_revalidation_needed_reacquisition_items,
+            top_retired_reacquisition_confidence_items=top_retired_reacquisition_confidence_items,
         ),
         "follow_through_status_counts": status_counts,
         "follow_through_checkpoint_counts": checkpoint_counts,
@@ -1851,6 +1936,8 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         "follow_through_recovery_reacquisition_counts": recovery_reacquisition_counts,
         "follow_through_recovery_reacquisition_durability_counts": recovery_reacquisition_durability_counts,
         "follow_through_recovery_reacquisition_consolidation_counts": recovery_reacquisition_consolidation_counts,
+        "follow_through_reacquisition_softening_decay_counts": reacquisition_softening_decay_counts,
+        "follow_through_reacquisition_confidence_retirement_counts": reacquisition_confidence_retirement_counts,
         "top_unattempted_items": top_unattempted_items,
         "top_stale_follow_through_items": top_stale_follow_through_items,
         "top_overdue_follow_through_items": top_overdue_follow_through_items,
@@ -1875,6 +1962,9 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         "top_durable_reacquired_items": top_durable_reacquired_items,
         "top_softening_reacquired_items": top_softening_reacquired_items,
         "top_fragile_reacquisition_confidence_items": top_fragile_reacquisition_confidence_items,
+        "top_softening_reacquisition_items": top_softening_reacquisition_items,
+        "top_revalidation_needed_reacquisition_items": top_revalidation_needed_reacquisition_items,
+        "top_retired_reacquisition_confidence_items": top_retired_reacquisition_confidence_items,
         "follow_through_checkpoint_summary": follow_through_checkpoint_summary,
         "follow_through_escalation_summary": follow_through_escalation_summary,
         "follow_through_recovery_summary": follow_through_recovery_summary,
@@ -1891,6 +1981,8 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         "follow_through_recovery_reacquisition_summary": follow_through_recovery_reacquisition_summary,
         "follow_through_recovery_reacquisition_durability_summary": follow_through_recovery_reacquisition_durability_summary,
         "follow_through_recovery_reacquisition_consolidation_summary": follow_through_recovery_reacquisition_consolidation_summary,
+        "follow_through_reacquisition_softening_decay_summary": follow_through_reacquisition_softening_decay_summary,
+        "follow_through_reacquisition_confidence_retirement_summary": follow_through_reacquisition_confidence_retirement_summary,
     }
 
 
@@ -3150,6 +3242,33 @@ def _project_queue_follow_through(
             follow_through_recovery_freshness_status=follow_through_recovery_freshness_status,
             follow_through_recovery_decay_status=follow_through_recovery_decay_status,
         )
+        (
+            follow_through_reacquisition_softening_decay_age_runs,
+            follow_through_reacquisition_softening_decay_status,
+            follow_through_reacquisition_softening_decay_reason,
+            follow_through_reacquisition_softening_decay_summary,
+        ) = _follow_through_reacquisition_softening_decay_projection(
+            item,
+            prior_matches,
+            follow_through_recovery_reacquisition_durability_status=follow_through_recovery_reacquisition_durability_status,
+            follow_through_recovery_reacquisition_consolidation_status=follow_through_recovery_reacquisition_consolidation_status,
+            follow_through_recovery_freshness_status=follow_through_recovery_freshness_status,
+            follow_through_recovery_decay_status=follow_through_recovery_decay_status,
+            follow_through_relapse_churn_status=follow_through_relapse_churn_status,
+        )
+        (
+            follow_through_reacquisition_confidence_retirement_status,
+            follow_through_reacquisition_confidence_retirement_reason,
+            follow_through_reacquisition_confidence_retirement_summary,
+        ) = _follow_through_reacquisition_confidence_retirement_projection(
+            item,
+            prior_matches,
+            follow_through_recovery_reacquisition_durability_status=follow_through_recovery_reacquisition_durability_status,
+            follow_through_recovery_reacquisition_consolidation_status=follow_through_recovery_reacquisition_consolidation_status,
+            follow_through_reacquisition_softening_decay_status=follow_through_reacquisition_softening_decay_status,
+            follow_through_recovery_freshness_status=follow_through_recovery_freshness_status,
+            follow_through_recovery_decay_status=follow_through_recovery_decay_status,
+        )
         follow_through_summary = _follow_through_item_summary(
             item,
             memory,
@@ -3206,6 +3325,13 @@ def _project_queue_follow_through(
                 "follow_through_recovery_reacquisition_consolidation_status": follow_through_recovery_reacquisition_consolidation_status,
                 "follow_through_recovery_reacquisition_consolidation_summary": follow_through_recovery_reacquisition_consolidation_summary,
                 "follow_through_recovery_reacquisition_consolidation_reason": follow_through_recovery_reacquisition_consolidation_reason,
+                "follow_through_reacquisition_softening_decay_age_runs": follow_through_reacquisition_softening_decay_age_runs,
+                "follow_through_reacquisition_softening_decay_status": follow_through_reacquisition_softening_decay_status,
+                "follow_through_reacquisition_softening_decay_summary": follow_through_reacquisition_softening_decay_summary,
+                "follow_through_reacquisition_softening_decay_reason": follow_through_reacquisition_softening_decay_reason,
+                "follow_through_reacquisition_confidence_retirement_status": follow_through_reacquisition_confidence_retirement_status,
+                "follow_through_reacquisition_confidence_retirement_summary": follow_through_reacquisition_confidence_retirement_summary,
+                "follow_through_reacquisition_confidence_retirement_reason": follow_through_reacquisition_confidence_retirement_reason,
             }
         )
     return enriched_queue
@@ -4250,6 +4376,125 @@ def _follow_through_reacquisition_consolidation_projection(
             return "durable-confidence", f"{label} has kept the re-acquired calmer posture durable enough, with fresh enough support behind it, that the restored confidence now looks safely consolidated.", f"{label}'s restored calmer confidence now looks durable."
         return "holding-confidence", f"{label} has a durable re-acquired posture, but the freshness behind that restored confidence is no longer strong enough to call fully durable.", f"{label}'s restored calmer confidence is holding, but it is not fully durable yet."
     return "none", f"{label} has not reached a re-acquired posture that needs separate confidence-consolidation guidance yet.", f"{label} does not currently have separate re-acquisition confidence to consolidate."
+
+
+def _follow_through_reacquisition_softening_decay_projection(
+    item: dict,
+    prior_matches: list[dict],
+    *,
+    follow_through_recovery_reacquisition_durability_status: str,
+    follow_through_recovery_reacquisition_consolidation_status: str,
+    follow_through_recovery_freshness_status: str,
+    follow_through_recovery_decay_status: str,
+    follow_through_relapse_churn_status: str,
+) -> tuple[int, str, str, str]:
+    label = _target_label(item)
+    prior_window = list(prior_matches[: HISTORY_WINDOW_RUNS - 1])
+    had_recent_strong_posture = any(
+        str(entry.get("follow_through_recovery_reacquisition_durability_status", "none") or "none")
+        in {"holding-reacquired", "durable-reacquired"}
+        or str(entry.get("follow_through_recovery_reacquisition_consolidation_status", "none") or "none")
+        in {"holding-confidence", "durable-confidence"}
+        for entry in prior_window
+    )
+    prior_softening_streak = 0
+    for entry in prior_window:
+        prior_status = str(entry.get("follow_through_reacquisition_softening_decay_status", "none") or "none")
+        if prior_status in {"softening-watch", "step-down", "revalidation-needed"}:
+            prior_softening_streak += 1
+            continue
+        break
+
+    weakening_signal = (
+        follow_through_recovery_reacquisition_durability_status == "softening"
+        or follow_through_recovery_reacquisition_consolidation_status in {"fragile-confidence", "reversing"}
+        or follow_through_recovery_freshness_status in {"mixed-age", "stale"}
+        or follow_through_recovery_decay_status in {"softening", "aging", "fragile-aging", "expired"}
+        or follow_through_relapse_churn_status in {"fragile", "churn", "blocked"}
+    )
+    if not had_recent_strong_posture and not weakening_signal:
+        return 0, "none", f"{label} does not currently have a once-restored calmer posture that is aging back down.", f"{label} is not currently carrying a softening restored posture."
+    if (
+        follow_through_recovery_reacquisition_durability_status == "insufficient-evidence"
+        or follow_through_recovery_reacquisition_consolidation_status == "insufficient-evidence"
+    ) and had_recent_strong_posture:
+        return 1, "insufficient-evidence", f"{label} may be stepping down from a once-strong restored posture, but the recent history is still too thin to judge whether that softening is real.", f"{label} may be stepping down from restored calmer support, but the softening path is still unclear."
+    if weakening_signal and had_recent_strong_posture:
+        age_runs = prior_softening_streak + 1
+        if age_runs >= 3:
+            return age_runs, "revalidation-needed", f"{label} has stayed weak for long enough after a once-strong restored posture that the earlier durable support now needs fresh confirmation before it should be trusted again.", f"{label}'s once-restored calmer posture now needs revalidation before it should be trusted again."
+        if age_runs >= 2:
+            return age_runs, "step-down", f"{label} has spent a second confirming run in a weaker restored posture, so the earlier durable support should now be stepped down.", f"{label}'s once-restored calmer posture is now stepping down."
+        return age_runs, "softening-watch", f"{label} has started to soften after a once-strong restored posture, but it is still too early to retire that support completely.", f"{label}'s once-restored calmer posture is softening and should be watched."
+    if (
+        prior_softening_streak
+        and not had_recent_strong_posture
+        and follow_through_recovery_reacquisition_durability_status in {"none", "just-reacquired", "consolidating"}
+        and follow_through_recovery_reacquisition_consolidation_status in {"none", "building-confidence"}
+    ):
+        return prior_softening_streak, "retired-softening", f"{label}'s earlier softening signal has aged out enough that the old restored-hold memory is no longer active.", f"{label} is no longer carrying active softening memory from an earlier restored posture."
+    return 0, "none", f"{label} does not currently have a softening restored posture that needs separate step-down guidance.", f"{label} is not currently softening out of a restored calmer posture."
+
+
+def _follow_through_reacquisition_confidence_retirement_projection(
+    item: dict,
+    prior_matches: list[dict],
+    *,
+    follow_through_recovery_reacquisition_durability_status: str,
+    follow_through_recovery_reacquisition_consolidation_status: str,
+    follow_through_reacquisition_softening_decay_status: str,
+    follow_through_recovery_freshness_status: str,
+    follow_through_recovery_decay_status: str,
+) -> tuple[str, str, str]:
+    label = _target_label(item)
+    prior_window = list(prior_matches[: HISTORY_WINDOW_RUNS - 1])
+    had_recent_strong_confidence = any(
+        str(entry.get("follow_through_recovery_reacquisition_consolidation_status", "none") or "none")
+        in {"holding-confidence", "durable-confidence"}
+        for entry in prior_window
+    )
+    prior_retirement_streak = 0
+    for entry in prior_window:
+        prior_status = str(entry.get("follow_through_reacquisition_confidence_retirement_status", "none") or "none")
+        if prior_status in {"watch-retirement", "retiring-confidence", "revalidation-needed"}:
+            prior_retirement_streak += 1
+            continue
+        break
+
+    if (
+        follow_through_recovery_reacquisition_consolidation_status in {"holding-confidence", "durable-confidence"}
+        and follow_through_reacquisition_softening_decay_status == "none"
+    ):
+        return "none", f"{label}'s restored confidence is still holding strongly enough that no retirement step-down is needed.", f"{label}'s restored calmer confidence is still active and does not need retirement."
+    if (
+        follow_through_recovery_reacquisition_consolidation_status == "insufficient-evidence"
+        or follow_through_recovery_reacquisition_durability_status == "insufficient-evidence"
+    ) and had_recent_strong_confidence:
+        return "insufficient-evidence", f"{label} may be retiring earlier restored confidence, but there is not enough recent history yet to judge whether that stronger carry-forward should really be withdrawn.", f"{label}'s restored calmer confidence may be retiring, but the evidence is still too thin to judge."
+
+    weakening_confidence = (
+        follow_through_recovery_reacquisition_consolidation_status in {"fragile-confidence", "reversing", "none"}
+        or follow_through_reacquisition_softening_decay_status in {"softening-watch", "step-down", "revalidation-needed"}
+        or follow_through_recovery_freshness_status in {"mixed-age", "stale"}
+        or follow_through_recovery_decay_status in {"softening", "aging", "fragile-aging", "expired"}
+    )
+    if weakening_confidence and had_recent_strong_confidence:
+        age_runs = prior_retirement_streak + 1
+        if follow_through_recovery_reacquisition_consolidation_status == "none" and age_runs >= 3:
+            return "retired-confidence", f"{label}'s earlier restored-confidence posture is no longer supported by recent evidence, so that carry-forward confidence has now been retired.", f"{label}'s earlier restored calmer confidence has now been retired."
+        if age_runs >= 2:
+            if follow_through_reacquisition_softening_decay_status == "revalidation-needed":
+                return "revalidation-needed", f"{label}'s earlier restored-confidence posture was materially strong, but it now needs fresh confirmation before it should be trusted again.", f"{label}'s earlier restored calmer confidence now needs revalidation before it should be trusted again."
+            return "retiring-confidence", f"{label}'s restored-confidence posture has stayed weak for a second confirming run, so the earlier stronger confidence is now retiring.", f"{label}'s earlier restored calmer confidence is now stepping down."
+        return "watch-retirement", f"{label}'s restored-confidence posture has started to weaken, but it has not yet spent long enough in that weaker state to retire immediately.", f"{label}'s restored calmer confidence is weakening and should be watched for retirement."
+
+    if (
+        prior_retirement_streak
+        and follow_through_recovery_reacquisition_consolidation_status == "none"
+        and not had_recent_strong_confidence
+    ):
+        return "retired-confidence", f"{label}'s earlier restored-confidence posture has fully aged out of active carry-forward support.", f"{label}'s earlier restored calmer confidence has now fully retired."
+    return "none", f"{label} does not currently need separate restored-confidence retirement guidance.", f"{label}'s restored calmer confidence does not currently need retirement guidance."
 
 
 def _follow_through_item_summary(
@@ -34252,6 +34497,8 @@ def _follow_through_summary(
     recovery_reacquisition_counts: dict[str, int] | None = None,
     recovery_reacquisition_durability_counts: dict[str, int] | None = None,
     recovery_reacquisition_consolidation_counts: dict[str, int] | None = None,
+    reacquisition_softening_decay_counts: dict[str, int] | None = None,
+    reacquisition_confidence_retirement_counts: dict[str, int] | None = None,
     top_fresh_recovery_items: list[dict] | None = None,
     top_stale_recovery_items: list[dict] | None = None,
     top_softening_recovery_items: list[dict] | None = None,
@@ -34266,6 +34513,9 @@ def _follow_through_summary(
     top_durable_reacquired_items: list[dict] | None = None,
     top_softening_reacquired_items: list[dict] | None = None,
     top_fragile_reacquisition_confidence_items: list[dict] | None = None,
+    top_softening_reacquisition_items: list[dict] | None = None,
+    top_revalidation_needed_reacquisition_items: list[dict] | None = None,
+    top_retired_reacquisition_confidence_items: list[dict] | None = None,
 ) -> str:
     status_counts = status_counts or {}
     checkpoint_counts = checkpoint_counts or {}
@@ -34290,6 +34540,8 @@ def _follow_through_summary(
     recovery_reacquisition_counts = recovery_reacquisition_counts or {}
     recovery_reacquisition_durability_counts = recovery_reacquisition_durability_counts or {}
     recovery_reacquisition_consolidation_counts = recovery_reacquisition_consolidation_counts or {}
+    reacquisition_softening_decay_counts = reacquisition_softening_decay_counts or {}
+    reacquisition_confidence_retirement_counts = reacquisition_confidence_retirement_counts or {}
     top_fresh_recovery_items = top_fresh_recovery_items or []
     top_stale_recovery_items = top_stale_recovery_items or []
     top_softening_recovery_items = top_softening_recovery_items or []
@@ -34304,6 +34556,9 @@ def _follow_through_summary(
     top_durable_reacquired_items = top_durable_reacquired_items or []
     top_softening_reacquired_items = top_softening_reacquired_items or []
     top_fragile_reacquisition_confidence_items = top_fragile_reacquisition_confidence_items or []
+    top_softening_reacquisition_items = top_softening_reacquisition_items or []
+    top_revalidation_needed_reacquisition_items = top_revalidation_needed_reacquisition_items or []
+    top_retired_reacquisition_confidence_items = top_retired_reacquisition_confidence_items or []
     legacy_summary = ""
     if repeat_urgent_count or stale_item_count:
         legacy_summary = (
@@ -34400,6 +34655,27 @@ def _follow_through_summary(
         return (
             f"{recovery_reacquisition_consolidation_counts.get('fragile-confidence', 0) + recovery_reacquisition_consolidation_counts.get('reversing', 0)} item(s) have technically re-acquired calmer support, "
             f"but {label} is the clearest place where that restored confidence still looks too fragile to trust."
+        )
+    if top_revalidation_needed_reacquisition_items:
+        top_item = top_revalidation_needed_reacquisition_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{reacquisition_softening_decay_counts.get('revalidation-needed', 0) + reacquisition_confidence_retirement_counts.get('revalidation-needed', 0)} restored re-acquisition path(s) now need fresh confirmation before they should be trusted again, "
+            f"and {label} is the clearest revalidation hotspot."
+        )
+    if top_retired_reacquisition_confidence_items:
+        top_item = top_retired_reacquisition_confidence_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{reacquisition_confidence_retirement_counts.get('retired-confidence', 0)} restored-confidence path(s) have now aged out of active carry-forward support, "
+            f"and {label} is the clearest place where earlier restored confidence has been retired."
+        )
+    if top_softening_reacquisition_items:
+        top_item = top_softening_reacquisition_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{reacquisition_softening_decay_counts.get('softening-watch', 0) + reacquisition_softening_decay_counts.get('step-down', 0) + reacquisition_softening_decay_counts.get('revalidation-needed', 0)} once-restored re-acquisition path(s) are now softening enough to warrant closer revalidation, "
+            f"and {label} is the clearest restored posture that is stepping back down."
         )
     if top_softening_reacquired_items:
         top_item = top_softening_reacquired_items[0]
@@ -34879,6 +35155,62 @@ def _follow_through_reacquisition_consolidation_summary(
             f"{recovery_reacquisition_consolidation_counts.get('insufficient-evidence', 0)} item(s) may have restored calmer confidence building, but the recent evidence is still too thin to judge consolidation."
         )
     return "No follow-through reacquisition confidence-consolidation signal is currently surfaced."
+
+
+def _follow_through_reacquisition_softening_decay_summary(
+    reacquisition_softening_decay_counts: dict[str, int],
+    top_softening_reacquisition_items: list[dict],
+    top_revalidation_needed_reacquisition_items: list[dict],
+) -> str:
+    if top_revalidation_needed_reacquisition_items:
+        top_item = top_revalidation_needed_reacquisition_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{reacquisition_softening_decay_counts.get('revalidation-needed', 0)} restored re-acquisition path(s) now need fresh confirmation before they should be trusted again, and {label} is the clearest revalidation hotspot."
+        )
+    if top_softening_reacquisition_items:
+        top_item = top_softening_reacquisition_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{reacquisition_softening_decay_counts.get('softening-watch', 0) + reacquisition_softening_decay_counts.get('step-down', 0)} restored re-acquisition path(s) are now stepping down from an earlier stronger posture, and {label} is the clearest softening hotspot."
+        )
+    if reacquisition_softening_decay_counts.get("retired-softening", 0):
+        return (
+            f"{reacquisition_softening_decay_counts.get('retired-softening', 0)} earlier softening path(s) have fully aged out and no longer carry active restored-hold memory."
+        )
+    if reacquisition_softening_decay_counts.get("insufficient-evidence", 0):
+        return (
+            f"{reacquisition_softening_decay_counts.get('insufficient-evidence', 0)} restored re-acquisition path(s) may be stepping down, but the recent history is still too thin to judge that softening cleanly."
+        )
+    return "No reacquisition softening-decay signal is currently surfaced."
+
+
+def _follow_through_reacquisition_confidence_retirement_summary(
+    reacquisition_confidence_retirement_counts: dict[str, int],
+    top_revalidation_needed_reacquisition_items: list[dict],
+    top_retired_reacquisition_confidence_items: list[dict],
+) -> str:
+    if top_revalidation_needed_reacquisition_items:
+        top_item = top_revalidation_needed_reacquisition_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{reacquisition_confidence_retirement_counts.get('revalidation-needed', 0)} restored-confidence path(s) now need fresh confirmation before they should be trusted again, and {label} is the clearest confidence-retirement hotspot."
+        )
+    if top_retired_reacquisition_confidence_items:
+        top_item = top_retired_reacquisition_confidence_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{reacquisition_confidence_retirement_counts.get('retired-confidence', 0)} restored-confidence path(s) have now been retired out of active carry-forward support, and {label} is the clearest retired-confidence example."
+        )
+    if reacquisition_confidence_retirement_counts.get("watch-retirement", 0) or reacquisition_confidence_retirement_counts.get("retiring-confidence", 0):
+        return (
+            f"{reacquisition_confidence_retirement_counts.get('watch-retirement', 0) + reacquisition_confidence_retirement_counts.get('retiring-confidence', 0)} restored-confidence path(s) are now weakening enough that the earlier stronger posture is starting to retire."
+        )
+    if reacquisition_confidence_retirement_counts.get("insufficient-evidence", 0):
+        return (
+            f"{reacquisition_confidence_retirement_counts.get('insufficient-evidence', 0)} restored-confidence path(s) may be retiring, but the recent evidence is still too thin to judge that step-down confidently."
+        )
+    return "No reacquisition confidence-retirement signal is currently surfaced."
 
 
 def _handoff_urgency(queue: list[dict], setup_health: dict) -> str:
