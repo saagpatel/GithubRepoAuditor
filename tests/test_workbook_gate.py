@@ -40,6 +40,9 @@ def test_record_manual_signoff_marks_gate_ready_and_updates_artifacts(tmp_path):
         checks=[
             "excel-open-no-repair=passed",
             "visible-tabs-present=passed",
+            "core-navigation-links-work=passed",
+            "repo-detail-selector-works=passed",
+            "run-changes-readable=passed",
             "normal-zoom-readable=passed",
             "chart-placement-clean=passed",
             "filters-work=passed",
@@ -66,6 +69,9 @@ def test_record_manual_signoff_marks_gate_blocked_on_failure(tmp_path):
         checks=[
             "excel-open-no-repair=failed",
             "visible-tabs-present=passed",
+            "core-navigation-links-work=passed",
+            "repo-detail-selector-works=passed",
+            "run-changes-readable=passed",
             "normal-zoom-readable=passed",
             "chart-placement-clean=passed",
             "filters-work=passed",

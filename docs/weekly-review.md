@@ -7,14 +7,15 @@
 3. Run `audit <github-username> --control-center` to refresh the operator queue.
 4. Open the workbook and move in this order:
    - `Dashboard` for the big picture
-   - `Run Changes` for what moved this run
-   - `Review Queue` for what needs action now
+   - `Run Changes` for what moved this run and whether the movement is healthy or concerning
+   - `Review Queue` for what needs action now and the exact next step
    - `Repo Detail` for a single-repo briefing
    - `Executive Summary` when you need a short shareable readout
 
 ## Recommended cadence
 
 - Start with anything in `Blocked`
+- Use `Run Changes` before `Review Queue` when you want to understand what changed instead of jumping straight into action
 - Clear `Needs Attention Now` before lower-pressure work
 - Use `Repo Detail` when one repo needs a deeper decision
 - Leave `Safe to Defer` alone unless priorities changed

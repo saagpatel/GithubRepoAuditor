@@ -16,12 +16,18 @@ The workbook is the main operator surface. For most people, this is the best rea
 
 - `Index`: orientation and workbook navigation
 - `Dashboard`: portfolio health, operator pressure, and top opportunities
-- `Run Changes`: what changed since the last run
-- `Review Queue`: what needs action now and why
+- `Run Changes`: what moved since the last run and whether the movement is good, bad, or worth investigating
+- `Review Queue`: what needs action now, why it is in the queue, and what to do next
 - `Portfolio Explorer`: cross-repo comparison
-- `Repo Detail`: one repo’s score, tier, trend, hotspots, and next move
+- `Repo Detail`: one repo’s score, tier, trend, hotspots, last movement, and next move
 - `Executive Summary`: short one-page shareable readout
 - `Print Pack`: printer-friendly review surface
+
+## When to use `Run Changes` vs `Review Queue`
+
+- Use `Run Changes` when you want to understand what shifted this run before deciding where to spend time.
+- Use `Review Queue` when you are ready to act and need the current blocked, urgent, ready, and safe-to-defer lanes.
+- Use `Repo Detail` when one repo from either page needs a deeper decision or a short briefing.
 
 ## Hidden sheets
 
