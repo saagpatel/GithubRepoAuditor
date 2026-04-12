@@ -2465,15 +2465,10 @@ def _project_queue_follow_through(
 ) -> list[dict]:
     recent_runs = [snapshot for snapshot in recent_runs if snapshot.get("items") or snapshot.get("has_attention") is not None]
     decision_memory_map = resolution_trend.get("decision_memory_map") or {}
-    resolution_targets = {
-        _queue_identity(item): item for item in resolution_trend.get("resolution_targets", []) or []
-    }
     enriched_queue: list[dict] = []
     for item in queue:
         key = _queue_identity(item)
         memory = decision_memory_map.get(key, {})
-        target = resolution_targets.get(key, {})
-        latest_event = memory.get("last_intervention") or {}
         previous_match = recent_runs[1]["items"].get(key) if len(recent_runs) > 1 else None
         prior_matches = [
             snapshot.get("items", {}).get(key)
