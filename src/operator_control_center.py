@@ -414,6 +414,9 @@ def build_operator_snapshot(
         "follow_through_recovery_counts": follow_through["follow_through_recovery_counts"],
         "follow_through_recovery_persistence_counts": follow_through["follow_through_recovery_persistence_counts"],
         "follow_through_relapse_churn_counts": follow_through["follow_through_relapse_churn_counts"],
+        "follow_through_recovery_freshness_counts": follow_through["follow_through_recovery_freshness_counts"],
+        "follow_through_recovery_decay_counts": follow_through["follow_through_recovery_decay_counts"],
+        "follow_through_recovery_memory_reset_counts": follow_through["follow_through_recovery_memory_reset_counts"],
         "top_unattempted_items": follow_through["top_unattempted_items"],
         "top_stale_follow_through_items": follow_through["top_stale_follow_through_items"],
         "top_overdue_follow_through_items": follow_through["top_overdue_follow_through_items"],
@@ -424,11 +427,19 @@ def build_operator_snapshot(
         "top_fragile_recovery_items": follow_through["top_fragile_recovery_items"],
         "top_sustained_recovery_items": follow_through["top_sustained_recovery_items"],
         "top_churn_follow_through_items": follow_through["top_churn_follow_through_items"],
+        "top_fresh_recovery_items": follow_through["top_fresh_recovery_items"],
+        "top_stale_recovery_items": follow_through["top_stale_recovery_items"],
+        "top_softening_recovery_items": follow_through["top_softening_recovery_items"],
+        "top_reset_recovery_items": follow_through["top_reset_recovery_items"],
+        "top_rebuilding_recovery_items": follow_through["top_rebuilding_recovery_items"],
         "follow_through_checkpoint_summary": follow_through["follow_through_checkpoint_summary"],
         "follow_through_escalation_summary": follow_through["follow_through_escalation_summary"],
         "follow_through_recovery_summary": follow_through["follow_through_recovery_summary"],
         "follow_through_recovery_persistence_summary": follow_through["follow_through_recovery_persistence_summary"],
         "follow_through_relapse_churn_summary": follow_through["follow_through_relapse_churn_summary"],
+        "follow_through_recovery_freshness_summary": follow_through["follow_through_recovery_freshness_summary"],
+        "follow_through_recovery_decay_summary": follow_through["follow_through_recovery_decay_summary"],
+        "follow_through_recovery_memory_reset_summary": follow_through["follow_through_recovery_memory_reset_summary"],
         "trend_status": resolution_trend["trend_status"],
         "new_attention_count": resolution_trend["new_attention_count"],
         "resolved_attention_count": resolution_trend["resolved_attention_count"],
@@ -886,6 +897,10 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
         lines.append(f"*Recovery Persistence:* {summary['follow_through_recovery_persistence_summary']}")
     if summary.get("follow_through_relapse_churn_summary"):
         lines.append(f"*Relapse Churn:* {summary['follow_through_relapse_churn_summary']}")
+    if summary.get("follow_through_recovery_freshness_summary"):
+        lines.append(f"*Recovery Freshness:* {summary['follow_through_recovery_freshness_summary']}")
+    if summary.get("follow_through_recovery_memory_reset_summary"):
+        lines.append(f"*Recovery Memory Reset:* {summary['follow_through_recovery_memory_reset_summary']}")
     if summary.get("primary_target"):
         target = summary["primary_target"]
         repo = f"{target.get('repo')}: " if target.get("repo") else ""
@@ -1425,6 +1440,30 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         "blocked": 0,
         "insufficient-evidence": 0,
     }
+    recovery_freshness_counts = {
+        "none": 0,
+        "fresh": 0,
+        "holding-fresh": 0,
+        "mixed-age": 0,
+        "stale": 0,
+        "insufficient-evidence": 0,
+    }
+    recovery_decay_counts = {
+        "none": 0,
+        "softening": 0,
+        "aging": 0,
+        "fragile-aging": 0,
+        "expired": 0,
+        "insufficient-evidence": 0,
+    }
+    recovery_memory_reset_counts = {
+        "none": 0,
+        "reset-watch": 0,
+        "resetting": 0,
+        "reset": 0,
+        "rebuilding": 0,
+        "insufficient-evidence": 0,
+    }
     top_unattempted_items: list[dict] = []
     top_stale_follow_through_items: list[dict] = []
     top_overdue_follow_through_items: list[dict] = []
@@ -1435,6 +1474,11 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
     top_fragile_recovery_items: list[dict] = []
     top_sustained_recovery_items: list[dict] = []
     top_churn_follow_through_items: list[dict] = []
+    top_fresh_recovery_items: list[dict] = []
+    top_stale_recovery_items: list[dict] = []
+    top_softening_recovery_items: list[dict] = []
+    top_reset_recovery_items: list[dict] = []
+    top_rebuilding_recovery_items: list[dict] = []
     for item in queue:
         status = item.get("follow_through_status", "unknown")
         if status not in status_counts:
@@ -1460,6 +1504,18 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         if relapse_churn_status not in relapse_churn_counts:
             relapse_churn_status = "insufficient-evidence"
         relapse_churn_counts[relapse_churn_status] += 1
+        recovery_freshness_status = item.get("follow_through_recovery_freshness_status", "none")
+        if recovery_freshness_status not in recovery_freshness_counts:
+            recovery_freshness_status = "insufficient-evidence"
+        recovery_freshness_counts[recovery_freshness_status] += 1
+        recovery_decay_status = item.get("follow_through_recovery_decay_status", "none")
+        if recovery_decay_status not in recovery_decay_counts:
+            recovery_decay_status = "insufficient-evidence"
+        recovery_decay_counts[recovery_decay_status] += 1
+        recovery_memory_reset_status = item.get("follow_through_recovery_memory_reset_status", "none")
+        if recovery_memory_reset_status not in recovery_memory_reset_counts:
+            recovery_memory_reset_status = "insufficient-evidence"
+        recovery_memory_reset_counts[recovery_memory_reset_status] += 1
         compact_item = {
             "item_id": item.get("item_id", ""),
             "repo": item.get("repo", ""),
@@ -1484,6 +1540,16 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
             "follow_through_relapse_churn_status": relapse_churn_status,
             "follow_through_relapse_churn_summary": item.get("follow_through_relapse_churn_summary", ""),
             "follow_through_relapse_churn_reason": item.get("follow_through_relapse_churn_reason", ""),
+            "follow_through_recovery_freshness_age_runs": item.get("follow_through_recovery_freshness_age_runs", 0),
+            "follow_through_recovery_freshness_status": recovery_freshness_status,
+            "follow_through_recovery_freshness_summary": item.get("follow_through_recovery_freshness_summary", ""),
+            "follow_through_recovery_freshness_reason": item.get("follow_through_recovery_freshness_reason", ""),
+            "follow_through_recovery_decay_status": recovery_decay_status,
+            "follow_through_recovery_decay_summary": item.get("follow_through_recovery_decay_summary", ""),
+            "follow_through_recovery_decay_reason": item.get("follow_through_recovery_decay_reason", ""),
+            "follow_through_recovery_memory_reset_status": recovery_memory_reset_status,
+            "follow_through_recovery_memory_reset_summary": item.get("follow_through_recovery_memory_reset_summary", ""),
+            "follow_through_recovery_memory_reset_reason": item.get("follow_through_recovery_memory_reset_reason", ""),
         }
         if status == "untouched" and len(top_unattempted_items) < 5:
             top_unattempted_items.append(compact_item)
@@ -1511,6 +1577,16 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
             top_sustained_recovery_items.append(compact_item)
         if relapse_churn_status in {"fragile", "churn", "blocked"} and len(top_churn_follow_through_items) < 5:
             top_churn_follow_through_items.append(compact_item)
+        if recovery_freshness_status in {"fresh", "holding-fresh"} and len(top_fresh_recovery_items) < 5:
+            top_fresh_recovery_items.append(compact_item)
+        if recovery_freshness_status == "stale" and len(top_stale_recovery_items) < 5:
+            top_stale_recovery_items.append(compact_item)
+        if recovery_decay_status in {"softening", "aging", "fragile-aging"} and len(top_softening_recovery_items) < 5:
+            top_softening_recovery_items.append(compact_item)
+        if recovery_memory_reset_status in {"reset-watch", "resetting", "reset"} and len(top_reset_recovery_items) < 5:
+            top_reset_recovery_items.append(compact_item)
+        if recovery_memory_reset_status == "rebuilding" and len(top_rebuilding_recovery_items) < 5:
+            top_rebuilding_recovery_items.append(compact_item)
     status_counts["resolved"] += resolution_trend.get("confirmed_resolved_count", 0)
     follow_through_checkpoint_summary = _follow_through_checkpoint_summary(
         status_counts,
@@ -1541,6 +1617,17 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         relapse_churn_counts,
         top_churn_follow_through_items,
     )
+    follow_through_recovery_freshness_summary = _follow_through_recovery_freshness_summary(
+        recovery_freshness_counts,
+        top_fresh_recovery_items,
+        top_stale_recovery_items,
+        top_softening_recovery_items,
+    )
+    follow_through_recovery_memory_reset_summary = _follow_through_recovery_memory_reset_summary(
+        recovery_memory_reset_counts,
+        top_reset_recovery_items,
+        top_rebuilding_recovery_items,
+    )
     return {
         "repeat_urgent_count": repeat_urgent_count,
         "stale_item_count": stale_item_count,
@@ -1567,6 +1654,14 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
             top_fragile_recovery_items=top_fragile_recovery_items,
             top_sustained_recovery_items=top_sustained_recovery_items,
             top_churn_follow_through_items=top_churn_follow_through_items,
+            recovery_freshness_counts=recovery_freshness_counts,
+            recovery_decay_counts=recovery_decay_counts,
+            recovery_memory_reset_counts=recovery_memory_reset_counts,
+            top_fresh_recovery_items=top_fresh_recovery_items,
+            top_stale_recovery_items=top_stale_recovery_items,
+            top_softening_recovery_items=top_softening_recovery_items,
+            top_reset_recovery_items=top_reset_recovery_items,
+            top_rebuilding_recovery_items=top_rebuilding_recovery_items,
         ),
         "follow_through_status_counts": status_counts,
         "follow_through_checkpoint_counts": checkpoint_counts,
@@ -1574,6 +1669,9 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         "follow_through_recovery_counts": recovery_counts,
         "follow_through_recovery_persistence_counts": recovery_persistence_counts,
         "follow_through_relapse_churn_counts": relapse_churn_counts,
+        "follow_through_recovery_freshness_counts": recovery_freshness_counts,
+        "follow_through_recovery_decay_counts": recovery_decay_counts,
+        "follow_through_recovery_memory_reset_counts": recovery_memory_reset_counts,
         "top_unattempted_items": top_unattempted_items,
         "top_stale_follow_through_items": top_stale_follow_through_items,
         "top_overdue_follow_through_items": top_overdue_follow_through_items,
@@ -1584,11 +1682,23 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         "top_fragile_recovery_items": top_fragile_recovery_items,
         "top_sustained_recovery_items": top_sustained_recovery_items,
         "top_churn_follow_through_items": top_churn_follow_through_items,
+        "top_fresh_recovery_items": top_fresh_recovery_items,
+        "top_stale_recovery_items": top_stale_recovery_items,
+        "top_softening_recovery_items": top_softening_recovery_items,
+        "top_reset_recovery_items": top_reset_recovery_items,
+        "top_rebuilding_recovery_items": top_rebuilding_recovery_items,
         "follow_through_checkpoint_summary": follow_through_checkpoint_summary,
         "follow_through_escalation_summary": follow_through_escalation_summary,
         "follow_through_recovery_summary": follow_through_recovery_summary,
         "follow_through_recovery_persistence_summary": follow_through_recovery_persistence_summary,
         "follow_through_relapse_churn_summary": follow_through_relapse_churn_summary,
+        "follow_through_recovery_freshness_summary": follow_through_recovery_freshness_summary,
+        "follow_through_recovery_decay_summary": _follow_through_recovery_decay_summary(
+            recovery_decay_counts,
+            top_softening_recovery_items,
+            top_stale_recovery_items,
+        ),
+        "follow_through_recovery_memory_reset_summary": follow_through_recovery_memory_reset_summary,
     }
 
 
@@ -2754,6 +2864,44 @@ def _project_queue_follow_through(
             follow_through_recovery_status=follow_through_recovery_status,
             follow_through_recovery_persistence_status=follow_through_recovery_persistence_status,
         )
+        (
+            follow_through_recovery_freshness_age_runs,
+            follow_through_recovery_freshness_status,
+            follow_through_recovery_freshness_reason,
+            follow_through_recovery_freshness_summary,
+        ) = _follow_through_recovery_freshness_projection(
+            item,
+            prior_matches,
+            follow_through_status=follow_through_status,
+            follow_through_checkpoint_status=follow_through_checkpoint_status,
+            follow_through_escalation_status=follow_through_escalation_status,
+            follow_through_recovery_status=follow_through_recovery_status,
+            follow_through_recovery_persistence_status=follow_through_recovery_persistence_status,
+            follow_through_relapse_churn_status=follow_through_relapse_churn_status,
+        )
+        (
+            follow_through_recovery_decay_status,
+            follow_through_recovery_decay_reason,
+            follow_through_recovery_decay_summary,
+        ) = _follow_through_recovery_decay_projection(
+            item,
+            prior_matches,
+            follow_through_recovery_status=follow_through_recovery_status,
+            follow_through_recovery_persistence_status=follow_through_recovery_persistence_status,
+            follow_through_relapse_churn_status=follow_through_relapse_churn_status,
+            follow_through_recovery_freshness_status=follow_through_recovery_freshness_status,
+        )
+        (
+            follow_through_recovery_memory_reset_status,
+            follow_through_recovery_memory_reset_reason,
+            follow_through_recovery_memory_reset_summary,
+        ) = _follow_through_recovery_memory_reset_projection(
+            item,
+            prior_matches,
+            follow_through_recovery_status=follow_through_recovery_status,
+            follow_through_recovery_freshness_status=follow_through_recovery_freshness_status,
+            follow_through_recovery_decay_status=follow_through_recovery_decay_status,
+        )
         follow_through_summary = _follow_through_item_summary(
             item,
             memory,
@@ -2786,6 +2934,16 @@ def _project_queue_follow_through(
                 "follow_through_relapse_churn_status": follow_through_relapse_churn_status,
                 "follow_through_relapse_churn_summary": follow_through_relapse_churn_summary,
                 "follow_through_relapse_churn_reason": follow_through_relapse_churn_reason,
+                "follow_through_recovery_freshness_age_runs": follow_through_recovery_freshness_age_runs,
+                "follow_through_recovery_freshness_status": follow_through_recovery_freshness_status,
+                "follow_through_recovery_freshness_summary": follow_through_recovery_freshness_summary,
+                "follow_through_recovery_freshness_reason": follow_through_recovery_freshness_reason,
+                "follow_through_recovery_decay_status": follow_through_recovery_decay_status,
+                "follow_through_recovery_decay_summary": follow_through_recovery_decay_summary,
+                "follow_through_recovery_decay_reason": follow_through_recovery_decay_reason,
+                "follow_through_recovery_memory_reset_status": follow_through_recovery_memory_reset_status,
+                "follow_through_recovery_memory_reset_summary": follow_through_recovery_memory_reset_summary,
+                "follow_through_recovery_memory_reset_reason": follow_through_recovery_memory_reset_reason,
             }
         )
     return enriched_queue
@@ -3445,6 +3603,129 @@ def _follow_through_relapse_churn_projection(
             return "fragile", f"{label} is still on a recovery path, but a recent wobble has softened confidence that the calmer state will hold.", f"{label} is still recovering, but the calmer path looks fragile after a recent wobble."
         return "watch", f"{label} had one mild wobble after recovery began, so it should stay visible until another calmer run confirms that the recovery is holding.", f"{label} had one mild wobble and should stay on watch until the calmer path proves itself again."
     return "none", f"{label} is not currently showing relapse churn beyond the normal recovery path.", f"{label} is not currently showing relapse churn."
+
+
+def _follow_through_recovery_freshness_projection(
+    item: dict,
+    prior_matches: list[dict],
+    *,
+    follow_through_status: str,
+    follow_through_checkpoint_status: str,
+    follow_through_escalation_status: str,
+    follow_through_recovery_status: str,
+    follow_through_recovery_persistence_status: str,
+    follow_through_relapse_churn_status: str,
+) -> tuple[int, str, str, str]:
+    label = _target_label(item)
+    history = _follow_through_history_metrics(
+        item,
+        prior_matches,
+        follow_through_status=follow_through_status,
+        follow_through_checkpoint_status=follow_through_checkpoint_status,
+        follow_through_escalation_status=follow_through_escalation_status,
+        follow_through_recovery_status=follow_through_recovery_status,
+    )
+    positive_path_streak = int(history["positive_path_streak"])
+    retired_streak = int(history["retired_streak"])
+    prior_has_recovery_shape = bool(history["prior_has_recovery_shape"])
+    repeated_flip = bool(history["repeated_flip"])
+    mild_wobble = bool(history["mild_wobble"])
+    strong_holding_statuses = {
+        "holding-recovery",
+        "holding-retiring-watch",
+        "sustained-retiring-watch",
+        "sustained-retired",
+    }
+
+    if follow_through_recovery_status == "none":
+        return 0, "none", f"{label} does not currently have a recovery path whose freshness needs to be judged.", f"{label} does not currently show recovery freshness."
+    if (
+        follow_through_recovery_status == "insufficient-evidence"
+        or follow_through_recovery_persistence_status == "insufficient-evidence"
+        or (not prior_has_recovery_shape and follow_through_recovery_status in {"recovering", "retiring-watch", "retired"})
+    ):
+        return 1, "insufficient-evidence", f"{label} may be calmer, but the recovery history is still too thin to judge whether that calmer memory is fresh or already aging.", f"{label} may be calmer, but there is not enough recovery history yet to judge freshness."
+    if follow_through_recovery_status == "relapsing":
+        return 0, "none", f"{label} is already relapsing, so the earlier calmer memory is no longer fresh enough to treat as active support.", f"{label} is no longer carrying fresh recovery memory."
+    if retired_streak >= FOLLOW_THROUGH_RETIREMENT_WINDOW_RUNS:
+        return retired_streak, "stale", f"{label} is still calmer, but the recovery memory is now leaning mostly on older retired runs instead of fresh confirmation.", f"{label} still looks calmer, but that recovery memory is now aging out."
+    if repeated_flip or follow_through_relapse_churn_status in {"churn"}:
+        age_runs = max(1, positive_path_streak)
+        return age_runs, "mixed-age", f"{label} still has some recovery memory, but it is now mixed with recent elevated flips and should not count as fully fresh.", f"{label} still has some recovery memory, but that signal is now mixed-age rather than fully fresh."
+    if mild_wobble or follow_through_relapse_churn_status in {"watch", "fragile", "blocked"} or follow_through_recovery_persistence_status == "fragile-recovery":
+        age_runs = max(1, positive_path_streak)
+        return age_runs, "mixed-age", f"{label} still has useful recovery memory, but a recent wobble has softened it into a mixed-age signal.", f"{label} still has useful recovery memory, but part of that calmer signal is already softening."
+    if follow_through_recovery_persistence_status in strong_holding_statuses and positive_path_streak >= 2:
+        return positive_path_streak, "holding-fresh", f"{label} has held a calmer recovery posture across consecutive runs and that recovery memory still looks fresh.", f"{label} has fresh recovery memory that is actively holding."
+    if follow_through_recovery_status in {"recovering", "retiring-watch", "retired"}:
+        age_runs = max(1, positive_path_streak)
+        return age_runs, "fresh", f"{label} has a recent calmer path with no meaningful wobble yet, so the recovery memory still looks fresh.", f"{label} still has fresh recovery memory."
+    return 0, "none", f"{label} does not currently have a recovery freshness posture to project.", f"{label} does not currently show recovery freshness."
+
+
+def _follow_through_recovery_decay_projection(
+    item: dict,
+    prior_matches: list[dict],
+    *,
+    follow_through_recovery_status: str,
+    follow_through_recovery_persistence_status: str,
+    follow_through_relapse_churn_status: str,
+    follow_through_recovery_freshness_status: str,
+) -> tuple[str, str, str]:
+    label = _target_label(item)
+    if follow_through_recovery_freshness_status == "none":
+        return "none", f"{label} does not currently have fresh recovery memory to decay.", f"{label} is not currently showing recovery-memory decay."
+    if follow_through_recovery_freshness_status == "insufficient-evidence":
+        return "insufficient-evidence", f"{label} may be calming down, but there is not enough history to tell whether the recovery memory is decaying yet.", f"{label} does not yet have enough history to judge freshness decay."
+    if follow_through_recovery_freshness_status == "holding-fresh":
+        return "none", f"{label} still has strong fresh confirmation behind its calmer posture, so no recovery-memory decay needs to be surfaced yet.", f"{label} is holding a fresh recovery path without visible decay."
+    if follow_through_recovery_freshness_status == "fresh":
+        return "none", f"{label} still has recent calmer confirmation behind it, so the recovery memory has not started decaying yet.", f"{label} still has fresh enough recovery memory."
+    if follow_through_recovery_freshness_status == "mixed-age":
+        if follow_through_relapse_churn_status in {"fragile", "blocked", "churn"} or follow_through_recovery_persistence_status == "fragile-recovery":
+            return "fragile-aging", f"{label} still has some recovery memory, but wobble and mixed-age evidence now make that calmer path fragile and aging.", f"{label} still has some recovery memory, but it is aging in a fragile way."
+        return "softening", f"{label} still has useful recovery memory, but part of that calmer signal is aging and should now be weighted more cautiously.", f"{label} still looks calmer, but the recovery memory is already softening."
+    if follow_through_recovery_freshness_status == "stale":
+        if follow_through_recovery_status == "retired":
+            return "expired", f"{label} is still quieter, but the recovery memory is now old enough that the stronger holding posture should expire unless fresh evidence returns.", f"{label}'s older recovery confidence is now expiring."
+        if follow_through_relapse_churn_status in {"watch", "fragile", "blocked", "churn"} or follow_through_recovery_persistence_status == "fragile-recovery":
+            return "fragile-aging", f"{label} is leaning on older calmer memory while the live path still looks noisy, so the recovery confidence is aging in a fragile way.", f"{label}'s recovery memory is aging out and still looks fragile."
+        return "aging", f"{label} is still leaning on older recovery memory, but it no longer has enough fresh confirmation to keep the stronger hold posture on its own.", f"{label}'s recovery memory is aging out."
+    return "none", f"{label} does not currently have a recovery decay posture that needs a stronger label.", f"{label} is not currently showing recovery-memory decay."
+
+
+def _follow_through_recovery_memory_reset_projection(
+    item: dict,
+    prior_matches: list[dict],
+    *,
+    follow_through_recovery_status: str,
+    follow_through_recovery_freshness_status: str,
+    follow_through_recovery_decay_status: str,
+) -> tuple[str, str, str]:
+    label = _target_label(item)
+    prior_window = list(prior_matches[: HISTORY_WINDOW_RUNS - 1])
+    prior_reset_statuses = [
+        str(entry.get("follow_through_recovery_memory_reset_status", "none") or "none")
+        for entry in prior_window
+        if entry.get("follow_through_recovery_memory_reset_status") not in {None, ""}
+    ]
+    has_recent_reset = any(status in {"reset-watch", "resetting", "reset"} for status in prior_reset_statuses[:FOLLOW_THROUGH_RETIREMENT_WINDOW_RUNS])
+
+    if follow_through_recovery_freshness_status == "none":
+        return "none", f"{label} does not currently have a recovery-memory reset path to manage.", f"{label} is not currently showing a recovery-memory reset path."
+    if follow_through_recovery_freshness_status == "insufficient-evidence" or follow_through_recovery_decay_status == "insufficient-evidence":
+        return "insufficient-evidence", f"{label} may be calming down, but the recovery memory is still too thin to judge whether it should reset or rebuild.", f"{label} does not yet have enough history to judge recovery-memory reset."
+    if has_recent_reset and follow_through_recovery_freshness_status in {"fresh", "mixed-age"}:
+        return "rebuilding", f"{label} had its older recovery confidence reset recently and is now rebuilding calmer support with fresh evidence.", f"{label} is rebuilding recovery memory after an earlier reset."
+    if follow_through_recovery_decay_status in {"softening", "aging"}:
+        return "reset-watch", f"{label} still has some calmer carry-forward, but the recovery memory is softening enough that it should move onto reset watch if fresh confirmation does not return soon.", f"{label} still looks calmer, but its recovery memory is now on reset watch."
+    if follow_through_recovery_decay_status == "fragile-aging":
+        return "resetting", f"{label} is still leaning on older calmer memory, but the mixed-age and wobble signals are strong enough that the earlier stronger hold is now stepping down.", f"{label}'s earlier recovery confidence is now actively resetting."
+    if follow_through_recovery_decay_status == "expired":
+        return "reset", f"{label} no longer has enough fresh calmer confirmation to keep the earlier stronger recovery hold, so that older recovery memory should now be treated as reset.", f"{label}'s older recovery confidence has now reset."
+    if has_recent_reset and follow_through_recovery_status in {"recovering", "retiring-watch"}:
+        return "rebuilding", f"{label} had older recovery confidence reset earlier and is now starting to accumulate calmer evidence again.", f"{label} is rebuilding recovery memory after a prior reset."
+    return "none", f"{label} still has enough fresh calmer support that no recovery-memory reset needs to be surfaced yet.", f"{label} is not currently showing a recovery-memory reset."
 
 
 def _follow_through_item_summary(
@@ -33440,6 +33721,14 @@ def _follow_through_summary(
     top_fragile_recovery_items: list[dict] | None = None,
     top_sustained_recovery_items: list[dict] | None = None,
     top_churn_follow_through_items: list[dict] | None = None,
+    recovery_freshness_counts: dict[str, int] | None = None,
+    recovery_decay_counts: dict[str, int] | None = None,
+    recovery_memory_reset_counts: dict[str, int] | None = None,
+    top_fresh_recovery_items: list[dict] | None = None,
+    top_stale_recovery_items: list[dict] | None = None,
+    top_softening_recovery_items: list[dict] | None = None,
+    top_reset_recovery_items: list[dict] | None = None,
+    top_rebuilding_recovery_items: list[dict] | None = None,
 ) -> str:
     status_counts = status_counts or {}
     checkpoint_counts = checkpoint_counts or {}
@@ -33457,6 +33746,14 @@ def _follow_through_summary(
     top_fragile_recovery_items = top_fragile_recovery_items or []
     top_sustained_recovery_items = top_sustained_recovery_items or []
     top_churn_follow_through_items = top_churn_follow_through_items or []
+    recovery_freshness_counts = recovery_freshness_counts or {}
+    recovery_decay_counts = recovery_decay_counts or {}
+    recovery_memory_reset_counts = recovery_memory_reset_counts or {}
+    top_fresh_recovery_items = top_fresh_recovery_items or []
+    top_stale_recovery_items = top_stale_recovery_items or []
+    top_softening_recovery_items = top_softening_recovery_items or []
+    top_reset_recovery_items = top_reset_recovery_items or []
+    top_rebuilding_recovery_items = top_rebuilding_recovery_items or []
     legacy_summary = ""
     if repeat_urgent_count or stale_item_count:
         legacy_summary = (
@@ -33518,6 +33815,41 @@ def _follow_through_summary(
         return (
             f"{relapse_churn_counts.get('churn', 0) + relapse_churn_counts.get('fragile', 0) + relapse_churn_counts.get('blocked', 0)} item(s) now look fragile or churn-prone after starting to recover, "
             f"and {label} is the clearest calmer-state hotspot to watch."
+        )
+    if top_reset_recovery_items:
+        top_item = top_reset_recovery_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_memory_reset_counts.get('reset-watch', 0) + recovery_memory_reset_counts.get('resetting', 0) + recovery_memory_reset_counts.get('reset', 0)} item(s) now need their older recovery confidence stepped down, "
+            f"and {label} is the clearest recovery-memory reset hotspot."
+        )
+    if top_softening_recovery_items:
+        top_item = top_softening_recovery_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_decay_counts.get('softening', 0) + recovery_decay_counts.get('aging', 0) + recovery_decay_counts.get('fragile-aging', 0) + recovery_decay_counts.get('expired', 0)} item(s) still look calmer, but their recovery memory is softening or aging, "
+            f"and {label} is the clearest place where that calmer posture is weakening."
+        )
+    if top_stale_recovery_items:
+        top_item = top_stale_recovery_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_freshness_counts.get('stale', 0)} item(s) are still leaning on older calmer memory, "
+            f"and {label} is the clearest place where that recovery support is now stale."
+        )
+    if top_rebuilding_recovery_items:
+        top_item = top_rebuilding_recovery_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_memory_reset_counts.get('rebuilding', 0)} item(s) are rebuilding recovery confidence after an earlier reset, "
+            f"and {label} is the clearest calmer path that is earning back fresher support."
+        )
+    if top_fresh_recovery_items:
+        top_item = top_fresh_recovery_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_freshness_counts.get('fresh', 0) + recovery_freshness_counts.get('holding-fresh', 0)} item(s) still have fresh recovery support behind the calmer posture, "
+            f"and {label} is the clearest fresh recovery handoff."
         )
     if top_fragile_recovery_items:
         top_item = top_fragile_recovery_items[0]
@@ -33724,6 +34056,85 @@ def _follow_through_relapse_churn_summary(
             f"{relapse_churn_counts.get('insufficient-evidence', 0)} item(s) do not yet have enough recovery-side history to judge whether the calmer path is wobbling."
         )
     return "No relapse churn is currently surfaced."
+
+
+def _follow_through_recovery_freshness_summary(
+    recovery_freshness_counts: dict[str, int],
+    top_fresh_recovery_items: list[dict],
+    top_stale_recovery_items: list[dict],
+    top_softening_recovery_items: list[dict],
+) -> str:
+    if top_softening_recovery_items:
+        top_item = top_softening_recovery_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_freshness_counts.get('mixed-age', 0) + recovery_freshness_counts.get('stale', 0)} item(s) still have some calmer carry-forward, but that recovery memory is now softening or aging, and {label} is the clearest mixed-age hotspot."
+        )
+    if top_stale_recovery_items:
+        top_item = top_stale_recovery_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_freshness_counts.get('stale', 0)} item(s) are now leaning mostly on older recovery memory, and {label} is the clearest place where that calmer support has gone stale."
+        )
+    if top_fresh_recovery_items:
+        top_item = top_fresh_recovery_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_freshness_counts.get('fresh', 0) + recovery_freshness_counts.get('holding-fresh', 0)} item(s) still have fresh calmer support behind them, and {label} is the clearest fresh recovery handoff."
+        )
+    if recovery_freshness_counts.get("insufficient-evidence", 0):
+        return (
+            f"{recovery_freshness_counts.get('insufficient-evidence', 0)} item(s) may be calming down, but there is not enough history yet to judge whether that recovery memory is fresh or aging out."
+        )
+    return "No follow-through recovery freshness signal is currently surfaced."
+
+
+def _follow_through_recovery_decay_summary(
+    recovery_decay_counts: dict[str, int],
+    top_softening_recovery_items: list[dict],
+    top_stale_recovery_items: list[dict],
+) -> str:
+    if top_softening_recovery_items:
+        top_item = top_softening_recovery_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_decay_counts.get('softening', 0) + recovery_decay_counts.get('aging', 0) + recovery_decay_counts.get('fragile-aging', 0) + recovery_decay_counts.get('expired', 0)} item(s) still look calmer, but their recovery memory is weakening, and {label} is the clearest softening hotspot."
+        )
+    if top_stale_recovery_items:
+        top_item = top_stale_recovery_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_decay_counts.get('aging', 0) + recovery_decay_counts.get('expired', 0)} item(s) are now relying mainly on older calmer carry-forward, and {label} is the clearest place where that recovery support is aging out."
+        )
+    if recovery_decay_counts.get("insufficient-evidence", 0):
+        return (
+            f"{recovery_decay_counts.get('insufficient-evidence', 0)} item(s) do not yet have enough recovery history to judge whether the calmer memory is decaying."
+        )
+    return "No follow-through recovery freshness-decay signal is currently surfaced."
+
+
+def _follow_through_recovery_memory_reset_summary(
+    recovery_memory_reset_counts: dict[str, int],
+    top_reset_recovery_items: list[dict],
+    top_rebuilding_recovery_items: list[dict],
+) -> str:
+    if top_reset_recovery_items:
+        top_item = top_reset_recovery_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_memory_reset_counts.get('reset-watch', 0) + recovery_memory_reset_counts.get('resetting', 0) + recovery_memory_reset_counts.get('reset', 0)} item(s) now need older recovery confidence stepped down, and {label} is the clearest reset hotspot."
+        )
+    if top_rebuilding_recovery_items:
+        top_item = top_rebuilding_recovery_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_memory_reset_counts.get('rebuilding', 0)} item(s) are rebuilding calmer support after an earlier reset, and {label} is the clearest recovery-memory rebuild."
+        )
+    if recovery_memory_reset_counts.get("insufficient-evidence", 0):
+        return (
+            f"{recovery_memory_reset_counts.get('insufficient-evidence', 0)} item(s) may be calming down, but there is not enough history yet to judge whether older recovery confidence should reset or rebuild."
+        )
+    return "No follow-through recovery memory reset signal is currently surfaced."
 
 
 def _handoff_urgency(queue: list[dict], setup_health: dict) -> str:

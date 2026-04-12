@@ -37,6 +37,9 @@ NO_FOLLOW_THROUGH_ESCALATION = "No stronger follow-through escalation is current
 NO_FOLLOW_THROUGH_RECOVERY = "No follow-through recovery or escalation-retirement signal is currently surfaced."
 NO_FOLLOW_THROUGH_RECOVERY_PERSISTENCE = "No follow-through recovery persistence signal is currently surfaced."
 NO_FOLLOW_THROUGH_RELAPSE_CHURN = "No relapse churn is currently surfaced."
+NO_FOLLOW_THROUGH_RECOVERY_FRESHNESS = "No follow-through recovery freshness signal is currently surfaced."
+NO_FOLLOW_THROUGH_RECOVERY_DECAY = "No follow-through recovery freshness-decay signal is currently surfaced."
+NO_FOLLOW_THROUGH_RECOVERY_MEMORY_RESET = "No follow-through recovery memory reset signal is currently surfaced."
 
 
 def _metadata(audit: Any) -> dict[str, Any]:
@@ -343,6 +346,12 @@ def build_repo_briefing(
     follow_through_recovery_persistence_summary = build_follow_through_recovery_persistence_summary(handoff_source)
     follow_through_relapse_churn = build_follow_through_relapse_churn_status_label(handoff_source)
     follow_through_relapse_churn_summary = build_follow_through_relapse_churn_summary(handoff_source)
+    follow_through_recovery_freshness = build_follow_through_recovery_freshness_status_label(handoff_source)
+    follow_through_recovery_freshness_summary = build_follow_through_recovery_freshness_summary(handoff_source)
+    follow_through_recovery_decay = build_follow_through_recovery_decay_status_label(handoff_source)
+    follow_through_recovery_decay_summary = build_follow_through_recovery_decay_summary(handoff_source)
+    follow_through_recovery_memory_reset = build_follow_through_recovery_memory_reset_status_label(handoff_source)
+    follow_through_recovery_memory_reset_summary = build_follow_through_recovery_memory_reset_summary(handoff_source)
     follow_through_resurfacing_reason = build_follow_through_resurfacing_reason(handoff_source)
     return {
         "repo": repo_name,
@@ -385,6 +394,12 @@ def build_repo_briefing(
             "recovery_persistence_summary": follow_through_recovery_persistence_summary,
             "relapse_churn": follow_through_relapse_churn,
             "relapse_churn_summary": follow_through_relapse_churn_summary,
+            "recovery_freshness": follow_through_recovery_freshness,
+            "recovery_freshness_summary": follow_through_recovery_freshness_summary,
+            "recovery_decay": follow_through_recovery_decay,
+            "recovery_decay_summary": follow_through_recovery_decay_summary,
+            "recovery_memory_reset": follow_through_recovery_memory_reset,
+            "recovery_memory_reset_summary": follow_through_recovery_memory_reset_summary,
             "what_would_count_as_progress": follow_through_checkpoint,
         },
         "what_to_do_next_line": f"{recommended_action} {next_best_action_rationale}".strip(),
@@ -395,6 +410,9 @@ def build_repo_briefing(
         "recovery_line": f"{follow_through_recovery}: {follow_through_recovery_summary}",
         "recovery_persistence_line": f"{follow_through_recovery_persistence}: {follow_through_recovery_persistence_summary}",
         "relapse_churn_line": f"{follow_through_relapse_churn}: {follow_through_relapse_churn_summary}",
+        "recovery_freshness_line": f"{follow_through_recovery_freshness}: {follow_through_recovery_freshness_summary}",
+        "recovery_decay_line": f"{follow_through_recovery_decay}: {follow_through_recovery_decay_summary}",
+        "recovery_memory_reset_line": f"{follow_through_recovery_memory_reset}: {follow_through_recovery_memory_reset_summary}",
         "resurfacing_reason_line": follow_through_resurfacing_reason,
     }
 
@@ -456,6 +474,12 @@ def build_weekly_review_pack(
                 "follow_through_recovery_persistence_summary": build_follow_through_recovery_persistence_summary(mapped),
                 "follow_through_relapse_churn": build_follow_through_relapse_churn_status_label(mapped),
                 "follow_through_relapse_churn_summary": build_follow_through_relapse_churn_summary(mapped),
+                "follow_through_recovery_freshness": build_follow_through_recovery_freshness_status_label(mapped),
+                "follow_through_recovery_freshness_summary": build_follow_through_recovery_freshness_summary(mapped),
+                "follow_through_recovery_decay": build_follow_through_recovery_decay_status_label(mapped),
+                "follow_through_recovery_decay_summary": build_follow_through_recovery_decay_summary(mapped),
+                "follow_through_recovery_memory_reset": build_follow_through_recovery_memory_reset_status_label(mapped),
+                "follow_through_recovery_memory_reset_summary": build_follow_through_recovery_memory_reset_summary(mapped),
             }
         )
     top_recommendation = build_top_recommendation_summary(data)
@@ -487,6 +511,15 @@ def build_weekly_review_pack(
         "follow_through_relapse_churn_summary": str(
             operator_summary.get("follow_through_relapse_churn_summary") or NO_FOLLOW_THROUGH_RELAPSE_CHURN
         ),
+        "follow_through_recovery_freshness_summary": str(
+            operator_summary.get("follow_through_recovery_freshness_summary") or NO_FOLLOW_THROUGH_RECOVERY_FRESHNESS
+        ),
+        "follow_through_recovery_decay_summary": str(
+            operator_summary.get("follow_through_recovery_decay_summary") or NO_FOLLOW_THROUGH_RECOVERY_DECAY
+        ),
+        "follow_through_recovery_memory_reset_summary": str(
+            operator_summary.get("follow_through_recovery_memory_reset_summary") or NO_FOLLOW_THROUGH_RECOVERY_MEMORY_RESET
+        ),
         "top_unattempted_items": list(operator_summary.get("top_unattempted_items") or []),
         "top_stale_follow_through_items": list(operator_summary.get("top_stale_follow_through_items") or []),
         "top_overdue_follow_through_items": list(operator_summary.get("top_overdue_follow_through_items") or []),
@@ -497,6 +530,11 @@ def build_weekly_review_pack(
         "top_fragile_recovery_items": list(operator_summary.get("top_fragile_recovery_items") or []),
         "top_sustained_recovery_items": list(operator_summary.get("top_sustained_recovery_items") or []),
         "top_churn_follow_through_items": list(operator_summary.get("top_churn_follow_through_items") or []),
+        "top_fresh_recovery_items": list(operator_summary.get("top_fresh_recovery_items") or []),
+        "top_stale_recovery_items": list(operator_summary.get("top_stale_recovery_items") or []),
+        "top_softening_recovery_items": list(operator_summary.get("top_softening_recovery_items") or []),
+        "top_reset_recovery_items": list(operator_summary.get("top_reset_recovery_items") or []),
+        "top_rebuilding_recovery_items": list(operator_summary.get("top_rebuilding_recovery_items") or []),
     }
 
 
@@ -580,6 +618,18 @@ def no_follow_through_recovery_persistence() -> str:
 
 def no_follow_through_relapse_churn() -> str:
     return NO_FOLLOW_THROUGH_RELAPSE_CHURN
+
+
+def no_follow_through_recovery_freshness() -> str:
+    return NO_FOLLOW_THROUGH_RECOVERY_FRESHNESS
+
+
+def no_follow_through_recovery_decay() -> str:
+    return NO_FOLLOW_THROUGH_RECOVERY_DECAY
+
+
+def no_follow_through_recovery_memory_reset() -> str:
+    return NO_FOLLOW_THROUGH_RECOVERY_MEMORY_RESET
 
 
 def build_follow_through_status_label(value: Any) -> str:
@@ -695,6 +745,63 @@ def build_follow_through_relapse_churn_status_label(value: Any) -> str:
 def build_follow_through_relapse_churn_summary(value: Any) -> str:
     mapped = _mapping(value)
     return str(mapped.get("follow_through_relapse_churn_summary") or NO_FOLLOW_THROUGH_RELAPSE_CHURN)
+
+
+def build_follow_through_recovery_freshness_status_label(value: Any) -> str:
+    mapped = _mapping(value)
+    status = str(mapped.get("follow_through_recovery_freshness_status", value if isinstance(value, str) else "") or "none")
+    labels = {
+        "none": "None",
+        "fresh": "Fresh",
+        "holding-fresh": "Holding Fresh",
+        "mixed-age": "Mixed Age",
+        "stale": "Stale",
+        "insufficient-evidence": "Insufficient Evidence",
+    }
+    return labels.get(status, status.replace("-", " ").title())
+
+
+def build_follow_through_recovery_freshness_summary(value: Any) -> str:
+    mapped = _mapping(value)
+    return str(mapped.get("follow_through_recovery_freshness_summary") or NO_FOLLOW_THROUGH_RECOVERY_FRESHNESS)
+
+
+def build_follow_through_recovery_decay_status_label(value: Any) -> str:
+    mapped = _mapping(value)
+    status = str(mapped.get("follow_through_recovery_decay_status", value if isinstance(value, str) else "") or "none")
+    labels = {
+        "none": "None",
+        "softening": "Softening",
+        "aging": "Aging",
+        "fragile-aging": "Fragile Aging",
+        "expired": "Expired",
+        "insufficient-evidence": "Insufficient Evidence",
+    }
+    return labels.get(status, status.replace("-", " ").title())
+
+
+def build_follow_through_recovery_decay_summary(value: Any) -> str:
+    mapped = _mapping(value)
+    return str(mapped.get("follow_through_recovery_decay_summary") or NO_FOLLOW_THROUGH_RECOVERY_DECAY)
+
+
+def build_follow_through_recovery_memory_reset_status_label(value: Any) -> str:
+    mapped = _mapping(value)
+    status = str(mapped.get("follow_through_recovery_memory_reset_status", value if isinstance(value, str) else "") or "none")
+    labels = {
+        "none": "None",
+        "reset-watch": "Reset Watch",
+        "resetting": "Resetting",
+        "reset": "Reset",
+        "rebuilding": "Rebuilding",
+        "insufficient-evidence": "Insufficient Evidence",
+    }
+    return labels.get(status, status.replace("-", " ").title())
+
+
+def build_follow_through_recovery_memory_reset_summary(value: Any) -> str:
+    mapped = _mapping(value)
+    return str(mapped.get("follow_through_recovery_memory_reset_summary") or NO_FOLLOW_THROUGH_RECOVERY_MEMORY_RESET)
 
 
 def build_follow_through_resurfacing_reason(value: Any) -> str:

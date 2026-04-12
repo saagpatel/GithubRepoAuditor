@@ -288,6 +288,8 @@ def _make_report(audits=None) -> dict:
             "resolution_evidence_summary": "The last intervention was drifted for RepoC: Security posture needs attention, but the item is still open.",
             "follow_through_recovery_persistence_summary": "RepoC has started calming down, but the recovery path still looks fragile and needs another confirming run.",
             "follow_through_relapse_churn_summary": "RepoC had a mild wobble after recovery began, so keep it visible until another calmer run confirms the recovery is holding.",
+            "follow_through_recovery_freshness_summary": "RepoC still has some calmer carry-forward, but the recovery memory is already mixed-age and needs fresh confirmation.",
+            "follow_through_recovery_memory_reset_summary": "RepoC is calmer, but the older recovery confidence should step down if the next run does not refresh it.",
             "top_fragile_recovery_items": [
                 {
                     "repo": "RepoC",
@@ -309,6 +311,28 @@ def _make_report(audits=None) -> dict:
                     "follow_through_relapse_churn_summary": "RepoC had one mild wobble and the recovery still looks fragile.",
                 }
             ],
+            "top_stale_recovery_items": [
+                {
+                    "repo": "RepoC",
+                    "title": "Security posture needs attention",
+                    "follow_through_recovery_freshness_summary": "RepoC still has some calmer carry-forward, but the recovery memory is already mixed-age and needs fresh confirmation.",
+                }
+            ],
+            "top_softening_recovery_items": [
+                {
+                    "repo": "RepoC",
+                    "title": "Security posture needs attention",
+                    "follow_through_recovery_freshness_summary": "RepoC still has some calmer carry-forward, but the recovery memory is already mixed-age and needs fresh confirmation.",
+                }
+            ],
+            "top_reset_recovery_items": [
+                {
+                    "repo": "RepoC",
+                    "title": "Security posture needs attention",
+                    "follow_through_recovery_memory_reset_summary": "RepoC is calmer, but the older recovery confidence should step down if the next run does not refresh it.",
+                }
+            ],
+            "top_rebuilding_recovery_items": [],
             "next_action_confidence_score": 0.75,
             "next_action_confidence_label": "high",
             "next_action_confidence_reasons": ["The next step is tied directly to the current top target."],
@@ -635,6 +659,13 @@ def _make_report(audits=None) -> dict:
                 "follow_through_recovery_persistence_summary": "RepoC is recovering, but the calmer path still looks fragile rather than settled.",
                 "follow_through_relapse_churn_status": "fragile",
                 "follow_through_relapse_churn_summary": "RepoC had one mild wobble and the recovery still looks fragile.",
+                "follow_through_recovery_freshness_age_runs": 1,
+                "follow_through_recovery_freshness_status": "mixed-age",
+                "follow_through_recovery_freshness_summary": "RepoC still has some calmer carry-forward, but the recovery memory is already mixed-age and needs fresh confirmation.",
+                "follow_through_recovery_decay_status": "softening",
+                "follow_through_recovery_decay_summary": "RepoC still looks calmer, but the recovery memory is softening without a fully fresh confirming run yet.",
+                "follow_through_recovery_memory_reset_status": "reset-watch",
+                "follow_through_recovery_memory_reset_summary": "RepoC is calmer, but the older recovery confidence should step down if the next run does not refresh it.",
             }
         ],
         "governance_preview": {"applyable_count": 1},
@@ -963,8 +994,13 @@ class TestAnalystWorkbookSheets:
         assert ws.cell(row=header_row, column=17).value == "Persistence Summary"
         assert ws.cell(row=header_row, column=18).value == "Relapse Churn"
         assert ws.cell(row=header_row, column=19).value == "Churn Summary"
+        assert ws.cell(row=header_row, column=20).value == "Recovery Freshness"
+        assert ws.cell(row=header_row, column=21).value == "Freshness Summary"
+        assert ws.cell(row=header_row, column=22).value == "Recovery Memory Reset"
+        assert ws.cell(row=header_row, column=23).value == "Reset Summary"
+        assert ws.cell(row=header_row, column=24).value == "Open Artifact"
         assert no_linked_artifact_summary() in {
-            ws.cell(row=row, column=20).value
+            ws.cell(row=row, column=24).value
             for row in range(header_row + 1, header_row + 10)
         }
         assert "RepoC has recent follow-up recorded and is now waiting for confirming evidence." in {
@@ -985,6 +1021,14 @@ class TestAnalystWorkbookSheets:
         }
         assert "Fragile" in {
             ws.cell(row=row, column=18).value
+            for row in range(header_row + 1, header_row + 10)
+        }
+        assert "Mixed Age" in {
+            ws.cell(row=row, column=20).value
+            for row in range(header_row + 1, header_row + 10)
+        }
+        assert "Reset Watch" in {
+            ws.cell(row=row, column=22).value
             for row in range(header_row + 1, header_row + 10)
         }
 
@@ -1030,7 +1074,7 @@ class TestAnalystWorkbookSheets:
 
         review_labels = [
             review_ws.cell(row=row, column=1).value
-            for row in range(10, 60)
+            for row in range(10, 90)
             if review_ws.cell(row=row, column=1).value is not None
         ]
         assert "Trend" in review_labels
@@ -1086,6 +1130,10 @@ class TestAnalystWorkbookSheets:
         ]
         assert "Trend" in executive_labels
         assert "Why Top Target" in executive_labels
+        assert "Recovery Freshness" in executive_labels
+        assert "Recovery Memory Reset" in executive_labels
+        assert "Freshness Hotspot" in executive_labels
+        assert "Rebuild Hotspot" in executive_labels
 
     def test_dashboard_and_executive_summary_share_operator_story_lines(self):
         wb = Workbook()
@@ -1180,19 +1228,19 @@ class TestAnalystWorkbookSheets:
         assert print_ws["A19"].value == "Recovery / Retirement"
         assert print_ws["A20"].value == "Recovery Persistence"
         assert print_ws["A21"].value == "Relapse Churn"
-        assert print_ws["A22"].value == "What We Tried"
-        assert print_ws["A23"].value == "Last Outcome"
-        assert print_ws["A24"].value == "Resolution Evidence"
-        assert print_ws["A25"].value == "Recovery Counts"
-        assert print_ws["A26"].value == "Recommendation Confidence"
-        assert print_ws["A27"].value == "Confidence Rationale"
-        assert print_ws["A28"].value == "Next Action Confidence"
-        assert print_ws["A29"].value == "Trust Policy"
-        assert print_ws["A30"].value == "Trust Rationale"
-        assert print_ws["A31"].value == "Trust Exception"
-        assert print_ws["A32"].value == "Trust Recovery"
-        assert print_ws["A33"].value == "Recovery Confidence"
-        assert print_ws["A34"].value == "Exception Retirement"
+        assert print_ws["A22"].value == "Recovery Freshness"
+        assert print_ws["A23"].value == "Recovery Memory Reset"
+        assert print_ws["A24"].value == "What We Tried"
+        assert print_ws["A25"].value == "Last Outcome"
+        assert print_ws["A26"].value == "Resolution Evidence"
+        assert print_ws["A27"].value == "Recovery Counts"
+        assert print_ws["A28"].value == "Recommendation Confidence"
+        assert print_ws["A29"].value == "Confidence Rationale"
+        assert print_ws["A30"].value == "Next Action Confidence"
+        assert print_ws["A31"].value == "Trust Policy"
+        assert print_ws["A32"].value == "Trust Rationale"
+        assert print_ws["A33"].value == "Trust Exception"
+        assert print_ws["A34"].value == "Trust Recovery"
         assert print_ws["A35"].value == "Retirement Summary"
         assert print_ws["A36"].value == "Policy Debt"
         assert print_ws["A37"].value == "Class Normalization"
@@ -1480,7 +1528,7 @@ class TestWorkbookModes:
         wb = load_workbook(output)
         ws = wb["Review Queue"]
         header_row = next(row for row in range(20, 70) if ws.cell(row=row, column=1).value == "Repo")
-        assert ws.auto_filter.ref == f"A{header_row}:U{header_row + 1}"
+        assert ws.auto_filter.ref == f"A{header_row}:Y{header_row + 1}"
         assert not ws.tables
 
     def test_visible_sheets_use_filters_while_hidden_data_sheets_keep_tables(self, tmp_path):

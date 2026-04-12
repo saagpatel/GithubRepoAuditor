@@ -66,6 +66,10 @@ from src.report_enrichment import (
     build_follow_through_checkpoint_status_label,
     build_follow_through_escalation_status_label,
     build_follow_through_escalation_summary,
+    build_follow_through_recovery_freshness_status_label,
+    build_follow_through_recovery_freshness_summary,
+    build_follow_through_recovery_memory_reset_status_label,
+    build_follow_through_recovery_memory_reset_summary,
     build_follow_through_recovery_persistence_status_label,
     build_follow_through_recovery_persistence_summary,
     build_follow_through_recovery_status_label,
@@ -335,6 +339,33 @@ def _operator_follow_through_recovery_details(data: dict) -> tuple[str, str, str
         else churn_item.get("title", "")
     ) or "No relapse-churn hotspot"
     return recovery, persistence, churn, top_label, top_summary or persistence, churn_label
+
+
+def _operator_follow_through_freshness_details(data: dict) -> tuple[str, str, str, str, str]:
+    summary = data.get("operator_summary") or {}
+    freshness = summary.get("follow_through_recovery_freshness_summary", "") or "No follow-through recovery freshness signal is currently surfaced."
+    memory_reset = summary.get("follow_through_recovery_memory_reset_summary", "") or "No follow-through recovery memory reset signal is currently surfaced."
+    top_stale = list(summary.get("top_stale_recovery_items") or [])
+    top_reset = list(summary.get("top_reset_recovery_items") or [])
+    top_rebuilding = list(summary.get("top_rebuilding_recovery_items") or [])
+    top_item = top_stale[0] if top_stale else (top_reset[0] if top_reset else {})
+    top_label = (
+        f"{top_item.get('repo')}: {top_item.get('title')}"
+        if top_item.get("repo")
+        else top_item.get("title", "")
+    ) or "No stale recovery-memory hotspot"
+    top_summary = (
+        top_item.get("follow_through_recovery_freshness_summary", "")
+        or top_item.get("follow_through_recovery_memory_reset_summary", "")
+        or freshness
+    )
+    rebuild_item = top_rebuilding[0] if top_rebuilding else {}
+    rebuild_label = (
+        f"{rebuild_item.get('repo')}: {rebuild_item.get('title')}"
+        if rebuild_item.get("repo")
+        else rebuild_item.get("title", "")
+    ) or "No rebuilding recovery-memory hotspot"
+    return freshness, memory_reset, top_label, top_summary, rebuild_label
 
 
 def _operator_trend_values(data: dict) -> tuple[str, str, str, str]:
@@ -910,6 +941,16 @@ def _build_workbook_rollups(data: dict) -> tuple[list[list[object]], list[list[o
                 item.get("follow_through_relapse_churn_status", ""),
                 item.get("follow_through_relapse_churn_summary", ""),
                 item.get("follow_through_relapse_churn_reason", ""),
+                item.get("follow_through_recovery_freshness_age_runs", 0),
+                item.get("follow_through_recovery_freshness_status", ""),
+                item.get("follow_through_recovery_freshness_summary", ""),
+                item.get("follow_through_recovery_freshness_reason", ""),
+                item.get("follow_through_recovery_decay_status", ""),
+                item.get("follow_through_recovery_decay_summary", ""),
+                item.get("follow_through_recovery_decay_reason", ""),
+                item.get("follow_through_recovery_memory_reset_status", ""),
+                item.get("follow_through_recovery_memory_reset_summary", ""),
+                item.get("follow_through_recovery_memory_reset_reason", ""),
             ]
         )
 
@@ -1248,6 +1289,13 @@ def _build_dashboard(
         follow_through_retiring_hotspot,
         follow_through_churn_hotspot,
     ) = _operator_follow_through_recovery_details(data)
+    (
+        follow_through_recovery_freshness,
+        follow_through_recovery_memory_reset,
+        follow_through_recovery_freshness_hotspot,
+        follow_through_recovery_freshness_hotspot_summary,
+        follow_through_recovery_rebuild_hotspot,
+    ) = _operator_follow_through_freshness_details(data)
     trend_status, trend_summary, primary_target, resolution_counts = _operator_trend_values(data)
     primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
     last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
@@ -1307,6 +1355,8 @@ def _build_dashboard(
         ("Recovery / Retirement", follow_through_recovery),
         ("Recovery Persistence", follow_through_recovery_persistence),
         ("Relapse Churn", follow_through_relapse_churn),
+        ("Recovery Freshness", follow_through_recovery_freshness),
+        ("Recovery Memory Reset", follow_through_recovery_memory_reset),
         ("Next Action", next_action),
         ("Top Recommendation", top_recommendation_summary),
     ]
@@ -1319,6 +1369,9 @@ def _build_dashboard(
                 ("Recovery Hotspot", follow_through_relapsing_hotspot),
                 ("Retiring Watch Hotspot", follow_through_retiring_hotspot),
                 ("Churn Hotspot", follow_through_churn_hotspot),
+                ("Freshness Hotspot", follow_through_recovery_freshness_hotspot),
+                ("Freshness Detail", follow_through_recovery_freshness_hotspot_summary),
+                ("Rebuild Hotspot", follow_through_recovery_rebuild_hotspot),
             ]
         )
     operator_rows.extend(
@@ -3223,6 +3276,10 @@ def _repo_detail_rows(data: dict, score_history: dict[str, list[float]] | None) 
             briefing.get("what_to_do_next", {}).get("recovery_persistence_summary", "No follow-through recovery persistence signal is currently surfaced."),
             briefing.get("what_to_do_next", {}).get("relapse_churn", "None"),
             briefing.get("what_to_do_next", {}).get("relapse_churn_summary", "No relapse churn is currently surfaced."),
+            briefing.get("what_to_do_next", {}).get("recovery_freshness", "None"),
+            briefing.get("what_to_do_next", {}).get("recovery_freshness_summary", "No follow-through recovery freshness signal is currently surfaced."),
+            briefing.get("what_to_do_next", {}).get("recovery_memory_reset", "None"),
+            briefing.get("what_to_do_next", {}).get("recovery_memory_reset_summary", "No follow-through recovery memory reset signal is currently surfaced."),
             briefing.get("what_to_do_next", {}).get("what_would_count_as_progress", "Use the next run or linked artifact to confirm whether the recommendation moved."),
         ])
 
@@ -3785,6 +3842,16 @@ def _build_hidden_data_sheets(
             "Follow-Through Relapse Churn Status",
             "Follow-Through Relapse Churn Summary",
             "Follow-Through Relapse Churn Reason",
+            "Follow-Through Recovery Freshness Age Runs",
+            "Follow-Through Recovery Freshness Status",
+            "Follow-Through Recovery Freshness Summary",
+            "Follow-Through Recovery Freshness Reason",
+            "Follow-Through Recovery Decay Status",
+            "Follow-Through Recovery Decay Summary",
+            "Follow-Through Recovery Decay Reason",
+            "Follow-Through Recovery Memory Reset Status",
+            "Follow-Through Recovery Memory Reset Summary",
+            "Follow-Through Recovery Memory Reset Reason",
         ],
         operator_queue_rows,
     )
@@ -3849,6 +3916,10 @@ def _build_hidden_data_sheets(
             "Recovery Persistence Summary",
             "Relapse Churn",
             "Relapse Churn Summary",
+            "Recovery Freshness",
+            "Recovery Freshness Summary",
+            "Recovery Memory Reset",
+            "Recovery Memory Reset Summary",
             "What Would Count As Progress",
         ],
         repo_detail_rows,
@@ -4470,7 +4541,11 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
         ("Recovery Persistence Summary", 40, "No follow-through recovery persistence signal is currently surfaced."),
         ("Relapse Churn", 41, "None"),
         ("Relapse Churn Summary", 42, "No relapse churn is currently surfaced."),
-        ("Progress Checkpoint", 43, "Use the next run or linked artifact to confirm whether the recommendation moved."),
+        ("Recovery Freshness", 43, "None"),
+        ("Recovery Freshness Summary", 44, "No follow-through recovery freshness signal is currently surfaced."),
+        ("Recovery Memory Reset", 45, "None"),
+        ("Recovery Memory Reset Summary", 46, "No follow-through recovery memory reset signal is currently surfaced."),
+        ("Progress Checkpoint", 47, "Use the next run or linked artifact to confirm whether the recommendation moved."),
         ("Action Candidate 2", 28, "No second action candidate recorded yet."),
         ("Action Candidate 3", 29, "No third action candidate recorded yet."),
     ]
@@ -4479,13 +4554,13 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
         ws.cell(row=row, column=6, value=label).font = SUBHEADER_FONT
         style_data_cell(ws.cell(row=row, column=7, value=_repo_detail_lookup_formula(column_index, fallback)), "left")
 
-    ws["A42"] = "Use Score Explainer"
-    _set_internal_hyperlink(ws["B42"], "Score Explainer", display="Open Score Explainer")
-    ws["D42"] = "Go To Explorer"
-    _set_internal_hyperlink(ws["E42"], "Portfolio Explorer", display="Open Explorer")
-    ws["F42"] = "Go To Queue"
-    _set_internal_hyperlink(ws["G42"], "Review Queue", display="Open Review Queue")
-    auto_width(ws, 8, 42)
+    ws["A46"] = "Use Score Explainer"
+    _set_internal_hyperlink(ws["B46"], "Score Explainer", display="Open Score Explainer")
+    ws["D46"] = "Go To Explorer"
+    _set_internal_hyperlink(ws["E46"], "Portfolio Explorer", display="Open Explorer")
+    ws["F46"] = "Go To Queue"
+    _set_internal_hyperlink(ws["G46"], "Review Queue", display="Open Review Queue")
+    auto_width(ws, 8, 46)
 
 
 def _build_run_changes(wb: Workbook, data: dict, diff_data: dict | None) -> None:
@@ -4774,6 +4849,10 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
         "Persistence Summary",
         "Relapse Churn",
         "Churn Summary",
+        "Recovery Freshness",
+        "Freshness Summary",
+        "Recovery Memory Reset",
+        "Reset Summary",
         "Open Artifact",
         "Safe To Defer",
     ]
@@ -4811,17 +4890,21 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
             build_follow_through_recovery_persistence_summary(item),
             build_follow_through_relapse_churn_status_label(item),
             build_follow_through_relapse_churn_summary(item),
+            build_follow_through_recovery_freshness_status_label(item),
+            build_follow_through_recovery_freshness_summary(item),
+            build_follow_through_recovery_memory_reset_status_label(item),
+            build_follow_through_recovery_memory_reset_summary(item),
             "Open linked artifact" if primary_link else no_linked_artifact_summary(),
             "yes" if safe_to_defer else "no",
         ]
         for col, value in enumerate(values, 1):
-            align = "center" if col in {3, 4, 5, 11, 12, 14, 16, 18, 21} else "left"
+            align = "center" if col in {3, 4, 5, 11, 12, 14, 16, 18, 20, 22, 25} else "left"
             style_data_cell(ws.cell(row=row, column=col, value=value), align)
         repo_cell = ws.cell(row=row, column=1)
         if item.get("repo_url"):
             repo_cell.hyperlink = item.get("repo_url")
             repo_cell.font = Font("Calibri", 10, color=TEAL, underline="single")
-        artifact_cell = ws.cell(row=row, column=20)
+        artifact_cell = ws.cell(row=row, column=24)
         if primary_link:
             artifact_cell.hyperlink = primary_link
             artifact_cell.font = Font("Calibri", 10, color=TEAL, underline="single")
@@ -5160,6 +5243,13 @@ def _build_executive_summary(
         follow_through_retiring_hotspot,
         follow_through_churn_hotspot,
     ) = _operator_follow_through_recovery_details(data)
+    (
+        follow_through_recovery_freshness,
+        follow_through_recovery_memory_reset,
+        follow_through_recovery_freshness_hotspot,
+        follow_through_recovery_freshness_hotspot_summary,
+        follow_through_recovery_rebuild_hotspot,
+    ) = _operator_follow_through_freshness_details(data)
     trend_status, trend_summary, primary_target, resolution_counts = _operator_trend_values(data)
     primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
     last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
@@ -5230,6 +5320,8 @@ def _build_executive_summary(
         ("Recovery / Retirement", follow_through_recovery),
         ("Recovery Persistence", follow_through_recovery_persistence),
         ("Relapse Churn", follow_through_relapse_churn),
+        ("Recovery Freshness", follow_through_recovery_freshness),
+        ("Recovery Memory Reset", follow_through_recovery_memory_reset),
         ("Trust Summary", trust_actionability_summary),
         ("Top Recommendation", top_recommendation),
         ("Biggest Opportunity", biggest_opportunity),
@@ -5243,16 +5335,19 @@ def _build_executive_summary(
         narrative_rows.insert(9, ("Recovery Hotspot", follow_through_relapsing_hotspot))
         narrative_rows.insert(10, ("Retiring Watch Hotspot", follow_through_retiring_hotspot))
         narrative_rows.insert(11, ("Churn Hotspot", follow_through_churn_hotspot))
-        narrative_rows.insert(12, ("Closure Guidance", closure_guidance))
-        narrative_rows.insert(13, ("What We Tried", last_intervention))
-        narrative_rows.insert(14, ("Resolution Evidence", resolution_evidence))
-        narrative_rows.insert(14, ("Recommendation Confidence", primary_confidence))
-        narrative_rows.insert(15, ("Confidence Rationale", confidence_reason))
-        narrative_rows.insert(16, ("Trust Policy", trust_policy))
-        narrative_rows.insert(17, ("Trust Rationale", trust_policy_reason))
-        narrative_rows.insert(18, ("Trust Exception", f"{exception_status} — {exception_reason}"))
-        narrative_rows.insert(19, ("Trust Recovery", f"{trust_recovery_status} — {trust_recovery_reason}"))
-        narrative_rows.insert(20, ("Recovery Confidence", recovery_confidence))
+        narrative_rows.insert(12, ("Freshness Hotspot", follow_through_recovery_freshness_hotspot))
+        narrative_rows.insert(13, ("Freshness Detail", follow_through_recovery_freshness_hotspot_summary))
+        narrative_rows.insert(14, ("Rebuild Hotspot", follow_through_recovery_rebuild_hotspot))
+        narrative_rows.insert(15, ("Closure Guidance", closure_guidance))
+        narrative_rows.insert(16, ("What We Tried", last_intervention))
+        narrative_rows.insert(17, ("Resolution Evidence", resolution_evidence))
+        narrative_rows.insert(17, ("Recommendation Confidence", primary_confidence))
+        narrative_rows.insert(18, ("Confidence Rationale", confidence_reason))
+        narrative_rows.insert(19, ("Trust Policy", trust_policy))
+        narrative_rows.insert(20, ("Trust Rationale", trust_policy_reason))
+        narrative_rows.insert(21, ("Trust Exception", f"{exception_status} — {exception_reason}"))
+        narrative_rows.insert(22, ("Trust Recovery", f"{trust_recovery_status} — {trust_recovery_reason}"))
+        narrative_rows.insert(23, ("Recovery Confidence", recovery_confidence))
         narrative_rows.insert(21, ("Exception Retirement", f"{retirement_status} — {retirement_reason}"))
         narrative_rows.insert(22, ("Retirement Summary", retirement_summary))
         narrative_rows.insert(23, ("Policy Debt", f"{policy_debt_status} — {policy_debt_reason}"))
@@ -5367,66 +5462,76 @@ def _build_executive_summary(
             ws.cell(row=46, column=5, value=follow_through_recovery_persistence)
             ws.cell(row=47, column=4, value="Relapse Churn").font = SUBHEADER_FONT
             ws.cell(row=47, column=5, value=follow_through_relapse_churn)
-            ws.cell(row=48, column=4, value="Recovery Hotspot").font = SUBHEADER_FONT
-            ws.cell(row=48, column=5, value=follow_through_relapsing_hotspot)
-            ws.cell(row=49, column=4, value="Retiring Watch Hotspot").font = SUBHEADER_FONT
-            ws.cell(row=49, column=5, value=follow_through_retiring_hotspot)
-            ws.cell(row=50, column=4, value="Churn Hotspot").font = SUBHEADER_FONT
-            ws.cell(row=50, column=5, value=follow_through_churn_hotspot)
-            ws.cell(row=51, column=4, value="Exception Retirement").font = SUBHEADER_FONT
-            ws.cell(row=51, column=5, value=f"{retirement_status} — {retirement_reason}")
-            ws.cell(row=52, column=4, value="Retirement Summary").font = SUBHEADER_FONT
-            ws.cell(row=52, column=5, value=retirement_summary)
-            ws.cell(row=53, column=4, value="Policy Debt").font = SUBHEADER_FONT
-            ws.cell(row=53, column=5, value=f"{policy_debt_status} — {policy_debt_reason}")
-            ws.cell(row=54, column=4, value="Class Normalization").font = SUBHEADER_FONT
-            ws.cell(row=54, column=5, value=f"{class_normalization_status} — {trust_normalization_summary}")
-            ws.cell(row=55, column=4, value="Class Memory").font = SUBHEADER_FONT
-            ws.cell(row=55, column=5, value=f"{class_memory_status} — {class_memory_reason}")
-            ws.cell(row=56, column=4, value="Trust Decay").font = SUBHEADER_FONT
-            ws.cell(row=56, column=5, value=f"{class_decay_status} — {class_decay_summary}")
-            ws.cell(row=57, column=4, value="Class Reweighting").font = SUBHEADER_FONT
-            ws.cell(row=57, column=5, value=f"{class_reweight_direction} ({class_reweight_score}) — {class_reweight_summary}")
-            ws.cell(row=58, column=4, value="Class Reweighting Why").font = SUBHEADER_FONT
-            ws.cell(row=58, column=5, value=class_reweight_reason)
-            ws.cell(row=59, column=4, value="Class Momentum").font = SUBHEADER_FONT
-            ws.cell(row=59, column=5, value=class_momentum_status)
-            ws.cell(row=60, column=4, value="Reweight Stability").font = SUBHEADER_FONT
-            ws.cell(row=60, column=5, value=class_reweight_stability)
-            ws.cell(row=61, column=4, value="Transition Health").font = SUBHEADER_FONT
-            ws.cell(row=61, column=5, value=class_transition_health)
-            ws.cell(row=62, column=4, value="Transition Resolution").font = SUBHEADER_FONT
-            ws.cell(row=62, column=5, value=class_transition_resolution)
-            ws.cell(row=63, column=4, value="Transition Summary").font = SUBHEADER_FONT
-            ws.cell(row=63, column=5, value=class_transition_summary)
-            ws.cell(row=64, column=4, value="Transition Closure").font = SUBHEADER_FONT
-            ws.cell(row=64, column=5, value=transition_closure_confidence)
-            ws.cell(row=65, column=4, value="Transition Likely Outcome").font = SUBHEADER_FONT
-            ws.cell(row=65, column=5, value=transition_likely_outcome)
-            ws.cell(row=66, column=4, value="Pending Debt Freshness").font = SUBHEADER_FONT
-            ws.cell(row=66, column=5, value=pending_debt_freshness)
-            ws.cell(row=67, column=4, value="Closure Forecast").font = SUBHEADER_FONT
-            ws.cell(row=67, column=5, value=closure_forecast_direction)
-            ws.cell(row=68, column=4, value="Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence").font = SUBHEADER_FONT
-            ws.cell(row=68, column=5, value=reset_reentry_rebuild_reentry_restore_rerererestore_persistence)
-            ws.cell(row=69, column=4, value="Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls").font = SUBHEADER_FONT
-            ws.cell(row=69, column=5, value=reset_reentry_rebuild_reentry_restore_rerererestore_churn)
-            ws.cell(row=70, column=4, value="Closure Forecast Summary").font = SUBHEADER_FONT
-            ws.cell(row=70, column=5, value=transition_closure_summary)
-            ws.cell(row=71, column=4, value="Momentum Summary").font = SUBHEADER_FONT
-            ws.cell(row=71, column=5, value=class_momentum_summary)
-            ws.cell(row=72, column=4, value="Exception Learning").font = SUBHEADER_FONT
-            ws.cell(row=72, column=5, value=f"{exception_pattern_status} — {exception_pattern_summary}")
-            ws.cell(row=73, column=4, value="Recommendation Drift").font = SUBHEADER_FONT
-            ws.cell(row=73, column=5, value=f"{drift_status} — {drift_summary}")
-            ws.cell(row=74, column=4, value="Adaptive Confidence").font = SUBHEADER_FONT
-            ws.cell(row=74, column=5, value=adaptive_confidence_summary)
-            ws.cell(row=75, column=4, value="Recommendation Quality").font = SUBHEADER_FONT
-            ws.cell(row=75, column=5, value=recommendation_quality)
-            ws.cell(row=76, column=4, value="Confidence Validation").font = SUBHEADER_FONT
-            ws.cell(row=76, column=5, value=f"{calibration_status} — {calibration_summary}")
-            ws.cell(row=77, column=4, value="Calibration Snapshot").font = SUBHEADER_FONT
-            ws.cell(row=77, column=5, value=f"High-confidence hit rate {high_hit_rate} | {reopened_recommendations}")
+            ws.cell(row=48, column=4, value="Recovery Freshness").font = SUBHEADER_FONT
+            ws.cell(row=48, column=5, value=follow_through_recovery_freshness)
+            ws.cell(row=49, column=4, value="Recovery Memory Reset").font = SUBHEADER_FONT
+            ws.cell(row=49, column=5, value=follow_through_recovery_memory_reset)
+            ws.cell(row=50, column=4, value="Recovery Hotspot").font = SUBHEADER_FONT
+            ws.cell(row=50, column=5, value=follow_through_relapsing_hotspot)
+            ws.cell(row=51, column=4, value="Retiring Watch Hotspot").font = SUBHEADER_FONT
+            ws.cell(row=51, column=5, value=follow_through_retiring_hotspot)
+            ws.cell(row=52, column=4, value="Churn Hotspot").font = SUBHEADER_FONT
+            ws.cell(row=52, column=5, value=follow_through_churn_hotspot)
+            ws.cell(row=53, column=4, value="Freshness Hotspot").font = SUBHEADER_FONT
+            ws.cell(row=53, column=5, value=follow_through_recovery_freshness_hotspot)
+            ws.cell(row=54, column=4, value="Freshness Detail").font = SUBHEADER_FONT
+            ws.cell(row=54, column=5, value=follow_through_recovery_freshness_hotspot_summary)
+            ws.cell(row=55, column=4, value="Rebuild Hotspot").font = SUBHEADER_FONT
+            ws.cell(row=55, column=5, value=follow_through_recovery_rebuild_hotspot)
+            ws.cell(row=56, column=4, value="Exception Retirement").font = SUBHEADER_FONT
+            ws.cell(row=56, column=5, value=f"{retirement_status} — {retirement_reason}")
+            ws.cell(row=57, column=4, value="Retirement Summary").font = SUBHEADER_FONT
+            ws.cell(row=57, column=5, value=retirement_summary)
+            ws.cell(row=58, column=4, value="Policy Debt").font = SUBHEADER_FONT
+            ws.cell(row=58, column=5, value=f"{policy_debt_status} — {policy_debt_reason}")
+            ws.cell(row=59, column=4, value="Class Normalization").font = SUBHEADER_FONT
+            ws.cell(row=59, column=5, value=f"{class_normalization_status} — {trust_normalization_summary}")
+            ws.cell(row=60, column=4, value="Class Memory").font = SUBHEADER_FONT
+            ws.cell(row=60, column=5, value=f"{class_memory_status} — {class_memory_reason}")
+            ws.cell(row=61, column=4, value="Trust Decay").font = SUBHEADER_FONT
+            ws.cell(row=61, column=5, value=f"{class_decay_status} — {class_decay_summary}")
+            ws.cell(row=62, column=4, value="Class Reweighting").font = SUBHEADER_FONT
+            ws.cell(row=62, column=5, value=f"{class_reweight_direction} ({class_reweight_score}) — {class_reweight_summary}")
+            ws.cell(row=63, column=4, value="Class Reweighting Why").font = SUBHEADER_FONT
+            ws.cell(row=63, column=5, value=class_reweight_reason)
+            ws.cell(row=64, column=4, value="Class Momentum").font = SUBHEADER_FONT
+            ws.cell(row=64, column=5, value=class_momentum_status)
+            ws.cell(row=65, column=4, value="Reweight Stability").font = SUBHEADER_FONT
+            ws.cell(row=65, column=5, value=class_reweight_stability)
+            ws.cell(row=66, column=4, value="Transition Health").font = SUBHEADER_FONT
+            ws.cell(row=66, column=5, value=class_transition_health)
+            ws.cell(row=67, column=4, value="Transition Resolution").font = SUBHEADER_FONT
+            ws.cell(row=67, column=5, value=class_transition_resolution)
+            ws.cell(row=68, column=4, value="Transition Summary").font = SUBHEADER_FONT
+            ws.cell(row=68, column=5, value=class_transition_summary)
+            ws.cell(row=69, column=4, value="Transition Closure").font = SUBHEADER_FONT
+            ws.cell(row=69, column=5, value=transition_closure_confidence)
+            ws.cell(row=70, column=4, value="Transition Likely Outcome").font = SUBHEADER_FONT
+            ws.cell(row=70, column=5, value=transition_likely_outcome)
+            ws.cell(row=71, column=4, value="Pending Debt Freshness").font = SUBHEADER_FONT
+            ws.cell(row=71, column=5, value=pending_debt_freshness)
+            ws.cell(row=72, column=4, value="Closure Forecast").font = SUBHEADER_FONT
+            ws.cell(row=72, column=5, value=closure_forecast_direction)
+            ws.cell(row=73, column=4, value="Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence").font = SUBHEADER_FONT
+            ws.cell(row=73, column=5, value=reset_reentry_rebuild_reentry_restore_rerererestore_persistence)
+            ws.cell(row=74, column=4, value="Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls").font = SUBHEADER_FONT
+            ws.cell(row=74, column=5, value=reset_reentry_rebuild_reentry_restore_rerererestore_churn)
+            ws.cell(row=75, column=4, value="Closure Forecast Summary").font = SUBHEADER_FONT
+            ws.cell(row=75, column=5, value=transition_closure_summary)
+            ws.cell(row=76, column=4, value="Momentum Summary").font = SUBHEADER_FONT
+            ws.cell(row=76, column=5, value=class_momentum_summary)
+            ws.cell(row=77, column=4, value="Exception Learning").font = SUBHEADER_FONT
+            ws.cell(row=77, column=5, value=f"{exception_pattern_status} — {exception_pattern_summary}")
+            ws.cell(row=78, column=4, value="Recommendation Drift").font = SUBHEADER_FONT
+            ws.cell(row=78, column=5, value=f"{drift_status} — {drift_summary}")
+            ws.cell(row=79, column=4, value="Adaptive Confidence").font = SUBHEADER_FONT
+            ws.cell(row=79, column=5, value=adaptive_confidence_summary)
+            ws.cell(row=80, column=4, value="Recommendation Quality").font = SUBHEADER_FONT
+            ws.cell(row=80, column=5, value=recommendation_quality)
+            ws.cell(row=81, column=4, value="Confidence Validation").font = SUBHEADER_FONT
+            ws.cell(row=81, column=5, value=f"{calibration_status} — {calibration_summary}")
+            ws.cell(row=82, column=4, value="Calibration Snapshot").font = SUBHEADER_FONT
+            ws.cell(row=82, column=5, value=f"High-confidence hit rate {high_hit_rate} | {reopened_recommendations}")
     preflight = data.get("preflight_summary") or {}
     if preflight and (preflight.get("blocking_errors", 0) or preflight.get("warnings", 0)):
         row_base = 59 if excel_mode == "standard" else 33
@@ -5442,7 +5547,7 @@ def _build_executive_summary(
     ws.page_setup.fitToHeight = 1
     ws.print_title_rows = "1:4"
     ws.print_area = "A1:L40"
-    auto_width(ws, 6, 77 if excel_mode == "standard" else 35)
+    auto_width(ws, 6, 82 if excel_mode == "standard" else 35)
 
 
 def _build_print_pack(
@@ -5489,6 +5594,13 @@ def _build_print_pack(
         follow_through_retiring_hotspot,
         follow_through_churn_hotspot,
     ) = _operator_follow_through_recovery_details(data)
+    (
+        follow_through_recovery_freshness,
+        follow_through_recovery_memory_reset,
+        follow_through_recovery_freshness_hotspot,
+        follow_through_recovery_freshness_hotspot_summary,
+        follow_through_recovery_rebuild_hotspot,
+    ) = _operator_follow_through_freshness_details(data)
     trend_status, trend_summary, primary_target, resolution_counts = _operator_trend_values(data)
     primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
     last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
@@ -5541,7 +5653,7 @@ def _build_print_pack(
     ws["B15"] = next_action or weekly_pack.get("what_to_do_this_week", build_top_recommendation_summary(data))
     ws["A16"] = "Follow-Through"
     ws["B16"] = (
-        f"{trend_summary} {follow_through} Next checkpoint: {follow_through_checkpoint} Escalation: {follow_through_escalation} Recovery: {follow_through_recovery} Persistence: {follow_through_recovery_persistence} Churn: {follow_through_relapse_churn} Focus hotspot: {follow_through_hotspot}. Escalation hotspot: {follow_through_escalation_hotspot}. Recovery hotspot: {follow_through_relapsing_hotspot}. Retiring watch hotspot: {follow_through_retiring_hotspot}. Churn hotspot: {follow_through_churn_hotspot}".strip()
+        f"{trend_summary} {follow_through} Next checkpoint: {follow_through_checkpoint} Escalation: {follow_through_escalation} Recovery: {follow_through_recovery} Persistence: {follow_through_recovery_persistence} Churn: {follow_through_relapse_churn} Freshness: {follow_through_recovery_freshness} Reset: {follow_through_recovery_memory_reset} Focus hotspot: {follow_through_hotspot}. Escalation hotspot: {follow_through_escalation_hotspot}. Recovery hotspot: {follow_through_relapsing_hotspot}. Retiring watch hotspot: {follow_through_retiring_hotspot}. Churn hotspot: {follow_through_churn_hotspot}. Freshness hotspot: {follow_through_recovery_freshness_hotspot}. Rebuild hotspot: {follow_through_recovery_rebuild_hotspot}".strip()
     )
     if excel_mode == "standard":
         ws["A17"] = "Primary Target"
@@ -5554,32 +5666,36 @@ def _build_print_pack(
         ws["B20"] = follow_through_recovery_persistence
         ws["A21"] = "Relapse Churn"
         ws["B21"] = follow_through_relapse_churn
-        ws["A22"] = "What We Tried"
-        ws["B22"] = last_intervention
-        ws["A23"] = "Last Outcome"
-        ws["B23"] = last_outcome
-        ws["A24"] = "Resolution Evidence"
-        ws["B24"] = resolution_evidence
-        ws["A25"] = "Recovery Counts"
-        ws["B25"] = recovery_counts
-        ws["A26"] = "Recommendation Confidence"
-        ws["B26"] = primary_confidence
-        ws["A27"] = "Confidence Rationale"
-        ws["B27"] = confidence_reason
-        ws["A28"] = "Next Action Confidence"
-        ws["B28"] = next_action_confidence
-        ws["A29"] = "Trust Policy"
-        ws["B29"] = trust_policy
-        ws["A30"] = "Trust Rationale"
-        ws["B30"] = trust_policy_reason
-        ws["A31"] = "Trust Exception"
-        ws["B31"] = f"{exception_status} — {exception_reason}"
-        ws["A32"] = "Trust Recovery"
-        ws["B32"] = f"{trust_recovery_status} — {trust_recovery_reason}"
-        ws["A33"] = "Recovery Confidence"
-        ws["B33"] = recovery_confidence
-        ws["A34"] = "Exception Retirement"
-        ws["B34"] = f"{retirement_status} — {retirement_reason}"
+        ws["A22"] = "Recovery Freshness"
+        ws["B22"] = follow_through_recovery_freshness
+        ws["A23"] = "Recovery Memory Reset"
+        ws["B23"] = follow_through_recovery_memory_reset
+        ws["A24"] = "What We Tried"
+        ws["B24"] = last_intervention
+        ws["A25"] = "Last Outcome"
+        ws["B25"] = last_outcome
+        ws["A26"] = "Resolution Evidence"
+        ws["B26"] = resolution_evidence
+        ws["A27"] = "Recovery Counts"
+        ws["B27"] = recovery_counts
+        ws["A28"] = "Recommendation Confidence"
+        ws["B28"] = primary_confidence
+        ws["A29"] = "Confidence Rationale"
+        ws["B29"] = confidence_reason
+        ws["A30"] = "Next Action Confidence"
+        ws["B30"] = next_action_confidence
+        ws["A31"] = "Trust Policy"
+        ws["B31"] = trust_policy
+        ws["A32"] = "Trust Rationale"
+        ws["B32"] = trust_policy_reason
+        ws["A33"] = "Trust Exception"
+        ws["B33"] = f"{exception_status} — {exception_reason}"
+        ws["A34"] = "Trust Recovery"
+        ws["B34"] = f"{trust_recovery_status} — {trust_recovery_reason}"
+        ws["A35"] = "Recovery Confidence"
+        ws["B35"] = recovery_confidence
+        ws["A36"] = "Exception Retirement"
+        ws["B36"] = f"{retirement_status} — {retirement_reason}"
         ws["A35"] = "Retirement Summary"
         ws["B35"] = retirement_summary
         ws["A36"] = "Policy Debt"
