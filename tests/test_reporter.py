@@ -455,6 +455,19 @@ class TestMarkdownReport:
             "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_window_runs": 4,
             "recovering_from_confirmation_rebuild_reentry_rererestore_reset_hotspots": [],
             "recovering_from_clearance_rebuild_reentry_rererestore_reset_hotspots": [],
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs": 1,
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score": 0.24,
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status": "just-rerererestored",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason": "Stronger re-re-restored rebuilt re-entry posture has been re-re-re-restored, but it has not yet proved it can hold.",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_summary": "Missing template asset has only just re-re-re-restored stronger re-re-restored posture, so it is still fragile (0.24; 1 run).",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_window_runs": 4,
+            "just_rerererestored_rebuild_reentry_hotspots": [],
+            "holding_reset_reentry_rebuild_reentry_restore_rerererestore_hotspots": [],
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_score": 0.21,
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status": "watch",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason": "Re-re-re-restored rebuilt re-entry is wobbling and may lose its stronger re-re-restored posture soon.",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_summary": "Re-re-re-restored rebuilt re-entry for Missing template asset is wobbling enough that stronger re-re-restored posture may soften soon (0.21).",
+            "reset_reentry_rebuild_reentry_restore_rerererestore_churn_hotspots": [],
             "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_summary": "Fresh confirmation-side evidence is returning for Missing template asset after stronger rerestored posture softened, but it has not yet re-re-restored stronger posture (0.34).",
             "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_summary": "Missing template asset is recovering after stronger rerestored posture softened, but it still needs more fresh follow-through before it is re-re-restored.",
             "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_window_runs": 4,
@@ -685,6 +698,8 @@ class TestMarkdownReport:
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Controls:" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery:" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Controls:" in content
+        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence:" in content
+        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls:" in content
         assert "Reset Re-entry Rebuild Persistence:" in content
         assert "Reset Re-entry Rebuild Churn Controls:" in content
         assert "Reset Re-entry Persistence Summary" in content
@@ -718,6 +733,8 @@ class TestMarkdownReport:
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness Summary" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery Summary" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Summary" in content
+        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence Summary" in content
+        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Summary" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Summary" in content
         assert "Reset Re-entry Rebuild Persistence Summary" in content
         assert "Reset Re-entry Rebuild Churn Summary" in content

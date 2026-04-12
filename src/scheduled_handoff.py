@@ -1789,6 +1789,64 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- {summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_summary', 'No reset re-entry rebuild re-entry restore re-re-re-restore summary is recorded yet.')}"
     )
     lines.append("")
+    lines.append("## Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence")
+    lines.append("")
+    lines.append(
+        f"- Reset re-entry rebuild re-entry restore re-re-re-restore persistence: {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status', 'none')} "
+        f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score', 0.0):.2f}; "
+        f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs', 0)} run(s))"
+    )
+    if primary_target.get("recent_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_path"):
+        lines.append(
+            f"- Recent reset re-entry rebuild re-entry restore re-re-re-restore persistence path: {primary_target.get('recent_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_path')}"
+        )
+    lines.append(
+        f"- {summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_summary', 'No reset re-entry rebuild re-entry restore re-re-re-restore persistence summary is recorded yet.')}"
+    )
+    rerererestore_persistence_hotspots = summary.get(
+        "just_rerererestored_rebuild_reentry_hotspots"
+    ) or summary.get(
+        "holding_reset_reentry_rebuild_reentry_restore_rerererestore_hotspots"
+    ) or []
+    if rerererestore_persistence_hotspots:
+        for hotspot in rerererestore_persistence_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Re-re-re-restore persistence hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status', 'none')} "
+                f"({hotspot.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score', 0.0):.2f}; "
+                f"{hotspot.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs', 0)} run(s)) via "
+                f"{hotspot.get('recent_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_path', 'no re-re-re-restore persistence path recorded')}"
+            )
+    else:
+        lines.append("- No re-re-re-restored rebuilt re-entry persistence hotspots are recorded in the recent window.")
+    lines.append("")
+    lines.append("## Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls")
+    lines.append("")
+    lines.append(
+        f"- Reset re-entry rebuild re-entry restore re-re-re-restore churn controls: {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status', 'none')} "
+        f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason', 'No reset re-entry rebuild re-entry restore re-re-re-restore churn reason is recorded yet.')})"
+    )
+    if primary_target.get("recent_reset_reentry_rebuild_reentry_restore_rerererestore_churn_path"):
+        lines.append(
+            f"- Recent reset re-entry rebuild re-entry restore re-re-re-restore churn path: {primary_target.get('recent_reset_reentry_rebuild_reentry_restore_rerererestore_churn_path')}"
+        )
+    lines.append(
+        f"- {summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_summary', 'No reset re-entry rebuild re-entry restore re-re-re-restore churn summary is recorded yet.')}"
+    )
+    rerererestore_churn_hotspots = summary.get(
+        "reset_reentry_rebuild_reentry_restore_rerererestore_churn_hotspots"
+    ) or []
+    if rerererestore_churn_hotspots:
+        for hotspot in rerererestore_churn_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Re-re-re-restore churn hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status', 'none')} "
+                f"({hotspot.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_score', 0.0):.2f}) via "
+                f"{hotspot.get('recent_reset_reentry_rebuild_reentry_restore_rerererestore_churn_path', 'no re-re-re-restore churn path recorded')}"
+            )
+    else:
+        lines.append("- No re-re-re-restored rebuilt re-entry churn hotspots are recorded in the recent window.")
+    lines.append("")
     lines.append("## Reset Re-entry Rebuild Persistence")
     lines.append("")
     lines.append(

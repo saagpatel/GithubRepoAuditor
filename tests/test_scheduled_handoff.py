@@ -341,6 +341,19 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
             "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_window_runs": 4,
             "recovering_from_confirmation_rebuild_reentry_rererestore_reset_hotspots": [],
             "recovering_from_clearance_rebuild_reentry_rererestore_reset_hotspots": [],
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs": 1,
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score": 0.24,
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status": "just-rerererestored",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason": "Stronger re-re-restored rebuilt re-entry posture has been re-re-re-restored, but it has not yet proved it can hold.",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_summary": "RepoC: RepoC drift needs review has only just re-re-re-restored stronger re-re-restored posture, so it is still fragile (0.24; 1 run).",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_window_runs": 4,
+            "just_rerererestored_rebuild_reentry_hotspots": [],
+            "holding_reset_reentry_rebuild_reentry_restore_rerererestore_hotspots": [],
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_score": 0.21,
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status": "watch",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason": "Re-re-re-restored rebuilt re-entry is wobbling and may lose its stronger re-re-restored posture soon.",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_summary": "Re-re-re-restored rebuilt re-entry for RepoC: RepoC drift needs review is wobbling enough that stronger re-re-restored posture may soften soon (0.21).",
+            "reset_reentry_rebuild_reentry_restore_rerererestore_churn_hotspots": [],
             "chronic_item_count": 0,
             "newly_stale_count": 0,
             "longest_persisting_item": {
@@ -472,6 +485,8 @@ def test_build_scheduled_handoff_writes_artifacts_and_issue_candidate(tmp_path):
     assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Controls" in markdown
     assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery" in markdown
     assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Controls" in markdown
+    assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence" in markdown
+    assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls" in markdown
     assert "Reset Re-entry Rebuild Persistence" in markdown
     assert "Reset Re-entry Rebuild Churn Controls" in markdown
     assert "Reacquisition Persistence" in markdown
