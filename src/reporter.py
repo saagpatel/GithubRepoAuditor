@@ -11,6 +11,8 @@ from src.report_enrichment import (
     build_follow_through_checkpoint_status_label,
     build_follow_through_escalation_status_label,
     build_follow_through_escalation_summary,
+    build_follow_through_recovery_status_label,
+    build_follow_through_recovery_summary,
     build_follow_through_status_label,
     build_follow_through_summary,
     build_last_movement_label,
@@ -267,6 +269,10 @@ def write_markdown_report(
             f"{item.get('follow_through_escalation_summary', 'No stronger follow-through escalation is currently surfaced.')}"
         )
         _w(
+            f"  - Recovery / Retirement: {item.get('follow_through_recovery', 'None')} — "
+            f"{item.get('follow_through_recovery_summary', 'No follow-through recovery or escalation-retirement signal is currently surfaced.')}"
+        )
+        _w(
             f"  - Next Checkpoint: {item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}"
         )
     if not weekly_pack.get("top_attention"):
@@ -308,6 +314,30 @@ def write_markdown_report(
     _w("")
     _w(f"- Summary: {weekly_pack.get('follow_through_escalation_summary', 'No stronger follow-through escalation is currently surfaced.')}")
     _w("")
+    _w("### Follow-Through Recovery and Escalation Retirement")
+    _w("")
+    _w(f"- Summary: {weekly_pack.get('follow_through_recovery_summary', 'No follow-through recovery or escalation-retirement signal is currently surfaced.')}")
+    top_recovering = weekly_pack.get("top_recovering_follow_through_items", [])[:3]
+    top_retiring = weekly_pack.get("top_retiring_follow_through_items", [])[:3]
+    top_relapsing = weekly_pack.get("top_relapsing_follow_through_items", [])[:3]
+    if top_recovering:
+        _w("- Recovering:")
+        for item in top_recovering:
+            label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+            _w(f"  - {label} — {item.get('follow_through_recovery_summary', 'No follow-through recovery or escalation-retirement signal is currently surfaced.')}")
+    if top_retiring:
+        _w("- Retiring Watch:")
+        for item in top_retiring:
+            label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+            _w(f"  - {label} — {item.get('follow_through_recovery_summary', 'No follow-through recovery or escalation-retirement signal is currently surfaced.')}")
+    if top_relapsing:
+        _w("- Relapsing:")
+        for item in top_relapsing:
+            label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+            _w(f"  - {label} — {item.get('follow_through_recovery_summary', 'No follow-through recovery or escalation-retirement signal is currently surfaced.')}")
+    if not top_recovering and not top_retiring and not top_relapsing:
+        _w("- No recovery or retirement hotspots are currently surfaced.")
+    _w("")
     _w("### Top Repo Drilldowns")
     _w("")
     for briefing in weekly_pack.get("repo_briefings", [])[:3]:
@@ -320,6 +350,7 @@ def write_markdown_report(
         _w(f"- Follow-Through: {briefing.get('follow_through_line', 'No follow-through evidence is recorded yet.')}")
         _w(f"- Checkpoint Timing: {briefing.get('checkpoint_timing_line', 'Unknown')}")
         _w(f"- Escalation: {briefing.get('escalation_line', 'Unknown: No stronger follow-through escalation is currently surfaced.')}")
+        _w(f"- Recovery / Retirement: {briefing.get('recovery_line', 'None: No follow-through recovery or escalation-retirement signal is currently surfaced.')}")
         _w(f"- What Would Count As Progress: {briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
         _w("")
 
@@ -354,6 +385,8 @@ def write_markdown_report(
             _w(f"- Next Checkpoint: {report.operator_summary.get('follow_through_checkpoint_summary')}")
         if report.operator_summary.get("follow_through_escalation_summary"):
             _w(f"- Follow-Through Aging and Escalation: {report.operator_summary.get('follow_through_escalation_summary')}")
+        if report.operator_summary.get("follow_through_recovery_summary"):
+            _w(f"- Follow-Through Recovery and Escalation Retirement: {report.operator_summary.get('follow_through_recovery_summary')}")
         primary_target = report.operator_summary.get("primary_target") or {}
         if primary_target:
             repo = f"{primary_target.get('repo')}: " if primary_target.get("repo") else ""
@@ -921,6 +954,10 @@ def write_markdown_report(
             _w(
                 f"  - Escalation: {build_follow_through_escalation_status_label(item)} — "
                 f"{build_follow_through_escalation_summary(item)}"
+            )
+            _w(
+                f"  - Recovery / Retirement: {build_follow_through_recovery_status_label(item)} — "
+                f"{build_follow_through_recovery_summary(item)}"
             )
             _w(f"  - Next Checkpoint: {build_follow_through_checkpoint(item)}")
             links = item.get("links") or []

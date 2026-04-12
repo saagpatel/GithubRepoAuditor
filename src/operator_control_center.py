@@ -27,6 +27,7 @@ CALIBRATION_WINDOW_RUNS = 20
 VALIDATION_WINDOW_RUNS = 2
 TRUST_RECOVERY_WINDOW_RUNS = 3
 EXCEPTION_RETIREMENT_WINDOW_RUNS = 4
+FOLLOW_THROUGH_RETIREMENT_WINDOW_RUNS = 3
 CLASS_NORMALIZATION_WINDOW_RUNS = 4
 CLASS_MEMORY_FRESHNESS_WINDOW_RUNS = 4
 CLASS_REWEIGHTING_WINDOW_RUNS = 4
@@ -409,12 +410,17 @@ def build_operator_snapshot(
         "follow_through_status_counts": follow_through["follow_through_status_counts"],
         "follow_through_checkpoint_counts": follow_through["follow_through_checkpoint_counts"],
         "follow_through_escalation_counts": follow_through["follow_through_escalation_counts"],
+        "follow_through_recovery_counts": follow_through["follow_through_recovery_counts"],
         "top_unattempted_items": follow_through["top_unattempted_items"],
         "top_stale_follow_through_items": follow_through["top_stale_follow_through_items"],
         "top_overdue_follow_through_items": follow_through["top_overdue_follow_through_items"],
         "top_escalation_items": follow_through["top_escalation_items"],
+        "top_recovering_follow_through_items": follow_through["top_recovering_follow_through_items"],
+        "top_retiring_follow_through_items": follow_through["top_retiring_follow_through_items"],
+        "top_relapsing_follow_through_items": follow_through["top_relapsing_follow_through_items"],
         "follow_through_checkpoint_summary": follow_through["follow_through_checkpoint_summary"],
         "follow_through_escalation_summary": follow_through["follow_through_escalation_summary"],
+        "follow_through_recovery_summary": follow_through["follow_through_recovery_summary"],
         "trend_status": resolution_trend["trend_status"],
         "new_attention_count": resolution_trend["new_attention_count"],
         "resolved_attention_count": resolution_trend["resolved_attention_count"],
@@ -866,6 +872,8 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
         lines.append(f"*Accountability:* {summary['accountability_summary']}")
     if summary.get("follow_through_summary"):
         lines.append(f"*Follow-Through:* {summary['follow_through_summary']}")
+    if summary.get("follow_through_recovery_summary"):
+        lines.append(f"*Follow-Through Recovery:* {summary['follow_through_recovery_summary']}")
     if summary.get("primary_target"):
         target = summary["primary_target"]
         repo = f"{target.get('repo')}: " if target.get("repo") else ""
@@ -1331,6 +1339,7 @@ def _build_operator_handoff(
         f"{confidence_calibration.get('confidence_calibration_summary', '')} "
         f"{confidence.get('adaptive_confidence_summary', '')} "
         f"{follow_through.get('follow_through_summary', '')} "
+        f"{follow_through.get('follow_through_recovery_summary', '')} "
         f"Next: {next_action}"
     ).strip()
     return {
@@ -1378,10 +1387,21 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         "resolved-watch": 0,
         "unknown": 0,
     }
+    recovery_counts = {
+        "none": 0,
+        "recovering": 0,
+        "retiring-watch": 0,
+        "retired": 0,
+        "relapsing": 0,
+        "insufficient-evidence": 0,
+    }
     top_unattempted_items: list[dict] = []
     top_stale_follow_through_items: list[dict] = []
     top_overdue_follow_through_items: list[dict] = []
     top_escalation_items: list[dict] = []
+    top_recovering_follow_through_items: list[dict] = []
+    top_retiring_follow_through_items: list[dict] = []
+    top_relapsing_follow_through_items: list[dict] = []
     for item in queue:
         status = item.get("follow_through_status", "unknown")
         if status not in status_counts:
@@ -1395,6 +1415,10 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         if escalation_status not in escalation_counts:
             escalation_status = "unknown"
         escalation_counts[escalation_status] += 1
+        recovery_status = item.get("follow_through_recovery_status", "none")
+        if recovery_status not in recovery_counts:
+            recovery_status = "insufficient-evidence"
+        recovery_counts[recovery_status] += 1
         compact_item = {
             "item_id": item.get("item_id", ""),
             "repo": item.get("repo", ""),
@@ -1408,6 +1432,10 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
             "follow_through_escalation_status": escalation_status,
             "follow_through_escalation_summary": item.get("follow_through_escalation_summary", ""),
             "follow_through_escalation_reason": item.get("follow_through_escalation_reason", ""),
+            "follow_through_recovery_age_runs": item.get("follow_through_recovery_age_runs", 0),
+            "follow_through_recovery_status": recovery_status,
+            "follow_through_recovery_summary": item.get("follow_through_recovery_summary", ""),
+            "follow_through_recovery_reason": item.get("follow_through_recovery_reason", ""),
         }
         if status == "untouched" and len(top_unattempted_items) < 5:
             top_unattempted_items.append(compact_item)
@@ -1417,6 +1445,12 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
             top_overdue_follow_through_items.append(compact_item)
         if escalation_status in {"escalate-now", "nudge"} and len(top_escalation_items) < 5:
             top_escalation_items.append(compact_item)
+        if recovery_status == "recovering" and len(top_recovering_follow_through_items) < 5:
+            top_recovering_follow_through_items.append(compact_item)
+        if recovery_status == "retiring-watch" and len(top_retiring_follow_through_items) < 5:
+            top_retiring_follow_through_items.append(compact_item)
+        if recovery_status == "relapsing" and len(top_relapsing_follow_through_items) < 5:
+            top_relapsing_follow_through_items.append(compact_item)
     status_counts["resolved"] += resolution_trend.get("confirmed_resolved_count", 0)
     follow_through_checkpoint_summary = _follow_through_checkpoint_summary(
         status_counts,
@@ -1428,6 +1462,12 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         escalation_counts,
         top_overdue_follow_through_items,
         top_escalation_items,
+    )
+    follow_through_recovery_summary = _follow_through_recovery_summary(
+        recovery_counts,
+        top_recovering_follow_through_items,
+        top_retiring_follow_through_items,
+        top_relapsing_follow_through_items,
     )
     return {
         "repeat_urgent_count": repeat_urgent_count,
@@ -1442,20 +1482,29 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
             status_counts=status_counts,
             checkpoint_counts=checkpoint_counts,
             escalation_counts=escalation_counts,
+            recovery_counts=recovery_counts,
             top_unattempted_items=top_unattempted_items,
             top_stale_follow_through_items=top_stale_follow_through_items,
             top_overdue_follow_through_items=top_overdue_follow_through_items,
             top_escalation_items=top_escalation_items,
+            top_recovering_follow_through_items=top_recovering_follow_through_items,
+            top_retiring_follow_through_items=top_retiring_follow_through_items,
+            top_relapsing_follow_through_items=top_relapsing_follow_through_items,
         ),
         "follow_through_status_counts": status_counts,
         "follow_through_checkpoint_counts": checkpoint_counts,
         "follow_through_escalation_counts": escalation_counts,
+        "follow_through_recovery_counts": recovery_counts,
         "top_unattempted_items": top_unattempted_items,
         "top_stale_follow_through_items": top_stale_follow_through_items,
         "top_overdue_follow_through_items": top_overdue_follow_through_items,
         "top_escalation_items": top_escalation_items,
+        "top_recovering_follow_through_items": top_recovering_follow_through_items,
+        "top_retiring_follow_through_items": top_retiring_follow_through_items,
+        "top_relapsing_follow_through_items": top_relapsing_follow_through_items,
         "follow_through_checkpoint_summary": follow_through_checkpoint_summary,
         "follow_through_escalation_summary": follow_through_escalation_summary,
+        "follow_through_recovery_summary": follow_through_recovery_summary,
     }
 
 
@@ -2583,6 +2632,18 @@ def _project_queue_follow_through(
             follow_through_escalation_status=follow_through_escalation_status,
             follow_through_escalation_reason=follow_through_escalation_reason,
         )
+        (
+            follow_through_recovery_age_runs,
+            follow_through_recovery_status,
+            follow_through_recovery_reason,
+            follow_through_recovery_summary,
+        ) = _follow_through_recovery_projection(
+            item,
+            prior_matches,
+            follow_through_status=follow_through_status,
+            follow_through_checkpoint_status=follow_through_checkpoint_status,
+            follow_through_escalation_status=follow_through_escalation_status,
+        )
         follow_through_summary = _follow_through_item_summary(
             item,
             memory,
@@ -2604,6 +2665,10 @@ def _project_queue_follow_through(
                 "follow_through_escalation_status": follow_through_escalation_status,
                 "follow_through_escalation_summary": follow_through_escalation_summary,
                 "follow_through_escalation_reason": follow_through_escalation_reason,
+                "follow_through_recovery_age_runs": follow_through_recovery_age_runs,
+                "follow_through_recovery_status": follow_through_recovery_status,
+                "follow_through_recovery_summary": follow_through_recovery_summary,
+                "follow_through_recovery_reason": follow_through_recovery_reason,
             }
         )
     return enriched_queue
@@ -2825,6 +2890,230 @@ def _follow_through_escalation_item_summary(
     if follow_through_escalation_status == "none":
         return f"{label} does not currently need stronger follow-through escalation."
     return f"{label} does not yet have enough timing evidence to support a clearer escalation call."
+
+
+def _follow_through_is_elevated_state(
+    *,
+    follow_through_status: str,
+    follow_through_checkpoint_status: str,
+    follow_through_escalation_status: str,
+) -> bool:
+    return (
+        follow_through_status == "stale-follow-through"
+        or follow_through_checkpoint_status == "overdue"
+        or follow_through_escalation_status in {"nudge", "escalate-now"}
+    )
+
+
+def _follow_through_is_calm_state(
+    *,
+    follow_through_status: str,
+    follow_through_checkpoint_status: str,
+    follow_through_escalation_status: str,
+) -> bool:
+    if follow_through_status == "unknown":
+        return False
+    if follow_through_checkpoint_status == "overdue":
+        return False
+    if follow_through_escalation_status in {"nudge", "escalate-now", "unknown"}:
+        return False
+    return follow_through_checkpoint_status in {"not-due", "due-soon", "satisfied"} or follow_through_status == "resolved"
+
+
+def _follow_through_escalation_level(follow_through_escalation_status: str) -> int:
+    if follow_through_escalation_status == "none":
+        return 0
+    if follow_through_escalation_status in {"watch", "resolved-watch"}:
+        return 1
+    if follow_through_escalation_status == "nudge":
+        return 2
+    if follow_through_escalation_status == "escalate-now":
+        return 3
+    return -1
+
+
+def _follow_through_is_recovery_candidate_state(
+    *,
+    follow_through_status: str,
+    follow_through_checkpoint_status: str,
+    follow_through_escalation_status: str,
+) -> bool:
+    if follow_through_status == "unknown":
+        return False
+    if follow_through_checkpoint_status in {"overdue", "unknown"}:
+        return False
+    return _follow_through_escalation_level(follow_through_escalation_status) >= 0
+
+
+def _follow_through_recovery_projection(
+    item: dict,
+    prior_matches: list[dict],
+    *,
+    follow_through_status: str,
+    follow_through_checkpoint_status: str,
+    follow_through_escalation_status: str,
+) -> tuple[int, str, str, str]:
+    label = _target_label(item)
+    prior_window = list(prior_matches[: HISTORY_WINDOW_RUNS - 1])
+    current_entry = {
+        **item,
+        "follow_through_status": follow_through_status,
+        "follow_through_checkpoint_status": follow_through_checkpoint_status,
+        "follow_through_escalation_status": follow_through_escalation_status,
+    }
+    recent_window = [current_entry, *prior_window]
+    current_is_elevated = _follow_through_is_elevated_state(
+        follow_through_status=follow_through_status,
+        follow_through_checkpoint_status=follow_through_checkpoint_status,
+        follow_through_escalation_status=follow_through_escalation_status,
+    )
+    current_is_calm = _follow_through_is_calm_state(
+        follow_through_status=follow_through_status,
+        follow_through_checkpoint_status=follow_through_checkpoint_status,
+        follow_through_escalation_status=follow_through_escalation_status,
+    )
+    current_is_recovery_candidate = _follow_through_is_recovery_candidate_state(
+        follow_through_status=follow_through_status,
+        follow_through_checkpoint_status=follow_through_checkpoint_status,
+        follow_through_escalation_status=follow_through_escalation_status,
+    )
+    prior_has_follow_through_shape = any(
+        any(
+            prior.get(key) not in {None, ""}
+            for key in (
+                "follow_through_status",
+                "follow_through_checkpoint_status",
+                "follow_through_escalation_status",
+                "follow_through_recovery_status",
+            )
+        )
+        for prior in prior_window[:FOLLOW_THROUGH_RETIREMENT_WINDOW_RUNS]
+    )
+
+    calm_streak = 0
+    for entry in recent_window:
+        entry_status = str(entry.get("follow_through_status", "unknown") or "unknown")
+        entry_checkpoint = str(entry.get("follow_through_checkpoint_status", "unknown") or "unknown")
+        entry_escalation = str(entry.get("follow_through_escalation_status", "unknown") or "unknown")
+        if _follow_through_is_calm_state(
+            follow_through_status=entry_status,
+            follow_through_checkpoint_status=entry_checkpoint,
+            follow_through_escalation_status=entry_escalation,
+        ):
+            calm_streak += 1
+            continue
+        break
+
+    recovery_candidate_streak = 0
+    for entry in recent_window:
+        entry_status = str(entry.get("follow_through_status", "unknown") or "unknown")
+        entry_checkpoint = str(entry.get("follow_through_checkpoint_status", "unknown") or "unknown")
+        entry_escalation = str(entry.get("follow_through_escalation_status", "unknown") or "unknown")
+        if _follow_through_is_recovery_candidate_state(
+            follow_through_status=entry_status,
+            follow_through_checkpoint_status=entry_checkpoint,
+            follow_through_escalation_status=entry_escalation,
+        ):
+            recovery_candidate_streak += 1
+            continue
+        break
+
+    prior_calm_streak = 0
+    for entry in prior_window[:FOLLOW_THROUGH_RETIREMENT_WINDOW_RUNS]:
+        entry_status = str(entry.get("follow_through_status", "unknown") or "unknown")
+        entry_checkpoint = str(entry.get("follow_through_checkpoint_status", "unknown") or "unknown")
+        entry_escalation = str(entry.get("follow_through_escalation_status", "unknown") or "unknown")
+        if _follow_through_is_calm_state(
+            follow_through_status=entry_status,
+            follow_through_checkpoint_status=entry_checkpoint,
+            follow_through_escalation_status=entry_escalation,
+        ):
+            prior_calm_streak += 1
+            continue
+        break
+
+    recent_elevated_index: int | None = None
+    recent_elevated_level = -1
+    for index, entry in enumerate(recent_window[1:], start=1):
+        entry_status = str(entry.get("follow_through_status", "unknown") or "unknown")
+        entry_checkpoint = str(entry.get("follow_through_checkpoint_status", "unknown") or "unknown")
+        entry_escalation = str(entry.get("follow_through_escalation_status", "unknown") or "unknown")
+        if _follow_through_is_elevated_state(
+            follow_through_status=entry_status,
+            follow_through_checkpoint_status=entry_checkpoint,
+            follow_through_escalation_status=entry_escalation,
+        ):
+            recent_elevated_index = index
+            recent_elevated_level = _follow_through_escalation_level(entry_escalation)
+            break
+    has_recent_elevated_context = (
+        recent_elevated_index is not None and recent_elevated_index <= FOLLOW_THROUGH_RETIREMENT_WINDOW_RUNS
+    )
+    current_escalation_level = _follow_through_escalation_level(follow_through_escalation_status)
+
+    if current_is_elevated:
+        prior_has_recent_calm = prior_calm_streak > 0
+        prior_elevated_after_calm = False
+        after_calm_index = prior_calm_streak
+        if prior_has_recent_calm and after_calm_index < len(prior_window):
+            entry = prior_window[after_calm_index]
+            prior_elevated_after_calm = _follow_through_is_elevated_state(
+                follow_through_status=str(entry.get("follow_through_status", "unknown") or "unknown"),
+                follow_through_checkpoint_status=str(entry.get("follow_through_checkpoint_status", "unknown") or "unknown"),
+                follow_through_escalation_status=str(entry.get("follow_through_escalation_status", "unknown") or "unknown"),
+            )
+        if prior_has_recent_calm and prior_elevated_after_calm:
+            reason = (
+                f"{label} had started calming down after earlier escalation, but it has returned to an overdue or escalated state and now counts as a relapse."
+            )
+            return 1, "relapsing", reason, f"{label} is relapsing after a brief calmer period and should stay surfaced until the pressure settles again."
+        if (
+            current_is_recovery_candidate
+            and has_recent_elevated_context
+            and recent_elevated_level > current_escalation_level >= 0
+        ):
+            recovery_age_runs = max(1, min(recovery_candidate_streak, FOLLOW_THROUGH_RETIREMENT_WINDOW_RUNS))
+            reason = (
+                f"{label} was recently escalated more strongly, but the checkpoint is no longer overdue and the escalation has stepped down, so it is actively recovering."
+            )
+            return recovery_age_runs, "recovering", reason, f"{label} is recovering from recent escalation, but the lower-pressure state still needs to hold."
+        return 0, "none", f"{label} is still in active escalation and has not yet started a calmer recovery path.", f"{label} is still in active escalation."
+
+    if current_is_calm and has_recent_elevated_context:
+        recovery_age_runs = max(1, min(calm_streak, FOLLOW_THROUGH_RETIREMENT_WINDOW_RUNS))
+        if follow_through_status == "resolved" or follow_through_checkpoint_status == "satisfied":
+            if calm_streak >= 2:
+                reason = (
+                    f"{label} has stayed calm for {min(calm_streak, FOLLOW_THROUGH_RETIREMENT_WINDOW_RUNS)} consecutive run(s) after recent escalation, so the stronger resurfacing can retire."
+                )
+                return recovery_age_runs, "retired", reason, f"{label} has retired its recent escalation after holding a calmer state across consecutive runs."
+            reason = (
+                f"{label} now looks calm after recent escalation, but it has only one quiet confirmation run so far and should stay on retirement watch."
+            )
+            return recovery_age_runs, "retiring-watch", reason, f"{label} is calmer now, but it needs one more quiet run before the escalation fully retires."
+        reason = (
+            f"{label} was recently escalated, but the checkpoint is no longer overdue and the escalation has stepped down, so it is actively recovering."
+        )
+        return recovery_age_runs, "recovering", reason, f"{label} is recovering from recent escalation, but the lower-pressure state still needs to hold."
+
+    if (
+        current_is_recovery_candidate
+        and has_recent_elevated_context
+        and recent_elevated_level > current_escalation_level >= 0
+    ):
+        recovery_age_runs = max(1, min(recovery_candidate_streak, FOLLOW_THROUGH_RETIREMENT_WINDOW_RUNS))
+        reason = (
+            f"{label} was recently escalated more strongly, but the checkpoint is no longer overdue and the escalation has stepped down, so it is actively recovering."
+        )
+        return recovery_age_runs, "recovering", reason, f"{label} is recovering from recent escalation, but the lower-pressure state still needs to hold."
+
+    if current_is_calm and prior_window and not prior_has_follow_through_shape:
+        reason = (
+            f"{label} looks calmer now, but the older queue snapshots do not have enough follow-through detail to say whether this is a real recovery or a one-run blip."
+        )
+        return 1, "insufficient-evidence", reason, f"{label} may be calming down, but there is not enough earlier follow-through evidence to retire the escalation confidently."
+
+    return 0, "none", f"{label} does not have a recent escalated follow-through path to recover from.", f"{label} does not currently show a recent recovery or escalation-retirement pattern."
 
 
 def _follow_through_item_summary(
@@ -32807,18 +33096,26 @@ def _follow_through_summary(
     status_counts: dict[str, int] | None = None,
     checkpoint_counts: dict[str, int] | None = None,
     escalation_counts: dict[str, int] | None = None,
+    recovery_counts: dict[str, int] | None = None,
     top_unattempted_items: list[dict] | None = None,
     top_stale_follow_through_items: list[dict] | None = None,
     top_overdue_follow_through_items: list[dict] | None = None,
     top_escalation_items: list[dict] | None = None,
+    top_recovering_follow_through_items: list[dict] | None = None,
+    top_retiring_follow_through_items: list[dict] | None = None,
+    top_relapsing_follow_through_items: list[dict] | None = None,
 ) -> str:
     status_counts = status_counts or {}
     checkpoint_counts = checkpoint_counts or {}
     escalation_counts = escalation_counts or {}
+    recovery_counts = recovery_counts or {}
     top_unattempted_items = top_unattempted_items or []
     top_stale_follow_through_items = top_stale_follow_through_items or []
     top_overdue_follow_through_items = top_overdue_follow_through_items or []
     top_escalation_items = top_escalation_items or []
+    top_recovering_follow_through_items = top_recovering_follow_through_items or []
+    top_retiring_follow_through_items = top_retiring_follow_through_items or []
+    top_relapsing_follow_through_items = top_relapsing_follow_through_items or []
     legacy_summary = ""
     if repeat_urgent_count or stale_item_count:
         legacy_summary = (
@@ -32866,6 +33163,27 @@ def _follow_through_summary(
         return (
             f"{escalation_counts.get('escalate-now', 0)} item(s) now need stronger follow-through resurfacing, "
             f"and {label} is the clearest escalation target."
+        )
+    if top_relapsing_follow_through_items:
+        top_item = top_relapsing_follow_through_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_counts.get('relapsing', 0)} item(s) looked calmer before slipping back into active follow-through pressure, "
+            f"and {label} is the clearest relapse hotspot."
+        )
+    if top_retiring_follow_through_items:
+        top_item = top_retiring_follow_through_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_counts.get('retiring-watch', 0)} item(s) now look calmer after recent escalation, "
+            f"and {label} is closest to retiring its stronger resurfacing if the next quiet run holds."
+        )
+    if top_recovering_follow_through_items:
+        top_item = top_recovering_follow_through_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_counts.get('recovering', 0)} item(s) are actively calming down after recent escalation, "
+            f"and {label} is the clearest recovery path to watch."
         )
     if status_counts.get("waiting-on-evidence", 0):
         return (
@@ -32945,6 +33263,41 @@ def _follow_through_escalation_summary(
             f"{escalation_counts.get('resolved-watch', 0)} item(s) look calmer but still need one more quiet run before they can fully fade from follow-through watch."
         )
     return "No stronger follow-through escalation is currently surfaced."
+
+
+def _follow_through_recovery_summary(
+    recovery_counts: dict[str, int],
+    top_recovering_follow_through_items: list[dict],
+    top_retiring_follow_through_items: list[dict],
+    top_relapsing_follow_through_items: list[dict],
+) -> str:
+    if top_relapsing_follow_through_items:
+        top_item = top_relapsing_follow_through_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_counts.get('relapsing', 0)} item(s) relapsed after seeming calmer, and {label} is the clearest place where escalation retirement failed to hold."
+        )
+    if top_retiring_follow_through_items:
+        top_item = top_retiring_follow_through_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_counts.get('retiring-watch', 0)} item(s) are on retirement watch after recent escalation, and {label} is closest to fully retiring if one more quiet run holds."
+        )
+    if top_recovering_follow_through_items:
+        top_item = top_recovering_follow_through_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_counts.get('recovering', 0)} item(s) are actively recovering from recent escalation, and {label} is the clearest calmer-but-still-open handoff."
+        )
+    if recovery_counts.get("retired", 0):
+        return (
+            f"{recovery_counts.get('retired', 0)} item(s) have now held a calm enough state to retire their stronger follow-through escalation."
+        )
+    if recovery_counts.get("insufficient-evidence", 0):
+        return (
+            f"{recovery_counts.get('insufficient-evidence', 0)} item(s) may be calming down, but the recent history is too thin to retire escalation with confidence yet."
+        )
+    return "No follow-through recovery or escalation-retirement signal is currently surfaced."
 
 
 def _handoff_urgency(queue: list[dict], setup_health: dict) -> str:
