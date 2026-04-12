@@ -1481,6 +1481,24 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         "fragile-reacquisition": 0,
         "insufficient-evidence": 0,
     }
+    recovery_reacquisition_durability_counts = {
+        "none": 0,
+        "just-reacquired": 0,
+        "consolidating": 0,
+        "holding-reacquired": 0,
+        "durable-reacquired": 0,
+        "softening": 0,
+        "insufficient-evidence": 0,
+    }
+    recovery_reacquisition_consolidation_counts = {
+        "none": 0,
+        "building-confidence": 0,
+        "holding-confidence": 0,
+        "durable-confidence": 0,
+        "fragile-confidence": 0,
+        "reversing": 0,
+        "insufficient-evidence": 0,
+    }
     top_unattempted_items: list[dict] = []
     top_stale_follow_through_items: list[dict] = []
     top_overdue_follow_through_items: list[dict] = []
@@ -1500,6 +1518,11 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
     top_reacquiring_recovery_items: list[dict] = []
     top_reacquired_recovery_items: list[dict] = []
     top_fragile_reacquisition_items: list[dict] = []
+    top_just_reacquired_items: list[dict] = []
+    top_holding_reacquired_items: list[dict] = []
+    top_durable_reacquired_items: list[dict] = []
+    top_softening_reacquired_items: list[dict] = []
+    top_fragile_reacquisition_confidence_items: list[dict] = []
     for item in queue:
         status = item.get("follow_through_status", "unknown")
         if status not in status_counts:
@@ -1545,6 +1568,20 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         if recovery_reacquisition_status not in recovery_reacquisition_counts:
             recovery_reacquisition_status = "insufficient-evidence"
         recovery_reacquisition_counts[recovery_reacquisition_status] += 1
+        recovery_reacquisition_durability_status = item.get(
+            "follow_through_recovery_reacquisition_durability_status",
+            "none",
+        )
+        if recovery_reacquisition_durability_status not in recovery_reacquisition_durability_counts:
+            recovery_reacquisition_durability_status = "insufficient-evidence"
+        recovery_reacquisition_durability_counts[recovery_reacquisition_durability_status] += 1
+        recovery_reacquisition_consolidation_status = item.get(
+            "follow_through_recovery_reacquisition_consolidation_status",
+            "none",
+        )
+        if recovery_reacquisition_consolidation_status not in recovery_reacquisition_consolidation_counts:
+            recovery_reacquisition_consolidation_status = "insufficient-evidence"
+        recovery_reacquisition_consolidation_counts[recovery_reacquisition_consolidation_status] += 1
         compact_item = {
             "item_id": item.get("item_id", ""),
             "repo": item.get("repo", ""),
@@ -1586,6 +1623,28 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
             "follow_through_recovery_reacquisition_status": recovery_reacquisition_status,
             "follow_through_recovery_reacquisition_summary": item.get("follow_through_recovery_reacquisition_summary", ""),
             "follow_through_recovery_reacquisition_reason": item.get("follow_through_recovery_reacquisition_reason", ""),
+            "follow_through_recovery_reacquisition_durability_age_runs": item.get(
+                "follow_through_recovery_reacquisition_durability_age_runs",
+                0,
+            ),
+            "follow_through_recovery_reacquisition_durability_status": recovery_reacquisition_durability_status,
+            "follow_through_recovery_reacquisition_durability_summary": item.get(
+                "follow_through_recovery_reacquisition_durability_summary",
+                "",
+            ),
+            "follow_through_recovery_reacquisition_durability_reason": item.get(
+                "follow_through_recovery_reacquisition_durability_reason",
+                "",
+            ),
+            "follow_through_recovery_reacquisition_consolidation_status": recovery_reacquisition_consolidation_status,
+            "follow_through_recovery_reacquisition_consolidation_summary": item.get(
+                "follow_through_recovery_reacquisition_consolidation_summary",
+                "",
+            ),
+            "follow_through_recovery_reacquisition_consolidation_reason": item.get(
+                "follow_through_recovery_reacquisition_consolidation_reason",
+                "",
+            ),
         }
         if status == "untouched" and len(top_unattempted_items) < 5:
             top_unattempted_items.append(compact_item)
@@ -1640,6 +1699,31 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
             and len(top_fragile_reacquisition_items) < 5
         ):
             top_fragile_reacquisition_items.append(compact_item)
+        if (
+            recovery_reacquisition_durability_status == "just-reacquired"
+            and len(top_just_reacquired_items) < 5
+        ):
+            top_just_reacquired_items.append(compact_item)
+        if (
+            recovery_reacquisition_durability_status in {"consolidating", "holding-reacquired"}
+            and len(top_holding_reacquired_items) < 5
+        ):
+            top_holding_reacquired_items.append(compact_item)
+        if (
+            recovery_reacquisition_durability_status == "durable-reacquired"
+            and len(top_durable_reacquired_items) < 5
+        ):
+            top_durable_reacquired_items.append(compact_item)
+        if (
+            recovery_reacquisition_durability_status == "softening"
+            and len(top_softening_reacquired_items) < 5
+        ):
+            top_softening_reacquired_items.append(compact_item)
+        if (
+            recovery_reacquisition_consolidation_status in {"fragile-confidence", "reversing"}
+            and len(top_fragile_reacquisition_confidence_items) < 5
+        ):
+            top_fragile_reacquisition_confidence_items.append(compact_item)
     status_counts["resolved"] += resolution_trend.get("confirmed_resolved_count", 0)
     follow_through_checkpoint_summary = _follow_through_checkpoint_summary(
         status_counts,
@@ -1692,6 +1776,20 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         top_reacquired_recovery_items,
         top_fragile_reacquisition_items,
     )
+    follow_through_recovery_reacquisition_durability_summary = _follow_through_reacquisition_durability_summary(
+        recovery_reacquisition_durability_counts,
+        top_just_reacquired_items,
+        top_holding_reacquired_items,
+        top_durable_reacquired_items,
+        top_softening_reacquired_items,
+    )
+    follow_through_recovery_reacquisition_consolidation_summary = _follow_through_reacquisition_consolidation_summary(
+        recovery_reacquisition_consolidation_counts,
+        top_holding_reacquired_items,
+        top_durable_reacquired_items,
+        top_softening_reacquired_items,
+        top_fragile_reacquisition_confidence_items,
+    )
     return {
         "repeat_urgent_count": repeat_urgent_count,
         "stale_item_count": stale_item_count,
@@ -1723,6 +1821,8 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
             recovery_memory_reset_counts=recovery_memory_reset_counts,
             recovery_rebuild_strength_counts=recovery_rebuild_strength_counts,
             recovery_reacquisition_counts=recovery_reacquisition_counts,
+            recovery_reacquisition_durability_counts=recovery_reacquisition_durability_counts,
+            recovery_reacquisition_consolidation_counts=recovery_reacquisition_consolidation_counts,
             top_fresh_recovery_items=top_fresh_recovery_items,
             top_stale_recovery_items=top_stale_recovery_items,
             top_softening_recovery_items=top_softening_recovery_items,
@@ -1732,6 +1832,11 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
             top_reacquiring_recovery_items=top_reacquiring_recovery_items,
             top_reacquired_recovery_items=top_reacquired_recovery_items,
             top_fragile_reacquisition_items=top_fragile_reacquisition_items,
+            top_just_reacquired_items=top_just_reacquired_items,
+            top_holding_reacquired_items=top_holding_reacquired_items,
+            top_durable_reacquired_items=top_durable_reacquired_items,
+            top_softening_reacquired_items=top_softening_reacquired_items,
+            top_fragile_reacquisition_confidence_items=top_fragile_reacquisition_confidence_items,
         ),
         "follow_through_status_counts": status_counts,
         "follow_through_checkpoint_counts": checkpoint_counts,
@@ -1744,6 +1849,8 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         "follow_through_recovery_memory_reset_counts": recovery_memory_reset_counts,
         "follow_through_recovery_rebuild_strength_counts": recovery_rebuild_strength_counts,
         "follow_through_recovery_reacquisition_counts": recovery_reacquisition_counts,
+        "follow_through_recovery_reacquisition_durability_counts": recovery_reacquisition_durability_counts,
+        "follow_through_recovery_reacquisition_consolidation_counts": recovery_reacquisition_consolidation_counts,
         "top_unattempted_items": top_unattempted_items,
         "top_stale_follow_through_items": top_stale_follow_through_items,
         "top_overdue_follow_through_items": top_overdue_follow_through_items,
@@ -1763,6 +1870,11 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         "top_reacquiring_recovery_items": top_reacquiring_recovery_items,
         "top_reacquired_recovery_items": top_reacquired_recovery_items,
         "top_fragile_reacquisition_items": top_fragile_reacquisition_items,
+        "top_just_reacquired_items": top_just_reacquired_items,
+        "top_holding_reacquired_items": top_holding_reacquired_items,
+        "top_durable_reacquired_items": top_durable_reacquired_items,
+        "top_softening_reacquired_items": top_softening_reacquired_items,
+        "top_fragile_reacquisition_confidence_items": top_fragile_reacquisition_confidence_items,
         "follow_through_checkpoint_summary": follow_through_checkpoint_summary,
         "follow_through_escalation_summary": follow_through_escalation_summary,
         "follow_through_recovery_summary": follow_through_recovery_summary,
@@ -1777,6 +1889,8 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
         "follow_through_recovery_memory_reset_summary": follow_through_recovery_memory_reset_summary,
         "follow_through_recovery_rebuild_strength_summary": follow_through_recovery_rebuild_strength_summary,
         "follow_through_recovery_reacquisition_summary": follow_through_recovery_reacquisition_summary,
+        "follow_through_recovery_reacquisition_durability_summary": follow_through_recovery_reacquisition_durability_summary,
+        "follow_through_recovery_reacquisition_consolidation_summary": follow_through_recovery_reacquisition_consolidation_summary,
     }
 
 
@@ -3009,6 +3123,33 @@ def _project_queue_follow_through(
             follow_through_recovery_memory_reset_status=follow_through_recovery_memory_reset_status,
             follow_through_recovery_rebuild_strength_status=follow_through_recovery_rebuild_strength_status,
         )
+        (
+            follow_through_recovery_reacquisition_durability_age_runs,
+            follow_through_recovery_reacquisition_durability_status,
+            follow_through_recovery_reacquisition_durability_reason,
+            follow_through_recovery_reacquisition_durability_summary,
+        ) = _follow_through_reacquisition_durability_projection(
+            item,
+            prior_matches,
+            follow_through_recovery_reacquisition_status=follow_through_recovery_reacquisition_status,
+            follow_through_relapse_churn_status=follow_through_relapse_churn_status,
+            follow_through_recovery_freshness_status=follow_through_recovery_freshness_status,
+            follow_through_recovery_decay_status=follow_through_recovery_decay_status,
+            follow_through_recovery_memory_reset_status=follow_through_recovery_memory_reset_status,
+        )
+        (
+            follow_through_recovery_reacquisition_consolidation_status,
+            follow_through_recovery_reacquisition_consolidation_reason,
+            follow_through_recovery_reacquisition_consolidation_summary,
+        ) = _follow_through_reacquisition_consolidation_projection(
+            item,
+            prior_matches,
+            follow_through_recovery_reacquisition_status=follow_through_recovery_reacquisition_status,
+            follow_through_recovery_reacquisition_durability_status=follow_through_recovery_reacquisition_durability_status,
+            follow_through_relapse_churn_status=follow_through_relapse_churn_status,
+            follow_through_recovery_freshness_status=follow_through_recovery_freshness_status,
+            follow_through_recovery_decay_status=follow_through_recovery_decay_status,
+        )
         follow_through_summary = _follow_through_item_summary(
             item,
             memory,
@@ -3058,6 +3199,13 @@ def _project_queue_follow_through(
                 "follow_through_recovery_reacquisition_status": follow_through_recovery_reacquisition_status,
                 "follow_through_recovery_reacquisition_summary": follow_through_recovery_reacquisition_summary,
                 "follow_through_recovery_reacquisition_reason": follow_through_recovery_reacquisition_reason,
+                "follow_through_recovery_reacquisition_durability_age_runs": follow_through_recovery_reacquisition_durability_age_runs,
+                "follow_through_recovery_reacquisition_durability_status": follow_through_recovery_reacquisition_durability_status,
+                "follow_through_recovery_reacquisition_durability_summary": follow_through_recovery_reacquisition_durability_summary,
+                "follow_through_recovery_reacquisition_durability_reason": follow_through_recovery_reacquisition_durability_reason,
+                "follow_through_recovery_reacquisition_consolidation_status": follow_through_recovery_reacquisition_consolidation_status,
+                "follow_through_recovery_reacquisition_consolidation_summary": follow_through_recovery_reacquisition_consolidation_summary,
+                "follow_through_recovery_reacquisition_consolidation_reason": follow_through_recovery_reacquisition_consolidation_reason,
             }
         )
     return enriched_queue
@@ -3971,6 +4119,137 @@ def _follow_through_recovery_reacquisition_projection(
     if reacquisition_age >= 2:
         return "holding-reacquired", f"{label} re-earned stronger calmer support after reset and has now held that restored posture for {reacquisition_age} consecutive run(s), but it is not fully durable yet.", f"{label} has re-acquired stronger calmer support and it is actively holding."
     return "just-reacquired", f"{label} has just crossed back into stronger calmer support after reset, but it still has only one confirmation run in the re-acquired posture.", f"{label} has only just re-acquired stronger calmer support after reset."
+
+
+def _follow_through_reacquisition_durability_projection(
+    item: dict,
+    prior_matches: list[dict],
+    *,
+    follow_through_recovery_reacquisition_status: str,
+    follow_through_relapse_churn_status: str,
+    follow_through_recovery_freshness_status: str,
+    follow_through_recovery_decay_status: str,
+    follow_through_recovery_memory_reset_status: str,
+) -> tuple[int, str, str, str]:
+    label = _target_label(item)
+    prior_window = list(prior_matches[: HISTORY_WINDOW_RUNS - 1])
+    recent_window = [
+        {
+            **item,
+            "follow_through_recovery_reacquisition_status": follow_through_recovery_reacquisition_status,
+        },
+        *prior_window,
+    ]
+
+    prior_durable_streak = 0
+    for entry in recent_window[1:]:
+        prior_status = str(entry.get("follow_through_recovery_reacquisition_status", "none") or "none")
+        if prior_status in {"just-reacquired", "holding-reacquired", "reacquired"}:
+            prior_durable_streak += 1
+            continue
+        break
+
+    had_recent_reacquisition = any(
+        str(entry.get("follow_through_recovery_reacquisition_status", "none") or "none")
+        in {"just-reacquired", "holding-reacquired", "reacquired", "fragile-reacquisition"}
+        for entry in prior_window
+    )
+    weakening_signal = (
+        follow_through_relapse_churn_status in {"fragile", "churn", "blocked"}
+        or follow_through_recovery_freshness_status in {"mixed-age", "stale"}
+        or follow_through_recovery_decay_status in {"softening", "aging", "fragile-aging", "expired"}
+        or follow_through_recovery_memory_reset_status in {"reset-watch", "resetting", "reset"}
+    )
+
+    if follow_through_recovery_reacquisition_status == "none":
+        return 0, "none", f"{label} does not currently have an active re-acquired calmer posture to judge for durability.", f"{label} is not currently holding a re-acquired calmer posture."
+    if follow_through_recovery_reacquisition_status == "insufficient-evidence":
+        return 1, "insufficient-evidence", f"{label} may be re-acquiring stronger calmer support, but there is not enough history yet to judge whether that restored posture can hold.", f"{label} may be re-acquiring stronger calmer support, but its durability is still unclear."
+    if follow_through_recovery_reacquisition_status == "fragile-reacquisition":
+        age_runs = max(1, prior_durable_streak)
+        if had_recent_reacquisition or weakening_signal:
+            return age_runs, "softening", f"{label} had recently re-acquired stronger calmer support, but the restored posture is already softening under weaker freshness or wobble.", f"{label}'s restored calmer posture is already softening again."
+        return 0, "none", f"{label} is still too fragile to count as actively re-acquired yet.", f"{label} has not reached an actively durable re-acquired posture yet."
+    if follow_through_recovery_reacquisition_status == "reacquiring":
+        if had_recent_reacquisition and weakening_signal:
+            return max(1, prior_durable_streak), "softening", f"{label} was closer to a restored calmer hold earlier, but the current re-acquisition path is softening before it could stabilize.", f"{label}'s re-acquired calmer posture is softening before it can hold."
+        return 0, "none", f"{label} is close to re-acquiring stronger calmer support, but the restored posture is not active enough yet to judge durability.", f"{label} is near reacquisition, but the restored posture is not active enough to judge durability yet."
+
+    if weakening_signal and had_recent_reacquisition:
+        return max(1, prior_durable_streak), "softening", f"{label} still has a re-acquired calmer posture, but mixed-age support or wobble is already softening how trustworthy that restored hold looks.", f"{label} still has a re-acquired calmer posture, but it is already softening again."
+
+    if follow_through_recovery_reacquisition_status == "just-reacquired":
+        return 1, "just-reacquired", f"{label} has only just re-entered stronger calmer support after reset, so the restored posture is still too new to treat as durable.", f"{label} has only just re-acquired stronger calmer support and still needs more confirmation."
+    if follow_through_recovery_reacquisition_status == "holding-reacquired":
+        age_runs = 1 + sum(
+            1
+            for entry in prior_window
+            if str(entry.get("follow_through_recovery_reacquisition_status", "none") or "none")
+            in {"just-reacquired", "holding-reacquired"}
+        )
+        return age_runs, "consolidating", f"{label} has one additional confirming run after re-acquiring stronger calmer support, but the restored posture is still consolidating rather than stable.", f"{label} has re-acquired stronger calmer support and is now consolidating it."
+
+    durability_streak = 1
+    for entry in prior_window:
+        prior_status = str(entry.get("follow_through_recovery_reacquisition_durability_status", "none") or "none")
+        if prior_status in {"holding-reacquired", "durable-reacquired"}:
+            durability_streak += 1
+            continue
+        break
+    if durability_streak >= 3:
+        return durability_streak, "durable-reacquired", f"{label} has kept its restored calmer posture stable for {durability_streak} consecutive durability runs, so that re-acquired support now looks durable enough to trust.", f"{label} now has a durably re-established calmer posture."
+    return durability_streak, "holding-reacquired", f"{label} has moved beyond initial re-acquisition and is now holding the restored calmer posture across {durability_streak} consecutive durability run(s), but it is not durable yet.", f"{label} has re-acquired stronger calmer support and it is now actively holding."
+
+
+def _follow_through_reacquisition_consolidation_projection(
+    item: dict,
+    prior_matches: list[dict],
+    *,
+    follow_through_recovery_reacquisition_status: str,
+    follow_through_recovery_reacquisition_durability_status: str,
+    follow_through_relapse_churn_status: str,
+    follow_through_recovery_freshness_status: str,
+    follow_through_recovery_decay_status: str,
+) -> tuple[str, str, str]:
+    label = _target_label(item)
+    prior_window = list(prior_matches[: HISTORY_WINDOW_RUNS - 1])
+    weakening_signal = (
+        follow_through_relapse_churn_status in {"fragile", "churn", "blocked"}
+        or follow_through_recovery_freshness_status in {"mixed-age", "stale"}
+        or follow_through_recovery_decay_status in {"softening", "aging", "fragile-aging", "expired"}
+    )
+    had_confident_reacquisition = any(
+        str(entry.get("follow_through_recovery_reacquisition_consolidation_status", "none") or "none")
+        in {"holding-confidence", "durable-confidence"}
+        or str(entry.get("follow_through_recovery_reacquisition_durability_status", "none") or "none")
+        in {"holding-reacquired", "durable-reacquired"}
+        for entry in prior_window
+    )
+
+    if follow_through_recovery_reacquisition_status == "none":
+        return "none", f"{label} does not currently have an active re-acquired posture to consolidate.", f"{label} is not currently consolidating restored calmer confidence."
+    if (
+        follow_through_recovery_reacquisition_status == "insufficient-evidence"
+        or follow_through_recovery_reacquisition_durability_status == "insufficient-evidence"
+    ):
+        return "insufficient-evidence", f"{label} may be rebuilding restored calmer support, but the history is still too thin to judge whether that confidence is consolidating.", f"{label} may be rebuilding restored calmer support, but its confidence is still unclear."
+    if weakening_signal and had_confident_reacquisition:
+        return "reversing", f"{label} had started to consolidate restored calmer confidence, but weaker freshness or churn is already pushing that confidence back down.", f"{label}'s restored calmer confidence is already reversing."
+    if (
+        follow_through_recovery_reacquisition_status == "fragile-reacquisition"
+        or follow_through_recovery_reacquisition_durability_status == "softening"
+        or weakening_signal
+    ):
+        return "fragile-confidence", f"{label} technically still has a re-acquired calmer posture, but wobble or aging support makes that restored confidence too fragile to trust strongly.", f"{label}'s restored calmer confidence still looks fragile."
+    if follow_through_recovery_reacquisition_durability_status in {"just-reacquired", "consolidating"}:
+        return "building-confidence", f"{label} has re-acquired stronger calmer support, but the restored confidence is still building and needs another confirming run before it should carry more weight.", f"{label} has re-acquired stronger calmer support, but its restored confidence is still building."
+    if follow_through_recovery_reacquisition_durability_status == "holding-reacquired":
+        return "holding-confidence", f"{label} is holding its re-acquired calmer posture with net-positive support, so restored confidence is now consolidating cleanly.", f"{label}'s restored calmer confidence is now holding."
+    if follow_through_recovery_reacquisition_durability_status == "durable-reacquired":
+        if follow_through_recovery_freshness_status in {"fresh", "holding-fresh"} and follow_through_recovery_decay_status == "none":
+            return "durable-confidence", f"{label} has kept the re-acquired calmer posture durable enough, with fresh enough support behind it, that the restored confidence now looks safely consolidated.", f"{label}'s restored calmer confidence now looks durable."
+        return "holding-confidence", f"{label} has a durable re-acquired posture, but the freshness behind that restored confidence is no longer strong enough to call fully durable.", f"{label}'s restored calmer confidence is holding, but it is not fully durable yet."
+    return "none", f"{label} has not reached a re-acquired posture that needs separate confidence-consolidation guidance yet.", f"{label} does not currently have separate re-acquisition confidence to consolidate."
 
 
 def _follow_through_item_summary(
@@ -33971,6 +34250,8 @@ def _follow_through_summary(
     recovery_memory_reset_counts: dict[str, int] | None = None,
     recovery_rebuild_strength_counts: dict[str, int] | None = None,
     recovery_reacquisition_counts: dict[str, int] | None = None,
+    recovery_reacquisition_durability_counts: dict[str, int] | None = None,
+    recovery_reacquisition_consolidation_counts: dict[str, int] | None = None,
     top_fresh_recovery_items: list[dict] | None = None,
     top_stale_recovery_items: list[dict] | None = None,
     top_softening_recovery_items: list[dict] | None = None,
@@ -33980,6 +34261,11 @@ def _follow_through_summary(
     top_reacquiring_recovery_items: list[dict] | None = None,
     top_reacquired_recovery_items: list[dict] | None = None,
     top_fragile_reacquisition_items: list[dict] | None = None,
+    top_just_reacquired_items: list[dict] | None = None,
+    top_holding_reacquired_items: list[dict] | None = None,
+    top_durable_reacquired_items: list[dict] | None = None,
+    top_softening_reacquired_items: list[dict] | None = None,
+    top_fragile_reacquisition_confidence_items: list[dict] | None = None,
 ) -> str:
     status_counts = status_counts or {}
     checkpoint_counts = checkpoint_counts or {}
@@ -34002,6 +34288,8 @@ def _follow_through_summary(
     recovery_memory_reset_counts = recovery_memory_reset_counts or {}
     recovery_rebuild_strength_counts = recovery_rebuild_strength_counts or {}
     recovery_reacquisition_counts = recovery_reacquisition_counts or {}
+    recovery_reacquisition_durability_counts = recovery_reacquisition_durability_counts or {}
+    recovery_reacquisition_consolidation_counts = recovery_reacquisition_consolidation_counts or {}
     top_fresh_recovery_items = top_fresh_recovery_items or []
     top_stale_recovery_items = top_stale_recovery_items or []
     top_softening_recovery_items = top_softening_recovery_items or []
@@ -34011,6 +34299,11 @@ def _follow_through_summary(
     top_reacquiring_recovery_items = top_reacquiring_recovery_items or []
     top_reacquired_recovery_items = top_reacquired_recovery_items or []
     top_fragile_reacquisition_items = top_fragile_reacquisition_items or []
+    top_just_reacquired_items = top_just_reacquired_items or []
+    top_holding_reacquired_items = top_holding_reacquired_items or []
+    top_durable_reacquired_items = top_durable_reacquired_items or []
+    top_softening_reacquired_items = top_softening_reacquired_items or []
+    top_fragile_reacquisition_confidence_items = top_fragile_reacquisition_confidence_items or []
     legacy_summary = ""
     if repeat_urgent_count or stale_item_count:
         legacy_summary = (
@@ -34100,6 +34393,41 @@ def _follow_through_summary(
         return (
             f"{recovery_memory_reset_counts.get('rebuilding', 0)} item(s) are rebuilding recovery confidence after an earlier reset, "
             f"and {label} is the clearest calmer path that is earning back fresher support."
+        )
+    if top_fragile_reacquisition_confidence_items:
+        top_item = top_fragile_reacquisition_confidence_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_reacquisition_consolidation_counts.get('fragile-confidence', 0) + recovery_reacquisition_consolidation_counts.get('reversing', 0)} item(s) have technically re-acquired calmer support, "
+            f"but {label} is the clearest place where that restored confidence still looks too fragile to trust."
+        )
+    if top_softening_reacquired_items:
+        top_item = top_softening_reacquired_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_reacquisition_durability_counts.get('softening', 0)} re-acquired item(s) are already softening again, "
+            f"and {label} is the clearest restored posture that may step back down soon."
+        )
+    if top_durable_reacquired_items:
+        top_item = top_durable_reacquired_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_reacquisition_durability_counts.get('durable-reacquired', 0)} item(s) now have a re-acquired calmer posture that is holding durably, "
+            f"and {label} is the clearest restored path you can trust more strongly."
+        )
+    if top_holding_reacquired_items:
+        top_item = top_holding_reacquired_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_reacquisition_durability_counts.get('consolidating', 0) + recovery_reacquisition_durability_counts.get('holding-reacquired', 0)} re-acquired item(s) are actively consolidating, "
+            f"and {label} is the clearest restored path that is now holding."
+        )
+    if top_just_reacquired_items:
+        top_item = top_just_reacquired_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_reacquisition_durability_counts.get('just-reacquired', 0)} item(s) have only just re-acquired stronger calmer support, "
+            f"and {label} is the clearest newly restored path that still needs more proof."
         )
     if top_fragile_reacquisition_items:
         top_item = top_fragile_reacquisition_items[0]
@@ -34475,6 +34803,82 @@ def _follow_through_recovery_reacquisition_summary(
             f"{recovery_reacquisition_counts.get('insufficient-evidence', 0)} item(s) may be rebuilding after reset, but there is not enough history yet to judge whether stronger calmer support has really been re-acquired."
         )
     return "No follow-through recovery reacquisition signal is currently surfaced."
+
+
+def _follow_through_reacquisition_durability_summary(
+    recovery_reacquisition_durability_counts: dict[str, int],
+    top_just_reacquired_items: list[dict],
+    top_holding_reacquired_items: list[dict],
+    top_durable_reacquired_items: list[dict],
+    top_softening_reacquired_items: list[dict],
+) -> str:
+    if top_softening_reacquired_items:
+        top_item = top_softening_reacquired_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_reacquisition_durability_counts.get('softening', 0)} re-acquired item(s) are already weakening again, and {label} is the clearest restored calmer posture that is softening before it can be trusted as stable."
+        )
+    if top_durable_reacquired_items:
+        top_item = top_durable_reacquired_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_reacquisition_durability_counts.get('durable-reacquired', 0)} item(s) now have a durably re-established calmer posture, and {label} is the clearest durable example."
+        )
+    if top_holding_reacquired_items:
+        top_item = top_holding_reacquired_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_reacquisition_durability_counts.get('consolidating', 0) + recovery_reacquisition_durability_counts.get('holding-reacquired', 0)} item(s) are now consolidating or holding their restored calmer posture, and {label} is the clearest active durability path."
+        )
+    if top_just_reacquired_items:
+        top_item = top_just_reacquired_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_reacquisition_durability_counts.get('just-reacquired', 0)} item(s) only just re-acquired stronger calmer support, and {label} is the clearest restored posture that is still too new to trust."
+        )
+    if recovery_reacquisition_durability_counts.get("insufficient-evidence", 0):
+        return (
+            f"{recovery_reacquisition_durability_counts.get('insufficient-evidence', 0)} item(s) may be re-acquiring stronger calmer support, but there is not enough history yet to judge durability."
+        )
+    return "No follow-through reacquisition durability signal is currently surfaced."
+
+
+def _follow_through_reacquisition_consolidation_summary(
+    recovery_reacquisition_consolidation_counts: dict[str, int],
+    top_holding_reacquired_items: list[dict],
+    top_durable_reacquired_items: list[dict],
+    top_softening_reacquired_items: list[dict],
+    top_fragile_reacquisition_confidence_items: list[dict],
+) -> str:
+    if top_fragile_reacquisition_confidence_items:
+        top_item = top_fragile_reacquisition_confidence_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_reacquisition_consolidation_counts.get('fragile-confidence', 0) + recovery_reacquisition_consolidation_counts.get('reversing', 0)} item(s) have restored calmer confidence that still looks fragile or is already reversing, and {label} is the clearest weak-consolidation hotspot."
+        )
+    if top_durable_reacquired_items:
+        top_item = top_durable_reacquired_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_reacquisition_consolidation_counts.get('durable-confidence', 0)} item(s) now have restored calmer confidence that looks durably consolidated, and {label} is the clearest high-trust restored path."
+        )
+    if top_holding_reacquired_items:
+        top_item = top_holding_reacquired_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_reacquisition_consolidation_counts.get('building-confidence', 0) + recovery_reacquisition_consolidation_counts.get('holding-confidence', 0)} item(s) are actively consolidating restored calmer confidence, and {label} is the clearest path that is now holding."
+        )
+    if top_softening_reacquired_items:
+        top_item = top_softening_reacquired_items[0]
+        label = _target_label(top_item)
+        return (
+            f"{recovery_reacquisition_consolidation_counts.get('reversing', 0)} item(s) had started to consolidate restored calmer confidence, but {label} is the clearest path already stepping back down."
+        )
+    if recovery_reacquisition_consolidation_counts.get("insufficient-evidence", 0):
+        return (
+            f"{recovery_reacquisition_consolidation_counts.get('insufficient-evidence', 0)} item(s) may have restored calmer confidence building, but the recent evidence is still too thin to judge consolidation."
+        )
+    return "No follow-through reacquisition confidence-consolidation signal is currently surfaced."
 
 
 def _handoff_urgency(queue: list[dict], setup_health: dict) -> str:

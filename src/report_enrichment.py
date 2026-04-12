@@ -42,6 +42,8 @@ NO_FOLLOW_THROUGH_RECOVERY_DECAY = "No follow-through recovery freshness-decay s
 NO_FOLLOW_THROUGH_RECOVERY_MEMORY_RESET = "No follow-through recovery memory reset signal is currently surfaced."
 NO_FOLLOW_THROUGH_RECOVERY_REBUILD_STRENGTH = "No follow-through recovery rebuild-strength signal is currently surfaced."
 NO_FOLLOW_THROUGH_RECOVERY_REACQUISITION = "No follow-through recovery reacquisition signal is currently surfaced."
+NO_FOLLOW_THROUGH_REACQUISITION_DURABILITY = "No follow-through reacquisition durability signal is currently surfaced."
+NO_FOLLOW_THROUGH_REACQUISITION_CONSOLIDATION = "No follow-through reacquisition confidence-consolidation signal is currently surfaced."
 
 
 def _metadata(audit: Any) -> dict[str, Any]:
@@ -358,6 +360,10 @@ def build_repo_briefing(
     follow_through_recovery_rebuild_strength_summary = build_follow_through_recovery_rebuild_strength_summary(handoff_source)
     follow_through_recovery_reacquisition = build_follow_through_recovery_reacquisition_status_label(handoff_source)
     follow_through_recovery_reacquisition_summary = build_follow_through_recovery_reacquisition_summary(handoff_source)
+    follow_through_reacquisition_durability = build_follow_through_reacquisition_durability_status_label(handoff_source)
+    follow_through_reacquisition_durability_summary = build_follow_through_reacquisition_durability_summary(handoff_source)
+    follow_through_reacquisition_consolidation = build_follow_through_reacquisition_consolidation_status_label(handoff_source)
+    follow_through_reacquisition_consolidation_summary = build_follow_through_reacquisition_consolidation_summary(handoff_source)
     follow_through_resurfacing_reason = build_follow_through_resurfacing_reason(handoff_source)
     return {
         "repo": repo_name,
@@ -410,6 +416,10 @@ def build_repo_briefing(
             "recovery_rebuild_strength_summary": follow_through_recovery_rebuild_strength_summary,
             "recovery_reacquisition": follow_through_recovery_reacquisition,
             "recovery_reacquisition_summary": follow_through_recovery_reacquisition_summary,
+            "reacquisition_durability": follow_through_reacquisition_durability,
+            "reacquisition_durability_summary": follow_through_reacquisition_durability_summary,
+            "reacquisition_confidence": follow_through_reacquisition_consolidation,
+            "reacquisition_confidence_summary": follow_through_reacquisition_consolidation_summary,
             "what_would_count_as_progress": follow_through_checkpoint,
         },
         "what_to_do_next_line": f"{recommended_action} {next_best_action_rationale}".strip(),
@@ -425,6 +435,8 @@ def build_repo_briefing(
         "recovery_memory_reset_line": f"{follow_through_recovery_memory_reset}: {follow_through_recovery_memory_reset_summary}",
         "recovery_rebuild_strength_line": f"{follow_through_recovery_rebuild_strength}: {follow_through_recovery_rebuild_strength_summary}",
         "recovery_reacquisition_line": f"{follow_through_recovery_reacquisition}: {follow_through_recovery_reacquisition_summary}",
+        "reacquisition_durability_line": f"{follow_through_reacquisition_durability}: {follow_through_reacquisition_durability_summary}",
+        "reacquisition_confidence_line": f"{follow_through_reacquisition_consolidation}: {follow_through_reacquisition_consolidation_summary}",
         "resurfacing_reason_line": follow_through_resurfacing_reason,
     }
 
@@ -496,6 +508,10 @@ def build_weekly_review_pack(
                 "follow_through_recovery_rebuild_strength_summary": build_follow_through_recovery_rebuild_strength_summary(mapped),
                 "follow_through_recovery_reacquisition": build_follow_through_recovery_reacquisition_status_label(mapped),
                 "follow_through_recovery_reacquisition_summary": build_follow_through_recovery_reacquisition_summary(mapped),
+                "follow_through_reacquisition_durability": build_follow_through_reacquisition_durability_status_label(mapped),
+                "follow_through_reacquisition_durability_summary": build_follow_through_reacquisition_durability_summary(mapped),
+                "follow_through_reacquisition_confidence": build_follow_through_reacquisition_consolidation_status_label(mapped),
+                "follow_through_reacquisition_confidence_summary": build_follow_through_reacquisition_consolidation_summary(mapped),
             }
         )
     top_recommendation = build_top_recommendation_summary(data)
@@ -544,6 +560,14 @@ def build_weekly_review_pack(
             operator_summary.get("follow_through_recovery_reacquisition_summary")
             or NO_FOLLOW_THROUGH_RECOVERY_REACQUISITION
         ),
+        "follow_through_reacquisition_durability_summary": str(
+            operator_summary.get("follow_through_recovery_reacquisition_durability_summary")
+            or NO_FOLLOW_THROUGH_REACQUISITION_DURABILITY
+        ),
+        "follow_through_reacquisition_consolidation_summary": str(
+            operator_summary.get("follow_through_recovery_reacquisition_consolidation_summary")
+            or NO_FOLLOW_THROUGH_REACQUISITION_CONSOLIDATION
+        ),
         "top_unattempted_items": list(operator_summary.get("top_unattempted_items") or []),
         "top_stale_follow_through_items": list(operator_summary.get("top_stale_follow_through_items") or []),
         "top_overdue_follow_through_items": list(operator_summary.get("top_overdue_follow_through_items") or []),
@@ -563,6 +587,11 @@ def build_weekly_review_pack(
         "top_reacquiring_recovery_items": list(operator_summary.get("top_reacquiring_recovery_items") or []),
         "top_reacquired_recovery_items": list(operator_summary.get("top_reacquired_recovery_items") or []),
         "top_fragile_reacquisition_items": list(operator_summary.get("top_fragile_reacquisition_items") or []),
+        "top_just_reacquired_items": list(operator_summary.get("top_just_reacquired_items") or []),
+        "top_holding_reacquired_items": list(operator_summary.get("top_holding_reacquired_items") or []),
+        "top_durable_reacquired_items": list(operator_summary.get("top_durable_reacquired_items") or []),
+        "top_softening_reacquired_items": list(operator_summary.get("top_softening_reacquired_items") or []),
+        "top_fragile_reacquisition_confidence_items": list(operator_summary.get("top_fragile_reacquisition_confidence_items") or []),
     }
 
 
@@ -666,6 +695,14 @@ def no_follow_through_recovery_rebuild_strength() -> str:
 
 def no_follow_through_recovery_reacquisition() -> str:
     return NO_FOLLOW_THROUGH_RECOVERY_REACQUISITION
+
+
+def no_follow_through_reacquisition_durability() -> str:
+    return NO_FOLLOW_THROUGH_REACQUISITION_DURABILITY
+
+
+def no_follow_through_reacquisition_consolidation() -> str:
+    return NO_FOLLOW_THROUGH_REACQUISITION_CONSOLIDATION
 
 
 def build_follow_through_status_label(value: Any) -> str:
@@ -886,6 +923,61 @@ def build_follow_through_recovery_reacquisition_summary(value: Any) -> str:
     return str(
         mapped.get("follow_through_recovery_reacquisition_summary")
         or NO_FOLLOW_THROUGH_RECOVERY_REACQUISITION
+    )
+
+
+def build_follow_through_reacquisition_durability_status_label(value: Any) -> str:
+    mapped = _mapping(value)
+    status = str(
+        mapped.get("follow_through_recovery_reacquisition_durability_status", value if isinstance(value, str) else "")
+        or "none"
+    )
+    labels = {
+        "none": "None",
+        "just-reacquired": "Just Reacquired",
+        "consolidating": "Consolidating",
+        "holding-reacquired": "Holding Reacquired",
+        "durable-reacquired": "Durable Reacquired",
+        "softening": "Softening",
+        "insufficient-evidence": "Insufficient Evidence",
+    }
+    return labels.get(status, status.replace("-", " ").title())
+
+
+def build_follow_through_reacquisition_durability_summary(value: Any) -> str:
+    mapped = _mapping(value)
+    return str(
+        mapped.get("follow_through_recovery_reacquisition_durability_summary")
+        or NO_FOLLOW_THROUGH_REACQUISITION_DURABILITY
+    )
+
+
+def build_follow_through_reacquisition_consolidation_status_label(value: Any) -> str:
+    mapped = _mapping(value)
+    status = str(
+        mapped.get(
+            "follow_through_recovery_reacquisition_consolidation_status",
+            value if isinstance(value, str) else "",
+        )
+        or "none"
+    )
+    labels = {
+        "none": "None",
+        "building-confidence": "Building Confidence",
+        "holding-confidence": "Holding Confidence",
+        "durable-confidence": "Durable Confidence",
+        "fragile-confidence": "Fragile Confidence",
+        "reversing": "Reversing",
+        "insufficient-evidence": "Insufficient Evidence",
+    }
+    return labels.get(status, status.replace("-", " ").title())
+
+
+def build_follow_through_reacquisition_consolidation_summary(value: Any) -> str:
+    mapped = _mapping(value)
+    return str(
+        mapped.get("follow_through_recovery_reacquisition_consolidation_summary")
+        or NO_FOLLOW_THROUGH_REACQUISITION_CONSOLIDATION
     )
 
 
