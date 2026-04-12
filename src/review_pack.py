@@ -50,8 +50,24 @@ def export_review_pack(
         _w(f"- [{item.get('lane', 'ready')}] {item.get('repo', 'Portfolio')}: {item.get('title', 'Operator attention item')}")
         _w(f"  Why: {item.get('why', 'Operator pressure is active.')}")
         _w(f"  Action: {item.get('next_step', 'Review the latest state.')}")
+        _w(
+            f"  Follow-Through: {item.get('follow_through_status', 'Unknown')} — "
+            f"{item.get('follow_through_summary', 'No follow-through evidence is recorded yet.')}"
+        )
+        _w(f"  Next Checkpoint: {item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
     if not weekly_pack.get("top_attention"):
         _w("- No urgent attention items are currently surfaced.")
+    _w("")
+    _w("### Review-to-Action Follow-Through")
+    _w("")
+    _w(f"- Summary: {weekly_pack.get('follow_through_summary', 'No follow-through evidence is recorded yet.')}")
+    _w(f"- Next Checkpoint: {weekly_pack.get('follow_through_checkpoint_summary', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
+    for item in weekly_pack.get("top_unattempted_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        _w(f"- Untouched: {label} — {item.get('follow_through_summary', 'No follow-through evidence is recorded yet.')}")
+    for item in weekly_pack.get("top_stale_follow_through_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        _w(f"- Stale: {label} — {item.get('follow_through_summary', 'No follow-through evidence is recorded yet.')}")
     _w("")
     _w("### Top Repo Drilldowns")
     _w("")
@@ -61,6 +77,8 @@ def export_review_pack(
         _w(f"  What Changed: {briefing.get('what_changed_line', 'No change summary is recorded yet.')}")
         _w(f"  Why It Matters: {briefing.get('why_it_matters_line', 'No explanation summary is recorded yet.')}")
         _w(f"  What To Do Next: {briefing.get('what_to_do_next_line', 'No next action is recorded yet.')}")
+        _w(f"  Follow-Through: {briefing.get('follow_through_line', 'No follow-through evidence is recorded yet.')}")
+        _w(f"  What Would Count As Progress: {briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
     _w("")
 
     operator_summary = report_data.get("operator_summary", {})

@@ -826,6 +826,8 @@ class TestAnalystWorkbookSheets:
         assert ws["E13"].value == "Why This Repo Looks This Way"
         assert ws["F20"].value == "What Changed"
         assert ws["F25"].value == "What To Do Next"
+        assert ws["F28"].value == "Follow-Through Status"
+        assert ws["F29"].value == "Follow-Through Summary"
         assert ws["A4"].value == "Select Repo"
         assert ws["B4"].value == "RepoA"
         assert ws.data_validations.dataValidation
@@ -866,7 +868,8 @@ class TestAnalystWorkbookSheets:
         assert "Unknown" in str(ws["E6"].value)
         assert "No description recorded yet." in str(ws["B11"].value)
         assert "No briefing detail recorded yet." in str(ws["F18"].value)
-        assert "No action candidate recorded yet." in str(ws["G26"].value)
+        assert "Unknown" in str(ws["G28"].value)
+        assert "No clear next action is recorded yet." in str(ws["G26"].value)
 
     def test_run_changes_surfaces_summary(self):
         wb = Workbook()
@@ -898,7 +901,13 @@ class TestAnalystWorkbookSheets:
         header_row = next(row for row in range(20, 80) if ws.cell(row=row, column=1).value == "Repo")
         assert header_row > 24
         assert ws.freeze_panes == f"A{header_row + 1}"
+        assert ws.cell(row=header_row, column=9).value == "Follow-Through"
+        assert ws.cell(row=header_row, column=10).value == "Next Checkpoint"
         assert no_linked_artifact_summary() in {
+            ws.cell(row=row, column=11).value
+            for row in range(header_row + 1, header_row + 10)
+        }
+        assert "No follow-through evidence is recorded yet." in {
             ws.cell(row=row, column=9).value
             for row in range(header_row + 1, header_row + 10)
         }
@@ -1388,7 +1397,7 @@ class TestWorkbookModes:
         wb = load_workbook(output)
         ws = wb["Review Queue"]
         header_row = next(row for row in range(20, 70) if ws.cell(row=row, column=1).value == "Repo")
-        assert ws.auto_filter.ref == f"A{header_row}:J{header_row + 1}"
+        assert ws.auto_filter.ref == f"A{header_row}:L{header_row + 1}"
         assert not ws.tables
 
     def test_visible_sheets_use_filters_while_hidden_data_sheets_keep_tables(self, tmp_path):

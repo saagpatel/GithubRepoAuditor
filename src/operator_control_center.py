@@ -343,7 +343,14 @@ def build_operator_snapshot(
         confidence_calibration=confidence_calibration,
         current_generated_at=report_data.get("generated_at", ""),
     )
-    follow_through = _build_follow_through(resolution_trend)
+    queue = _project_queue_follow_through(
+        queue,
+        recent_runs=[_snapshot_from_queue(queue, generated_at=report_data.get("generated_at", ""))]
+        + [_snapshot_from_history(entry) for entry in history[: HISTORY_WINDOW_RUNS - 1]],
+        resolution_trend=resolution_trend,
+        current_generated_at=report_data.get("generated_at", ""),
+    )
+    follow_through = _build_follow_through_with_queue(resolution_trend, queue)
     raw_next_action = _next_operator_action(
         resolution_trend.get("primary_target") or (queue[0] if queue else {}),
         watch_guidance,
@@ -399,6 +406,10 @@ def build_operator_snapshot(
         "oldest_open_item_days": follow_through["oldest_open_item_days"],
         "quiet_streak_runs": follow_through["quiet_streak_runs"],
         "follow_through_summary": follow_through["follow_through_summary"],
+        "follow_through_status_counts": follow_through["follow_through_status_counts"],
+        "top_unattempted_items": follow_through["top_unattempted_items"],
+        "top_stale_follow_through_items": follow_through["top_stale_follow_through_items"],
+        "follow_through_checkpoint_summary": follow_through["follow_through_checkpoint_summary"],
         "trend_status": resolution_trend["trend_status"],
         "new_attention_count": resolution_trend["new_attention_count"],
         "resolved_attention_count": resolution_trend["resolved_attention_count"],
@@ -1330,11 +1341,49 @@ def _build_operator_handoff(
 
 
 def _build_follow_through(resolution_trend: dict) -> dict:
+    return _build_follow_through_with_queue(resolution_trend, [])
+
+
+def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) -> dict:
     resolution_targets = resolution_trend.get("resolution_targets", [])
     repeat_urgent_count = sum(1 for item in resolution_targets if item.get("repeat_urgent"))
     stale_item_count = sum(1 for item in resolution_targets if item.get("stale"))
     oldest_open_item_days = max((item.get("age_days", 0) for item in resolution_targets), default=0)
     quiet_streak_runs = resolution_trend.get("quiet_streak_runs", 0)
+    status_counts = {
+        "untouched": 0,
+        "attempted": 0,
+        "waiting-on-evidence": 0,
+        "stale-follow-through": 0,
+        "resolved": 0,
+        "unknown": 0,
+    }
+    top_unattempted_items: list[dict] = []
+    top_stale_follow_through_items: list[dict] = []
+    for item in queue:
+        status = item.get("follow_through_status", "unknown")
+        if status not in status_counts:
+            status = "unknown"
+        status_counts[status] += 1
+        compact_item = {
+            "item_id": item.get("item_id", ""),
+            "repo": item.get("repo", ""),
+            "title": item.get("title", ""),
+            "lane": item.get("lane", ""),
+            "follow_through_status": status,
+            "follow_through_summary": item.get("follow_through_summary", ""),
+            "follow_through_next_checkpoint": item.get("follow_through_next_checkpoint", ""),
+        }
+        if status == "untouched" and len(top_unattempted_items) < 5:
+            top_unattempted_items.append(compact_item)
+        if status == "stale-follow-through" and len(top_stale_follow_through_items) < 5:
+            top_stale_follow_through_items.append(compact_item)
+    status_counts["resolved"] += resolution_trend.get("confirmed_resolved_count", 0)
+    follow_through_checkpoint_summary = _follow_through_checkpoint_summary(
+        status_counts,
+        top_unattempted_items,
+        top_stale_follow_through_items,
+    )
     return {
         "repeat_urgent_count": repeat_urgent_count,
         "stale_item_count": stale_item_count,
@@ -1345,7 +1394,14 @@ def _build_follow_through(resolution_trend: dict) -> dict:
             stale_item_count,
             oldest_open_item_days,
             quiet_streak_runs,
+            status_counts=status_counts,
+            top_unattempted_items=top_unattempted_items,
+            top_stale_follow_through_items=top_stale_follow_through_items,
         ),
+        "follow_through_status_counts": status_counts,
+        "top_unattempted_items": top_unattempted_items,
+        "top_stale_follow_through_items": top_stale_follow_through_items,
+        "follow_through_checkpoint_summary": follow_through_checkpoint_summary,
     }
 
 
@@ -2292,6 +2348,7 @@ def _build_resolution_trend(
         "reopened_after_resolution_count": decision_memory["reopened_after_resolution_count"],
         "decision_memory_window_runs": decision_memory["decision_memory_window_runs"],
         "resolution_evidence_summary": decision_memory["resolution_evidence_summary"],
+        "decision_memory_map": decision_memory_map,
     }
 
 
@@ -2397,6 +2454,215 @@ def _resolution_targets(
     targets = [_with_confidence(target, confidence_calibration) for target in targets]
     targets.sort(key=_resolution_target_sort_key)
     return targets
+
+
+def _project_queue_follow_through(
+    queue: list[dict],
+    *,
+    recent_runs: list[dict],
+    resolution_trend: dict,
+    current_generated_at: str,
+) -> list[dict]:
+    recent_runs = [snapshot for snapshot in recent_runs if snapshot.get("items") or snapshot.get("has_attention") is not None]
+    decision_memory_map = resolution_trend.get("decision_memory_map") or {}
+    resolution_targets = {
+        _queue_identity(item): item for item in resolution_trend.get("resolution_targets", []) or []
+    }
+    enriched_queue: list[dict] = []
+    for item in queue:
+        key = _queue_identity(item)
+        memory = decision_memory_map.get(key, {})
+        target = resolution_targets.get(key, {})
+        latest_event = memory.get("last_intervention") or {}
+        previous_match = recent_runs[1]["items"].get(key) if len(recent_runs) > 1 else None
+        prior_matches = [
+            snapshot.get("items", {}).get(key)
+            for snapshot in recent_runs[1:]
+            if snapshot.get("items", {}).get(key)
+        ]
+        earliest_age_days = max(
+            [int(item.get("age_days", 0) or 0)]
+            + [int((match or {}).get("age_days", 0) or 0) for match in prior_matches],
+            default=int(item.get("age_days", 0) or 0),
+        )
+        appearance_count = 1 + len(prior_matches)
+        attention_appearances = sum(
+            1
+            for snapshot in recent_runs
+            if (snapshot.get("items", {}).get(key) or {}).get("lane") in ATTENTION_LANES
+        )
+        follow_through_status = _queue_item_follow_through_status(
+            item,
+            memory,
+            previous_match=previous_match,
+            appearance_count=appearance_count,
+            attention_appearances=attention_appearances,
+            earliest_age_days=earliest_age_days,
+            current_generated_at=current_generated_at,
+        )
+        follow_through_last_touch = _follow_through_last_touch_label(item, memory)
+        follow_through_evidence_hint = _follow_through_evidence_hint(item, memory)
+        follow_through_next_checkpoint = _follow_through_next_checkpoint(
+            item,
+            memory,
+            follow_through_status=follow_through_status,
+        )
+        follow_through_summary = _follow_through_item_summary(
+            item,
+            memory,
+            follow_through_status=follow_through_status,
+            follow_through_last_touch=follow_through_last_touch,
+            follow_through_next_checkpoint=follow_through_next_checkpoint,
+            follow_through_evidence_hint=follow_through_evidence_hint,
+        )
+        enriched_queue.append(
+            {
+                **item,
+                "follow_through_status": follow_through_status,
+                "follow_through_summary": follow_through_summary,
+                "follow_through_last_touch": follow_through_last_touch,
+                "follow_through_next_checkpoint": follow_through_next_checkpoint,
+                "follow_through_evidence_hint": follow_through_evidence_hint,
+            }
+        )
+    return enriched_queue
+
+
+def _queue_item_follow_through_status(
+    item: dict,
+    memory: dict,
+    *,
+    previous_match: dict | None,
+    appearance_count: int,
+    attention_appearances: int,
+    earliest_age_days: int,
+    current_generated_at: str,
+) -> str:
+    if not item.get("title") and not item.get("summary"):
+        return "unknown"
+    latest_event = memory.get("last_intervention") or {}
+    has_intervention = _has_follow_through_intervention(latest_event)
+    lane = item.get("lane", "")
+    last_outcome = memory.get("last_outcome", "no-change")
+    decision_memory_status = memory.get("decision_memory_status", "new")
+    aging_status = item.get("aging_status") or _aging_status(appearance_count, earliest_age_days)
+    stale_signal = item.get("newly_stale") or aging_status in {"stale", "chronic"} or earliest_age_days > 7 or appearance_count >= 3
+    if not item.get("source_run_id") and not has_intervention and not previous_match:
+        return "unknown"
+    if has_intervention and (
+        lane == "deferred"
+        or (
+            previous_match
+            and _lane_pressure(lane) >= 0
+            and _lane_pressure(lane) < _lane_pressure(previous_match.get("lane"))
+        )
+    ):
+        return "resolved"
+    if has_intervention and not stale_signal and _is_recent_follow_through(latest_event, current_generated_at):
+        return "waiting-on-evidence"
+    if stale_signal and (has_intervention or decision_memory_status in {"attempted", "persisting"}):
+        return "stale-follow-through"
+    if has_intervention:
+        return "attempted"
+    if stale_signal or (decision_memory_status == "persisting" and attention_appearances >= 2):
+        return "stale-follow-through"
+    if decision_memory_status in {"reopened", "new", "persisting"} or attention_appearances >= 1:
+        return "untouched"
+    if last_outcome in {"improved", "quieted"}:
+        return "waiting-on-evidence"
+    return "unknown"
+
+
+def _has_follow_through_intervention(event: dict | None) -> bool:
+    if not event:
+        return False
+    return any(event.get(key) for key in ("recorded_at", "event_type", "outcome", "item_id", "title"))
+
+
+def _parse_iso_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _is_recent_follow_through(event: dict, current_generated_at: str) -> bool:
+    recorded_at = _parse_iso_datetime(event.get("recorded_at"))
+    current_generated = _parse_iso_datetime(current_generated_at)
+    if not recorded_at or not current_generated:
+        return False
+    return abs((current_generated - recorded_at).days) <= 3
+
+
+def _follow_through_last_touch_label(item: dict, memory: dict) -> str:
+    latest_event = memory.get("last_intervention") or {}
+    recorded_at = (latest_event.get("recorded_at") or "")[:10]
+    if recorded_at:
+        return f"Follow-up recorded {recorded_at}"
+    last_seen_at = (memory.get("last_seen_at") or "")[:10]
+    if last_seen_at:
+        return f"Still visible as of {last_seen_at}"
+    source_run_id = item.get("source_run_id", "")
+    if source_run_id:
+        return f"First surfaced in {str(source_run_id).split(':')[-1][:10]}"
+    return "No recorded follow-up yet."
+
+
+def _follow_through_evidence_hint(item: dict, memory: dict) -> str:
+    evidence = memory.get("resolution_evidence", "")
+    if evidence:
+        return evidence
+    if item.get("summary"):
+        return str(item.get("summary"))
+    return "No follow-through evidence is recorded yet."
+
+
+def _follow_through_next_checkpoint(
+    item: dict,
+    memory: dict,
+    *,
+    follow_through_status: str,
+) -> str:
+    recommended_action = item.get("recommended_action") or "Review the latest state."
+    if follow_through_status == "untouched":
+        return f"Take the recommended action next and record a visible follow-up after: {recommended_action}"
+    if follow_through_status == "attempted":
+        return "Check the next run or linked artifact to see whether the item drops in pressure or leaves the queue."
+    if follow_through_status == "waiting-on-evidence":
+        return "Wait for the next run or linked artifact update to confirm whether the recent follow-up actually moved the pressure."
+    if follow_through_status == "stale-follow-through":
+        return "Escalate, explicitly close, or reframe this item if the next review still shows no meaningful movement."
+    if follow_through_status == "resolved":
+        return "Keep this on watch until the quieter state holds for another run."
+    evidence = memory.get("resolution_evidence", "")
+    if evidence:
+        return f"Review the latest evidence before changing the next action: {evidence}"
+    return "Review the latest history or artifact before assuming this item moved."
+
+
+def _follow_through_item_summary(
+    item: dict,
+    memory: dict,
+    *,
+    follow_through_status: str,
+    follow_through_last_touch: str,
+    follow_through_next_checkpoint: str,
+    follow_through_evidence_hint: str,
+) -> str:
+    label = _target_label(item)
+    if follow_through_status == "untouched":
+        return f"{label} is still surfaced with no recorded follow-up yet. {follow_through_last_touch}."
+    if follow_through_status == "attempted":
+        return f"{label} has recorded follow-up, but the pressure is still active. {follow_through_evidence_hint}"
+    if follow_through_status == "waiting-on-evidence":
+        return f"{label} has recent follow-up recorded and is now waiting for confirming evidence. {follow_through_next_checkpoint}"
+    if follow_through_status == "stale-follow-through":
+        return f"{label} has stayed open long enough that the follow-through now looks stale. {follow_through_last_touch}."
+    if follow_through_status == "resolved":
+        return f"{label} looks calmer after follow-through and is now in a lower-pressure state. {follow_through_next_checkpoint}"
+    return f"{label} does not have enough follow-through evidence yet to classify cleanly."
 
 
 def _with_confidence(item: dict, confidence_calibration: dict) -> dict:
@@ -32352,17 +32618,81 @@ def _follow_through_summary(
     stale_item_count: int,
     oldest_open_item_days: int,
     quiet_streak_runs: int,
+    *,
+    status_counts: dict[str, int] | None = None,
+    top_unattempted_items: list[dict] | None = None,
+    top_stale_follow_through_items: list[dict] | None = None,
 ) -> str:
+    status_counts = status_counts or {}
+    top_unattempted_items = top_unattempted_items or []
+    top_stale_follow_through_items = top_stale_follow_through_items or []
+    legacy_summary = ""
     if repeat_urgent_count or stale_item_count:
-        return (
+        legacy_summary = (
             f"{repeat_urgent_count} urgent item(s) repeated in the recent window, "
             f"{stale_item_count} open item(s) now look stale, and the oldest open item has been visible for about {oldest_open_item_days} day(s)."
         )
+    if top_stale_follow_through_items:
+        top_item = top_stale_follow_through_items[0]
+        label = _target_label(top_item)
+        detailed = (
+            f"{status_counts.get('stale-follow-through', 0)} item(s) now look stalled after earlier review-to-action handoff, "
+            f"and {label} is the strongest case to close or escalate next."
+        )
+        return f"{legacy_summary} {detailed}".strip() if legacy_summary else detailed
+    if top_unattempted_items:
+        top_item = top_unattempted_items[0]
+        label = _target_label(top_item)
+        detailed = (
+            f"{status_counts.get('untouched', 0)} surfaced item(s) still have no recorded follow-through, "
+            f"and {label} is the clearest place to start."
+        )
+        return f"{legacy_summary} {detailed}".strip() if legacy_summary else detailed
+    if status_counts.get("waiting-on-evidence", 0):
+        return (
+            f"{status_counts.get('waiting-on-evidence', 0)} item(s) have recent follow-up recorded and are now waiting for later evidence to confirm movement."
+        )
+    if status_counts.get("attempted", 0):
+        return (
+            f"{status_counts.get('attempted', 0)} item(s) show recorded follow-up, but the underlying pressure is still visible in the current queue."
+        )
+    if status_counts.get("resolved", 0):
+        return (
+            f"{status_counts.get('resolved', 0)} item(s) now look calmer or resolved after recent follow-through, but they still need one more confirming read before they fully disappear from memory."
+        )
+    if legacy_summary:
+        return legacy_summary
     if quiet_streak_runs >= 2:
         return f"The operator queue has stayed quiet for {quiet_streak_runs} consecutive run(s)."
     if quiet_streak_runs == 1:
         return "The latest run is quiet, but the recent window has not stayed quiet long enough to count as a streak yet."
     return "This is the first noisy run in the recent window, so follow-through pressure is still fresh."
+
+
+def _follow_through_checkpoint_summary(
+    status_counts: dict[str, int],
+    top_unattempted_items: list[dict],
+    top_stale_follow_through_items: list[dict],
+) -> str:
+    if top_stale_follow_through_items:
+        top_item = top_stale_follow_through_items[0]
+        label = _target_label(top_item)
+        return (
+            f"Start with {label}. Progress should look like a concrete follow-up plus a quieter next run or a lower-pressure lane."
+        )
+    if top_unattempted_items:
+        top_item = top_unattempted_items[0]
+        label = _target_label(top_item)
+        return (
+            f"Start with {label}. Progress should look like a recorded intervention or a linked artifact update before the next review."
+        )
+    if status_counts.get("waiting-on-evidence", 0):
+        return "Recent follow-up is in flight, so the next checkpoint is whether the next run confirms quieter pressure."
+    if status_counts.get("attempted", 0):
+        return "Follow-up is recorded, but the next checkpoint is whether the pressure actually drops on the next run."
+    if status_counts.get("resolved", 0):
+        return "Some items already look calmer, so the next checkpoint is whether that calmer state holds for another run."
+    return "Use the next run or linked artifact to confirm whether the current recommendation actually moved."
 
 
 def _handoff_urgency(queue: list[dict], setup_health: dict) -> str:

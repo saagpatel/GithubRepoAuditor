@@ -7,6 +7,9 @@ from pathlib import Path
 
 from src.models import AuditReport, RepoAudit
 from src.report_enrichment import (
+    build_follow_through_checkpoint,
+    build_follow_through_status_label,
+    build_follow_through_summary,
     build_last_movement_label,
     build_queue_pressure_summary,
     build_repo_briefing,
@@ -251,8 +254,34 @@ def write_markdown_report(
         _w(f"  - What Changed: {item.get('last_movement', 'Current run')}")
         _w(f"  - Why It Matters: {item.get('why', 'Operator pressure is active.')}")
         _w(f"  - What To Do Next: {item.get('next_step', 'Review the latest state.')}")
+        _w(
+            f"  - Follow-Through: {item.get('follow_through_status', 'Unknown')} — "
+            f"{item.get('follow_through_summary', 'No follow-through evidence is recorded yet.')}"
+        )
+        _w(
+            f"  - Next Checkpoint: {item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}"
+        )
     if not weekly_pack.get("top_attention"):
         _w("- No urgent attention items are currently surfaced.")
+    _w("")
+    _w("### Review-to-Action Follow-Through")
+    _w("")
+    _w(f"- Summary: {weekly_pack.get('follow_through_summary', 'No follow-through evidence is recorded yet.')}")
+    _w(f"- Next Checkpoint: {weekly_pack.get('follow_through_checkpoint_summary', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
+    top_unattempted = weekly_pack.get("top_unattempted_items", [])[:3]
+    top_stale = weekly_pack.get("top_stale_follow_through_items", [])[:3]
+    if top_unattempted:
+        _w("- Still Untouched:")
+        for item in top_unattempted:
+            label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+            _w(f"  - {label} — {item.get('follow_through_summary', 'No follow-through evidence is recorded yet.')}")
+    if top_stale:
+        _w("- Stale Follow-Through:")
+        for item in top_stale:
+            label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+            _w(f"  - {label} — {item.get('follow_through_summary', 'No follow-through evidence is recorded yet.')}")
+    if not top_unattempted and not top_stale:
+        _w("- No top untouched or stale follow-through items are currently surfaced.")
     _w("")
     _w("### Top Repo Drilldowns")
     _w("")
@@ -263,6 +292,8 @@ def write_markdown_report(
         _w(f"- What Changed: {briefing.get('what_changed_line', 'No change summary is recorded yet.')}")
         _w(f"- Why It Matters: {briefing.get('why_it_matters_line', 'No explanation summary is recorded yet.')}")
         _w(f"- What To Do Next: {briefing.get('what_to_do_next_line', 'No next action is recorded yet.')}")
+        _w(f"- Follow-Through: {briefing.get('follow_through_line', 'No follow-through evidence is recorded yet.')}")
+        _w(f"- What Would Count As Progress: {briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
         _w("")
 
     if report.operator_summary or report.operator_queue:
@@ -851,6 +882,11 @@ def write_markdown_report(
             _w(f"  - Lane Reason: {item.get('lane_reason', 'Operator triage')}")
             _w(f"  - Next: {item.get('recommended_action', 'Review the latest state.')}")
             _w(f"  - Last Movement: {build_last_movement_label(item, report.review_summary or {})}")
+            _w(
+                f"  - Follow-Through: {build_follow_through_status_label(item)} — "
+                f"{build_follow_through_summary(item)}"
+            )
+            _w(f"  - Next Checkpoint: {build_follow_through_checkpoint(item)}")
             links = item.get("links") or []
             artifact = links[0].get("url", "") if links else ""
             _w(f"  - Artifact: {artifact or no_linked_artifact_summary()}")
@@ -1193,6 +1229,8 @@ def write_markdown_report(
             _w(f"- What Changed: {briefing.get('what_changed_line', 'No change summary is recorded yet.')}")
             _w(f"- Why It Matters: {briefing.get('why_it_matters_line', 'No explanation summary is recorded yet.')}")
             _w(f"- What To Do Next: {briefing.get('what_to_do_next_line', 'No next action is recorded yet.')}")
+            _w(f"- Follow-Through: {briefing.get('follow_through_line', 'No follow-through evidence is recorded yet.')}")
+            _w(f"- What Would Count As Progress: {briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
         if audit.security_posture:
             _w("")
             _w("**Security Posture:**")

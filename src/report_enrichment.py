@@ -31,6 +31,8 @@ NO_HISTORY_SUMMARY = (
     "No history is recorded yet, so this view is using the current run only."
 )
 NO_LINKED_ARTIFACT_SUMMARY = "No linked artifact available yet."
+NO_FOLLOW_THROUGH_SUMMARY = "No follow-through evidence is recorded yet."
+NO_FOLLOW_THROUGH_CHECKPOINT = "Use the next run or linked artifact to confirm whether the recommendation moved."
 
 
 def _metadata(audit: Any) -> dict[str, Any]:
@@ -321,6 +323,13 @@ def build_repo_briefing(
     next_best_action = explanation.get("next_best_action") or "Review the current hotspot and pick the next best repo action."
     next_best_action_rationale = explanation.get("next_best_action_rationale") or "No action rationale is recorded yet."
     top_action_candidates = _repo_action_candidates(audit)
+    queue_item = _repo_queue_item(repo_name, report_data)
+    review_target = _repo_review_target(repo_name, report_data)
+    handoff_source = queue_item or review_target or {}
+    recommended_action = build_action_handoff_summary(handoff_source) or str(next_best_action)
+    follow_through_status = build_follow_through_status_label(handoff_source)
+    follow_through_summary = build_follow_through_summary(handoff_source)
+    follow_through_checkpoint = build_follow_through_checkpoint(handoff_source)
     return {
         "repo": repo_name,
         "anchor": f"repo-{_repo_anchor(repo_name)}",
@@ -347,12 +356,17 @@ def build_repo_briefing(
         },
         "what_changed_line": f"{last_movement} {recent_change_summary}".strip(),
         "what_to_do_next": {
-            "next_best_action": str(next_best_action),
+            "next_best_action": str(recommended_action),
             "rationale": str(next_best_action_rationale),
             "top_action_candidates": top_action_candidates,
             "linked_artifact": _repo_artifact_label(repo_name, report_data),
+            "follow_through_status": follow_through_status,
+            "follow_through_summary": follow_through_summary,
+            "what_would_count_as_progress": follow_through_checkpoint,
         },
-        "what_to_do_next_line": f"{next_best_action} {next_best_action_rationale}".strip(),
+        "what_to_do_next_line": f"{recommended_action} {next_best_action_rationale}".strip(),
+        "follow_through_line": f"{follow_through_status}: {follow_through_summary}",
+        "checkpoint_line": follow_through_checkpoint,
     }
 
 
@@ -401,6 +415,9 @@ def build_weekly_review_pack(
                 "why": str(mapped.get("lane_reason") or mapped.get("summary") or "Operator pressure is active."),
                 "next_step": str(mapped.get("recommended_action") or mapped.get("next_step") or "Review the latest repo state."),
                 "last_movement": build_last_movement_label(mapped, review_summary),
+                "follow_through_status": build_follow_through_status_label(mapped),
+                "follow_through_summary": build_follow_through_summary(mapped),
+                "follow_through_checkpoint": build_follow_through_checkpoint(mapped),
             }
         )
     top_recommendation = build_top_recommendation_summary(data)
@@ -416,6 +433,12 @@ def build_weekly_review_pack(
         "top_attention": top_attention,
         "repo_briefings": repo_briefings,
         "what_to_do_this_week": what_to_do_this_week,
+        "follow_through_summary": str(operator_summary.get("follow_through_summary") or NO_FOLLOW_THROUGH_SUMMARY),
+        "follow_through_checkpoint_summary": str(
+            operator_summary.get("follow_through_checkpoint_summary") or NO_FOLLOW_THROUGH_CHECKPOINT
+        ),
+        "top_unattempted_items": list(operator_summary.get("top_unattempted_items") or []),
+        "top_stale_follow_through_items": list(operator_summary.get("top_stale_follow_through_items") or []),
     }
 
 
@@ -475,6 +498,46 @@ def no_history_summary() -> str:
 
 def no_linked_artifact_summary() -> str:
     return NO_LINKED_ARTIFACT_SUMMARY
+
+
+def no_follow_through_summary() -> str:
+    return NO_FOLLOW_THROUGH_SUMMARY
+
+
+def no_follow_through_checkpoint() -> str:
+    return NO_FOLLOW_THROUGH_CHECKPOINT
+
+
+def build_follow_through_status_label(value: Any) -> str:
+    mapped = _mapping(value)
+    status = str(mapped.get("follow_through_status", value if isinstance(value, str) else "") or "unknown")
+    labels = {
+        "untouched": "Untouched",
+        "attempted": "Attempted",
+        "waiting-on-evidence": "Waiting on Evidence",
+        "stale-follow-through": "Stale Follow-Through",
+        "resolved": "Resolved",
+        "unknown": "Unknown",
+    }
+    return labels.get(status, status.replace("-", " ").title())
+
+
+def build_follow_through_summary(value: Any) -> str:
+    mapped = _mapping(value)
+    return str(mapped.get("follow_through_summary") or NO_FOLLOW_THROUGH_SUMMARY)
+
+
+def build_follow_through_checkpoint(value: Any) -> str:
+    mapped = _mapping(value)
+    return str(mapped.get("follow_through_next_checkpoint") or NO_FOLLOW_THROUGH_CHECKPOINT)
+
+
+def build_action_handoff_summary(value: Any) -> str:
+    mapped = _mapping(value)
+    action = str(mapped.get("recommended_action") or mapped.get("next_step") or "").strip()
+    if action:
+        return action
+    return "Review the latest state and choose the next concrete follow-through step."
 
 
 def build_queue_pressure_summary(report_data: Any, diff_data: dict | None = None) -> str:
