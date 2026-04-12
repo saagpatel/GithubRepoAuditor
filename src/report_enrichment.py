@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 COMPLETENESS_THRESHOLDS = [
     ("shipped", 0.75),
     ("functional", 0.55),

@@ -62,7 +62,11 @@ from src.excel_template import (
     inject_native_sparklines,
     resolve_template_path,
 )
-from src.report_enrichment import build_run_change_counts, build_run_change_summary, build_score_explanation
+from src.report_enrichment import (
+    build_run_change_counts,
+    build_run_change_summary,
+    build_score_explanation,
+)
 from src.sparkline import sparkline as render_sparkline
 
 # Tier display order

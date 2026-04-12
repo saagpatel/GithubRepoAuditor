@@ -12,7 +12,11 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from src.analyst_views import build_analyst_context
-from src.report_enrichment import build_run_change_counts, build_run_change_summary, build_score_explanation
+from src.report_enrichment import (
+    build_run_change_counts,
+    build_run_change_summary,
+    build_score_explanation,
+)
 from src.sparkline import sparkline as render_sparkline
 
 # ── Color constants (matching Excel design system) ──────────────────

@@ -18,8 +18,8 @@ import json
 import os
 import subprocess
 import sys
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 from time import perf_counter
@@ -38,8 +38,8 @@ from src.cli_output import create_progress, print_info, print_status, print_warn
 from src.cloner import clone_workspace
 from src.github_client import GitHubClient
 from src.models import AnalyzerResult, AuditReport, RepoAudit, RepoMetadata
-from src.report_enrichment import build_run_change_counts, build_run_change_summary
 from src.recurring_review import FULL_REFRESH_DAYS
+from src.report_enrichment import build_run_change_counts, build_run_change_summary
 from src.reporter import (
     write_json_report,
     write_markdown_report,
