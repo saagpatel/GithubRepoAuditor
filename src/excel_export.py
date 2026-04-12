@@ -1135,7 +1135,6 @@ def _build_dashboard(
             cell = ws.cell(row=7, column=3, value=f"Trend: {spark}")
             cell.font = SPARKLINE_FONT
     run_change_summary = data.get("run_change_summary") or build_run_change_summary(diff_data)
-    run_change_counts = data.get("run_change_counts") or build_run_change_counts(diff_data)
     queue_pressure_summary = build_queue_pressure_summary(data, diff_data)
     trust_actionability_summary = build_trust_actionability_summary(data)
     top_recommendation_summary = build_top_recommendation_summary(data)

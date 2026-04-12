@@ -939,16 +939,8 @@ class TestAnalystWorkbookSheets:
         _build_executive_summary(wb, report, None, portfolio_profile="default", collection="showcase", excel_mode="standard")
         _build_print_pack(wb, report, None, portfolio_profile="default", collection="showcase", excel_mode="standard")
 
-        dashboard_ws = wb["Dashboard"]
         review_ws = wb["Review Queue"]
         executive_ws = wb["Executive Summary"]
-        print_ws = wb["Print Pack"]
-        dashboard_values = [
-            cell
-            for row in dashboard_ws.iter_rows(min_row=1, max_row=70, min_col=1, max_col=25, values_only=True)
-            for cell in row
-            if cell is not None
-        ]
 
         review_labels = [
             review_ws.cell(row=row, column=1).value

@@ -4,18 +4,18 @@ import json
 from datetime import datetime, timezone
 
 from src.models import AnalyzerResult, AuditReport, RepoAudit, RepoMetadata
+from src.report_enrichment import (
+    build_queue_pressure_summary,
+    build_top_recommendation_summary,
+    build_trust_actionability_summary,
+    no_linked_artifact_summary,
+)
 from src.reporter import (
     _sanitize_for_json,
     write_json_report,
     write_markdown_report,
     write_pcc_export,
     write_raw_metadata,
-)
-from src.report_enrichment import (
-    build_queue_pressure_summary,
-    build_top_recommendation_summary,
-    build_trust_actionability_summary,
-    no_linked_artifact_summary,
 )
 
 

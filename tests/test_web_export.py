@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from src.web_export import _render_html, export_html_dashboard
 from src.report_enrichment import (
     build_queue_pressure_summary,
     build_top_recommendation_summary,
     no_baseline_summary,
     no_linked_artifact_summary,
 )
+from src.web_export import _render_html, export_html_dashboard
 
 
 def _make_report(**overrides) -> dict:
