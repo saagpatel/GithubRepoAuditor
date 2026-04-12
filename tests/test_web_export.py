@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+from src.report_enrichment import (
+    build_queue_pressure_summary,
+    build_top_recommendation_summary,
+    no_baseline_summary,
+    no_linked_artifact_summary,
+)
 from src.web_export import _render_html, export_html_dashboard
 
 
@@ -547,8 +553,15 @@ class TestRenderHtml:
         assert "Run Changes" in html
         assert "One repo improved and one regressed." in html
 
+    def test_run_changes_uses_shared_fallback_without_diff(self):
+        html = _render_html(_make_report(), diff_data=None)
+        assert no_baseline_summary() in html
+
     def test_operator_section_includes_trend_and_primary_target(self):
         html = _render_html(_make_report())
+        assert f"Queue Pressure:</strong> {build_queue_pressure_summary(_make_report())}" in html
+        assert f"Top Recommendation:</strong> {build_top_recommendation_summary(_make_report())}" in html
+        assert "Top Attention / Next Action" in html
         assert "Trend:" in html
         assert "Accountability:" in html
         assert "Primary Target:" in html
@@ -751,6 +764,8 @@ class TestRenderHtml:
         assert "Why It Matters" in html
         assert "What To Do Next" in html
         assert "Follow-Through" in html
+        assert "Last movement:" in html
+        assert no_linked_artifact_summary() in html
 
     def test_data_embedded_as_json(self):
         html = _render_html(_make_report())

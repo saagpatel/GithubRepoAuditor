@@ -6,7 +6,15 @@ from datetime import datetime
 from pathlib import Path
 
 from src.models import AuditReport, RepoAudit
-from src.report_enrichment import build_run_change_counts, build_run_change_summary
+from src.report_enrichment import (
+    build_last_movement_label,
+    build_queue_pressure_summary,
+    build_run_change_counts,
+    build_run_change_summary,
+    build_top_recommendation_summary,
+    build_trust_actionability_summary,
+    no_linked_artifact_summary,
+)
 
 TIER_ORDER = ["shipped", "functional", "wip", "skeleton", "abandoned"]
 
@@ -204,9 +212,14 @@ def write_markdown_report(
         _w("")
 
     run_change_counts = report.run_change_counts or build_run_change_counts(diff_data)
+    queue_pressure_summary = build_queue_pressure_summary(report.to_dict(), diff_data)
+    top_recommendation_summary = build_top_recommendation_summary(report.to_dict())
+    trust_actionability_summary = build_trust_actionability_summary(report.to_dict())
     _w("### Run Changes")
     _w("")
     _w(f"- Summary: {report.run_change_summary or build_run_change_summary(diff_data)}")
+    _w(f"- Why It Matters: {queue_pressure_summary}")
+    _w(f"- What To Do Next: {top_recommendation_summary}")
     _w(
         "- Counts: "
         f"{run_change_counts.get('score_improvements', 0)} improvements, "
@@ -237,6 +250,7 @@ def write_markdown_report(
             _w(f"- Why It Matters: {report.operator_summary.get('why_it_matters')}")
         if report.operator_summary.get("what_to_do_next"):
             _w(f"- What To Do Next: {report.operator_summary.get('what_to_do_next')}")
+        _w(f"- Queue Pressure: {queue_pressure_summary}")
         if report.operator_summary.get("trend_summary"):
             _w(f"- Trend: {report.operator_summary.get('trend_summary')}")
         if report.operator_summary.get("accountability_summary"):
@@ -283,6 +297,8 @@ def write_markdown_report(
                 f"- Trust Policy: {report.operator_summary.get('primary_target_trust_policy')} "
                 f"({report.operator_summary.get('primary_target_trust_policy_reason', 'No trust-policy reason is recorded yet.')})"
             )
+        _w(f"- Trust / Actionability: {trust_actionability_summary}")
+        _w(f"- Top Recommendation: {top_recommendation_summary}")
         if report.operator_summary.get("adaptive_confidence_summary"):
             _w(f"- Why This Confidence Is Actionable: {report.operator_summary.get('adaptive_confidence_summary')}")
         if report.operator_summary.get("primary_target_exception_status") not in {None, "", "none"}:
@@ -791,12 +807,18 @@ def write_markdown_report(
             f"- Blocked: {counts.get('blocked', 0)} | Urgent: {counts.get('urgent', 0)} | "
             f"Ready: {counts.get('ready', 0)} | Deferred: {counts.get('deferred', 0)}"
         )
+        if report.operator_queue:
+            _w("- Top Attention:")
         for item in report.operator_queue[:6]:
             repo = f"{item.get('repo')}: " if item.get("repo") else ""
             _w(f"- [{item.get('lane_label', item.get('lane', 'ready'))}] {repo}{item.get('title', 'Triage item')}")
             _w(f"  - Why: {item.get('summary', 'No summary available.')}")
             _w(f"  - Lane Reason: {item.get('lane_reason', 'Operator triage')}")
             _w(f"  - Next: {item.get('recommended_action', 'Review the latest state.')}")
+            _w(f"  - Last Movement: {build_last_movement_label(item, report.review_summary or {})}")
+            links = item.get("links") or []
+            artifact = links[0].get("url", "") if links else ""
+            _w(f"  - Artifact: {artifact or no_linked_artifact_summary()}")
         recent_changes = report.operator_summary.get("operator_recent_changes", [])
         if recent_changes:
             _w("- Recent Changes:")

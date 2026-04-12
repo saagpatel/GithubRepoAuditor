@@ -4,6 +4,12 @@ import json
 from datetime import datetime, timezone
 
 from src.models import AnalyzerResult, AuditReport, RepoAudit, RepoMetadata
+from src.report_enrichment import (
+    build_queue_pressure_summary,
+    build_top_recommendation_summary,
+    build_trust_actionability_summary,
+    no_linked_artifact_summary,
+)
 from src.reporter import (
     _sanitize_for_json,
     write_json_report,
@@ -600,6 +606,9 @@ class TestMarkdownReport:
         content = path.read_text()
         assert "Operator Control Center" in content
         assert "Missing template asset" in content
+        assert build_queue_pressure_summary(report.to_dict()) in content
+        assert build_top_recommendation_summary(report.to_dict()) in content
+        assert build_trust_actionability_summary(report.to_dict()) in content
         assert "Recommendation Drift:" in content
         assert "Exception Pattern Learning:" in content
         assert "Trust Recovery:" in content
@@ -631,6 +640,10 @@ class TestMarkdownReport:
         assert "Watch Strategy" in content
         assert "What Changed" in content
         assert "What To Do Next" in content
+        assert "Queue Pressure" in content
+        assert "Trust / Actionability" in content
+        assert "Top Recommendation" in content
+        assert "Top Attention" in content
         assert "Trend" in content
         assert "Follow-Through" in content
         assert "Accountability" in content
@@ -746,6 +759,7 @@ class TestMarkdownReport:
         assert "Class Pending Debt Summary" in content
         assert "Confidence Validation" in content
         assert "Recent Confidence Outcomes" in content
+        assert no_linked_artifact_summary() in content
 
     def test_includes_governance_operator_summary_when_present(self, tmp_path):
         report = _make_report()

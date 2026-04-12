@@ -970,12 +970,18 @@ def _validate_parity(standard_path: Path, template_path: Path) -> dict:
     template_wb = load_workbook(template_path)
     parity_checks = [
         ("Dashboard", "A1"),
+        ("Dashboard", "N8"),
+        ("Dashboard", "N9"),
+        ("Dashboard", "N10"),
+        ("Dashboard", "N11"),
         ("Repo Detail", "A1"),
         ("Repo Detail", "B4"),
-        ("Review Queue", "B6"),
+        ("Review Queue", "B4"),
         ("Run Changes", "A1"),
+        ("Run Changes", "A3"),
         ("Run Changes", "B5"),
         ("Executive Summary", "A1"),
+        ("Executive Summary", "B4"),
         ("Governance Controls", "B5"),
         ("Print Pack", "B9"),
     ]
@@ -1019,6 +1025,11 @@ def _manual_signoff_template(standard_path: Path) -> dict:
             {
                 "id": "core-navigation-links-work",
                 "label": "Confirm the top navigation links work on Dashboard, Run Changes, Review Queue, Repo Detail, and Executive Summary.",
+                "status": "pending",
+            },
+            {
+                "id": "operator-story-consistent",
+                "label": "Confirm Dashboard and Executive Summary tell the same run-change, queue-pressure, and top-recommendation story.",
                 "status": "pending",
             },
             {

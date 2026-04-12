@@ -63,9 +63,15 @@ from src.excel_template import (
     resolve_template_path,
 )
 from src.report_enrichment import (
+    build_last_movement_label,
+    build_queue_pressure_summary,
     build_run_change_counts,
     build_run_change_summary,
     build_score_explanation,
+    build_top_recommendation_summary,
+    build_trust_actionability_summary,
+    no_baseline_summary,
+    no_linked_artifact_summary,
 )
 from src.sparkline import sparkline as render_sparkline
 
@@ -1129,19 +1135,16 @@ def _build_dashboard(
             cell = ws.cell(row=7, column=3, value=f"Trend: {spark}")
             cell.font = SPARKLINE_FONT
     run_change_summary = data.get("run_change_summary") or build_run_change_summary(diff_data)
-    run_change_counts = data.get("run_change_counts") or build_run_change_counts(diff_data)
+    queue_pressure_summary = build_queue_pressure_summary(data, diff_data)
+    trust_actionability_summary = build_trust_actionability_summary(data)
+    top_recommendation_summary = build_top_recommendation_summary(data)
     ws["M8"] = "Run Summary"
     ws["M8"].font = SUBHEADER_FONT
     ws["N8"] = run_change_summary
     ws["N8"].alignment = WRAP
     ws["M9"] = "Queue Pressure"
     ws["M9"].font = SUBHEADER_FONT
-    ws["N9"] = (
-        f"{run_change_counts.get('score_improvements', 0)} improving | "
-        f"{run_change_counts.get('score_regressions', 0)} regressing | "
-        f"{run_change_counts.get('tier_promotions', 0)} promoted | "
-        f"{run_change_counts.get('tier_demotions', 0)} demoted"
-    )
+    ws["N9"] = queue_pressure_summary
 
     operator_summary = data.get("operator_summary") or {}
     governance_summary = data.get("governance_summary") or {}
@@ -1178,10 +1181,13 @@ def _build_dashboard(
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
     ws["M10"] = "Trust Summary"
     ws["M10"].font = SUBHEADER_FONT
-    ws["N10"] = f"{trust_policy} — {trust_policy_reason}"
-    ws["M11"] = "Use This Page"
+    ws["N10"] = trust_actionability_summary
+    ws["M11"] = "Top Recommendation"
     ws["M11"].font = SUBHEADER_FONT
-    ws["N11"] = "Read the left side for portfolio shape, the right side for operator pressure, then jump into Review Queue or Repo Detail."
+    ws["N11"] = top_recommendation_summary
+    ws["M12"] = "Use This Page"
+    ws["M12"].font = SUBHEADER_FONT
+    ws["N12"] = "Read the left side for portfolio shape, the right side for operator pressure, then jump into Review Queue or Repo Detail."
 
     operator_rows = [
         ("Setup Health", _display_operator_state(setup_health.get("status", "ok"))),
@@ -1197,14 +1203,13 @@ def _build_dashboard(
         ("Run Changes", run_change_summary),
         (
             "Queue Pressure",
-            f"{run_change_counts.get('score_improvements', 0)} improving, "
-            f"{run_change_counts.get('score_regressions', 0)} regressing, "
-            f"{run_change_counts.get('security_changes', 0)} security shifts",
+            queue_pressure_summary,
         ),
         ("What Changed", what_changed),
         ("Why It Matters", why_it_matters),
         ("Follow-Through", follow_through),
         ("Next Action", next_action),
+        ("Top Recommendation", top_recommendation_summary),
     ]
     if excel_mode == "standard":
         operator_rows.extend(
@@ -4222,7 +4227,7 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
     ws["B11"] = _repo_detail_lookup_formula(4, "No description recorded yet.")
     ws["B11"].alignment = WRAP
 
-    ws["A13"] = "Top Lens Summaries"
+    ws["A13"] = "Current State"
     ws["A13"].font = SECTION_FONT
     lens_rows = [
         ("Ship Readiness", 14),
@@ -4235,7 +4240,7 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
         ws.cell(row=row, column=1, value=label).font = SUBHEADER_FONT
         style_data_cell(ws.cell(row=row, column=2, value=_repo_detail_lookup_formula(column_index, "No summary recorded yet.")), "left")
 
-    ws["E13"] = "Why This Score Looks This Way"
+    ws["E13"] = "Why This Repo Looks This Way"
     ws["E13"].font = SECTION_FONT
     explanation_rows = [
         ("Strongest Drivers", 19),
@@ -4266,14 +4271,14 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
         for col in range(1, 5):
             style_data_cell(ws.cell(row=row, column=col), "center" if col in {1, 3} else "left")
 
-    ws["F20"] = "Top Hotspots"
+    ws["F20"] = "What Changed"
     ws["F20"].font = SECTION_FONT
     for idx in range(1, 4):
         row = 20 + idx
         ws.cell(row=row, column=6, value=f"Hotspot {idx}").font = SUBHEADER_FONT
         style_data_cell(ws.cell(row=row, column=7, value=_repo_detail_lookup_formula(23 + idx, "No hotspot recorded yet.")), "left")
 
-    ws["F25"] = "Top Actions"
+    ws["F25"] = "What To Do Next"
     ws["F25"].font = SECTION_FONT
     for idx in range(1, 4):
         row = 25 + idx
@@ -4318,7 +4323,7 @@ def _build_run_changes(wb: Workbook, data: dict, diff_data: dict | None) -> None
     ws["B5"] = (
         f"{(diff_data or {}).get('previous_date', '')[:10]} -> {(diff_data or {}).get('current_date', data.get('generated_at', ''))[:10]}"
         if diff_data
-        else "No prior baseline was available, so this sheet shows the current run summary and operator pressure without before/after deltas."
+        else no_baseline_summary()
     )
     ws["B5"].alignment = WRAP
 
@@ -4414,6 +4419,8 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
     )
     counts = _operator_counts(data)
     queue = data.get("operator_queue", []) or []
+    queue_pressure_summary = build_queue_pressure_summary(data)
+    top_recommendation_summary = build_top_recommendation_summary(data)
     material_changes = data.get("material_changes", []) or []
     ordered_queue = _ordered_queue_items(queue)
     repo_rollups = _build_workbook_rollups(data)[1]
@@ -4446,11 +4453,13 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
     summary_rows = [
         ("Headline", (data.get("operator_summary") or {}).get("headline", "Review activity is available below.")),
         ("Queue Counts", _format_lane_counts(counts)),
+        ("Queue Pressure", queue_pressure_summary),
         ("Total Queue Items", len(queue)),
         (
             "Immediate Focus",
             (ordered_queue[0].get("recommended_action") or ordered_queue[0].get("title", "")) if ordered_queue else "No immediate queue item is open.",
         ),
+        ("Top Recommendation", top_recommendation_summary),
         ("Top Issue Family", f"{top_issue_families[0][0]} ({top_issue_families[0][1]})" if top_issue_families else "No material change families"),
     ]
     if excel_mode == "standard":
@@ -4575,13 +4584,7 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
         safe_to_defer = item.get("lane") == "deferred" or item.get("safe_to_defer")
         links = item.get("links") or []
         primary_link = links[0].get("url", "") if links else ""
-        last_movement = (
-            item.get("source_run_id")
-            or item.get("updated_at")
-            or item.get("created_at")
-            or (data.get("review_summary") or {}).get("generated_at", "")
-            or "Current run"
-        )
+        last_movement = build_last_movement_label(item, data.get("review_summary") or {})
         why_this_is_here = item.get("lane_reason", "") or item.get("summary", "") or item.get("decision_hint", "") or "This item is still open and needs operator follow-through."
         values = [
             item.get("repo", item.get("repo_name", "")),
@@ -4592,7 +4595,7 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
             why_this_is_here,
             next_step,
             last_movement,
-            "Open linked artifact" if primary_link else "No linked artifact",
+            "Open linked artifact" if primary_link else no_linked_artifact_summary(),
             "yes" if safe_to_defer else "no",
         ]
         for col, value in enumerate(values, 1):
@@ -4969,12 +4972,10 @@ def _build_executive_summary(
         )
     run_change_counts = data.get("run_change_counts") or build_run_change_counts(diff_data)
     run_change_summary = data.get("run_change_summary") or build_run_change_summary(diff_data)
+    queue_pressure_summary = build_queue_pressure_summary(data, diff_data)
+    trust_actionability_summary = build_trust_actionability_summary(data)
     top_attention = _build_workbook_rollups(data)[1][:5]
-    top_recommendation = (
-        (data.get("operator_queue") or [{}])[0].get("recommended_action")
-        if data.get("operator_queue")
-        else recommended_focus
-    ) or "Start with the highest-pressure queue item, then protect the current leaders."
+    top_recommendation = build_top_recommendation_summary(data) or recommended_focus or "Start with the highest-pressure queue item, then protect the current leaders."
     biggest_opportunity = leaders[0]["name"] if leaders else "Portfolio-wide follow-through"
     narrative_rows = [
         (
@@ -4988,13 +4989,13 @@ def _build_executive_summary(
         ),
         ("Run Changes", run_change_summary or change_summary),
         (
-            "Improving vs Regressing",
-            f"{run_change_counts.get('score_improvements', 0)} improving, {run_change_counts.get('score_regressions', 0)} regressing, "
-            f"{run_change_counts.get('tier_promotions', 0)} promoted, {run_change_counts.get('tier_demotions', 0)} demoted.",
+            "Queue Pressure",
+            queue_pressure_summary,
         ),
         ("What Changed", what_changed or change_summary),
         ("Why It Matters", why_it_matters),
         ("Follow-Through", follow_through),
+        ("Trust Summary", trust_actionability_summary),
         ("Top Recommendation", top_recommendation),
         ("Biggest Opportunity", biggest_opportunity),
         ("Focus This Week", next_action or recommended_focus or "Review the top queue items first, then protect the highest-value repos from drift."),
