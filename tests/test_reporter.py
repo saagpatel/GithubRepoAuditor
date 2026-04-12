@@ -406,6 +406,12 @@ class TestMarkdownReport:
             "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reset_status": "none",
             "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reset_reason": "",
             "closure_forecast_reset_reentry_rebuild_reentry_restore_reset_summary": "Restored rebuilt re-entry posture for Missing template asset is aging enough that it can keep holding, but it should no longer stay indefinitely at sustained strength.",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_score": 0.31,
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_status": "recovering-confirmation-rebuild-reentry-restore-reset",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_status": "pending-confirmation-rebuild-reentry-rerestore",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reason": "Fresh confirmation-side evidence is returning after restored rebuilt re-entry softened or reset, but it has not yet re-restored stronger restored posture.",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_summary": "Fresh confirmation-side evidence is returning for Missing template asset after restored rebuilt re-entry softened, but it has not yet re-restored stronger restored posture (0.31).",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_summary": "Missing template asset is recovering after restored rebuilt re-entry softened, but stronger restored posture still needs more fresh follow-through before it is re-restored.",
             "primary_target_closure_forecast_reset_reentry_rebuild_age_runs": 1,
             "primary_target_closure_forecast_reset_reentry_rebuild_persistence_score": 0.29,
             "primary_target_closure_forecast_reset_reentry_rebuild_persistence_status": "just-rebuilt",
@@ -604,6 +610,8 @@ class TestMarkdownReport:
         assert "Reset Re-entry Rebuild Re-Entry Restore Controls:" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Freshness:" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Reset Controls:" in content
+        assert "Reset Re-entry Rebuild Re-Entry Restore Refresh Recovery:" in content
+        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Controls:" in content
         assert "Reset Re-entry Rebuild Persistence:" in content
         assert "Reset Re-entry Rebuild Churn Controls:" in content
         assert "Reset Re-entry Persistence Summary" in content
@@ -624,6 +632,8 @@ class TestMarkdownReport:
         assert "Reset Re-entry Rebuild Re-Entry Restore Summary" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Freshness Summary" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Reset Summary" in content
+        assert "Reset Re-entry Rebuild Re-Entry Restore Refresh Recovery Summary" in content
+        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Summary" in content
         assert "Reset Re-entry Rebuild Persistence Summary" in content
         assert "Reset Re-entry Rebuild Churn Summary" in content
         assert "Reacquisition Freshness Summary" in content

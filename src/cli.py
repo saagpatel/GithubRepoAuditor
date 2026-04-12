@@ -1093,6 +1093,28 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry rebuild re-entry restore reset summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_reset_summary']}"
         )
+    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_status") not in {None, "", "none"}:
+        print(
+            "  Reset re-entry rebuild re-entry restore refresh recovery: "
+            f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_status', 'none')} "
+            f"({summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_summary', 'No reset re-entry rebuild re-entry restore refresh recovery summary is recorded yet.')})"
+        )
+    if summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_summary"):
+        print(
+            "  Reset re-entry rebuild re-entry restore refresh recovery summary: "
+            f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_summary']}"
+        )
+    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_status") not in {None, "", "none"}:
+        print(
+            "  Reset re-entry rebuild re-entry restore re-restore controls: "
+            f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_status', 'none')} "
+            f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reason', 'No reset re-entry rebuild re-entry restore re-restore reason is recorded yet.')})"
+        )
+    if summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_summary"):
+        print(
+            "  Reset re-entry rebuild re-entry restore re-restore summary: "
+            f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_summary']}"
+        )
     if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_persistence_status") not in {None, "", "none"}:
         print(
             "  Reset re-entry rebuild persistence: "
