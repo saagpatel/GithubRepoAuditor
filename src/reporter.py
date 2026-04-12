@@ -8,8 +8,8 @@ from pathlib import Path
 from src.models import AuditReport, RepoAudit
 from src.report_enrichment import (
     build_last_movement_label,
-    build_repo_briefing,
     build_queue_pressure_summary,
+    build_repo_briefing,
     build_run_change_counts,
     build_run_change_summary,
     build_top_recommendation_summary,

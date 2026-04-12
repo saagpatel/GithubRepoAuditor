@@ -14,8 +14,8 @@ from urllib.parse import urlparse
 from src.analyst_views import build_analyst_context
 from src.report_enrichment import (
     build_last_movement_label,
-    build_repo_briefing,
     build_queue_pressure_summary,
+    build_repo_briefing,
     build_run_change_counts,
     build_run_change_summary,
     build_score_explanation,
