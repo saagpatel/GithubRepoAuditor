@@ -226,6 +226,12 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
             "primary_target_closure_forecast_reset_reentry_rebuild_reason": "Fresh confirmation-side evidence is rebuilding after the reset re-entry aged out, but it has not yet fully re-earned stronger posture.",
             "closure_forecast_reset_reentry_refresh_recovery_summary": "Fresh confirmation-side evidence is rebuilding for RepoC: RepoC drift needs review after reset re-entry aged out (0.31).",
             "closure_forecast_reset_reentry_rebuild_summary": "RepoC: RepoC drift needs review is rebuilding confirmation-side reset re-entry, but it has not fully re-earned stronger posture yet.",
+            "primary_target_closure_forecast_reset_reentry_rebuild_freshness_status": "mixed-age",
+            "primary_target_closure_forecast_reset_reentry_rebuild_freshness_reason": "Rebuilt reset re-entry memory is still useful, but it is partly aging: 50% of the weighted signal is recent and the rest is older carry-forward.",
+            "closure_forecast_reset_reentry_rebuild_freshness_summary": "RepoC: RepoC drift needs review still has useful rebuilt reset re-entry memory, but the restored posture is no longer getting fully fresh reinforcement.",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reset_status": "none",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reset_reason": "",
+            "closure_forecast_reset_reentry_rebuild_reset_summary": "Rebuilt posture for RepoC: RepoC drift needs review is aging enough that it can keep holding, but it should no longer stay indefinitely at sustained strength.",
             "primary_target_closure_forecast_reset_reentry_rebuild_age_runs": 1,
             "primary_target_closure_forecast_reset_reentry_rebuild_persistence_score": 0.29,
             "primary_target_closure_forecast_reset_reentry_rebuild_persistence_status": "just-rebuilt",
@@ -238,11 +244,14 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
             "just_rebuilt_hotspots": [],
             "holding_reset_reentry_rebuild_hotspots": [],
             "reset_reentry_rebuild_churn_hotspots": [],
+            "stale_reset_reentry_rebuild_hotspots": [],
+            "fresh_reset_reentry_rebuild_signal_hotspots": [],
             "stale_reset_reentry_hotspots": [],
             "fresh_reset_reentry_signal_hotspots": [],
             "closure_forecast_reset_reentry_decay_window_runs": 4,
             "closure_forecast_reset_reentry_refresh_window_runs": 4,
             "closure_forecast_reset_reentry_rebuild_window_runs": 4,
+            "closure_forecast_reset_reentry_rebuild_decay_window_runs": 4,
             "stale_closure_forecast_hotspots": [],
             "fresh_closure_forecast_signal_hotspots": [],
             "closure_forecast_decay_window_runs": 4,
@@ -407,6 +416,8 @@ def test_build_scheduled_handoff_writes_artifacts_and_issue_candidate(tmp_path):
     assert "Reset Re-entry Reset Controls" in markdown
     assert "Reset Re-entry Refresh Recovery" in markdown
     assert "Reset Re-entry Rebuild Controls" in markdown
+    assert "Reset Re-entry Rebuild Freshness" in markdown
+    assert "Reset Re-entry Rebuild Reset Controls" in markdown
     assert "Reset Re-entry Rebuild Persistence" in markdown
     assert "Reset Re-entry Rebuild Churn Controls" in markdown
     assert "Reacquisition Persistence" in markdown

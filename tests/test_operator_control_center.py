@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import src.operator_control_center as operator_control_center
 from src.operator_control_center import build_operator_snapshot, normalize_review_state
 
 
@@ -372,6 +373,20 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
         "churn",
         "blocked",
     }
+    assert summary["primary_target_closure_forecast_reset_reentry_rebuild_freshness_status"] in {
+        "fresh",
+        "mixed-age",
+        "stale",
+        "insufficient-data",
+    }
+    assert summary["primary_target_closure_forecast_reset_reentry_rebuild_reset_status"] in {
+        "none",
+        "confirmation-softened",
+        "clearance-softened",
+        "confirmation-reset",
+        "clearance-reset",
+        "blocked",
+    }
     assert -0.95 <= summary["primary_target_closure_forecast_reweight_score"] <= 0.95
     assert -0.95 <= summary["primary_target_closure_forecast_momentum_score"] <= 0.95
     assert -0.95 <= summary["primary_target_closure_forecast_refresh_recovery_score"] <= 0.95
@@ -385,9 +400,12 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
     assert 0.0 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_churn_score"] <= 0.95
     assert 0.0 <= summary["primary_target"]["decayed_confirmation_forecast_rate"] <= 1.0
     assert 0.0 <= summary["primary_target"]["decayed_clearance_forecast_rate"] <= 1.0
+    assert 0.0 <= summary["primary_target"]["decayed_rebuilt_confirmation_reentry_rate"] <= 1.0
+    assert 0.0 <= summary["primary_target"]["decayed_rebuilt_clearance_reentry_rate"] <= 1.0
     assert 0.0 <= summary["primary_target_weighted_pending_resolution_support_score"] <= 0.95
     assert 0.0 <= summary["primary_target_weighted_pending_debt_caution_score"] <= 0.95
     assert summary["class_decay_window_runs"] == 4
+    assert summary["closure_forecast_reset_reentry_rebuild_decay_window_runs"] == 4
     assert summary["class_normalization_window_runs"] == 4
     assert summary["class_reweighting_window_runs"] == 4
     assert summary["class_transition_window_runs"] == 4
@@ -5312,6 +5330,71 @@ def test_operator_snapshot_softens_rebuilt_clearance_when_rebuild_churn_is_high(
     assert summary["primary_target_closure_forecast_reset_reentry_rebuild_persistence_status"] == "reversing"
     assert summary["primary_target_transition_closure_likely_outcome"] == "hold"
     assert summary["primary_target_closure_forecast_hysteresis_status"] == "pending-clearance"
+
+
+def test_rebuild_freshness_softens_mixed_age_sustained_confirmation_rebuild():
+    updates = operator_control_center._apply_reset_reentry_rebuild_freshness_reset_control(
+        {
+            "closure_forecast_reset_reentry_rebuild_churn_status": "none",
+        },
+        freshness_meta={
+            "closure_forecast_reset_reentry_rebuild_freshness_status": "mixed-age",
+            "decayed_rebuilt_clearance_reentry_rate": 0.10,
+            "has_fresh_aligned_recent_evidence": True,
+        },
+        transition_history_meta={"recent_pending_status": "none"},
+        closure_likely_outcome="confirm-soon",
+        closure_hysteresis_status="confirmed-confirmation",
+        closure_hysteresis_reason="Fresh confirmation-side follow-through rebuilt stronger posture.",
+        transition_status="none",
+        transition_reason="",
+        resolution_status="none",
+        resolution_reason="",
+        rebuild_status="rebuilt-confirmation-reentry",
+        rebuild_reason="Fresh confirmation-side follow-through rebuilt stronger posture.",
+        persistence_age_runs=3,
+        persistence_score=0.33,
+        persistence_status="sustained-confirmation-rebuild",
+        persistence_reason="Confirmation-side rebuild is now holding with enough follow-through to trust the restored forecast more.",
+    )
+
+    assert updates["closure_forecast_reset_reentry_rebuild_reset_status"] == "confirmation-softened"
+    assert updates["closure_forecast_reset_reentry_rebuild_persistence_status"] == "holding-confirmation-rebuild"
+    assert updates["transition_closure_likely_outcome"] == "confirm-soon"
+
+
+def test_rebuild_freshness_resets_stale_clearance_and_restores_pending_posture():
+    updates = operator_control_center._apply_reset_reentry_rebuild_freshness_reset_control(
+        {
+            "closure_forecast_reset_reentry_rebuild_churn_status": "none",
+        },
+        freshness_meta={
+            "closure_forecast_reset_reentry_rebuild_freshness_status": "stale",
+            "decayed_rebuilt_clearance_reentry_rate": 0.22,
+            "has_fresh_aligned_recent_evidence": False,
+        },
+        transition_history_meta={"recent_pending_status": "pending-caution"},
+        closure_likely_outcome="expire-risk",
+        closure_hysteresis_status="confirmed-clearance",
+        closure_hysteresis_reason="Fresh clearance-side pressure rebuilt stronger caution.",
+        transition_status="none",
+        transition_reason="",
+        resolution_status="cleared",
+        resolution_reason="Earlier clear was re-enabled after rebuild.",
+        rebuild_status="rebuilt-clearance-reentry",
+        rebuild_reason="Fresh clearance-side pressure rebuilt stronger caution.",
+        persistence_age_runs=3,
+        persistence_score=-0.34,
+        persistence_status="sustained-clearance-rebuild",
+        persistence_reason="Clearance-side rebuild is now holding with enough follow-through to trust the restored caution more.",
+    )
+
+    assert updates["closure_forecast_reset_reentry_rebuild_reset_status"] == "clearance-reset"
+    assert updates["closure_forecast_reset_reentry_rebuild_status"] == "none"
+    assert updates["closure_forecast_reset_reentry_rebuild_persistence_status"] == "none"
+    assert updates["transition_closure_likely_outcome"] == "clear-risk"
+    assert updates["class_reweight_transition_status"] == "pending-caution"
+    assert updates["class_transition_resolution_status"] == "none"
 
 
 def test_operator_snapshot_learns_when_soft_exception_was_overcautious(tmp_path: Path, monkeypatch):
