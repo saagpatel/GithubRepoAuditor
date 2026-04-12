@@ -1,5 +1,3 @@
-import pytest
-from pathlib import Path
 from src.pdf_export import export_pdf_report
 
 

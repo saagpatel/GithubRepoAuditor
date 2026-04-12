@@ -200,7 +200,7 @@ def sync_notion_events(
         return {"created": 0, "deduped": 0, "updated_projects": 0, "errors": 0}
 
     # Query existing event keys for dedup
-    print(f"  Querying existing audit events...", file=sys.stderr)
+    print("  Querying existing audit events...", file=sys.stderr)
     existing_keys = _query_existing_event_keys(events_db_id, token, version)
     print(f"  Found {len(existing_keys)} existing audit events.", file=sys.stderr)
 
@@ -851,7 +851,6 @@ def patch_project_completeness_cards(
         grade = audit.get("grade", "F")
         score = audit.get("overall_score", 0)
         tier = audit.get("completeness_tier", "")
-        date = audit.get("metadata", {}).get("pushed_at", "")[:10] or "?"
         badges = ", ".join(audit.get("badges", [])[:5])
 
         dim_scores = {

@@ -1,7 +1,6 @@
 """README improvement suggestions — generates specific actionable fixes per repo."""
 from __future__ import annotations
 
-import json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -77,10 +76,10 @@ def generate_readme_suggestions(
         date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     lines = [
-        f"# README Improvement Suggestions",
-        f"",
+        "# README Improvement Suggestions",
+        "",
         f"Generated: {date} | {report_data.get('repos_audited', 0)} repos analyzed",
-        f"",
+        "",
     ]
 
     total_suggestions = 0

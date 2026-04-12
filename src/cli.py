@@ -36,13 +36,13 @@ from src.cli_output import create_progress, print_info, print_status, print_warn
 from src.cloner import clone_workspace
 from src.github_client import GitHubClient
 from src.models import AnalyzerResult, AuditReport, RepoAudit, RepoMetadata
+from src.recurring_review import FULL_REFRESH_DAYS
 from src.reporter import (
     write_json_report,
     write_markdown_report,
     write_pcc_export,
     write_raw_metadata,
 )
-from src.recurring_review import FULL_REFRESH_DAYS
 from src.scorer import score_repo
 
 
@@ -921,6 +921,28 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry churn summary: "
             f"{summary['closure_forecast_reset_reentry_churn_summary']}"
         )
+    if summary.get("primary_target_closure_forecast_reset_reentry_freshness_status") not in {None, "", "none"}:
+        print(
+            "  Reset re-entry freshness: "
+            f"{summary.get('primary_target_closure_forecast_reset_reentry_freshness_status', 'insufficient-data')} "
+            f"({summary.get('primary_target_closure_forecast_reset_reentry_freshness_reason', 'No reset re-entry freshness reason is recorded yet.')})"
+        )
+    if summary.get("closure_forecast_reset_reentry_freshness_summary"):
+        print(
+            "  Reset re-entry freshness summary: "
+            f"{summary['closure_forecast_reset_reentry_freshness_summary']}"
+        )
+    if summary.get("primary_target_closure_forecast_reset_reentry_reset_status") not in {None, "", "none"}:
+        print(
+            "  Reset re-entry reset controls: "
+            f"{summary.get('primary_target_closure_forecast_reset_reentry_reset_status', 'none')} "
+            f"({summary.get('primary_target_closure_forecast_reset_reentry_reset_reason', 'No reset re-entry reset reason is recorded yet.')})"
+        )
+    if summary.get("closure_forecast_reset_reentry_reset_summary"):
+        print(
+            "  Reset re-entry reset summary: "
+            f"{summary['closure_forecast_reset_reentry_reset_summary']}"
+        )
     if summary.get("recommendation_drift_status"):
         print(
             "  Recommendation drift: "
@@ -1201,16 +1223,16 @@ def _apply_ops_writeback(report: AuditReport, args, client: GitHubClient | None,
     if not args.campaign:
         return
 
+    from src.notion_sync import sync_campaign_actions
     from src.ops_writeback import (
         apply_github_writeback,
-        build_rollback_preview,
         build_action_runs,
         build_campaign_bundle,
         build_campaign_run,
+        build_rollback_preview,
         build_writeback_preview,
         summarize_writeback_results,
     )
-    from src.notion_sync import sync_campaign_actions
     from src.warehouse import load_campaign_history, load_latest_campaign_state
 
     previous_state = load_latest_campaign_state(output_dir, args.campaign)
@@ -1413,7 +1435,7 @@ def _write_report_outputs(
 
     badge_info = ""
     if args.badges:
-        from src.badge_export import export_badges, upload_badge_gist, _write_badges_markdown
+        from src.badge_export import _write_badges_markdown, export_badges, upload_badge_gist
 
         badge_result = export_badges(report_data, output_dir)
         badge_info = f"\n    {badge_result['badges_md']} ({badge_result['files_written']} badge files)"
@@ -1424,8 +1446,8 @@ def _write_report_outputs(
 
     notion_info = ""
     if args.notion:
-        from src.notion_export import export_notion_events, _load_project_map
         from src.notion_client import get_notion_token, load_notion_config
+        from src.notion_export import _load_project_map, export_notion_events
         from src.notion_sync import (
             check_recommendation_followup,
             create_audit_action_requests,
@@ -2221,8 +2243,8 @@ def main() -> None:
                 )
 
             if getattr(args, "summary", False) and outputs.get("json_path"):
-                from src.history import find_previous
                 from src.diff import diff_reports, print_diff_summary
+                from src.history import find_previous
 
                 prev_path = find_previous(outputs["json_path"].name)
                 if prev_path:

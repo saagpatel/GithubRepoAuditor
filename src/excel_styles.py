@@ -5,7 +5,7 @@ All sheets import from here for consistent visual language.
 """
 from __future__ import annotations
 
-from openpyxl.styles import Alignment, Border, Font, NamedStyle, PatternFill, Side
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.worksheet.hyperlink import Hyperlink
 
 # ── Color Palette ────────────────────────────────────────────────────

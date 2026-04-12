@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import json
 
-
 BASELINE_SIGNATURE_FIELDS = (
     "username",
     "scoring_profile",

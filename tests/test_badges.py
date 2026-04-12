@@ -106,6 +106,6 @@ class TestSuggestNextBadges:
             stars=1, languages={"Python": 1, "Rust": 1, "Go": 1},
         )
         audit.badges = compute_badges(audit)
-        suggestions = suggest_next_badges(audit)
+        suggest_next_badges(audit)
         # Most badges should be earned, few suggestions left
         assert len(audit.badges) >= 10

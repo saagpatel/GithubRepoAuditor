@@ -4,7 +4,6 @@ import argparse
 import json
 from pathlib import Path
 
-
 ISSUE_LABEL = "scheduled-audit-handoff"
 
 
@@ -153,6 +152,8 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Reset re-entry controls: `{summary.get('primary_target_closure_forecast_reset_reentry_status', 'none')}` — {summary.get('primary_target_closure_forecast_reset_reentry_reason', 'No reset re-entry reason is recorded yet.')}",
         f"- Reset re-entry persistence: `{summary.get('primary_target_closure_forecast_reset_reentry_persistence_status', 'none')}` ({summary.get('primary_target_closure_forecast_reset_reentry_persistence_score', 0.0):.2f}; {summary.get('primary_target_closure_forecast_reset_reentry_age_runs', 0)} run(s))",
         f"- Reset re-entry churn controls: `{summary.get('primary_target_closure_forecast_reset_reentry_churn_status', 'none')}` — {summary.get('primary_target_closure_forecast_reset_reentry_churn_reason', 'No reset re-entry churn reason is recorded yet.')}",
+        f"- Reset re-entry freshness: `{summary.get('primary_target_closure_forecast_reset_reentry_freshness_status', 'insufficient-data')}` — {summary.get('primary_target_closure_forecast_reset_reentry_freshness_reason', 'No reset re-entry freshness reason is recorded yet.')}",
+        f"- Reset re-entry reset controls: `{summary.get('primary_target_closure_forecast_reset_reentry_reset_status', 'none')}` — {summary.get('primary_target_closure_forecast_reset_reentry_reset_reason', 'No reset re-entry reset reason is recorded yet.')}",
         f"- Recommendation drift: `{summary.get('recommendation_drift_status', 'stable')}` — {summary.get('recommendation_drift_summary', 'No recommendation-drift summary is recorded yet.')}",
         f"- Exception pattern summary: {summary.get('exception_pattern_summary', 'No exception-pattern summary is recorded yet.')}",
         f"- Exception retirement summary: {summary.get('exception_retirement_summary', 'No exception-retirement summary is recorded yet.')}",
@@ -176,6 +177,8 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Reset re-entry summary: {summary.get('closure_forecast_reset_reentry_summary', 'No reset re-entry summary is recorded yet.')}",
         f"- Reset re-entry persistence summary: {summary.get('closure_forecast_reset_reentry_persistence_summary', 'No reset re-entry persistence summary is recorded yet.')}",
         f"- Reset re-entry churn summary: {summary.get('closure_forecast_reset_reentry_churn_summary', 'No reset re-entry churn summary is recorded yet.')}",
+        f"- Reset re-entry freshness summary: {summary.get('closure_forecast_reset_reentry_freshness_summary', 'No reset re-entry freshness summary is recorded yet.')}",
+        f"- Reset re-entry reset summary: {summary.get('closure_forecast_reset_reentry_reset_summary', 'No reset re-entry reset summary is recorded yet.')}",
         f"- Confidence validation: `{summary.get('confidence_validation_status', 'insufficient-data')}` — {summary.get('confidence_calibration_summary', 'No confidence-calibration summary is recorded yet.')}",
         f"- Next recommended run: `{summary.get('next_recommended_run_mode', 'n/a')}`",
         f"- Watch strategy: `{summary.get('watch_strategy', 'manual')}`",
@@ -1040,6 +1043,46 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
             )
     else:
         lines.append("- No reset re-entry churn hotspots are recorded in the recent window.")
+    lines.append("")
+    lines.append("## Reset Re-entry Freshness")
+    lines.append("")
+    lines.append(
+        f"- Reset re-entry freshness: {summary.get('primary_target_closure_forecast_reset_reentry_freshness_status', 'insufficient-data')} "
+        f"({summary.get('primary_target_closure_forecast_reset_reentry_freshness_reason', 'No reset re-entry freshness reason is recorded yet.')})"
+    )
+    lines.append(
+        f"- {summary.get('closure_forecast_reset_reentry_freshness_summary', 'No reset re-entry freshness summary is recorded yet.')}"
+    )
+    fresh_reset_reentry_signal_hotspots = summary.get("fresh_reset_reentry_signal_hotspots") or []
+    stale_reset_reentry_hotspots = summary.get("stale_reset_reentry_hotspots") or []
+    if fresh_reset_reentry_signal_hotspots:
+        for hotspot in fresh_reset_reentry_signal_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Fresh reset re-entry hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('closure_forecast_reset_reentry_freshness_status', 'fresh')} with "
+                f"{hotspot.get('decayed_reset_reentered_confirmation_rate', 0.0):.0%} confirmation-like and "
+                f"{hotspot.get('decayed_reset_reentered_clearance_rate', 0.0):.0%} clearance-like signal"
+            )
+    elif stale_reset_reentry_hotspots:
+        for hotspot in stale_reset_reentry_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Stale reset re-entry hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('closure_forecast_reset_reentry_freshness_status', 'stale')} with "
+                f"{hotspot.get('decayed_reset_reentered_confirmation_rate', 0.0):.0%} confirmation-like and "
+                f"{hotspot.get('decayed_reset_reentered_clearance_rate', 0.0):.0%} clearance-like signal"
+            )
+    else:
+        lines.append("- No reset re-entry freshness hotspots are recorded in the recent window.")
+    lines.append("")
+    lines.append("## Reset Re-entry Reset Controls")
+    lines.append("")
+    lines.append(
+        f"- Reset re-entry reset: {summary.get('primary_target_closure_forecast_reset_reentry_reset_status', 'none')} "
+        f"({summary.get('primary_target_closure_forecast_reset_reentry_reset_reason', 'No reset re-entry reset reason is recorded yet.')})"
+    )
+    lines.append(
+        f"- {summary.get('closure_forecast_reset_reentry_reset_summary', 'No reset re-entry reset summary is recorded yet.')}"
+    )
     lines.append("")
     lines.append("## Closure Forecast Hysteresis")
     lines.append("")

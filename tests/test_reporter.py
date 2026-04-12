@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
-from pathlib import Path
 
 from src.models import AnalyzerResult, AuditReport, RepoAudit, RepoMetadata
 from src.reporter import (
@@ -347,6 +346,15 @@ class TestMarkdownReport:
             "primary_target_closure_forecast_reset_reentry_churn_status": "none",
             "primary_target_closure_forecast_reset_reentry_churn_reason": "",
             "closure_forecast_reset_reentry_churn_summary": "No meaningful reset re-entry churn is active right now.",
+            "primary_target_closure_forecast_reset_reentry_freshness_status": "mixed-age",
+            "primary_target_closure_forecast_reset_reentry_freshness_reason": "Reset re-entry memory is still useful, but it is partly aging: 50% of the weighted signal is recent and the rest is older carry-forward.",
+            "closure_forecast_reset_reentry_freshness_summary": "Missing template asset still has useful reset re-entry memory, but the restored posture is no longer getting fully fresh reinforcement.",
+            "primary_target_closure_forecast_reset_reentry_reset_status": "none",
+            "primary_target_closure_forecast_reset_reentry_reset_reason": "",
+            "closure_forecast_reset_reentry_reset_summary": "Reset re-entry posture for Missing template asset is aging enough that it can keep holding, but it should no longer stay indefinitely at sustained strength.",
+            "stale_reset_reentry_hotspots": [],
+            "fresh_reset_reentry_signal_hotspots": [],
+            "closure_forecast_reset_reentry_decay_window_runs": 4,
             "stale_closure_forecast_hotspots": [],
             "fresh_closure_forecast_signal_hotspots": [],
             "closure_forecast_decay_window_runs": 4,
@@ -490,8 +498,12 @@ class TestMarkdownReport:
         assert "Reset Re-entry Controls:" in content
         assert "Reset Re-entry Persistence:" in content
         assert "Reset Re-entry Churn Controls:" in content
+        assert "Reset Re-entry Freshness:" in content
+        assert "Reset Re-entry Reset Controls:" in content
         assert "Reset Re-entry Persistence Summary" in content
         assert "Reset Re-entry Churn Summary" in content
+        assert "Reset Re-entry Freshness Summary" in content
+        assert "Reset Re-entry Reset Summary" in content
         assert "Reacquisition Freshness Summary" in content
         assert "Persistence Reset Summary" in content
         assert "Reset Refresh Recovery Summary" in content

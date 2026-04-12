@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from pathlib import Path
-
+from src.analyzers.cicd import CicdAnalyzer
+from src.analyzers.code_quality import CodeQualityAnalyzer
+from src.analyzers.completeness import BuildReadinessAnalyzer, DocumentationAnalyzer
+from src.analyzers.dependencies import DependenciesAnalyzer
 from src.analyzers.readme import ReadmeAnalyzer
 from src.analyzers.structure import StructureAnalyzer
 from src.analyzers.testing import TestingAnalyzer
-from src.analyzers.cicd import CicdAnalyzer
-from src.analyzers.dependencies import DependenciesAnalyzer
-from src.analyzers.code_quality import CodeQualityAnalyzer
-from src.analyzers.completeness import DocumentationAnalyzer, BuildReadinessAnalyzer
 from src.models import RepoMetadata
 
 
@@ -177,6 +175,7 @@ class TestCloneWorkspace:
     def test_workspace_uses_unique_temp_dir(self):
         """clone_workspace must use TemporaryDirectory, not a hardcoded path."""
         import inspect
+
         from src.cloner import clone_workspace
         src = inspect.getsource(clone_workspace)
         assert "TemporaryDirectory" in src

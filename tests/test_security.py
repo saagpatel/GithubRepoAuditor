@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from src.analyzers.security import SecurityAnalyzer, _scan_secrets, _find_dangerous_files
+from src.analyzers.security import SecurityAnalyzer, _find_dangerous_files, _scan_secrets
 from src.models import RepoMetadata
 
 

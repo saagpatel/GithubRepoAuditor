@@ -12,19 +12,47 @@ from pathlib import Path
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.chart import BarChart, BubbleChart, PieChart, RadarChart, Reference, ScatterChart
-from openpyxl.chart.series import Series as BubbleSeries
 from openpyxl.chart.label import DataLabelList
 from openpyxl.chart.series import DataPoint
+from openpyxl.chart.series import Series as BubbleSeries
 from openpyxl.drawing.line import LineProperties
 from openpyxl.formatting.rule import ColorScaleRule, DataBarRule, IconSetRule
 from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
+from openpyxl.workbook.defined_name import DefinedName
 from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.worksheet.hyperlink import Hyperlink
 from openpyxl.worksheet.table import Table, TableStyleInfo
-from openpyxl.workbook.defined_name import DefinedName
 
-from src.sparkline import sparkline as render_sparkline
+from src.excel_styles import (
+    CENTER,
+    GRADE_COLORS,
+    HEATMAP_AMBER,
+    HEATMAP_GREEN,
+    HEATMAP_RED,
+    LEFT,
+    NARRATIVE_FONT,
+    NAVY,
+    SECTION_FONT,
+    SPARKLINE_FONT,
+    SUBHEADER_FILL,
+    SUBHEADER_FONT,
+    SUBTITLE_FONT,
+    TEAL,
+    THIN_BORDER,
+    TIER_FILLS,
+    TITLE_FONT,
+    WHITE,
+    WRAP,
+    apply_zebra_stripes,
+    auto_width,
+    color_grade_cell,
+    color_pattern_cell,
+    color_tier_cell,
+    style_data_cell,
+    style_header_row,
+    write_kpi_card,
+)
 from src.excel_template import (
     DEFAULT_TEMPLATE_PATH,
     TEMPLATE_INFO_SHEET,
@@ -34,38 +62,7 @@ from src.excel_template import (
     inject_native_sparklines,
     resolve_template_path,
 )
-
-from src.excel_styles import (
-    CENTER,
-    GRADE_COLORS,
-    HEATMAP_AMBER,
-    HEATMAP_GREEN,
-    HEATMAP_RED,
-    NAVY,
-    PATTERN_COLORS,
-    SECTION_FONT,
-    SLATE,
-    SUBHEADER_FILL,
-    SUBHEADER_FONT,
-    SUBTITLE_FONT,
-    TEAL,
-    THIN_BORDER,
-    TIER_FILLS,
-    TITLE_FONT,
-    WRAP,
-    WHITE,
-    NARRATIVE_FONT,
-    SPARKLINE_FONT,
-    apply_zebra_stripes,
-    auto_width,
-    color_grade_cell,
-    color_pattern_cell,
-    color_tier_cell,
-    LEFT,
-    style_data_cell,
-    style_header_row,
-    write_kpi_card,
-)
+from src.sparkline import sparkline as render_sparkline
 
 # Tier display order
 TIER_ORDER = ["shipped", "functional", "wip", "skeleton", "abandoned"]
@@ -517,15 +514,17 @@ def _operator_transition_closure_values(data: dict) -> tuple[str, str, str, str,
     closure_forecast_direction = (
         summary.get("primary_target_closure_forecast_reweight_direction", "") or "neutral"
     ).replace("-", " ").title()
-    reset_reentry_persistence = (
-        summary.get("primary_target_closure_forecast_reset_reentry_persistence_status", "")
+    reset_reentry_freshness = (
+        summary.get("primary_target_closure_forecast_reset_reentry_freshness_status", "")
         or "none"
     ).replace("-", " ").title()
-    reset_reentry_churn = (
-        summary.get("primary_target_closure_forecast_reset_reentry_churn_status", "") or "none"
+    reset_reentry_reset = (
+        summary.get("primary_target_closure_forecast_reset_reentry_reset_status", "") or "none"
     ).replace("-", " ").title()
     closure_summary = (
-        summary.get("closure_forecast_reset_reentry_persistence_summary")
+        summary.get("closure_forecast_reset_reentry_freshness_summary")
+        or summary.get("closure_forecast_reset_reentry_reset_summary")
+        or summary.get("closure_forecast_reset_reentry_persistence_summary")
         or summary.get("closure_forecast_reset_reentry_churn_summary")
         or summary.get("closure_forecast_reset_reentry_summary")
         or summary.get("closure_forecast_reset_refresh_recovery_summary")
@@ -550,8 +549,8 @@ def _operator_transition_closure_values(data: dict) -> tuple[str, str, str, str,
         likely_outcome,
         pending_debt_freshness,
         closure_forecast_direction,
-        reset_reentry_persistence,
-        reset_reentry_churn,
+        reset_reentry_freshness,
+        reset_reentry_reset,
         closure_summary,
     )
 
@@ -1033,8 +1032,8 @@ def _build_dashboard(
         transition_likely_outcome,
         pending_debt_freshness,
         closure_forecast_direction,
-        reset_reentry_persistence,
-        reset_reentry_churn,
+        reset_reentry_freshness,
+        reset_reentry_reset,
         transition_closure_summary,
     ) = _operator_transition_closure_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
@@ -1106,8 +1105,8 @@ def _build_dashboard(
                 ("Transition Likely Outcome", transition_likely_outcome),
                 ("Pending Debt Freshness", pending_debt_freshness),
                 ("Closure Forecast", closure_forecast_direction),
-                ("Reset Re-entry Persistence", reset_reentry_persistence),
-                ("Reset Re-entry Churn", reset_reentry_churn),
+                ("Reset Re-entry Freshness", reset_reentry_freshness),
+                ("Reset Re-entry Reset", reset_reentry_reset),
                 ("Closure Forecast Summary", transition_closure_summary),
                 ("Momentum Summary", class_momentum_summary),
                 ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}"),
@@ -1514,7 +1513,6 @@ def _build_all_repos(wb: Workbook, data: dict, score_history: dict[str, list[flo
             values.append("—")
 
         # Why This Grade
-        from src.scorer import WEIGHTS as _W
         if dim_scores:
             sorted_dims = sorted(dim_scores.items(), key=lambda x: x[1])[:2]
             g = audit.get("grade", "F")
@@ -1971,7 +1969,7 @@ def _build_tier_breakdown(wb: Workbook, data: dict) -> None:
             continue
         tier_audits.sort(key=lambda a: a.get("overall_score", 0), reverse=True)
 
-        from src.excel_styles import TIER_FILLS, TIER_FONT
+        from src.excel_styles import TIER_FILLS
         ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=6)
         h = ws.cell(row=current_row, column=1, value=f"{tier.upper()} ({len(tier_audits)} repos)")
         h.font = XFont(bold=True, size=13, color=WHITE)
@@ -2128,7 +2126,7 @@ def _build_reconciliation(wb: Workbook, data: dict) -> None:
 
 def _build_score_explainer(wb: Workbook) -> None:
     """Static reference sheet explaining the scoring system."""
-    from src.scorer import WEIGHTS, GRADE_THRESHOLDS, COMPLETENESS_TIERS, INTEREST_TIERS
+    from src.scorer import COMPLETENESS_TIERS, GRADE_THRESHOLDS, WEIGHTS
 
     ws = _get_or_create_sheet(wb, "Score Explainer")
     ws.sheet_properties.tabColor = "37474F"
@@ -3779,8 +3777,8 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
         transition_likely_outcome,
         pending_debt_freshness,
         closure_forecast_direction,
-        reset_reentry_persistence,
-        reset_reentry_churn,
+        reset_reentry_freshness,
+        reset_reentry_reset,
         transition_closure_summary,
     ) = _operator_transition_closure_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
@@ -3832,8 +3830,8 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
                 ("Transition Likely Outcome", transition_likely_outcome),
                 ("Pending Debt Freshness", pending_debt_freshness),
                 ("Closure Forecast", closure_forecast_direction),
-                ("Reset Re-entry Persistence", reset_reentry_persistence),
-                ("Reset Re-entry Churn", reset_reentry_churn),
+                ("Reset Re-entry Freshness", reset_reentry_freshness),
+                ("Reset Re-entry Reset", reset_reentry_reset),
                 ("Closure Forecast Summary", transition_closure_summary),
                 ("Momentum Summary", class_momentum_summary),
                 ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}"),
@@ -4245,8 +4243,8 @@ def _build_executive_summary(
         transition_likely_outcome,
         pending_debt_freshness,
         closure_forecast_direction,
-        reset_reentry_persistence,
-        reset_reentry_churn,
+        reset_reentry_freshness,
+        reset_reentry_reset,
         transition_closure_summary,
     ) = _operator_transition_closure_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
@@ -4310,8 +4308,8 @@ def _build_executive_summary(
         narrative_rows.insert(31, ("Transition Likely Outcome", transition_likely_outcome))
         narrative_rows.insert(32, ("Pending Debt Freshness", pending_debt_freshness))
         narrative_rows.insert(33, ("Closure Forecast", closure_forecast_direction))
-        narrative_rows.insert(34, ("Reset Re-entry Persistence", reset_reentry_persistence))
-        narrative_rows.insert(35, ("Reset Re-entry Churn", reset_reentry_churn))
+        narrative_rows.insert(34, ("Reset Re-entry Freshness", reset_reentry_freshness))
+        narrative_rows.insert(35, ("Reset Re-entry Reset", reset_reentry_reset))
         narrative_rows.insert(36, ("Closure Forecast Summary", transition_closure_summary))
         narrative_rows.insert(37, ("Momentum Summary", class_momentum_summary))
         narrative_rows.insert(38, ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}"))
@@ -4429,10 +4427,10 @@ def _build_executive_summary(
             ws.cell(row=61, column=5, value=pending_debt_freshness)
             ws.cell(row=62, column=4, value="Closure Forecast").font = SUBHEADER_FONT
             ws.cell(row=62, column=5, value=closure_forecast_direction)
-            ws.cell(row=63, column=4, value="Reset Re-entry Persistence").font = SUBHEADER_FONT
-            ws.cell(row=63, column=5, value=reset_reentry_persistence)
-            ws.cell(row=64, column=4, value="Reset Re-entry Churn").font = SUBHEADER_FONT
-            ws.cell(row=64, column=5, value=reset_reentry_churn)
+            ws.cell(row=63, column=4, value="Reset Re-entry Freshness").font = SUBHEADER_FONT
+            ws.cell(row=63, column=5, value=reset_reentry_freshness)
+            ws.cell(row=64, column=4, value="Reset Re-entry Reset").font = SUBHEADER_FONT
+            ws.cell(row=64, column=5, value=reset_reentry_reset)
             ws.cell(row=65, column=4, value="Closure Forecast Summary").font = SUBHEADER_FONT
             ws.cell(row=65, column=5, value=transition_closure_summary)
             ws.cell(row=66, column=4, value="Momentum Summary").font = SUBHEADER_FONT
@@ -4510,8 +4508,8 @@ def _build_print_pack(
         transition_likely_outcome,
         pending_debt_freshness,
         closure_forecast_direction,
-        reset_reentry_persistence,
-        reset_reentry_churn,
+        reset_reentry_freshness,
+        reset_reentry_reset,
         transition_closure_summary,
     ) = _operator_transition_closure_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
@@ -4602,10 +4600,10 @@ def _build_print_pack(
         ws["B46"] = pending_debt_freshness
         ws["A47"] = "Closure Forecast"
         ws["B47"] = closure_forecast_direction
-        ws["A48"] = "Reset Re-entry Persistence"
-        ws["B48"] = reset_reentry_persistence
-        ws["A49"] = "Reset Re-entry Churn"
-        ws["B49"] = reset_reentry_churn
+        ws["A48"] = "Reset Re-entry Freshness"
+        ws["B48"] = reset_reentry_freshness
+        ws["A49"] = "Reset Re-entry Reset"
+        ws["B49"] = reset_reentry_reset
         ws["A50"] = "Closure Forecast Summary"
         ws["B50"] = transition_closure_summary
         ws["A51"] = "Momentum Summary"

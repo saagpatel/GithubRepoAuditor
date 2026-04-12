@@ -2,16 +2,10 @@
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 
 from src.notion_client import (
     DEFAULT_NOTION_VERSION,
-    get_notion_token,
-    load_notion_config,
     notion_request,
-    rich_text_value,
-    select_value,
-    title_value,
 )
 
 

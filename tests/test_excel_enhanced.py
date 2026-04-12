@@ -1,42 +1,41 @@
 from __future__ import annotations
 
 import json
-import zipfile
 import xml.etree.ElementTree as ET
-from pathlib import Path
+import zipfile
 
 import pytest
 from openpyxl import Workbook, load_workbook
 
 from src.excel_export import (
-    _build_dashboard,
-    _build_all_repos,
+    RADAR_DIMS,
+    RADAR_LABELS,
     _build_action_items,
+    _build_all_repos,
     _build_by_collection,
-    _build_trend_summary,
-    _build_trends,
-    _build_score_explainer,
-    _build_repo_profiles,
-    _build_security,
-    _build_security_debt,
+    _build_by_lens,
+    _build_campaigns,
     _build_changes,
+    _build_compare_sheet,
+    _build_dashboard,
+    _build_executive_summary,
+    _build_governance_audit,
+    _build_governance_controls,
     _build_hidden_data_sheets,
     _build_hotspots,
     _build_portfolio_explorer,
-    _build_by_lens,
-    _build_compare_sheet,
-    _build_scenario_planner,
-    _build_executive_summary,
     _build_print_pack,
-    _build_campaigns,
+    _build_repo_profiles,
     _build_review_history_sheet,
     _build_review_queue,
-    _build_governance_controls,
-    _build_governance_audit,
+    _build_scenario_planner,
+    _build_score_explainer,
+    _build_security,
+    _build_security_debt,
+    _build_trend_summary,
+    _build_trends,
     _build_writeback_audit,
     export_excel,
-    RADAR_DIMS,
-    RADAR_LABELS,
 )
 from src.excel_template import DEFAULT_TEMPLATE_PATH, TEMPLATE_INFO_SHEET
 
@@ -800,8 +799,8 @@ class TestAnalystWorkbookSheets:
         assert review_ws["A42"].value == "Transition Likely Outcome"
         assert review_ws["A43"].value == "Pending Debt Freshness"
         assert review_ws["A44"].value == "Closure Forecast"
-        assert review_ws["A45"].value == "Reset Re-entry Persistence"
-        assert review_ws["A46"].value == "Reset Re-entry Churn"
+        assert review_ws["A45"].value == "Reset Re-entry Freshness"
+        assert review_ws["A46"].value == "Reset Re-entry Reset"
         assert review_ws["A47"].value == "Closure Forecast Summary"
         assert review_ws["A48"].value == "Momentum Summary"
         assert review_ws["A49"].value == "Exception Learning"
@@ -837,8 +836,8 @@ class TestAnalystWorkbookSheets:
         assert executive_ws["D60"].value == "Transition Likely Outcome"
         assert executive_ws["D61"].value == "Pending Debt Freshness"
         assert executive_ws["D62"].value == "Closure Forecast"
-        assert executive_ws["D63"].value == "Reset Re-entry Persistence"
-        assert executive_ws["D64"].value == "Reset Re-entry Churn"
+        assert executive_ws["D63"].value == "Reset Re-entry Freshness"
+        assert executive_ws["D64"].value == "Reset Re-entry Reset"
         assert executive_ws["D65"].value == "Closure Forecast Summary"
         assert executive_ws["D66"].value == "Momentum Summary"
         assert executive_ws["D67"].value == "Exception Learning"
@@ -876,8 +875,8 @@ class TestAnalystWorkbookSheets:
         assert print_ws["A45"].value == "Transition Likely Outcome"
         assert print_ws["A46"].value == "Pending Debt Freshness"
         assert print_ws["A47"].value == "Closure Forecast"
-        assert print_ws["A48"].value == "Reset Re-entry Persistence"
-        assert print_ws["A49"].value == "Reset Re-entry Churn"
+        assert print_ws["A48"].value == "Reset Re-entry Freshness"
+        assert print_ws["A49"].value == "Reset Re-entry Reset"
         assert print_ws["A50"].value == "Closure Forecast Summary"
         assert print_ws["A51"].value == "Momentum Summary"
         assert print_ws["A52"].value == "Exception Learning"
@@ -905,8 +904,8 @@ class TestAnalystWorkbookSheets:
         assert "Transition Likely Outcome" in dashboard_values
         assert "Pending Debt Freshness" in dashboard_values
         assert "Closure Forecast" in dashboard_values
-        assert "Reset Re-entry Persistence" in dashboard_values
-        assert "Reset Re-entry Churn" in dashboard_values
+        assert "Reset Re-entry Freshness" in dashboard_values
+        assert "Reset Re-entry Reset" in dashboard_values
         assert "Exception Learning" in dashboard_values
         assert "Recommendation Drift" in dashboard_values
 
@@ -993,7 +992,11 @@ class TestAnalystWorkbookSheets:
         assert wb["Trends"].freeze_panes == "B4"
 
     def test_creates_security_phase_sheets(self):
-        from src.excel_export import _build_security_controls, _build_supply_chain, _build_security_debt
+        from src.excel_export import (
+            _build_security_controls,
+            _build_security_debt,
+            _build_supply_chain,
+        )
 
         wb = Workbook()
         _build_security_controls(wb, _make_report())

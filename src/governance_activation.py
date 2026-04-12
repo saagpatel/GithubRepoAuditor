@@ -8,7 +8,6 @@ from pathlib import Path
 from src.models import AuditReport
 from src.warehouse import (
     load_audit_report_path,
-    load_campaign_run,
     load_governance_approval,
     load_governance_history,
 )

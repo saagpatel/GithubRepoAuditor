@@ -10,7 +10,7 @@ class TestLoadConfig:
         assert load_config(tmp_path / "nonexistent.yaml") == {}
 
     def test_parses_yaml(self, tmp_path):
-        yaml = pytest.importorskip("yaml")
+        pytest.importorskip("yaml")
         cfg = tmp_path / "test.yaml"
         cfg.write_text("html: true\nskip_forks: true\noutput_dir: my-output\n")
         result = load_config(cfg)
@@ -19,7 +19,7 @@ class TestLoadConfig:
         assert result["output_dir"] == "my-output"
 
     def test_returns_empty_for_empty_yaml(self, tmp_path):
-        yaml = pytest.importorskip("yaml")
+        pytest.importorskip("yaml")
         cfg = tmp_path / "empty.yaml"
         cfg.write_text("")
         assert load_config(cfg) == {}

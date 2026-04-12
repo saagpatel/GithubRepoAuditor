@@ -3,8 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from src.models import AnalyzerResult, RepoAudit, RepoMetadata
-from src.registry_parser import parse_registry, reconcile, _normalize
+from src.models import RepoAudit, RepoMetadata
+from src.registry_parser import _normalize, parse_registry, reconcile
 
 
 def _make_audit(name: str, tier: str = "functional", score: float = 0.6) -> RepoAudit:

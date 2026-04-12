@@ -31,7 +31,6 @@ class TestResponseCache:
         cache.put(url, None, {"data": True})
 
         # Manually backdate the cache entry
-        key = cache._key(url, None)
         path = cache._path(url, None)
         entry = json.loads(path.read_text())
         entry["cached_at"] = time.time() - 10  # 10 seconds ago, TTL is 1s
@@ -56,5 +55,5 @@ class TestResponseCache:
 
     def test_cache_creates_dir(self, tmp_path):
         cache_dir = tmp_path / "deep" / "nested" / "cache"
-        cache = ResponseCache(cache_dir=cache_dir, ttl=3600)
+        ResponseCache(cache_dir=cache_dir, ttl=3600)
         assert cache_dir.exists()

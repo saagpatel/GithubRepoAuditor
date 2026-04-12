@@ -4,6 +4,7 @@ import logging
 import re
 import sys
 import time
+from collections.abc import Callable
 
 import requests
 from requests.adapters import HTTPAdapter
