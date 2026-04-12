@@ -292,10 +292,23 @@ def _make_report(**overrides) -> dict:
             "primary_target_closure_forecast_reset_reentry_rebuild_reason": "Fresh confirmation-side evidence is rebuilding after the reset re-entry aged out, but it has not yet fully re-earned stronger posture.",
             "closure_forecast_reset_reentry_refresh_recovery_summary": "Fresh confirmation-side evidence is rebuilding for RepoC: RepoC drift needs review after reset re-entry aged out (0.31).",
             "closure_forecast_reset_reentry_rebuild_summary": "RepoC: RepoC drift needs review is rebuilding confirmation-side reset re-entry, but it has not fully re-earned stronger posture yet.",
+            "primary_target_closure_forecast_reset_reentry_rebuild_age_runs": 1,
+            "primary_target_closure_forecast_reset_reentry_rebuild_persistence_score": 0.29,
+            "primary_target_closure_forecast_reset_reentry_rebuild_persistence_status": "just-rebuilt",
+            "primary_target_closure_forecast_reset_reentry_rebuild_persistence_reason": "Stronger reset re-entry posture has been rebuilt, but it has not yet proved it can hold.",
+            "closure_forecast_reset_reentry_rebuild_persistence_summary": "RepoC: RepoC drift needs review has only just rebuilt stronger reset re-entry posture, so it is still fragile (0.29; 1 run).",
+            "primary_target_closure_forecast_reset_reentry_rebuild_churn_score": 0.14,
+            "primary_target_closure_forecast_reset_reentry_rebuild_churn_status": "none",
+            "primary_target_closure_forecast_reset_reentry_rebuild_churn_reason": "",
+            "closure_forecast_reset_reentry_rebuild_churn_summary": "No meaningful reset re-entry rebuild churn is active right now.",
+            "just_rebuilt_hotspots": [],
+            "holding_reset_reentry_rebuild_hotspots": [],
+            "reset_reentry_rebuild_churn_hotspots": [],
             "stale_reset_reentry_hotspots": [],
             "fresh_reset_reentry_signal_hotspots": [],
             "closure_forecast_reset_reentry_decay_window_runs": 4,
             "closure_forecast_reset_reentry_refresh_window_runs": 4,
+            "closure_forecast_reset_reentry_rebuild_window_runs": 4,
             "stale_closure_forecast_hotspots": [],
             "fresh_closure_forecast_signal_hotspots": [],
             "closure_forecast_decay_window_runs": 4,
@@ -522,6 +535,8 @@ class TestRenderHtml:
         assert "Reset Re-entry Reset Controls:" in html
         assert "Reset Re-entry Refresh Recovery:" in html
         assert "Reset Re-entry Rebuild Controls:" in html
+        assert "Reset Re-entry Rebuild Persistence:" in html
+        assert "Reset Re-entry Rebuild Churn Controls:" in html
         assert "Recommendation Drift:" in html
         assert "Policy Debt Summary:" in html
         assert "Trust Normalization Summary:" in html
@@ -551,6 +566,8 @@ class TestRenderHtml:
         assert "Reset Re-entry Reset Summary:" in html
         assert "Reset Re-entry Refresh Recovery Summary:" in html
         assert "Reset Re-entry Rebuild Summary:" in html
+        assert "Reset Re-entry Rebuild Persistence Summary:" in html
+        assert "Reset Re-entry Rebuild Churn Summary:" in html
         assert "Closure Forecast Reacquisition Summary:" in html
         assert "Why This Confidence Is Actionable:" in html
         assert "Recent Confidence Outcomes:" in html

@@ -356,6 +356,22 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
         "rebuilt-clearance-reentry",
         "blocked",
     }
+    assert summary["primary_target_closure_forecast_reset_reentry_rebuild_persistence_status"] in {
+        "none",
+        "just-rebuilt",
+        "holding-confirmation-rebuild",
+        "holding-clearance-rebuild",
+        "sustained-confirmation-rebuild",
+        "sustained-clearance-rebuild",
+        "reversing",
+        "insufficient-data",
+    }
+    assert summary["primary_target_closure_forecast_reset_reentry_rebuild_churn_status"] in {
+        "none",
+        "watch",
+        "churn",
+        "blocked",
+    }
     assert -0.95 <= summary["primary_target_closure_forecast_reweight_score"] <= 0.95
     assert -0.95 <= summary["primary_target_closure_forecast_momentum_score"] <= 0.95
     assert -0.95 <= summary["primary_target_closure_forecast_refresh_recovery_score"] <= 0.95
@@ -363,8 +379,10 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
     assert -0.95 <= summary["primary_target_closure_forecast_reset_refresh_recovery_score"] <= 0.95
     assert -0.95 <= summary["primary_target_closure_forecast_reset_reentry_persistence_score"] <= 0.95
     assert -0.95 <= summary["primary_target_closure_forecast_reset_reentry_refresh_recovery_score"] <= 0.95
+    assert -0.95 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_persistence_score"] <= 0.95
     assert 0.0 <= summary["primary_target_closure_forecast_recovery_churn_score"] <= 0.95
     assert 0.0 <= summary["primary_target_closure_forecast_reset_reentry_churn_score"] <= 0.95
+    assert 0.0 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_churn_score"] <= 0.95
     assert 0.0 <= summary["primary_target"]["decayed_confirmation_forecast_rate"] <= 1.0
     assert 0.0 <= summary["primary_target"]["decayed_clearance_forecast_rate"] <= 1.0
     assert 0.0 <= summary["primary_target_weighted_pending_resolution_support_score"] <= 0.95
@@ -385,6 +403,7 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
     assert summary["closure_forecast_reset_reentry_window_runs"] == 4
     assert summary["closure_forecast_reset_reentry_decay_window_runs"] == 4
     assert summary["closure_forecast_reset_reentry_refresh_window_runs"] == 4
+    assert summary["closure_forecast_reset_reentry_rebuild_window_runs"] == 4
     assert "guidance" in summary["adaptive_confidence_summary"].lower() or "immediate action" in summary["adaptive_confidence_summary"].lower()
     assert summary["recommendation_quality_summary"].startswith("Strong recommendation because")
 
@@ -5121,6 +5140,178 @@ def test_operator_snapshot_rebuilds_clearance_reentry_after_fresh_follow_through
     assert summary["primary_target_closure_forecast_reacquisition_status"] == "reacquired-clearance"
     assert summary["primary_target_transition_closure_likely_outcome"] == "clear-risk"
     assert summary["primary_target_closure_forecast_hysteresis_status"] == "confirmed-clearance"
+
+
+def test_operator_snapshot_marks_rebuilt_confirmation_as_just_rebuilt(
+    tmp_path: Path,
+    monkeypatch,
+):
+    report = _make_report(
+        preflight_summary={"status": "ok", "blocking_errors": 0, "warnings": 0, "checks": []},
+        review_targets=[],
+        managed_state_drift=[],
+        governance_drift=[],
+        governance_preview={},
+        rollback_preview={},
+        material_changes=[
+            {
+                "change_key": "high-1",
+                "change_type": "security-change",
+                "repo_name": "RepoC",
+                "severity": 0.9,
+                "title": "RepoC security posture changed",
+                "summary": "critical -> watch",
+                "recommended_next_step": "Review RepoC security posture changed now.",
+            }
+        ],
+    )
+
+    monkeypatch.setattr(
+        "src.operator_control_center._apply_reset_reentry_refresh_recovery_and_rebuild",
+        lambda resolution_targets, _history, **_kwargs: (
+            resolution_targets.__setitem__(
+                slice(None),
+                [
+                    {
+                        **target,
+                        "transition_closure_likely_outcome": "confirm-soon",
+                        "closure_forecast_hysteresis_status": "confirmed-confirmation",
+                        "closure_forecast_hysteresis_reason": "Fresh confirmation-side follow-through has rebuilt stronger confirmation-side reset re-entry.",
+                        "closure_forecast_reset_reentry_freshness_status": "fresh",
+                        "closure_forecast_reset_reentry_refresh_recovery_status": "rebuilding-confirmation-reentry",
+                        "closure_forecast_reset_reentry_rebuild_status": "rebuilt-confirmation-reentry",
+                        "closure_forecast_reset_reentry_rebuild_reason": "Fresh confirmation-side follow-through has rebuilt stronger confirmation-side reset re-entry.",
+                        "closure_forecast_reset_reentry_status": "reentered-confirmation",
+                        "closure_forecast_reset_reentry_reason": "Fresh confirmation-side follow-through has rebuilt stronger confirmation-side reset re-entry.",
+                    }
+                    for target in resolution_targets
+                ],
+            )
+            or {
+                "primary_target_closure_forecast_reset_reentry_refresh_recovery_score": 0.34,
+                "primary_target_closure_forecast_reset_reentry_refresh_recovery_status": "rebuilding-confirmation-reentry",
+                "primary_target_closure_forecast_reset_reentry_rebuild_status": "rebuilt-confirmation-reentry",
+                "primary_target_closure_forecast_reset_reentry_rebuild_reason": "Fresh confirmation-side follow-through has rebuilt stronger confirmation-side reset re-entry.",
+                "closure_forecast_reset_reentry_refresh_recovery_summary": "Fresh confirmation-side evidence is rebuilding strongly for RepoC.",
+                "closure_forecast_reset_reentry_rebuild_summary": "RepoC has rebuilt stronger confirmation-side reset re-entry.",
+                "closure_forecast_reset_reentry_refresh_window_runs": 4,
+                "recovering_from_confirmation_reentry_reset_hotspots": [],
+                "recovering_from_clearance_reentry_reset_hotspots": [],
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center._closure_forecast_reset_reentry_rebuild_persistence_for_target",
+        lambda *_args, **_kwargs: {
+            "closure_forecast_reset_reentry_rebuild_age_runs": 1,
+            "closure_forecast_reset_reentry_rebuild_persistence_score": 0.29,
+            "closure_forecast_reset_reentry_rebuild_persistence_status": "just-rebuilt",
+            "closure_forecast_reset_reentry_rebuild_persistence_reason": "Stronger reset re-entry posture has been rebuilt, but it has not yet proved it can hold.",
+            "recent_reset_reentry_rebuild_persistence_path": "rebuilt-confirmation-reentry",
+        },
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center._closure_forecast_reset_reentry_rebuild_churn_for_target",
+        lambda *_args, **_kwargs: {
+            "closure_forecast_reset_reentry_rebuild_churn_score": 0.10,
+            "closure_forecast_reset_reentry_rebuild_churn_status": "none",
+            "closure_forecast_reset_reentry_rebuild_churn_reason": "",
+            "recent_reset_reentry_rebuild_churn_path": "rebuilt-confirmation-reentry",
+        },
+    )
+
+    summary = build_operator_snapshot(report, output_dir=tmp_path)["operator_summary"]
+
+    assert summary["primary_target_closure_forecast_reset_reentry_rebuild_persistence_status"] == "just-rebuilt"
+    assert summary["primary_target_closure_forecast_reset_reentry_rebuild_churn_status"] == "none"
+    assert summary["primary_target_transition_closure_likely_outcome"] == "confirm-soon"
+    assert summary["primary_target_closure_forecast_hysteresis_status"] == "confirmed-confirmation"
+
+
+def test_operator_snapshot_softens_rebuilt_clearance_when_rebuild_churn_is_high(
+    tmp_path: Path,
+    monkeypatch,
+):
+    report = _make_report(
+        preflight_summary={"status": "ok", "blocking_errors": 0, "warnings": 0, "checks": []},
+        review_targets=[],
+        managed_state_drift=[],
+        governance_drift=[],
+        governance_preview={},
+        rollback_preview={},
+        material_changes=[
+            {
+                "change_key": "high-1",
+                "change_type": "security-change",
+                "repo_name": "RepoC",
+                "severity": 0.9,
+                "title": "RepoC security posture changed",
+                "summary": "critical -> watch",
+                "recommended_next_step": "Review RepoC security posture changed now.",
+            }
+        ],
+    )
+
+    monkeypatch.setattr(
+        "src.operator_control_center._apply_reset_reentry_refresh_recovery_and_rebuild",
+        lambda resolution_targets, _history, **_kwargs: (
+            resolution_targets.__setitem__(
+                slice(None),
+                [
+                    {
+                        **target,
+                        "transition_closure_likely_outcome": "clear-risk",
+                        "closure_forecast_hysteresis_status": "confirmed-clearance",
+                        "closure_forecast_hysteresis_reason": "Fresh clearance-side pressure rebuilt stronger caution.",
+                        "closure_forecast_reset_reentry_freshness_status": "fresh",
+                        "closure_forecast_reset_reentry_refresh_recovery_status": "rebuilding-clearance-reentry",
+                        "closure_forecast_reset_reentry_rebuild_status": "rebuilt-clearance-reentry",
+                        "closure_forecast_reset_reentry_rebuild_reason": "Fresh clearance-side pressure has rebuilt stronger clearance-side reset re-entry.",
+                        "closure_forecast_reset_reentry_status": "reentered-clearance",
+                        "closure_forecast_reset_reentry_reason": "Fresh clearance-side pressure has rebuilt stronger clearance-side reset re-entry.",
+                    }
+                    for target in resolution_targets
+                ],
+            )
+            or {
+                "primary_target_closure_forecast_reset_reentry_refresh_recovery_score": -0.35,
+                "primary_target_closure_forecast_reset_reentry_refresh_recovery_status": "rebuilding-clearance-reentry",
+                "primary_target_closure_forecast_reset_reentry_rebuild_status": "rebuilt-clearance-reentry",
+                "primary_target_closure_forecast_reset_reentry_rebuild_reason": "Fresh clearance-side pressure has rebuilt stronger clearance-side reset re-entry.",
+                "closure_forecast_reset_reentry_refresh_recovery_summary": "Fresh clearance-side evidence is rebuilding strongly for RepoC.",
+                "closure_forecast_reset_reentry_rebuild_summary": "RepoC has rebuilt stronger clearance-side reset re-entry.",
+                "closure_forecast_reset_reentry_refresh_window_runs": 4,
+                "recovering_from_confirmation_reentry_reset_hotspots": [],
+                "recovering_from_clearance_reentry_reset_hotspots": [],
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center._closure_forecast_reset_reentry_rebuild_persistence_for_target",
+        lambda *_args, **_kwargs: {
+            "closure_forecast_reset_reentry_rebuild_age_runs": 2,
+            "closure_forecast_reset_reentry_rebuild_persistence_score": -0.11,
+            "closure_forecast_reset_reentry_rebuild_persistence_status": "reversing",
+            "closure_forecast_reset_reentry_rebuild_persistence_reason": "The rebuilt posture is already weakening, so it is being softened again.",
+            "recent_reset_reentry_rebuild_persistence_path": "rebuilt-clearance-reentry -> hold",
+        },
+    )
+    monkeypatch.setattr(
+        "src.operator_control_center._closure_forecast_reset_reentry_rebuild_churn_for_target",
+        lambda *_args, **_kwargs: {
+            "closure_forecast_reset_reentry_rebuild_churn_score": 0.52,
+            "closure_forecast_reset_reentry_rebuild_churn_status": "churn",
+            "closure_forecast_reset_reentry_rebuild_churn_reason": "Rebuilt reset re-entry is flipping enough that restored posture should be softened quickly.",
+            "recent_reset_reentry_rebuild_churn_path": "rebuilt-clearance-reentry -> churn",
+        },
+    )
+
+    summary = build_operator_snapshot(report, output_dir=tmp_path)["operator_summary"]
+
+    assert summary["primary_target_closure_forecast_reset_reentry_rebuild_churn_status"] == "churn"
+    assert summary["primary_target_closure_forecast_reset_reentry_rebuild_persistence_status"] == "reversing"
+    assert summary["primary_target_transition_closure_likely_outcome"] == "hold"
+    assert summary["primary_target_closure_forecast_hysteresis_status"] == "pending-clearance"
 
 
 def test_operator_snapshot_learns_when_soft_exception_was_overcautious(tmp_path: Path, monkeypatch):
