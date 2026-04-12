@@ -976,6 +976,8 @@ def _validate_parity(standard_path: Path, template_path: Path) -> dict:
         ("Dashboard", "N11"),
         ("Repo Detail", "A1"),
         ("Repo Detail", "B4"),
+        ("Repo Detail", "E13"),
+        ("Repo Detail", "F20"),
         ("Review Queue", "B4"),
         ("Run Changes", "A1"),
         ("Run Changes", "A3"),
@@ -983,7 +985,10 @@ def _validate_parity(standard_path: Path, template_path: Path) -> dict:
         ("Executive Summary", "A1"),
         ("Executive Summary", "B4"),
         ("Governance Controls", "B5"),
+        ("Print Pack", "B7"),
+        ("Print Pack", "B8"),
         ("Print Pack", "B9"),
+        ("Print Pack", "B10"),
     ]
     for sheet_name, cell in parity_checks:
         if standard_wb[sheet_name][cell].value != template_wb[sheet_name][cell].value:
@@ -1029,12 +1034,12 @@ def _manual_signoff_template(standard_path: Path) -> dict:
             },
             {
                 "id": "operator-story-consistent",
-                "label": "Confirm Dashboard and Executive Summary tell the same run-change, queue-pressure, and top-recommendation story.",
+                "label": "Confirm Dashboard, Executive Summary, and Print Pack tell the same weekly review story for run changes, queue pressure, trust, and next action.",
                 "status": "pending",
             },
             {
                 "id": "repo-detail-selector-works",
-                "label": "Confirm the Repo Detail selector changes the briefing cleanly and keeps the page readable.",
+                "label": "Confirm the Repo Detail selector changes the briefing cleanly, keeps the page readable, and preserves the shared Current State / What Changed / What To Do Next wording.",
                 "status": "pending",
             },
             {

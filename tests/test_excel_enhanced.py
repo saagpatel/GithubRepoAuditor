@@ -44,6 +44,7 @@ from src.report_enrichment import (
     build_queue_pressure_summary,
     build_top_recommendation_summary,
     build_trust_actionability_summary,
+    build_weekly_review_pack,
     no_baseline_summary,
     no_linked_artifact_summary,
 )
@@ -1028,6 +1029,7 @@ class TestAnalystWorkbookSheets:
         queue_summary = build_queue_pressure_summary(report)
         top_recommendation = build_top_recommendation_summary(report)
         trust_summary = build_trust_actionability_summary(report)
+        weekly_pack = build_weekly_review_pack(report)
 
         assert queue_summary in dashboard_values
         assert top_recommendation in dashboard_values
@@ -1035,6 +1037,12 @@ class TestAnalystWorkbookSheets:
         assert queue_summary in executive_values
         assert top_recommendation in executive_values
         assert trust_summary in executive_values
+        assert print_ws["B7"].value == weekly_pack["portfolio_headline"]
+        assert print_ws["B8"].value == weekly_pack["queue_pressure_summary"]
+        assert print_ws["B9"].value == weekly_pack["run_change_summary"]
+        assert print_ws["B10"].value == weekly_pack["what_to_do_this_week"]
+        assert print_ws["A59"].value == "Top Attention"
+        assert print_ws["E59"].value == "Top Repo Drilldowns"
         executive_labels = {
             executive_ws.cell(row=row, column=4).value
             for row in range(20, 80)
@@ -1349,7 +1357,10 @@ class TestWorkbookModes:
         assert standard_wb["Dashboard"]["A1"].value == template_wb["Dashboard"]["A1"].value
         assert standard_wb["Review Queue"]["B6"].value == template_wb["Review Queue"]["B6"].value
         assert standard_wb["Governance Controls"]["B5"].value == template_wb["Governance Controls"]["B5"].value
+        assert standard_wb["Print Pack"]["B7"].value == template_wb["Print Pack"]["B7"].value
+        assert standard_wb["Print Pack"]["B8"].value == template_wb["Print Pack"]["B8"].value
         assert standard_wb["Print Pack"]["B9"].value == template_wb["Print Pack"]["B9"].value
+        assert standard_wb["Print Pack"]["B10"].value == template_wb["Print Pack"]["B10"].value
         assert template_wb["Review Queue"]["A4"].value == "Summary"
         template_header_row = next(
             row for row in range(15, 45) if template_wb["Review Queue"].cell(row=row, column=1).value == "Repo"

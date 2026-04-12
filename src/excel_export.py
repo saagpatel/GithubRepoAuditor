@@ -64,12 +64,14 @@ from src.excel_template import (
 )
 from src.report_enrichment import (
     build_last_movement_label,
+    build_repo_briefing,
     build_queue_pressure_summary,
     build_run_change_counts,
     build_run_change_summary,
     build_score_explanation,
     build_top_recommendation_summary,
     build_trust_actionability_summary,
+    build_weekly_review_pack,
     no_baseline_summary,
     no_linked_artifact_summary,
 )
@@ -3059,6 +3061,7 @@ def _repo_detail_rows(data: dict, score_history: dict[str, list[float]] | None) 
         metadata = audit.get("metadata", {})
         repo_name = metadata.get("name", "")
         explanation = _score_explanation_for_audit(audit)
+        briefing = build_repo_briefing(audit, data, None)
         hotspot_titles = [item.get("title", "") for item in (audit.get("hotspots") or [])[:3]]
         action_titles = [item.get("title", "") for item in (audit.get("action_candidates") or [])[:3]]
         lenses = audit.get("lenses", {})
@@ -3081,19 +3084,19 @@ def _repo_detail_rows(data: dict, score_history: dict[str, list[float]] | None) 
             lenses.get("momentum", {}).get("summary", "") or "No momentum summary recorded yet.",
             lenses.get("security_posture", {}).get("summary", "") or "No security summary recorded yet.",
             lenses.get("portfolio_fit", {}).get("summary", "") or "No portfolio-fit summary recorded yet.",
-            render_sparkline(scores) if scores else "No trend history yet.",
-            ", ".join(explanation.get("top_positive_drivers", [])[:3]) or "No strong positive drivers recorded yet.",
-            ", ".join(explanation.get("top_negative_drivers", [])[:3]) or "No major drag factors recorded yet.",
-            explanation.get("next_tier_gap_summary", "") or "No next-tier gap is recorded yet.",
-            explanation.get("next_best_action", "") or "No clear next action is recorded yet.",
-            explanation.get("next_best_action_rationale", "") or "No action rationale is recorded yet.",
-            hotspot_titles[0] if len(hotspot_titles) > 0 else "No hotspot recorded yet.",
+            render_sparkline(scores) if scores else briefing.get("current_state", {}).get("trend", "No trend history yet."),
+            briefing.get("why_this_repo_looks_this_way", {}).get("strongest_drivers", ", ".join(explanation.get("top_positive_drivers", [])[:3]) or "No strong positive drivers recorded yet."),
+            briefing.get("why_this_repo_looks_this_way", {}).get("biggest_drags", ", ".join(explanation.get("top_negative_drivers", [])[:3]) or "No major drag factors recorded yet."),
+            briefing.get("why_this_repo_looks_this_way", {}).get("next_tier_gap", explanation.get("next_tier_gap_summary", "") or "No next-tier gap is recorded yet."),
+            briefing.get("what_to_do_next", {}).get("next_best_action", explanation.get("next_best_action", "") or "No clear next action is recorded yet."),
+            briefing.get("what_to_do_next", {}).get("rationale", explanation.get("next_best_action_rationale", "") or "No action rationale is recorded yet."),
+            briefing.get("what_changed", {}).get("top_hotspot_context", hotspot_titles[0] if len(hotspot_titles) > 0 else "No hotspot recorded yet."),
             hotspot_titles[1] if len(hotspot_titles) > 1 else "No secondary hotspot recorded yet.",
             hotspot_titles[2] if len(hotspot_titles) > 2 else "No third hotspot recorded yet.",
-            action_titles[0] if len(action_titles) > 0 else "No action candidate recorded yet.",
+            briefing.get("what_to_do_next", {}).get("next_best_action", action_titles[0] if len(action_titles) > 0 else "No action candidate recorded yet."),
             action_titles[1] if len(action_titles) > 1 else "No second action candidate recorded yet.",
             action_titles[2] if len(action_titles) > 2 else "No third action candidate recorded yet.",
-            _repo_detail_last_movement(scores),
+            briefing.get("what_changed", {}).get("last_movement", _repo_detail_last_movement(scores)),
         ])
 
         ranked_dimensions = sorted(
@@ -5250,28 +5253,31 @@ def _build_print_pack(
         transition_closure_summary,
     ) = _operator_transition_closure_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
-    ws["A7"] = "This Week"
-    ws["B7"] = operator_summary.get("headline", "Review the latest workbook surfaces for change and drift.")
-    ws["A8"] = "Operator Queue"
-    if operator_summary:
-        ws["B8"] = (
+    weekly_pack = build_weekly_review_pack(data, diff_data)
+    ws["A7"] = "Portfolio Headline"
+    ws["B7"] = weekly_pack.get("portfolio_headline", operator_summary.get("headline", "Review the latest workbook surfaces for change and drift."))
+    ws["A8"] = "Queue Pressure"
+    ws["B8"] = weekly_pack.get(
+        "queue_pressure_summary",
+        (
             f"{counts.get('blocked', 0)} blocked, {counts.get('urgent', 0)} need attention now, "
             f"and {counts.get('ready', 0)} are ready for manual action."
-        )
-    ws["A9"] = "Campaign Actions"
-    ws["B9"] = data.get("campaign_summary", {}).get("action_count", 0)
-    ws["A10"] = "Open Review Targets"
-    ws["B10"] = len(data.get("review_targets", []))
-    ws["A11"] = "Next Run"
-    ws["B11"] = f"{next_mode} via {watch_strategy}"
-    ws["A12"] = "Watch Decision"
-    ws["B12"] = watch_decision
+        ) if operator_summary else "",
+    )
+    ws["A9"] = "Run Changes"
+    ws["B9"] = weekly_pack.get("run_change_summary", build_run_change_summary(diff_data))
+    ws["A10"] = "What To Do This Week"
+    ws["B10"] = weekly_pack.get("what_to_do_this_week", next_action)
+    ws["A11"] = "Trust / Actionability"
+    ws["B11"] = weekly_pack.get("trust_actionability_summary", build_trust_actionability_summary(data))
+    ws["A12"] = "Top Attention Items"
+    ws["B12"] = len(weekly_pack.get("top_attention", []))
     ws["A13"] = "What Changed"
-    ws["B13"] = what_changed
+    ws["B13"] = what_changed or weekly_pack.get("run_change_summary", build_run_change_summary(diff_data))
     ws["A14"] = "Why It Matters"
-    ws["B14"] = why_it_matters
+    ws["B14"] = why_it_matters or weekly_pack.get("queue_pressure_summary", build_queue_pressure_summary(data, diff_data))
     ws["A15"] = "Decision This Week"
-    ws["B15"] = next_action
+    ws["B15"] = next_action or weekly_pack.get("what_to_do_this_week", build_top_recommendation_summary(data))
     ws["A16"] = "Follow-Through"
     ws["B16"] = follow_through if excel_mode != "standard" else f"{trend_summary} {follow_through}".strip()
     if excel_mode == "standard":
@@ -5357,29 +5363,29 @@ def _build_print_pack(
         ws["B56"] = f"{calibration_status} — {calibration_summary}"
         ws["A57"] = "Calibration Snapshot"
         ws["B57"] = f"High-confidence hit rate {high_hit_rate} | {reopened_recommendations}"
-        ws["A59"] = "Top Risks"
+        ws["A59"] = "Top Attention"
         ws["A59"].font = SECTION_FONT
         risk_start_row = 59
         opportunity_header_row = 59
         page2_row = 65
     else:
-        ws["A17"] = "Top Risks"
+        ws["A17"] = "Top Attention"
         ws["A17"].font = SECTION_FONT
         risk_start_row = 17
         opportunity_header_row = 17
         page2_row = 26
-    top_risks = sorted(data.get("hotspots", []) or [], key=lambda item: item.get("severity", 0), reverse=True)[:5]
-    for offset, item in enumerate(top_risks, 1):
-        ws.cell(row=risk_start_row + offset, column=1, value=item.get("repo", ""))
-        ws.cell(row=risk_start_row + offset, column=2, value=item.get("category", ""))
-        ws.cell(row=risk_start_row + offset, column=3, value=round(item.get("severity", 0.0), 3))
-        ws.cell(row=risk_start_row + offset, column=4, value=item.get("title", ""))
-    ws[f"E{opportunity_header_row}"] = "Top Opportunities"
+    top_attention_rows = weekly_pack.get("top_attention", [])[:5]
+    for offset, item in enumerate(top_attention_rows, 1):
+        ws.cell(row=risk_start_row + offset, column=1, value=item.get("repo", "Portfolio"))
+        ws.cell(row=risk_start_row + offset, column=2, value=item.get("lane", "ready"))
+        ws.cell(row=risk_start_row + offset, column=3, value=item.get("why", "Operator pressure is active."))
+        ws.cell(row=risk_start_row + offset, column=4, value=item.get("next_step", "Review the latest state."))
+    ws[f"E{opportunity_header_row}"] = "Top Repo Drilldowns"
     ws[f"E{opportunity_header_row}"].font = SECTION_FONT
-    top_opportunities = sorted(data.get("audits", []), key=lambda audit: audit.get("overall_score", 0), reverse=True)[:5]
-    for offset, audit in enumerate(top_opportunities, 1):
-        ws.cell(row=opportunity_header_row + offset, column=5, value=audit.get("metadata", {}).get("name", ""))
-        ws.cell(row=opportunity_header_row + offset, column=6, value=(audit.get("action_candidates") or [{}])[0].get("title", ""))
+    top_repo_briefings = weekly_pack.get("repo_briefings", [])[:3]
+    for offset, briefing in enumerate(top_repo_briefings, 1):
+        ws.cell(row=opportunity_header_row + offset, column=5, value=briefing.get("repo", ""))
+        ws.cell(row=opportunity_header_row + offset, column=6, value=briefing.get("what_to_do_next_line", "Review the latest repo state."))
     ws.cell(row=page2_row, column=1, value="Page 2: Changes and Governance").font = SECTION_FONT
     ws.cell(row=page2_row + 1, column=1, value="Top Material Change Families").font = SUBHEADER_FONT
     change_rows = [[label, count] for label, count in _summarize_top_issue_families(data.get("material_changes", []) or [], limit=6)]

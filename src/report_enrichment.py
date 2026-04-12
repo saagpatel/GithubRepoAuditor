@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 COMPLETENESS_THRESHOLDS = [
@@ -81,6 +82,157 @@ def _hotspots(audit: Any) -> list[dict[str, Any]]:
     return list((audit or {}).get("hotspots", []) or [])
 
 
+def _string_list(items: list[str], *, fallback: str) -> str:
+    cleaned = [str(item).strip() for item in items if str(item).strip()]
+    return ", ".join(cleaned[:3]) if cleaned else fallback
+
+
+def _repo_name(audit: Any) -> str:
+    return str(_metadata(audit).get("name", "") or "")
+
+
+def _repo_anchor(name: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", name.strip().lower()).strip("-")
+    return slug or "repo"
+
+
+def _repo_queue_item(repo_name: str, report_data: Any) -> dict[str, Any]:
+    queue = list(_mapping(report_data).get("operator_queue") or [])
+    for item in queue:
+        mapped = _mapping(item)
+        if (mapped.get("repo") or mapped.get("repo_name") or "").strip() == repo_name:
+            return mapped
+    return {}
+
+
+def _repo_review_target(repo_name: str, report_data: Any) -> dict[str, Any]:
+    targets = list(_mapping(report_data).get("review_targets") or [])
+    for item in targets:
+        mapped = _mapping(item)
+        if (mapped.get("repo") or mapped.get("repo_name") or "").strip() == repo_name:
+            return mapped
+    return {}
+
+
+def _repo_change(repo_name: str, diff_data: dict | None) -> dict[str, Any]:
+    if not diff_data:
+        return {}
+    for section_name in ("repo_changes", "tier_changes", "score_changes"):
+        for item in diff_data.get(section_name, []) or []:
+            mapped = _mapping(item)
+            if (mapped.get("name") or mapped.get("repo") or "").strip() == repo_name:
+                return mapped
+    return {}
+
+
+def _repo_trend_label(repo_name: str, audit: Any, report_data: Any) -> str:
+    history = _mapping(report_data).get("score_history") or {}
+    scores = list(history.get(repo_name) or [])
+    current_score = round(_overall_score(audit), 3)
+    if not scores:
+        return no_history_summary()
+    previous_score = float(scores[-1] or 0.0)
+    delta = round(current_score - previous_score, 3)
+    if abs(delta) < 0.005:
+        return "Holding flat versus the last recorded run."
+    if delta > 0:
+        return f"Up {delta:.3f} versus the last recorded run."
+    return f"Down {abs(delta):.3f} versus the last recorded run."
+
+
+def _repo_last_movement(repo_name: str, report_data: Any, diff_data: dict | None) -> str:
+    change = _repo_change(repo_name, diff_data)
+    if change:
+        delta = change.get("delta")
+        if delta is None and change.get("new_score") is not None and change.get("old_score") is not None:
+            delta = float(change.get("new_score", 0.0) or 0.0) - float(change.get("old_score", 0.0) or 0.0)
+        if delta is not None:
+            delta_value = round(float(delta or 0.0), 3)
+            if abs(delta_value) < 0.005:
+                movement = "Held flat versus the last run."
+            elif delta_value > 0:
+                movement = f"Improved {delta_value:.3f} versus the last run."
+            else:
+                movement = f"Regressed {abs(delta_value):.3f} versus the last run."
+            old_tier = change.get("old_tier")
+            new_tier = change.get("new_tier")
+            if old_tier and new_tier and old_tier != new_tier:
+                return f"{movement} Tier moved {old_tier} -> {new_tier}."
+            return movement
+
+    queue_item = _repo_queue_item(repo_name, report_data)
+    review_summary = _mapping(_mapping(report_data).get("review_summary"))
+    if queue_item:
+        return build_last_movement_label(queue_item, review_summary)
+
+    review_target = _repo_review_target(repo_name, report_data)
+    if review_target:
+        return build_last_movement_label(review_target, review_summary)
+
+    return no_history_summary()
+
+
+def _repo_change_summary(repo_name: str, audit: Any, report_data: Any, diff_data: dict | None) -> str:
+    change = _repo_change(repo_name, diff_data)
+    if change:
+        delta = change.get("delta")
+        if delta is None and change.get("new_score") is not None and change.get("old_score") is not None:
+            delta = float(change.get("new_score", 0.0) or 0.0) - float(change.get("old_score", 0.0) or 0.0)
+        if delta is not None:
+            delta_value = round(float(delta or 0.0), 3)
+            direction = "improved" if delta_value > 0.005 else "regressed" if delta_value < -0.005 else "held flat"
+            summary = f"Score {direction} {abs(delta_value):.3f} since the last run." if direction != "held flat" else "Score held flat since the last run."
+            old_tier = change.get("old_tier")
+            new_tier = change.get("new_tier")
+            if old_tier and new_tier and old_tier != new_tier:
+                summary += f" Tier moved {old_tier} -> {new_tier}."
+            return summary
+
+    queue_item = _repo_queue_item(repo_name, report_data)
+    if queue_item.get("summary"):
+        return str(queue_item.get("summary"))
+    if queue_item.get("title"):
+        return str(queue_item.get("title"))
+
+    hotspots = _hotspots(audit)
+    if hotspots:
+        return str(hotspots[0].get("summary") or hotspots[0].get("title") or "Current-run hotspot pressure is present.")
+
+    return no_baseline_summary()
+
+
+def _repo_hotspot_context(audit: Any) -> str:
+    hotspots = _hotspots(audit)
+    if not hotspots:
+        return "No hotspot context is recorded yet."
+    hotspot = _mapping(hotspots[0])
+    title = str(hotspot.get("title") or "Current hotspot")
+    summary = str(hotspot.get("summary") or "").strip()
+    return f"{title}: {summary}" if summary else title
+
+
+def _repo_action_candidates(audit: Any) -> list[str]:
+    candidates = []
+    for item in _action_candidates(audit)[:3]:
+        mapped = _mapping(item)
+        title = mapped.get("title") or mapped.get("action")
+        if title:
+            candidates.append(str(title))
+    return candidates
+
+
+def _repo_artifact_label(repo_name: str, report_data: Any) -> str:
+    queue_item = _repo_queue_item(repo_name, report_data)
+    for key in ("artifact_url", "url", "html_url"):
+        if queue_item.get(key):
+            return str(queue_item.get(key))
+    review_target = _repo_review_target(repo_name, report_data)
+    for key in ("artifact_url", "url", "html_url"):
+        if review_target.get(key):
+            return str(review_target.get(key))
+    return no_linked_artifact_summary()
+
+
 def _score_map(audit: Any) -> dict[str, float]:
     scores: dict[str, float] = {}
     for result in _results(audit):
@@ -136,6 +288,134 @@ def build_score_explanation(audit: Any) -> dict[str, Any]:
         "next_best_action_rationale": best_action.get("rationale") or (
             hotspots[0].get("summary") if hotspots else "No dominant rationale is recorded yet."
         ),
+    }
+
+
+def build_repo_briefing(
+    audit: Any,
+    report_data: Any,
+    diff_data: dict | None = None,
+) -> dict[str, Any]:
+    metadata = _metadata(audit)
+    repo_name = _repo_name(audit)
+    explanation = _mapping((_mapping(audit).get("score_explanation") if isinstance(audit, dict) else getattr(audit, "score_explanation", None)))
+    if not explanation:
+        explanation = build_score_explanation(audit)
+    current_state = {
+        "score": round(_overall_score(audit), 3),
+        "grade": _mapping(audit).get("grade") if isinstance(audit, dict) else getattr(audit, "grade", ""),
+        "tier": _mapping(audit).get("completeness_tier") if isinstance(audit, dict) else getattr(audit, "completeness_tier", ""),
+        "language": metadata.get("language") or "Unknown",
+        "trend": _repo_trend_label(repo_name, audit, report_data),
+        "badges": _string_list(list(_mapping(audit).get("badges", []) if isinstance(audit, dict) else getattr(audit, "badges", []) or []), fallback="None"),
+        "flags": _string_list(list(_mapping(audit).get("flags", []) if isinstance(audit, dict) else getattr(audit, "flags", []) or []), fallback="None"),
+        "url": metadata.get("html_url", ""),
+        "description": metadata.get("description") or "No description recorded yet.",
+    }
+    strongest_drivers = explanation.get("top_positive_drivers", []) or []
+    biggest_drags = explanation.get("top_negative_drivers", []) or []
+    next_tier_gap = explanation.get("next_tier_gap_summary") or "No next-tier gap is recorded yet."
+    last_movement = _repo_last_movement(repo_name, report_data, diff_data)
+    recent_change_summary = _repo_change_summary(repo_name, audit, report_data, diff_data)
+    hotspot_context = _repo_hotspot_context(audit)
+    next_best_action = explanation.get("next_best_action") or "Review the current hotspot and pick the next best repo action."
+    next_best_action_rationale = explanation.get("next_best_action_rationale") or "No action rationale is recorded yet."
+    top_action_candidates = _repo_action_candidates(audit)
+    return {
+        "repo": repo_name,
+        "anchor": f"repo-{_repo_anchor(repo_name)}",
+        "headline": f"{repo_name} — {current_state['score']:.2f} ({current_state['tier'] or 'unrated'})",
+        "current_state": current_state,
+        "current_state_line": (
+            f"Score {current_state['score']:.2f}, grade {current_state['grade'] or '—'}, "
+            f"{current_state['tier'] or 'unrated'} tier, {current_state['language']}, trend: {current_state['trend']}"
+        ),
+        "why_this_repo_looks_this_way": {
+            "strongest_drivers": _string_list(list(strongest_drivers), fallback="No strong positive drivers recorded yet."),
+            "biggest_drags": _string_list(list(biggest_drags), fallback="No major drag factors recorded yet."),
+            "next_tier_gap": str(next_tier_gap),
+        },
+        "why_it_matters_line": (
+            f"Strongest drivers: {_string_list(list(strongest_drivers), fallback='No strong positive drivers recorded yet.')}. "
+            f"Biggest drags: {_string_list(list(biggest_drags), fallback='No major drag factors recorded yet.')}. "
+            f"Next tier gap: {next_tier_gap}"
+        ),
+        "what_changed": {
+            "last_movement": last_movement,
+            "recent_change_summary": recent_change_summary,
+            "top_hotspot_context": hotspot_context,
+        },
+        "what_changed_line": f"{last_movement} {recent_change_summary}".strip(),
+        "what_to_do_next": {
+            "next_best_action": str(next_best_action),
+            "rationale": str(next_best_action_rationale),
+            "top_action_candidates": top_action_candidates,
+            "linked_artifact": _repo_artifact_label(repo_name, report_data),
+        },
+        "what_to_do_next_line": f"{next_best_action} {next_best_action_rationale}".strip(),
+    }
+
+
+def build_weekly_review_pack(
+    report_data: Any,
+    diff_data: dict | None = None,
+    *,
+    repo_limit: int = 3,
+    attention_limit: int = 5,
+) -> dict[str, Any]:
+    data = _mapping(report_data)
+    audits = list(data.get("audits") or [])
+    operator_summary = _mapping(data.get("operator_summary"))
+    operator_queue = list(data.get("operator_queue") or [])
+    portfolio_headline = operator_summary.get("headline") or (
+        f"Portfolio grade {data.get('portfolio_grade', 'F')} across {data.get('repos_audited', 0)} audited repos."
+    )
+    repo_names: list[str] = []
+    for item in operator_queue:
+        repo = (_mapping(item).get("repo") or _mapping(item).get("repo_name") or "").strip()
+        if repo and repo not in repo_names:
+            repo_names.append(repo)
+    for audit in sorted(audits, key=_overall_score, reverse=True):
+        name = _repo_name(audit)
+        if name and name not in repo_names:
+            repo_names.append(name)
+        if len(repo_names) >= repo_limit:
+            break
+    audit_by_name = {_repo_name(audit): audit for audit in audits}
+    repo_briefings = [
+        build_repo_briefing(audit_by_name[name], data, diff_data)
+        for name in repo_names[:repo_limit]
+        if name in audit_by_name
+    ]
+    top_attention = []
+    review_summary = _mapping(data.get("review_summary"))
+    for item in operator_queue[:attention_limit]:
+        mapped = _mapping(item)
+        title = mapped.get("title") or mapped.get("summary") or "Operator attention item"
+        repo = mapped.get("repo") or mapped.get("repo_name") or "Portfolio"
+        top_attention.append(
+            {
+                "repo": repo,
+                "title": str(title),
+                "lane": mapped.get("lane_label") or mapped.get("lane") or "ready",
+                "why": str(mapped.get("lane_reason") or mapped.get("summary") or "Operator pressure is active."),
+                "next_step": str(mapped.get("recommended_action") or mapped.get("next_step") or "Review the latest repo state."),
+                "last_movement": build_last_movement_label(mapped, review_summary),
+            }
+        )
+    top_recommendation = build_top_recommendation_summary(data)
+    what_to_do_this_week = top_recommendation
+    if repo_briefings:
+        what_to_do_this_week = f"{top_recommendation} Start with {repo_briefings[0]['repo']} if you need a concrete place to begin."
+    return {
+        "portfolio_headline": str(portfolio_headline),
+        "run_change_summary": build_run_change_summary(diff_data if diff_data is not None else data.get("diff_data")),
+        "queue_pressure_summary": build_queue_pressure_summary(data, diff_data),
+        "trust_actionability_summary": build_trust_actionability_summary(data),
+        "top_recommendation_summary": top_recommendation,
+        "top_attention": top_attention,
+        "repo_briefings": repo_briefings,
+        "what_to_do_this_week": what_to_do_this_week,
     }
 
 

@@ -758,6 +758,10 @@ class TestRenderHtml:
     def test_html_includes_operator_control_center(self):
         html = _render_html(_make_report())
         assert "Operator Control Center" in html
+        assert "Weekly Review Pack" in html
+        assert "Repo Drilldowns" in html
+        assert "Top Repo Drilldowns" in html
+        assert 'href="#repo-' in html
         assert "Next Recommended Run" in html
         assert "Watch Strategy" in html
         assert "RepoC drift needs review" in html
