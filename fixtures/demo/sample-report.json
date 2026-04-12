@@ -1,0 +1,511 @@
+{
+  "username": "sample-user",
+  "generated_at": "2026-04-12T12:00:00+00:00",
+  "repos_audited": 3,
+  "total_repos": 3,
+  "average_score": 0.65,
+  "portfolio_grade": "B",
+  "portfolio_health_score": 0.69,
+  "tier_distribution": {
+    "shipped": 1,
+    "functional": 1,
+    "wip": 1,
+    "skeleton": 0,
+    "abandoned": 0
+  },
+  "language_distribution": {
+    "Python": 2,
+    "TypeScript": 1
+  },
+  "profiles": {
+    "default": {
+      "description": "Balanced portfolio scoring."
+    }
+  },
+  "collections": {
+    "showcase": {
+      "description": "Best examples to show other people.",
+      "repos": [
+        {
+          "name": "RepoA",
+          "reason": "Strong showcase candidate."
+        }
+      ]
+    }
+  },
+  "lenses": {
+    "ship_readiness": {
+      "description": "Delivery readiness",
+      "average_score": 0.71
+    },
+    "showcase_value": {
+      "description": "Story and polish",
+      "average_score": 0.63
+    }
+  },
+  "scenario_summary": {
+    "top_levers": [
+      {
+        "key": "testing",
+        "title": "Strengthen tests",
+        "lens": "ship_readiness",
+        "repo_count": 2,
+        "average_expected_lens_delta": 0.09,
+        "projected_tier_promotions": 1
+      }
+    ],
+    "portfolio_projection": {
+      "selected_repo_count": 3,
+      "projected_average_score_delta": 0.05,
+      "projected_tier_promotions": 1
+    }
+  },
+  "security_posture": {
+    "average_score": 0.58,
+    "critical_repos": [
+      "RepoC"
+    ],
+    "repos_with_secrets": [],
+    "provider_coverage": {
+      "github": {
+        "available_repos": 3,
+        "total_repos": 3
+      }
+    },
+    "open_alerts": {
+      "code_scanning": 2,
+      "secret_scanning": 1
+    }
+  },
+  "security_governance_preview": [
+    {
+      "repo": "RepoC",
+      "priority": "high",
+      "title": "Enable CodeQL default setup",
+      "expected_posture_lift": 0.12,
+      "effort": "medium",
+      "source": "github",
+      "why": "Code scanning is not configured."
+    }
+  ],
+  "governance_summary": {
+    "headline": "Governed security drift needs review.",
+    "status": "drifted",
+    "needs_reapproval": false,
+    "drift_count": 1,
+    "applyable_count": 1,
+    "applied_count": 0,
+    "rollback_available_count": 1,
+    "top_actions": [
+      {
+        "repo": "RepoC",
+        "title": "Enable CodeQL default setup",
+        "operator_state": "ready",
+        "expected_posture_lift": 0.12,
+        "source": "github"
+      }
+    ]
+  },
+  "campaign_summary": {
+    "campaign_type": "security-review",
+    "label": "Security Review",
+    "action_count": 1,
+    "repo_count": 1
+  },
+  "writeback_preview": {
+    "sync_mode": "reconcile",
+    "repos": [
+      {
+        "repo": "RepoC",
+        "topics": [
+          "ghra-call-security-review"
+        ],
+        "issue_title": "[Repo Auditor] Security Review",
+        "notion_action_count": 1
+      }
+    ]
+  },
+  "writeback_results": {
+    "mode": "apply",
+    "target": "github",
+    "results": [
+      {
+        "repo_full_name": "sample-user/RepoC",
+        "target": "github-issue",
+        "status": "created",
+        "url": "https://github.com/sample-user/RepoC/issues/1"
+      }
+    ]
+  },
+  "managed_state_drift": [
+    {
+      "repo_full_name": "sample-user/RepoC",
+      "target": "github-issue",
+      "drift_state": "managed-issue-edited"
+    }
+  ],
+  "governance_drift": [
+    {
+      "repo_full_name": "sample-user/RepoC",
+      "drift_type": "already-enabled"
+    }
+  ],
+  "review_summary": {
+    "review_id": "sample-review-1",
+    "status": "open",
+    "source_run_id": "sample-user:2026-04-12T12:00:00+00:00"
+  },
+  "review_targets": [
+    {
+      "repo": "RepoC",
+      "title": "Security posture needs attention",
+      "severity": 0.84,
+      "next_step": "Preview governance controls",
+      "decision_hint": "ready-for-governance-approval",
+      "safe_to_defer": false
+    }
+  ],
+  "review_history": [
+    {
+      "review_id": "sample-review-1",
+      "generated_at": "2026-04-12T12:00:00+00:00",
+      "material_change_count": 2,
+      "status": "open",
+      "decision_state": "needs-review",
+      "sync_state": "local-only",
+      "emitted": true
+    }
+  ],
+  "material_changes": [
+    {
+      "change_type": "security-change",
+      "repo": "RepoC",
+      "severity": 0.84,
+      "title": "Security posture needs attention"
+    },
+    {
+      "change_type": "reopened-review",
+      "repo": "RepoB",
+      "severity": 0.51,
+      "title": "Release checklist reopened"
+    }
+  ],
+  "operator_summary": {
+    "headline": "RepoC still needs security follow-through before the queue will calm down.",
+    "counts": {
+      "blocked": 1,
+      "urgent": 1,
+      "ready": 1,
+      "deferred": 1
+    },
+    "source_run_id": "sample-user:2026-04-12T12:00:00+00:00",
+    "next_recommended_run_mode": "incremental",
+    "watch_strategy": "adaptive",
+    "watch_decision_summary": "The current baseline is still compatible, so incremental watch remains safe for the next run.",
+    "what_changed": "RepoC drift needs review and RepoB reopened a release checklist item.",
+    "why_it_matters": "Live drift is still present, so security work should stay ahead of lower-pressure cleanup.",
+    "what_to_do_next": "Review RepoC first, then close RepoB's reopened checklist item.",
+    "trend_summary": "Queue pressure is stable but still sticky.",
+    "follow_through_summary": "One urgent item is still repeating in the recent window.",
+    "primary_target_reason": "RepoC remains the top target because live drift is still open.",
+    "closure_guidance": "Clear RepoC's security drift before moving to lower-pressure work.",
+    "primary_target_trust_policy": "verify-first",
+    "primary_target_trust_policy_reason": "The recommendation is sound, but recent reopen noise means it should still be reviewed before acting.",
+    "control_center_reference": "output/demo/operator-control-center-sample-user-2026-04-12.json"
+  },
+  "operator_queue": [
+    {
+      "repo": "RepoC",
+      "title": "Security drift needs review",
+      "lane": "blocked",
+      "lane_label": "Blocked",
+      "lane_reason": "Governed security drift is still unresolved.",
+      "kind": "campaign",
+      "priority": 1,
+      "summary": "RepoC still needs a governance decision before the security review can settle.",
+      "recommended_action": "Open the governed control preview and decide whether to apply CodeQL.",
+      "repo_url": "https://github.com/sample-user/RepoC",
+      "links": [
+        {
+          "label": "GitHub Issue",
+          "url": "https://github.com/sample-user/RepoC/issues/1"
+        }
+      ]
+    },
+    {
+      "repo": "RepoB",
+      "title": "Release checklist reopened",
+      "lane": "urgent",
+      "lane_label": "Needs Attention Now",
+      "lane_reason": "A previously quiet repo reopened a visible checklist item.",
+      "kind": "review",
+      "priority": 2,
+      "summary": "RepoB needs a small release follow-through pass.",
+      "recommended_action": "Re-run the release checklist and close the missing item.",
+      "repo_url": "https://github.com/sample-user/RepoB"
+    },
+    {
+      "repo": "RepoA",
+      "title": "Protect shipped momentum",
+      "lane": "ready",
+      "lane_label": "Ready for Manual Action",
+      "lane_reason": "RepoA is healthy enough that a small polish task would keep it strong.",
+      "kind": "maintenance",
+      "priority": 3,
+      "summary": "A small polish pass would keep the showcase repo strong.",
+      "recommended_action": "Tidy the release notes and publish the next small maintenance release.",
+      "repo_url": "https://github.com/sample-user/RepoA"
+    },
+    {
+      "repo": "RepoA",
+      "title": "Archive old brainstorm notes",
+      "lane": "deferred",
+      "lane_label": "Safe to Defer",
+      "lane_reason": "This is cleanup-only work with no current pressure.",
+      "kind": "cleanup",
+      "priority": 4,
+      "summary": "Backlog cleanup is optional this week.",
+      "recommended_action": "Leave this alone unless priorities change.",
+      "repo_url": "https://github.com/sample-user/RepoA"
+    }
+  ],
+  "run_change_summary": "The portfolio improved slightly: 1 repo improved materially, 1 regressed, and security pressure stayed concentrated in RepoC.",
+  "run_change_counts": {
+    "new_repos": 0,
+    "removed_repos": 0,
+    "tier_promotions": 1,
+    "tier_demotions": 1,
+    "score_improvements": 1,
+    "score_regressions": 1,
+    "security_changes": 1,
+    "hotspot_changes": 2,
+    "collection_changes": 1,
+    "notable_repo_changes": 2
+  },
+  "audits": [
+    {
+      "metadata": {
+        "name": "RepoA",
+        "full_name": "sample-user/RepoA",
+        "html_url": "https://github.com/sample-user/RepoA",
+        "description": "A polished shipped project.",
+        "language": "Python",
+        "private": false,
+        "archived": false,
+        "stars": 12,
+        "topics": [
+          "python",
+          "cli"
+        ]
+      },
+      "overall_score": 0.88,
+      "interest_score": 0.61,
+      "grade": "A",
+      "completeness_tier": "shipped",
+      "badges": [
+        "fresh",
+        "tested"
+      ],
+      "flags": [],
+      "lenses": {
+        "ship_readiness": {
+          "score": 0.89,
+          "summary": "Ready"
+        },
+        "momentum": {
+          "score": 0.75,
+          "summary": "Holding"
+        },
+        "security_posture": {
+          "score": 0.82,
+          "summary": "Healthy"
+        },
+        "portfolio_fit": {
+          "score": 0.86,
+          "summary": "Strong"
+        }
+      },
+      "security_posture": {
+        "label": "healthy",
+        "score": 0.82
+      },
+      "hotspots": [
+        {
+          "title": "Keep release notes fresh",
+          "severity": 0.21,
+          "category": "finish-line"
+        }
+      ],
+      "action_candidates": [
+        {
+          "title": "Publish the next maintenance release"
+        }
+      ],
+      "analyzer_results": [
+        {
+          "dimension": "testing",
+          "score": 0.9,
+          "findings": [
+            "Healthy test coverage"
+          ]
+        },
+        {
+          "dimension": "documentation",
+          "score": 0.85,
+          "findings": [
+            "README is strong"
+          ]
+        }
+      ]
+    },
+    {
+      "metadata": {
+        "name": "RepoB",
+        "full_name": "sample-user/RepoB",
+        "html_url": "https://github.com/sample-user/RepoB",
+        "description": "A functional project with follow-through left to do.",
+        "language": "TypeScript",
+        "private": false,
+        "archived": false,
+        "stars": 5,
+        "topics": [
+          "typescript",
+          "web"
+        ]
+      },
+      "overall_score": 0.62,
+      "interest_score": 0.37,
+      "grade": "C",
+      "completeness_tier": "functional",
+      "badges": [],
+      "flags": [
+        "release-checklist-open"
+      ],
+      "lenses": {
+        "ship_readiness": {
+          "score": 0.63,
+          "summary": "Needs work"
+        },
+        "momentum": {
+          "score": 0.54,
+          "summary": "Mixed"
+        },
+        "security_posture": {
+          "score": 0.66,
+          "summary": "Watch"
+        },
+        "portfolio_fit": {
+          "score": 0.58,
+          "summary": "Useful"
+        }
+      },
+      "security_posture": {
+        "label": "watch",
+        "score": 0.66
+      },
+      "hotspots": [
+        {
+          "title": "Finish release checklist",
+          "severity": 0.56,
+          "category": "quality"
+        }
+      ],
+      "action_candidates": [
+        {
+          "title": "Close the reopened release item"
+        }
+      ],
+      "analyzer_results": [
+        {
+          "dimension": "testing",
+          "score": 0.55,
+          "findings": [
+            "A few test gaps remain"
+          ]
+        },
+        {
+          "dimension": "release",
+          "score": 0.48,
+          "findings": [
+            "Checklist is incomplete"
+          ]
+        }
+      ]
+    },
+    {
+      "metadata": {
+        "name": "RepoC",
+        "full_name": "sample-user/RepoC",
+        "html_url": "https://github.com/sample-user/RepoC",
+        "description": "A risky work-in-progress project.",
+        "language": "Python",
+        "private": false,
+        "archived": false,
+        "stars": 1,
+        "topics": [
+          "python",
+          "security"
+        ]
+      },
+      "overall_score": 0.44,
+      "interest_score": 0.16,
+      "grade": "D",
+      "completeness_tier": "wip",
+      "badges": [],
+      "flags": [
+        "no-tests",
+        "security-review"
+      ],
+      "lenses": {
+        "ship_readiness": {
+          "score": 0.42,
+          "summary": "Thin"
+        },
+        "momentum": {
+          "score": 0.31,
+          "summary": "Fragile"
+        },
+        "security_posture": {
+          "score": 0.28,
+          "summary": "Risky"
+        },
+        "portfolio_fit": {
+          "score": 0.36,
+          "summary": "Questionable"
+        }
+      },
+      "security_posture": {
+        "label": "critical",
+        "score": 0.28
+      },
+      "hotspots": [
+        {
+          "title": "Security posture needs attention",
+          "severity": 0.84,
+          "category": "security-debt"
+        }
+      ],
+      "action_candidates": [
+        {
+          "title": "Preview governance controls"
+        }
+      ],
+      "analyzer_results": [
+        {
+          "dimension": "security",
+          "score": 0.22,
+          "findings": [
+            "Security controls are missing"
+          ]
+        },
+        {
+          "dimension": "testing",
+          "score": 0.18,
+          "findings": [
+            "No meaningful tests found"
+          ]
+        }
+      ]
+    }
+  ]
+}

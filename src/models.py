@@ -101,6 +101,7 @@ class RepoAudit:
     hotspots: list[dict] = field(default_factory=list)
     action_candidates: list[dict] = field(default_factory=list)
     security_posture: dict = field(default_factory=dict)
+    score_explanation: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
@@ -119,6 +120,7 @@ class RepoAudit:
             "hotspots": self.hotspots,
             "action_candidates": self.action_candidates,
             "security_posture": self.security_posture,
+            "score_explanation": self.score_explanation,
         }
 
 
@@ -178,6 +180,9 @@ class AuditReport:
     watch_state: dict = field(default_factory=dict)
     operator_summary: dict = field(default_factory=dict)
     operator_queue: list[dict] = field(default_factory=list)
+    run_change_summary: str = ""
+    run_change_counts: dict = field(default_factory=dict)
+    runtime_breakdown: dict = field(default_factory=dict)
     reconciliation: object | None = None  # RegistryReconciliation when --registry used
 
     @classmethod
@@ -336,6 +341,9 @@ class AuditReport:
             watch_state={},
             operator_summary={},
             operator_queue=[],
+            run_change_summary="",
+            run_change_counts={},
+            runtime_breakdown={},
         )
 
     def to_dict(self) -> dict:
@@ -384,6 +392,9 @@ class AuditReport:
             "watch_state": self.watch_state,
             "operator_summary": self.operator_summary,
             "operator_queue": self.operator_queue,
+            "run_change_summary": self.run_change_summary,
+            "run_change_counts": self.run_change_counts,
+            "runtime_breakdown": self.runtime_breakdown,
             "tech_stack": self.tech_stack,
             "best_work": self.best_work,
             "tier_distribution": self.tier_distribution,

@@ -12,6 +12,11 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from src.analyst_views import build_analyst_context
+from src.report_enrichment import (
+    build_run_change_counts,
+    build_run_change_summary,
+    build_score_explanation,
+)
 from src.sparkline import sparkline as render_sparkline
 
 # ── Color constants (matching Excel design system) ──────────────────
@@ -144,6 +149,7 @@ def _render_html(
         '</div>',
         _repo_table(analyst_context, score_history),
         _portfolio_trends_section(trend_data or []),
+        _run_changes_section(report_data, diff_data),
         _compare_section(diff_data),
         _scenario_section(analyst_context),
         _governance_section(report_data),
@@ -523,6 +529,7 @@ def _repo_table(analyst_context: dict, score_history: dict[str, list[float]] | N
     for entry in analyst_context["ranked_audits"]:
         a = entry["audit"]
         m = a.get("metadata", {})
+        explanation = a.get("score_explanation") or build_score_explanation(a)
         name = m.get("name", "")
         url = m.get("html_url", "")
         grade = a.get("grade", "F")
@@ -547,6 +554,10 @@ def _repo_table(analyst_context: dict, score_history: dict[str, list[float]] | N
         safe_tier = escape(tier)
         safe_collections = escape(collections)
         safe_url = _safe_href(url)
+        next_action = escape(explanation.get("next_best_action", "") or "")
+        score_note = escape(explanation.get("next_tier_gap_summary", "") or "")
+        next_action_markup = f'<br><span class="muted"><strong>Next:</strong> {next_action}</span>' if next_action else ""
+        score_note_markup = f'<br><span class="muted"><strong>Gap:</strong> {score_note}</span>' if score_note else ""
         link = f'<a href="{safe_url}" target="_blank" rel="noopener noreferrer">{safe_name}</a>' if safe_url else safe_name
         rows.append(
             f'<tr data-tier="{escape(tier, quote=True)}" '
@@ -564,7 +575,10 @@ def _repo_table(analyst_context: dict, score_history: dict[str, list[float]] | N
             f'<td>{safe_lang}</td>'
             f'<td>{safe_collections or "—"}</td>'
             f'<td class="sparkline">{escape(spark)}</td>'
-            f'<td class="desc">{safe_desc}</td>'
+            f'<td class="desc">{safe_desc}'
+            f"{next_action_markup}"
+            f"{score_note_markup}"
+            f'</td>'
             f'</tr>'
         )
 
@@ -609,6 +623,39 @@ def _repo_table(analyst_context: dict, score_history: dict[str, list[float]] | N
         </tr></thead>
         <tbody>{''.join(rows)}</tbody>
       </table>
+    </div>"""
+
+
+def _run_changes_section(report_data: dict, diff_data: dict | None) -> str:
+    counts = report_data.get("run_change_counts") or build_run_change_counts(diff_data)
+    summary = report_data.get("run_change_summary") or build_run_change_summary(diff_data)
+    if not summary and not diff_data:
+        return ""
+
+    detail_rows = []
+    for change in (diff_data or {}).get("repo_changes", [])[:6]:
+        detail_rows.append(
+            f"<tr><td>{escape(change.get('name', ''))}</td>"
+            f"<td class='num'>{change.get('delta', 0.0):+.3f}</td>"
+            f"<td>{escape(change.get('old_tier', '—'))} → {escape(change.get('new_tier', '—'))}</td></tr>"
+        )
+    return f"""
+    <div class="section">
+      <h2>Run Changes</h2>
+      <div class="analyst-grid">
+        <div class="panel">
+          <div class="meta-line"><strong>Summary:</strong> {escape(summary)}</div>
+          <div class="meta-line"><strong>Improving:</strong> {counts.get('score_improvements', 0)} | <strong>Regressing:</strong> {counts.get('score_regressions', 0)}</div>
+          <div class="meta-line"><strong>Promotions:</strong> {counts.get('tier_promotions', 0)} | <strong>Demotions:</strong> {counts.get('tier_demotions', 0)}</div>
+          <div class="meta-line"><strong>Security / Governance:</strong> {counts.get('security_changes', 0)} / {counts.get('collection_changes', 0)}</div>
+        </div>
+        <div class="panel">
+          <table class="compact-table">
+            <thead><tr><th>Repo</th><th>Delta</th><th>Tier Change</th></tr></thead>
+            <tbody>{''.join(detail_rows) or "<tr><td colspan='3'>No prior run comparison is available yet.</td></tr>"}</tbody>
+          </table>
+        </div>
+      </div>
     </div>"""
 
 

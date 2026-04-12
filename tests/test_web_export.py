@@ -535,6 +535,18 @@ class TestRenderHtml:
         assert "Profile" in html
         assert "Collections" in html
 
+    def test_repo_table_includes_next_action_explainability(self):
+        html = _render_html(_make_report())
+        assert "Next:" in html or "Gap:" in html
+
+    def test_run_changes_section_is_rendered(self):
+        html = _render_html(
+            _make_report(run_change_summary="One repo improved and one regressed."),
+            diff_data={"repo_changes": [], "score_changes": []},
+        )
+        assert "Run Changes" in html
+        assert "One repo improved and one regressed." in html
+
     def test_operator_section_includes_trend_and_primary_target(self):
         html = _render_html(_make_report())
         assert "Trend:" in html

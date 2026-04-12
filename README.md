@@ -22,6 +22,32 @@ Today it can:
 
 If you are new here, the simplest way to think about it is: this project tells you which repos are healthy, which ones are drifting, and what to look at next.
 
+## 5-Minute Review
+
+If you just want to understand the product quickly:
+
+```bash
+make demo
+```
+
+That generates a demo JSON report, HTML dashboard, workbook, and control-center artifact in `output/demo/` from the committed fixture at [fixtures/demo/sample-report.json](/Users/d/Projects/GithubRepoAuditor/fixtures/demo/sample-report.json).
+
+For the real workflow, the fastest review loop is:
+
+```bash
+audit <github-username> --doctor
+audit <github-username> --html
+audit <github-username> --control-center
+```
+
+Then open the workbook and move in this order:
+- `Dashboard`
+- `Run Changes`
+- `Review Queue`
+- `Portfolio Explorer`
+- `Repo Detail`
+- `Executive Summary`
+
 ## Features
 
 - **12 Analyzers** — README quality, test coverage, CI/CD, dependency freshness, commit patterns, bus factor, code complexity, security controls, license, build readiness, GraphQL signals, and more
@@ -88,6 +114,13 @@ Normal runs now perform a lightweight automatic preflight before fetching repos.
 The new `--control-center` path is read-only. It loads the latest report + warehouse state, groups open work into `Blocked`, `Needs Attention Now`, `Ready for Manual Action`, and `Safe to Defer`, and writes `operator-control-center-<username>-<date>.json` plus `.md`.
 
 Watch mode now supports `--watch-strategy adaptive|incremental|full`. `adaptive` is the default and uses the stored baseline contract plus the scheduled full-refresh interval to decide whether each watch cycle should run full or incremental.
+
+## Demo and Guides
+
+- Demo fixture: [fixtures/demo/sample-report.json](/Users/d/Projects/GithubRepoAuditor/fixtures/demo/sample-report.json)
+- Workbook tour: [docs/workbook-tour.md](/Users/d/Projects/GithubRepoAuditor/docs/workbook-tour.md)
+- Weekly operator workflow: [docs/weekly-review.md](/Users/d/Projects/GithubRepoAuditor/docs/weekly-review.md)
+- Extending analyzers: [docs/extending-analyzers.md](/Users/d/Projects/GithubRepoAuditor/docs/extending-analyzers.md)
 
 ### Best First Run
 
@@ -163,6 +196,15 @@ Both modes read from the same report + warehouse facts. Python owns the hidden `
 Template mode is also validated during preflight: the committed workbook asset must exist and pass a lightweight shell check before the run will continue.
 
 This workbook boundary is unchanged in the current phase: the project still emits one workbook artifact, visible sheets remain filter-based, and hidden `Data_*` sheets remain the contract surface for workbook facts and downstream bindings.
+
+The workbook’s main visible flow is now:
+- `Index` for orientation
+- `Dashboard` for the big-picture read
+- `Run Changes` for what moved this run
+- `Review Queue` for action
+- `Portfolio Explorer` for comparison
+- `Repo Detail` for one-repo drilldown
+- `Executive Summary` for a one-page shareable readout
 
 For workbook-facing changes, use the canonical release gate:
 

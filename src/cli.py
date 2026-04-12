@@ -19,8 +19,10 @@ import os
 import subprocess
 import sys
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
+from time import perf_counter
 
 from src.analyzers import run_all_analyzers
 from src.baseline_context import (
@@ -37,6 +39,7 @@ from src.cloner import clone_workspace
 from src.github_client import GitHubClient
 from src.models import AnalyzerResult, AuditReport, RepoAudit, RepoMetadata
 from src.recurring_review import FULL_REFRESH_DAYS
+from src.report_enrichment import build_run_change_counts, build_run_change_summary
 from src.reporter import (
     write_json_report,
     write_markdown_report,
@@ -44,6 +47,8 @@ from src.reporter import (
     write_raw_metadata,
 )
 from src.scorer import score_repo
+
+ANALYSIS_WORKERS = 4
 
 
 def _date_str(dt: datetime) -> str:
@@ -1402,6 +1407,7 @@ def _analyze_repos(
     client: GitHubClient,
     portfolio_lang_freq: dict[str, float],
     custom_weights: dict[str, float] | None,
+    runtime_stats: dict | None = None,
 ) -> list[RepoAudit]:
     from src.analyzers import load_custom_analyzers
 
@@ -1416,56 +1422,89 @@ def _analyze_repos(
             print_info(f"Loaded {len(extra_analyzers)} custom analyzer(s) from {args.analyzers_dir}")
 
     audits: list[RepoAudit] = []
+
+    def _analyze_one(repo_meta: RepoMetadata, repo_path: Path) -> RepoAudit:
+        worker_client = GitHubClient(token=client.token, cache=client.cache)
+        results = run_all_analyzers(repo_path, repo_meta, worker_client, extra_analyzers=extra_analyzers)
+        return score_repo(
+            repo_meta,
+            results,
+            portfolio_lang_freq=portfolio_lang_freq,
+            custom_weights=custom_weights,
+            github_client=worker_client,
+            scorecard_enabled=args.scorecard,
+            security_offline=args.security_offline,
+        )
+
     progress = create_progress()
+    clone_start = perf_counter()
     with clone_workspace(
         repos,
         token=args.token,
         on_progress=lambda i, t, n: None,
         on_error=lambda n, m: print_warning(f"Failed to clone {n}"),
     ) as cloned:
+        clone_seconds = perf_counter() - clone_start
+        if runtime_stats is not None:
+            runtime_stats["clone_fetch_seconds"] = round(clone_seconds, 3)
         print_info(f"Cloned {len(cloned)}/{len(repos)} repos. Analyzing...")
+        analyzable = [(index, repo_meta, cloned.get(repo_meta.name)) for index, repo_meta in enumerate(repos)]
+        analyzable = [(index, repo_meta, repo_path) for index, repo_meta, repo_path in analyzable if repo_path]
+        workers = min(ANALYSIS_WORKERS, max(1, len(analyzable)))
+        analyze_start = perf_counter()
         if progress:
             with progress:
                 task = progress.add_task("Analyzing", total=len(repos))
-                for repo_meta in repos:
-                    repo_path = cloned.get(repo_meta.name)
-                    if not repo_path:
-                        progress.advance(task)
-                        continue
-                    progress.update(task, description=f"Analyzing {repo_meta.name}")
-                    results = run_all_analyzers(repo_path, repo_meta, client, extra_analyzers=extra_analyzers)
-                    audit = score_repo(
-                        repo_meta,
-                        results,
-                        portfolio_lang_freq=portfolio_lang_freq,
-                        custom_weights=custom_weights,
-                        github_client=client,
-                        scorecard_enabled=args.scorecard,
-                        security_offline=args.security_offline,
-                    )
-                    audits.append(audit)
-                    if args.verbose:
-                        _print_verbose(audit)
+                completed: dict[int, RepoAudit] = {}
+                skipped = len(repos) - len(analyzable)
+                for _ in range(skipped):
                     progress.advance(task)
+                if workers == 1:
+                    for index, repo_meta, repo_path in analyzable:
+                        progress.update(task, description=f"Analyzing {repo_meta.name}")
+                        completed[index] = _analyze_one(repo_meta, repo_path)
+                        if args.verbose:
+                            _print_verbose(completed[index])
+                        progress.advance(task)
+                else:
+                    with ThreadPoolExecutor(max_workers=workers) as executor:
+                        futures = {
+                            executor.submit(_analyze_one, repo_meta, repo_path): (index, repo_meta.name)
+                            for index, repo_meta, repo_path in analyzable
+                        }
+                        for future in as_completed(futures):
+                            index, repo_name = futures[future]
+                            progress.update(task, description=f"Analyzing {repo_name}")
+                            completed[index] = future.result()
+                            if args.verbose:
+                                _print_verbose(completed[index])
+                            progress.advance(task)
+                audits.extend(completed[index] for index in sorted(completed))
         else:
-            for index, repo_meta in enumerate(repos, 1):
-                repo_path = cloned.get(repo_meta.name)
-                if not repo_path:
-                    continue
-                print(f"  [{index}/{len(repos)}] Analyzing {repo_meta.name}...", file=sys.stderr)
-                results = run_all_analyzers(repo_path, repo_meta, client, extra_analyzers=extra_analyzers)
-                audit = score_repo(
-                    repo_meta,
-                    results,
-                    portfolio_lang_freq=portfolio_lang_freq,
-                    custom_weights=custom_weights,
-                    github_client=client,
-                    scorecard_enabled=args.scorecard,
-                    security_offline=args.security_offline,
-                )
-                audits.append(audit)
-                if args.verbose:
-                    _print_verbose(audit)
+            completed: dict[int, RepoAudit] = {}
+            if workers == 1:
+                for index, repo_meta, repo_path in analyzable:
+                    print(f"  [{index + 1}/{len(repos)}] Analyzing {repo_meta.name}...", file=sys.stderr)
+                    completed[index] = _analyze_one(repo_meta, repo_path)
+                    if args.verbose:
+                        _print_verbose(completed[index])
+            else:
+                with ThreadPoolExecutor(max_workers=workers) as executor:
+                    futures = {
+                        executor.submit(_analyze_one, repo_meta, repo_path): (index, repo_meta.name)
+                        for index, repo_meta, repo_path in analyzable
+                    }
+                    finished = 0
+                    for future in as_completed(futures):
+                        index, repo_name = futures[future]
+                        finished += 1
+                        print(f"  [{finished}/{len(analyzable)}] Analyzing {repo_name}...", file=sys.stderr)
+                        completed[index] = future.result()
+                        if args.verbose:
+                            _print_verbose(completed[index])
+            audits.extend(completed[index] for index in sorted(completed))
+        if runtime_stats is not None:
+            runtime_stats["analyzer_seconds"] = round(perf_counter() - analyze_start, 3)
 
     print_info("Clones cleaned up")
     return audits
@@ -1701,6 +1740,7 @@ def _write_report_outputs(
     )
     from src.warehouse import write_warehouse_snapshot
 
+    output_start = perf_counter()
     _apply_ops_writeback(report, args, client, output_dir)
     _apply_governance_view_filter(report, args.governance_view)
     if write_json:
@@ -1737,12 +1777,15 @@ def _write_report_outputs(
         portfolio_profile=args.portfolio_profile,
         collection=args.collection,
     )
+    report.run_change_summary = build_run_change_summary(diff_dict)
+    report.run_change_counts = build_run_change_counts(diff_dict)
     report_data = report.to_dict()
     if write_json:
         json_path = write_json_report(report, output_dir)
 
     trend_data = load_trend_data()
     score_history = load_repo_score_history()
+    workbook_start = perf_counter()
     excel_path = export_excel(
         json_path,
         output_dir / f"audit-dashboard-{report.username}-{_date_str(report.generated_at)}.xlsx",
@@ -1753,6 +1796,7 @@ def _write_report_outputs(
         collection=args.collection,
         excel_mode=args.excel_mode,
     )
+    report.runtime_breakdown["workbook_build_seconds"] = round(perf_counter() - workbook_start, 3)
     md_path = write_markdown_report(report, output_dir, diff_data=diff_dict)
     pcc_path = write_pcc_export(report, output_dir)
     raw_path = write_raw_metadata(report, output_dir)
@@ -1762,6 +1806,7 @@ def _write_report_outputs(
         archive_report(json_path)
     if save_fingerprint_data:
         save_fingerprints(report_data["audits"], output_dir / ".audit-fingerprints.json")
+    report.runtime_breakdown["report_output_seconds"] = round(perf_counter() - output_start, 3)
 
     badge_info = ""
     if args.badges:
@@ -2011,12 +2056,14 @@ def _run_targeted_audit(
         return
 
     portfolio_lang_freq = _portfolio_lang_freq_for_filtered_baseline(filtered_repos)
+    runtime_stats: dict[str, float] = {}
     new_audits = _analyze_repos(
         targeted_repos,
         args=args,
         client=client,
         portfolio_lang_freq=portfolio_lang_freq,
         custom_weights=custom_weights,
+        runtime_stats=runtime_stats,
     )
     if not new_audits:
         return
@@ -2058,6 +2105,7 @@ def _run_targeted_audit(
         full_refresh_interval_days=FULL_REFRESH_DAYS,
     )
     report.preflight_summary = getattr(args, "_preflight_summary", {})
+    report.runtime_breakdown = runtime_stats
     _apply_requested_reconciliation(report, args, merged_audits)
 
     outputs = _write_report_outputs(
@@ -2514,12 +2562,14 @@ def main() -> None:
                     print_info(f"Resumed {len(resumed_audits)} previously completed repo(s)")
                     repos = [r for r in repos if r.name not in resumed_names]
 
+        runtime_stats: dict[str, float] = {}
         audits = _analyze_repos(
             repos,
             args=args,
             client=client,
             portfolio_lang_freq=_portfolio_lang_freq_for_filtered_baseline(repos),
             custom_weights=custom_weights,
+            runtime_stats=runtime_stats,
         )
         all_audits = resumed_audits + audits
 
@@ -2552,6 +2602,7 @@ def main() -> None:
                 full_refresh_interval_days=FULL_REFRESH_DAYS,
             )
             report.preflight_summary = getattr(args, "_preflight_summary", {})
+            report.runtime_breakdown = runtime_stats
             _apply_requested_reconciliation(report, args, audits)
             outputs = _write_report_outputs(report, args, output_dir, client=client, cache=cache)
             _print_output_summary(f"Audited {report.repos_audited} repos for {report.username}", report, outputs)

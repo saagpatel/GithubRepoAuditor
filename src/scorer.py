@@ -170,6 +170,7 @@ def score_repo(
         build_hotspots,
         compute_lens_scores,
     )
+    from src.report_enrichment import build_score_explanation
     from src.security_intelligence import build_security_posture
 
     audit.security_posture = build_security_posture(
@@ -188,6 +189,7 @@ def score_repo(
     )
     audit.action_candidates = build_action_candidates(audit)
     audit.hotspots = build_hotspots(audit)
+    audit.score_explanation = build_score_explanation(audit)
 
     return audit
 
