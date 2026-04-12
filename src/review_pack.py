@@ -71,6 +71,14 @@ def export_review_pack(
             f"  Relapse Churn: {item.get('follow_through_relapse_churn', 'None')} — "
             f"{item.get('follow_through_relapse_churn_summary', 'No relapse churn is currently surfaced.')}"
         )
+        _w(
+            f"  Recovery Freshness: {item.get('follow_through_recovery_freshness', 'None')} — "
+            f"{item.get('follow_through_recovery_freshness_summary', 'No follow-through recovery freshness signal is currently surfaced.')}"
+        )
+        _w(
+            f"  Recovery Memory Reset: {item.get('follow_through_recovery_memory_reset', 'None')} — "
+            f"{item.get('follow_through_recovery_memory_reset_summary', 'No follow-through recovery memory reset signal is currently surfaced.')}"
+        )
         _w(f"  Next Checkpoint: {item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
     if not weekly_pack.get("top_attention"):
         _w("- No urgent attention items are currently surfaced.")
@@ -123,6 +131,23 @@ def export_review_pack(
     for item in weekly_pack.get("top_churn_follow_through_items", [])[:3]:
         label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
         _w(f"- Churn Hotspot: {label} — {item.get('follow_through_relapse_churn_summary', 'No relapse churn is currently surfaced.')}")
+    _w("")
+    _w("### Follow-Through Freshness Decay and Recovery Memory Reset")
+    _w("")
+    _w(f"- Recovery Freshness: {weekly_pack.get('follow_through_recovery_freshness_summary', 'No follow-through recovery freshness signal is currently surfaced.')}")
+    _w(f"- Recovery Memory Reset: {weekly_pack.get('follow_through_recovery_memory_reset_summary', 'No follow-through recovery memory reset signal is currently surfaced.')}")
+    for item in weekly_pack.get("top_fresh_recovery_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        _w(f"- Fresh Recovery: {label} — {item.get('follow_through_recovery_freshness_summary', 'No follow-through recovery freshness signal is currently surfaced.')}")
+    for item in weekly_pack.get("top_softening_recovery_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        _w(f"- Softening Recovery: {label} — {item.get('follow_through_recovery_freshness_summary', 'No follow-through recovery freshness signal is currently surfaced.')}")
+    for item in weekly_pack.get("top_reset_recovery_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        _w(f"- Recovery Reset: {label} — {item.get('follow_through_recovery_memory_reset_summary', 'No follow-through recovery memory reset signal is currently surfaced.')}")
+    for item in weekly_pack.get("top_rebuilding_recovery_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        _w(f"- Rebuilding Recovery: {label} — {item.get('follow_through_recovery_memory_reset_summary', 'No follow-through recovery memory reset signal is currently surfaced.')}")
     _w("")
     _w("### Top Repo Drilldowns")
     _w("")

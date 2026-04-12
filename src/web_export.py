@@ -17,6 +17,10 @@ from src.report_enrichment import (
     build_follow_through_checkpoint_status_label,
     build_follow_through_escalation_status_label,
     build_follow_through_escalation_summary,
+    build_follow_through_recovery_freshness_status_label,
+    build_follow_through_recovery_freshness_summary,
+    build_follow_through_recovery_memory_reset_status_label,
+    build_follow_through_recovery_memory_reset_summary,
     build_follow_through_recovery_persistence_status_label,
     build_follow_through_recovery_persistence_summary,
     build_follow_through_recovery_status_label,
@@ -267,6 +271,8 @@ def _operator_section(data: dict) -> str:
             f"<br><span class='muted'><strong>Recovery / Retirement:</strong> {escape(build_follow_through_recovery_status_label(item))} — {escape(build_follow_through_recovery_summary(item))}</span>"
             f"<br><span class='muted'><strong>Recovery Persistence:</strong> {escape(build_follow_through_recovery_persistence_status_label(item))} — {escape(build_follow_through_recovery_persistence_summary(item))}</span>"
             f"<br><span class='muted'><strong>Relapse Churn:</strong> {escape(build_follow_through_relapse_churn_status_label(item))} — {escape(build_follow_through_relapse_churn_summary(item))}</span>"
+            f"<br><span class='muted'><strong>Recovery Freshness:</strong> {escape(build_follow_through_recovery_freshness_status_label(item))} — {escape(build_follow_through_recovery_freshness_summary(item))}</span>"
+            f"<br><span class='muted'><strong>Recovery Memory Reset:</strong> {escape(build_follow_through_recovery_memory_reset_status_label(item))} — {escape(build_follow_through_recovery_memory_reset_summary(item))}</span>"
             f"<br><span class='muted'><strong>Next checkpoint:</strong> {escape(build_follow_through_checkpoint(item))}</span>"
             f"<br><span class='muted'><strong>Artifact:</strong> {escape(artifact_label)}</span>"
             "</li>"
@@ -309,6 +315,8 @@ def _operator_section(data: dict) -> str:
         <div class="meta-line"><strong>Recovery / Retirement:</strong> {escape(summary.get('follow_through_recovery_summary', 'No follow-through recovery or escalation-retirement signal is currently surfaced.'))}</div>
         <div class="meta-line"><strong>Recovery Persistence:</strong> {escape(summary.get('follow_through_recovery_persistence_summary', 'No follow-through recovery persistence signal is currently surfaced.'))}</div>
         <div class="meta-line"><strong>Relapse Churn:</strong> {escape(summary.get('follow_through_relapse_churn_summary', 'No relapse churn is currently surfaced.'))}</div>
+        <div class="meta-line"><strong>Recovery Freshness:</strong> {escape(summary.get('follow_through_recovery_freshness_summary', 'No follow-through recovery freshness signal is currently surfaced.'))}</div>
+        <div class="meta-line"><strong>Recovery Memory Reset:</strong> {escape(summary.get('follow_through_recovery_memory_reset_summary', 'No follow-through recovery memory reset signal is currently surfaced.'))}</div>
         <div class="meta-line"><strong>Primary Target:</strong> {escape(primary_target_label or 'No active target')}</div>
         <div class="meta-line"><strong>Why This Is The Top Target:</strong> {escape(summary.get('primary_target_reason', 'No target rationale is recorded yet.'))}</div>
         <div class="meta-line"><strong>What Counts As Done:</strong> {escape(summary.get('primary_target_done_criteria', 'No done-state guidance is recorded yet.'))}</div>
@@ -514,6 +522,8 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
             f"<br><span class='muted'><strong>Recovery / Retirement:</strong> {escape(item.get('follow_through_recovery', 'None'))} — {escape(item.get('follow_through_recovery_summary', 'No follow-through recovery or escalation-retirement signal is currently surfaced.'))}</span>"
             f"<br><span class='muted'><strong>Recovery Persistence:</strong> {escape(item.get('follow_through_recovery_persistence', 'None'))} — {escape(item.get('follow_through_recovery_persistence_summary', 'No follow-through recovery persistence signal is currently surfaced.'))}</span>"
             f"<br><span class='muted'><strong>Relapse Churn:</strong> {escape(item.get('follow_through_relapse_churn', 'None'))} — {escape(item.get('follow_through_relapse_churn_summary', 'No relapse churn is currently surfaced.'))}</span>"
+            f"<br><span class='muted'><strong>Recovery Freshness:</strong> {escape(item.get('follow_through_recovery_freshness', 'None'))} — {escape(item.get('follow_through_recovery_freshness_summary', 'No follow-through recovery freshness signal is currently surfaced.'))}</span>"
+            f"<br><span class='muted'><strong>Recovery Memory Reset:</strong> {escape(item.get('follow_through_recovery_memory_reset', 'None'))} — {escape(item.get('follow_through_recovery_memory_reset_summary', 'No follow-through recovery memory reset signal is currently surfaced.'))}</span>"
             f"<br><span class='muted'><strong>Next Checkpoint:</strong> {escape(item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</span>"
             "</li>"
         )
@@ -553,6 +563,22 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
     for item in weekly_pack.get("top_churn_follow_through_items", [])[:3]:
         label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
         churn_rows.append(f"<li>{escape(label)} — {escape(item.get('follow_through_relapse_churn_summary', 'No relapse churn is currently surfaced.'))}</li>")
+    fresh_rows = []
+    for item in weekly_pack.get("top_fresh_recovery_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        fresh_rows.append(f"<li>{escape(label)} — {escape(item.get('follow_through_recovery_freshness_summary', 'No follow-through recovery freshness signal is currently surfaced.'))}</li>")
+    softening_rows = []
+    for item in weekly_pack.get("top_softening_recovery_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        softening_rows.append(f"<li>{escape(label)} — {escape(item.get('follow_through_recovery_freshness_summary', 'No follow-through recovery freshness signal is currently surfaced.'))}</li>")
+    reset_rows = []
+    for item in weekly_pack.get("top_reset_recovery_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        reset_rows.append(f"<li>{escape(label)} — {escape(item.get('follow_through_recovery_memory_reset_summary', 'No follow-through recovery memory reset signal is currently surfaced.'))}</li>")
+    rebuilding_rows = []
+    for item in weekly_pack.get("top_rebuilding_recovery_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        rebuilding_rows.append(f"<li>{escape(label)} — {escape(item.get('follow_through_recovery_memory_reset_summary', 'No follow-through recovery memory reset signal is currently surfaced.'))}</li>")
     repo_cards = []
     for briefing in weekly_pack.get("repo_briefings", [])[:3]:
         repo_cards.append(
@@ -569,6 +595,8 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
               <div class="meta-line"><strong>Recovery / Retirement:</strong> {escape(briefing.get('recovery_line', 'None: No follow-through recovery or escalation-retirement signal is currently surfaced.'))}</div>
               <div class="meta-line"><strong>Recovery Persistence:</strong> {escape(briefing.get('recovery_persistence_line', 'None: No follow-through recovery persistence signal is currently surfaced.'))}</div>
               <div class="meta-line"><strong>Relapse Churn:</strong> {escape(briefing.get('relapse_churn_line', 'None: No relapse churn is currently surfaced.'))}</div>
+              <div class="meta-line"><strong>Recovery Freshness:</strong> {escape(briefing.get('recovery_freshness_line', 'None: No follow-through recovery freshness signal is currently surfaced.'))}</div>
+              <div class="meta-line"><strong>Recovery Memory Reset:</strong> {escape(briefing.get('recovery_memory_reset_line', 'None: No follow-through recovery memory reset signal is currently surfaced.'))}</div>
               <div class="meta-line"><strong>What Would Count As Progress:</strong> {escape(briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</div>
             </div>
             """
@@ -589,6 +617,8 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
           <div class="meta-line"><strong>Follow-Through Recovery and Escalation Retirement:</strong> {escape(weekly_pack.get('follow_through_recovery_summary', 'No follow-through recovery or escalation-retirement signal is currently surfaced.'))}</div>
           <div class="meta-line"><strong>Follow-Through Recovery Persistence:</strong> {escape(weekly_pack.get('follow_through_recovery_persistence_summary', 'No follow-through recovery persistence signal is currently surfaced.'))}</div>
           <div class="meta-line"><strong>Follow-Through Relapse Churn:</strong> {escape(weekly_pack.get('follow_through_relapse_churn_summary', 'No relapse churn is currently surfaced.'))}</div>
+          <div class="meta-line"><strong>Follow-Through Recovery Freshness:</strong> {escape(weekly_pack.get('follow_through_recovery_freshness_summary', 'No follow-through recovery freshness signal is currently surfaced.'))}</div>
+          <div class="meta-line"><strong>Follow-Through Recovery Memory Reset:</strong> {escape(weekly_pack.get('follow_through_recovery_memory_reset_summary', 'No follow-through recovery memory reset signal is currently surfaced.'))}</div>
           <h3>Still Untouched</h3>
           <ul class="bullet-list">{''.join(untouched_rows) or '<li>No untouched follow-through hotspots are currently surfaced.</li>'}</ul>
           <h3>Stale Follow-Through</h3>
@@ -609,6 +639,14 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
           <ul class="bullet-list">{''.join(sustained_rows) or '<li>No sustained recovery items are currently surfaced.</li>'}</ul>
           <h3>Relapse Churn</h3>
           <ul class="bullet-list">{''.join(churn_rows) or '<li>No relapse-churn hotspots are currently surfaced.</li>'}</ul>
+          <h3>Fresh Recovery</h3>
+          <ul class="bullet-list">{''.join(fresh_rows) or '<li>No fresh recovery items are currently surfaced.</li>'}</ul>
+          <h3>Softening Recovery</h3>
+          <ul class="bullet-list">{''.join(softening_rows) or '<li>No softening recovery items are currently surfaced.</li>'}</ul>
+          <h3>Recovery Reset</h3>
+          <ul class="bullet-list">{''.join(reset_rows) or '<li>No recovery-memory reset hotspots are currently surfaced.</li>'}</ul>
+          <h3>Rebuilding Recovery</h3>
+          <ul class="bullet-list">{''.join(rebuilding_rows) or '<li>No rebuilding recovery items are currently surfaced.</li>'}</ul>
           <h3>Top Attention</h3>
           <ul class="bullet-list">{''.join(attention_rows) or '<li>No urgent attention items are currently surfaced.</li>'}</ul>
         </div>
