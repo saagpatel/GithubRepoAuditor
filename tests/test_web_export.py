@@ -298,6 +298,12 @@ def _make_report(**overrides) -> dict:
             "primary_target_closure_forecast_reset_reentry_rebuild_reset_status": "none",
             "primary_target_closure_forecast_reset_reentry_rebuild_reset_reason": "",
             "closure_forecast_reset_reentry_rebuild_reset_summary": "Rebuilt posture for RepoC: RepoC drift needs review is aging enough that it can keep holding, but it should no longer stay indefinitely at sustained strength.",
+            "primary_target_closure_forecast_reset_reentry_rebuild_refresh_recovery_score": 0.27,
+            "primary_target_closure_forecast_reset_reentry_rebuild_refresh_recovery_status": "recovering-confirmation-rebuild-reset",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_status": "pending-confirmation-rebuild-reentry",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_reason": "Fresh confirmation-side evidence is returning after rebuilt posture was softened or reset, but it has not yet re-earned stronger rebuilt posture.",
+            "closure_forecast_reset_reentry_rebuild_refresh_recovery_summary": "Fresh confirmation-side evidence is returning for RepoC: RepoC drift needs review after rebuilt posture softened, but it has not yet re-earned stronger rebuilt posture (0.27).",
+            "closure_forecast_reset_reentry_rebuild_reentry_summary": "RepoC: RepoC drift needs review is recovering after rebuilt posture softened, but stronger rebuilt confirmation posture still needs more fresh follow-through before it is re-earned.",
             "primary_target_closure_forecast_reset_reentry_rebuild_age_runs": 1,
             "primary_target_closure_forecast_reset_reentry_rebuild_persistence_score": 0.29,
             "primary_target_closure_forecast_reset_reentry_rebuild_persistence_status": "just-rebuilt",
@@ -312,12 +318,15 @@ def _make_report(**overrides) -> dict:
             "reset_reentry_rebuild_churn_hotspots": [],
             "stale_reset_reentry_rebuild_hotspots": [],
             "fresh_reset_reentry_rebuild_signal_hotspots": [],
+            "recovering_from_confirmation_rebuild_reset_hotspots": [],
+            "recovering_from_clearance_rebuild_reset_hotspots": [],
             "stale_reset_reentry_hotspots": [],
             "fresh_reset_reentry_signal_hotspots": [],
             "closure_forecast_reset_reentry_decay_window_runs": 4,
             "closure_forecast_reset_reentry_refresh_window_runs": 4,
             "closure_forecast_reset_reentry_rebuild_window_runs": 4,
             "closure_forecast_reset_reentry_rebuild_decay_window_runs": 4,
+            "closure_forecast_reset_reentry_rebuild_refresh_window_runs": 4,
             "stale_closure_forecast_hotspots": [],
             "fresh_closure_forecast_signal_hotspots": [],
             "closure_forecast_decay_window_runs": 4,
@@ -546,6 +555,8 @@ class TestRenderHtml:
         assert "Reset Re-entry Rebuild Controls:" in html
         assert "Reset Re-entry Rebuild Freshness:" in html
         assert "Reset Re-entry Rebuild Reset Controls:" in html
+        assert "Reset Re-entry Rebuild Refresh Recovery:" in html
+        assert "Reset Re-entry Rebuild Re-entry Controls:" in html
         assert "Reset Re-entry Rebuild Persistence:" in html
         assert "Reset Re-entry Rebuild Churn Controls:" in html
         assert "Recommendation Drift:" in html
@@ -579,6 +590,8 @@ class TestRenderHtml:
         assert "Reset Re-entry Rebuild Summary:" in html
         assert "Reset Re-entry Rebuild Freshness Summary:" in html
         assert "Reset Re-entry Rebuild Reset Summary:" in html
+        assert "Reset Re-entry Rebuild Refresh Recovery Summary:" in html
+        assert "Reset Re-entry Rebuild Re-entry Summary:" in html
         assert "Reset Re-entry Rebuild Persistence Summary:" in html
         assert "Reset Re-entry Rebuild Churn Summary:" in html
         assert "Closure Forecast Reacquisition Summary:" in html

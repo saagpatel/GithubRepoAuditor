@@ -364,6 +364,12 @@ class TestMarkdownReport:
             "primary_target_closure_forecast_reset_reentry_rebuild_reset_status": "none",
             "primary_target_closure_forecast_reset_reentry_rebuild_reset_reason": "",
             "closure_forecast_reset_reentry_rebuild_reset_summary": "Rebuilt posture for Missing template asset is aging enough that it can keep holding, but it should no longer stay indefinitely at sustained strength.",
+            "primary_target_closure_forecast_reset_reentry_rebuild_refresh_recovery_score": 0.27,
+            "primary_target_closure_forecast_reset_reentry_rebuild_refresh_recovery_status": "recovering-confirmation-rebuild-reset",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_status": "pending-confirmation-rebuild-reentry",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_reason": "Fresh confirmation-side evidence is returning after rebuilt posture was softened or reset, but it has not yet re-earned stronger rebuilt posture.",
+            "closure_forecast_reset_reentry_rebuild_refresh_recovery_summary": "Fresh confirmation-side evidence is returning for Missing template asset after rebuilt posture softened, but it has not yet re-earned stronger rebuilt posture (0.27).",
+            "closure_forecast_reset_reentry_rebuild_reentry_summary": "Missing template asset is recovering after rebuilt posture softened, but stronger rebuilt confirmation posture still needs more fresh follow-through before it is re-earned.",
             "primary_target_closure_forecast_reset_reentry_rebuild_age_runs": 1,
             "primary_target_closure_forecast_reset_reentry_rebuild_persistence_score": 0.29,
             "primary_target_closure_forecast_reset_reentry_rebuild_persistence_status": "just-rebuilt",
@@ -376,6 +382,8 @@ class TestMarkdownReport:
             "just_rebuilt_hotspots": [],
             "holding_reset_reentry_rebuild_hotspots": [],
             "reset_reentry_rebuild_churn_hotspots": [],
+            "recovering_from_confirmation_rebuild_reset_hotspots": [],
+            "recovering_from_clearance_rebuild_reset_hotspots": [],
             "stale_reset_reentry_rebuild_hotspots": [],
             "fresh_reset_reentry_rebuild_signal_hotspots": [],
             "stale_reset_reentry_hotspots": [],
@@ -535,6 +543,8 @@ class TestMarkdownReport:
         assert "Reset Re-entry Rebuild Controls:" in content
         assert "Reset Re-entry Rebuild Freshness:" in content
         assert "Reset Re-entry Rebuild Reset Controls:" in content
+        assert "Reset Re-entry Rebuild Refresh Recovery:" in content
+        assert "Reset Re-entry Rebuild Re-entry Controls:" in content
         assert "Reset Re-entry Rebuild Persistence:" in content
         assert "Reset Re-entry Rebuild Churn Controls:" in content
         assert "Reset Re-entry Persistence Summary" in content
@@ -545,6 +555,8 @@ class TestMarkdownReport:
         assert "Reset Re-entry Rebuild Summary" in content
         assert "Reset Re-entry Rebuild Freshness Summary" in content
         assert "Reset Re-entry Rebuild Reset Summary" in content
+        assert "Reset Re-entry Rebuild Refresh Recovery Summary" in content
+        assert "Reset Re-entry Rebuild Re-entry Summary" in content
         assert "Reset Re-entry Rebuild Persistence Summary" in content
         assert "Reset Re-entry Rebuild Churn Summary" in content
         assert "Reacquisition Freshness Summary" in content
