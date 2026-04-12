@@ -926,6 +926,14 @@ def _set_sheet_header(ws, title: str, subtitle: str, *, width: int = 8) -> None:
     ws["A2"].alignment = WRAP
 
 
+def _write_instruction_banner(ws, row: int, end_col: int, message: str) -> None:
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=end_col)
+    cell = ws.cell(row=row, column=1, value=message)
+    cell.font = SUBTITLE_FONT
+    cell.alignment = WRAP
+    cell.fill = PatternFill(fill_type="solid", fgColor="E0F2FE")
+
+
 def _write_key_value_block(ws, start_row: int, start_col: int, rows: list[tuple[str, object]], *, title: str | None = None) -> int:
     row = start_row
     if title:
@@ -965,35 +973,45 @@ def _write_ranked_list(
 
 
 def _inject_sheet_navigation(wb: Workbook) -> None:
-    nav_targets = {
-        "Dashboard": [("Review Queue", "Queue"), ("Repo Detail", "Repo Detail"), ("Run Changes", "Run Changes"), ("Executive Summary", "Exec")],
-        "All Repos": [("Dashboard", "Dashboard"), ("Repo Detail", "Repo Detail"), ("Score Explainer", "Score"), ("Run Changes", "Run Changes")],
-        "Portfolio Explorer": [("Dashboard", "Dashboard"), ("Repo Detail", "Repo Detail"), ("Review Queue", "Queue"), ("Run Changes", "Run Changes")],
-        "Repo Detail": [("Dashboard", "Dashboard"), ("Portfolio Explorer", "Explorer"), ("Score Explainer", "Score"), ("Run Changes", "Run Changes")],
-        "By Lens": [("Dashboard", "Dashboard"), ("Portfolio Explorer", "Explorer"), ("Repo Detail", "Repo Detail")],
-        "By Collection": [("Dashboard", "Dashboard"), ("Portfolio Explorer", "Explorer"), ("Run Changes", "Run Changes")],
-        "Trend Summary": [("Dashboard", "Dashboard"), ("Run Changes", "Run Changes"), ("Review Queue", "Queue")],
-        "Run Changes": [("Dashboard", "Dashboard"), ("Review Queue", "Queue"), ("Repo Detail", "Repo Detail"), ("Executive Summary", "Exec")],
-        "Review Queue": [("Dashboard", "Dashboard"), ("Repo Detail", "Repo Detail"), ("Run Changes", "Run Changes"), ("Print Pack", "Print Pack")],
-        "Campaigns": [("Dashboard", "Dashboard"), ("Review Queue", "Queue"), ("Run Changes", "Run Changes")],
-        "Governance Controls": [("Dashboard", "Dashboard"), ("Review Queue", "Queue"), ("Run Changes", "Run Changes")],
-        "Executive Summary": [("Dashboard", "Dashboard"), ("Review Queue", "Queue"), ("Repo Detail", "Repo Detail"), ("Print Pack", "Print Pack")],
-        "Print Pack": [("Dashboard", "Dashboard"), ("Executive Summary", "Exec"), ("Run Changes", "Run Changes")],
-        "Index": [("Dashboard", "Dashboard"), ("Review Queue", "Queue"), ("Repo Detail", "Repo Detail"), ("Run Changes", "Run Changes")],
+    strip_sheets = {
+        "Dashboard",
+        "All Repos",
+        "Portfolio Explorer",
+        "Repo Detail",
+        "By Lens",
+        "By Collection",
+        "Trend Summary",
+        "Run Changes",
+        "Review Queue",
+        "Campaigns",
+        "Governance Controls",
+        "Executive Summary",
+        "Print Pack",
+        "Index",
     }
-    for sheet_name, links in nav_targets.items():
+    ordered_targets = [
+        "Dashboard",
+        "Review Queue",
+        "Repo Detail",
+        "Run Changes",
+        "Executive Summary",
+    ]
+    for sheet_name in strip_sheets:
         if sheet_name not in wb.sheetnames:
             continue
         ws = wb[sheet_name]
         start_col = max(ws.max_column + 2, 10)
-        title_cell = ws.cell(row=1, column=start_col, value="Jump To")
+        title_cell = ws.cell(row=1, column=start_col, value="Quick Links")
         title_cell.font = SUBHEADER_FONT
-        for offset, (target_sheet, label) in enumerate(links, 1):
+        for offset, target_sheet in enumerate(ordered_targets, 1):
             if target_sheet not in wb.sheetnames:
                 continue
-            cell = ws.cell(row=offset + 1, column=start_col, value=label)
-            _set_internal_hyperlink(cell, target_sheet)
+            cell = ws.cell(row=offset + 1, column=start_col, value=target_sheet)
             cell.alignment = LEFT
+            if target_sheet == sheet_name:
+                cell.font = Font("Calibri", 10, bold=True, color=NAVY)
+                continue
+            _set_internal_hyperlink(cell, target_sheet, display=target_sheet)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -1158,6 +1176,12 @@ def _build_dashboard(
         transition_closure_summary,
     ) = _operator_transition_closure_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
+    ws["M10"] = "Trust Summary"
+    ws["M10"].font = SUBHEADER_FONT
+    ws["N10"] = f"{trust_policy} — {trust_policy_reason}"
+    ws["M11"] = "Use This Page"
+    ws["M11"].font = SUBHEADER_FONT
+    ws["N11"] = "Read the left side for portfolio shape, the right side for operator pressure, then jump into Review Queue or Repo Detail."
 
     operator_rows = [
         ("Setup Health", _display_operator_state(setup_health.get("status", "ok"))),
@@ -2449,6 +2473,12 @@ def _build_navigation(
     ws["A2"].value = f"Last updated: {data['generated_at'][:10]} | {data['repos_audited']} repos | Grade: {data.get('portfolio_grade', '?')}"
     ws["A2"].font = SUBTITLE_FONT
     ws["A2"].alignment = CENTER
+    _write_instruction_banner(
+        ws,
+        3,
+        7,
+        "Use this workbook in order: Dashboard for the brief, Run Changes for movement, Review Queue for action, Repo Detail for one-repo context, and Executive Summary for a shareable recap.",
+    )
     next_mode, watch_strategy, watch_decision = _operator_watch_values(data)
     what_changed, why_it_matters, next_action = _operator_handoff_values(data)
     follow_through = _operator_follow_through_value(data)
@@ -2973,6 +3003,25 @@ def _set_internal_hyperlink(cell, sheet_name: str, *, target_cell: str = "A1", d
     cell.font = Font("Calibri", 10, bold=True, color=TEAL, underline="single")
 
 
+def _repo_detail_lookup_formula(column_index: int, fallback: str, *, allow_blank: bool = False) -> str:
+    escaped_fallback = fallback.replace('"', '""')
+    lookup = f"VLOOKUP($B$4,Data_RepoDetail!$A:$AD,{column_index},FALSE)"
+    if allow_blank:
+        return f'=IFERROR({lookup},"{escaped_fallback}")'
+    return f'=IFERROR(IF({lookup}="","{escaped_fallback}",{lookup}),"{escaped_fallback}")'
+
+
+def _repo_detail_last_movement(scores: list[float]) -> str:
+    if len(scores) < 2:
+        return "No prior comparison yet."
+    delta = round(scores[-1] - scores[-2], 3)
+    if abs(delta) < 0.005:
+        return "Holding flat versus the last run."
+    if delta > 0:
+        return f"Up {delta:.3f} versus the last run."
+    return f"Down {abs(delta):.3f} versus the last run."
+
+
 def _lane_fill_hex(lane: str | None) -> str | None:
     if not lane:
         return None
@@ -3013,7 +3062,7 @@ def _repo_detail_rows(data: dict, score_history: dict[str, list[float]] | None) 
             repo_name,
             metadata.get("html_url", ""),
             metadata.get("language") or "Unknown",
-            metadata.get("description") or "",
+            metadata.get("description") or "No description recorded yet.",
             round(audit.get("overall_score", 0.0), 3),
             round(audit.get("interest_score", 0.0), 3),
             audit.get("grade", ""),
@@ -3023,22 +3072,23 @@ def _repo_detail_rows(data: dict, score_history: dict[str, list[float]] | None) 
             ", ".join(memberships.get(repo_name, [])) or "—",
             audit.get("security_posture", {}).get("label", "unknown"),
             round(audit.get("security_posture", {}).get("score", 0.0), 3),
-            lenses.get("ship_readiness", {}).get("summary", ""),
-            lenses.get("momentum", {}).get("summary", ""),
-            lenses.get("security_posture", {}).get("summary", ""),
-            lenses.get("portfolio_fit", {}).get("summary", ""),
-            render_sparkline(scores) if scores else "",
+            lenses.get("ship_readiness", {}).get("summary", "") or "No ship-readiness summary recorded yet.",
+            lenses.get("momentum", {}).get("summary", "") or "No momentum summary recorded yet.",
+            lenses.get("security_posture", {}).get("summary", "") or "No security summary recorded yet.",
+            lenses.get("portfolio_fit", {}).get("summary", "") or "No portfolio-fit summary recorded yet.",
+            render_sparkline(scores) if scores else "No trend history yet.",
             ", ".join(explanation.get("top_positive_drivers", [])[:3]) or "No strong positive drivers recorded yet.",
             ", ".join(explanation.get("top_negative_drivers", [])[:3]) or "No major drag factors recorded yet.",
-            explanation.get("next_tier_gap_summary", ""),
-            explanation.get("next_best_action", ""),
-            explanation.get("next_best_action_rationale", ""),
-            hotspot_titles[0] if len(hotspot_titles) > 0 else "",
-            hotspot_titles[1] if len(hotspot_titles) > 1 else "",
-            hotspot_titles[2] if len(hotspot_titles) > 2 else "",
-            action_titles[0] if len(action_titles) > 0 else "",
-            action_titles[1] if len(action_titles) > 1 else "",
-            action_titles[2] if len(action_titles) > 2 else "",
+            explanation.get("next_tier_gap_summary", "") or "No next-tier gap is recorded yet.",
+            explanation.get("next_best_action", "") or "No clear next action is recorded yet.",
+            explanation.get("next_best_action_rationale", "") or "No action rationale is recorded yet.",
+            hotspot_titles[0] if len(hotspot_titles) > 0 else "No hotspot recorded yet.",
+            hotspot_titles[1] if len(hotspot_titles) > 1 else "No secondary hotspot recorded yet.",
+            hotspot_titles[2] if len(hotspot_titles) > 2 else "No third hotspot recorded yet.",
+            action_titles[0] if len(action_titles) > 0 else "No action candidate recorded yet.",
+            action_titles[1] if len(action_titles) > 1 else "No second action candidate recorded yet.",
+            action_titles[2] if len(action_titles) > 2 else "No third action candidate recorded yet.",
+            _repo_detail_last_movement(scores),
         ])
 
         ranked_dimensions = sorted(
@@ -3618,6 +3668,7 @@ def _build_hidden_data_sheets(
             "Top Action 1",
             "Top Action 2",
             "Top Action 3",
+            "Last Movement",
         ],
         repo_detail_rows,
     )
@@ -4100,6 +4151,9 @@ def _build_trend_summary(
 
 
 def _build_repo_detail(wb: Workbook, data: dict) -> None:
+    existing_selection = ""
+    if "Repo Detail" in wb.sheetnames:
+        existing_selection = str(wb["Repo Detail"]["B4"].value or "").strip()
     ws = _get_or_create_sheet(wb, "Repo Detail")
     ws.sheet_properties.tabColor = "1E40AF"
     _configure_sheet_view(ws, zoom=115, show_grid_lines=False)
@@ -4109,6 +4163,12 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
         "Pick one repo, then use this page as the fastest single-repo briefing: score, tier, trend, risks, and next move.",
         width=10,
     )
+    _write_instruction_banner(
+        ws,
+        3,
+        8,
+        "Choose one repo, skim the briefing blocks top to bottom, then jump to Run Changes or Review Queue if you need more context.",
+    )
     ws.freeze_panes = "A6"
 
     repo_names = sorted(
@@ -4116,7 +4176,7 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
         for audit in data.get("audits", [])
         if audit.get("metadata", {}).get("name")
     )
-    default_repo = repo_names[0] if repo_names else ""
+    default_repo = existing_selection if existing_selection in repo_names else (repo_names[0] if repo_names else "")
     ws["A4"] = "Select Repo"
     ws["A4"].font = SUBHEADER_FONT
     ws["B4"] = default_repo
@@ -4132,34 +4192,34 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
         ws.add_data_validation(dv)
     ws["D4"] = "GitHub"
     ws["D4"].font = SUBHEADER_FONT
-    ws["E4"] = '=IFERROR(HYPERLINK(VLOOKUP($B$4,Data_RepoDetail!$A:$AC,2,FALSE),"Open Repo"),"Open Repo")'
+    ws["E4"] = '=IFERROR(IF(VLOOKUP($B$4,Data_RepoDetail!$A:$AD,2,FALSE)="","Repo URL unavailable",HYPERLINK(VLOOKUP($B$4,Data_RepoDetail!$A:$AD,2,FALSE),"Open Repo")),"Repo URL unavailable")'
     ws["E4"].font = Font("Calibri", 10, bold=True, color=TEAL, underline="single")
 
     summary_fields = [
-        ("Repo", 1, 1, 1),
-        ("Language", 2, 1, 3),
-        ("Overall Score", 5, 1, 4),
-        ("Interest Score", 6, 1, 5),
-        ("Grade", 7, 1, 6),
-        ("Tier", 8, 1, 7),
-        ("Collections", 11, 3, 1),
-        ("Security", 12, 3, 3),
-        ("Security Score", 13, 3, 4),
-        ("Badges", 9, 5, 1),
-        ("Flags", 10, 5, 3),
-        ("Trend", 18, 5, 5),
+        ("Repo", 1, 1, 1, "No repo selected."),
+        ("Language", 3, 1, 4, "Unknown"),
+        ("Badges", 9, 1, 7, "None"),
+        ("Overall Score", 5, 2, 1, ""),
+        ("Interest Score", 6, 2, 4, ""),
+        ("Flags", 10, 2, 7, "None"),
+        ("Grade", 7, 3, 1, "—"),
+        ("Tier", 8, 3, 4, "—"),
+        ("Collections", 11, 3, 7, "—"),
+        ("Security", 12, 4, 1, "unknown"),
+        ("Security Score", 13, 4, 4, ""),
+        ("Trend", 18, 4, 7, "No trend history yet."),
     ]
-    for label, column_index, row_base, col_base in summary_fields:
+    for label, column_index, row_base, col_base, fallback in summary_fields:
         row = row_base + 5
         col = col_base
         ws.cell(row=row, column=col, value=label).font = SUBHEADER_FONT
-        formula = f'=IFERROR(VLOOKUP($B$4,Data_RepoDetail!$A:$AC,{column_index},FALSE),"")'
+        formula = _repo_detail_lookup_formula(column_index, fallback, allow_blank=column_index in {5, 6, 13})
         style_data_cell(ws.cell(row=row, column=col + 1, value=formula), "left")
 
     ws["A11"] = "Description"
     ws["A11"].font = SUBHEADER_FONT
     ws.merge_cells("B11:H11")
-    ws["B11"] = '=IFERROR(VLOOKUP($B$4,Data_RepoDetail!$A:$AC,4,FALSE),"")'
+    ws["B11"] = _repo_detail_lookup_formula(4, "No description recorded yet.")
     ws["B11"].alignment = WRAP
 
     ws["A13"] = "Top Lens Summaries"
@@ -4173,29 +4233,31 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
     for offset, (label, column_index) in enumerate(lens_rows, 1):
         row = 13 + offset
         ws.cell(row=row, column=1, value=label).font = SUBHEADER_FONT
-        style_data_cell(ws.cell(row=row, column=2, value=f'=IFERROR(VLOOKUP($B$4,Data_RepoDetail!$A:$AC,{column_index},FALSE),"")'), "left")
+        style_data_cell(ws.cell(row=row, column=2, value=_repo_detail_lookup_formula(column_index, "No summary recorded yet.")), "left")
 
     ws["E13"] = "Why This Score Looks This Way"
     ws["E13"].font = SECTION_FONT
     explanation_rows = [
         ("Strongest Drivers", 19),
         ("Biggest Drags", 20),
+        ("Last Movement", 30),
         ("Next Tier Gap", 21),
         ("Next Best Action", 22),
+        ("Why This Action", 23),
     ]
     for offset, (label, column_index) in enumerate(explanation_rows, 1):
         row = 13 + offset
         ws.cell(row=row, column=5, value=label).font = SUBHEADER_FONT
-        style_data_cell(ws.cell(row=row, column=6, value=f'=IFERROR(VLOOKUP($B$4,Data_RepoDetail!$A:$AC,{column_index},FALSE),"")'), "left")
+        style_data_cell(ws.cell(row=row, column=6, value=_repo_detail_lookup_formula(column_index, "No briefing detail recorded yet.")), "left")
 
-    ws["A19"] = "Dimension Breakdown"
-    ws["A19"].font = SECTION_FONT
+    ws["A20"] = "Dimension Breakdown"
+    ws["A20"].font = SECTION_FONT
     dimension_headers = ["Rank", "Dimension", "Score", "Summary"]
     for col, header in enumerate(dimension_headers, 1):
-        ws.cell(row=20, column=col, value=header)
-    style_header_row(ws, 20, len(dimension_headers))
+        ws.cell(row=21, column=col, value=header)
+    style_header_row(ws, 21, len(dimension_headers))
     for rank in range(1, 7):
-        row = 20 + rank
+        row = 21 + rank
         ws.cell(row=row, column=1, value=rank)
         lookup_expr = f'$B$4&"::{rank}"'
         ws.cell(row=row, column=2, value=f'=IFERROR(VLOOKUP({lookup_expr},Data_RepoDimensionRollups!$A:$F,4,FALSE),"")')
@@ -4204,25 +4266,27 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
         for col in range(1, 5):
             style_data_cell(ws.cell(row=row, column=col), "center" if col in {1, 3} else "left")
 
-    ws["F19"] = "Top Hotspots"
-    ws["F19"].font = SECTION_FONT
+    ws["F20"] = "Top Hotspots"
+    ws["F20"].font = SECTION_FONT
     for idx in range(1, 4):
-        row = 19 + idx
+        row = 20 + idx
         ws.cell(row=row, column=6, value=f"Hotspot {idx}").font = SUBHEADER_FONT
-        style_data_cell(ws.cell(row=row, column=7, value=f'=IFERROR(VLOOKUP($B$4,Data_RepoDetail!$A:$AC,{23 + idx},FALSE),"")'), "left")
+        style_data_cell(ws.cell(row=row, column=7, value=_repo_detail_lookup_formula(23 + idx, "No hotspot recorded yet.")), "left")
 
-    ws["F24"] = "Top Actions"
-    ws["F24"].font = SECTION_FONT
+    ws["F25"] = "Top Actions"
+    ws["F25"].font = SECTION_FONT
     for idx in range(1, 4):
-        row = 24 + idx
+        row = 25 + idx
         ws.cell(row=row, column=6, value=f"Action {idx}").font = SUBHEADER_FONT
-        style_data_cell(ws.cell(row=row, column=7, value=f'=IFERROR(VLOOKUP($B$4,Data_RepoDetail!$A:$AC,{26 + idx},FALSE),"")'), "left")
+        style_data_cell(ws.cell(row=row, column=7, value=_repo_detail_lookup_formula(26 + idx, "No action candidate recorded yet.")), "left")
 
-    ws["A29"] = "Use Score Explainer"
-    _set_internal_hyperlink(ws["B29"], "Score Explainer", display="Open Score Explainer")
-    ws["D29"] = "Go To Explorer"
-    _set_internal_hyperlink(ws["E29"], "Portfolio Explorer", display="Open Explorer")
-    auto_width(ws, 8, 30)
+    ws["A30"] = "Use Score Explainer"
+    _set_internal_hyperlink(ws["B30"], "Score Explainer", display="Open Score Explainer")
+    ws["D30"] = "Go To Explorer"
+    _set_internal_hyperlink(ws["E30"], "Portfolio Explorer", display="Open Explorer")
+    ws["F30"] = "Go To Queue"
+    _set_internal_hyperlink(ws["G30"], "Review Queue", display="Open Review Queue")
+    auto_width(ws, 8, 31)
 
 
 def _build_run_changes(wb: Workbook, data: dict, diff_data: dict | None) -> None:
@@ -4235,7 +4299,13 @@ def _build_run_changes(wb: Workbook, data: dict, diff_data: dict | None) -> None
         "Use this sheet to answer one question quickly: what moved since the last run, and what actually needs follow-through now?",
         width=9,
     )
-    ws.freeze_panes = "A8"
+    _write_instruction_banner(
+        ws,
+        4,
+        9,
+        "Read this page top to bottom: scan the summary cards first, then check regressions, blocked items, and new security or governance pressure.",
+    )
+    ws.freeze_panes = "A9"
 
     counts = build_run_change_counts(diff_data)
     summary = (data.get("run_change_summary") or build_run_change_summary(diff_data))
@@ -4243,6 +4313,14 @@ def _build_run_changes(wb: Workbook, data: dict, diff_data: dict | None) -> None
     ws["A3"] = summary
     ws["A3"].font = SUBTITLE_FONT
     ws["A3"].alignment = WRAP
+    ws["A5"] = "Comparison Window"
+    ws["A5"].font = SUBHEADER_FONT
+    ws["B5"] = (
+        f"{(diff_data or {}).get('previous_date', '')[:10]} -> {(diff_data or {}).get('current_date', data.get('generated_at', ''))[:10]}"
+        if diff_data
+        else "No prior baseline was available, so this sheet shows the current run summary and operator pressure without before/after deltas."
+    )
+    ws["B5"].alignment = WRAP
 
     summary_cards = [
         ("Improvements", counts.get("score_improvements", 0)),
@@ -4253,9 +4331,9 @@ def _build_run_changes(wb: Workbook, data: dict, diff_data: dict | None) -> None
         ("Governance", counts.get("collection_changes", 0)),
     ]
     for offset, (label, value) in enumerate(summary_cards):
-        write_kpi_card(ws, 5, 1 + offset * 2, label, value)
+        write_kpi_card(ws, 6, 1 + offset * 2, label, value)
 
-    row = 8
+    row = 9
     sections: list[tuple[str, list[list[object]], list[str]]] = []
     improvements = sorted((diff_data or {}).get("score_changes", []), key=lambda item: item.get("delta", 0.0), reverse=True)
     regressions = sorted((diff_data or {}).get("score_changes", []), key=lambda item: item.get("delta", 0.0))[:5]
@@ -4327,6 +4405,12 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
         "Review Queue",
         "Start with the summary strip, then use the full queue below when you need row-level facts and decision context.",
         width=12,
+    )
+    _write_instruction_banner(
+        ws,
+        3,
+        10,
+        "Work this page in lane order: clear Blocked first, handle Needs Attention Now next, and only then move into Ready for Manual Action or Safe to Defer.",
     )
     counts = _operator_counts(data)
     queue = data.get("operator_queue", []) or []
@@ -4487,7 +4571,7 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
 
     targets = ordered_queue or data.get("review_targets", [])
     for row, item in enumerate(targets, start_row + 1):
-        next_step = item.get("recommended_action", item.get("next_step", ""))
+        next_step = item.get("recommended_action") or item.get("next_step") or "Open Repo Detail and choose the next concrete follow-through step."
         safe_to_defer = item.get("lane") == "deferred" or item.get("safe_to_defer")
         links = item.get("links") or []
         primary_link = links[0].get("url", "") if links else ""
@@ -4498,16 +4582,17 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
             or (data.get("review_summary") or {}).get("generated_at", "")
             or "Current run"
         )
+        why_this_is_here = item.get("lane_reason", "") or item.get("summary", "") or item.get("decision_hint", "") or "This item is still open and needs operator follow-through."
         values = [
             item.get("repo", item.get("repo_name", "")),
             item.get("title", ""),
             item.get("lane", ""),
             item.get("kind", "review"),
             item.get("priority", item.get("severity", 0.0)),
-            item.get("lane_reason", "") or item.get("summary", "") or item.get("decision_hint", ""),
+            why_this_is_here,
             next_step,
             last_movement,
-            primary_link or item.get("repo_url", ""),
+            "Open linked artifact" if primary_link else "No linked artifact",
             "yes" if safe_to_defer else "no",
         ]
         for col, value in enumerate(values, 1):
@@ -4519,7 +4604,6 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
             repo_cell.font = Font("Calibri", 10, color=TEAL, underline="single")
         artifact_cell = ws.cell(row=row, column=9)
         if primary_link:
-            artifact_cell.value = "Open"
             artifact_cell.hyperlink = primary_link
             artifact_cell.font = Font("Calibri", 10, color=TEAL, underline="single")
         _apply_lane_row_fill(ws, row, len(headers), item.get("lane"))
@@ -4827,6 +4911,12 @@ def _build_executive_summary(
         "Executive Summary",
         f"Profile: {context['profile_name']} | Collection: {context['collection_name'] or 'all'}",
         width=6,
+    )
+    _write_instruction_banner(
+        ws,
+        3,
+        12,
+        "Use the left side for the short leadership story and the right side for operator evidence you may need to defend the next move.",
     )
     ws.freeze_panes = "A4"
 

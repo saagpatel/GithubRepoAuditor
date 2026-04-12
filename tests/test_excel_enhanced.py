@@ -813,10 +813,48 @@ class TestAnalystWorkbookSheets:
         wb = Workbook()
         _build_repo_detail(wb, _make_report())
         ws = wb["Repo Detail"]
+        assert "Choose one repo" in str(ws["A3"].value)
         assert ws["A4"].value == "Select Repo"
         assert ws["B4"].value == "RepoA"
         assert ws.data_validations.dataValidation
         assert "VLOOKUP" in str(ws["B6"].value)
+        assert "No description recorded yet." in str(ws["B11"].value)
+
+    def test_repo_detail_preserves_existing_selection_when_still_valid(self):
+        wb = Workbook()
+        _build_repo_detail(wb, _make_report())
+        ws = wb["Repo Detail"]
+        ws["B4"] = "RepoC"
+
+        _build_repo_detail(wb, _make_report())
+
+        assert wb["Repo Detail"]["B4"].value == "RepoC"
+
+    def test_repo_detail_formulas_include_safe_placeholder_copy(self):
+        audits = [
+            _make_audit("RepoA", 0.85, "A", "shipped")
+        ]
+        audits[0]["metadata"]["description"] = ""
+        audits[0]["metadata"]["language"] = None
+        audits[0]["action_candidates"] = []
+        audits[0]["hotspots"] = []
+        audits[0]["score_explanation"] = {
+            "top_positive_drivers": [],
+            "top_negative_drivers": [],
+            "next_tier_gap_summary": "",
+            "next_best_action": "",
+            "next_best_action_rationale": "",
+        }
+
+        wb = Workbook()
+        _build_hidden_data_sheets(wb, _make_report(audits=audits))
+        _build_repo_detail(wb, _make_report(audits=audits))
+        ws = wb["Repo Detail"]
+
+        assert "Unknown" in str(ws["E6"].value)
+        assert "No description recorded yet." in str(ws["B11"].value)
+        assert "No briefing detail recorded yet." in str(ws["F18"].value)
+        assert "No action candidate recorded yet." in str(ws["G26"].value)
 
     def test_run_changes_surfaces_summary(self):
         wb = Workbook()
@@ -829,16 +867,54 @@ class TestAnalystWorkbookSheets:
         ws = wb["Run Changes"]
         assert ws["A1"].value == "Run Changes"
         assert ws["A3"].value is not None
+        assert "Read this page top to bottom" in str(ws["A4"].value)
+        assert ws["A5"].value == "Comparison Window"
+
+    def test_run_changes_shows_safe_first_run_copy_without_diff(self):
+        wb = Workbook()
+        _build_run_changes(wb, _make_report(), None)
+        ws = wb["Run Changes"]
+        assert "No prior baseline was available" in str(ws["B5"].value)
 
     def test_review_queue_has_summary_and_freeze_panes(self):
         wb = Workbook()
         _build_review_queue(wb, _make_report())
         ws = wb["Review Queue"]
+        assert "Work this page in lane order" in str(ws["A3"].value)
         assert ws["A4"].value == "Summary"
         assert ws["E4"].value == "Top 10 To Act On"
         header_row = next(row for row in range(20, 65) if ws.cell(row=row, column=1).value == "Repo")
         assert header_row > 24
         assert ws.freeze_panes == f"A{header_row + 1}"
+
+    def test_core_sheets_expose_consistent_navigation_strip(self, tmp_path):
+        report_path = tmp_path / "report.json"
+        report_path.write_text(json.dumps(_make_report()))
+
+        output = export_excel(report_path, tmp_path / "out.xlsx", excel_mode="standard")
+        wb = load_workbook(output)
+
+        for sheet_name in ["Dashboard", "Run Changes", "Review Queue", "Repo Detail", "Executive Summary"]:
+            ws = wb[sheet_name]
+            quick_link_cells = [
+                cell
+                for row in ws.iter_rows(min_row=1, max_row=7, values_only=False)
+                for cell in row
+                if cell.value == "Quick Links"
+            ]
+            assert quick_link_cells, f"missing quick links header on {sheet_name}"
+            start_col = quick_link_cells[0].column
+            labels = [
+                ws.cell(row=row, column=start_col).value
+                for row in range(2, 7)
+            ]
+            assert labels == [
+                "Dashboard",
+                "Review Queue",
+                "Repo Detail",
+                "Run Changes",
+                "Executive Summary",
+            ]
 
     def test_standard_operator_sheets_include_trend_callouts(self):
         wb = Workbook()

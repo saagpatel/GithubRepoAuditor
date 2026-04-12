@@ -970,7 +970,12 @@ def _validate_parity(standard_path: Path, template_path: Path) -> dict:
     template_wb = load_workbook(template_path)
     parity_checks = [
         ("Dashboard", "A1"),
+        ("Repo Detail", "A1"),
+        ("Repo Detail", "B4"),
         ("Review Queue", "B6"),
+        ("Run Changes", "A1"),
+        ("Run Changes", "B5"),
+        ("Executive Summary", "A1"),
         ("Governance Controls", "B5"),
         ("Print Pack", "B9"),
     ]
@@ -1012,6 +1017,21 @@ def _manual_signoff_template(standard_path: Path) -> dict:
                 "status": "pending",
             },
             {
+                "id": "core-navigation-links-work",
+                "label": "Confirm the top navigation links work on Dashboard, Run Changes, Review Queue, Repo Detail, and Executive Summary.",
+                "status": "pending",
+            },
+            {
+                "id": "repo-detail-selector-works",
+                "label": "Confirm the Repo Detail selector changes the briefing cleanly and keeps the page readable.",
+                "status": "pending",
+            },
+            {
+                "id": "run-changes-readable",
+                "label": "Confirm Run Changes has clear sections, readable summary copy, and sensible first-run messaging when no comparison exists.",
+                "status": "pending",
+            },
+            {
                 "id": "normal-zoom-readable",
                 "label": "Confirm the standard workbook is readable at normal zoom on the core visible sheets.",
                 "status": "pending",
@@ -1023,7 +1043,7 @@ def _manual_signoff_template(standard_path: Path) -> dict:
             },
             {
                 "id": "filters-work",
-                "label": "Confirm visible filters work on the core operator sheets.",
+                "label": "Confirm visible filters and row links work on the core operator sheets, especially Review Queue.",
                 "status": "pending",
             },
         ],
