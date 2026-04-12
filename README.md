@@ -4,7 +4,23 @@
 
 > Know the truth about every project you've ever started — because `git log` across 100 repos doesn't tell you which ones are worth finishing.
 
-GitHub Repo Auditor clones every repo on your GitHub account, runs 12 analyzers across completeness and interest dimensions, assigns letter grades and achievement badges, and generates actionable dashboards you can actually use to decide what to work on next. Built for developers who ship fast, start often, and need a system to manage the sprawl.
+GitHub Repo Auditor is a portfolio audit and operator tool for developers with a lot of repositories. It clones every repo on your GitHub account, runs 12 analyzers across completeness and interest dimensions, assigns letter grades and achievement badges, preserves historical state, and generates actionable dashboards you can actually use to decide what to work on next. Built for developers who ship fast, start often, and need a system to manage the sprawl.
+
+## What This Project Is Today
+
+This project started as a repo auditing tool and has grown into a portfolio operating system for GitHub work.
+
+Today it can:
+
+- audit repositories across documentation, testing, CI, dependencies, activity, security, structure, community profile, completeness, and interest signals
+- score repos on dual axes, classify them into useful tiers, and surface quick wins that move each repo forward
+- generate multiple operator-facing outputs from the same audit facts: JSON, Markdown, HTML dashboard, and Excel workbook
+- keep historical state in SQLite so you can compare runs, detect regressions, and support incremental and watch-mode workflows
+- provide a read-only `--control-center` workflow that turns the latest audit state into a practical queue of what needs attention now, what is blocked, and what can safely wait
+- support workbook-based review with a stable `standard` mode, optional `template` mode, and a workbook release gate for changes that touch Excel surfaces
+- sync selected audit and campaign signals into Notion when that integration is enabled
+
+If you are new here, the simplest way to think about it is: this project tells you which repos are healthy, which ones are drifting, and what to look at next.
 
 ## Features
 
@@ -72,6 +88,23 @@ Normal runs now perform a lightweight automatic preflight before fetching repos.
 The new `--control-center` path is read-only. It loads the latest report + warehouse state, groups open work into `Blocked`, `Needs Attention Now`, `Ready for Manual Action`, and `Safe to Defer`, and writes `operator-control-center-<username>-<date>.json` plus `.md`.
 
 Watch mode now supports `--watch-strategy adaptive|incremental|full`. `adaptive` is the default and uses the stored baseline contract plus the scheduled full-refresh interval to decide whether each watch cycle should run full or incremental.
+
+### Best First Run
+
+If you are new to the project, use this flow:
+
+```bash
+audit <github-username> --doctor
+audit <github-username> --html
+audit <github-username> --control-center
+```
+
+That gives you:
+
+- a setup check so you can fix token, config, or workbook issues early
+- a full audit with the main report artifacts
+- an HTML dashboard and workbook-friendly output
+- a read-only operator queue that helps you decide what to work on next
 
 ### First-Run Flow
 
