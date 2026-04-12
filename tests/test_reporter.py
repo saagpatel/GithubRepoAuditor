@@ -379,6 +379,18 @@ class TestMarkdownReport:
             "primary_target_closure_forecast_reset_reentry_rebuild_reentry_churn_status": "none",
             "primary_target_closure_forecast_reset_reentry_rebuild_reentry_churn_reason": "",
             "closure_forecast_reset_reentry_rebuild_reentry_churn_summary": "No meaningful rebuilt re-entry churn is active right now.",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_freshness_status": "mixed-age",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_freshness_reason": "Rebuilt re-entry memory is still useful, but it is partly aging: 50% of the weighted signal is recent and the rest is older carry-forward.",
+            "closure_forecast_reset_reentry_rebuild_reentry_freshness_summary": "Missing template asset still has useful rebuilt re-entry memory, but the restored posture is no longer getting fully fresh reinforcement.",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_reset_status": "none",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_reset_reason": "",
+            "closure_forecast_reset_reentry_rebuild_reentry_reset_summary": "Rebuilt re-entry posture for Missing template asset is aging enough that it can keep holding, but it should no longer stay indefinitely at sustained strength.",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_score": 0.29,
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_status": "recovering-confirmation-rebuild-reentry-reset",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_status": "pending-confirmation-rebuild-reentry-restore",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reason": "Fresh confirmation-side evidence is returning after rebuilt re-entry was softened or reset, but it has not yet restored stronger rebuilt re-entry posture.",
+            "closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_summary": "Fresh confirmation-side evidence is returning for Missing template asset after rebuilt re-entry softened, but it has not yet restored stronger rebuilt re-entry posture (0.29).",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_summary": "Missing template asset is recovering after rebuilt re-entry softened, but stronger rebuilt re-entry posture still needs more fresh follow-through before it is restored.",
             "primary_target_closure_forecast_reset_reentry_rebuild_age_runs": 1,
             "primary_target_closure_forecast_reset_reentry_rebuild_persistence_score": 0.29,
             "primary_target_closure_forecast_reset_reentry_rebuild_persistence_status": "just-rebuilt",
@@ -396,14 +408,20 @@ class TestMarkdownReport:
             "reset_reentry_rebuild_reentry_churn_hotspots": [],
             "recovering_from_confirmation_rebuild_reset_hotspots": [],
             "recovering_from_clearance_rebuild_reset_hotspots": [],
+            "recovering_from_confirmation_rebuild_reentry_reset_hotspots": [],
+            "recovering_from_clearance_rebuild_reentry_reset_hotspots": [],
             "stale_reset_reentry_rebuild_hotspots": [],
             "fresh_reset_reentry_rebuild_signal_hotspots": [],
+            "stale_reset_reentry_rebuild_reentry_hotspots": [],
+            "fresh_reset_reentry_rebuild_reentry_signal_hotspots": [],
             "stale_reset_reentry_hotspots": [],
             "fresh_reset_reentry_signal_hotspots": [],
             "closure_forecast_reset_reentry_decay_window_runs": 4,
             "closure_forecast_reset_reentry_refresh_window_runs": 4,
             "closure_forecast_reset_reentry_rebuild_window_runs": 4,
             "closure_forecast_reset_reentry_rebuild_decay_window_runs": 4,
+            "closure_forecast_reset_reentry_rebuild_reentry_decay_window_runs": 4,
+            "closure_forecast_reset_reentry_rebuild_reentry_refresh_window_runs": 4,
             "stale_closure_forecast_hotspots": [],
             "fresh_closure_forecast_signal_hotspots": [],
             "closure_forecast_decay_window_runs": 4,
@@ -559,6 +577,10 @@ class TestMarkdownReport:
         assert "Reset Re-entry Rebuild Re-entry Controls:" in content
         assert "Reset Re-entry Rebuild Re-Entry Persistence:" in content
         assert "Reset Re-entry Rebuild Re-Entry Churn Controls:" in content
+        assert "Reset Re-entry Rebuild Re-Entry Freshness:" in content
+        assert "Reset Re-entry Rebuild Re-Entry Reset Controls:" in content
+        assert "Reset Re-entry Rebuild Re-Entry Refresh Recovery:" in content
+        assert "Reset Re-entry Rebuild Re-Entry Restore Controls:" in content
         assert "Reset Re-entry Rebuild Persistence:" in content
         assert "Reset Re-entry Rebuild Churn Controls:" in content
         assert "Reset Re-entry Persistence Summary" in content
@@ -573,6 +595,10 @@ class TestMarkdownReport:
         assert "Reset Re-entry Rebuild Re-entry Summary" in content
         assert "Reset Re-entry Rebuild Re-Entry Persistence Summary" in content
         assert "Reset Re-entry Rebuild Re-Entry Churn Summary" in content
+        assert "Reset Re-entry Rebuild Re-Entry Freshness Summary" in content
+        assert "Reset Re-entry Rebuild Re-Entry Reset Summary" in content
+        assert "Reset Re-entry Rebuild Re-Entry Refresh Recovery Summary" in content
+        assert "Reset Re-entry Rebuild Re-Entry Restore Summary" in content
         assert "Reset Re-entry Rebuild Persistence Summary" in content
         assert "Reset Re-entry Rebuild Churn Summary" in content
         assert "Reacquisition Freshness Summary" in content

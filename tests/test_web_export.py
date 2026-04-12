@@ -571,6 +571,10 @@ class TestRenderHtml:
         assert "Reset Re-entry Rebuild Re-entry Controls:" in html
         assert "Reset Re-entry Rebuild Re-Entry Persistence:" in html
         assert "Reset Re-entry Rebuild Re-Entry Churn Controls:" in html
+        assert "Reset Re-entry Rebuild Re-Entry Freshness:" in html
+        assert "Reset Re-entry Rebuild Re-Entry Reset Controls:" in html
+        assert "Reset Re-entry Rebuild Re-Entry Refresh Recovery:" in html
+        assert "Reset Re-entry Rebuild Re-Entry Restore Controls:" in html
         assert "Reset Re-entry Rebuild Persistence:" in html
         assert "Reset Re-entry Rebuild Churn Controls:" in html
         assert "Recommendation Drift:" in html
@@ -608,6 +612,10 @@ class TestRenderHtml:
         assert "Reset Re-entry Rebuild Re-entry Summary:" in html
         assert "Reset Re-entry Rebuild Re-Entry Persistence Summary:" in html
         assert "Reset Re-entry Rebuild Re-Entry Churn Summary:" in html
+        assert "Reset Re-entry Rebuild Re-Entry Freshness Summary:" in html
+        assert "Reset Re-entry Rebuild Re-Entry Reset Summary:" in html
+        assert "Reset Re-entry Rebuild Re-Entry Refresh Recovery Summary:" in html
+        assert "Reset Re-entry Rebuild Re-Entry Restore Summary:" in html
         assert "Reset Re-entry Rebuild Persistence Summary:" in html
         assert "Reset Re-entry Rebuild Churn Summary:" in html
         assert "Closure Forecast Reacquisition Summary:" in html
