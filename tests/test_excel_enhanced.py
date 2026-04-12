@@ -454,6 +454,15 @@ def _make_report(audits=None) -> dict:
             "primary_target_closure_forecast_reset_reentry_rebuild_reentry_reason": "Fresh confirmation-side evidence is returning after rebuilt posture was softened or reset, but it has not yet re-earned stronger rebuilt posture.",
             "closure_forecast_reset_reentry_rebuild_refresh_recovery_summary": "Fresh confirmation-side evidence is returning for RepoC: Security posture needs attention after rebuilt posture softened, but it has not yet re-earned stronger rebuilt posture (0.27).",
             "closure_forecast_reset_reentry_rebuild_reentry_summary": "RepoC: Security posture needs attention is recovering after rebuilt posture softened, but stronger rebuilt confirmation posture still needs more fresh follow-through before it is re-earned.",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_age_runs": 1,
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_persistence_score": 0.26,
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_persistence_status": "just-reentered",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_persistence_reason": "Stronger rebuilt posture has been re-earned, but it has not yet proved it can hold.",
+            "closure_forecast_reset_reentry_rebuild_reentry_persistence_summary": "RepoC: Security posture needs attention has only just re-earned stronger rebuilt posture, so it is still fragile (0.26; 1 run).",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_churn_score": 0.0,
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_churn_status": "none",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_churn_reason": "",
+            "closure_forecast_reset_reentry_rebuild_reentry_churn_summary": "No meaningful rebuilt re-entry churn is active right now.",
             "primary_target_closure_forecast_reset_reentry_rebuild_age_runs": 1,
             "primary_target_closure_forecast_reset_reentry_rebuild_persistence_score": 0.29,
             "primary_target_closure_forecast_reset_reentry_rebuild_persistence_status": "just-rebuilt",
@@ -464,8 +473,11 @@ def _make_report(audits=None) -> dict:
             "primary_target_closure_forecast_reset_reentry_rebuild_churn_reason": "",
             "closure_forecast_reset_reentry_rebuild_churn_summary": "No meaningful reset re-entry rebuild churn is active right now.",
             "just_rebuilt_hotspots": [],
+            "just_reentered_rebuild_hotspots": [],
             "holding_reset_reentry_rebuild_hotspots": [],
+            "holding_reset_reentry_rebuild_reentry_hotspots": [],
             "reset_reentry_rebuild_churn_hotspots": [],
+            "reset_reentry_rebuild_reentry_churn_hotspots": [],
             "stale_reset_reentry_rebuild_hotspots": [],
             "fresh_reset_reentry_rebuild_signal_hotspots": [],
             "stale_reset_reentry_hotspots": [],
@@ -475,6 +487,7 @@ def _make_report(audits=None) -> dict:
             "closure_forecast_reset_reentry_rebuild_window_runs": 4,
             "closure_forecast_reset_reentry_rebuild_decay_window_runs": 4,
             "closure_forecast_reset_reentry_rebuild_refresh_window_runs": 4,
+            "closure_forecast_reset_reentry_rebuild_reentry_window_runs": 4,
             "stale_closure_forecast_hotspots": [],
             "fresh_closure_forecast_signal_hotspots": [],
             "closure_forecast_decay_window_runs": 4,
@@ -848,8 +861,8 @@ class TestAnalystWorkbookSheets:
         assert review_ws["A42"].value == "Transition Likely Outcome"
         assert review_ws["A43"].value == "Pending Debt Freshness"
         assert review_ws["A44"].value == "Closure Forecast"
-        assert review_ws["A45"].value == "Reset Re-entry Rebuild Re-entry"
-        assert review_ws["A46"].value == "Reset Re-entry Rebuild Refresh"
+        assert review_ws["A45"].value == "Reset Re-entry Rebuild Re-Entry Persistence"
+        assert review_ws["A46"].value == "Reset Re-entry Rebuild Re-Entry Churn"
         assert review_ws["A47"].value == "Closure Forecast Summary"
         assert review_ws["A48"].value == "Momentum Summary"
         assert review_ws["A49"].value == "Exception Learning"
@@ -885,8 +898,8 @@ class TestAnalystWorkbookSheets:
         assert executive_ws["D60"].value == "Transition Likely Outcome"
         assert executive_ws["D61"].value == "Pending Debt Freshness"
         assert executive_ws["D62"].value == "Closure Forecast"
-        assert executive_ws["D63"].value == "Reset Re-entry Rebuild Re-Entry"
-        assert executive_ws["D64"].value == "Reset Re-entry Rebuild Refresh"
+        assert executive_ws["D63"].value == "Reset Re-entry Rebuild Re-Entry Persistence"
+        assert executive_ws["D64"].value == "Reset Re-entry Rebuild Re-Entry Churn"
         assert executive_ws["D65"].value == "Closure Forecast Summary"
         assert executive_ws["D66"].value == "Momentum Summary"
         assert executive_ws["D67"].value == "Exception Learning"
@@ -924,8 +937,8 @@ class TestAnalystWorkbookSheets:
         assert print_ws["A45"].value == "Transition Likely Outcome"
         assert print_ws["A46"].value == "Pending Debt Freshness"
         assert print_ws["A47"].value == "Closure Forecast"
-        assert print_ws["A48"].value == "Reset Re-entry Rebuild Re-Entry"
-        assert print_ws["A49"].value == "Reset Re-entry Rebuild Refresh"
+        assert print_ws["A48"].value == "Reset Re-entry Rebuild Re-Entry Persistence"
+        assert print_ws["A49"].value == "Reset Re-entry Rebuild Re-Entry Churn"
         assert print_ws["A50"].value == "Closure Forecast Summary"
         assert print_ws["A51"].value == "Momentum Summary"
         assert print_ws["A52"].value == "Exception Learning"
@@ -953,8 +966,8 @@ class TestAnalystWorkbookSheets:
         assert "Transition Likely Outcome" in dashboard_values
         assert "Pending Debt Freshness" in dashboard_values
         assert "Closure Forecast" in dashboard_values
-        assert "Reset Re-entry Rebuild Re-Entry" in dashboard_values
-        assert "Reset Re-entry Rebuild Refresh" in dashboard_values
+        assert "Reset Re-entry Rebuild Re-Entry Persistence" in dashboard_values
+        assert "Reset Re-entry Rebuild Re-Entry Churn" in dashboard_values
         assert "Exception Learning" in dashboard_values
         assert "Recommendation Drift" in dashboard_values
 

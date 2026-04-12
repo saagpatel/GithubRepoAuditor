@@ -238,6 +238,15 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
             "primary_target_closure_forecast_reset_reentry_rebuild_reentry_reason": "Fresh confirmation-side evidence is returning after rebuilt posture was softened or reset, but it has not yet re-earned stronger rebuilt posture.",
             "closure_forecast_reset_reentry_rebuild_refresh_recovery_summary": "Fresh confirmation-side evidence is returning for RepoC: RepoC drift needs review after rebuilt posture softened, but it has not yet re-earned stronger rebuilt posture (0.27).",
             "closure_forecast_reset_reentry_rebuild_reentry_summary": "RepoC: RepoC drift needs review is recovering after rebuilt posture softened, but stronger rebuilt confirmation posture still needs more fresh follow-through before it is re-earned.",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_age_runs": 1,
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_persistence_score": 0.26,
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_persistence_status": "just-reentered",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_persistence_reason": "Stronger rebuilt posture has been re-earned, but it has not yet proved it can hold.",
+            "closure_forecast_reset_reentry_rebuild_reentry_persistence_summary": "RepoC: RepoC drift needs review has only just re-earned stronger rebuilt posture, so it is still fragile (0.26; 1 run).",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_churn_score": 0.0,
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_churn_status": "none",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_churn_reason": "",
+            "closure_forecast_reset_reentry_rebuild_reentry_churn_summary": "No meaningful rebuilt re-entry churn is active right now.",
             "primary_target_closure_forecast_reset_reentry_rebuild_age_runs": 1,
             "primary_target_closure_forecast_reset_reentry_rebuild_persistence_score": 0.29,
             "primary_target_closure_forecast_reset_reentry_rebuild_persistence_status": "just-rebuilt",
@@ -248,8 +257,11 @@ def _control_center_payload(*, urgency: str = "urgent") -> dict:
             "primary_target_closure_forecast_reset_reentry_rebuild_churn_reason": "",
             "closure_forecast_reset_reentry_rebuild_churn_summary": "No meaningful reset re-entry rebuild churn is active right now.",
             "just_rebuilt_hotspots": [],
+            "just_reentered_rebuild_hotspots": [],
             "holding_reset_reentry_rebuild_hotspots": [],
+            "holding_reset_reentry_rebuild_reentry_hotspots": [],
             "reset_reentry_rebuild_churn_hotspots": [],
+            "reset_reentry_rebuild_reentry_churn_hotspots": [],
             "stale_reset_reentry_rebuild_hotspots": [],
             "fresh_reset_reentry_rebuild_signal_hotspots": [],
             "recovering_from_confirmation_rebuild_reset_hotspots": [],
@@ -429,6 +441,8 @@ def test_build_scheduled_handoff_writes_artifacts_and_issue_candidate(tmp_path):
     assert "Reset Re-entry Rebuild Reset Controls" in markdown
     assert "Reset Re-entry Rebuild Refresh Recovery" in markdown
     assert "Reset Re-entry Rebuild Re-entry Controls" in markdown
+    assert "Reset Re-entry Rebuild Re-Entry Persistence" in markdown
+    assert "Reset Re-entry Rebuild Re-Entry Churn Controls" in markdown
     assert "Reset Re-entry Rebuild Persistence" in markdown
     assert "Reset Re-entry Rebuild Churn Controls" in markdown
     assert "Reacquisition Persistence" in markdown
