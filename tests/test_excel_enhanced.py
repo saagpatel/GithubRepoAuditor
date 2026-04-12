@@ -430,6 +430,22 @@ def _make_report(audits=None) -> dict:
             "primary_target_closure_forecast_reset_reentry_churn_status": "none",
             "primary_target_closure_forecast_reset_reentry_churn_reason": "",
             "closure_forecast_reset_reentry_churn_summary": "No meaningful reset re-entry churn is active right now.",
+            "primary_target_closure_forecast_reset_reentry_freshness_status": "mixed-age",
+            "primary_target_closure_forecast_reset_reentry_freshness_reason": "Reset re-entry memory is still useful, but it is partly aging: 50% of the weighted signal is recent and the rest is older carry-forward.",
+            "closure_forecast_reset_reentry_freshness_summary": "RepoC: Security posture needs attention still has useful reset re-entry memory, but the restored posture is no longer getting fully fresh reinforcement.",
+            "primary_target_closure_forecast_reset_reentry_reset_status": "none",
+            "primary_target_closure_forecast_reset_reentry_reset_reason": "",
+            "closure_forecast_reset_reentry_reset_summary": "Reset re-entry posture for RepoC: Security posture needs attention is aging enough that it can keep holding, but it should no longer stay indefinitely at sustained strength.",
+            "primary_target_closure_forecast_reset_reentry_refresh_recovery_score": 0.31,
+            "primary_target_closure_forecast_reset_reentry_refresh_recovery_status": "rebuilding-confirmation-reentry",
+            "primary_target_closure_forecast_reset_reentry_rebuild_status": "pending-confirmation-rebuild",
+            "primary_target_closure_forecast_reset_reentry_rebuild_reason": "Fresh confirmation-side evidence is rebuilding after the reset re-entry aged out, but it has not yet fully re-earned stronger posture.",
+            "closure_forecast_reset_reentry_refresh_recovery_summary": "Fresh confirmation-side evidence is rebuilding for RepoC: Security posture needs attention after reset re-entry aged out (0.31).",
+            "closure_forecast_reset_reentry_rebuild_summary": "RepoC: Security posture needs attention is rebuilding confirmation-side reset re-entry, but it has not fully re-earned stronger posture yet.",
+            "stale_reset_reentry_hotspots": [],
+            "fresh_reset_reentry_signal_hotspots": [],
+            "closure_forecast_reset_reentry_decay_window_runs": 4,
+            "closure_forecast_reset_reentry_refresh_window_runs": 4,
             "stale_closure_forecast_hotspots": [],
             "fresh_closure_forecast_signal_hotspots": [],
             "closure_forecast_decay_window_runs": 4,
@@ -447,6 +463,8 @@ def _make_report(audits=None) -> dict:
             "recovery_churn_hotspots": [],
             "stale_reacquisition_hotspots": [],
             "fresh_reacquisition_signal_hotspots": [],
+            "recovering_from_confirmation_reentry_reset_hotspots": [],
+            "recovering_from_clearance_reentry_reset_hotspots": [],
             "supporting_pending_resolution_hotspots": [],
             "caution_pending_debt_hotspots": [],
             "stalled_transition_hotspots": [],
@@ -799,8 +817,8 @@ class TestAnalystWorkbookSheets:
         assert review_ws["A42"].value == "Transition Likely Outcome"
         assert review_ws["A43"].value == "Pending Debt Freshness"
         assert review_ws["A44"].value == "Closure Forecast"
-        assert review_ws["A45"].value == "Reset Re-entry Freshness"
-        assert review_ws["A46"].value == "Reset Re-entry Reset"
+        assert review_ws["A45"].value == "Reset Re-entry Refresh"
+        assert review_ws["A46"].value == "Reset Re-entry Rebuild"
         assert review_ws["A47"].value == "Closure Forecast Summary"
         assert review_ws["A48"].value == "Momentum Summary"
         assert review_ws["A49"].value == "Exception Learning"
@@ -836,8 +854,8 @@ class TestAnalystWorkbookSheets:
         assert executive_ws["D60"].value == "Transition Likely Outcome"
         assert executive_ws["D61"].value == "Pending Debt Freshness"
         assert executive_ws["D62"].value == "Closure Forecast"
-        assert executive_ws["D63"].value == "Reset Re-entry Freshness"
-        assert executive_ws["D64"].value == "Reset Re-entry Reset"
+        assert executive_ws["D63"].value == "Reset Re-entry Refresh"
+        assert executive_ws["D64"].value == "Reset Re-entry Rebuild"
         assert executive_ws["D65"].value == "Closure Forecast Summary"
         assert executive_ws["D66"].value == "Momentum Summary"
         assert executive_ws["D67"].value == "Exception Learning"
@@ -875,8 +893,8 @@ class TestAnalystWorkbookSheets:
         assert print_ws["A45"].value == "Transition Likely Outcome"
         assert print_ws["A46"].value == "Pending Debt Freshness"
         assert print_ws["A47"].value == "Closure Forecast"
-        assert print_ws["A48"].value == "Reset Re-entry Freshness"
-        assert print_ws["A49"].value == "Reset Re-entry Reset"
+        assert print_ws["A48"].value == "Reset Re-entry Refresh"
+        assert print_ws["A49"].value == "Reset Re-entry Rebuild"
         assert print_ws["A50"].value == "Closure Forecast Summary"
         assert print_ws["A51"].value == "Momentum Summary"
         assert print_ws["A52"].value == "Exception Learning"
@@ -904,8 +922,8 @@ class TestAnalystWorkbookSheets:
         assert "Transition Likely Outcome" in dashboard_values
         assert "Pending Debt Freshness" in dashboard_values
         assert "Closure Forecast" in dashboard_values
-        assert "Reset Re-entry Freshness" in dashboard_values
-        assert "Reset Re-entry Reset" in dashboard_values
+        assert "Reset Re-entry Refresh" in dashboard_values
+        assert "Reset Re-entry Rebuild" in dashboard_values
         assert "Exception Learning" in dashboard_values
         assert "Recommendation Drift" in dashboard_values
 
