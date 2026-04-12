@@ -8,6 +8,9 @@ from pathlib import Path
 from src.models import AuditReport, RepoAudit
 from src.report_enrichment import (
     build_follow_through_checkpoint,
+    build_follow_through_checkpoint_status_label,
+    build_follow_through_escalation_status_label,
+    build_follow_through_escalation_summary,
     build_follow_through_status_label,
     build_follow_through_summary,
     build_last_movement_label,
@@ -258,6 +261,11 @@ def write_markdown_report(
             f"  - Follow-Through: {item.get('follow_through_status', 'Unknown')} — "
             f"{item.get('follow_through_summary', 'No follow-through evidence is recorded yet.')}"
         )
+        _w(f"  - Checkpoint Timing: {item.get('follow_through_checkpoint_timing', 'Unknown')}")
+        _w(
+            f"  - Escalation: {item.get('follow_through_escalation', 'Unknown')} — "
+            f"{item.get('follow_through_escalation_summary', 'No stronger follow-through escalation is currently surfaced.')}"
+        )
         _w(
             f"  - Next Checkpoint: {item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}"
         )
@@ -268,8 +276,11 @@ def write_markdown_report(
     _w("")
     _w(f"- Summary: {weekly_pack.get('follow_through_summary', 'No follow-through evidence is recorded yet.')}")
     _w(f"- Next Checkpoint: {weekly_pack.get('follow_through_checkpoint_summary', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
+    _w(f"- Escalation: {weekly_pack.get('follow_through_escalation_summary', 'No stronger follow-through escalation is currently surfaced.')}")
     top_unattempted = weekly_pack.get("top_unattempted_items", [])[:3]
     top_stale = weekly_pack.get("top_stale_follow_through_items", [])[:3]
+    top_overdue = weekly_pack.get("top_overdue_follow_through_items", [])[:3]
+    top_escalation = weekly_pack.get("top_escalation_items", [])[:3]
     if top_unattempted:
         _w("- Still Untouched:")
         for item in top_unattempted:
@@ -280,8 +291,22 @@ def write_markdown_report(
         for item in top_stale:
             label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
             _w(f"  - {label} — {item.get('follow_through_summary', 'No follow-through evidence is recorded yet.')}")
-    if not top_unattempted and not top_stale:
-        _w("- No top untouched or stale follow-through items are currently surfaced.")
+    if top_overdue:
+        _w("- Overdue Checkpoints:")
+        for item in top_overdue:
+            label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+            _w(f"  - {label} — {item.get('follow_through_escalation_summary', item.get('follow_through_summary', 'No stronger follow-through escalation is currently surfaced.'))}")
+    if top_escalation:
+        _w("- Escalate Now:")
+        for item in top_escalation:
+            label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+            _w(f"  - {label} — {item.get('follow_through_escalation_summary', 'No stronger follow-through escalation is currently surfaced.')}")
+    if not top_unattempted and not top_stale and not top_overdue and not top_escalation:
+        _w("- No top follow-through aging or escalation hotspots are currently surfaced.")
+    _w("")
+    _w("### Follow-Through Aging and Escalation")
+    _w("")
+    _w(f"- Summary: {weekly_pack.get('follow_through_escalation_summary', 'No stronger follow-through escalation is currently surfaced.')}")
     _w("")
     _w("### Top Repo Drilldowns")
     _w("")
@@ -293,6 +318,8 @@ def write_markdown_report(
         _w(f"- Why It Matters: {briefing.get('why_it_matters_line', 'No explanation summary is recorded yet.')}")
         _w(f"- What To Do Next: {briefing.get('what_to_do_next_line', 'No next action is recorded yet.')}")
         _w(f"- Follow-Through: {briefing.get('follow_through_line', 'No follow-through evidence is recorded yet.')}")
+        _w(f"- Checkpoint Timing: {briefing.get('checkpoint_timing_line', 'Unknown')}")
+        _w(f"- Escalation: {briefing.get('escalation_line', 'Unknown: No stronger follow-through escalation is currently surfaced.')}")
         _w(f"- What Would Count As Progress: {briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
         _w("")
 
@@ -323,6 +350,10 @@ def write_markdown_report(
             _w(f"- Accountability: {report.operator_summary.get('accountability_summary')}")
         if report.operator_summary.get("follow_through_summary"):
             _w(f"- Follow-Through: {report.operator_summary.get('follow_through_summary')}")
+        if report.operator_summary.get("follow_through_checkpoint_summary"):
+            _w(f"- Next Checkpoint: {report.operator_summary.get('follow_through_checkpoint_summary')}")
+        if report.operator_summary.get("follow_through_escalation_summary"):
+            _w(f"- Follow-Through Aging and Escalation: {report.operator_summary.get('follow_through_escalation_summary')}")
         primary_target = report.operator_summary.get("primary_target") or {}
         if primary_target:
             repo = f"{primary_target.get('repo')}: " if primary_target.get("repo") else ""
@@ -886,6 +917,11 @@ def write_markdown_report(
                 f"  - Follow-Through: {build_follow_through_status_label(item)} — "
                 f"{build_follow_through_summary(item)}"
             )
+            _w(f"  - Checkpoint Timing: {build_follow_through_checkpoint_status_label(item)}")
+            _w(
+                f"  - Escalation: {build_follow_through_escalation_status_label(item)} — "
+                f"{build_follow_through_escalation_summary(item)}"
+            )
             _w(f"  - Next Checkpoint: {build_follow_through_checkpoint(item)}")
             links = item.get("links") or []
             artifact = links[0].get("url", "") if links else ""
@@ -1230,6 +1266,8 @@ def write_markdown_report(
             _w(f"- Why It Matters: {briefing.get('why_it_matters_line', 'No explanation summary is recorded yet.')}")
             _w(f"- What To Do Next: {briefing.get('what_to_do_next_line', 'No next action is recorded yet.')}")
             _w(f"- Follow-Through: {briefing.get('follow_through_line', 'No follow-through evidence is recorded yet.')}")
+            _w(f"- Checkpoint Timing: {briefing.get('checkpoint_timing_line', 'Unknown')}")
+            _w(f"- Escalation: {briefing.get('escalation_line', 'Unknown: No stronger follow-through escalation is currently surfaced.')}")
             _w(f"- What Would Count As Progress: {briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
         if audit.security_posture:
             _w("")

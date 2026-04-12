@@ -14,6 +14,9 @@ from urllib.parse import urlparse
 from src.analyst_views import build_analyst_context
 from src.report_enrichment import (
     build_follow_through_checkpoint,
+    build_follow_through_checkpoint_status_label,
+    build_follow_through_escalation_status_label,
+    build_follow_through_escalation_summary,
     build_follow_through_status_label,
     build_follow_through_summary,
     build_last_movement_label,
@@ -253,6 +256,8 @@ def _operator_section(data: dict) -> str:
             f"<br><span class='muted'><strong>Next:</strong> {escape(item.get('recommended_action', 'Review the latest state.'))}</span>"
             f"<br><span class='muted'><strong>Last movement:</strong> {escape(last_movement)}</span>"
             f"<br><span class='muted'><strong>Follow-through:</strong> {escape(build_follow_through_status_label(item))} — {escape(build_follow_through_summary(item))}</span>"
+            f"<br><span class='muted'><strong>Checkpoint timing:</strong> {escape(build_follow_through_checkpoint_status_label(item))}</span>"
+            f"<br><span class='muted'><strong>Escalation:</strong> {escape(build_follow_through_escalation_status_label(item))} — {escape(build_follow_through_escalation_summary(item))}</span>"
             f"<br><span class='muted'><strong>Next checkpoint:</strong> {escape(build_follow_through_checkpoint(item))}</span>"
             f"<br><span class='muted'><strong>Artifact:</strong> {escape(artifact_label)}</span>"
             "</li>"
@@ -291,6 +296,7 @@ def _operator_section(data: dict) -> str:
         <div class="meta-line"><strong>Accountability:</strong> {escape(summary.get('accountability_summary', 'No accountability summary is recorded yet.'))}</div>
         <div class="meta-line"><strong>Follow-Through:</strong> {escape(summary.get('follow_through_summary', 'No follow-through signal is recorded yet.'))}</div>
         <div class="meta-line"><strong>Next Checkpoint:</strong> {escape(summary.get('follow_through_checkpoint_summary', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</div>
+        <div class="meta-line"><strong>Escalation:</strong> {escape(summary.get('follow_through_escalation_summary', 'No stronger follow-through escalation is currently surfaced.'))}</div>
         <div class="meta-line"><strong>Primary Target:</strong> {escape(primary_target_label or 'No active target')}</div>
         <div class="meta-line"><strong>Why This Is The Top Target:</strong> {escape(summary.get('primary_target_reason', 'No target rationale is recorded yet.'))}</div>
         <div class="meta-line"><strong>What Counts As Done:</strong> {escape(summary.get('primary_target_done_criteria', 'No done-state guidance is recorded yet.'))}</div>
@@ -461,6 +467,8 @@ def _top_attention_section(data: dict) -> str:
             f"<br><span class='muted'><strong>Why it matters:</strong> {escape(item.get('lane_reason') or item.get('summary') or 'Operator attention is still needed.')}</span>"
             f"<br><span class='muted'><strong>What to do next:</strong> {escape(item.get('recommended_action') or item.get('next_step') or 'Review the latest state.')}</span>"
             f"<br><span class='muted'><strong>Follow-through:</strong> {escape(build_follow_through_status_label(item))} — {escape(build_follow_through_summary(item))}</span>"
+            f"<br><span class='muted'><strong>Checkpoint timing:</strong> {escape(build_follow_through_checkpoint_status_label(item))}</span>"
+            f"<br><span class='muted'><strong>Escalation:</strong> {escape(build_follow_through_escalation_status_label(item))} — {escape(build_follow_through_escalation_summary(item))}</span>"
             "</li>"
         )
 
@@ -478,6 +486,8 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
     attention_rows = []
     untouched_rows = []
     stale_rows = []
+    overdue_rows = []
+    escalation_rows = []
     for item in weekly_pack.get("top_attention", [])[:5]:
         attention_rows.append(
             "<li>"
@@ -486,6 +496,8 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
             f"<br><span class='muted'><strong>Why It Matters:</strong> {escape(item.get('why', 'Operator pressure is active.'))}</span>"
             f"<br><span class='muted'><strong>What To Do Next:</strong> {escape(item.get('next_step', 'Review the latest state.'))}</span>"
             f"<br><span class='muted'><strong>Follow-Through:</strong> {escape(item.get('follow_through_status', 'Unknown'))} — {escape(item.get('follow_through_summary', 'No follow-through evidence is recorded yet.'))}</span>"
+            f"<br><span class='muted'><strong>Checkpoint Timing:</strong> {escape(item.get('follow_through_checkpoint_timing', 'Unknown'))}</span>"
+            f"<br><span class='muted'><strong>Escalation:</strong> {escape(item.get('follow_through_escalation', 'Unknown'))} — {escape(item.get('follow_through_escalation_summary', 'No stronger follow-through escalation is currently surfaced.'))}</span>"
             f"<br><span class='muted'><strong>Next Checkpoint:</strong> {escape(item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</span>"
             "</li>"
         )
@@ -495,6 +507,12 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
     for item in weekly_pack.get("top_stale_follow_through_items", [])[:3]:
         label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
         stale_rows.append(f"<li>{escape(label)} — {escape(item.get('follow_through_summary', 'No follow-through evidence is recorded yet.'))}</li>")
+    for item in weekly_pack.get("top_overdue_follow_through_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        overdue_rows.append(f"<li>{escape(label)} — {escape(item.get('follow_through_escalation_summary', 'No stronger follow-through escalation is currently surfaced.'))}</li>")
+    for item in weekly_pack.get("top_escalation_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        escalation_rows.append(f"<li>{escape(label)} — {escape(item.get('follow_through_escalation_summary', 'No stronger follow-through escalation is currently surfaced.'))}</li>")
     repo_cards = []
     for briefing in weekly_pack.get("repo_briefings", [])[:3]:
         repo_cards.append(
@@ -506,6 +524,8 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
               <div class="meta-line"><strong>Why It Matters:</strong> {escape(briefing.get('why_it_matters_line', 'No explanation summary is recorded yet.'))}</div>
               <div class="meta-line"><strong>What To Do Next:</strong> {escape(briefing.get('what_to_do_next_line', 'No next action is recorded yet.'))}</div>
               <div class="meta-line"><strong>Follow-Through:</strong> {escape(briefing.get('follow_through_line', 'No follow-through evidence is recorded yet.'))}</div>
+              <div class="meta-line"><strong>Checkpoint Timing:</strong> {escape(briefing.get('checkpoint_timing_line', 'Unknown'))}</div>
+              <div class="meta-line"><strong>Escalation:</strong> {escape(briefing.get('escalation_line', 'Unknown: No stronger follow-through escalation is currently surfaced.'))}</div>
               <div class="meta-line"><strong>What Would Count As Progress:</strong> {escape(briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</div>
             </div>
             """
@@ -522,10 +542,15 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
           <div class="meta-line"><strong>What To Do This Week:</strong> {escape(weekly_pack.get('what_to_do_this_week', build_top_recommendation_summary(report_data)))}</div>
           <div class="meta-line"><strong>Review-to-Action Follow-Through:</strong> {escape(weekly_pack.get('follow_through_summary', 'No follow-through evidence is recorded yet.'))}</div>
           <div class="meta-line"><strong>Next Checkpoint:</strong> {escape(weekly_pack.get('follow_through_checkpoint_summary', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</div>
+          <div class="meta-line"><strong>Follow-Through Aging and Escalation:</strong> {escape(weekly_pack.get('follow_through_escalation_summary', 'No stronger follow-through escalation is currently surfaced.'))}</div>
           <h3>Still Untouched</h3>
           <ul class="bullet-list">{''.join(untouched_rows) or '<li>No untouched follow-through hotspots are currently surfaced.</li>'}</ul>
           <h3>Stale Follow-Through</h3>
           <ul class="bullet-list">{''.join(stale_rows) or '<li>No stale follow-through hotspots are currently surfaced.</li>'}</ul>
+          <h3>Overdue Checkpoints</h3>
+          <ul class="bullet-list">{''.join(overdue_rows) or '<li>No overdue follow-through checkpoints are currently surfaced.</li>'}</ul>
+          <h3>Escalate Now</h3>
+          <ul class="bullet-list">{''.join(escalation_rows) or '<li>No escalate-now follow-through items are currently surfaced.</li>'}</ul>
           <h3>Top Attention</h3>
           <ul class="bullet-list">{''.join(attention_rows) or '<li>No urgent attention items are currently surfaced.</li>'}</ul>
         </div>
@@ -767,6 +792,8 @@ def _repo_drilldown_section(report_data: dict, diff_data: dict | None) -> str:
               <div class="meta-line"><strong>What To Do Next:</strong> {escape(next_steps.get('next_best_action', 'No clear next action is recorded yet.'))}</div>
               <div class="meta-line"><strong>Rationale:</strong> {escape(next_steps.get('rationale', 'No action rationale is recorded yet.'))}</div>
               <div class="meta-line"><strong>Follow-Through:</strong> {escape(briefing.get('follow_through_line', 'No follow-through evidence is recorded yet.'))}</div>
+              <div class="meta-line"><strong>Checkpoint Timing:</strong> {escape(briefing.get('checkpoint_timing_line', 'Unknown'))}</div>
+              <div class="meta-line"><strong>Escalation:</strong> {escape(briefing.get('escalation_line', 'Unknown: No stronger follow-through escalation is currently surfaced.'))}</div>
               <div class="meta-line"><strong>What Would Count As Progress:</strong> {escape(briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</div>
               <div class="meta-line"><strong>Linked Artifact:</strong> {escape(next_steps.get('linked_artifact', no_linked_artifact_summary()))}</div>
             </div>
