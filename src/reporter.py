@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 from src.models import AuditReport, RepoAudit
+from src.report_enrichment import build_run_change_counts, build_run_change_summary
 
 TIER_ORDER = ["shipped", "functional", "wip", "skeleton", "abandoned"]
 
@@ -108,6 +109,9 @@ def write_raw_metadata(report: AuditReport, output_dir: Path) -> Path:
         "watch_state": report.watch_state,
         "operator_summary": report.operator_summary,
         "operator_queue": report.operator_queue,
+        "run_change_summary": report.run_change_summary,
+        "run_change_counts": report.run_change_counts,
+        "runtime_breakdown": report.runtime_breakdown,
         "tier_distribution": report.tier_distribution,
         "audits": [a.to_dict() for a in report.audits],
         "errors": report.errors,
@@ -198,6 +202,20 @@ def write_markdown_report(
         for check in (report.preflight_summary.get("checks") or [])[:5]:
             _w(f"- {check.get('summary', 'Issue detected')} ({check.get('category', 'setup')})")
         _w("")
+
+    run_change_counts = report.run_change_counts or build_run_change_counts(diff_data)
+    _w("### Run Changes")
+    _w("")
+    _w(f"- Summary: {report.run_change_summary or build_run_change_summary(diff_data)}")
+    _w(
+        "- Counts: "
+        f"{run_change_counts.get('score_improvements', 0)} improvements, "
+        f"{run_change_counts.get('score_regressions', 0)} regressions, "
+        f"{run_change_counts.get('tier_promotions', 0)} promotions, "
+        f"{run_change_counts.get('tier_demotions', 0)} demotions, "
+        f"{run_change_counts.get('new_repos', 0)} new repos"
+    )
+    _w("")
 
     if report.operator_summary or report.operator_queue:
         _w("### Operator Control Center")
@@ -1091,6 +1109,17 @@ def write_markdown_report(
                     f"- {action.get('title', 'Action')}: {action.get('action', '')} "
                     f"(lens: {action.get('lens', '—')}, confidence: {action.get('confidence', 0):.2f})"
                 )
+        if audit.score_explanation:
+            _w("")
+            _w("**Why This Score Looks This Way:**")
+            if audit.score_explanation.get("top_positive_drivers"):
+                _w(f"- Strongest drivers: {', '.join(audit.score_explanation.get('top_positive_drivers', [])[:3])}")
+            if audit.score_explanation.get("top_negative_drivers"):
+                _w(f"- Biggest drags: {', '.join(audit.score_explanation.get('top_negative_drivers', [])[:3])}")
+            if audit.score_explanation.get("next_tier_gap_summary"):
+                _w(f"- Next tier gap: {audit.score_explanation.get('next_tier_gap_summary')}")
+            if audit.score_explanation.get("next_best_action"):
+                _w(f"- Next best action: {audit.score_explanation.get('next_best_action')}")
         if audit.security_posture:
             _w("")
             _w("**Security Posture:**")

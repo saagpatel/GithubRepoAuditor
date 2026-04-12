@@ -17,7 +17,7 @@ from openpyxl.chart.series import DataPoint
 from openpyxl.chart.series import Series as BubbleSeries
 from openpyxl.drawing.line import LineProperties
 from openpyxl.formatting.rule import ColorScaleRule, DataBarRule, IconSetRule
-from openpyxl.styles import Font
+from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.workbook.defined_name import DefinedName
 from openpyxl.worksheet.datavalidation import DataValidation
@@ -62,6 +62,7 @@ from src.excel_template import (
     inject_native_sparklines,
     resolve_template_path,
 )
+from src.report_enrichment import build_run_change_counts, build_run_change_summary, build_score_explanation
 from src.sparkline import sparkline as render_sparkline
 
 # Tier display order
@@ -72,14 +73,23 @@ CORE_VISIBLE_SHEETS = {
     "Dashboard",
     "All Repos",
     "Portfolio Explorer",
+    "Repo Detail",
     "By Lens",
     "By Collection",
     "Trend Summary",
+    "Run Changes",
     "Review Queue",
     "Campaigns",
     "Governance Controls",
     "Executive Summary",
     "Print Pack",
+}
+
+REVIEW_QUEUE_LANE_FILLS = {
+    "blocked": "FEE2E2",
+    "urgent": "FEF3C7",
+    "ready": "DBEAFE",
+    "deferred": "DCFCE7",
 }
 
 
@@ -206,10 +216,12 @@ def _reorder_workbook_sheets(wb: Workbook) -> None:
         "Dashboard",
         "Review Queue",
         "Portfolio Explorer",
+        "Repo Detail",
         "Executive Summary",
         "By Lens",
         "By Collection",
         "Trend Summary",
+        "Run Changes",
         "Campaigns",
         "Governance Controls",
         "Print Pack",
@@ -948,6 +960,38 @@ def _write_ranked_list(
     return header_row + len(rows)
 
 
+def _inject_sheet_navigation(wb: Workbook) -> None:
+    nav_targets = {
+        "Dashboard": [("Review Queue", "Queue"), ("Repo Detail", "Repo Detail"), ("Run Changes", "Run Changes"), ("Executive Summary", "Exec")],
+        "All Repos": [("Dashboard", "Dashboard"), ("Repo Detail", "Repo Detail"), ("Score Explainer", "Score"), ("Run Changes", "Run Changes")],
+        "Portfolio Explorer": [("Dashboard", "Dashboard"), ("Repo Detail", "Repo Detail"), ("Review Queue", "Queue"), ("Run Changes", "Run Changes")],
+        "Repo Detail": [("Dashboard", "Dashboard"), ("Portfolio Explorer", "Explorer"), ("Score Explainer", "Score"), ("Run Changes", "Run Changes")],
+        "By Lens": [("Dashboard", "Dashboard"), ("Portfolio Explorer", "Explorer"), ("Repo Detail", "Repo Detail")],
+        "By Collection": [("Dashboard", "Dashboard"), ("Portfolio Explorer", "Explorer"), ("Run Changes", "Run Changes")],
+        "Trend Summary": [("Dashboard", "Dashboard"), ("Run Changes", "Run Changes"), ("Review Queue", "Queue")],
+        "Run Changes": [("Dashboard", "Dashboard"), ("Review Queue", "Queue"), ("Repo Detail", "Repo Detail"), ("Executive Summary", "Exec")],
+        "Review Queue": [("Dashboard", "Dashboard"), ("Repo Detail", "Repo Detail"), ("Run Changes", "Run Changes"), ("Print Pack", "Print Pack")],
+        "Campaigns": [("Dashboard", "Dashboard"), ("Review Queue", "Queue"), ("Run Changes", "Run Changes")],
+        "Governance Controls": [("Dashboard", "Dashboard"), ("Review Queue", "Queue"), ("Run Changes", "Run Changes")],
+        "Executive Summary": [("Dashboard", "Dashboard"), ("Review Queue", "Queue"), ("Repo Detail", "Repo Detail"), ("Print Pack", "Print Pack")],
+        "Print Pack": [("Dashboard", "Dashboard"), ("Executive Summary", "Exec"), ("Run Changes", "Run Changes")],
+        "Index": [("Dashboard", "Dashboard"), ("Review Queue", "Queue"), ("Repo Detail", "Repo Detail"), ("Run Changes", "Run Changes")],
+    }
+    for sheet_name, links in nav_targets.items():
+        if sheet_name not in wb.sheetnames:
+            continue
+        ws = wb[sheet_name]
+        start_col = max(ws.max_column + 2, 10)
+        title_cell = ws.cell(row=1, column=start_col, value="Jump To")
+        title_cell.font = SUBHEADER_FONT
+        for offset, (target_sheet, label) in enumerate(links, 1):
+            if target_sheet not in wb.sheetnames:
+                continue
+            cell = ws.cell(row=offset + 1, column=start_col, value=label)
+            _set_internal_hyperlink(cell, target_sheet)
+            cell.alignment = LEFT
+
+
 # ═══════════════════════════════════════════════════════════════════════
 # Sheet 1: Dashboard (Executive Overview)
 # ═══════════════════════════════════════════════════════════════════════
@@ -1062,6 +1106,20 @@ def _build_dashboard(
         if spark:
             cell = ws.cell(row=7, column=3, value=f"Trend: {spark}")
             cell.font = SPARKLINE_FONT
+    run_change_summary = data.get("run_change_summary") or build_run_change_summary(diff_data)
+    run_change_counts = data.get("run_change_counts") or build_run_change_counts(diff_data)
+    ws["M8"] = "Run Summary"
+    ws["M8"].font = SUBHEADER_FONT
+    ws["N8"] = run_change_summary
+    ws["N8"].alignment = WRAP
+    ws["M9"] = "Queue Pressure"
+    ws["M9"].font = SUBHEADER_FONT
+    ws["N9"] = (
+        f"{run_change_counts.get('score_improvements', 0)} improving | "
+        f"{run_change_counts.get('score_regressions', 0)} regressing | "
+        f"{run_change_counts.get('tier_promotions', 0)} promoted | "
+        f"{run_change_counts.get('tier_demotions', 0)} demoted"
+    )
 
     operator_summary = data.get("operator_summary") or {}
     governance_summary = data.get("governance_summary") or {}
@@ -1107,6 +1165,13 @@ def _build_dashboard(
             campaign_summary.get("label")
             or campaign_summary.get("campaign_type")
             or "No active managed campaign in this run.",
+        ),
+        ("Run Changes", run_change_summary),
+        (
+            "Queue Pressure",
+            f"{run_change_counts.get('score_improvements', 0)} improving, "
+            f"{run_change_counts.get('score_regressions', 0)} regressing, "
+            f"{run_change_counts.get('security_changes', 0)} security shifts",
         ),
         ("What Changed", what_changed),
         ("Why It Matters", why_it_matters),
@@ -2438,6 +2503,7 @@ def _build_navigation(
             [
                 ("Dashboard", "Start here for the big-picture health view and top attention items."),
                 ("Review Queue", "Use this for blocked, urgent, ready, and safe-to-defer review work."),
+                ("Run Changes", "See what changed since the last run before you decide where to spend attention."),
                 ("Campaigns", "Check managed campaign state, reopen/closure context, and drift."),
                 ("Governance Controls", "Review governed controls, approval posture, and rollback visibility."),
                 ("Writeback Audit", "See what writeback changed and what is reversible."),
@@ -2449,6 +2515,7 @@ def _build_navigation(
             5,
             [
                 ("Portfolio Explorer", "Rank repos, compare score quality, and drill from summary into raw facts."),
+                ("Repo Detail", "Select one repo and get a single-page briefing on score, risks, trend, and next action."),
                 ("By Lens", "Compare the portfolio by ship readiness, momentum, security, and fit."),
                 ("By Collection", "Understand collection-level leaders and concentration."),
                 ("Trend Summary", "See portfolio-wide movement and repo trendlines over time."),
@@ -2893,11 +2960,166 @@ def _write_hidden_table_sheet(
     auto_width(ws, len(headers), max_row)
 
 
+def _set_internal_hyperlink(cell, sheet_name: str, *, target_cell: str = "A1", display: str | None = None) -> None:
+    cell.hyperlink = Hyperlink(
+        ref=cell.coordinate,
+        location=_sheet_location(sheet_name, target_cell),
+        display=display or str(cell.value or ""),
+    )
+    cell.font = Font("Calibri", 10, bold=True, color=TEAL, underline="single")
+
+
+def _lane_fill_hex(lane: str | None) -> str | None:
+    if not lane:
+        return None
+    return REVIEW_QUEUE_LANE_FILLS.get(str(lane).strip().lower())
+
+
+def _apply_lane_row_fill(ws, row: int, max_col: int, lane: str | None) -> None:
+    fill_hex = _lane_fill_hex(lane)
+    if not fill_hex:
+        return
+    for col in range(1, max_col + 1):
+        ws.cell(row=row, column=col).fill = PatternFill(fill_type="solid", fgColor=fill_hex)
+
+
+def _score_explanation_for_audit(audit: dict) -> dict:
+    explanation = dict(audit.get("score_explanation") or {})
+    if explanation:
+        return explanation
+    return build_score_explanation(audit)
+
+
+def _repo_detail_rows(data: dict, score_history: dict[str, list[float]] | None) -> tuple[list[list[object]], list[list[object]], list[list[object]]]:
+    memberships = _collection_memberships(data)
+    history = _extend_score_history_with_current(data, score_history)
+    detail_rows: list[list[object]] = []
+    dimension_rows: list[list[object]] = []
+    history_rows: list[list[object]] = []
+
+    for audit in sorted(data.get("audits", []), key=lambda item: item.get("metadata", {}).get("name", "")):
+        metadata = audit.get("metadata", {})
+        repo_name = metadata.get("name", "")
+        explanation = _score_explanation_for_audit(audit)
+        hotspot_titles = [item.get("title", "") for item in (audit.get("hotspots") or [])[:3]]
+        action_titles = [item.get("title", "") for item in (audit.get("action_candidates") or [])[:3]]
+        lenses = audit.get("lenses", {})
+        scores = history.get(repo_name, [])
+        detail_rows.append([
+            repo_name,
+            metadata.get("html_url", ""),
+            metadata.get("language") or "Unknown",
+            metadata.get("description") or "",
+            round(audit.get("overall_score", 0.0), 3),
+            round(audit.get("interest_score", 0.0), 3),
+            audit.get("grade", ""),
+            audit.get("completeness_tier", ""),
+            ", ".join(audit.get("badges", [])[:6]) or "None",
+            ", ".join(audit.get("flags", [])[:6]) or "None",
+            ", ".join(memberships.get(repo_name, [])) or "—",
+            audit.get("security_posture", {}).get("label", "unknown"),
+            round(audit.get("security_posture", {}).get("score", 0.0), 3),
+            lenses.get("ship_readiness", {}).get("summary", ""),
+            lenses.get("momentum", {}).get("summary", ""),
+            lenses.get("security_posture", {}).get("summary", ""),
+            lenses.get("portfolio_fit", {}).get("summary", ""),
+            render_sparkline(scores) if scores else "",
+            ", ".join(explanation.get("top_positive_drivers", [])[:3]) or "No strong positive drivers recorded yet.",
+            ", ".join(explanation.get("top_negative_drivers", [])[:3]) or "No major drag factors recorded yet.",
+            explanation.get("next_tier_gap_summary", ""),
+            explanation.get("next_best_action", ""),
+            explanation.get("next_best_action_rationale", ""),
+            hotspot_titles[0] if len(hotspot_titles) > 0 else "",
+            hotspot_titles[1] if len(hotspot_titles) > 1 else "",
+            hotspot_titles[2] if len(hotspot_titles) > 2 else "",
+            action_titles[0] if len(action_titles) > 0 else "",
+            action_titles[1] if len(action_titles) > 1 else "",
+            action_titles[2] if len(action_titles) > 2 else "",
+        ])
+
+        ranked_dimensions = sorted(
+            [
+                (
+                    result.get("dimension", ""),
+                    round(result.get("score", 0.0), 3),
+                    "; ".join((result.get("findings") or [])[:2]) or "No major concerns recorded.",
+                )
+                for result in audit.get("analyzer_results", [])
+                if result.get("dimension") != "interest"
+            ],
+            key=lambda item: item[1],
+        )
+        for rank, (dimension, score, summary) in enumerate(ranked_dimensions, 1):
+            lookup_key = f"{repo_name}::{rank}"
+            dimension_rows.append([lookup_key, repo_name, rank, dimension, score, summary])
+
+        for run_index, score in enumerate(scores, 1):
+            history_rows.append([repo_name, run_index, score, render_sparkline(scores)])
+
+    return detail_rows, dimension_rows, history_rows
+
+
+def _run_change_rows(data: dict, diff_data: dict | None) -> tuple[list[list[object]], list[list[object]]]:
+    counts = build_run_change_counts(diff_data)
+    summary_rows = [
+        ["Summary", build_run_change_summary(diff_data), ""],
+        ["Score Improvements", counts.get("score_improvements", 0), "Repos that improved since the last run."],
+        ["Score Regressions", counts.get("score_regressions", 0), "Repos that regressed since the last run."],
+        ["Tier Promotions", counts.get("tier_promotions", 0), "Repos that moved up a tier."],
+        ["Tier Demotions", counts.get("tier_demotions", 0), "Repos that moved down a tier."],
+        ["New Repos", counts.get("new_repos", 0), "Repos that are new in this run."],
+        ["Removed Repos", counts.get("removed_repos", 0), "Repos missing compared with the prior run."],
+        ["Security Changes", counts.get("security_changes", 0), "Repos with security posture movement."],
+        ["Governance Changes", counts.get("collection_changes", 0), "Repos with collection or governance drift."],
+        ["Notable Repo Changes", counts.get("notable_repo_changes", 0), "Repos with notable diff rows."],
+    ]
+
+    repo_rows: list[list[object]] = []
+    for change in diff_data.get("repo_changes", []) if diff_data else []:
+        repo_rows.append([
+            "repo-change",
+            change.get("name", ""),
+            round(change.get("delta", 0.0), 3),
+            change.get("old_tier", ""),
+            change.get("new_tier", ""),
+            change.get("security_change", {}).get("new_label", ""),
+            change.get("hotspot_change", {}).get("new_count", 0),
+            ", ".join(change.get("collection_change", {}).get("new", []) or []),
+            "General repo movement since the previous run.",
+        ])
+    for change in diff_data.get("tier_changes", []) if diff_data else []:
+        repo_rows.append([
+            f"tier-{change.get('direction', 'change')}",
+            change.get("name", ""),
+            round(change.get("new_score", 0.0) - change.get("old_score", 0.0), 3),
+            change.get("old_tier", ""),
+            change.get("new_tier", ""),
+            "",
+            "",
+            "",
+            f"Tier {change.get('direction', 'change')} detected in the comparison window.",
+        ])
+    for item in data.get("material_changes", []) or []:
+        repo_rows.append([
+            f"material-{item.get('change_type', 'other')}",
+            item.get("repo", ""),
+            _severity_rank(item.get("severity")),
+            "",
+            "",
+            "",
+            "",
+            "",
+            item.get("title", ""),
+        ])
+    return summary_rows, repo_rows
+
+
 def _build_hidden_data_sheets(
     wb: Workbook,
     data: dict,
     trend_data: list[dict] | None = None,
     score_history: dict[str, list[float]] | None = None,
+    diff_data: dict | None = None,
 ) -> None:
     from src.analyst_views import build_analyst_context
 
@@ -2926,6 +3148,8 @@ def _build_hidden_data_sheets(
     campaign_rows: list[list[object]] = []
     writeback_rows: list[list[object]] = []
     lookup_rows: list[list[object]] = []
+    repo_detail_rows, repo_dimension_rollup_rows, repo_history_rollup_rows = _repo_detail_rows(data, score_history)
+    run_change_rollup_rows, run_change_repo_rows = _run_change_rows(data, diff_data)
     operator_queue_rows, operator_repo_rollups, material_rollups = _build_workbook_rollups(data)
 
     for audit in audits:
@@ -3162,6 +3386,10 @@ def _build_hidden_data_sheets(
         lookup_rows.append(["profile", profile_name, profile_data.get("description", "")])
     for tier_name in TIER_ORDER:
         lookup_rows.append(["tier", tier_name, str(data.get("tier_distribution", {}).get(tier_name, 0))])
+    for audit in sorted(data.get("audits", []), key=lambda item: item.get("metadata", {}).get("name", "")):
+        repo_name = audit.get("metadata", {}).get("name", "")
+        if repo_name:
+            lookup_rows.append(["repo-selector", repo_name, repo_name])
     campaign_summary = data.get("campaign_summary", {})
     if campaign_summary:
         campaign_rows.append([
@@ -3351,6 +3579,71 @@ def _build_hidden_data_sheets(
         "tblMaterialChangeRollups",
         ["Repo", "Change Type", "Count", "Max Severity", "Sample Title"],
         material_rollups,
+    )
+    _write_hidden_table_sheet(
+        wb,
+        "Data_RepoDetail",
+        "tblRepoDetailData",
+        [
+            "Repo",
+            "URL",
+            "Language",
+            "Description",
+            "Overall Score",
+            "Interest Score",
+            "Grade",
+            "Tier",
+            "Badges",
+            "Flags",
+            "Collections",
+            "Security Label",
+            "Security Score",
+            "Ship Lens Summary",
+            "Momentum Lens Summary",
+            "Security Lens Summary",
+            "Portfolio Fit Summary",
+            "Trend Sparkline",
+            "Top Positive Drivers",
+            "Top Negative Drivers",
+            "Next Tier Gap Summary",
+            "Next Best Action",
+            "Next Best Action Rationale",
+            "Top Hotspot 1",
+            "Top Hotspot 2",
+            "Top Hotspot 3",
+            "Top Action 1",
+            "Top Action 2",
+            "Top Action 3",
+        ],
+        repo_detail_rows,
+    )
+    _write_hidden_table_sheet(
+        wb,
+        "Data_RepoDimensionRollups",
+        "tblRepoDimensionRollups",
+        ["Lookup Key", "Repo", "Rank", "Dimension", "Score", "Summary"],
+        repo_dimension_rollup_rows,
+    )
+    _write_hidden_table_sheet(
+        wb,
+        "Data_RepoHistoryRollups",
+        "tblRepoHistoryRollups",
+        ["Repo", "Run Index", "Score", "Sparkline"],
+        repo_history_rollup_rows,
+    )
+    _write_hidden_table_sheet(
+        wb,
+        "Data_RunChangeRollups",
+        "tblRunChangeRollups",
+        ["Metric", "Value", "Summary"],
+        run_change_rollup_rows,
+    )
+    _write_hidden_table_sheet(
+        wb,
+        "Data_RunChangeRepoData",
+        "tblRunChangeRepoData",
+        ["Section", "Repo", "Delta", "Old Tier", "New Tier", "Security", "Hotspots", "Collections", "Summary"],
+        run_change_repo_rows,
     )
     _write_hidden_table_sheet(
         wb,
@@ -3802,6 +4095,225 @@ def _build_trend_summary(
     auto_width(ws, max(8, len(headers)), max_row)
 
 
+def _build_repo_detail(wb: Workbook, data: dict) -> None:
+    ws = _get_or_create_sheet(wb, "Repo Detail")
+    ws.sheet_properties.tabColor = "1E40AF"
+    _configure_sheet_view(ws, zoom=115, show_grid_lines=False)
+    _set_sheet_header(
+        ws,
+        "Repo Detail",
+        "Pick one repo, then use this page as the fastest single-repo briefing: score, tier, trend, risks, and next move.",
+        width=10,
+    )
+    ws.freeze_panes = "A6"
+
+    repo_names = sorted(
+        audit.get("metadata", {}).get("name", "")
+        for audit in data.get("audits", [])
+        if audit.get("metadata", {}).get("name")
+    )
+    default_repo = repo_names[0] if repo_names else ""
+    ws["A4"] = "Select Repo"
+    ws["A4"].font = SUBHEADER_FONT
+    ws["B4"] = default_repo
+    if repo_names:
+        dv = DataValidation(
+            type="list",
+            formula1=f"=Data_RepoDetail!$A$2:$A${len(repo_names) + 1}",
+            allow_blank=False,
+            promptTitle="Repo Detail",
+            prompt="Choose a repo to refresh this briefing page.",
+        )
+        dv.add("B4")
+        ws.add_data_validation(dv)
+    ws["D4"] = "GitHub"
+    ws["D4"].font = SUBHEADER_FONT
+    ws["E4"] = '=IFERROR(HYPERLINK(VLOOKUP($B$4,Data_RepoDetail!$A:$AC,2,FALSE),"Open Repo"),"Open Repo")'
+    ws["E4"].font = Font("Calibri", 10, bold=True, color=TEAL, underline="single")
+
+    summary_fields = [
+        ("Repo", 1, 1, 1),
+        ("Language", 2, 1, 3),
+        ("Overall Score", 5, 1, 4),
+        ("Interest Score", 6, 1, 5),
+        ("Grade", 7, 1, 6),
+        ("Tier", 8, 1, 7),
+        ("Collections", 11, 3, 1),
+        ("Security", 12, 3, 3),
+        ("Security Score", 13, 3, 4),
+        ("Badges", 9, 5, 1),
+        ("Flags", 10, 5, 3),
+        ("Trend", 18, 5, 5),
+    ]
+    for label, column_index, row_base, col_base in summary_fields:
+        row = row_base + 5
+        col = col_base
+        ws.cell(row=row, column=col, value=label).font = SUBHEADER_FONT
+        formula = f'=IFERROR(VLOOKUP($B$4,Data_RepoDetail!$A:$AC,{column_index},FALSE),"")'
+        style_data_cell(ws.cell(row=row, column=col + 1, value=formula), "left")
+
+    ws["A11"] = "Description"
+    ws["A11"].font = SUBHEADER_FONT
+    ws.merge_cells("B11:H11")
+    ws["B11"] = '=IFERROR(VLOOKUP($B$4,Data_RepoDetail!$A:$AC,4,FALSE),"")'
+    ws["B11"].alignment = WRAP
+
+    ws["A13"] = "Top Lens Summaries"
+    ws["A13"].font = SECTION_FONT
+    lens_rows = [
+        ("Ship Readiness", 14),
+        ("Momentum", 15),
+        ("Security", 16),
+        ("Portfolio Fit", 17),
+    ]
+    for offset, (label, column_index) in enumerate(lens_rows, 1):
+        row = 13 + offset
+        ws.cell(row=row, column=1, value=label).font = SUBHEADER_FONT
+        style_data_cell(ws.cell(row=row, column=2, value=f'=IFERROR(VLOOKUP($B$4,Data_RepoDetail!$A:$AC,{column_index},FALSE),"")'), "left")
+
+    ws["E13"] = "Why This Score Looks This Way"
+    ws["E13"].font = SECTION_FONT
+    explanation_rows = [
+        ("Strongest Drivers", 19),
+        ("Biggest Drags", 20),
+        ("Next Tier Gap", 21),
+        ("Next Best Action", 22),
+    ]
+    for offset, (label, column_index) in enumerate(explanation_rows, 1):
+        row = 13 + offset
+        ws.cell(row=row, column=5, value=label).font = SUBHEADER_FONT
+        style_data_cell(ws.cell(row=row, column=6, value=f'=IFERROR(VLOOKUP($B$4,Data_RepoDetail!$A:$AC,{column_index},FALSE),"")'), "left")
+
+    ws["A19"] = "Dimension Breakdown"
+    ws["A19"].font = SECTION_FONT
+    dimension_headers = ["Rank", "Dimension", "Score", "Summary"]
+    for col, header in enumerate(dimension_headers, 1):
+        ws.cell(row=20, column=col, value=header)
+    style_header_row(ws, 20, len(dimension_headers))
+    for rank in range(1, 7):
+        row = 20 + rank
+        ws.cell(row=row, column=1, value=rank)
+        lookup_expr = f'$B$4&"::{rank}"'
+        ws.cell(row=row, column=2, value=f'=IFERROR(VLOOKUP({lookup_expr},Data_RepoDimensionRollups!$A:$F,4,FALSE),"")')
+        ws.cell(row=row, column=3, value=f'=IFERROR(VLOOKUP({lookup_expr},Data_RepoDimensionRollups!$A:$F,5,FALSE),"")')
+        ws.cell(row=row, column=4, value=f'=IFERROR(VLOOKUP({lookup_expr},Data_RepoDimensionRollups!$A:$F,6,FALSE),"")')
+        for col in range(1, 5):
+            style_data_cell(ws.cell(row=row, column=col), "center" if col in {1, 3} else "left")
+
+    ws["F19"] = "Top Hotspots"
+    ws["F19"].font = SECTION_FONT
+    for idx in range(1, 4):
+        row = 19 + idx
+        ws.cell(row=row, column=6, value=f"Hotspot {idx}").font = SUBHEADER_FONT
+        style_data_cell(ws.cell(row=row, column=7, value=f'=IFERROR(VLOOKUP($B$4,Data_RepoDetail!$A:$AC,{23 + idx},FALSE),"")'), "left")
+
+    ws["F24"] = "Top Actions"
+    ws["F24"].font = SECTION_FONT
+    for idx in range(1, 4):
+        row = 24 + idx
+        ws.cell(row=row, column=6, value=f"Action {idx}").font = SUBHEADER_FONT
+        style_data_cell(ws.cell(row=row, column=7, value=f'=IFERROR(VLOOKUP($B$4,Data_RepoDetail!$A:$AC,{26 + idx},FALSE),"")'), "left")
+
+    ws["A29"] = "Use Score Explainer"
+    _set_internal_hyperlink(ws["B29"], "Score Explainer", display="Open Score Explainer")
+    ws["D29"] = "Go To Explorer"
+    _set_internal_hyperlink(ws["E29"], "Portfolio Explorer", display="Open Explorer")
+    auto_width(ws, 8, 30)
+
+
+def _build_run_changes(wb: Workbook, data: dict, diff_data: dict | None) -> None:
+    ws = _get_or_create_sheet(wb, "Run Changes")
+    ws.sheet_properties.tabColor = "0891B2"
+    _configure_sheet_view(ws, zoom=115, show_grid_lines=False)
+    _set_sheet_header(
+        ws,
+        "Run Changes",
+        "Use this sheet to answer one question quickly: what moved since the last run, and what actually needs follow-through now?",
+        width=9,
+    )
+    ws.freeze_panes = "A8"
+
+    counts = build_run_change_counts(diff_data)
+    summary = (data.get("run_change_summary") or build_run_change_summary(diff_data))
+    ws.merge_cells("A3:I3")
+    ws["A3"] = summary
+    ws["A3"].font = SUBTITLE_FONT
+    ws["A3"].alignment = WRAP
+
+    summary_cards = [
+        ("Improvements", counts.get("score_improvements", 0)),
+        ("Regressions", counts.get("score_regressions", 0)),
+        ("Promotions", counts.get("tier_promotions", 0)),
+        ("Demotions", counts.get("tier_demotions", 0)),
+        ("Security", counts.get("security_changes", 0)),
+        ("Governance", counts.get("collection_changes", 0)),
+    ]
+    for offset, (label, value) in enumerate(summary_cards):
+        write_kpi_card(ws, 5, 1 + offset * 2, label, value)
+
+    row = 8
+    sections: list[tuple[str, list[list[object]], list[str]]] = []
+    improvements = sorted((diff_data or {}).get("score_changes", []), key=lambda item: item.get("delta", 0.0), reverse=True)
+    regressions = sorted((diff_data or {}).get("score_changes", []), key=lambda item: item.get("delta", 0.0))[:5]
+    sections.append((
+        "Biggest Score Gains",
+        [[item.get("name", ""), round(item.get("delta", 0.0), 3), round(item.get("new_score", 0.0), 3)] for item in improvements[:5]],
+        ["Repo", "Delta", "New Score"],
+    ))
+    sections.append((
+        "Biggest Regressions",
+        [[item.get("name", ""), round(item.get("delta", 0.0), 3), round(item.get("new_score", 0.0), 3)] for item in regressions[:5]],
+        ["Repo", "Delta", "New Score"],
+    ))
+    tier_changes = (diff_data or {}).get("tier_changes", [])
+    promotions = [item for item in tier_changes if item.get("direction") == "promotion"][:5]
+    demotions = [item for item in tier_changes if item.get("direction") == "demotion"][:5]
+    sections.append((
+        "Tier Promotions / Demotions",
+        [[item.get("name", ""), item.get("old_tier", ""), item.get("new_tier", ""), item.get("direction", "")] for item in promotions + demotions],
+        ["Repo", "Old Tier", "New Tier", "Movement"],
+    ))
+    blocked_items = [item for item in (data.get("operator_queue") or []) if item.get("lane") == "blocked"][:5]
+    sections.append((
+        "Newly Blocked Items",
+        [[item.get("repo", ""), item.get("title", ""), item.get("lane_reason", "") or item.get("summary", "")] for item in blocked_items],
+        ["Repo", "Item", "Why"],
+    ))
+    reopened = [item for item in (data.get("material_changes") or []) if "reopen" in str(item.get("change_type", "")).lower()][:5]
+    sections.append((
+        "Reopened Items",
+        [[item.get("repo", ""), item.get("title", ""), item.get("change_type", "")] for item in reopened],
+        ["Repo", "Title", "Type"],
+    ))
+    pressure_rows = []
+    for item in (data.get("governance_drift") or [])[:5]:
+        pressure_rows.append([item.get("repo_full_name", ""), item.get("drift_type", ""), "governance"])
+    for item in (diff_data or {}).get("security_changes", [])[:5]:
+        pressure_rows.append([item.get("name", ""), item.get("new_label", ""), "security"])
+    sections.append((
+        "New Security / Governance Pressure",
+        pressure_rows[:5],
+        ["Repo", "Signal", "Area"],
+    ))
+
+    for title, rows, headers in sections:
+        ws.cell(row=row, column=1, value=title).font = SECTION_FONT
+        header_row = row + 1
+        for col, header in enumerate(headers, 1):
+            ws.cell(row=header_row, column=col, value=header)
+        style_header_row(ws, header_row, len(headers))
+        if not rows:
+            rows = [["No movement to call out yet.", "", ""][: len(headers)]]
+        for offset, values in enumerate(rows, 1):
+            for col, value in enumerate(values, 1):
+                style_data_cell(ws.cell(row=header_row + offset, column=col, value=value), "center" if isinstance(value, (int, float)) else "left")
+        if rows:
+            apply_zebra_stripes(ws, header_row + 1, header_row + len(rows), len(headers))
+        row = header_row + len(rows) + 2
+
+    auto_width(ws, 9, row)
+
+
 def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard") -> None:
     ws = _get_or_create_sheet(wb, "Review Queue")
     ws.sheet_properties.tabColor = "2563EB"
@@ -3951,7 +4463,18 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
     ws.merge_cells(start_row=guidance_row, start_column=1, end_row=guidance_row, end_column=8)
     ws.cell(row=guidance_row, column=1, value="Read this table top-down: urgent items first, ready items second, and safe-to-defer rows last.").font = SUBTITLE_FONT
     ws.cell(row=guidance_row, column=1).alignment = WRAP
-    headers = ["Repo", "Title", "Lane", "Kind", "Priority", "Next Step", "Decision Hint", "Safe To Defer"]
+    headers = [
+        "Repo",
+        "Title",
+        "Lane",
+        "Kind",
+        "Priority",
+        "Why This Is Here",
+        "What To Do Next",
+        "Last Movement",
+        "Open Artifact",
+        "Safe To Defer",
+    ]
     start_row = guidance_row + 1
     for col, header in enumerate(headers, 1):
         ws.cell(row=start_row, column=col, value=header)
@@ -3962,22 +4485,46 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
     for row, item in enumerate(targets, start_row + 1):
         next_step = item.get("recommended_action", item.get("next_step", ""))
         safe_to_defer = item.get("lane") == "deferred" or item.get("safe_to_defer")
+        links = item.get("links") or []
+        primary_link = links[0].get("url", "") if links else ""
+        last_movement = (
+            item.get("source_run_id")
+            or item.get("updated_at")
+            or item.get("created_at")
+            or (data.get("review_summary") or {}).get("generated_at", "")
+            or "Current run"
+        )
         values = [
             item.get("repo", item.get("repo_name", "")),
             item.get("title", ""),
             item.get("lane", ""),
             item.get("kind", "review"),
             item.get("priority", item.get("severity", 0.0)),
+            item.get("lane_reason", "") or item.get("summary", "") or item.get("decision_hint", ""),
             next_step,
-            item.get("decision_hint", item.get("lane", "review")),
+            last_movement,
+            primary_link or item.get("repo_url", ""),
             "yes" if safe_to_defer else "no",
         ]
         for col, value in enumerate(values, 1):
-            style_data_cell(ws.cell(row=row, column=col, value=value), "center" if col in {3, 4, 5, 8} else "left")
+            align = "center" if col in {3, 4, 5, 10} else "left"
+            style_data_cell(ws.cell(row=row, column=col, value=value), align)
+        repo_cell = ws.cell(row=row, column=1)
+        if item.get("repo_url"):
+            repo_cell.hyperlink = item.get("repo_url")
+            repo_cell.font = Font("Calibri", 10, color=TEAL, underline="single")
+        artifact_cell = ws.cell(row=row, column=9)
+        if primary_link:
+            artifact_cell.value = "Open"
+            artifact_cell.hyperlink = primary_link
+            artifact_cell.font = Font("Calibri", 10, color=TEAL, underline="single")
+        _apply_lane_row_fill(ws, row, len(headers), item.get("lane"))
 
     max_row = len(targets) + start_row
     if targets:
         apply_zebra_stripes(ws, start_row + 1, max_row, len(headers))
+        for row, item in enumerate(targets, start_row + 1):
+            _apply_lane_row_fill(ws, row, len(headers), item.get("lane"))
         _set_autofilter(ws, len(headers), max_row, start_row=start_row)
     auto_width(ws, len(headers), max_row)
 
@@ -4326,19 +4873,36 @@ def _build_executive_summary(
             f"{len(data.get('material_changes', []) or [])} material changes and "
             f"{len(data.get('governance_drift', []) or [])} governance drift signals were captured in this run."
         )
+    run_change_counts = data.get("run_change_counts") or build_run_change_counts(diff_data)
+    run_change_summary = data.get("run_change_summary") or build_run_change_summary(diff_data)
+    top_attention = _build_workbook_rollups(data)[1][:5]
+    top_recommendation = (
+        (data.get("operator_queue") or [{}])[0].get("recommended_action")
+        if data.get("operator_queue")
+        else recommended_focus
+    ) or "Start with the highest-pressure queue item, then protect the current leaders."
+    biggest_opportunity = leaders[0]["name"] if leaders else "Portfolio-wide follow-through"
     narrative_rows = [
         (
-            "What Is Going Well",
+            "Portfolio Health",
             f"{data.get('tier_distribution', {}).get('shipped', 0)} repos are shipped, the portfolio average is {data.get('average_score', 0):.2f}, and {leaders[0]['name'] if leaders else 'the current leaders'} set the current high-water mark.",
         ),
         (
-            "What Needs Attention",
+            "Top Attention",
             operator_summary.get("headline", "No urgent operator headline is present.")
             + (f" Critical security pressure is concentrated in {len(critical_repos)} repos." if critical_repos else ""),
+        ),
+        ("Run Changes", run_change_summary or change_summary),
+        (
+            "Improving vs Regressing",
+            f"{run_change_counts.get('score_improvements', 0)} improving, {run_change_counts.get('score_regressions', 0)} regressing, "
+            f"{run_change_counts.get('tier_promotions', 0)} promoted, {run_change_counts.get('tier_demotions', 0)} demoted.",
         ),
         ("What Changed", what_changed or change_summary),
         ("Why It Matters", why_it_matters),
         ("Follow-Through", follow_through),
+        ("Top Recommendation", top_recommendation),
+        ("Biggest Opportunity", biggest_opportunity),
         ("Focus This Week", next_action or recommended_focus or "Review the top queue items first, then protect the highest-value repos from drift."),
     ]
     if excel_mode == "standard":
@@ -4384,9 +4948,17 @@ def _build_executive_summary(
     write_kpi_card(ws, 10, 1, "Portfolio Grade", data.get("portfolio_grade", "F"))
     write_kpi_card(ws, 10, 3, "Avg Score", f"{data.get('average_score', 0):.2f}")
     write_kpi_card(ws, 10, 5, "Critical Repos", len(critical_repos))
+    write_kpi_card(ws, 10, 7, "Improving", run_change_counts.get("score_improvements", 0))
+    write_kpi_card(ws, 10, 9, "Regressing", run_change_counts.get("score_regressions", 0), "C2410C")
 
     leader_rows = [[entry["name"], entry["profile_score"], entry["tier"]] for entry in leaders] or [["No leader", 0, "—"]]
     _write_ranked_list(ws, 14, 1, "Top Profile Leaders", ["Repo", "Profile Score", "Tier"], leader_rows)
+
+    attention_rows = [
+        [repo, f"B{blocked}/U{urgent}/R{ready}", title or "Queue pressure", action or "Review the repo detail page."]
+        for repo, _total, blocked, urgent, ready, _deferred, _kind, _priority, title, action in top_attention
+    ] or [["Portfolio", "No open items", "Queue is clear", "Monitor future runs."]]
+    _write_ranked_list(ws, 14, 9, "Top 5 Attention Items", ["Repo", "Counts", "Why Now", "Next Step"], attention_rows)
 
     if diff_data:
         mover_rows = [
@@ -4520,6 +5092,11 @@ def _build_executive_summary(
         ws.cell(row=row_base + 2, column=2, value=preflight.get("blocking_errors", 0))
         ws.cell(row=row_base + 3, column=1, value="Warnings").font = SUBHEADER_FONT
         ws.cell(row=row_base + 3, column=2, value=preflight.get("warnings", 0))
+    ws.page_setup.orientation = "landscape"
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 1
+    ws.print_title_rows = "1:4"
+    ws.print_area = "A1:L40"
     auto_width(ws, 6, 65 if excel_mode == "standard" else 35)
 
 
@@ -4810,6 +5387,7 @@ def _build_excel_workbook(
         portfolio_profile=portfolio_profile,
         collection=collection,
     )
+    _build_repo_detail(wb, data)
     _build_by_lens(
         wb,
         data,
@@ -4822,6 +5400,7 @@ def _build_excel_workbook(
         portfolio_profile=portfolio_profile,
     )
     _build_trend_summary(wb, data, trend_data, score_history)
+    _build_run_changes(wb, data, diff_data)
     _build_heatmap(wb, data)
     _build_quick_wins(wb, data)
     _build_badges(wb, data)
@@ -4869,7 +5448,7 @@ def _build_excel_workbook(
     _build_dependency_graph(wb, data)
     _build_score_explainer(wb)
     _build_action_items(wb, data)
-    _build_hidden_data_sheets(wb, data, trend_data, score_history)
+    _build_hidden_data_sheets(wb, data, trend_data, score_history, diff_data)
     _build_navigation(
         wb,
         data,
@@ -4877,6 +5456,7 @@ def _build_excel_workbook(
         portfolio_profile=portfolio_profile,
         collection=collection,
     )
+    _inject_sheet_navigation(wb)
     _apply_workbook_named_ranges(
         wb,
         data,

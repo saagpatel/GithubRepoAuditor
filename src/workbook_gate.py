@@ -1008,7 +1008,7 @@ def _manual_signoff_template(standard_path: Path) -> dict:
             },
             {
                 "id": "visible-tabs-present",
-                "label": "Confirm Index, Dashboard, Review Queue, Executive Summary, and Print Pack are present and readable.",
+                "label": "Confirm Index, Dashboard, Review Queue, Repo Detail, Run Changes, Executive Summary, and Print Pack are present and readable.",
                 "status": "pending",
             },
             {

@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 import tempfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Callable, Generator
@@ -12,6 +13,8 @@ from typing import Callable, Generator
 from src.models import RepoMetadata
 
 logger = logging.getLogger(__name__)
+
+CLONE_WORKERS = 4
 
 
 @contextmanager
@@ -99,24 +102,54 @@ def clone_workspace(
         clone_dir = Path(tmpdir)
         cloned: dict[str, Path] = {}
         total = len(repos)
-
-        for i, repo in enumerate(repos, 1):
-            if on_progress:
-                on_progress(i, total, repo.name)
-            else:
-                print(
-                    f"  [{i}/{total}] Cloning {repo.full_name}...",
-                    file=sys.stderr,
-                )
-            try:
-                path = clone_repo(repo.clone_url, repo.name, token, clone_dir)
-                cloned[repo.name] = path
-            except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
-                if on_error:
-                    on_error(repo.name, "clone failed")
+        if total <= 1:
+            for i, repo in enumerate(repos, 1):
+                if on_progress:
+                    on_progress(i, total, repo.name)
                 else:
                     print(
-                        f"  ⚠ Failed to clone {repo.name}, skipping",
+                        f"  [{i}/{total}] Cloning {repo.full_name}...",
                         file=sys.stderr,
                     )
+                try:
+                    path = clone_repo(repo.clone_url, repo.name, token, clone_dir)
+                    cloned[repo.name] = path
+                except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                    if on_error:
+                        on_error(repo.name, "clone failed")
+                    else:
+                        print(
+                            f"  ⚠ Failed to clone {repo.name}, skipping",
+                            file=sys.stderr,
+                        )
+            yield cloned
+            return
+
+        workers = min(CLONE_WORKERS, total)
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = {
+                executor.submit(clone_repo, repo.clone_url, repo.name, token, clone_dir): (index, repo)
+                for index, repo in enumerate(repos, 1)
+            }
+            completed = 0
+            for future in as_completed(futures):
+                index, repo = futures[future]
+                completed += 1
+                if on_progress:
+                    on_progress(completed, total, repo.name)
+                else:
+                    print(
+                        f"  [{completed}/{total}] Cloning {repo.full_name}...",
+                        file=sys.stderr,
+                    )
+                try:
+                    cloned[repo.name] = future.result()
+                except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                    if on_error:
+                        on_error(repo.name, "clone failed")
+                    else:
+                        print(
+                            f"  ⚠ Failed to clone {repo.name}, skipping",
+                            file=sys.stderr,
+                        )
         yield cloned

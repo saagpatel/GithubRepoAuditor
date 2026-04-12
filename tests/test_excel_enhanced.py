@@ -25,9 +25,11 @@ from src.excel_export import (
     _build_hotspots,
     _build_portfolio_explorer,
     _build_print_pack,
+    _build_repo_detail,
     _build_repo_profiles,
     _build_review_history_sheet,
     _build_review_queue,
+    _build_run_changes,
     _build_scenario_planner,
     _build_score_explainer,
     _build_security,
@@ -755,6 +757,11 @@ class TestHotspotsAndDataSheets:
         assert "Data_OperatorQueue" in wb.sheetnames
         assert "Data_OperatorRepoRollups" in wb.sheetnames
         assert "Data_MaterialChangeRollups" in wb.sheetnames
+        assert "Data_RepoDetail" in wb.sheetnames
+        assert "Data_RepoDimensionRollups" in wb.sheetnames
+        assert "Data_RepoHistoryRollups" in wb.sheetnames
+        assert "Data_RunChangeRollups" in wb.sheetnames
+        assert "Data_RunChangeRepoData" in wb.sheetnames
         assert wb["Data_Repos"].sheet_state == "hidden"
 
     def test_hidden_repo_sheet_has_structured_table(self):
@@ -785,6 +792,8 @@ class TestAnalystWorkbookSheets:
         report = _make_report()
         _build_by_collection(wb, report, portfolio_profile="default")
         _build_trend_summary(wb, report, trend_data=[{"date": "2026-03-28", "average_score": 0.6, "repos_audited": 3, "tier_distribution": {"shipped": 1, "functional": 1}}], score_history={"RepoA": [0.5, 0.8]})
+        _build_repo_detail(wb, report)
+        _build_run_changes(wb, report, {"score_changes": []})
         _build_review_queue(wb, report)
         _build_review_history_sheet(wb, report)
         _build_governance_controls(wb, report)
@@ -792,11 +801,34 @@ class TestAnalystWorkbookSheets:
         _build_print_pack(wb, report, None, portfolio_profile="default", collection="showcase")
         assert "By Collection" in wb.sheetnames
         assert "Trend Summary" in wb.sheetnames
+        assert "Repo Detail" in wb.sheetnames
+        assert "Run Changes" in wb.sheetnames
         assert "Review Queue" in wb.sheetnames
         assert "Review History" in wb.sheetnames
         assert "Governance Controls" in wb.sheetnames
         assert "Governance Audit" in wb.sheetnames
         assert "Print Pack" in wb.sheetnames
+
+    def test_repo_detail_uses_selector_and_data_validation(self):
+        wb = Workbook()
+        _build_repo_detail(wb, _make_report())
+        ws = wb["Repo Detail"]
+        assert ws["A4"].value == "Select Repo"
+        assert ws["B4"].value == "RepoA"
+        assert ws.data_validations.dataValidation
+        assert "VLOOKUP" in str(ws["B6"].value)
+
+    def test_run_changes_surfaces_summary(self):
+        wb = Workbook()
+        diff = {
+            "score_changes": [{"name": "RepoA", "old_score": 0.7, "new_score": 0.8, "delta": 0.1}],
+            "tier_changes": [],
+            "repo_changes": [],
+        }
+        _build_run_changes(wb, _make_report(), diff)
+        ws = wb["Run Changes"]
+        assert ws["A1"].value == "Run Changes"
+        assert ws["A3"].value is not None
 
     def test_review_queue_has_summary_and_freeze_panes(self):
         wb = Workbook()
@@ -1096,7 +1128,9 @@ class TestWorkbookModes:
         assert "Dashboard" in wb.sheetnames
         assert "By Collection" in wb.sheetnames
         assert "Trend Summary" in wb.sheetnames
+        assert "Run Changes" in wb.sheetnames
         assert "Review Queue" in wb.sheetnames
+        assert "Repo Detail" in wb.sheetnames
         assert "Governance Controls" in wb.sheetnames
         assert "Print Pack" in wb.sheetnames
 
@@ -1118,10 +1152,12 @@ class TestWorkbookModes:
             "All Repos",
             "Review Queue",
             "Portfolio Explorer",
+            "Repo Detail",
             "Executive Summary",
             "By Lens",
             "By Collection",
             "Trend Summary",
+            "Run Changes",
             "Campaigns",
             "Governance Controls",
             "Print Pack",
@@ -1200,7 +1236,7 @@ class TestWorkbookModes:
         wb = load_workbook(output)
         ws = wb["Review Queue"]
         header_row = next(row for row in range(20, 70) if ws.cell(row=row, column=1).value == "Repo")
-        assert ws.auto_filter.ref == f"A{header_row}:H{header_row + 1}"
+        assert ws.auto_filter.ref == f"A{header_row}:J{header_row + 1}"
         assert not ws.tables
 
     def test_visible_sheets_use_filters_while_hidden_data_sheets_keep_tables(self, tmp_path):
