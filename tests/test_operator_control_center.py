@@ -565,6 +565,24 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
         "churn",
         "blocked",
     }
+    assert summary[
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status"
+    ] in {
+        "fresh",
+        "mixed-age",
+        "stale",
+        "insufficient-data",
+    }
+    assert summary[
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_status"
+    ] in {
+        "none",
+        "confirmation-softened",
+        "clearance-softened",
+        "confirmation-reset",
+        "clearance-reset",
+        "blocked",
+    }
     assert summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_persistence_status"] in {
         "none",
         "just-restored",
@@ -601,6 +619,8 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
     assert 0.0 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_churn_score"] <= 0.95
     assert 0.0 <= summary["primary_target"]["decayed_rerestored_rebuild_reentry_confirmation_rate"] <= 1.0
     assert 0.0 <= summary["primary_target"]["decayed_rerestored_rebuild_reentry_clearance_rate"] <= 1.0
+    assert 0.0 <= summary["primary_target"]["decayed_rererestored_rebuild_reentry_confirmation_rate"] <= 1.0
+    assert 0.0 <= summary["primary_target"]["decayed_rererestored_rebuild_reentry_clearance_rate"] <= 1.0
     assert (
         summary["closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_decay_window_runs"]
         == 4
@@ -628,6 +648,7 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
     assert summary["closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_window_runs"] == 4
     assert summary["closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_window_runs"] == 4
     assert summary["closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_window_runs"] == 4
+    assert summary["closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_decay_window_runs"] == 4
     assert summary["class_normalization_window_runs"] == 4
     assert summary["class_reweighting_window_runs"] == 4
     assert summary["class_transition_window_runs"] == 4

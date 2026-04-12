@@ -1688,6 +1688,68 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     else:
         lines.append("- No re-re-restored churn hotspots are recorded in the recent window.")
     lines.append("")
+    lines.append("## Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness")
+    lines.append("")
+    lines.append(
+        f"- Reset re-entry rebuild re-entry restore re-re-restore freshness: {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status', 'insufficient-data')} "
+        f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_reason', 'No reset re-entry rebuild re-entry restore re-re-restore freshness reason is recorded yet.')})"
+    )
+    if primary_target.get("recent_reset_reentry_rebuild_reentry_restore_rererestore_signal_mix"):
+        lines.append(
+            f"- Recent reset re-entry rebuild re-entry restore re-re-restore signal mix: {primary_target.get('recent_reset_reentry_rebuild_reentry_restore_rererestore_signal_mix')}"
+        )
+    lines.append(
+        f"- {summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_summary', 'No reset re-entry rebuild re-entry restore re-re-restore freshness summary is recorded yet.')}"
+    )
+    stale_rererestore_hotspots = summary.get(
+        "stale_reset_reentry_rebuild_reentry_restore_rererestore_hotspots"
+    ) or []
+    fresh_rererestore_hotspots = summary.get(
+        "fresh_reset_reentry_rebuild_reentry_restore_rererestore_signal_hotspots"
+    ) or []
+    if stale_rererestore_hotspots:
+        for hotspot in stale_rererestore_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Stale re-re-restored rebuilt re-entry hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status', 'stale')} with "
+                f"{hotspot.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_memory_weight', 0.0):.2f} weighted memory across "
+                f"{hotspot.get('recent_reset_reentry_rebuild_reentry_restore_rererestore_signal_mix', 'no re-re-restored rebuilt re-entry signal mix recorded')}"
+            )
+    elif fresh_rererestore_hotspots:
+        for hotspot in fresh_rererestore_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Fresh re-re-restored rebuilt re-entry hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status', 'fresh')} with "
+                f"{hotspot.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_memory_weight', 0.0):.2f} weighted memory across "
+                f"{hotspot.get('recent_reset_reentry_rebuild_reentry_restore_rererestore_signal_mix', 'no re-re-restored rebuilt re-entry signal mix recorded')}"
+            )
+    else:
+        lines.append("- No re-re-restored freshness hotspots are recorded in the recent window.")
+    lines.append("")
+    lines.append("## Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Controls")
+    lines.append("")
+    lines.append(
+        f"- Reset re-entry rebuild re-entry restore re-re-restore reset controls: {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_status', 'none')} "
+        f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_reason', 'No reset re-entry rebuild re-entry restore re-re-restore reset reason is recorded yet.')})"
+    )
+    if primary_target.get("recent_reset_reentry_rebuild_reentry_restore_rererestore_signal_mix"):
+        lines.append(
+            f"- Recent reset re-entry rebuild re-entry restore re-re-restore signal mix: {primary_target.get('recent_reset_reentry_rebuild_reentry_restore_rererestore_signal_mix')}"
+        )
+    lines.append(
+        f"- {summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_summary', 'No reset re-entry rebuild re-entry restore re-re-restore reset summary is recorded yet.')}"
+    )
+    rererestore_reset_hotspots = stale_rererestore_hotspots or fresh_rererestore_hotspots
+    if rererestore_reset_hotspots:
+        for hotspot in rererestore_reset_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Re-re-restore reset hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_status', 'none')} across "
+                f"{hotspot.get('recent_reset_reentry_rebuild_reentry_restore_rererestore_signal_mix', 'no re-re-restored rebuilt re-entry signal mix recorded')}"
+            )
+    else:
+        lines.append("- No re-re-restored reset hotspots are recorded in the recent window.")
+    lines.append("")
     lines.append("## Reset Re-entry Rebuild Persistence")
     lines.append("")
     lines.append(

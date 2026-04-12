@@ -459,6 +459,8 @@ def test_build_scheduled_handoff_writes_artifacts_and_issue_candidate(tmp_path):
     assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Controls" in markdown
     assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Persistence" in markdown
     assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Churn Controls" in markdown
+    assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness" in markdown
+    assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Controls" in markdown
     assert "Reset Re-entry Rebuild Persistence" in markdown
     assert "Reset Re-entry Rebuild Churn Controls" in markdown
     assert "Reacquisition Persistence" in markdown
