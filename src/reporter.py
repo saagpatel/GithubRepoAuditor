@@ -11,10 +11,14 @@ from src.report_enrichment import (
     build_follow_through_checkpoint_status_label,
     build_follow_through_escalation_status_label,
     build_follow_through_escalation_summary,
+    build_follow_through_reacquisition_confidence_retirement_status_label,
+    build_follow_through_reacquisition_confidence_retirement_summary,
     build_follow_through_reacquisition_consolidation_status_label,
     build_follow_through_reacquisition_consolidation_summary,
     build_follow_through_reacquisition_durability_status_label,
     build_follow_through_reacquisition_durability_summary,
+    build_follow_through_reacquisition_softening_decay_status_label,
+    build_follow_through_reacquisition_softening_decay_summary,
     build_follow_through_recovery_freshness_status_label,
     build_follow_through_recovery_freshness_summary,
     build_follow_through_recovery_memory_reset_status_label,
@@ -462,6 +466,22 @@ def write_markdown_report(
     if not weekly_pack.get("top_just_reacquired_items") and not weekly_pack.get("top_holding_reacquired_items") and not weekly_pack.get("top_durable_reacquired_items") and not weekly_pack.get("top_softening_reacquired_items") and not weekly_pack.get("top_fragile_reacquisition_confidence_items"):
         _w("- No reacquisition durability or confidence-consolidation hotspots are currently surfaced.")
     _w("")
+    _w("### Follow-Through Reacquisition Softening and Confidence Retirement")
+    _w("")
+    _w(f"- Reacquisition Softening Decay: {weekly_pack.get('follow_through_reacquisition_softening_decay_summary', 'No reacquisition softening-decay signal is currently surfaced.')}")
+    _w(f"- Reacquisition Confidence Retirement: {weekly_pack.get('follow_through_reacquisition_confidence_retirement_summary', 'No reacquisition confidence-retirement signal is currently surfaced.')}")
+    for item in weekly_pack.get("top_softening_reacquisition_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        _w(f"- Softening Reacquisition: {label} — {item.get('follow_through_reacquisition_softening_decay_summary', 'No reacquisition softening-decay signal is currently surfaced.')}")
+    for item in weekly_pack.get("top_revalidation_needed_reacquisition_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        _w(f"- Revalidation Needed: {label} — {item.get('follow_through_reacquisition_confidence_retirement_summary', 'No reacquisition confidence-retirement signal is currently surfaced.')}")
+    for item in weekly_pack.get("top_retired_reacquisition_confidence_items", [])[:3]:
+        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+        _w(f"- Retired Confidence: {label} — {item.get('follow_through_reacquisition_confidence_retirement_summary', 'No reacquisition confidence-retirement signal is currently surfaced.')}")
+    if not weekly_pack.get("top_softening_reacquisition_items") and not weekly_pack.get("top_revalidation_needed_reacquisition_items") and not weekly_pack.get("top_retired_reacquisition_confidence_items"):
+        _w("- No reacquisition softening or confidence-retirement hotspots are currently surfaced.")
+    _w("")
     _w("### Top Repo Drilldowns")
     _w("")
     for briefing in weekly_pack.get("repo_briefings", [])[:3]:
@@ -481,6 +501,8 @@ def write_markdown_report(
         _w(f"- Recovery Reacquisition: {briefing.get('recovery_reacquisition_line', 'None: No follow-through recovery reacquisition signal is currently surfaced.')}")
         _w(f"- Reacquisition Durability: {briefing.get('reacquisition_durability_line', 'None: No follow-through reacquisition durability signal is currently surfaced.')}")
         _w(f"- Reacquisition Confidence: {briefing.get('reacquisition_confidence_line', 'None: No follow-through reacquisition confidence-consolidation signal is currently surfaced.')}")
+        _w(f"- Reacquisition Softening Decay: {briefing.get('reacquisition_softening_decay_line', 'None: No reacquisition softening-decay signal is currently surfaced.')}")
+        _w(f"- Reacquisition Confidence Retirement: {briefing.get('reacquisition_confidence_retirement_line', 'None: No reacquisition confidence-retirement signal is currently surfaced.')}")
         _w(f"- What Would Count As Progress: {briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
         _w("")
 
