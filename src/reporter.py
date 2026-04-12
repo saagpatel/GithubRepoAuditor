@@ -490,6 +490,26 @@ def write_markdown_report(
                 f"- Reset Re-entry Rebuild Re-Entry Churn Controls: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_churn_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_churn_reason', 'No reset re-entry rebuild re-entry churn reason is recorded yet.')})"
             )
+        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_freshness_status"):
+            _w(
+                f"- Reset Re-entry Rebuild Re-Entry Freshness: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_freshness_status')} "
+                f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_freshness_reason', 'No reset re-entry rebuild re-entry freshness reason is recorded yet.')})"
+            )
+        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_reset_status"):
+            _w(
+                f"- Reset Re-entry Rebuild Re-Entry Reset Controls: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_reset_status')} "
+                f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_reset_reason', 'No reset re-entry rebuild re-entry reset reason is recorded yet.')})"
+            )
+        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_status"):
+            _w(
+                f"- Reset Re-entry Rebuild Re-Entry Refresh Recovery: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_status')} "
+                f"({report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_summary', 'No reset re-entry rebuild re-entry refresh recovery summary is recorded yet.')})"
+            )
+        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_status"):
+            _w(
+                f"- Reset Re-entry Rebuild Re-Entry Restore Controls: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_status')} "
+                f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reason', 'No reset re-entry rebuild re-entry restore reason is recorded yet.')})"
+            )
         if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_persistence_status"):
             _w(
                 f"- Reset Re-entry Rebuild Persistence: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_persistence_status')} "
@@ -590,6 +610,14 @@ def write_markdown_report(
             _w(f"- Reset Re-entry Rebuild Re-Entry Persistence Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_persistence_summary')}")
         if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_churn_summary"):
             _w(f"- Reset Re-entry Rebuild Re-Entry Churn Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_churn_summary')}")
+        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_freshness_summary"):
+            _w(f"- Reset Re-entry Rebuild Re-Entry Freshness Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_freshness_summary')}")
+        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_reset_summary"):
+            _w(f"- Reset Re-entry Rebuild Re-Entry Reset Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_reset_summary')}")
+        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_summary"):
+            _w(f"- Reset Re-entry Rebuild Re-Entry Refresh Recovery Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_summary')}")
+        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_summary"):
+            _w(f"- Reset Re-entry Rebuild Re-Entry Restore Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_summary')}")
         if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_persistence_summary"):
             _w(f"- Reset Re-entry Rebuild Persistence Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_persistence_summary')}")
         if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_churn_summary"):
