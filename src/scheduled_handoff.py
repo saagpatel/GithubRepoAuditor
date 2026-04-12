@@ -156,6 +156,8 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Reset re-entry reset controls: `{summary.get('primary_target_closure_forecast_reset_reentry_reset_status', 'none')}` — {summary.get('primary_target_closure_forecast_reset_reentry_reset_reason', 'No reset re-entry reset reason is recorded yet.')}",
         f"- Reset re-entry refresh recovery: `{summary.get('primary_target_closure_forecast_reset_reentry_refresh_recovery_status', 'none')}` ({summary.get('primary_target_closure_forecast_reset_reentry_refresh_recovery_score', 0.0):.2f})",
         f"- Reset re-entry rebuild controls: `{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_status', 'none')}` — {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reason', 'No reset re-entry rebuild reason is recorded yet.')}",
+        f"- Reset re-entry rebuild persistence: `{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_persistence_status', 'none')}` ({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_persistence_score', 0.0):.2f}; {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_age_runs', 0)} run(s))",
+        f"- Reset re-entry rebuild churn controls: `{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_churn_status', 'none')}` — {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_churn_reason', 'No reset re-entry rebuild churn reason is recorded yet.')}",
         f"- Recommendation drift: `{summary.get('recommendation_drift_status', 'stable')}` — {summary.get('recommendation_drift_summary', 'No recommendation-drift summary is recorded yet.')}",
         f"- Exception pattern summary: {summary.get('exception_pattern_summary', 'No exception-pattern summary is recorded yet.')}",
         f"- Exception retirement summary: {summary.get('exception_retirement_summary', 'No exception-retirement summary is recorded yet.')}",
@@ -183,6 +185,8 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Reset re-entry reset summary: {summary.get('closure_forecast_reset_reentry_reset_summary', 'No reset re-entry reset summary is recorded yet.')}",
         f"- Reset re-entry refresh recovery summary: {summary.get('closure_forecast_reset_reentry_refresh_recovery_summary', 'No reset re-entry refresh-recovery summary is recorded yet.')}",
         f"- Reset re-entry rebuild summary: {summary.get('closure_forecast_reset_reentry_rebuild_summary', 'No reset re-entry rebuild summary is recorded yet.')}",
+        f"- Reset re-entry rebuild persistence summary: {summary.get('closure_forecast_reset_reentry_rebuild_persistence_summary', 'No reset re-entry rebuild-persistence summary is recorded yet.')}",
+        f"- Reset re-entry rebuild churn summary: {summary.get('closure_forecast_reset_reentry_rebuild_churn_summary', 'No reset re-entry rebuild-churn summary is recorded yet.')}",
         f"- Confidence validation: `{summary.get('confidence_validation_status', 'insufficient-data')}` — {summary.get('confidence_calibration_summary', 'No confidence-calibration summary is recorded yet.')}",
         f"- Next recommended run: `{summary.get('next_recommended_run_mode', 'n/a')}`",
         f"- Watch strategy: `{summary.get('watch_strategy', 'manual')}`",
@@ -1129,6 +1133,70 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     lines.append(
         f"- {summary.get('closure_forecast_reset_reentry_rebuild_summary', 'No reset re-entry rebuild summary is recorded yet.')}"
     )
+    lines.append("")
+    lines.append("## Reset Re-entry Rebuild Persistence")
+    lines.append("")
+    lines.append(
+        f"- Reset re-entry rebuild persistence: {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_persistence_status', 'none')} "
+        f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_persistence_score', 0.0):.2f}; "
+        f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_age_runs', 0)} run(s))"
+    )
+    if primary_target.get("recent_reset_reentry_rebuild_persistence_path"):
+        lines.append(
+            f"- Recent reset re-entry rebuild persistence path: {primary_target.get('recent_reset_reentry_rebuild_persistence_path')}"
+        )
+    lines.append(
+        f"- {summary.get('closure_forecast_reset_reentry_rebuild_persistence_summary', 'No reset re-entry rebuild-persistence summary is recorded yet.')}"
+    )
+    just_rebuilt_hotspots = summary.get("just_rebuilt_hotspots") or []
+    holding_reset_reentry_rebuild_hotspots = summary.get(
+        "holding_reset_reentry_rebuild_hotspots"
+    ) or []
+    if just_rebuilt_hotspots:
+        for hotspot in just_rebuilt_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Just rebuilt hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('closure_forecast_reset_reentry_rebuild_persistence_status', 'just-rebuilt')} at "
+                f"{hotspot.get('closure_forecast_reset_reentry_rebuild_persistence_score', 0.0):.2f} across "
+                f"{hotspot.get('recent_reset_reentry_rebuild_persistence_path', 'no rebuild persistence path recorded')}"
+            )
+    elif holding_reset_reentry_rebuild_hotspots:
+        for hotspot in holding_reset_reentry_rebuild_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Holding rebuild hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('closure_forecast_reset_reentry_rebuild_persistence_status', 'holding-confirmation-rebuild')} at "
+                f"{hotspot.get('closure_forecast_reset_reentry_rebuild_persistence_score', 0.0):.2f} across "
+                f"{hotspot.get('recent_reset_reentry_rebuild_persistence_path', 'no rebuild persistence path recorded')}"
+            )
+    else:
+        lines.append("- No rebuild-persistence hotspots are recorded in the recent window.")
+    lines.append("")
+    lines.append("## Reset Re-entry Rebuild Churn Controls")
+    lines.append("")
+    lines.append(
+        f"- Reset re-entry rebuild churn: {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_churn_status', 'none')} "
+        f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_churn_reason', 'No reset re-entry rebuild churn reason is recorded yet.')})"
+    )
+    if primary_target.get("recent_reset_reentry_rebuild_churn_path"):
+        lines.append(
+            f"- Recent reset re-entry rebuild churn path: {primary_target.get('recent_reset_reentry_rebuild_churn_path')}"
+        )
+    lines.append(
+        f"- {summary.get('closure_forecast_reset_reentry_rebuild_churn_summary', 'No reset re-entry rebuild-churn summary is recorded yet.')}"
+    )
+    reset_reentry_rebuild_churn_hotspots = summary.get(
+        "reset_reentry_rebuild_churn_hotspots"
+    ) or []
+    if reset_reentry_rebuild_churn_hotspots:
+        for hotspot in reset_reentry_rebuild_churn_hotspots[:3]:
+            lines.append(
+                f"- {hotspot.get('label', 'Rebuild churn hotspot')} [{hotspot.get('scope', 'class')}] -> "
+                f"{hotspot.get('closure_forecast_reset_reentry_rebuild_churn_status', 'watch')} at "
+                f"{hotspot.get('closure_forecast_reset_reentry_rebuild_churn_score', 0.0):.2f} across "
+                f"{hotspot.get('recent_reset_reentry_rebuild_churn_path', 'no rebuild churn path recorded')}"
+            )
+    else:
+        lines.append("- No rebuild-churn hotspots are recorded in the recent window.")
     lines.append("")
     lines.append("## Closure Forecast Hysteresis")
     lines.append("")
