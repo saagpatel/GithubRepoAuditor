@@ -552,6 +552,8 @@ def _repo_table(analyst_context: dict, score_history: dict[str, list[float]] | N
         safe_url = _safe_href(url)
         next_action = escape(explanation.get("next_best_action", "") or "")
         score_note = escape(explanation.get("next_tier_gap_summary", "") or "")
+        next_action_markup = f'<br><span class="muted"><strong>Next:</strong> {next_action}</span>' if next_action else ""
+        score_note_markup = f'<br><span class="muted"><strong>Gap:</strong> {score_note}</span>' if score_note else ""
         link = f'<a href="{safe_url}" target="_blank" rel="noopener noreferrer">{safe_name}</a>' if safe_url else safe_name
         rows.append(
             f'<tr data-tier="{escape(tier, quote=True)}" '
@@ -570,8 +572,8 @@ def _repo_table(analyst_context: dict, score_history: dict[str, list[float]] | N
             f'<td>{safe_collections or "—"}</td>'
             f'<td class="sparkline">{escape(spark)}</td>'
             f'<td class="desc">{safe_desc}'
-            f"{'<br><span class=\"muted\"><strong>Next:</strong> ' + next_action + '</span>' if next_action else ''}"
-            f"{'<br><span class=\"muted\"><strong>Gap:</strong> ' + score_note + '</span>' if score_note else ''}"
+            f"{next_action_markup}"
+            f"{score_note_markup}"
             f'</td>'
             f'</tr>'
         )
