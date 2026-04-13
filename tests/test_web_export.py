@@ -56,6 +56,9 @@ def _make_report(**overrides) -> dict:
                 "projected_tier_promotions": 1,
             },
         },
+        "implementation_hotspots_summary": {
+            "summary": "1 repos have concrete implementation pressure. Start with RepoC in file src/core.py.",
+        },
         "security_posture": {
             "average_score": 0.61,
             "critical_repos": ["RepoC"],
@@ -474,6 +477,19 @@ def _make_report(**overrides) -> dict:
                 },
                 "security_posture": {"label": "healthy", "score": 0.8},
                 "hotspots": [{"title": "Keep momentum"}],
+                "implementation_hotspots": [
+                    {
+                        "scope": "file",
+                        "path": "src/core.py",
+                        "module": "src",
+                        "category": "code-complexity",
+                        "pressure_score": 0.74,
+                        "suggestion_type": "refactor",
+                        "why_it_matters": "src/core.py is carrying concentrated complexity.",
+                        "suggested_first_move": "Split the biggest function and add one regression test.",
+                        "signal_summary": "Complexity pressure 0.74 across 2 complex blocks.",
+                    }
+                ],
                 "analyzer_results": [],
             },
             {
@@ -784,6 +800,7 @@ class TestRenderHtml:
         assert "Watch Strategy" in html
         assert "RepoC drift needs review" in html
         assert "Why It Matters" in html
+        assert "Where To Start" in html
 
     def test_html_includes_portfolio_catalog_and_intent_alignment(self):
         html = _render_html(
@@ -829,6 +846,8 @@ class TestRenderHtml:
         assert "Reacquisition Softening Decay" in html
         assert "Reacquisition Confidence Retirement" in html
         assert "Revalidation Recovery" in html
+        assert "Implementation Hotspots:" in html
+        assert "src/core.py" in html
         assert "Last movement:" in html
         assert no_linked_artifact_summary() in html
 
@@ -951,3 +970,32 @@ class TestRenderHtml:
         assert "Compare" in html
         assert "Scenario Preview" in html
         assert "showcase" in html
+
+    def test_campaign_section_includes_github_projects_summary(self):
+        html = _render_html(
+            _make_report(
+                writeback_preview={
+                    "sync_mode": "reconcile",
+                    "github_projects": {
+                        "enabled": True,
+                        "status": "configured",
+                        "project_owner": "octo-org",
+                        "project_number": 7,
+                        "item_count": 1,
+                    },
+                    "repos": [
+                        {
+                            "repo": "RepoC",
+                            "issue_title": "[Repo Auditor] Security Review",
+                            "topics": ["ghra-call-security-review"],
+                            "github_project_field_count": 3,
+                            "notion_action_count": 1,
+                        }
+                    ],
+                }
+            )
+        )
+
+        assert "GitHub Projects:</strong> configured" in html
+        assert "octo-org #7, 1 items" in html
+        assert '<td class="num">3</td>' in html

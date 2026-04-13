@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from src.badges import compute_badges, suggest_next_badges
@@ -57,6 +58,7 @@ def letter_grade(score: float) -> str:
 def score_repo(
     metadata: RepoMetadata,
     results: list[AnalyzerResult],
+    repo_path: Path | None = None,
     portfolio_lang_freq: dict[str, float] | None = None,
     custom_weights: dict[str, float] | None = None,
     github_client: GitHubClient | None = None,
@@ -165,6 +167,7 @@ def score_repo(
     # Compute badges and suggestions
     audit.badges = compute_badges(audit)
     audit.next_badges = suggest_next_badges(audit)
+    from src.implementation_hotspots import build_implementation_hotspots
     from src.portfolio_intelligence import (
         build_action_candidates,
         build_hotspots,
@@ -189,6 +192,7 @@ def score_repo(
     )
     audit.action_candidates = build_action_candidates(audit)
     audit.hotspots = build_hotspots(audit)
+    audit.implementation_hotspots = build_implementation_hotspots(repo_path, audit)
     audit.score_explanation = build_score_explanation(audit)
 
     return audit

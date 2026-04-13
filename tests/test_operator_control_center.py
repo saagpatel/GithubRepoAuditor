@@ -3,7 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 
 import src.operator_control_center as operator_control_center
-from src.operator_control_center import build_operator_snapshot, normalize_review_state, render_control_center_markdown
+from src.operator_control_center import (
+    build_operator_snapshot,
+    normalize_review_state,
+    render_control_center_markdown,
+)
 
 
 def _make_report(**overrides) -> dict:
@@ -108,6 +112,26 @@ def test_operator_snapshot_assigns_expected_lanes(tmp_path: Path):
     assert lanes["RepoD drift needs review"] == "urgent"
     assert lanes["Enable secret scanning"] == "ready"
     assert lanes["Review RepoB"] == "deferred"
+
+
+def test_operator_snapshot_treats_project_mirror_drift_as_campaign_drift(tmp_path: Path):
+    snapshot = build_operator_snapshot(
+        _make_report(
+            managed_state_drift=[
+                {
+                    "action_id": "campaign-1",
+                    "repo_full_name": "user/RepoD",
+                    "target": "github-project-item",
+                    "drift_state": "managed-project-item-missing",
+                }
+            ]
+        ),
+        output_dir=tmp_path,
+    )
+
+    project_item = next(item for item in snapshot["operator_queue"] if item["repo"] == "RepoD")
+    assert project_item["title"] == "RepoD drift needs review"
+    assert project_item["lane"] == "urgent"
 
 
 def test_operator_snapshot_filters_by_triage_view(tmp_path: Path):

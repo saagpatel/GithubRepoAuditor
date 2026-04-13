@@ -1,0 +1,6 @@
+# Optional GitHub Projects v2 mirror for managed campaign actions.
+# This file is only used when `--github-projects` is explicitly enabled.
+
+owner: ""
+project_number: 0
+fields: {}

@@ -99,6 +99,7 @@ class RepoAudit:
     flags: list[str] = field(default_factory=list)
     lenses: dict[str, dict] = field(default_factory=dict)
     hotspots: list[dict] = field(default_factory=list)
+    implementation_hotspots: list[dict] = field(default_factory=list)
     action_candidates: list[dict] = field(default_factory=list)
     security_posture: dict = field(default_factory=dict)
     score_explanation: dict = field(default_factory=dict)
@@ -120,6 +121,7 @@ class RepoAudit:
             "flags": self.flags,
             "lenses": self.lenses,
             "hotspots": self.hotspots,
+            "implementation_hotspots": self.implementation_hotspots,
             "action_candidates": self.action_candidates,
             "security_posture": self.security_posture,
             "score_explanation": self.score_explanation,
@@ -155,6 +157,8 @@ class AuditReport:
     schema_version: str = "3.7"
     lenses: dict[str, dict] = field(default_factory=dict)
     hotspots: list[dict] = field(default_factory=list)
+    implementation_hotspots: list[dict] = field(default_factory=list)
+    implementation_hotspots_summary: dict = field(default_factory=dict)
     security_posture: dict = field(default_factory=dict)
     security_governance_preview: list[dict] = field(default_factory=list)
     collections: dict[str, dict] = field(default_factory=dict)
@@ -209,6 +213,10 @@ class AuditReport:
     ) -> AuditReport:
         """Construct an AuditReport with all derived statistics."""
         now = datetime.now(tz=__import__("datetime").timezone.utc)
+        from src.implementation_hotspots import (
+            build_implementation_hotspots_summary,
+            build_portfolio_implementation_hotspots,
+        )
         from src.portfolio_intelligence import (
             DEFAULT_PROFILES,
             REPORT_SCHEMA_VERSION,
@@ -277,6 +285,8 @@ class AuditReport:
         best_work = [a.metadata.name for a in best[:5]]
         portfolio_lenses = build_portfolio_lens_summary(audits)
         portfolio_hotspots = build_portfolio_hotspots(audits)
+        implementation_hotspots = build_portfolio_implementation_hotspots(audits)
+        implementation_hotspots_summary = build_implementation_hotspots_summary(audits)
         portfolio_security = build_portfolio_security_posture(audits)
         security_governance_preview = build_portfolio_security_governance_preview(audits)
         collections = build_default_collections(audits)
@@ -320,6 +330,8 @@ class AuditReport:
             schema_version=REPORT_SCHEMA_VERSION,
             lenses=portfolio_lenses,
             hotspots=portfolio_hotspots,
+            implementation_hotspots=implementation_hotspots,
+            implementation_hotspots_summary=implementation_hotspots_summary,
             security_posture=portfolio_security,
             security_governance_preview=security_governance_preview,
             collections=collections,
@@ -375,6 +387,8 @@ class AuditReport:
             "baseline_context": self.baseline_context,
             "lenses": self.lenses,
             "hotspots": self.hotspots,
+            "implementation_hotspots": self.implementation_hotspots,
+            "implementation_hotspots_summary": self.implementation_hotspots_summary,
             "security_posture": self.security_posture,
             "security_governance_preview": self.security_governance_preview,
             "collections": self.collections,

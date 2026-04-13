@@ -92,6 +92,13 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
     queue = payload.get("operator_queue", []) or []
     recent_changes = payload.get("operator_recent_changes", []) or []
     issue_candidate = payload.get("issue_candidate", {})
+    campaign_summary = payload.get("campaign_summary", {}) or {}
+    writeback_preview = payload.get("writeback_preview", {}) or {}
+    github_projects = writeback_preview.get("github_projects", {}) or {}
+    project_drift = [
+        item for item in (payload.get("managed_state_drift", []) or [])
+        if str(item.get("target", "")).startswith("github-project")
+    ]
     primary_target = summary.get("primary_target") or {}
     primary_target_label = (
         f"{primary_target.get('repo')}: {primary_target.get('title')}"
@@ -226,6 +233,16 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Queue counts: {_queue_counts(summary)}",
         f"- Issue automation: `{issue_candidate.get('action', 'quiet')}` ({issue_candidate.get('reason', 'quiet')})",
         *( [f"- Existing issue: #{issue_candidate.get('issue_number')}"] if issue_candidate.get("issue_number") else [] ),
+        *(
+            [
+                f"- Campaign mirror: {campaign_summary.get('label', campaign_summary.get('campaign_type', '—'))}",
+                f"- GitHub Projects: {github_projects.get('status', 'disabled')} "
+                f"({github_projects.get('project_owner', '—')} #{github_projects.get('project_number', 0)}, "
+                f"{github_projects.get('item_count', 0)} items, {len(project_drift)} project drift)",
+            ]
+            if campaign_summary and github_projects.get("enabled")
+            else []
+        ),
         "",
     ]
     lines.append("## Recommendation Confidence")
@@ -2131,6 +2148,10 @@ def build_scheduled_handoff(
         "generated_at": generated_at,
         "control_center_reference": str(control_center_path),
         "report_reference": control_center.get("report_reference", ""),
+        "campaign_summary": control_center.get("campaign_summary", {}),
+        "writeback_preview": control_center.get("writeback_preview", {}),
+        "writeback_results": control_center.get("writeback_results", {}),
+        "managed_state_drift": control_center.get("managed_state_drift", []),
         "operator_summary": summary,
         "operator_queue": control_center.get("operator_queue", []),
         "operator_recent_changes": control_center.get("operator_recent_changes", []),

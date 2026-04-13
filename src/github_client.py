@@ -180,6 +180,23 @@ class GitHubClient:
 
         return data
 
+    def _graphql_query(self, query: str, variables: dict | None = None) -> dict:
+        """Execute a bounded GraphQL query or mutation against GitHub."""
+        response = self.session.post(
+            f"{API_BASE}/graphql",
+            json={"query": query, "variables": variables or {}},
+            timeout=30,
+        )
+        self._check_rate_limit(response)
+        response.raise_for_status()
+        payload = response.json()
+        errors = payload.get("errors") or []
+        if errors:
+            message = "; ".join(str(item.get("message", "GraphQL error")) for item in errors if isinstance(item, dict))
+            raise GitHubClientError(message or "GitHub GraphQL request failed")
+        data = payload.get("data")
+        return data if isinstance(data, dict) else {}
+
     # ── public API ────────────────────────────────────────────────────
 
     def get_community_profile(self, owner: str, repo: str) -> dict:
@@ -552,6 +569,7 @@ class GitHubClient:
                 "ok": True,
                 "number": data.get("number"),
                 "html_url": data.get("html_url"),
+                "node_id": data.get("node_id"),
                 "http_status": response.status_code,
             }
         except requests.HTTPError as exc:
@@ -560,6 +578,7 @@ class GitHubClient:
             return {
                 "ok": False,
                 "http_status": status,
+                "node_id": None,
             }
 
     def update_issue(self, owner: str, repo: str, issue_number: int, payload: dict) -> dict:
@@ -575,6 +594,7 @@ class GitHubClient:
                 "ok": True,
                 "number": data.get("number", issue_number),
                 "html_url": data.get("html_url"),
+                "node_id": data.get("node_id"),
                 "http_status": response.status_code,
             }
         except requests.HTTPError as exc:
@@ -583,6 +603,7 @@ class GitHubClient:
             return {
                 "ok": False,
                 "number": issue_number,
+                "node_id": None,
                 "http_status": status,
             }
 
@@ -684,6 +705,336 @@ class GitHubClient:
                 "after": before.get("values", {}),
                 "updated": to_update,
             }
+
+    def get_project_v2(self, owner: str, project_number: int) -> dict:
+        """Resolve a GitHub Projects v2 board and its field schema."""
+        query = """
+        query($login: String!, $number: Int!) {
+          user(login: $login) {
+            projectV2(number: $number) {
+              id
+              title
+              url
+              fields(first: 50) {
+                nodes {
+                  __typename
+                  ... on ProjectV2FieldCommon {
+                    id
+                    name
+                    dataType
+                  }
+                  ... on ProjectV2SingleSelectField {
+                    id
+                    name
+                    dataType
+                    options {
+                      id
+                      name
+                    }
+                  }
+                }
+              }
+            }
+          }
+          organization(login: $login) {
+            projectV2(number: $number) {
+              id
+              title
+              url
+              fields(first: 50) {
+                nodes {
+                  __typename
+                  ... on ProjectV2FieldCommon {
+                    id
+                    name
+                    dataType
+                  }
+                  ... on ProjectV2SingleSelectField {
+                    id
+                    name
+                    dataType
+                    options {
+                      id
+                      name
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        """
+        try:
+            data = self._graphql_query(query, {"login": owner, "number": int(project_number)})
+        except (requests.HTTPError, GitHubClientError) as exc:
+            logger.warning("Failed to resolve GitHub Project %s #%s: %s", owner, project_number, exc)
+            return {
+                "available": False,
+                "owner": owner,
+                "project_number": project_number,
+                "fields": {},
+            }
+
+        project = (data.get("user") or {}).get("projectV2") or (data.get("organization") or {}).get("projectV2")
+        if not isinstance(project, dict):
+            return {
+                "available": False,
+                "owner": owner,
+                "project_number": project_number,
+                "fields": {},
+            }
+
+        fields: dict[str, dict] = {}
+        for item in ((project.get("fields") or {}).get("nodes") or []):
+            if not isinstance(item, dict):
+                continue
+            name = item.get("name")
+            if not name:
+                continue
+            options = {
+                option.get("name", ""): option.get("id", "")
+                for option in item.get("options", []) or []
+                if isinstance(option, dict) and option.get("name") and option.get("id")
+            }
+            fields[str(name)] = {
+                "id": item.get("id", ""),
+                "name": name,
+                "data_type": item.get("dataType", ""),
+                "options": options,
+            }
+        return {
+            "available": True,
+            "owner": owner,
+            "project_number": project_number,
+            "id": project.get("id", ""),
+            "title": project.get("title", ""),
+            "url": project.get("url", ""),
+            "fields": fields,
+        }
+
+    def find_project_v2_item_by_issue(
+        self,
+        project_id: str,
+        issue_node_id: str,
+    ) -> dict:
+        """Find a project item linked to an issue node when accessible."""
+        query = """
+        query($projectId: ID!, $after: String) {
+          node(id: $projectId) {
+            ... on ProjectV2 {
+              items(first: 100, after: $after) {
+                nodes {
+                  id
+                  isArchived
+                  content {
+                    __typename
+                    ... on Issue {
+                      id
+                      number
+                      url
+                    }
+                  }
+                }
+                pageInfo {
+                  hasNextPage
+                  endCursor
+                }
+              }
+            }
+          }
+        }
+        """
+        after: str | None = None
+        try:
+            while True:
+                data = self._graphql_query(query, {"projectId": project_id, "after": after})
+                items = (((data.get("node") or {}).get("items") or {}).get("nodes") or [])
+                for item in items:
+                    content = (item or {}).get("content") or {}
+                    if content.get("id") == issue_node_id:
+                        return {
+                            "available": True,
+                            "item": {
+                                "id": item.get("id", ""),
+                                "is_archived": bool(item.get("isArchived")),
+                                "issue_node_id": issue_node_id,
+                                "issue_number": content.get("number"),
+                                "issue_url": content.get("url", ""),
+                            },
+                        }
+                page_info = (((data.get("node") or {}).get("items") or {}).get("pageInfo") or {})
+                if not page_info.get("hasNextPage"):
+                    break
+                after = page_info.get("endCursor")
+        except (requests.HTTPError, GitHubClientError) as exc:
+            logger.warning("Failed to inspect GitHub Project item for issue %s: %s", issue_node_id, exc)
+            return {"available": False, "item": None}
+        return {"available": True, "item": None}
+
+    def find_project_v2_item_by_id(self, project_id: str, item_id: str) -> dict:
+        """Find a project item by its GitHub Projects v2 item id."""
+        query = """
+        query($projectId: ID!, $after: String) {
+          node(id: $projectId) {
+            ... on ProjectV2 {
+              items(first: 100, after: $after) {
+                nodes {
+                  id
+                  isArchived
+                  content {
+                    __typename
+                    ... on Issue {
+                      id
+                      number
+                      url
+                    }
+                  }
+                }
+                pageInfo {
+                  hasNextPage
+                  endCursor
+                }
+              }
+            }
+          }
+        }
+        """
+        after: str | None = None
+        try:
+            while True:
+                data = self._graphql_query(query, {"projectId": project_id, "after": after})
+                items = (((data.get("node") or {}).get("items") or {}).get("nodes") or [])
+                for item in items:
+                    if (item or {}).get("id") == item_id:
+                        content = (item or {}).get("content") or {}
+                        return {
+                            "available": True,
+                            "item": {
+                                "id": item.get("id", ""),
+                                "is_archived": bool(item.get("isArchived")),
+                                "issue_node_id": content.get("id", ""),
+                                "issue_number": content.get("number"),
+                                "issue_url": content.get("url", ""),
+                            },
+                        }
+                page_info = (((data.get("node") or {}).get("items") or {}).get("pageInfo") or {})
+                if not page_info.get("hasNextPage"):
+                    break
+                after = page_info.get("endCursor")
+        except (requests.HTTPError, GitHubClientError) as exc:
+            logger.warning("Failed to inspect GitHub Project item %s: %s", item_id, exc)
+            return {"available": False, "item": None}
+        return {"available": True, "item": None}
+
+    def add_issue_to_project_v2(self, project_id: str, issue_node_id: str) -> dict:
+        """Add an issue-backed item to a GitHub Project v2 board."""
+        mutation = """
+        mutation($projectId: ID!, $contentId: ID!) {
+          addProjectV2ItemById(input: {projectId: $projectId, contentId: $contentId}) {
+            item {
+              id
+            }
+          }
+        }
+        """
+        try:
+            data = self._graphql_query(mutation, {"projectId": project_id, "contentId": issue_node_id})
+            item = ((data.get("addProjectV2ItemById") or {}).get("item") or {})
+            return {
+                "ok": True,
+                "status": "created",
+                "item_id": item.get("id", ""),
+            }
+        except (requests.HTTPError, GitHubClientError) as exc:
+            logger.warning("Failed to add issue %s to project %s: %s", issue_node_id, project_id, exc)
+            return {"ok": False, "status": "failed", "item_id": ""}
+
+    def update_project_v2_item_field(
+        self,
+        *,
+        project_id: str,
+        item_id: str,
+        field_id: str,
+        field_type: str,
+        value: str,
+    ) -> dict:
+        """Update one supported Projects v2 field value."""
+        if field_type == "single_select":
+            mutation = """
+            mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+              updateProjectV2ItemFieldValue(
+                input: {
+                  projectId: $projectId,
+                  itemId: $itemId,
+                  fieldId: $fieldId,
+                  value: {singleSelectOptionId: $optionId}
+                }
+              ) {
+                projectV2Item {
+                  id
+                }
+              }
+            }
+            """
+            variables = {
+                "projectId": project_id,
+                "itemId": item_id,
+                "fieldId": field_id,
+                "optionId": value,
+            }
+        else:
+            mutation = """
+            mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $text: String!) {
+              updateProjectV2ItemFieldValue(
+                input: {
+                  projectId: $projectId,
+                  itemId: $itemId,
+                  fieldId: $fieldId,
+                  value: {text: $text}
+                }
+              ) {
+                projectV2Item {
+                  id
+                }
+              }
+            }
+            """
+            variables = {
+                "projectId": project_id,
+                "itemId": item_id,
+                "fieldId": field_id,
+                "text": value,
+            }
+        try:
+            self._graphql_query(mutation, variables)
+            return {"ok": True, "status": "updated"}
+        except (requests.HTTPError, GitHubClientError) as exc:
+            logger.warning("Failed to update project field %s on item %s: %s", field_id, item_id, exc)
+            return {"ok": False, "status": "failed"}
+
+    def archive_project_v2_item(self, item_id: str) -> dict:
+        """Archive a GitHub Projects v2 item."""
+        mutation = """
+        mutation($itemId: ID!) {
+          archiveProjectV2Item(input: {itemId: $itemId}) {
+            item {
+              id
+              isArchived
+            }
+          }
+        }
+        """
+        try:
+            data = self._graphql_query(mutation, {"itemId": item_id})
+            item = ((data.get("archiveProjectV2Item") or {}).get("item") or {})
+            return {
+                "ok": True,
+                "status": "archived",
+                "item_id": item.get("id", item_id),
+            }
+        except (requests.HTTPError, GitHubClientError) as exc:
+            logger.warning("Failed to archive project item %s: %s", item_id, exc)
+            return {"ok": False, "status": "failed", "item_id": item_id}
 
     def get_commit_activity(self, owner: str, repo: str) -> list[dict]:
         """Fetch weekly commit counts for the last year (52 weeks).

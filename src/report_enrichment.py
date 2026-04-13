@@ -52,6 +52,7 @@ NO_PORTFOLIO_CATALOG_SUMMARY = "No portfolio catalog contract is recorded yet."
 NO_INTENT_ALIGNMENT_SUMMARY = "Intent alignment cannot be judged until a portfolio catalog contract exists."
 NO_SCORECARD_SUMMARY = "No maturity scorecard is recorded yet."
 NO_MATURITY_GAP_SUMMARY = "No maturity gap summary is recorded yet."
+NO_WHERE_TO_START_SUMMARY = "No meaningful implementation hotspot is currently surfaced."
 
 OPERATOR_FOCUS_LABELS = {
     "act-now": "Act Now",
@@ -116,6 +117,12 @@ def _hotspots(audit: Any) -> list[dict[str, Any]]:
     if hasattr(audit, "hotspots"):
         return list(getattr(audit, "hotspots", []) or [])
     return list((audit or {}).get("hotspots", []) or [])
+
+
+def _implementation_hotspots(audit: Any) -> list[dict[str, Any]]:
+    if hasattr(audit, "implementation_hotspots"):
+        return list(getattr(audit, "implementation_hotspots", []) or [])
+    return list((audit or {}).get("implementation_hotspots", []) or [])
 
 
 def _string_list(items: list[str], *, fallback: str) -> str:
@@ -253,6 +260,31 @@ def _repo_hotspot_context(audit: Any) -> str:
     title = str(hotspot.get("title") or "Current hotspot")
     summary = str(hotspot.get("summary") or "").strip()
     return f"{title}: {summary}" if summary else title
+
+
+def _implementation_hotspot_line(hotspot: dict[str, Any]) -> str:
+    path = str(hotspot.get("path") or "repo root")
+    category = str(hotspot.get("category") or "implementation pressure").replace("-", " ")
+    move = str(hotspot.get("suggested_first_move") or "").strip()
+    prefix = f"{path} ({category})"
+    return f"{prefix}: {move}" if move else prefix
+
+
+def _where_to_start_summary(audit: Any) -> str:
+    hotspots = _implementation_hotspots(audit)
+    if not hotspots:
+        return NO_WHERE_TO_START_SUMMARY
+    hotspot = _mapping(hotspots[0])
+    path = str(hotspot.get("path") or "repo root")
+    why = str(hotspot.get("why_it_matters") or "").strip()
+    move = str(hotspot.get("suggested_first_move") or "").strip()
+    if why and move:
+        return f"Start in {path}. {why} {move}"
+    if move:
+        return f"Start in {path}. {move}"
+    if why:
+        return f"Start in {path}. {why}"
+    return f"Start in {path}."
 
 
 def _repo_action_candidates(audit: Any) -> list[str]:
@@ -412,6 +444,8 @@ def build_repo_briefing(
     scorecard_line = build_scorecard_line(audit)
     maturity_gap_summary = build_maturity_gap_summary(audit)
     follow_through_resurfacing_reason = build_follow_through_resurfacing_reason(handoff_source)
+    implementation_hotspots = _implementation_hotspots(audit)[:3]
+    where_to_start_summary = _where_to_start_summary(audit)
     return {
         "repo": repo_name,
         "anchor": f"repo-{_repo_anchor(repo_name)}",
@@ -437,6 +471,9 @@ def build_repo_briefing(
             "top_hotspot_context": hotspot_context,
         },
         "what_changed_line": f"{last_movement} {recent_change_summary}".strip(),
+        "where_to_start_summary": where_to_start_summary,
+        "where_to_start_line": where_to_start_summary,
+        "implementation_hotspots": implementation_hotspots,
         "what_to_do_next": {
             "next_best_action": str(recommended_action),
             "rationale": str(next_best_action_rationale),
@@ -567,6 +604,10 @@ def build_weekly_review_pack(
         "portfolio_catalog_summary": build_portfolio_catalog_summary(data),
         "intent_alignment_summary": build_portfolio_intent_alignment_summary(data),
         "scorecards_summary": build_scorecards_summary(data),
+        "implementation_hotspots_summary": str(
+            _mapping(data.get("implementation_hotspots_summary")).get("summary")
+            or "No meaningful implementation hotspots are currently surfaced."
+        ),
         "top_attention": top_attention,
         "repo_briefings": repo_briefings,
         "top_below_target_scorecard_items": list(_mapping(data).get("scorecards_summary", {}).get("top_below_target_repos") or []),

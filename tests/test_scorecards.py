@@ -128,7 +128,7 @@ programs:
 
 def test_evaluate_repo_scorecard_prefers_explicit_program_and_target(tmp_path: Path):
     pytest.importorskip("yaml")
-    scorecards = load_scorecards(Path("/Users/d/Projects/GithubRepoAuditor/config/scorecards.yaml"))
+    scorecards = load_scorecards(Path(__file__).resolve().parents[1] / "config" / "scorecards.yaml")
     audit = _make_audit(
         maturity_program="maintain",
         target_maturity="strong",

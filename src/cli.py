@@ -269,6 +269,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Execute live writeback instead of preview-only planning",
     )
     parser.add_argument(
+        "--github-projects",
+        action="store_true",
+        help="Mirror managed GitHub campaign actions into a configured GitHub Projects v2 board",
+    )
+    parser.add_argument(
+        "--github-projects-config",
+        type=Path,
+        default=None,
+        help="Path to github-projects.yaml for GitHub Projects v2 mirroring",
+    )
+    parser.add_argument(
         "--campaign-sync-mode",
         choices=["reconcile", "append-only", "close-missing"],
         default="reconcile",
@@ -694,8 +705,12 @@ def _apply_portfolio_catalog(report: AuditReport, args) -> AuditReport:
 
 
 def _apply_scorecards(report: AuditReport, args) -> AuditReport:
-    from src.scorecards import DEFAULT_SCORECARDS_PATH, evaluate_scorecards_for_report, load_scorecards
     from src.report_enrichment import build_maturity_gap_summary, build_scorecard_line
+    from src.scorecards import (
+        DEFAULT_SCORECARDS_PATH,
+        evaluate_scorecards_for_report,
+        load_scorecards,
+    )
 
     scorecards_path = getattr(args, "scorecards", None) or DEFAULT_SCORECARDS_PATH
     scorecards_data = load_scorecards(Path(scorecards_path))
@@ -1542,6 +1557,7 @@ def _analyze_repos(
         return score_repo(
             repo_meta,
             results,
+            repo_path=repo_path,
             portfolio_lang_freq=portfolio_lang_freq,
             custom_weights=custom_weights,
             github_client=worker_client,
@@ -1705,6 +1721,29 @@ def _apply_ops_writeback(report: AuditReport, args, client: GitHubClient | None,
     if not args.campaign:
         return
 
+    github_projects_config = None
+    operator_context: dict[str, dict] = {}
+    if getattr(args, "github_projects", False):
+        from src.github_projects import load_github_projects_config, operator_context_by_repo
+        from src.operator_control_center import build_operator_snapshot, normalize_review_state
+
+        github_projects_config = load_github_projects_config(
+            Path(args.github_projects_config) if getattr(args, "github_projects_config", None) else None
+        )
+        normalized = normalize_review_state(
+            report.to_dict(),
+            output_dir=output_dir,
+            diff_data=None,
+            portfolio_profile=args.portfolio_profile,
+            collection_name=args.collection,
+        )
+        operator_snapshot = build_operator_snapshot(
+            normalized,
+            output_dir=output_dir,
+            triage_view="all",
+        )
+        operator_context = operator_context_by_repo(operator_snapshot.get("operator_queue", []))
+
     from src.notion_sync import sync_campaign_actions
     from src.ops_writeback import (
         apply_github_writeback,
@@ -1735,6 +1774,8 @@ def _apply_ops_writeback(report: AuditReport, args, client: GitHubClient | None,
         apply=args.writeback_apply,
         previous_state=previous_state,
         sync_mode=args.campaign_sync_mode,
+        github_projects_config=github_projects_config,
+        operator_context=operator_context,
     )
 
     results: list[dict] = []
@@ -1747,6 +1788,9 @@ def _apply_ops_writeback(report: AuditReport, args, client: GitHubClient | None,
                 actions,
                 previous_state=previous_state,
                 sync_mode=args.campaign_sync_mode,
+                campaign_summary=campaign_summary,
+                github_projects_config=github_projects_config,
+                operator_context=operator_context,
             )
             results.extend(github_results)
             external_refs.update(github_refs)
@@ -2469,6 +2513,10 @@ def main() -> None:
         parser.error("--writeback-apply requires --writeback-target")
     if args.writeback_target and not args.campaign:
         parser.error("--writeback-target requires --campaign")
+    if args.github_projects and not args.campaign:
+        parser.error("--github-projects requires --campaign")
+    if args.github_projects and args.writeback_target not in {"github", "all"}:
+        parser.error("--github-projects requires --writeback-target github or all")
 
     if args.doctor:
         result = run_diagnostics(args, config_inspection=config_inspection, full=True)

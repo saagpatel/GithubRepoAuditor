@@ -46,6 +46,7 @@ def export_review_pack(
     _w(f"- Portfolio Catalog: {weekly_pack.get('portfolio_catalog_summary', 'No portfolio catalog contract is recorded yet.')}")
     _w(f"- Intent Alignment: {weekly_pack.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.')}")
     _w(f"- Scorecards: {weekly_pack.get('scorecards_summary', 'No maturity scorecard is recorded yet.')}")
+    _w(f"- Implementation Hotspots: {weekly_pack.get('implementation_hotspots_summary', 'No meaningful implementation hotspots are currently surfaced.')}")
     _w("")
     _w("### Top Attention")
     _w("")
@@ -94,6 +95,7 @@ def export_review_pack(
         _w(f"  Current State: {briefing.get('current_state_line', 'No current-state summary is recorded yet.')}")
         _w(f"  What Changed: {briefing.get('what_changed_line', 'No change summary is recorded yet.')}")
         _w(f"  Why It Matters: {briefing.get('why_it_matters_line', 'No explanation summary is recorded yet.')}")
+        _w(f"  Where To Start: {briefing.get('where_to_start_summary', 'No meaningful implementation hotspot is currently surfaced.')}")
         _w(f"  What To Do Next: {briefing.get('what_to_do_next_line', 'No next action is recorded yet.')}")
         _w(f"  Operator Focus: {briefing.get('operator_focus_line', 'Watch Closely: No operator focus bucket is currently surfaced.')}")
         _w(f"  Catalog: {briefing.get('catalog_line', 'No portfolio catalog contract is recorded yet.')}")
@@ -209,17 +211,25 @@ def export_review_pack(
 
     campaign_summary = report_data.get("campaign_summary", {})
     if campaign_summary:
+        github_projects = report_data.get("writeback_preview", {}).get("github_projects", {}) or {}
         _w("## Next Actions")
         _w("")
         _w(f"- Campaign: {campaign_summary.get('label', campaign_summary.get('campaign_type', '—'))}")
         _w(f"- Actions: {campaign_summary.get('action_count', 0)}")
         _w(f"- Repos: {campaign_summary.get('repo_count', 0)}")
         _w(f"- Sync Mode: {report_data.get('writeback_preview', {}).get('sync_mode', 'reconcile')}")
+        if github_projects.get("enabled"):
+            _w(
+                f"- GitHub Projects: {github_projects.get('status', 'disabled')} "
+                f"({github_projects.get('project_owner', '—')} #{github_projects.get('project_number', 0)}, "
+                f"{github_projects.get('item_count', 0)} items)"
+            )
         _w("")
         for item in report_data.get("writeback_preview", {}).get("repos", [])[:8]:
             _w(
                 f"- {item.get('repo', '—')}: "
                 f"{item.get('issue_title', 'no managed issue')} | "
+                f"{item.get('github_project_field_count', 0)} project fields | "
                 f"{len(item.get('topics', []))} managed topics | "
                 f"{item.get('notion_action_count', 0)} Notion actions"
             )

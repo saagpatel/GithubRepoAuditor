@@ -140,6 +140,35 @@ def test_security_campaign_builds_expected_preview():
     assert "ghra-security-high" in preview["repos"][0]["topics"]
 
 
+def test_build_writeback_preview_includes_github_projects_summary():
+    summary, actions = build_campaign_bundle(
+        _report_data(),
+        campaign_type="security-review",
+        portfolio_profile="default",
+        collection_name=None,
+        max_actions=10,
+        writeback_target="github",
+    )
+    preview = build_writeback_preview(
+        summary,
+        actions,
+        writeback_target="github",
+        apply=False,
+        github_projects_config={
+            "exists": True,
+            "errors": [],
+            "warnings": [],
+            "owner": "octo-org",
+            "project_number": 7,
+            "fields": {"repo": "Repository", "priority": "Priority"},
+        },
+        operator_context={},
+    )
+
+    assert preview["github_projects"]["status"] == "configured"
+    assert preview["repos"][0]["github_project_field_count"] == 2
+
+
 def test_managed_topics_and_issue_body_include_expected_markers():
     action = {
         "repo": "RepoA",
@@ -171,6 +200,7 @@ class _FakeGitHubClient:
             "user/RepoB": [
                 {
                     "number": 7,
+                    "node_id": "ISSUE_7",
                     "title": managed_issue_title("security-review"),
                     "body": "<!-- ghra-action-bundle:security-review:repob -->\nold body",
                     "state": "open",
@@ -178,6 +208,27 @@ class _FakeGitHubClient:
                 }
             ],
         }
+        self.project = {
+            "available": True,
+            "owner": "octo-org",
+            "project_number": 7,
+            "id": "PVT_1",
+            "url": "https://github.com/orgs/octo-org/projects/7",
+            "fields": {
+                "Campaign": {"id": "field-campaign", "data_type": "TEXT", "options": {}},
+                "Priority": {"id": "field-priority", "data_type": "SINGLE_SELECT", "options": {"high": "opt-high"}},
+                "Repository": {"id": "field-repo", "data_type": "TEXT", "options": {}},
+            },
+        }
+        self.project_items = {
+            "ISSUE_7": {
+                "id": "PVTI_7",
+                "issue_node_id": "ISSUE_7",
+                "issue_number": 7,
+                "issue_url": "https://github.com/user/RepoB/issues/7",
+            }
+        }
+        self.archived_items: list[str] = []
 
     def get_repo_topics(self, owner: str, repo: str) -> dict:
         return {"available": True, "topics": list(self.topics.get(f"{owner}/{repo}", []))}
@@ -201,21 +252,47 @@ class _FakeGitHubClient:
     def create_issue(self, owner: str, repo: str, payload: dict) -> dict:
         issue = {
             "number": 11,
+            "node_id": "ISSUE_11",
             "title": payload["title"],
             "body": payload["body"],
             "state": "open",
             "html_url": f"https://github.com/{owner}/{repo}/issues/11",
         }
         self.issues.setdefault(f"{owner}/{repo}", []).append(issue)
-        return {"ok": True, "number": 11, "html_url": issue["html_url"]}
+        return {"ok": True, "number": 11, "html_url": issue["html_url"], "node_id": "ISSUE_11"}
 
     def update_issue(self, owner: str, repo: str, issue_number: int, payload: dict) -> dict:
         for issue in self.issues.get(f"{owner}/{repo}", []):
             if issue["number"] == issue_number:
                 issue.update(payload)
                 issue["html_url"] = issue.get("html_url", f"https://github.com/{owner}/{repo}/issues/{issue_number}")
-                return {"ok": True, "number": issue_number, "html_url": issue["html_url"]}
+                return {"ok": True, "number": issue_number, "html_url": issue["html_url"], "node_id": issue.get("node_id")}
         return {"ok": False, "number": issue_number}
+
+    def get_project_v2(self, owner: str, project_number: int) -> dict:
+        return dict(self.project)
+
+    def find_project_v2_item_by_id(self, project_id: str, item_id: str) -> dict:
+        for item in self.project_items.values():
+            if item["id"] == item_id:
+                return {"available": True, "item": dict(item)}
+        return {"available": True, "item": None}
+
+    def find_project_v2_item_by_issue(self, project_id: str, issue_node_id: str) -> dict:
+        item = self.project_items.get(issue_node_id)
+        return {"available": True, "item": dict(item) if item else None}
+
+    def add_issue_to_project_v2(self, project_id: str, issue_node_id: str) -> dict:
+        item_id = f"PVTI_{issue_node_id.split('_')[-1]}"
+        self.project_items[issue_node_id] = {"id": item_id, "issue_node_id": issue_node_id}
+        return {"ok": True, "status": "created", "item_id": item_id}
+
+    def update_project_v2_item_field(self, *, project_id: str, item_id: str, field_id: str, field_type: str, value: str) -> dict:
+        return {"ok": True, "status": "updated"}
+
+    def archive_project_v2_item(self, item_id: str) -> dict:
+        self.archived_items.append(item_id)
+        return {"ok": True, "status": "archived", "item_id": item_id}
 
 
 def test_apply_github_writeback_reopens_and_detects_drift():
@@ -245,11 +322,24 @@ def test_apply_github_writeback_reopens_and_detects_drift():
         actions,
         previous_state=previous_state,
         sync_mode="reconcile",
+        campaign_summary={"label": "Security Review"},
+        github_projects_config={
+            "exists": True,
+            "errors": [],
+            "warnings": [],
+            "owner": "octo-org",
+            "project_number": 7,
+            "fields": {"repo": "Repository", "priority": "Priority"},
+        },
+        operator_context={"user/RepoB": {"lane": "urgent", "confidence_label": "high"}},
     )
 
     issue_result = next(item for item in results if item["target"] == "github-issue")
+    project_result = next(item for item in results if item["target"] == "github-project-item")
     assert issue_result["status"] == "updated"
+    assert project_result["status"] == "unchanged"
     assert refs[actions[0]["action_id"]]["github_issue_url"].endswith("/7")
+    assert refs[actions[0]["action_id"]]["github_project_item_id"] == "PVTI_7"
     assert any(item["drift_state"] == "managed-issue-edited" for item in drift)
 
 
@@ -268,6 +358,7 @@ def test_apply_github_writeback_closes_missing_actions_under_reconcile():
                 "campaign_type": "security-review",
                 "snapshots": {
                     "github-issue": {"external_key": "7"},
+                    "github-project-item": {"external_key": "PVTI_7"},
                 },
             }
         }
@@ -279,10 +370,22 @@ def test_apply_github_writeback_closes_missing_actions_under_reconcile():
         actions,
         previous_state=previous_state,
         sync_mode="reconcile",
+        campaign_summary={"label": "Promotion Push"},
+        github_projects_config={
+            "exists": True,
+            "errors": [],
+            "warnings": [],
+            "owner": "octo-org",
+            "project_number": 7,
+            "fields": {"repo": "Repository"},
+        },
+        operator_context={},
     )
 
     stale_result = next(item for item in results if item.get("action_id") == "stale-action")
+    stale_project = next(item for item in results if item.get("action_id") == "stale-action" and item.get("target") == "github-project-item")
     assert stale_result["status"] == "closed"
+    assert stale_project["status"] == "archived"
     assert any(item["action_id"] == "stale-action" and item["lifecycle_state"] == "resolved" for item in closures)
 
 

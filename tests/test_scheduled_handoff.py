@@ -509,6 +509,41 @@ def test_build_scheduled_handoff_writes_artifacts_and_issue_candidate(tmp_path):
     assert "What Reopened" in markdown
 
 
+def test_build_scheduled_handoff_includes_github_projects_campaign_status(tmp_path):
+    payload = _control_center_payload()
+    payload["campaign_summary"] = {
+        "campaign_type": "security-review",
+        "label": "Security Review",
+        "action_count": 2,
+        "repo_count": 2,
+    }
+    payload["writeback_preview"] = {
+        "sync_mode": "reconcile",
+        "github_projects": {
+            "enabled": True,
+            "status": "configured",
+            "project_owner": "octo-org",
+            "project_number": 7,
+            "item_count": 2,
+        },
+    }
+    payload["managed_state_drift"] = [
+        {
+            "action_id": "campaign-1",
+            "repo_full_name": "user/RepoD",
+            "target": "github-project-item",
+            "drift_state": "managed-project-item-missing",
+        }
+    ]
+    (tmp_path / "operator-control-center-testuser-2026-04-07.json").write_text(json.dumps(payload))
+
+    build_scheduled_handoff(tmp_path)
+
+    markdown = (tmp_path / "scheduled-handoff-testuser-2026-04-07.md").read_text()
+    assert "Campaign mirror: Security Review" in markdown
+    assert "GitHub Projects: configured (octo-org #7, 2 items, 1 project drift)" in markdown
+
+
 def test_build_scheduled_handoff_stays_quiet_for_quiet_runs(tmp_path):
     payload = _control_center_payload(urgency="quiet")
     payload["operator_summary"]["headline"] = "No operator triage items are currently surfaced."
