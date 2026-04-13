@@ -20,6 +20,18 @@
 - Use `Repo Detail` when one repo needs a deeper decision
 - Leave `Safe to Defer` alone unless priorities changed
 
+## Operator focus reading order
+
+Primary workbook, HTML, Markdown, and review-pack surfaces now compress the deeper follow-through model into five buckets:
+
+1. `Act Now` for blocked or urgent operator pressure
+2. `Watch Closely` for active items that need more evidence but do not yet outrank the rest
+3. `Improving` for paths that are stabilizing and rebuilding trust
+4. `Fragile` for progress that is real but still easy to lose
+5. `Revalidate` for items that still need confidence rebuilt before they can be treated as restored
+
+Read those buckets in exactly that order on the primary surfaces. The hidden workbook data and raw JSON still keep the richer lifecycle detail underneath.
+
 ## When to run workbook gate
 
 Use `make workbook-gate` only when you changed workbook-facing code or layout. The normal audit workflow does not require the gate every time.

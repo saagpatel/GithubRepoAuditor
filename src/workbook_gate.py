@@ -786,6 +786,10 @@ def _sample_report_data() -> dict:
             ],
             "trend_summary": "The queue is stable but still sticky: 1 attention item is persisting from the last run. Close RepoC: Security posture needs attention next.",
             "follow_through_summary": "1 urgent item repeated in the recent window, 0 open items now look stale, and the oldest open item has been visible for about 2 day(s).",
+            "follow_through_reacquisition_revalidation_recovery_summary": "1 restored-confidence path has only just been re-earned and still needs another confirming run before the stronger posture can be treated as dependable again.",
+            "top_just_reearned_confidence_items": [
+                {"repo": "RepoC", "title": "Security posture needs attention"}
+            ],
             "quiet_streak_runs": 0,
         },
         "operator_queue": [
@@ -803,6 +807,8 @@ def _sample_report_data() -> dict:
                 "source_run_id": "sample-user:2026-04-07T12:00:00+00:00",
                 "age_days": 0,
                 "links": [],
+                "follow_through_reacquisition_revalidation_recovery_status": "just-reearned-confidence",
+                "follow_through_reacquisition_revalidation_recovery_summary": "RepoC has only just re-earned restored confidence after revalidation.",
             }
         ],
         "governance_preview": {"applyable_count": 1},

@@ -1396,6 +1396,144 @@ def test_follow_through_reacquisition_consolidation_tracks_holding_durable_and_r
     assert "already reversing" in summary
 
 
+def test_follow_through_revalidation_recovery_stays_under_revalidation_while_revalidation_is_active():
+    age_runs, status, reason, summary = operator_control_center._follow_through_reacquisition_revalidation_recovery_projection(
+        {"repo": "RepoD", "title": "RepoD drift needs review"},
+        [],
+        follow_through_recovery_reacquisition_status="reacquiring",
+        follow_through_recovery_reacquisition_durability_status="consolidating",
+        follow_through_recovery_reacquisition_consolidation_status="fragile-confidence",
+        follow_through_reacquisition_softening_decay_status="revalidation-needed",
+        follow_through_reacquisition_confidence_retirement_status="revalidation-needed",
+        follow_through_recovery_freshness_status="fresh",
+        follow_through_recovery_decay_status="none",
+    )
+
+    assert age_runs == 0
+    assert status == "under-revalidation"
+    assert "still in the revalidation window" in reason
+    assert "still under revalidation" in summary
+
+
+def test_follow_through_revalidation_recovery_marks_rebuilding_when_revalidation_clears_but_confidence_is_not_back():
+    age_runs, status, reason, summary = operator_control_center._follow_through_reacquisition_revalidation_recovery_projection(
+        {"repo": "RepoD", "title": "RepoD drift needs review"},
+        [{"follow_through_reacquisition_confidence_retirement_status": "revalidation-needed"}],
+        follow_through_recovery_reacquisition_status="reacquiring",
+        follow_through_recovery_reacquisition_durability_status="consolidating",
+        follow_through_recovery_reacquisition_consolidation_status="fragile-confidence",
+        follow_through_reacquisition_softening_decay_status="none",
+        follow_through_reacquisition_confidence_retirement_status="none",
+        follow_through_recovery_freshness_status="fresh",
+        follow_through_recovery_decay_status="none",
+    )
+
+    assert age_runs == 0
+    assert status == "rebuilding-restored-confidence"
+    assert "still rebuilding before confidence can be treated as re-earned" in reason
+    assert "rebuilding restored confidence after revalidation" in summary
+
+
+def test_follow_through_revalidation_recovery_marks_reearning_when_confidence_is_building_again():
+    age_runs, status, reason, summary = operator_control_center._follow_through_reacquisition_revalidation_recovery_projection(
+        {"repo": "RepoD", "title": "RepoD drift needs review"},
+        [{"follow_through_reacquisition_confidence_retirement_status": "revalidation-needed"}],
+        follow_through_recovery_reacquisition_status="reacquired",
+        follow_through_recovery_reacquisition_durability_status="holding-reacquired",
+        follow_through_recovery_reacquisition_consolidation_status="building-confidence",
+        follow_through_reacquisition_softening_decay_status="none",
+        follow_through_reacquisition_confidence_retirement_status="none",
+        follow_through_recovery_freshness_status="holding-fresh",
+        follow_through_recovery_decay_status="none",
+    )
+
+    assert age_runs == 0
+    assert status == "reearning-confidence"
+    assert "start re-earning confidence again" in reason
+    assert "actively re-earning restored confidence" in summary
+
+
+def test_follow_through_revalidation_recovery_marks_just_reearned_on_first_restored_confidence_run():
+    age_runs, status, reason, summary = operator_control_center._follow_through_reacquisition_revalidation_recovery_projection(
+        {"repo": "RepoD", "title": "RepoD drift needs review"},
+        [{"follow_through_reacquisition_confidence_retirement_status": "revalidation-needed"}],
+        follow_through_recovery_reacquisition_status="reacquired",
+        follow_through_recovery_reacquisition_durability_status="durable-reacquired",
+        follow_through_recovery_reacquisition_consolidation_status="holding-confidence",
+        follow_through_reacquisition_softening_decay_status="none",
+        follow_through_reacquisition_confidence_retirement_status="none",
+        follow_through_recovery_freshness_status="holding-fresh",
+        follow_through_recovery_decay_status="none",
+    )
+
+    assert age_runs == 1
+    assert status == "just-reearned-confidence"
+    assert "only just re-earned restored confidence" in reason
+    assert "only just re-earned restored confidence" in summary
+
+
+def test_follow_through_revalidation_recovery_marks_holding_reearned_after_confirming_run():
+    age_runs, status, reason, summary = operator_control_center._follow_through_reacquisition_revalidation_recovery_projection(
+        {"repo": "RepoD", "title": "RepoD drift needs review"},
+        [
+            {"follow_through_reacquisition_revalidation_recovery_status": "just-reearned-confidence"},
+            {"follow_through_reacquisition_confidence_retirement_status": "revalidation-needed"},
+        ],
+        follow_through_recovery_reacquisition_status="reacquired",
+        follow_through_recovery_reacquisition_durability_status="durable-reacquired",
+        follow_through_recovery_reacquisition_consolidation_status="durable-confidence",
+        follow_through_reacquisition_softening_decay_status="none",
+        follow_through_reacquisition_confidence_retirement_status="none",
+        follow_through_recovery_freshness_status="holding-fresh",
+        follow_through_recovery_decay_status="none",
+    )
+
+    assert age_runs == 2
+    assert status == "holding-reearned-confidence"
+    assert "held re-earned restored confidence for 2 consecutive run(s)" in reason
+    assert "holding re-earned restored confidence after revalidation" in summary
+
+
+def test_follow_through_revalidation_recovery_falls_back_to_insufficient_evidence_when_history_is_thin():
+    age_runs, status, reason, summary = operator_control_center._follow_through_reacquisition_revalidation_recovery_projection(
+        {"repo": "RepoD", "title": "RepoD drift needs review"},
+        [{"follow_through_reacquisition_softening_decay_status": "revalidation-needed"}],
+        follow_through_recovery_reacquisition_status="reacquired",
+        follow_through_recovery_reacquisition_durability_status="insufficient-evidence",
+        follow_through_recovery_reacquisition_consolidation_status="insufficient-evidence",
+        follow_through_reacquisition_softening_decay_status="none",
+        follow_through_reacquisition_confidence_retirement_status="none",
+        follow_through_recovery_freshness_status="mixed-age",
+        follow_through_recovery_decay_status="aging",
+    )
+
+    assert age_runs == 0
+    assert status == "insufficient-evidence"
+    assert "not enough post-revalidation history yet" in reason
+    assert "post-revalidation recovery evidence is still too thin" in summary
+
+
+def test_follow_through_revalidation_recovery_summary_prioritizes_under_revalidation_hotspots():
+    summary = operator_control_center._follow_through_reacquisition_revalidation_recovery_summary(
+        {
+            "under-revalidation": 2,
+            "rebuilding-restored-confidence": 1,
+            "reearning-confidence": 0,
+            "just-reearned-confidence": 0,
+            "holding-reearned-confidence": 0,
+            "insufficient-evidence": 0,
+        },
+        [{"repo": "RepoC", "title": "RepoC drift needs review"}],
+        [{"repo": "RepoD", "title": "RepoD drift needs review"}],
+        [],
+        [],
+        [],
+    )
+
+    assert "2 restored-confidence path(s) are still under revalidation" in summary
+    assert "RepoC: RepoC drift needs review" in summary
+
+
 def test_operator_snapshot_marks_quiet_recovery_as_improving(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(
         "src.operator_control_center.load_operator_state_history",

@@ -46,6 +46,23 @@ NO_FOLLOW_THROUGH_REACQUISITION_DURABILITY = "No follow-through reacquisition du
 NO_FOLLOW_THROUGH_REACQUISITION_CONSOLIDATION = "No follow-through reacquisition confidence-consolidation signal is currently surfaced."
 NO_FOLLOW_THROUGH_REACQUISITION_SOFTENING_DECAY = "No reacquisition softening-decay signal is currently surfaced."
 NO_FOLLOW_THROUGH_REACQUISITION_CONFIDENCE_RETIREMENT = "No reacquisition confidence-retirement signal is currently surfaced."
+NO_FOLLOW_THROUGH_REACQUISITION_REVALIDATION_RECOVERY = "No post-revalidation recovery or confidence re-earning signal is currently surfaced."
+NO_OPERATOR_FOCUS_SUMMARY = "No operator focus bucket is currently surfaced."
+
+OPERATOR_FOCUS_LABELS = {
+    "act-now": "Act Now",
+    "watch-closely": "Watch Closely",
+    "improving": "Improving",
+    "fragile": "Fragile",
+    "revalidate": "Revalidate",
+}
+OPERATOR_FOCUS_DISPLAY_ORDER = [
+    "act-now",
+    "watch-closely",
+    "improving",
+    "fragile",
+    "revalidate",
+]
 
 
 def _metadata(audit: Any) -> dict[str, Any]:
@@ -100,6 +117,14 @@ def _hotspots(audit: Any) -> list[dict[str, Any]]:
 def _string_list(items: list[str], *, fallback: str) -> str:
     cleaned = [str(item).strip() for item in items if str(item).strip()]
     return ", ".join(cleaned[:3]) if cleaned else fallback
+
+
+def _first_nonempty(*values: Any) -> str:
+    for value in values:
+        text = str(value or "").strip()
+        if text:
+            return text
+    return ""
 
 
 def _repo_name(audit: Any) -> str:
@@ -370,6 +395,11 @@ def build_repo_briefing(
     follow_through_reacquisition_softening_decay_summary = build_follow_through_reacquisition_softening_decay_summary(handoff_source)
     follow_through_reacquisition_confidence_retirement = build_follow_through_reacquisition_confidence_retirement_status_label(handoff_source)
     follow_through_reacquisition_confidence_retirement_summary = build_follow_through_reacquisition_confidence_retirement_summary(handoff_source)
+    follow_through_reacquisition_revalidation_recovery = build_follow_through_reacquisition_revalidation_recovery_status_label(handoff_source)
+    follow_through_reacquisition_revalidation_recovery_summary = build_follow_through_reacquisition_revalidation_recovery_summary(handoff_source)
+    operator_focus = build_operator_focus(handoff_source)
+    operator_focus_summary = build_operator_focus_summary(handoff_source)
+    operator_focus_line = build_operator_focus_line(handoff_source)
     follow_through_resurfacing_reason = build_follow_through_resurfacing_reason(handoff_source)
     return {
         "repo": repo_name,
@@ -430,6 +460,11 @@ def build_repo_briefing(
             "reacquisition_softening_decay_summary": follow_through_reacquisition_softening_decay_summary,
             "reacquisition_confidence_retirement": follow_through_reacquisition_confidence_retirement,
             "reacquisition_confidence_retirement_summary": follow_through_reacquisition_confidence_retirement_summary,
+            "revalidation_recovery": follow_through_reacquisition_revalidation_recovery,
+            "revalidation_recovery_summary": follow_through_reacquisition_revalidation_recovery_summary,
+            "operator_focus": operator_focus,
+            "operator_focus_summary": operator_focus_summary,
+            "operator_focus_line": operator_focus_line,
             "what_would_count_as_progress": follow_through_checkpoint,
         },
         "what_to_do_next_line": f"{recommended_action} {next_best_action_rationale}".strip(),
@@ -449,6 +484,10 @@ def build_repo_briefing(
         "reacquisition_confidence_line": f"{follow_through_reacquisition_consolidation}: {follow_through_reacquisition_consolidation_summary}",
         "reacquisition_softening_decay_line": f"{follow_through_reacquisition_softening_decay}: {follow_through_reacquisition_softening_decay_summary}",
         "reacquisition_confidence_retirement_line": f"{follow_through_reacquisition_confidence_retirement}: {follow_through_reacquisition_confidence_retirement_summary}",
+        "revalidation_recovery_line": f"{follow_through_reacquisition_revalidation_recovery}: {follow_through_reacquisition_revalidation_recovery_summary}",
+        "operator_focus": operator_focus,
+        "operator_focus_summary": operator_focus_summary,
+        "operator_focus_line": operator_focus_line,
         "resurfacing_reason_line": follow_through_resurfacing_reason,
     }
 
@@ -488,48 +527,12 @@ def build_weekly_review_pack(
     review_summary = _mapping(data.get("review_summary"))
     for item in operator_queue[:attention_limit]:
         mapped = _mapping(item)
-        title = mapped.get("title") or mapped.get("summary") or "Operator attention item"
-        repo = mapped.get("repo") or mapped.get("repo_name") or "Portfolio"
-        top_attention.append(
-            {
-                "repo": repo,
-                "title": str(title),
-                "lane": mapped.get("lane_label") or mapped.get("lane") or "ready",
-                "why": str(mapped.get("lane_reason") or mapped.get("summary") or "Operator pressure is active."),
-                "next_step": str(mapped.get("recommended_action") or mapped.get("next_step") or "Review the latest repo state."),
-                "last_movement": build_last_movement_label(mapped, review_summary),
-                "follow_through_status": build_follow_through_status_label(mapped),
-                "follow_through_summary": build_follow_through_summary(mapped),
-                "follow_through_checkpoint": build_follow_through_checkpoint(mapped),
-                "follow_through_checkpoint_timing": build_follow_through_checkpoint_status_label(mapped),
-                "follow_through_escalation": build_follow_through_escalation_status_label(mapped),
-                "follow_through_escalation_summary": build_follow_through_escalation_summary(mapped),
-                "follow_through_recovery": build_follow_through_recovery_status_label(mapped),
-                "follow_through_recovery_summary": build_follow_through_recovery_summary(mapped),
-                "follow_through_recovery_persistence": build_follow_through_recovery_persistence_status_label(mapped),
-                "follow_through_recovery_persistence_summary": build_follow_through_recovery_persistence_summary(mapped),
-                "follow_through_relapse_churn": build_follow_through_relapse_churn_status_label(mapped),
-                "follow_through_relapse_churn_summary": build_follow_through_relapse_churn_summary(mapped),
-                "follow_through_recovery_freshness": build_follow_through_recovery_freshness_status_label(mapped),
-                "follow_through_recovery_freshness_summary": build_follow_through_recovery_freshness_summary(mapped),
-                "follow_through_recovery_decay": build_follow_through_recovery_decay_status_label(mapped),
-                "follow_through_recovery_decay_summary": build_follow_through_recovery_decay_summary(mapped),
-                "follow_through_recovery_memory_reset": build_follow_through_recovery_memory_reset_status_label(mapped),
-                "follow_through_recovery_memory_reset_summary": build_follow_through_recovery_memory_reset_summary(mapped),
-                "follow_through_recovery_rebuild_strength": build_follow_through_recovery_rebuild_strength_status_label(mapped),
-                "follow_through_recovery_rebuild_strength_summary": build_follow_through_recovery_rebuild_strength_summary(mapped),
-                "follow_through_recovery_reacquisition": build_follow_through_recovery_reacquisition_status_label(mapped),
-                "follow_through_recovery_reacquisition_summary": build_follow_through_recovery_reacquisition_summary(mapped),
-                "follow_through_reacquisition_durability": build_follow_through_reacquisition_durability_status_label(mapped),
-                "follow_through_reacquisition_durability_summary": build_follow_through_reacquisition_durability_summary(mapped),
-                "follow_through_reacquisition_confidence": build_follow_through_reacquisition_consolidation_status_label(mapped),
-                "follow_through_reacquisition_confidence_summary": build_follow_through_reacquisition_consolidation_summary(mapped),
-                "follow_through_reacquisition_softening_decay": build_follow_through_reacquisition_softening_decay_status_label(mapped),
-                "follow_through_reacquisition_softening_decay_summary": build_follow_through_reacquisition_softening_decay_summary(mapped),
-                "follow_through_reacquisition_confidence_retirement": build_follow_through_reacquisition_confidence_retirement_status_label(mapped),
-                "follow_through_reacquisition_confidence_retirement_summary": build_follow_through_reacquisition_confidence_retirement_summary(mapped),
-            }
-        )
+        top_attention.append(_build_operator_focus_item(mapped, review_summary))
+    grouped_focus_items = {bucket: [] for bucket in OPERATOR_FOCUS_DISPLAY_ORDER}
+    for item in operator_queue:
+        enriched = _build_operator_focus_item(_mapping(item), review_summary)
+        focus_key = _operator_focus_bucket_key(item)
+        grouped_focus_items[focus_key].append(enriched)
     top_recommendation = build_top_recommendation_summary(data)
     what_to_do_this_week = top_recommendation
     if repo_briefings:
@@ -540,6 +543,7 @@ def build_weekly_review_pack(
         "queue_pressure_summary": build_queue_pressure_summary(data, diff_data),
         "trust_actionability_summary": build_trust_actionability_summary(data),
         "top_recommendation_summary": top_recommendation,
+        "operator_focus_summary": _build_operator_focus_summary_from_groups(grouped_focus_items),
         "top_attention": top_attention,
         "repo_briefings": repo_briefings,
         "what_to_do_this_week": what_to_do_this_week,
@@ -592,6 +596,10 @@ def build_weekly_review_pack(
             operator_summary.get("follow_through_reacquisition_confidence_retirement_summary")
             or NO_FOLLOW_THROUGH_REACQUISITION_CONFIDENCE_RETIREMENT
         ),
+        "follow_through_reacquisition_revalidation_recovery_summary": str(
+            operator_summary.get("follow_through_reacquisition_revalidation_recovery_summary")
+            or NO_FOLLOW_THROUGH_REACQUISITION_REVALIDATION_RECOVERY
+        ),
         "top_unattempted_items": list(operator_summary.get("top_unattempted_items") or []),
         "top_stale_follow_through_items": list(operator_summary.get("top_stale_follow_through_items") or []),
         "top_overdue_follow_through_items": list(operator_summary.get("top_overdue_follow_through_items") or []),
@@ -619,6 +627,16 @@ def build_weekly_review_pack(
         "top_softening_reacquisition_items": list(operator_summary.get("top_softening_reacquisition_items") or []),
         "top_revalidation_needed_reacquisition_items": list(operator_summary.get("top_revalidation_needed_reacquisition_items") or []),
         "top_retired_reacquisition_confidence_items": list(operator_summary.get("top_retired_reacquisition_confidence_items") or []),
+        "top_under_revalidation_recovery_items": list(operator_summary.get("top_under_revalidation_recovery_items") or []),
+        "top_rebuilding_restored_confidence_items": list(operator_summary.get("top_rebuilding_restored_confidence_items") or []),
+        "top_reearning_confidence_items": list(operator_summary.get("top_reearning_confidence_items") or []),
+        "top_just_reearned_confidence_items": list(operator_summary.get("top_just_reearned_confidence_items") or []),
+        "top_holding_reearned_confidence_items": list(operator_summary.get("top_holding_reearned_confidence_items") or []),
+        "top_act_now_items": grouped_focus_items["act-now"][:3],
+        "top_watch_closely_items": grouped_focus_items["watch-closely"][:3],
+        "top_improving_items": grouped_focus_items["improving"][:3],
+        "top_fragile_items": grouped_focus_items["fragile"][:3],
+        "top_revalidate_items": grouped_focus_items["revalidate"][:3],
     }
 
 
@@ -738,6 +756,10 @@ def no_follow_through_reacquisition_softening_decay() -> str:
 
 def no_follow_through_reacquisition_confidence_retirement() -> str:
     return NO_FOLLOW_THROUGH_REACQUISITION_CONFIDENCE_RETIREMENT
+
+
+def no_follow_through_reacquisition_revalidation_recovery() -> str:
+    return NO_FOLLOW_THROUGH_REACQUISITION_REVALIDATION_RECOVERY
 
 
 def build_follow_through_status_label(value: Any) -> str:
@@ -1064,6 +1086,221 @@ def build_follow_through_reacquisition_confidence_retirement_summary(value: Any)
         mapped.get("follow_through_reacquisition_confidence_retirement_summary")
         or NO_FOLLOW_THROUGH_REACQUISITION_CONFIDENCE_RETIREMENT
     )
+
+
+def build_follow_through_reacquisition_revalidation_recovery_status_label(value: Any) -> str:
+    mapped = _mapping(value)
+    status = str(
+        mapped.get("follow_through_reacquisition_revalidation_recovery_status", value if isinstance(value, str) else "")
+        or "none"
+    )
+    labels = {
+        "none": "None",
+        "under-revalidation": "Under Revalidation",
+        "rebuilding-restored-confidence": "Rebuilding Restored Confidence",
+        "reearning-confidence": "Re-Earning Confidence",
+        "just-reearned-confidence": "Just Re-Earned Confidence",
+        "holding-reearned-confidence": "Holding Re-Earned Confidence",
+        "insufficient-evidence": "Insufficient Evidence",
+    }
+    return labels.get(status, status.replace("-", " ").title())
+
+
+def build_follow_through_reacquisition_revalidation_recovery_summary(value: Any) -> str:
+    mapped = _mapping(value)
+    return str(
+        mapped.get("follow_through_reacquisition_revalidation_recovery_summary")
+        or NO_FOLLOW_THROUGH_REACQUISITION_REVALIDATION_RECOVERY
+    )
+
+
+def _operator_focus_bucket_key(value: Any) -> str:
+    mapped = _mapping(value)
+    lane = str(mapped.get("lane") or "").strip()
+    checkpoint_status = str(mapped.get("follow_through_checkpoint_status") or "").strip()
+    escalation_status = str(mapped.get("follow_through_escalation_status") or "").strip()
+    relapse_churn_status = str(mapped.get("follow_through_relapse_churn_status") or "").strip()
+    recovery_persistence_status = str(mapped.get("follow_through_recovery_persistence_status") or "").strip()
+    recovery_status = str(mapped.get("follow_through_recovery_status") or "").strip()
+    reacquisition_durability_status = str(
+        mapped.get("follow_through_recovery_reacquisition_durability_status") or ""
+    ).strip()
+    reacquisition_confidence_status = str(
+        mapped.get("follow_through_recovery_reacquisition_consolidation_status") or ""
+    ).strip()
+    softening_status = str(mapped.get("follow_through_reacquisition_softening_decay_status") or "").strip()
+    confidence_retirement_status = str(
+        mapped.get("follow_through_reacquisition_confidence_retirement_status") or ""
+    ).strip()
+    revalidation_recovery_status = str(
+        mapped.get("follow_through_reacquisition_revalidation_recovery_status") or ""
+    ).strip()
+
+    if lane in {"blocked", "urgent"} or checkpoint_status == "overdue" or escalation_status == "escalate-now":
+        return "act-now"
+    if confidence_retirement_status == "revalidation-needed" or revalidation_recovery_status in {
+        "under-revalidation",
+        "insufficient-evidence",
+    }:
+        return "revalidate"
+    if relapse_churn_status in {"fragile", "churn", "blocked"}:
+        return "fragile"
+    if recovery_persistence_status == "fragile-recovery":
+        return "fragile"
+    if reacquisition_confidence_status in {"fragile-confidence", "reversing"}:
+        return "fragile"
+    if softening_status in {"softening-watch", "step-down", "revalidation-needed"}:
+        return "fragile"
+    if revalidation_recovery_status in {
+        "rebuilding-restored-confidence",
+        "reearning-confidence",
+        "just-reearned-confidence",
+    }:
+        return "fragile"
+    if recovery_status in {"recovering", "retiring-watch", "retired"}:
+        return "improving"
+    if recovery_persistence_status in {
+        "holding-recovery",
+        "holding-retiring-watch",
+        "sustained-retiring-watch",
+        "sustained-retired",
+    }:
+        return "improving"
+    if reacquisition_durability_status == "durable-reacquired":
+        return "improving"
+    if reacquisition_confidence_status in {"holding-confidence", "durable-confidence"}:
+        return "improving"
+    if revalidation_recovery_status == "holding-reearned-confidence":
+        return "improving"
+    return "watch-closely"
+
+
+def build_operator_focus(value: Any) -> str:
+    return OPERATOR_FOCUS_LABELS[_operator_focus_bucket_key(value)]
+
+
+def build_operator_focus_summary(value: Any) -> str:
+    mapped = _mapping(value)
+    focus_key = _operator_focus_bucket_key(mapped)
+    if focus_key == "act-now":
+        return _first_nonempty(
+            mapped.get("lane_reason"),
+            build_follow_through_escalation_summary(mapped),
+            build_follow_through_checkpoint(mapped),
+            mapped.get("summary"),
+        ) or "Immediate operator action is still required."
+    if focus_key == "revalidate":
+        return _first_nonempty(
+            build_follow_through_reacquisition_revalidation_recovery_summary(mapped),
+            build_follow_through_reacquisition_confidence_retirement_summary(mapped),
+            build_follow_through_checkpoint(mapped),
+        ) or "This target still needs revalidation before confidence can be restored."
+    if focus_key == "fragile":
+        return _first_nonempty(
+            build_follow_through_reacquisition_revalidation_recovery_summary(mapped),
+            build_follow_through_reacquisition_softening_decay_summary(mapped),
+            build_follow_through_relapse_churn_summary(mapped),
+            build_follow_through_recovery_persistence_summary(mapped),
+            build_follow_through_reacquisition_consolidation_summary(mapped),
+        ) or "Progress is visible, but the restored posture is still fragile."
+    if focus_key == "improving":
+        return _first_nonempty(
+            build_follow_through_reacquisition_revalidation_recovery_summary(mapped),
+            build_follow_through_reacquisition_consolidation_summary(mapped),
+            build_follow_through_reacquisition_durability_summary(mapped),
+            build_follow_through_recovery_summary(mapped),
+        ) or "The current path is stabilizing and regaining trust."
+    return _first_nonempty(
+        build_follow_through_summary(mapped),
+        build_follow_through_checkpoint(mapped),
+        mapped.get("lane_reason"),
+        mapped.get("summary"),
+    ) or "Keep this item in view while waiting for clearer evidence."
+
+
+def build_operator_focus_line(value: Any) -> str:
+    return f"{build_operator_focus(value)}: {build_operator_focus_summary(value)}"
+
+
+def _build_operator_focus_item(mapped: dict[str, Any], review_summary: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "repo": mapped.get("repo") or mapped.get("repo_name") or "Portfolio",
+        "title": str(mapped.get("title") or mapped.get("summary") or "Operator attention item"),
+        "lane": mapped.get("lane_label") or mapped.get("lane") or "ready",
+        "why": str(mapped.get("lane_reason") or mapped.get("summary") or "Operator pressure is active."),
+        "next_step": str(
+            mapped.get("recommended_action")
+            or mapped.get("next_step")
+            or "Review the latest repo state."
+        ),
+        "last_movement": build_last_movement_label(mapped, review_summary),
+        "follow_through_status": build_follow_through_status_label(mapped),
+        "follow_through_summary": build_follow_through_summary(mapped),
+        "follow_through_checkpoint": build_follow_through_checkpoint(mapped),
+        "follow_through_checkpoint_timing": build_follow_through_checkpoint_status_label(mapped),
+        "follow_through_escalation": build_follow_through_escalation_status_label(mapped),
+        "follow_through_escalation_summary": build_follow_through_escalation_summary(mapped),
+        "follow_through_recovery": build_follow_through_recovery_status_label(mapped),
+        "follow_through_recovery_summary": build_follow_through_recovery_summary(mapped),
+        "follow_through_recovery_persistence": build_follow_through_recovery_persistence_status_label(mapped),
+        "follow_through_recovery_persistence_summary": build_follow_through_recovery_persistence_summary(mapped),
+        "follow_through_relapse_churn": build_follow_through_relapse_churn_status_label(mapped),
+        "follow_through_relapse_churn_summary": build_follow_through_relapse_churn_summary(mapped),
+        "follow_through_recovery_freshness": build_follow_through_recovery_freshness_status_label(mapped),
+        "follow_through_recovery_freshness_summary": build_follow_through_recovery_freshness_summary(mapped),
+        "follow_through_recovery_decay": build_follow_through_recovery_decay_status_label(mapped),
+        "follow_through_recovery_decay_summary": build_follow_through_recovery_decay_summary(mapped),
+        "follow_through_recovery_memory_reset": build_follow_through_recovery_memory_reset_status_label(mapped),
+        "follow_through_recovery_memory_reset_summary": build_follow_through_recovery_memory_reset_summary(mapped),
+        "follow_through_recovery_rebuild_strength": build_follow_through_recovery_rebuild_strength_status_label(mapped),
+        "follow_through_recovery_rebuild_strength_summary": build_follow_through_recovery_rebuild_strength_summary(mapped),
+        "follow_through_recovery_reacquisition": build_follow_through_recovery_reacquisition_status_label(mapped),
+        "follow_through_recovery_reacquisition_summary": build_follow_through_recovery_reacquisition_summary(mapped),
+        "follow_through_reacquisition_durability": build_follow_through_reacquisition_durability_status_label(mapped),
+        "follow_through_reacquisition_durability_summary": build_follow_through_reacquisition_durability_summary(mapped),
+        "follow_through_reacquisition_confidence": build_follow_through_reacquisition_consolidation_status_label(mapped),
+        "follow_through_reacquisition_confidence_summary": build_follow_through_reacquisition_consolidation_summary(mapped),
+        "follow_through_reacquisition_softening_decay": build_follow_through_reacquisition_softening_decay_status_label(mapped),
+        "follow_through_reacquisition_softening_decay_summary": build_follow_through_reacquisition_softening_decay_summary(mapped),
+        "follow_through_reacquisition_confidence_retirement": build_follow_through_reacquisition_confidence_retirement_status_label(mapped),
+        "follow_through_reacquisition_confidence_retirement_summary": build_follow_through_reacquisition_confidence_retirement_summary(mapped),
+        "follow_through_reacquisition_revalidation_recovery": build_follow_through_reacquisition_revalidation_recovery_status_label(mapped),
+        "follow_through_reacquisition_revalidation_recovery_summary": build_follow_through_reacquisition_revalidation_recovery_summary(mapped),
+        "operator_focus": build_operator_focus(mapped),
+        "operator_focus_summary": build_operator_focus_summary(mapped),
+        "operator_focus_line": build_operator_focus_line(mapped),
+    }
+
+
+def _build_operator_focus_summary_from_groups(grouped_items: dict[str, list[dict[str, Any]]]) -> str:
+    counts = {bucket: len(grouped_items.get(bucket, [])) for bucket in OPERATOR_FOCUS_DISPLAY_ORDER}
+
+    def _labels(bucket: str) -> str:
+        items = grouped_items.get(bucket, [])[:3]
+        labels = [str(item.get("repo") or item.get("title") or "operator item") for item in items]
+        return _string_list(labels, fallback="the current queue")
+
+    if counts["act-now"]:
+        return (
+            f"{counts['act-now']} item(s) need immediate action first, led by {_labels('act-now')}."
+        )
+    if counts["revalidate"]:
+        return (
+            f"{counts['revalidate']} item(s) are in a revalidation posture, led by {_labels('revalidate')}."
+        )
+    if counts["fragile"]:
+        return (
+            f"{counts['fragile']} item(s) are improving but still fragile, led by {_labels('fragile')}."
+        )
+    if counts["improving"]:
+        return (
+            f"{counts['improving']} item(s) are clearly improving, led by {_labels('improving')}."
+        )
+    if counts["watch-closely"]:
+        return (
+            f"{counts['watch-closely']} item(s) should stay visible while more evidence arrives, led by {_labels('watch-closely')}."
+        )
+    return NO_OPERATOR_FOCUS_SUMMARY
 
 
 def build_follow_through_resurfacing_reason(value: Any) -> str:
