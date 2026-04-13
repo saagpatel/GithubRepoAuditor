@@ -162,6 +162,9 @@ class AuditReport:
     portfolio_outcomes_summary: dict = field(default_factory=dict)
     operator_effectiveness_summary: dict = field(default_factory=dict)
     high_pressure_queue_history: list[dict] = field(default_factory=list)
+    campaign_readiness_summary: dict = field(default_factory=dict)
+    action_sync_summary: dict = field(default_factory=dict)
+    next_action_sync_step: str = ""
     security_posture: dict = field(default_factory=dict)
     security_governance_preview: list[dict] = field(default_factory=list)
     collections: dict[str, dict] = field(default_factory=dict)
@@ -398,6 +401,9 @@ class AuditReport:
             "portfolio_outcomes_summary": self.portfolio_outcomes_summary,
             "operator_effectiveness_summary": self.operator_effectiveness_summary,
             "high_pressure_queue_history": self.high_pressure_queue_history,
+            "campaign_readiness_summary": self.campaign_readiness_summary,
+            "action_sync_summary": self.action_sync_summary,
+            "next_action_sync_step": self.next_action_sync_step,
             "security_posture": self.security_posture,
             "security_governance_preview": self.security_governance_preview,
             "collections": self.collections,

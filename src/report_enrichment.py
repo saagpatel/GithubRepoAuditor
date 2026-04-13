@@ -56,6 +56,9 @@ NO_WHERE_TO_START_SUMMARY = "No meaningful implementation hotspot is currently s
 NO_OPERATOR_OUTCOMES_SUMMARY = "Not enough operator history is recorded yet to judge whether recent actions are improving portfolio outcomes."
 NO_OPERATOR_EFFECTIVENESS_SUMMARY = "Not enough judged recommendation history is recorded yet to judge operator effectiveness."
 NO_HIGH_PRESSURE_QUEUE_TREND = "High-pressure queue trend is not ready yet."
+NO_ACTION_SYNC_SUMMARY = "No current campaign needs Action Sync yet, so the safest next move is to keep the story local."
+NO_ACTION_SYNC_STEP = "Stay local for now; no current campaign needs preview or apply."
+NO_ACTION_SYNC_LINE = "Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites."
 
 OPERATOR_FOCUS_LABELS = {
     "act-now": "Act Now",
@@ -550,6 +553,7 @@ def build_repo_briefing(
     scorecard = build_scorecard_entry(audit)
     scorecard_line = build_scorecard_line(audit)
     maturity_gap_summary = build_maturity_gap_summary(audit)
+    action_sync_line = build_action_sync_line(handoff_source)
     follow_through_resurfacing_reason = build_follow_through_resurfacing_reason(handoff_source)
     implementation_hotspots = _implementation_hotspots(audit)[:3]
     where_to_start_summary = _where_to_start_summary(audit)
@@ -643,6 +647,7 @@ def build_repo_briefing(
         "operator_focus": operator_focus,
         "operator_focus_summary": operator_focus_summary,
         "operator_focus_line": operator_focus_line,
+        "action_sync_line": action_sync_line,
         "portfolio_catalog": portfolio_catalog,
         "catalog_line": catalog_line,
         "intent_alignment": intent_alignment,
@@ -652,6 +657,10 @@ def build_repo_briefing(
         "scorecard_line": scorecard_line,
         "maturity_gap_summary": maturity_gap_summary,
         "maturity_gap_line": f"Maturity Gap: {maturity_gap_summary}",
+        "action_sync_stage": str(handoff_source.get("action_sync_stage") or "idle"),
+        "action_sync_reason": str(handoff_source.get("action_sync_reason") or "No current Action Sync guidance is surfaced for this repo."),
+        "suggested_campaign": str(handoff_source.get("suggested_campaign") or ""),
+        "suggested_writeback_target": str(handoff_source.get("suggested_writeback_target") or "none"),
         "resurfacing_reason_line": follow_through_resurfacing_reason,
     }
 
@@ -726,6 +735,13 @@ def build_weekly_review_pack(
         "operator_outcomes_summary": build_operator_outcomes_summary(data),
         "operator_effectiveness_line": build_operator_effectiveness_line(data),
         "high_pressure_queue_trend_line": build_high_pressure_queue_trend_line(data),
+        "action_sync_summary": build_action_sync_summary(data),
+        "next_action_sync_step": build_next_action_sync_step(data),
+        "action_sync_readiness_line": build_action_sync_readiness_line(data),
+        "top_apply_ready_campaigns": list(operator_summary.get("top_apply_ready_campaigns") or []),
+        "top_preview_ready_campaigns": list(operator_summary.get("top_preview_ready_campaigns") or []),
+        "top_drift_review_campaigns": list(operator_summary.get("top_drift_review_campaigns") or []),
+        "top_blocked_campaigns": list(operator_summary.get("top_blocked_campaigns") or []),
         "top_attention": top_attention,
         "repo_briefings": repo_briefings,
         "top_below_target_scorecard_items": list(_mapping(data).get("scorecards_summary", {}).get("top_below_target_repos") or []),
@@ -1487,6 +1503,47 @@ def build_high_pressure_queue_trend_line(report_data: Any) -> str:
     return str(operator_summary.get("high_pressure_queue_trend_summary") or NO_HIGH_PRESSURE_QUEUE_TREND)
 
 
+def build_action_sync_summary(report_data: Any) -> str:
+    summary = _mapping(_mapping(report_data).get("action_sync_summary"))
+    if not summary:
+        summary = _mapping(_mapping(report_data).get("operator_summary")).get("action_sync_summary") or {}
+    return str(_mapping(summary).get("summary") or NO_ACTION_SYNC_SUMMARY)
+
+
+def build_next_action_sync_step(report_data: Any) -> str:
+    data = _mapping(report_data)
+    operator_summary = _mapping(data.get("operator_summary"))
+    return str(
+        data.get("next_action_sync_step")
+        or operator_summary.get("next_action_sync_step")
+        or NO_ACTION_SYNC_STEP
+    )
+
+
+def build_action_sync_readiness_line(report_data: Any) -> str:
+    summary = build_action_sync_summary(report_data)
+    next_step = build_next_action_sync_step(report_data)
+    if summary == NO_ACTION_SYNC_SUMMARY and next_step == NO_ACTION_SYNC_STEP:
+        return NO_ACTION_SYNC_LINE
+    return f"{summary} Next step: {next_step}"
+
+
+def build_action_sync_line(value: Any) -> str:
+    mapped = _mapping(value)
+    direct = str(mapped.get("action_sync_line") or "").strip()
+    if direct:
+        return direct
+    stage = str(mapped.get("action_sync_stage") or "").strip()
+    campaign = str(mapped.get("suggested_campaign") or "").strip()
+    target = str(mapped.get("suggested_writeback_target") or "").strip()
+    if not stage and not campaign:
+        return NO_ACTION_SYNC_LINE
+    campaign_label = PRODUCT_MODE_LABELS.get(campaign, campaign.replace("-", " ").title()) if campaign in PRODUCT_MODE_LABELS else campaign.replace("-", " ").title()
+    if target and target != "none":
+        return f"Action Sync: {campaign_label or 'Campaign'} is {stage or 'idle'} — recommended target {target}."
+    return f"Action Sync: {campaign_label or 'Campaign'} is {stage or 'idle'} — stay local until prerequisites are healthy."
+
+
 def _build_operator_focus_item(mapped: dict[str, Any], review_summary: dict[str, Any]) -> dict[str, Any]:
     return {
         "repo": mapped.get("repo") or mapped.get("repo_name") or "Portfolio",
@@ -1539,6 +1596,11 @@ def _build_operator_focus_item(mapped: dict[str, Any], review_summary: dict[str,
         "intent_alignment_summary": build_intent_alignment_summary(mapped),
         "scorecard_line": build_scorecard_line(mapped),
         "maturity_gap_summary": build_maturity_gap_summary(mapped),
+        "action_sync_stage": str(mapped.get("action_sync_stage") or "idle"),
+        "action_sync_reason": str(mapped.get("action_sync_reason") or "No current Action Sync guidance is surfaced for this item."),
+        "suggested_campaign": str(mapped.get("suggested_campaign") or ""),
+        "suggested_writeback_target": str(mapped.get("suggested_writeback_target") or "none"),
+        "action_sync_line": build_action_sync_line(mapped),
     }
 
 

@@ -123,6 +123,8 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- What changed: {summary.get('what_changed', 'No operator change summary is recorded.')}",
         f"- Why it matters: {summary.get('why_it_matters', 'No additional operator impact is recorded.')}",
         f"- What to do next: {summary.get('what_to_do_next', 'Continue the normal operator loop.')}",
+        f"- Action Sync readiness: {(summary.get('action_sync_summary') or {}).get('summary', 'No current campaign needs Action Sync yet, so the safest next move is to keep the story local.')}",
+        f"- Next Action Sync step: {summary.get('next_action_sync_step', 'Stay local for now; no current campaign needs preview or apply.')}",
         f"- Trend: `{summary.get('trend_status', 'stable')}` — {summary.get('trend_summary', 'No trend summary is recorded yet.')}",
         f"- Aging status: `{summary.get('aging_status', 'fresh')}`",
         f"- Attention counts: new={summary.get('new_attention_count', 0)}, resolved={resolved_count}, persisting={persisting_count}, reopened={summary.get('reopened_attention_count', 0)}",

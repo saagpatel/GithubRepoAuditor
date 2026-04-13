@@ -511,6 +511,10 @@ def test_build_scheduled_handoff_writes_artifacts_and_issue_candidate(tmp_path):
 
 def test_build_scheduled_handoff_includes_github_projects_campaign_status(tmp_path):
     payload = _control_center_payload()
+    payload["operator_summary"]["action_sync_summary"] = {
+        "summary": "Action Sync is preview-ready: Security Review is the strongest next campaign to preview from the current local facts.",
+    }
+    payload["operator_summary"]["next_action_sync_step"] = "Preview Security Review next, then decide whether it is ready to sync to all."
     payload["campaign_summary"] = {
         "campaign_type": "security-review",
         "label": "Security Review",
@@ -542,6 +546,8 @@ def test_build_scheduled_handoff_includes_github_projects_campaign_status(tmp_pa
     markdown = (tmp_path / "scheduled-handoff-testuser-2026-04-07.md").read_text()
     assert "Campaign mirror: Security Review" in markdown
     assert "GitHub Projects: configured (octo-org #7, 2 items, 1 project drift)" in markdown
+    assert "Action Sync readiness: Action Sync is preview-ready" in markdown
+    assert "Next Action Sync step: Preview Security Review next" in markdown
 
 
 def test_build_scheduled_handoff_stays_quiet_for_quiet_runs(tmp_path):

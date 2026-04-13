@@ -7342,3 +7342,64 @@ def test_normalize_review_state_backfills_missing_fields(tmp_path: Path):
     assert "review_summary" in report
     assert "review_targets" in report
     assert isinstance(report["review_history"], list)
+
+
+def test_operator_snapshot_includes_action_sync_readiness_and_queue_handoff(tmp_path: Path):
+    snapshot = build_operator_snapshot(
+        _make_report(
+            preflight_summary={"checks": []},
+            managed_state_drift=[],
+            governance_drift=[],
+            governance_preview={},
+            campaign_summary={},
+            writeback_preview={"sync_mode": "reconcile"},
+            security_governance_preview=[
+                {
+                    "repo": "RepoSecure",
+                    "key": "enable-secret-scanning",
+                    "title": "Enable secret scanning",
+                    "priority": "high",
+                    "expected_posture_lift": 0.2,
+                    "effort": "medium",
+                    "source": "github",
+                    "why": "Secret scanning is not enabled.",
+                }
+            ],
+            action_backlog=[],
+            hotspots=[],
+            audits=[
+                {
+                    "metadata": {
+                        "name": "RepoSecure",
+                        "full_name": "user/RepoSecure",
+                        "topics": [],
+                    },
+                    "overall_score": 0.35,
+                    "completeness_tier": "wip",
+                    "lenses": {"security_posture": {"score": 0.2}},
+                    "security_posture": {"label": "critical", "score": 0.2},
+                    "action_candidates": [],
+                    "portfolio_catalog": {},
+                }
+            ],
+            review_targets=[
+                {
+                    "repo": "RepoSecure",
+                    "reason": "Security follow-up is needed",
+                    "severity": 0.7,
+                    "recommended_next_step": "Inspect the repo and decide whether to sync the security campaign.",
+                }
+            ],
+            material_changes=[],
+        ),
+        output_dir=tmp_path,
+    )
+
+    summary = snapshot["operator_summary"]
+    assert "action_sync_summary" in summary
+    assert summary["next_action_sync_step"]
+    assert summary["top_preview_ready_campaigns"]
+    repo_item = next(item for item in snapshot["operator_queue"] if item.get("repo") == "RepoSecure")
+    assert repo_item["suggested_campaign"] == "security-review"
+    assert repo_item["action_sync_stage"] == "preview-ready"
+    assert "Action Sync:" in repo_item["action_sync_line"]

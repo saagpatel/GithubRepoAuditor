@@ -641,6 +641,9 @@ def _report_from_dict(data: dict) -> AuditReport:
         portfolio_outcomes_summary=data.get("portfolio_outcomes_summary", {}),
         operator_effectiveness_summary=data.get("operator_effectiveness_summary", {}),
         high_pressure_queue_history=data.get("high_pressure_queue_history", []),
+        campaign_readiness_summary=data.get("campaign_readiness_summary", {}),
+        action_sync_summary=data.get("action_sync_summary", {}),
+        next_action_sync_step=data.get("next_action_sync_step", ""),
         security_posture=data.get("security_posture", {}),
         security_governance_preview=data.get("security_governance_preview", []),
         collections=data.get("collections", {}),
@@ -1928,6 +1931,9 @@ def _enrich_report_with_operator_state(
     report.portfolio_outcomes_summary = snapshot.get("portfolio_outcomes_summary", {})
     report.operator_effectiveness_summary = snapshot.get("operator_effectiveness_summary", {})
     report.high_pressure_queue_history = snapshot.get("high_pressure_queue_history", [])
+    report.campaign_readiness_summary = snapshot.get("campaign_readiness_summary", {})
+    report.action_sync_summary = snapshot.get("action_sync_summary", {})
+    report.next_action_sync_step = snapshot.get("next_action_sync_step", "")
     return report
 
 

@@ -54,6 +54,27 @@ def export_review_pack(
     _w(f"- Operator Outcomes: {weekly_pack.get('operator_outcomes_summary', 'Not enough operator history is recorded yet to judge outcomes.')}")
     _w(f"- Operator Effectiveness: {weekly_pack.get('operator_effectiveness_line', 'Not enough judged recommendation history is recorded yet to judge operator effectiveness.')}")
     _w(f"- High-Pressure Queue Trend: {weekly_pack.get('high_pressure_queue_trend_line', 'High-pressure queue trend is not ready yet.')}")
+    _w(f"- Action Sync Readiness: {weekly_pack.get('action_sync_summary', 'No current campaign needs Action Sync yet, so the safest next move is to keep the story local.')}")
+    _w(f"- Next Action Sync Step: {weekly_pack.get('next_action_sync_step', 'Stay local for now; no current campaign needs preview or apply.')}")
+    _w("")
+    _w("### Action Sync Readiness")
+    _w("")
+    readiness_sections = [
+        ("Apply Ready", weekly_pack.get("top_apply_ready_campaigns", []), "No campaigns are currently apply-ready."),
+        ("Preview Ready", weekly_pack.get("top_preview_ready_campaigns", []), "No campaigns are currently preview-ready."),
+        ("Drift Review", weekly_pack.get("top_drift_review_campaigns", []), "No campaigns are currently waiting on drift review."),
+        ("Blocked", weekly_pack.get("top_blocked_campaigns", []), "No campaigns are currently blocked."),
+    ]
+    for label, items, empty_message in readiness_sections:
+        _w(f"- {label}:")
+        if items:
+            for item in items[:3]:
+                _w(
+                    f"  - {item.get('label', item.get('campaign_type', 'Campaign'))} — {item.get('reason', 'No readiness reason is recorded yet.')} "
+                    f"(target {item.get('recommended_target', 'none')})"
+                )
+        else:
+            _w(f"  - {empty_message}")
     _w("")
     _w("### Top Attention")
     _w("")
@@ -66,6 +87,7 @@ def export_review_pack(
         _w(f"  Intent Alignment: {item.get('intent_alignment', 'missing-contract')} — {item.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.')}")
         _w(f"  {item.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.')}")
         _w(f"  Maturity Gap: {item.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.')}")
+        _w(f"  {item.get('action_sync_line', 'Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.')}")
         _w(f"  Checkpoint Timing: {item.get('follow_through_checkpoint_timing', 'Unknown')}")
         _w(f"  Next Checkpoint: {item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
     if not weekly_pack.get("top_attention"):
@@ -109,6 +131,7 @@ def export_review_pack(
         _w(f"  Intent Alignment: {briefing.get('intent_alignment_line', 'missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.')}")
         _w(f"  {briefing.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.')}")
         _w(f"  Maturity Gap: {briefing.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.')}")
+        _w(f"  {briefing.get('action_sync_line', 'Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.')}")
         _w(f"  Checkpoint Timing: {briefing.get('checkpoint_timing_line', 'Unknown')}")
         _w(f"  What Would Count As Progress: {briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
     _w("")
@@ -126,11 +149,16 @@ def export_review_pack(
             f"- Blocked: {counts.get('blocked', 0)} | Urgent: {counts.get('urgent', 0)} | "
             f"Ready: {counts.get('ready', 0)} | Deferred: {counts.get('deferred', 0)}"
         )
+        if (operator_summary.get("action_sync_summary") or {}).get("summary"):
+            _w(f"- Action Sync Readiness: {(operator_summary.get('action_sync_summary') or {}).get('summary')}")
+        if operator_summary.get("next_action_sync_step"):
+            _w(f"- Next Action Sync Step: {operator_summary.get('next_action_sync_step')}")
         for item in operator_queue[:8]:
             repo = f"{item.get('repo', '')}: " if item.get("repo") else ""
             _w(f"- [{item.get('lane_label', item.get('lane', 'ready'))}] {repo}{item.get('title', 'Triage item')}")
             _w(f"  Why: {item.get('lane_reason', item.get('summary', 'Operator triage item.'))}")
             _w(f"  Action: {item.get('recommended_action', 'Review the latest state.')}")
+            _w(f"  {item.get('action_sync_line', 'Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.')}")
         recent_changes = operator_summary.get("operator_recent_changes", [])
         for change in recent_changes[:3]:
             subject = change.get("repo") or change.get("repo_full_name") or change.get("item_id") or "portfolio"

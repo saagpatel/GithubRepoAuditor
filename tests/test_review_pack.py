@@ -93,6 +93,17 @@ def _make_report() -> dict:
         "operator_summary": {
             "headline": "Restored confidence is coming back after revalidation.",
             "counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0},
+            "action_sync_summary": {
+                "summary": "Action Sync is preview-ready: Security Review is the strongest next campaign to preview from the current local facts.",
+            },
+            "next_action_sync_step": "Preview Security Review next, then decide whether it is ready to sync to all.",
+            "top_preview_ready_campaigns": [
+                {
+                    "label": "Security Review",
+                    "reason": "1 action is ready for preview.",
+                    "recommended_target": "all",
+                }
+            ],
             "follow_through_reacquisition_revalidation_recovery_summary": "1 restored-confidence path has only just been re-earned and still needs another confirming run.",
             "top_just_reearned_confidence_items": [
                 {"repo": "RepoC", "title": "RepoC drift needs review"}
@@ -138,6 +149,7 @@ def _make_report() -> dict:
                     "top_gaps": ["Testing", "CI"],
                     "summary": "Maintain is at Operating and still below the Strong target because testing and ci are behind.",
                 },
+                "action_sync_line": "Action Sync: Security Review is preview-ready — recommended target all.",
             }
         ],
     }
@@ -161,11 +173,14 @@ def test_review_pack_includes_revalidation_recovery_section(tmp_path):
     assert "Operator Outcomes:" in content
     assert "Operator Effectiveness:" in content
     assert "High-Pressure Queue Trend:" in content
+    assert "Action Sync Readiness:" in content
+    assert "Preview Ready" in content
     assert "Catalog: operator-loop | flagship workbook-first flow" in content
     assert "Where To Start: Start in src/core.py." in content
     assert "Intent Alignment: aligned: The repo is holding a maintain posture" in content
     assert "Scorecard: Maintain — Operating (target Strong)" in content
     assert "Maturity Gap: testing, ci are still below the maintain bar." in content
+    assert "Action Sync: Security Review is preview-ready — recommended target all." in content
     assert "Follow-Through Revalidation Recovery and Confidence Re-Earning" not in content
 
 

@@ -291,6 +291,27 @@ def write_markdown_report(
     _w(f"- Operator Outcomes: {weekly_pack.get('operator_outcomes_summary', 'Not enough operator history is recorded yet to judge outcomes.')}")
     _w(f"- Operator Effectiveness: {weekly_pack.get('operator_effectiveness_line', 'Not enough judged recommendation history is recorded yet to judge operator effectiveness.')}")
     _w(f"- High-Pressure Queue Trend: {weekly_pack.get('high_pressure_queue_trend_line', 'High-pressure queue trend is not ready yet.')}")
+    _w(f"- Action Sync Readiness: {weekly_pack.get('action_sync_summary', 'No current campaign needs Action Sync yet, so the safest next move is to keep the story local.')}")
+    _w(f"- Next Action Sync Step: {weekly_pack.get('next_action_sync_step', 'Stay local for now; no current campaign needs preview or apply.')}")
+    _w("")
+    _w("### Action Sync Readiness")
+    _w("")
+    readiness_sections = [
+        ("Apply Ready", weekly_pack.get("top_apply_ready_campaigns", []), "No campaigns are currently apply-ready."),
+        ("Preview Ready", weekly_pack.get("top_preview_ready_campaigns", []), "No campaigns are currently preview-ready."),
+        ("Drift Review", weekly_pack.get("top_drift_review_campaigns", []), "No campaigns are currently waiting on drift review."),
+        ("Blocked", weekly_pack.get("top_blocked_campaigns", []), "No campaigns are currently blocked."),
+    ]
+    for label, items, empty_message in readiness_sections:
+        _w(f"- {label}:")
+        if items:
+            for item in items[:3]:
+                _w(
+                    f"  - {item.get('label', item.get('campaign_type', 'Campaign'))} — {item.get('reason', 'No readiness reason is recorded yet.')} "
+                    f"(target {item.get('recommended_target', 'none')})"
+                )
+        else:
+            _w(f"  - {empty_message}")
     _w("")
     _w("### Top Attention")
     _w("")
@@ -306,6 +327,7 @@ def write_markdown_report(
         _w(f"  - Intent Alignment: {item.get('intent_alignment', 'missing-contract')} — {item.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.')}")
         _w(f"  - {item.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.')}")
         _w(f"  - Maturity Gap: {item.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.')}")
+        _w(f"  - {item.get('action_sync_line', 'Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.')}")
         _w(f"  - Checkpoint Timing: {item.get('follow_through_checkpoint_timing', 'Unknown')}")
         _w(
             f"  - Next Checkpoint: {item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}"
@@ -351,6 +373,7 @@ def write_markdown_report(
         _w(f"- Intent Alignment: {briefing.get('intent_alignment_line', 'missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.')}")
         _w(f"- {briefing.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.')}")
         _w(f"- Maturity Gap: {briefing.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.')}")
+        _w(f"- {briefing.get('action_sync_line', 'Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.')}")
         _w(f"- Checkpoint Timing: {briefing.get('checkpoint_timing_line', 'Unknown')}")
         _w(f"- What Would Count As Progress: {briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
         _w("")
@@ -384,6 +407,12 @@ def write_markdown_report(
             _w(f"- Follow-Through: {report.operator_summary.get('follow_through_summary')}")
         if report.operator_summary.get("follow_through_checkpoint_summary"):
             _w(f"- Next Checkpoint: {report.operator_summary.get('follow_through_checkpoint_summary')}")
+        if (report.operator_summary.get("action_sync_summary") or {}).get("summary"):
+            _w(
+                f"- Action Sync Readiness: {(report.operator_summary.get('action_sync_summary') or {}).get('summary')}"
+            )
+        if report.operator_summary.get("next_action_sync_step"):
+            _w(f"- Next Action Sync Step: {report.operator_summary.get('next_action_sync_step')}")
         if report.operator_summary.get("follow_through_escalation_summary"):
             _w(f"- Follow-Through Aging and Escalation: {report.operator_summary.get('follow_through_escalation_summary')}")
         if report.operator_summary.get("follow_through_recovery_summary"):
