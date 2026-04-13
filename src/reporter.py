@@ -17,6 +17,8 @@ from src.report_enrichment import (
     build_follow_through_reacquisition_consolidation_summary,
     build_follow_through_reacquisition_durability_status_label,
     build_follow_through_reacquisition_durability_summary,
+    build_follow_through_reacquisition_revalidation_recovery_status_label,
+    build_follow_through_reacquisition_revalidation_recovery_summary,
     build_follow_through_reacquisition_softening_decay_status_label,
     build_follow_through_reacquisition_softening_decay_summary,
     build_follow_through_recovery_freshness_status_label,
@@ -279,208 +281,33 @@ def write_markdown_report(
         _w(f"  - What Changed: {item.get('last_movement', 'Current run')}")
         _w(f"  - Why It Matters: {item.get('why', 'Operator pressure is active.')}")
         _w(f"  - What To Do Next: {item.get('next_step', 'Review the latest state.')}")
-        _w(
-            f"  - Follow-Through: {item.get('follow_through_status', 'Unknown')} — "
-            f"{item.get('follow_through_summary', 'No follow-through evidence is recorded yet.')}"
-        )
+        _w(f"  - Operator Focus: {item.get('operator_focus_line', 'Watch Closely: No operator focus bucket is currently surfaced.')}")
         _w(f"  - Checkpoint Timing: {item.get('follow_through_checkpoint_timing', 'Unknown')}")
-        _w(
-            f"  - Escalation: {item.get('follow_through_escalation', 'Unknown')} — "
-            f"{item.get('follow_through_escalation_summary', 'No stronger follow-through escalation is currently surfaced.')}"
-        )
-        _w(
-            f"  - Recovery / Retirement: {item.get('follow_through_recovery', 'None')} — "
-            f"{item.get('follow_through_recovery_summary', 'No follow-through recovery or escalation-retirement signal is currently surfaced.')}"
-        )
-        _w(
-            f"  - Recovery Persistence: {item.get('follow_through_recovery_persistence', 'None')} — "
-            f"{item.get('follow_through_recovery_persistence_summary', 'No follow-through recovery persistence signal is currently surfaced.')}"
-        )
-        _w(
-            f"  - Relapse Churn: {item.get('follow_through_relapse_churn', 'None')} — "
-            f"{item.get('follow_through_relapse_churn_summary', 'No relapse churn is currently surfaced.')}"
-        )
-        _w(
-            f"  - Recovery Freshness: {item.get('follow_through_recovery_freshness', 'None')} — "
-            f"{item.get('follow_through_recovery_freshness_summary', 'No follow-through recovery freshness signal is currently surfaced.')}"
-        )
-        _w(
-            f"  - Recovery Memory Reset: {item.get('follow_through_recovery_memory_reset', 'None')} — "
-            f"{item.get('follow_through_recovery_memory_reset_summary', 'No follow-through recovery memory reset signal is currently surfaced.')}"
-        )
-        _w(
-            f"  - Recovery Rebuild Strength: {item.get('follow_through_recovery_rebuild_strength', 'None')} — "
-            f"{item.get('follow_through_recovery_rebuild_strength_summary', 'No follow-through recovery rebuild-strength signal is currently surfaced.')}"
-        )
-        _w(
-            f"  - Recovery Reacquisition: {item.get('follow_through_recovery_reacquisition', 'None')} — "
-            f"{item.get('follow_through_recovery_reacquisition_summary', 'No follow-through recovery reacquisition signal is currently surfaced.')}"
-        )
-        _w(
-            f"  - Reacquisition Durability: {item.get('follow_through_reacquisition_durability', 'None')} — "
-            f"{item.get('follow_through_reacquisition_durability_summary', 'No follow-through reacquisition durability signal is currently surfaced.')}"
-        )
-        _w(
-            f"  - Reacquisition Confidence: {item.get('follow_through_reacquisition_confidence', 'None')} — "
-            f"{item.get('follow_through_reacquisition_confidence_summary', 'No follow-through reacquisition confidence-consolidation signal is currently surfaced.')}"
-        )
         _w(
             f"  - Next Checkpoint: {item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}"
         )
     if not weekly_pack.get("top_attention"):
         _w("- No urgent attention items are currently surfaced.")
     _w("")
-    _w("### Review-to-Action Follow-Through")
+    _w("### Operator Focus")
     _w("")
-    _w(f"- Summary: {weekly_pack.get('follow_through_summary', 'No follow-through evidence is recorded yet.')}")
+    _w(f"- Summary: {weekly_pack.get('operator_focus_summary', 'No operator focus bucket is currently surfaced.')}")
     _w(f"- Next Checkpoint: {weekly_pack.get('follow_through_checkpoint_summary', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
-    _w(f"- Escalation: {weekly_pack.get('follow_through_escalation_summary', 'No stronger follow-through escalation is currently surfaced.')}")
-    top_unattempted = weekly_pack.get("top_unattempted_items", [])[:3]
-    top_stale = weekly_pack.get("top_stale_follow_through_items", [])[:3]
-    top_overdue = weekly_pack.get("top_overdue_follow_through_items", [])[:3]
-    top_escalation = weekly_pack.get("top_escalation_items", [])[:3]
-    if top_unattempted:
-        _w("- Still Untouched:")
-        for item in top_unattempted:
-            label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
-            _w(f"  - {label} — {item.get('follow_through_summary', 'No follow-through evidence is recorded yet.')}")
-    if top_stale:
-        _w("- Stale Follow-Through:")
-        for item in top_stale:
-            label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
-            _w(f"  - {label} — {item.get('follow_through_summary', 'No follow-through evidence is recorded yet.')}")
-    if top_overdue:
-        _w("- Overdue Checkpoints:")
-        for item in top_overdue:
-            label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
-            _w(f"  - {label} — {item.get('follow_through_escalation_summary', item.get('follow_through_summary', 'No stronger follow-through escalation is currently surfaced.'))}")
-    if top_escalation:
-        _w("- Escalate Now:")
-        for item in top_escalation:
-            label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
-            _w(f"  - {label} — {item.get('follow_through_escalation_summary', 'No stronger follow-through escalation is currently surfaced.')}")
-    if not top_unattempted and not top_stale and not top_overdue and not top_escalation:
-        _w("- No top follow-through aging or escalation hotspots are currently surfaced.")
-    _w("")
-    _w("### Follow-Through Aging and Escalation")
-    _w("")
-    _w(f"- Summary: {weekly_pack.get('follow_through_escalation_summary', 'No stronger follow-through escalation is currently surfaced.')}")
-    _w("")
-    _w("### Follow-Through Recovery and Escalation Retirement")
-    _w("")
-    _w(f"- Summary: {weekly_pack.get('follow_through_recovery_summary', 'No follow-through recovery or escalation-retirement signal is currently surfaced.')}")
-    top_recovering = weekly_pack.get("top_recovering_follow_through_items", [])[:3]
-    top_retiring = weekly_pack.get("top_retiring_follow_through_items", [])[:3]
-    top_relapsing = weekly_pack.get("top_relapsing_follow_through_items", [])[:3]
-    if top_recovering:
-        _w("- Recovering:")
-        for item in top_recovering:
-            label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
-            _w(f"  - {label} — {item.get('follow_through_recovery_summary', 'No follow-through recovery or escalation-retirement signal is currently surfaced.')}")
-    if top_retiring:
-        _w("- Retiring Watch:")
-        for item in top_retiring:
-            label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
-            _w(f"  - {label} — {item.get('follow_through_recovery_summary', 'No follow-through recovery or escalation-retirement signal is currently surfaced.')}")
-    if top_relapsing:
-        _w("- Relapsing:")
-        for item in top_relapsing:
-            label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
-            _w(f"  - {label} — {item.get('follow_through_recovery_summary', 'No follow-through recovery or escalation-retirement signal is currently surfaced.')}")
-    if not top_recovering and not top_retiring and not top_relapsing:
-        _w("- No recovery or retirement hotspots are currently surfaced.")
-    _w("")
-    _w("### Follow-Through Recovery Persistence and Relapse Churn")
-    _w("")
-    _w(f"- Recovery Persistence: {weekly_pack.get('follow_through_recovery_persistence_summary', 'No follow-through recovery persistence signal is currently surfaced.')}")
-    _w(f"- Relapse Churn: {weekly_pack.get('follow_through_relapse_churn_summary', 'No relapse churn is currently surfaced.')}")
-    for item in weekly_pack.get("top_fragile_recovery_items", [])[:3]:
-        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
-        _w(f"- Fragile Recovery: {label} — {item.get('follow_through_recovery_persistence_summary', 'No follow-through recovery persistence signal is currently surfaced.')}")
-    for item in weekly_pack.get("top_sustained_recovery_items", [])[:3]:
-        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
-        _w(f"- Sustained Recovery: {label} — {item.get('follow_through_recovery_persistence_summary', 'No follow-through recovery persistence signal is currently surfaced.')}")
-    for item in weekly_pack.get("top_churn_follow_through_items", [])[:3]:
-        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
-        _w(f"- Churn Hotspot: {label} — {item.get('follow_through_relapse_churn_summary', 'No relapse churn is currently surfaced.')}")
-    if not weekly_pack.get("top_fragile_recovery_items") and not weekly_pack.get("top_sustained_recovery_items") and not weekly_pack.get("top_churn_follow_through_items"):
-        _w("- No recovery-persistence or relapse-churn hotspots are currently surfaced.")
-    _w("")
-    _w("### Follow-Through Freshness Decay and Recovery Memory Reset")
-    _w("")
-    _w(f"- Recovery Freshness: {weekly_pack.get('follow_through_recovery_freshness_summary', 'No follow-through recovery freshness signal is currently surfaced.')}")
-    _w(f"- Recovery Memory Reset: {weekly_pack.get('follow_through_recovery_memory_reset_summary', 'No follow-through recovery memory reset signal is currently surfaced.')}")
-    for item in weekly_pack.get("top_fresh_recovery_items", [])[:3]:
-        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
-        _w(f"- Fresh Recovery: {label} — {item.get('follow_through_recovery_freshness_summary', 'No follow-through recovery freshness signal is currently surfaced.')}")
-    for item in weekly_pack.get("top_softening_recovery_items", [])[:3]:
-        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
-        _w(f"- Softening Recovery: {label} — {item.get('follow_through_recovery_freshness_summary', 'No follow-through recovery freshness signal is currently surfaced.')}")
-    for item in weekly_pack.get("top_reset_recovery_items", [])[:3]:
-        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
-        _w(f"- Recovery Reset: {label} — {item.get('follow_through_recovery_memory_reset_summary', 'No follow-through recovery memory reset signal is currently surfaced.')}")
-    for item in weekly_pack.get("top_rebuilding_recovery_items", [])[:3]:
-        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
-        _w(f"- Rebuilding Recovery: {label} — {item.get('follow_through_recovery_memory_reset_summary', 'No follow-through recovery memory reset signal is currently surfaced.')}")
-    if not weekly_pack.get("top_fresh_recovery_items") and not weekly_pack.get("top_softening_recovery_items") and not weekly_pack.get("top_reset_recovery_items") and not weekly_pack.get("top_rebuilding_recovery_items"):
-        _w("- No recovery-freshness or memory-reset hotspots are currently surfaced.")
-    _w("")
-    _w("### Follow-Through Recovery Rebuild and Reacquisition")
-    _w("")
-    _w(f"- Recovery Rebuild Strength: {weekly_pack.get('follow_through_recovery_rebuild_strength_summary', 'No follow-through recovery rebuild-strength signal is currently surfaced.')}")
-    _w(f"- Recovery Reacquisition: {weekly_pack.get('follow_through_recovery_reacquisition_summary', 'No follow-through recovery reacquisition signal is currently surfaced.')}")
-    for item in weekly_pack.get("top_rebuilding_recovery_strength_items", [])[:3]:
-        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
-        _w(f"- Rebuilding After Reset: {label} — {item.get('follow_through_recovery_rebuild_strength_summary', 'No follow-through recovery rebuild-strength signal is currently surfaced.')}")
-    for item in weekly_pack.get("top_reacquiring_recovery_items", [])[:3]:
-        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
-        _w(f"- Near Reacquisition: {label} — {item.get('follow_through_recovery_reacquisition_summary', 'No follow-through recovery reacquisition signal is currently surfaced.')}")
-    for item in weekly_pack.get("top_reacquired_recovery_items", [])[:3]:
-        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
-        _w(f"- Reacquired: {label} — {item.get('follow_through_recovery_reacquisition_summary', 'No follow-through recovery reacquisition signal is currently surfaced.')}")
-    for item in weekly_pack.get("top_fragile_reacquisition_items", [])[:3]:
-        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
-        _w(f"- Fragile Reacquisition: {label} — {item.get('follow_through_recovery_reacquisition_summary', 'No follow-through recovery reacquisition signal is currently surfaced.')}")
-    if not weekly_pack.get("top_rebuilding_recovery_strength_items") and not weekly_pack.get("top_reacquiring_recovery_items") and not weekly_pack.get("top_reacquired_recovery_items") and not weekly_pack.get("top_fragile_reacquisition_items"):
-        _w("- No rebuild-strength or reacquisition hotspots are currently surfaced.")
-    _w("")
-    _w("### Follow-Through Reacquisition Durability and Confidence")
-    _w("")
-    _w(f"- Reacquisition Durability: {weekly_pack.get('follow_through_reacquisition_durability_summary', 'No follow-through reacquisition durability signal is currently surfaced.')}")
-    _w(f"- Reacquisition Confidence: {weekly_pack.get('follow_through_reacquisition_consolidation_summary', 'No follow-through reacquisition confidence-consolidation signal is currently surfaced.')}")
-    for item in weekly_pack.get("top_just_reacquired_items", [])[:3]:
-        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
-        _w(f"- Just Reacquired: {label} — {item.get('follow_through_recovery_reacquisition_durability_summary', 'No follow-through reacquisition durability signal is currently surfaced.')}")
-    for item in weekly_pack.get("top_holding_reacquired_items", [])[:3]:
-        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
-        _w(f"- Holding Reacquired: {label} — {item.get('follow_through_recovery_reacquisition_durability_summary', 'No follow-through reacquisition durability signal is currently surfaced.')}")
-    for item in weekly_pack.get("top_durable_reacquired_items", [])[:3]:
-        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
-        _w(f"- Durable Reacquired: {label} — {item.get('follow_through_recovery_reacquisition_durability_summary', 'No follow-through reacquisition durability signal is currently surfaced.')}")
-    for item in weekly_pack.get("top_softening_reacquired_items", [])[:3]:
-        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
-        _w(f"- Softening Reacquired: {label} — {item.get('follow_through_recovery_reacquisition_durability_summary', 'No follow-through reacquisition durability signal is currently surfaced.')}")
-    for item in weekly_pack.get("top_fragile_reacquisition_confidence_items", [])[:3]:
-        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
-        _w(f"- Fragile Reacquisition Confidence: {label} — {item.get('follow_through_recovery_reacquisition_consolidation_summary', 'No follow-through reacquisition confidence-consolidation signal is currently surfaced.')}")
-    if not weekly_pack.get("top_just_reacquired_items") and not weekly_pack.get("top_holding_reacquired_items") and not weekly_pack.get("top_durable_reacquired_items") and not weekly_pack.get("top_softening_reacquired_items") and not weekly_pack.get("top_fragile_reacquisition_confidence_items"):
-        _w("- No reacquisition durability or confidence-consolidation hotspots are currently surfaced.")
-    _w("")
-    _w("### Follow-Through Reacquisition Softening and Confidence Retirement")
-    _w("")
-    _w(f"- Reacquisition Softening Decay: {weekly_pack.get('follow_through_reacquisition_softening_decay_summary', 'No reacquisition softening-decay signal is currently surfaced.')}")
-    _w(f"- Reacquisition Confidence Retirement: {weekly_pack.get('follow_through_reacquisition_confidence_retirement_summary', 'No reacquisition confidence-retirement signal is currently surfaced.')}")
-    for item in weekly_pack.get("top_softening_reacquisition_items", [])[:3]:
-        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
-        _w(f"- Softening Reacquisition: {label} — {item.get('follow_through_reacquisition_softening_decay_summary', 'No reacquisition softening-decay signal is currently surfaced.')}")
-    for item in weekly_pack.get("top_revalidation_needed_reacquisition_items", [])[:3]:
-        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
-        _w(f"- Revalidation Needed: {label} — {item.get('follow_through_reacquisition_confidence_retirement_summary', 'No reacquisition confidence-retirement signal is currently surfaced.')}")
-    for item in weekly_pack.get("top_retired_reacquisition_confidence_items", [])[:3]:
-        label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
-        _w(f"- Retired Confidence: {label} — {item.get('follow_through_reacquisition_confidence_retirement_summary', 'No reacquisition confidence-retirement signal is currently surfaced.')}")
-    if not weekly_pack.get("top_softening_reacquisition_items") and not weekly_pack.get("top_revalidation_needed_reacquisition_items") and not weekly_pack.get("top_retired_reacquisition_confidence_items"):
-        _w("- No reacquisition softening or confidence-retirement hotspots are currently surfaced.")
+    focus_sections = [
+        ("Act Now", weekly_pack.get("top_act_now_items", []), "No immediate-action hotspots are currently surfaced."),
+        ("Watch Closely", weekly_pack.get("top_watch_closely_items", []), "No watch-closely hotspots are currently surfaced."),
+        ("Improving", weekly_pack.get("top_improving_items", []), "No clearly improving hotspots are currently surfaced."),
+        ("Fragile", weekly_pack.get("top_fragile_items", []), "No fragile hotspots are currently surfaced."),
+        ("Revalidate", weekly_pack.get("top_revalidate_items", []), "No revalidation hotspots are currently surfaced."),
+    ]
+    for label, items, empty_message in focus_sections:
+        _w(f"- {label}:")
+        if items:
+            for item in items[:3]:
+                item_label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+                _w(f"  - {item_label} — {item.get('operator_focus_summary', 'No operator focus bucket is currently surfaced.')}")
+        else:
+            _w(f"  - {empty_message}")
     _w("")
     _w("### Top Repo Drilldowns")
     _w("")
@@ -491,18 +318,8 @@ def write_markdown_report(
         _w(f"- What Changed: {briefing.get('what_changed_line', 'No change summary is recorded yet.')}")
         _w(f"- Why It Matters: {briefing.get('why_it_matters_line', 'No explanation summary is recorded yet.')}")
         _w(f"- What To Do Next: {briefing.get('what_to_do_next_line', 'No next action is recorded yet.')}")
-        _w(f"- Follow-Through: {briefing.get('follow_through_line', 'No follow-through evidence is recorded yet.')}")
+        _w(f"- Operator Focus: {briefing.get('operator_focus_line', 'Watch Closely: No operator focus bucket is currently surfaced.')}")
         _w(f"- Checkpoint Timing: {briefing.get('checkpoint_timing_line', 'Unknown')}")
-        _w(f"- Escalation: {briefing.get('escalation_line', 'Unknown: No stronger follow-through escalation is currently surfaced.')}")
-        _w(f"- Recovery / Retirement: {briefing.get('recovery_line', 'None: No follow-through recovery or escalation-retirement signal is currently surfaced.')}")
-        _w(f"- Recovery Persistence: {briefing.get('recovery_persistence_line', 'None: No follow-through recovery persistence signal is currently surfaced.')}")
-        _w(f"- Relapse Churn: {briefing.get('relapse_churn_line', 'None: No relapse churn is currently surfaced.')}")
-        _w(f"- Recovery Rebuild Strength: {briefing.get('recovery_rebuild_strength_line', 'None: No follow-through recovery rebuild-strength signal is currently surfaced.')}")
-        _w(f"- Recovery Reacquisition: {briefing.get('recovery_reacquisition_line', 'None: No follow-through recovery reacquisition signal is currently surfaced.')}")
-        _w(f"- Reacquisition Durability: {briefing.get('reacquisition_durability_line', 'None: No follow-through reacquisition durability signal is currently surfaced.')}")
-        _w(f"- Reacquisition Confidence: {briefing.get('reacquisition_confidence_line', 'None: No follow-through reacquisition confidence-consolidation signal is currently surfaced.')}")
-        _w(f"- Reacquisition Softening Decay: {briefing.get('reacquisition_softening_decay_line', 'None: No reacquisition softening-decay signal is currently surfaced.')}")
-        _w(f"- Reacquisition Confidence Retirement: {briefing.get('reacquisition_confidence_retirement_line', 'None: No reacquisition confidence-retirement signal is currently surfaced.')}")
         _w(f"- What Would Count As Progress: {briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
         _w("")
 
@@ -1166,6 +983,10 @@ def write_markdown_report(
             _w(
                 f"  - Reacquisition Confidence Retirement: {build_follow_through_reacquisition_confidence_retirement_status_label(item)} — "
                 f"{build_follow_through_reacquisition_confidence_retirement_summary(item)}"
+            )
+            _w(
+                f"  - Revalidation Recovery: {build_follow_through_reacquisition_revalidation_recovery_status_label(item)} — "
+                f"{build_follow_through_reacquisition_revalidation_recovery_summary(item)}"
             )
             _w(f"  - Next Checkpoint: {build_follow_through_checkpoint(item)}")
             links = item.get("links") or []

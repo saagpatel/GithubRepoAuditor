@@ -639,7 +639,13 @@ class TestMarkdownReport:
         assert "Next Recommended Run" in content
         assert "Watch Strategy" in content
         assert "Weekly Review Pack" in content
-        assert "Review-to-Action Follow-Through" in content
+        assert "### Operator Focus" in content
+        assert "- Summary:" in content
+        assert "- Act Now:" in content
+        assert "- Watch Closely:" in content
+        assert "- Improving:" in content
+        assert "- Fragile:" in content
+        assert "- Revalidate:" in content
         assert "Top Repo Drilldowns" in content
         assert "What To Do This Week" in content
         assert "Current State" in content
@@ -653,11 +659,6 @@ class TestMarkdownReport:
         assert "Trend" in content
         assert "Follow-Through" in content
         assert "Next Checkpoint" in content
-        assert "Follow-Through Aging and Escalation" in content
-        assert "Follow-Through Recovery and Escalation Retirement" in content
-        assert "Follow-Through Recovery Persistence and Relapse Churn" in content
-        assert "Follow-Through Reacquisition Durability and Confidence" in content
-        assert "Follow-Through Reacquisition Softening and Confidence Retirement" in content
         assert "Checkpoint Timing" in content
         assert "Escalation" in content
         assert "Recovery / Retirement" in content
@@ -667,6 +668,7 @@ class TestMarkdownReport:
         assert "Reacquisition Confidence" in content
         assert "Reacquisition Softening Decay" in content
         assert "Reacquisition Confidence Retirement" in content
+        assert "Revalidation Recovery" in content
         assert "Accountability" in content
         assert "Primary Target" in content
         assert "Why This Is The Top Target" in content
@@ -770,8 +772,7 @@ class TestMarkdownReport:
         assert "Reacquisition Confidence:" in content
         assert "Reacquisition Softening Decay:" in content
         assert "Reacquisition Confidence Retirement:" in content
-        assert "No reacquisition durability or confidence-consolidation hotspots are currently surfaced." in content
-        assert "No reacquisition softening or confidence-retirement hotspots are currently surfaced." in content
+        assert "Revalidation Recovery:" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Summary" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence Summary" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Summary" in content

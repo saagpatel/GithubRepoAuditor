@@ -712,18 +712,13 @@ class TestRenderHtml:
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Summary:" in html
         assert "Reset Re-entry Rebuild Persistence Summary:" in html
         assert "Reset Re-entry Rebuild Churn Summary:" in html
-        assert "Follow-Through Reacquisition Durability:" in html
-        assert "Follow-Through Reacquisition Confidence:" in html
-        assert "Reacquisition Softening Decay:" in html
-        assert "Reacquisition Confidence Retirement:" in html
-        assert "Just Reacquired" in html
-        assert "Holding Reacquired" in html
-        assert "Durable Reacquired" in html
-        assert "Softening Reacquired" in html
-        assert "Fragile Reacquisition Confidence" in html
-        assert "Softening Reacquisition" in html
-        assert "Revalidation Needed" in html
-        assert "Retired Confidence" in html
+        assert "Operator Focus:</strong>" in html
+        assert "Act Now" in html
+        assert "Watch Closely" in html
+        assert "Improving" in html
+        assert "Fragile" in html
+        assert "Revalidate" in html
+        assert "Follow-Through Revalidation Recovery and Confidence Re-Earning" not in html
         assert "Closure Forecast Reacquisition Summary:" in html
         assert "Why This Confidence Is Actionable:" in html
         assert "Recent Confidence Outcomes:" in html
@@ -791,15 +786,9 @@ class TestRenderHtml:
         assert "Why It Matters" in html
         assert "What To Do Next" in html
         assert "Follow-Through" in html
-        assert "Review-to-Action Follow-Through" in html
+        assert "Operator Focus" in html
         assert "What Would Count As Progress" in html
         assert "Next Checkpoint" in html
-        assert "Follow-Through Aging and Escalation" in html
-        assert "Follow-Through Recovery and Escalation Retirement" in html
-        assert "Follow-Through Recovery Persistence" in html
-        assert "Follow-Through Relapse Churn" in html
-        assert "Follow-Through Reacquisition Durability and Confidence" in html
-        assert "Follow-Through Reacquisition Softening and Confidence Retirement" in html
         assert "Checkpoint Timing" in html
         assert "Escalation" in html
         assert "Recovery / Retirement" in html
@@ -809,6 +798,7 @@ class TestRenderHtml:
         assert "Reacquisition Confidence" in html
         assert "Reacquisition Softening Decay" in html
         assert "Reacquisition Confidence Retirement" in html
+        assert "Revalidation Recovery" in html
         assert "Last movement:" in html
         assert no_linked_artifact_summary() in html
 
