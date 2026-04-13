@@ -149,6 +149,8 @@ def write_raw_metadata(report: AuditReport, output_dir: Path) -> Path:
         "watch_state": report.watch_state,
         "operator_summary": report.operator_summary,
         "operator_queue": report.operator_queue,
+        "portfolio_catalog_summary": report.portfolio_catalog_summary,
+        "intent_alignment_summary": report.intent_alignment_summary,
         "run_change_summary": report.run_change_summary,
         "run_change_counts": report.run_change_counts,
         "runtime_breakdown": report.runtime_breakdown,
@@ -271,6 +273,8 @@ def write_markdown_report(
     _w(f"- Queue Pressure: {weekly_pack.get('queue_pressure_summary', queue_pressure_summary)}")
     _w(f"- Trust / Actionability: {weekly_pack.get('trust_actionability_summary', trust_actionability_summary)}")
     _w(f"- What To Do This Week: {weekly_pack.get('what_to_do_this_week', top_recommendation_summary)}")
+    _w(f"- Portfolio Catalog: {weekly_pack.get('portfolio_catalog_summary', 'No portfolio catalog contract is recorded yet.')}")
+    _w(f"- Intent Alignment: {weekly_pack.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.')}")
     _w("")
     _w("### Top Attention")
     _w("")
@@ -282,6 +286,8 @@ def write_markdown_report(
         _w(f"  - Why It Matters: {item.get('why', 'Operator pressure is active.')}")
         _w(f"  - What To Do Next: {item.get('next_step', 'Review the latest state.')}")
         _w(f"  - Operator Focus: {item.get('operator_focus_line', 'Watch Closely: No operator focus bucket is currently surfaced.')}")
+        _w(f"  - Catalog: {item.get('catalog_line', 'No portfolio catalog contract is recorded yet.')}")
+        _w(f"  - Intent Alignment: {item.get('intent_alignment', 'missing-contract')} — {item.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.')}")
         _w(f"  - Checkpoint Timing: {item.get('follow_through_checkpoint_timing', 'Unknown')}")
         _w(
             f"  - Next Checkpoint: {item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}"
@@ -319,6 +325,8 @@ def write_markdown_report(
         _w(f"- Why It Matters: {briefing.get('why_it_matters_line', 'No explanation summary is recorded yet.')}")
         _w(f"- What To Do Next: {briefing.get('what_to_do_next_line', 'No next action is recorded yet.')}")
         _w(f"- Operator Focus: {briefing.get('operator_focus_line', 'Watch Closely: No operator focus bucket is currently surfaced.')}")
+        _w(f"- Catalog: {briefing.get('catalog_line', 'No portfolio catalog contract is recorded yet.')}")
+        _w(f"- Intent Alignment: {briefing.get('intent_alignment_line', 'missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.')}")
         _w(f"- Checkpoint Timing: {briefing.get('checkpoint_timing_line', 'Unknown')}")
         _w(f"- What Would Count As Progress: {briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
         _w("")
@@ -1332,6 +1340,8 @@ def write_markdown_report(
             _w(f"- Why It Matters: {briefing.get('why_it_matters_line', 'No explanation summary is recorded yet.')}")
             _w(f"- What To Do Next: {briefing.get('what_to_do_next_line', 'No next action is recorded yet.')}")
             _w(f"- Follow-Through: {briefing.get('follow_through_line', 'No follow-through evidence is recorded yet.')}")
+            _w(f"- Catalog: {briefing.get('catalog_line', 'No portfolio catalog contract is recorded yet.')}")
+            _w(f"- Intent Alignment: {briefing.get('intent_alignment_line', 'missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.')}")
             _w(f"- Checkpoint Timing: {briefing.get('checkpoint_timing_line', 'Unknown')}")
             _w(f"- Escalation: {briefing.get('escalation_line', 'Unknown: No stronger follow-through escalation is currently surfaced.')}")
             _w(f"- What Would Count As Progress: {briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")

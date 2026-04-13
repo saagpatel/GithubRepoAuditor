@@ -784,6 +784,36 @@ class TestRenderHtml:
         assert "Watch Strategy" in html
         assert "RepoC drift needs review" in html
         assert "Why It Matters" in html
+
+    def test_html_includes_portfolio_catalog_and_intent_alignment(self):
+        html = _render_html(
+            _make_report(
+                portfolio_catalog_summary={
+                    "summary": "1/3 repos have an explicit catalog contract.",
+                },
+                intent_alignment_summary={
+                    "summary": "1 aligned, 0 needing review, and 2 missing a contract.",
+                },
+                operator_queue=[
+                    {
+                        "repo": "RepoC",
+                        "title": "RepoC drift needs review",
+                        "lane": "urgent",
+                        "lane_label": "Urgent",
+                        "lane_reason": "Live drift still needs review.",
+                        "summary": "Operator pressure is active.",
+                        "recommended_action": "Inspect the managed issue before closing the campaign.",
+                        "catalog_line": "operator-loop | flagship repo | lifecycle active | criticality high | cadence weekly | disposition maintain",
+                        "intent_alignment": "aligned",
+                        "intent_alignment_reason": "The repo is holding a maintain posture without urgent or revalidation pressure.",
+                    }
+                ],
+            )
+        )
+        assert "Portfolio Catalog:" in html
+        assert "Intent Alignment:" in html
+        assert "operator-loop | flagship repo" in html
+        assert "aligned: The repo is holding a maintain posture" in html
         assert "What To Do Next" in html
         assert "Follow-Through" in html
         assert "Operator Focus" in html

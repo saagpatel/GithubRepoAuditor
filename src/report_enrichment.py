@@ -48,6 +48,8 @@ NO_FOLLOW_THROUGH_REACQUISITION_SOFTENING_DECAY = "No reacquisition softening-de
 NO_FOLLOW_THROUGH_REACQUISITION_CONFIDENCE_RETIREMENT = "No reacquisition confidence-retirement signal is currently surfaced."
 NO_FOLLOW_THROUGH_REACQUISITION_REVALIDATION_RECOVERY = "No post-revalidation recovery or confidence re-earning signal is currently surfaced."
 NO_OPERATOR_FOCUS_SUMMARY = "No operator focus bucket is currently surfaced."
+NO_PORTFOLIO_CATALOG_SUMMARY = "No portfolio catalog contract is recorded yet."
+NO_INTENT_ALIGNMENT_SUMMARY = "Intent alignment cannot be judged until a portfolio catalog contract exists."
 
 OPERATOR_FOCUS_LABELS = {
     "act-now": "Act Now",
@@ -400,6 +402,10 @@ def build_repo_briefing(
     operator_focus = build_operator_focus(handoff_source)
     operator_focus_summary = build_operator_focus_summary(handoff_source)
     operator_focus_line = build_operator_focus_line(handoff_source)
+    portfolio_catalog = build_portfolio_catalog_entry(audit)
+    catalog_line = build_portfolio_catalog_line(audit)
+    intent_alignment = build_intent_alignment_status(audit)
+    intent_alignment_reason = build_intent_alignment_summary(audit)
     follow_through_resurfacing_reason = build_follow_through_resurfacing_reason(handoff_source)
     return {
         "repo": repo_name,
@@ -488,6 +494,11 @@ def build_repo_briefing(
         "operator_focus": operator_focus,
         "operator_focus_summary": operator_focus_summary,
         "operator_focus_line": operator_focus_line,
+        "portfolio_catalog": portfolio_catalog,
+        "catalog_line": catalog_line,
+        "intent_alignment": intent_alignment,
+        "intent_alignment_reason": intent_alignment_reason,
+        "intent_alignment_line": f"{intent_alignment}: {intent_alignment_reason}",
         "resurfacing_reason_line": follow_through_resurfacing_reason,
     }
 
@@ -544,6 +555,8 @@ def build_weekly_review_pack(
         "trust_actionability_summary": build_trust_actionability_summary(data),
         "top_recommendation_summary": top_recommendation,
         "operator_focus_summary": _build_operator_focus_summary_from_groups(grouped_focus_items),
+        "portfolio_catalog_summary": build_portfolio_catalog_summary(data),
+        "intent_alignment_summary": build_portfolio_intent_alignment_summary(data),
         "top_attention": top_attention,
         "repo_briefings": repo_briefings,
         "what_to_do_this_week": what_to_do_this_week,
@@ -1222,6 +1235,37 @@ def build_operator_focus_line(value: Any) -> str:
     return f"{build_operator_focus(value)}: {build_operator_focus_summary(value)}"
 
 
+def build_portfolio_catalog_entry(value: Any) -> dict[str, Any]:
+    mapped = _mapping(value)
+    entry = mapped.get("portfolio_catalog")
+    return _mapping(entry)
+
+
+def build_portfolio_catalog_line(value: Any) -> str:
+    entry = build_portfolio_catalog_entry(value)
+    return str(entry.get("catalog_line") or NO_PORTFOLIO_CATALOG_SUMMARY)
+
+
+def build_intent_alignment_status(value: Any) -> str:
+    entry = build_portfolio_catalog_entry(value)
+    return str(entry.get("intent_alignment") or "missing-contract")
+
+
+def build_intent_alignment_summary(value: Any) -> str:
+    entry = build_portfolio_catalog_entry(value)
+    return str(entry.get("intent_alignment_reason") or NO_INTENT_ALIGNMENT_SUMMARY)
+
+
+def build_portfolio_catalog_summary(report_data: Any) -> str:
+    summary = _mapping(_mapping(report_data).get("portfolio_catalog_summary"))
+    return str(summary.get("summary") or NO_PORTFOLIO_CATALOG_SUMMARY)
+
+
+def build_portfolio_intent_alignment_summary(report_data: Any) -> str:
+    summary = _mapping(_mapping(report_data).get("intent_alignment_summary"))
+    return str(summary.get("summary") or NO_INTENT_ALIGNMENT_SUMMARY)
+
+
 def _build_operator_focus_item(mapped: dict[str, Any], review_summary: dict[str, Any]) -> dict[str, Any]:
     return {
         "repo": mapped.get("repo") or mapped.get("repo_name") or "Portfolio",
@@ -1269,6 +1313,9 @@ def _build_operator_focus_item(mapped: dict[str, Any], review_summary: dict[str,
         "operator_focus": build_operator_focus(mapped),
         "operator_focus_summary": build_operator_focus_summary(mapped),
         "operator_focus_line": build_operator_focus_line(mapped),
+        "catalog_line": build_portfolio_catalog_line(mapped),
+        "intent_alignment": build_intent_alignment_status(mapped),
+        "intent_alignment_summary": build_intent_alignment_summary(mapped),
     }
 
 

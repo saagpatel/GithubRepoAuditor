@@ -23,6 +23,8 @@ def _make_report() -> dict:
             }
         },
         "scenario_summary": {"top_levers": [], "portfolio_projection": {}},
+        "portfolio_catalog_summary": {"summary": "1/1 repos have an explicit catalog contract."},
+        "intent_alignment_summary": {"summary": "1 aligned, 0 needing review, and 0 missing a contract."},
         "audits": [
             {
                 "metadata": {
@@ -48,6 +50,19 @@ def _make_report() -> dict:
                 "security_posture": {"label": "watch", "score": 0.55},
                 "action_candidates": [{"title": "Recheck restored evidence"}],
                 "hotspots": [{"title": "Restored confidence still needs confirmation"}],
+                "portfolio_catalog": {
+                    "has_explicit_entry": True,
+                    "owner": "d",
+                    "team": "operator-loop",
+                    "purpose": "flagship workbook-first flow",
+                    "lifecycle_state": "active",
+                    "criticality": "high",
+                    "review_cadence": "weekly",
+                    "intended_disposition": "maintain",
+                    "catalog_line": "operator-loop | flagship workbook-first flow | lifecycle active | criticality high | cadence weekly | disposition maintain",
+                    "intent_alignment": "aligned",
+                    "intent_alignment_reason": "The repo is holding a maintain posture without urgent or revalidation pressure.",
+                },
                 "analyzer_results": [],
             }
         ],
@@ -87,6 +102,9 @@ def _make_report() -> dict:
                 "follow_through_reacquisition_confidence_retirement_summary": "No reacquisition confidence-retirement signal is currently surfaced.",
                 "follow_through_reacquisition_revalidation_recovery_status": "just-reearned-confidence",
                 "follow_through_reacquisition_revalidation_recovery_summary": "RepoC has only just re-earned restored confidence after revalidation.",
+                "catalog_line": "operator-loop | flagship workbook-first flow | lifecycle active | criticality high | cadence weekly | disposition maintain",
+                "intent_alignment": "aligned",
+                "intent_alignment_reason": "The repo is holding a maintain posture without urgent or revalidation pressure.",
             }
         ],
     }
@@ -99,4 +117,8 @@ def test_review_pack_includes_revalidation_recovery_section(tmp_path):
     assert "### Operator Focus" in content
     assert "Operator Focus:" in content
     assert "Act Now" in content
+    assert "Portfolio Catalog: 1/1 repos have an explicit catalog contract." in content
+    assert "Intent Alignment: 1 aligned, 0 needing review, and 0 missing a contract." in content
+    assert "Catalog: operator-loop | flagship workbook-first flow" in content
+    assert "Intent Alignment: aligned: The repo is holding a maintain posture" in content
     assert "Follow-Through Revalidation Recovery and Confidence Re-Earning" not in content

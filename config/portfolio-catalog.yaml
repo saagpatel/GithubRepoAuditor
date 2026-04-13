@@ -1,0 +1,6 @@
+defaults:
+  lifecycle_state: maintenance
+  criticality: medium
+  review_cadence: monthly
+
+repos: {}

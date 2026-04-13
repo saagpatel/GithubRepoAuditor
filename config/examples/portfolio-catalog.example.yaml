@@ -1,0 +1,29 @@
+defaults:
+  lifecycle_state: maintenance
+  criticality: medium
+  review_cadence: monthly
+
+repos:
+  sample-user/RepoA:
+    owner: d
+    team: operator-loop
+    purpose: flagship workbook-first example
+    lifecycle_state: active
+    criticality: high
+    review_cadence: weekly
+    intended_disposition: maintain
+    notes: Keep this repo polished because it anchors the current product story.
+  RepoB:
+    owner: d
+    purpose: near-term completion candidate
+    lifecycle_state: active
+    criticality: medium
+    review_cadence: monthly
+    intended_disposition: finish
+  RepoC:
+    team: experiments
+    purpose: risky exploratory work
+    lifecycle_state: experimental
+    criticality: low
+    review_cadence: ad-hoc
+    intended_disposition: experiment

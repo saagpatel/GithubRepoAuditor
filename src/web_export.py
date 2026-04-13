@@ -510,12 +510,18 @@ def _top_attention_section(data: dict) -> str:
     rows = []
     for item in queue[:3]:
         repo = f"{escape(item.get('repo', ''))}: " if item.get("repo") else ""
+        intent_alignment = (
+            f"{item.get('intent_alignment', 'missing-contract')}: "
+            f"{item.get('intent_alignment_reason', 'Intent alignment cannot be judged until a portfolio catalog contract exists.')}"
+        )
         rows.append(
             "<li>"
             f"<strong>{repo}{escape(item.get('title', 'Triage item'))}</strong>"
             f"<br><span class='muted'><strong>Why it matters:</strong> {escape(item.get('lane_reason') or item.get('summary') or 'Operator attention is still needed.')}</span>"
             f"<br><span class='muted'><strong>What to do next:</strong> {escape(item.get('recommended_action') or item.get('next_step') or 'Review the latest state.')}</span>"
             f"<br><span class='muted'><strong>Operator Focus:</strong> {escape(build_operator_focus_line(item))}</span>"
+            f"<br><span class='muted'><strong>Catalog:</strong> {escape(item.get('catalog_line', 'No portfolio catalog contract is recorded yet.'))}</span>"
+            f"<br><span class='muted'><strong>Intent Alignment:</strong> {escape(intent_alignment)}</span>"
             f"<br><span class='muted'><strong>Checkpoint timing:</strong> {escape(build_follow_through_checkpoint_status_label(item))}</span>"
             "</li>"
         )
@@ -533,6 +539,10 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
     weekly_pack = build_weekly_review_pack(report_data, diff_data)
     attention_rows = []
     for item in weekly_pack.get("top_attention", [])[:5]:
+        intent_alignment = (
+            f"{item.get('intent_alignment', 'missing-contract')}: "
+            f"{item.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.')}"
+        )
         attention_rows.append(
             "<li>"
             f"<strong>{escape(item.get('repo', 'Portfolio'))}:</strong> {escape(item.get('title', 'Operator attention item'))}"
@@ -540,6 +550,8 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
             f"<br><span class='muted'><strong>Why It Matters:</strong> {escape(item.get('why', 'Operator pressure is active.'))}</span>"
             f"<br><span class='muted'><strong>What To Do Next:</strong> {escape(item.get('next_step', 'Review the latest state.'))}</span>"
             f"<br><span class='muted'><strong>Operator Focus:</strong> {escape(item.get('operator_focus_line', 'Watch Closely: No operator focus bucket is currently surfaced.'))}</span>"
+            f"<br><span class='muted'><strong>Catalog:</strong> {escape(item.get('catalog_line', 'No portfolio catalog contract is recorded yet.'))}</span>"
+            f"<br><span class='muted'><strong>Intent Alignment:</strong> {escape(intent_alignment)}</span>"
             f"<br><span class='muted'><strong>Checkpoint Timing:</strong> {escape(item.get('follow_through_checkpoint_timing', 'Unknown'))}</span>"
             f"<br><span class='muted'><strong>Next Checkpoint:</strong> {escape(item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</span>"
             "</li>"
@@ -575,6 +587,8 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
               <div class="meta-line"><strong>Why It Matters:</strong> {escape(briefing.get('why_it_matters_line', 'No explanation summary is recorded yet.'))}</div>
               <div class="meta-line"><strong>What To Do Next:</strong> {escape(briefing.get('what_to_do_next_line', 'No next action is recorded yet.'))}</div>
               <div class="meta-line"><strong>Operator Focus:</strong> {escape(briefing.get('operator_focus_line', 'Watch Closely: No operator focus bucket is currently surfaced.'))}</div>
+              <div class="meta-line"><strong>Catalog:</strong> {escape(briefing.get('catalog_line', 'No portfolio catalog contract is recorded yet.'))}</div>
+              <div class="meta-line"><strong>Intent Alignment:</strong> {escape(briefing.get('intent_alignment_line', 'missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.'))}</div>
               <div class="meta-line"><strong>Checkpoint Timing:</strong> {escape(briefing.get('checkpoint_timing_line', 'Unknown'))}</div>
               <div class="meta-line"><strong>What Would Count As Progress:</strong> {escape(briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</div>
             </div>
@@ -590,6 +604,8 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
           <div class="meta-line"><strong>Queue Pressure:</strong> {escape(weekly_pack.get('queue_pressure_summary', build_queue_pressure_summary(report_data, diff_data)))}</div>
           <div class="meta-line"><strong>Trust / Actionability:</strong> {escape(weekly_pack.get('trust_actionability_summary', build_trust_actionability_summary(report_data)))}</div>
           <div class="meta-line"><strong>What To Do This Week:</strong> {escape(weekly_pack.get('what_to_do_this_week', build_top_recommendation_summary(report_data)))}</div>
+          <div class="meta-line"><strong>Portfolio Catalog:</strong> {escape(weekly_pack.get('portfolio_catalog_summary', 'No portfolio catalog contract is recorded yet.'))}</div>
+          <div class="meta-line"><strong>Intent Alignment:</strong> {escape(weekly_pack.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.'))}</div>
           <div class="meta-line"><strong>Operator Focus:</strong> {escape(weekly_pack.get('operator_focus_summary', 'No operator focus bucket is currently surfaced.'))}</div>
           <div class="meta-line"><strong>Next Checkpoint:</strong> {escape(weekly_pack.get('follow_through_checkpoint_summary', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</div>
           <h3>Operator Focus</h3>
