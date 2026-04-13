@@ -74,6 +74,11 @@ Goal:
 - sync to GitHub, GitHub Projects, or Notion
 - keep the local report authoritative while mirroring the decision outward
 
+Action Sync now moves through three layers:
+- readiness
+- apply packet
+- post-apply monitoring
+
 Action Sync readiness now uses one shared reading order:
 - `drift-review` first
 - `blocked` second
@@ -98,6 +103,19 @@ When the product shows an `Apply Packet`, read it as a handoff suggestion:
 - preview commands are safe planning commands only
 - apply commands always require an explicit manual rerun with `--writeback-apply`
 - `ready-to-apply` never means automatic mutation
+
+After preview or apply, use the new post-apply monitoring layer as the third read:
+- `drift-returned`: managed drift came back after apply, so review drift before another sync
+- `reopened`: the action lifecycle reopened after apply, so the earlier sync did not hold
+- `rollback-watch`: rollback coverage was partial or missing, or rollback was later used
+- `monitor-now`: the campaign was applied recently and is still inside the short follow-up window
+- `holding-clean`: the campaign has enough follow-up runs and is currently staying quiet
+- `insufficient-evidence`: some apply evidence exists, but the history is too thin to judge confidently
+- `no-recent-apply`: there is no recent apply to monitor yet
+
+Post-apply monitoring is still descriptive:
+- it does not trigger another writeback automatically
+- it tells you whether the next step is drift review, reopen review, rollback watch, or normal monitoring
 
 ## Default guidance
 

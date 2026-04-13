@@ -880,6 +880,7 @@ class TestHotspotsAndDataSheets:
         assert "Data_ReviewTargets" in wb.sheetnames
         assert "Data_OperatorQueue" in wb.sheetnames
         assert "Data_OperatorOutcomes" in wb.sheetnames
+        assert "Data_ActionSyncOutcomes" in wb.sheetnames
         assert "Data_OperatorRepoRollups" in wb.sheetnames
         assert "Data_MaterialChangeRollups" in wb.sheetnames
         assert "Data_RepoDetail" in wb.sheetnames
@@ -1470,6 +1471,12 @@ class TestAnalystWorkbookSheets:
             "summary": "Preview Security Review next, then decide whether it is ready to apply to all.",
             "preview_command": "audit user --campaign security-review --writeback-target all",
         }
+        report["campaign_outcomes_summary"] = {
+            "summary": "Security Review was applied recently; monitor it now before treating it as stable.",
+        }
+        report["next_monitoring_step"] = {
+            "summary": "Monitor Security Review for at least 2 post-apply runs before treating it as stable.",
+        }
         report["writeback_preview"] = {
             "sync_mode": "reconcile",
             "github_projects": {
@@ -1498,6 +1505,8 @@ class TestAnalystWorkbookSheets:
         assert "preview-ready" in str(ws["K5"].value).lower()
         assert ws["J7"].value == "Apply Packet"
         assert "preview security review next" in str(ws["K7"].value).lower()
+        assert ws["J9"].value == "Post-Apply Monitoring"
+        assert "monitor it now" in str(ws["K9"].value).lower()
         assert ws["D15"].value == "Projects"
         assert ws["D16"].value == 3
 
@@ -1518,6 +1527,12 @@ class TestAnalystWorkbookSheets:
                 "summary": "Preview Security Review next, then decide whether it is ready to apply to all.",
                 "preview_command": "audit user --campaign security-review --writeback-target all",
             },
+            "campaign_outcomes_summary": {
+                "summary": "Security Review was applied recently; monitor it now before treating it as stable.",
+            },
+            "next_monitoring_step": {
+                "summary": "Monitor Security Review for at least 2 post-apply runs before treating it as stable.",
+            },
         }
         _build_print_pack(wb, report, None)
         ws = wb["Print Pack"]
@@ -1528,6 +1543,9 @@ class TestAnalystWorkbookSheets:
         assert ws["D11"].value == "Apply Packet"
         assert "preview security review next" in str(ws["E11"].value).lower()
         assert ws["D12"].value == "Command Hint"
+        assert ws["D13"].value == "Post-Apply Monitoring"
+        assert "monitor it now" in str(ws["E13"].value).lower()
+        assert ws["D14"].value == "Next Monitoring Step"
 
     def test_writeback_audit_shows_empty_state_when_no_results(self):
         wb = Workbook()

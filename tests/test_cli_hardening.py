@@ -471,6 +471,48 @@ def test_print_output_summary_emits_normal_audit_hint(capsys, sample_metadata):
     assert "Next step: open the standard workbook first" in (captured.out + captured.err)
 
 
+def test_print_output_summary_emits_post_apply_monitoring_hints(capsys, sample_metadata):
+    audit = RepoAudit(
+        metadata=sample_metadata,
+        analyzer_results=[],
+        overall_score=0.5,
+        completeness_tier="functional",
+    )
+    report = AuditReport.from_audits("testuser", [audit], [], 1)
+    report.campaign_outcomes_summary = {
+        "summary": "Security Review was applied recently; monitor it now before treating it as stable.",
+    }
+    report.next_monitoring_step = {
+        "summary": "Monitor Security Review for at least 2 post-apply runs before treating it as stable.",
+    }
+
+    cli._print_output_summary(
+        "Audited 1 repos for testuser",
+        report,
+        {
+            "cache_info": "",
+            "json_path": "output/audit-report.json",
+            "md_path": "output/audit-report.md",
+            "excel_path": "output/audit-report.xlsx",
+            "pcc_path": "output/pcc.json",
+            "raw_path": "output/raw.json",
+            "warehouse_path": "output/history.db",
+            "badge_info": "",
+            "notion_info": "",
+            "readme_info": "",
+            "suggestions_info": "",
+            "html_info": "",
+            "pdf_info": "",
+            "review_pack_info": "",
+        },
+    )
+
+    captured = capsys.readouterr()
+    combined = captured.out + captured.err
+    assert "Post-apply monitoring: Security Review was applied recently" in combined
+    assert "Next monitoring step: Monitor Security Review for at least 2 post-apply runs" in combined
+
+
 def test_incremental_noop_regenerates_from_latest_report(monkeypatch, tmp_path, sample_metadata):
     args = _make_args(username="testuser")
     report_path = tmp_path / "audit-report-testuser-2026-03-29.json"

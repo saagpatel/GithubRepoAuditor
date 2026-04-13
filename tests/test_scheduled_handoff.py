@@ -522,6 +522,12 @@ def test_build_scheduled_handoff_includes_github_projects_campaign_status(tmp_pa
         "summary": "Preview Security Review next, then decide whether it is ready to apply to all.",
         "preview_command": "audit testuser --campaign security-review --writeback-target all",
     }
+    payload["operator_summary"]["campaign_outcomes_summary"] = {
+        "summary": "Security Review was applied recently; monitor it now before treating it as stable.",
+    }
+    payload["operator_summary"]["next_monitoring_step"] = {
+        "summary": "Monitor Security Review for at least 2 post-apply runs before treating it as stable.",
+    }
     payload["campaign_summary"] = {
         "campaign_type": "security-review",
         "label": "Security Review",
@@ -557,6 +563,8 @@ def test_build_scheduled_handoff_includes_github_projects_campaign_status(tmp_pa
     assert "Next Action Sync step: Preview Security Review next" in markdown
     assert "Apply packet: Apply handoff says preview Security Review next" in markdown
     assert "Action Sync command hint: audit testuser --campaign security-review --writeback-target all" in markdown
+    assert "Post-apply monitoring: Security Review was applied recently" in markdown
+    assert "Next monitoring step: Monitor Security Review for at least 2 post-apply runs" in markdown
 
 
 def test_build_scheduled_handoff_stays_quiet_for_quiet_runs(tmp_path):

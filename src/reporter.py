@@ -296,6 +296,8 @@ def write_markdown_report(
     _w(f"- Apply Packet: {weekly_pack.get('apply_readiness_summary', 'No current campaign has a safe execution handoff yet, so the local story should stay local for now.')}")
     _w(f"- Next Apply Candidate: {weekly_pack.get('next_apply_candidate', 'Stay local for now; no current campaign has a safe execution handoff.')}")
     _w(f"- Action Sync Command Hint: {weekly_pack.get('action_sync_command_hint', 'No Action Sync command is recommended yet.')}")
+    _w(f"- Post-Apply Monitoring: {weekly_pack.get('campaign_outcomes_summary', 'No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.')}")
+    _w(f"- Next Monitoring Step: {weekly_pack.get('next_monitoring_step', 'Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.')}")
     _w("")
     _w("### Action Sync Readiness")
     _w("")
@@ -332,6 +334,22 @@ def write_markdown_report(
                 _w(f"  - {item.get('label', item.get('campaign_type', 'Campaign'))} — {item.get('summary', 'No packet summary is recorded yet.')} [{command}]")
         else:
             _w(f"  - {empty_message}")
+    _w("- Post-Apply Monitoring:")
+    _w(f"  - Summary: {weekly_pack.get('campaign_outcomes_summary', 'No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.')}")
+    _w(f"  - Next Step: {weekly_pack.get('next_monitoring_step', 'Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.')}")
+    monitoring_sections = [
+        ("Drift Returned", weekly_pack.get("top_drift_returned_campaigns", []), "No campaigns currently show post-apply drift return."),
+        ("Reopened", weekly_pack.get("top_reopened_campaigns", []), "No campaigns currently show reopened action flow after apply."),
+        ("Monitor Now", weekly_pack.get("top_monitor_now_campaigns", []), "No campaigns are currently in the short monitoring window."),
+        ("Holding Clean", weekly_pack.get("top_holding_clean_campaigns", []), "No campaigns have enough follow-up evidence to be called clean yet."),
+    ]
+    for label, items, empty_message in monitoring_sections:
+        _w(f"- {label}:")
+        if items:
+            for item in items[:3]:
+                _w(f"  - {item.get('label', item.get('campaign_type', 'Campaign'))} — {item.get('summary', 'No post-apply monitoring summary is recorded yet.')}")
+        else:
+            _w(f"  - {empty_message}")
     _w("")
     _w("### Top Attention")
     _w("")
@@ -349,6 +367,7 @@ def write_markdown_report(
         _w(f"  - Maturity Gap: {item.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.')}")
         _w(f"  - {item.get('action_sync_line', 'Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.')}")
         _w(f"  - {item.get('apply_packet_line', 'Apply Packet: no current execution handoff is surfaced.')}")
+        _w(f"  - {item.get('post_apply_line', 'Post-Apply Monitoring: no recent Action Sync apply needs follow-up yet.')}")
         _w(f"  - Checkpoint Timing: {item.get('follow_through_checkpoint_timing', 'Unknown')}")
         _w(
             f"  - Next Checkpoint: {item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}"
@@ -442,6 +461,10 @@ def write_markdown_report(
         command_hint = (report.operator_summary.get("next_apply_candidate") or {}).get("apply_command") or (report.operator_summary.get("next_apply_candidate") or {}).get("preview_command")
         if command_hint:
             _w(f"- Action Sync Command Hint: `{command_hint}`")
+        if (report.operator_summary.get("campaign_outcomes_summary") or {}).get("summary"):
+            _w(f"- Post-Apply Monitoring: {(report.operator_summary.get('campaign_outcomes_summary') or {}).get('summary')}")
+        if (report.operator_summary.get("next_monitoring_step") or {}).get("summary"):
+            _w(f"- Next Monitoring Step: {(report.operator_summary.get('next_monitoring_step') or {}).get('summary')}")
         if report.operator_summary.get("follow_through_escalation_summary"):
             _w(f"- Follow-Through Aging and Escalation: {report.operator_summary.get('follow_through_escalation_summary')}")
         if report.operator_summary.get("follow_through_recovery_summary"):
@@ -1189,6 +1212,10 @@ def write_markdown_report(
         command_hint = report.next_apply_candidate.get("apply_command") or report.next_apply_candidate.get("preview_command")
         if command_hint:
             _w(f"- Action Sync Command Hint: `{command_hint}`")
+        if report.campaign_outcomes_summary.get("summary"):
+            _w(f"- Post-Apply Monitoring: {report.campaign_outcomes_summary.get('summary')}")
+        if report.next_monitoring_step.get("summary"):
+            _w(f"- Next Monitoring Step: {report.next_monitoring_step.get('summary')}")
         if github_projects.get("enabled"):
             _w(
                 f"- GitHub Projects: {github_projects.get('status', 'disabled')} "
