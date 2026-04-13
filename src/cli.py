@@ -654,6 +654,9 @@ def _report_from_dict(data: dict) -> AuditReport:
         action_sync_tuning=data.get("action_sync_tuning", []),
         campaign_tuning_summary=data.get("campaign_tuning_summary", {}),
         next_tuned_campaign=data.get("next_tuned_campaign", {}),
+        historical_portfolio_intelligence=data.get("historical_portfolio_intelligence", []),
+        intervention_ledger_summary=data.get("intervention_ledger_summary", {}),
+        next_historical_focus=data.get("next_historical_focus", {}),
         security_posture=data.get("security_posture", {}),
         security_governance_preview=data.get("security_governance_preview", []),
         collections=data.get("collections", {}),
@@ -1953,6 +1956,9 @@ def _enrich_report_with_operator_state(
     report.action_sync_tuning = snapshot.get("action_sync_tuning", [])
     report.campaign_tuning_summary = snapshot.get("campaign_tuning_summary", {})
     report.next_tuned_campaign = snapshot.get("next_tuned_campaign", {})
+    report.historical_portfolio_intelligence = snapshot.get("historical_portfolio_intelligence", [])
+    report.intervention_ledger_summary = snapshot.get("intervention_ledger_summary", {})
+    report.next_historical_focus = snapshot.get("next_historical_focus", {})
     return report
 
 
@@ -2259,6 +2265,10 @@ def _print_output_summary(
         print_info(f"Campaign tuning: {report.campaign_tuning_summary.get('summary')}")
     if report.next_tuned_campaign.get("summary"):
         print_info(f"{ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}: {report.next_tuned_campaign.get('summary')}")
+    if report.intervention_ledger_summary.get("summary"):
+        print_info(f"Historical portfolio intelligence: {report.intervention_ledger_summary.get('summary')}")
+    if report.next_historical_focus.get("summary"):
+        print_info(f"Next historical focus: {report.next_historical_focus.get('summary')}")
     print_info(_normal_audit_next_step_hint(report.username))
 
 

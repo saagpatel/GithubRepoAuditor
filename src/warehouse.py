@@ -8,7 +8,7 @@ from pathlib import Path
 from src.models import AuditReport
 
 WAREHOUSE_FILENAME = "portfolio-warehouse.db"
-WAREHOUSE_SCHEMA_VERSION = 12
+WAREHOUSE_SCHEMA_VERSION = 13
 
 
 def write_warehouse_snapshot(
@@ -66,6 +66,8 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             high_pressure_queue_history_json TEXT NOT NULL DEFAULT '[]',
             action_sync_outcomes_summary_json TEXT NOT NULL DEFAULT '{}',
             campaign_tuning_summary_json TEXT NOT NULL DEFAULT '{}',
+            historical_portfolio_intelligence_json TEXT NOT NULL DEFAULT '{}',
+            implementation_hotspots_summary_json TEXT NOT NULL DEFAULT '{}',
             scenario_summary_json TEXT NOT NULL,
             campaign_summary_json TEXT NOT NULL DEFAULT '{}',
             writeback_preview_json TEXT NOT NULL DEFAULT '{}',
@@ -349,6 +351,30 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             PRIMARY KEY (run_id, campaign_type)
         );
 
+        CREATE TABLE IF NOT EXISTS intervention_ledger (
+            run_id TEXT NOT NULL,
+            repo TEXT NOT NULL,
+            historical_intelligence_status TEXT NOT NULL,
+            pressure_trend TEXT NOT NULL,
+            hotspot_persistence TEXT NOT NULL,
+            scorecard_trend TEXT NOT NULL,
+            campaign_follow_through TEXT NOT NULL,
+            recent_intervention_count INTEGER NOT NULL,
+            details_json TEXT NOT NULL DEFAULT '{}',
+            PRIMARY KEY (run_id, repo)
+        );
+
+        CREATE TABLE IF NOT EXISTS repo_implementation_hotspots (
+            run_id TEXT NOT NULL,
+            repo TEXT NOT NULL,
+            path TEXT NOT NULL,
+            category TEXT NOT NULL,
+            pressure_score REAL NOT NULL,
+            suggestion_type TEXT NOT NULL,
+            details_json TEXT NOT NULL DEFAULT '{}',
+            PRIMARY KEY (run_id, repo, path, category)
+        );
+
         CREATE TABLE IF NOT EXISTS governance_approvals (
             source_run_id TEXT PRIMARY KEY,
             approved_at TEXT NOT NULL,
@@ -518,6 +544,8 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     _ensure_column(conn, "audit_runs", "high_pressure_queue_history_json", "TEXT NOT NULL DEFAULT '[]'")
     _ensure_column(conn, "audit_runs", "action_sync_outcomes_summary_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(conn, "audit_runs", "campaign_tuning_summary_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(conn, "audit_runs", "historical_portfolio_intelligence_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(conn, "audit_runs", "implementation_hotspots_summary_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(
         conn, "portfolio_catalog_entries", "maturity_program", "TEXT NOT NULL DEFAULT ''"
     )
@@ -570,13 +598,14 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             portfolio_outcomes_summary_json, operator_effectiveness_summary_json, high_pressure_queue_history_json,
             action_sync_outcomes_summary_json,
             campaign_tuning_summary_json,
+            historical_portfolio_intelligence_json, implementation_hotspots_summary_json,
             campaign_summary_json, writeback_preview_json, writeback_results_json,
             managed_state_drift_json, rollback_preview_json, campaign_history_json,
             governance_preview_json, governance_approval_json, governance_results_json,
             governance_history_json, governance_drift_json, governance_summary_json, review_summary_json, review_alerts_json,
             preflight_summary_json, material_changes_json, review_targets_json, review_history_json, watch_state_json,
             operator_summary_json, operator_queue_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             run_id,
@@ -608,6 +637,8 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             json.dumps(report.high_pressure_queue_history),
             json.dumps(report.campaign_outcomes_summary),
             json.dumps(report.campaign_tuning_summary),
+            json.dumps(report.intervention_ledger_summary),
+            json.dumps(report.implementation_hotspots_summary),
             json.dumps(report.campaign_summary),
             json.dumps(report.writeback_preview),
             json.dumps(report.writeback_results),
@@ -725,6 +756,24 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
                     hotspot.get("title", ""),
                     hotspot.get("summary", ""),
                     hotspot.get("recommended_action", ""),
+                ),
+            )
+
+        for hotspot in audit.implementation_hotspots:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO repo_implementation_hotspots (
+                    run_id, repo, path, category, pressure_score, suggestion_type, details_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run_id,
+                    audit.metadata.name,
+                    hotspot.get("path", ""),
+                    hotspot.get("category", ""),
+                    float(hotspot.get("pressure_score", 0.0) or 0.0),
+                    hotspot.get("suggestion_type", ""),
+                    json.dumps(hotspot),
                 ),
             )
 
@@ -1207,6 +1256,27 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             ),
         )
 
+    for row in report.historical_portfolio_intelligence:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO intervention_ledger (
+                run_id, repo, historical_intelligence_status, pressure_trend, hotspot_persistence,
+                scorecard_trend, campaign_follow_through, recent_intervention_count, details_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                run_id,
+                row.get("repo", ""),
+                row.get("historical_intelligence_status", "insufficient-evidence"),
+                row.get("pressure_trend", "insufficient-evidence"),
+                row.get("hotspot_persistence", "insufficient-evidence"),
+                row.get("scorecard_trend", "insufficient-evidence"),
+                row.get("campaign_follow_through", "insufficient-evidence"),
+                int(row.get("recent_intervention_count", 0) or 0),
+                json.dumps(row),
+            ),
+        )
+
     for result in (
         report.writeback_results.get("results", [])
         if isinstance(report.writeback_results, dict)
@@ -1655,6 +1725,7 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
                    scorecards_summary_json, scorecard_programs_json,
                    portfolio_outcomes_summary_json, operator_effectiveness_summary_json, high_pressure_queue_history_json,
                    action_sync_outcomes_summary_json, campaign_tuning_summary_json,
+                   historical_portfolio_intelligence_json, implementation_hotspots_summary_json,
                    campaign_summary_json, writeback_preview_json, writeback_results_json,
                    managed_state_drift_json, rollback_preview_json, campaign_history_json,
                    review_summary_json, operator_summary_json
@@ -1696,6 +1767,8 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
                 "high_pressure_queue_history": json.loads(row["high_pressure_queue_history_json"] or "[]"),
                 "campaign_outcomes_summary": json.loads(row["action_sync_outcomes_summary_json"] or "{}"),
                 "campaign_tuning_summary": json.loads(row["campaign_tuning_summary_json"] or "{}"),
+                "intervention_ledger_summary": json.loads(row["historical_portfolio_intelligence_json"] or "{}"),
+                "implementation_hotspots_summary": json.loads(row["implementation_hotspots_summary_json"] or "{}"),
                 "campaign_summary": json.loads(row["campaign_summary_json"] or "{}"),
                 "writeback_preview": json.loads(row["writeback_preview_json"] or "{}"),
                 "writeback_results": json.loads(row["writeback_results_json"] or "{}"),
@@ -1733,6 +1806,12 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
                 ),
                 "next_tuned_campaign": _coerce_action_sync_snapshot_field(
                     operator_summary, "next_tuned_campaign", {}
+                ),
+                "historical_portfolio_intelligence": _coerce_action_sync_snapshot_field(
+                    operator_summary, "historical_portfolio_intelligence", []
+                ),
+                "next_historical_focus": _coerce_action_sync_snapshot_field(
+                    operator_summary, "next_historical_focus", {}
                 ),
             }
         )
@@ -2031,6 +2110,105 @@ def load_campaign_tuning(output_dir: Path, username: str, limit: int = 60) -> li
     return tuning_rows
 
 
+def load_recent_repo_scorecards(output_dir: Path, username: str, limit: int = 200) -> list[dict]:
+    conn = _connect(output_dir)
+    if conn is None:
+        return []
+    try:
+        rows = conn.execute(
+            """
+            SELECT repo_scorecards.run_id,
+                   audit_runs.generated_at,
+                   repos.name AS repo,
+                   repo_scorecards.program,
+                   repo_scorecards.program_label,
+                   repo_scorecards.target_maturity,
+                   repo_scorecards.maturity_level,
+                   repo_scorecards.score,
+                   repo_scorecards.status,
+                   repo_scorecards.summary
+            FROM repo_scorecards
+            JOIN audit_runs ON audit_runs.run_id = repo_scorecards.run_id
+            JOIN repos ON repos.repo_id = repo_scorecards.repo_id
+            WHERE audit_runs.username = ?
+            ORDER BY audit_runs.generated_at DESC
+            LIMIT ?
+            """,
+            (username, limit),
+        ).fetchall()
+    finally:
+        conn.close()
+    return [dict(row) for row in rows]
+
+
+def load_recent_implementation_hotspots(output_dir: Path, username: str, limit: int = 400) -> list[dict]:
+    conn = _connect(output_dir)
+    if conn is None:
+        return []
+    try:
+        rows = conn.execute(
+            """
+            SELECT repo_implementation_hotspots.run_id,
+                   audit_runs.generated_at,
+                   repo_implementation_hotspots.repo,
+                   repo_implementation_hotspots.path,
+                   repo_implementation_hotspots.category,
+                   repo_implementation_hotspots.pressure_score,
+                   repo_implementation_hotspots.suggestion_type,
+                   repo_implementation_hotspots.details_json
+            FROM repo_implementation_hotspots
+            JOIN audit_runs ON audit_runs.run_id = repo_implementation_hotspots.run_id
+            WHERE audit_runs.username = ?
+            ORDER BY audit_runs.generated_at DESC, repo_implementation_hotspots.repo, repo_implementation_hotspots.path
+            LIMIT ?
+            """,
+            (username, limit),
+        ).fetchall()
+    finally:
+        conn.close()
+    history: list[dict] = []
+    for row in rows:
+        payload = dict(row)
+        payload["details"] = json.loads(row["details_json"] or "{}")
+        history.append(payload)
+    return history
+
+
+def load_intervention_ledger(output_dir: Path, username: str, limit: int = 200) -> list[dict]:
+    conn = _connect(output_dir)
+    if conn is None:
+        return []
+    try:
+        rows = conn.execute(
+            """
+            SELECT intervention_ledger.run_id,
+                   audit_runs.generated_at,
+                   intervention_ledger.repo,
+                   intervention_ledger.historical_intelligence_status,
+                   intervention_ledger.pressure_trend,
+                   intervention_ledger.hotspot_persistence,
+                   intervention_ledger.scorecard_trend,
+                   intervention_ledger.campaign_follow_through,
+                   intervention_ledger.recent_intervention_count,
+                   intervention_ledger.details_json
+            FROM intervention_ledger
+            JOIN audit_runs ON audit_runs.run_id = intervention_ledger.run_id
+            WHERE audit_runs.username = ?
+            ORDER BY audit_runs.generated_at DESC, intervention_ledger.repo
+            LIMIT ?
+            """,
+            (username, limit),
+        ).fetchall()
+    finally:
+        conn.close()
+    rows_out: list[dict] = []
+    for row in rows:
+        payload = dict(row)
+        payload["details"] = json.loads(row["details_json"] or "{}")
+        rows_out.append(payload)
+    return rows_out
+
+
 def load_watch_checkpoint(output_dir: Path, username: str) -> dict | None:
     conn = _connect(output_dir)
     if conn is None:
@@ -2070,6 +2248,7 @@ def load_latest_operator_state(output_dir: Path, username: str) -> dict | None:
                    portfolio_outcomes_summary_json, operator_effectiveness_summary_json, high_pressure_queue_history_json,
                    action_sync_outcomes_summary_json,
                    campaign_tuning_summary_json,
+                   historical_portfolio_intelligence_json, implementation_hotspots_summary_json,
                    review_summary_json, review_alerts_json, material_changes_json,
                    review_targets_json, review_history_json, watch_state_json,
                    operator_summary_json, operator_queue_json
@@ -2102,6 +2281,8 @@ def load_latest_operator_state(output_dir: Path, username: str) -> dict | None:
         "high_pressure_queue_history": json.loads(row["high_pressure_queue_history_json"] or "[]"),
         "campaign_outcomes_summary": json.loads(row["action_sync_outcomes_summary_json"] or "{}"),
         "campaign_tuning_summary": json.loads(row["campaign_tuning_summary_json"] or "{}"),
+        "intervention_ledger_summary": json.loads(row["historical_portfolio_intelligence_json"] or "{}"),
+        "implementation_hotspots_summary": json.loads(row["implementation_hotspots_summary_json"] or "{}"),
         "review_summary": json.loads(row["review_summary_json"] or "{}"),
         "review_alerts": json.loads(row["review_alerts_json"] or "[]"),
         "material_changes": json.loads(row["material_changes_json"] or "[]"),
@@ -2139,6 +2320,12 @@ def load_latest_operator_state(output_dir: Path, username: str) -> dict | None:
         ),
         "next_tuned_campaign": _coerce_action_sync_snapshot_field(
             operator_summary, "next_tuned_campaign", {}
+        ),
+        "historical_portfolio_intelligence": _coerce_action_sync_snapshot_field(
+            operator_summary, "historical_portfolio_intelligence", []
+        ),
+        "next_historical_focus": _coerce_action_sync_snapshot_field(
+            operator_summary, "next_historical_focus", {}
         ),
     }
 

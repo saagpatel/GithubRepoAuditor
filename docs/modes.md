@@ -128,6 +128,17 @@ Use that overlay as a ranking hint, not a new execution layer:
 - it never changes queue order or write authority
 - it helps the product explain which tied campaign should be recommended first through the `Next Tie-Break Candidate` line
 
+After those Action Sync layers, read the bounded historical layer when you need the longer-run repo story:
+
+- `Historical Portfolio Intelligence` connects recurring operator attention, implementation hotspot recurrence, scorecard direction, and campaign aftermath
+- the `Intervention Ledger` is the cross-run source of truth for that historical read
+- it tells you whether a repo is `relapsing`, under `persistent-pressure`, `improving-after-intervention`, or `holding-steady`
+
+Use that layer to decide whether the same repo is truly getting better over time or just consuming another week of attention:
+- it does not create a new queue
+- it does not change readiness or apply precedence
+- it complements the current weekly/operator story rather than replacing it
+
 ## Default guidance
 
 - `--doctor` is the recommended first step.

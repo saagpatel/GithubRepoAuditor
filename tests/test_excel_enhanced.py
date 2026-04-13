@@ -22,6 +22,7 @@ from src.excel_export import (
     _build_governance_audit,
     _build_governance_controls,
     _build_hidden_data_sheets,
+    _build_historical_intelligence,
     _build_hotspots,
     _build_implementation_hotspots,
     _build_operator_outcomes,
@@ -882,6 +883,7 @@ class TestHotspotsAndDataSheets:
         assert "Data_OperatorOutcomes" in wb.sheetnames
         assert "Data_ActionSyncOutcomes" in wb.sheetnames
         assert "Data_CampaignTuning" in wb.sheetnames
+        assert "Data_InterventionLedger" in wb.sheetnames
         assert "Data_OperatorRepoRollups" in wb.sheetnames
         assert "Data_MaterialChangeRollups" in wb.sheetnames
         assert "Data_RepoDetail" in wb.sheetnames
@@ -914,6 +916,33 @@ class TestAnalystWorkbookSheets:
         _build_writeback_audit(wb, _make_report())
         assert "Campaigns" in wb.sheetnames
         assert "Writeback Audit" in wb.sheetnames
+
+    def test_creates_historical_intelligence_sheet(self):
+        wb = Workbook()
+        report = _make_report()
+        report["intervention_ledger_summary"] = {
+            "summary": "RepoC is improving after intervention while RepoB still looks relapsing.",
+        }
+        report["next_historical_focus"] = {
+            "summary": "Read RepoC next: it is the clearest current example of improvement after intervention.",
+        }
+        report["top_improving_repos"] = [
+            {
+                "repo": "RepoC",
+                "historical_intelligence_status": "improving-after-intervention",
+                "pressure_trend": "improving",
+                "hotspot_persistence": "changing",
+                "scorecard_trend": "improving",
+                "summary": "RepoC is improving after intervention.",
+            }
+        ]
+
+        _build_historical_intelligence(wb, report)
+        ws = wb["Historical Intelligence"]
+
+        assert ws["A1"].value == "Historical Portfolio Intelligence"
+        assert "RepoC is improving after intervention" in str(ws["A2"].value)
+        assert "Read RepoC next" in str(ws["A3"].value)
 
     def test_creates_collection_trend_review_governance_and_print_sheets(self):
         wb = Workbook()
@@ -1484,6 +1513,12 @@ class TestAnalystWorkbookSheets:
         report["next_tuned_campaign"] = {
             "summary": "Security Review should win ties inside the preview-ready group because recent outcome history is proven.",
         }
+        report["intervention_ledger_summary"] = {
+            "summary": "RepoC is improving after intervention while one repo still looks relapsing.",
+        }
+        report["next_historical_focus"] = {
+            "summary": "Read RepoC next: it is the clearest current example of improvement after intervention.",
+        }
         report["writeback_preview"] = {
             "sync_mode": "reconcile",
             "github_projects": {
@@ -1516,6 +1551,8 @@ class TestAnalystWorkbookSheets:
         assert "monitor it now" in str(ws["K9"].value).lower()
         assert ws["J11"].value == "Campaign Tuning"
         assert "win ties" in str(ws["K11"].value).lower()
+        assert ws["J13"].value == "Historical Portfolio Intelligence"
+        assert "improving after intervention" in str(ws["K13"].value).lower()
         assert ws["D15"].value == "Projects"
         assert ws["D16"].value == 3
 
@@ -1548,6 +1585,12 @@ class TestAnalystWorkbookSheets:
             "next_tuned_campaign": {
                 "summary": "Security Review should win ties inside the preview-ready group because recent outcome history is proven.",
             },
+            "intervention_ledger_summary": {
+                "summary": "RepoC is improving after intervention while one repo still looks relapsing.",
+            },
+            "next_historical_focus": {
+                "summary": "Read RepoC next: it is the clearest current example of improvement after intervention.",
+            },
         }
         _build_print_pack(wb, report, None)
         ws = wb["Print Pack"]
@@ -1564,6 +1607,9 @@ class TestAnalystWorkbookSheets:
         assert ws["D15"].value == "Campaign Tuning"
         assert "win ties" in str(ws["E15"].value).lower()
         assert ws["D16"].value == "Next Tie-Break Candidate"
+        assert ws["D17"].value == "Historical Portfolio Intelligence"
+        assert "improving after intervention" in str(ws["E17"].value).lower()
+        assert ws["D18"].value == "Next Historical Focus"
 
     def test_writeback_audit_shows_empty_state_when_no_results(self):
         wb = Workbook()
@@ -1711,6 +1757,7 @@ class TestWorkbookModes:
             "Scorecards",
             "Implementation Hotspots",
             "Operator Outcomes",
+            "Historical Intelligence",
             "Repo Detail",
             "Executive Summary",
             "By Lens",

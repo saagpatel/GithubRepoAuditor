@@ -6,4 +6,5 @@ ACTION_SYNC_CANONICAL_LABELS = {
     "post_apply_monitoring": "Post-Apply Monitoring",
     "campaign_tuning": "Campaign Tuning",
     "next_tie_break_candidate": "Next Tie-Break Candidate",
+    "historical_portfolio_intelligence": "Historical Portfolio Intelligence",
 }

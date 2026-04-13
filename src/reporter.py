@@ -138,6 +138,9 @@ def write_raw_metadata(report: AuditReport, output_dir: Path) -> Path:
         "writeback_preview": report.writeback_preview,
         "writeback_results": report.writeback_results,
         "action_runs": report.action_runs,
+        "historical_portfolio_intelligence": report.historical_portfolio_intelligence,
+        "intervention_ledger_summary": report.intervention_ledger_summary,
+        "next_historical_focus": report.next_historical_focus,
         "external_refs": report.external_refs,
         "managed_state_drift": report.managed_state_drift,
         "rollback_preview": report.rollback_preview,
@@ -302,6 +305,8 @@ def write_markdown_report(
     _w(f"- Next Monitoring Step: {weekly_pack.get('next_monitoring_step', 'Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.')}")
     _w(f"- {ACTION_SYNC_CANONICAL_LABELS['campaign_tuning']}: {weekly_pack.get('campaign_tuning_summary', 'Campaign tuning stays neutral until there is enough outcome history to bias tied recommendations.')}")
     _w(f"- {ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}: {weekly_pack.get('next_tie_break_candidate', build_next_tie_break_candidate_line(weekly_pack))}")
+    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['historical_portfolio_intelligence']}: {weekly_pack.get('historical_portfolio_intelligence', 'Historical portfolio intelligence is still thin, so the weekly story should stay grounded in the current run and recent operator queue.')}")
+    _w(f"- Next Historical Focus: {weekly_pack.get('next_historical_focus', 'Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet.')}")
     _w("")
     _w(f"### {ACTION_SYNC_CANONICAL_LABELS['readiness']}")
     _w("")
@@ -369,6 +374,22 @@ def write_markdown_report(
                 _w(f"  - {item.get('label', item.get('campaign_type', 'Campaign'))} — {item.get('summary', 'No campaign tuning summary is recorded yet.')}")
         else:
             _w(f"  - {empty_message}")
+    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['historical_portfolio_intelligence']}:")
+    _w(f"  - Summary: {weekly_pack.get('historical_portfolio_intelligence', 'Historical portfolio intelligence is still thin, so the weekly story should stay grounded in the current run and recent operator queue.')}")
+    _w(f"  - Next Focus: {weekly_pack.get('next_historical_focus', 'Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet.')}")
+    historical_sections = [
+        ("Relapsing", weekly_pack.get("top_relapsing_repos", []), "No repos currently show a relapsing intervention story."),
+        ("Persistent Pressure", weekly_pack.get("top_persistent_pressure_repos", []), "No repos currently show persistent pressure."),
+        ("Improving After Intervention", weekly_pack.get("top_improving_repos", []), "No repos currently show a clear improving-after-intervention story."),
+        ("Holding Steady", weekly_pack.get("top_holding_repos", []), "No repos currently show a holding-steady story."),
+    ]
+    for label, items, empty_message in historical_sections:
+        _w(f"- {label}:")
+        if items:
+            for item in items[:3]:
+                _w(f"  - {item.get('repo', 'Repo')} — {item.get('summary', 'No historical intelligence summary is recorded yet.')}")
+        else:
+            _w(f"  - {empty_message}")
     _w("")
     _w("### Top Attention")
     _w("")
@@ -388,6 +409,7 @@ def write_markdown_report(
         _w(f"  - {item.get('apply_packet_line', 'Apply Packet: no current execution handoff is surfaced.')}")
         _w(f"  - {item.get('post_apply_line', 'Post-Apply Monitoring: no recent Action Sync apply needs follow-up yet.')}")
         _w(f"  - {item.get('campaign_tuning_line', 'Campaign Tuning: recommendations stay neutral until more outcome history is available.')}")
+        _w(f"  - {item.get('historical_intelligence_line', 'Historical Portfolio Intelligence: keep the weekly story anchored in the current run until more cross-run evidence accumulates.')}")
         _w(f"  - Checkpoint Timing: {item.get('follow_through_checkpoint_timing', 'Unknown')}")
         _w(
             f"  - Next Checkpoint: {item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}"
@@ -437,6 +459,7 @@ def write_markdown_report(
         _w(f"- {briefing.get('apply_packet_line', 'Apply Packet: no current execution handoff is surfaced.')}")
         _w(f"- {briefing.get('post_apply_line', 'Post-Apply Monitoring: no recent Action Sync apply needs follow-up yet.')}")
         _w(f"- {briefing.get('campaign_tuning_line', 'Campaign Tuning: recommendations stay neutral until more outcome history is available.')}")
+        _w(f"- {briefing.get('historical_intelligence_line', 'Historical Portfolio Intelligence: keep the weekly story anchored in the current run until more cross-run evidence accumulates.')}")
         _w(f"- Checkpoint Timing: {briefing.get('checkpoint_timing_line', 'Unknown')}")
         _w(f"- What Would Count As Progress: {briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
         _w("")
@@ -487,6 +510,10 @@ def write_markdown_report(
             _w(f"- {ACTION_SYNC_CANONICAL_LABELS['post_apply_monitoring']}: {(report.operator_summary.get('campaign_outcomes_summary') or {}).get('summary')}")
         if (report.operator_summary.get("next_monitoring_step") or {}).get("summary"):
             _w(f"- Next Monitoring Step: {(report.operator_summary.get('next_monitoring_step') or {}).get('summary')}")
+        if (report.operator_summary.get("intervention_ledger_summary") or {}).get("summary"):
+            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['historical_portfolio_intelligence']}: {(report.operator_summary.get('intervention_ledger_summary') or {}).get('summary')}")
+        if (report.operator_summary.get("next_historical_focus") or {}).get("summary"):
+            _w(f"- Next Historical Focus: {(report.operator_summary.get('next_historical_focus') or {}).get('summary')}")
         if report.operator_summary.get("follow_through_escalation_summary"):
             _w(f"- Follow-Through Aging and Escalation: {report.operator_summary.get('follow_through_escalation_summary')}")
         if report.operator_summary.get("follow_through_recovery_summary"):
@@ -1242,6 +1269,10 @@ def write_markdown_report(
             _w(f"- {ACTION_SYNC_CANONICAL_LABELS['campaign_tuning']}: {report.campaign_tuning_summary.get('summary')}")
         if report.next_tuned_campaign.get("summary"):
             _w(f"- {ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}: {report.next_tuned_campaign.get('summary')}")
+        if report.intervention_ledger_summary.get("summary"):
+            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['historical_portfolio_intelligence']}: {report.intervention_ledger_summary.get('summary')}")
+        if report.next_historical_focus.get("summary"):
+            _w(f"- Next Historical Focus: {report.next_historical_focus.get('summary')}")
         if github_projects.get("enabled"):
             _w(
                 f"- GitHub Projects: {github_projects.get('status', 'disabled')} "
