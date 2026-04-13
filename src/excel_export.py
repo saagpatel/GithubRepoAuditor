@@ -4810,6 +4810,25 @@ def _build_campaigns(wb: Workbook, data: dict) -> None:
         ],
         title="Current Campaign State",
     )
+    _write_key_value_block(
+        ws,
+        4,
+        10,
+        [
+            (
+                "Action Sync Readiness",
+                (data.get("action_sync_summary") or {}).get(
+                    "summary",
+                    "No current campaign needs Action Sync yet, so the safest next move is to keep the story local.",
+                ),
+            ),
+            (
+                "Next Action Sync Step",
+                data.get("next_action_sync_step", "Stay local for now; no current campaign needs preview or apply."),
+            ),
+        ],
+        title="Action Sync Readiness",
+    )
     headers = ["Repo", "Issue", "Topics", "Projects", "Notion Actions", "Action IDs", "Drift", "Sync Mode"]
     start_row = summary_end_row + 2
     for col, header in enumerate(headers, 1):
@@ -4870,6 +4889,25 @@ def _build_writeback_audit(wb: Workbook, data: dict) -> None:
             ("Created / Updated / Closed", f"{status_counts.get('created', 0)} / {status_counts.get('updated', 0)} / {status_counts.get('closed', 0)}"),
         ],
         title="Current Writeback State",
+    )
+    _write_key_value_block(
+        ws,
+        4,
+        5,
+        [
+            (
+                "Action Sync Readiness",
+                (data.get("action_sync_summary") or {}).get(
+                    "summary",
+                    "No current campaign needs Action Sync yet, so the safest next move is to keep the story local.",
+                ),
+            ),
+            (
+                "Next Action Sync Step",
+                data.get("next_action_sync_step", "Stay local for now; no current campaign needs preview or apply."),
+            ),
+        ],
+        title="Action Sync Readiness",
     )
     headers = ["Repo", "Target", "Status", "Rollback", "URL", "Details"]
     start_row = 10
@@ -6640,6 +6678,16 @@ def _build_print_pack(
     ws["E8"] = weekly_pack.get(
         "next_best_workflow_step",
         "Open the standard workbook first, then use --control-center for read-only triage.",
+    )
+    ws["D9"] = "Action Sync Readiness"
+    ws["E9"] = weekly_pack.get(
+        "action_sync_summary",
+        "No current campaign needs Action Sync yet, so the safest next move is to keep the story local.",
+    )
+    ws["D10"] = "Next Action Sync Step"
+    ws["E10"] = weekly_pack.get(
+        "next_action_sync_step",
+        "Stay local for now; no current campaign needs preview or apply.",
     )
     ws["A7"] = "Portfolio Headline"
     ws["B7"] = weekly_pack.get("portfolio_headline", operator_summary.get("headline", "Review the latest workbook surfaces for change and drift."))

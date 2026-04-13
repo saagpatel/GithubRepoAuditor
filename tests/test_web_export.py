@@ -1006,3 +1006,40 @@ class TestRenderHtml:
         assert "GitHub Projects:</strong> configured" in html
         assert "octo-org #7, 1 items" in html
         assert '<td class="num">3</td>' in html
+
+    def test_weekly_review_pack_includes_action_sync_readiness(self):
+        html = _render_html(
+            _make_report(
+                operator_summary={
+                    "headline": "Campaign work can move forward.",
+                    "counts": {"blocked": 0, "urgent": 0, "ready": 1, "deferred": 0},
+                    "action_sync_summary": {
+                        "summary": "Action Sync is preview-ready: Security Review is the strongest next campaign to preview from the current local facts.",
+                    },
+                    "next_action_sync_step": "Preview Security Review next, then decide whether it is ready to sync to all.",
+                    "top_preview_ready_campaigns": [
+                        {
+                            "label": "Security Review",
+                            "reason": "1 action is ready for preview.",
+                            "recommended_target": "all",
+                        }
+                    ],
+                },
+                operator_queue=[
+                    {
+                        "repo": "RepoC",
+                        "title": "Review RepoC",
+                        "lane": "ready",
+                        "lane_label": "Ready",
+                        "summary": "A campaign preview is available.",
+                        "recommended_action": "Review the repo detail page.",
+                        "action_sync_line": "Action Sync: Security Review is preview-ready — recommended target all.",
+                    }
+                ],
+            )
+        )
+
+        assert "Action Sync Readiness:" in html
+        assert "Next Action Sync Step:" in html
+        assert "Preview Ready" in html
+        assert "recommended target all" in html

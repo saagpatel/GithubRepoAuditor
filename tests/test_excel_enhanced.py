@@ -1459,6 +1459,10 @@ class TestAnalystWorkbookSheets:
     def test_campaigns_show_github_projects_status_and_counts(self):
         wb = Workbook()
         report = _make_report()
+        report["action_sync_summary"] = {
+            "summary": "Action Sync is preview-ready: Security Review is the strongest next campaign to preview from the current local facts.",
+        }
+        report["next_action_sync_step"] = "Preview Security Review next, then decide whether it is ready to sync to all."
         report["writeback_preview"] = {
             "sync_mode": "reconcile",
             "github_projects": {
@@ -1483,8 +1487,28 @@ class TestAnalystWorkbookSheets:
 
         assert ws["A13"].value == "GitHub Projects"
         assert ws["B13"].value == "configured (octo-org #7)"
+        assert ws["J5"].value == "Action Sync Readiness"
+        assert "preview-ready" in str(ws["K5"].value).lower()
         assert ws["D15"].value == "Projects"
         assert ws["D16"].value == 3
+
+    def test_print_pack_shows_action_sync_readiness_guidance(self):
+        wb = Workbook()
+        report = _make_report()
+        report["operator_summary"] = {
+            "headline": "Campaign work can move forward.",
+            "counts": {"blocked": 0, "urgent": 0, "ready": 1, "deferred": 0},
+            "action_sync_summary": {
+                "summary": "Action Sync is preview-ready: Security Review is the strongest next campaign to preview from the current local facts.",
+            },
+            "next_action_sync_step": "Preview Security Review next, then decide whether it is ready to sync to all.",
+        }
+        _build_print_pack(wb, report, None)
+        ws = wb["Print Pack"]
+
+        assert ws["D9"].value == "Action Sync Readiness"
+        assert "preview-ready" in str(ws["E9"].value).lower()
+        assert ws["D10"].value == "Next Action Sync Step"
 
     def test_writeback_audit_shows_empty_state_when_no_results(self):
         wb = Workbook()

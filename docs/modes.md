@@ -74,6 +74,19 @@ Goal:
 - sync to GitHub, GitHub Projects, or Notion
 - keep the local report authoritative while mirroring the decision outward
 
+Action Sync readiness now uses one shared reading order:
+- `drift-review` first
+- `blocked` second
+- `apply-ready` third
+- `preview-ready` fourth
+- otherwise stay local
+
+Use that as the default rule:
+- review drift before more syncing
+- clear blockers before apply
+- only apply when the local story is already settled
+- preview next when there is a good campaign but no reason to push yet
+
 ## Default guidance
 
 - `--doctor` is the recommended first step.

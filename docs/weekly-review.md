@@ -57,6 +57,16 @@ That sequence tells you whether the portfolio is actually changing, why the top 
 - Leave `Safe to Defer` alone unless your priorities changed.
 - Only move into campaigns, writeback, GitHub Projects, or Notion sync when the local workbook and control-center story is already settled.
 
+## When to move into Action Sync
+
+Use the shared `Action Sync Readiness` summary in the workbook, HTML, Markdown, review-pack, or control-center:
+
+- `drift-review` means review managed drift before you sync anything else.
+- `blocked` means the campaign has useful local work, but a prerequisite or approval still needs attention.
+- `apply-ready` means the local story is settled enough that you can sync outward if you choose.
+- `preview-ready` means the campaign is worth previewing next, but the product is still nudging you to stay preview-first.
+- `idle` means there is no good reason to leave the local weekly loop yet.
+
 ## Workbook gate reminder
 
 Use `make workbook-gate` only when you changed workbook-facing code or layout. Normal portfolio use does not require the workbook gate.

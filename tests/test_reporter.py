@@ -203,6 +203,42 @@ class TestMarkdownReport:
         assert "GitHub Projects: configured (octo-org #7, 1 items)" in content
         assert "| test-repo | ghra-call-security-review | [Repo Auditor] Security Review | 3 field(s) | 0 |" in content
 
+    def test_weekly_pack_includes_action_sync_readiness(self, tmp_path):
+        report = _make_report()
+        report.operator_summary = {
+            "headline": "Campaign work can move forward.",
+            "counts": {"blocked": 0, "urgent": 0, "ready": 1, "deferred": 0},
+            "action_sync_summary": {
+                "summary": "Action Sync is preview-ready: Security Review is the strongest next campaign to preview from the current local facts.",
+            },
+            "next_action_sync_step": "Preview Security Review next, then decide whether it is ready to sync to all.",
+            "top_preview_ready_campaigns": [
+                {
+                    "label": "Security Review",
+                    "reason": "1 action is ready for preview.",
+                    "recommended_target": "all",
+                }
+            ],
+        }
+        report.operator_queue = [
+            {
+                "repo": "test-repo",
+                "title": "Review test-repo",
+                "lane": "ready",
+                "summary": "Promotion work is available.",
+                "recommended_action": "Review the repo detail page.",
+                "action_sync_line": "Action Sync: Security Review is preview-ready — recommended target all.",
+            }
+        ]
+
+        path = write_markdown_report(report, tmp_path)
+        content = path.read_text()
+
+        assert "Action Sync Readiness" in content
+        assert "Next Action Sync Step" in content
+        assert "Preview Ready" in content
+        assert "recommended target all" in content
+
     def test_includes_preflight_diagnostics_when_present(self, tmp_path):
         report = _make_report()
         report.preflight_summary = {

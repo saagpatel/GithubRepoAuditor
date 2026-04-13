@@ -373,6 +373,10 @@ def build_operator_snapshot(
         current_generated_at=report_data.get("generated_at", ""),
     )
     queue = _attach_portfolio_catalog_context(queue, report_data)
+    from src.action_sync_readiness import build_action_sync_readiness_bundle
+
+    action_sync = build_action_sync_readiness_bundle(report_data, queue)
+    queue = action_sync.get("operator_queue", queue)
     follow_through = _build_follow_through_with_queue(resolution_trend, queue)
     raw_next_action = _next_operator_action(
         resolution_trend.get("primary_target") or (queue[0] if queue else {}),
@@ -879,6 +883,13 @@ def build_operator_snapshot(
         "recent_reopened_recommendations": operator_effectiveness["recent_reopened_recommendations"],
         "recent_closed_actions": operator_effectiveness["recent_closed_actions"],
         "recent_regression_examples": operator_effectiveness["recent_regression_examples"],
+        "campaign_readiness_summary": action_sync["campaign_readiness_summary"],
+        "action_sync_summary": action_sync["action_sync_summary"],
+        "next_action_sync_step": action_sync["next_action_sync_step"],
+        "top_apply_ready_campaigns": action_sync["top_apply_ready_campaigns"],
+        "top_preview_ready_campaigns": action_sync["top_preview_ready_campaigns"],
+        "top_drift_review_campaigns": action_sync["top_drift_review_campaigns"],
+        "top_blocked_campaigns": action_sync["top_blocked_campaigns"],
     }
     return {
         "operator_summary": summary,
@@ -888,6 +899,9 @@ def build_operator_snapshot(
         "portfolio_outcomes_summary": operator_effectiveness["portfolio_outcomes_summary"],
         "operator_effectiveness_summary": operator_effectiveness["operator_effectiveness_summary"],
         "high_pressure_queue_history": operator_effectiveness["high_pressure_queue_history"],
+        "campaign_readiness_summary": action_sync["campaign_readiness_summary"],
+        "action_sync_summary": action_sync["action_sync_summary"],
+        "next_action_sync_step": action_sync["next_action_sync_step"],
     }
 
 
@@ -917,6 +931,10 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
         lines.append(f"*Why It Matters:* {summary['why_it_matters']}")
     if summary.get("what_to_do_next"):
         lines.append(f"*What To Do Next:* {summary['what_to_do_next']}")
+    if (summary.get("action_sync_summary") or {}).get("summary"):
+        lines.append(f"*Action Sync Readiness:* {(summary.get('action_sync_summary') or {}).get('summary')}")
+    if summary.get("next_action_sync_step"):
+        lines.append(f"*Next Action Sync Step:* {summary['next_action_sync_step']}")
     if summary.get("trend_summary"):
         lines.append(f"*Trend:* {summary['trend_summary']}")
     if summary.get("accountability_summary"):
