@@ -784,6 +784,36 @@ class TestRenderHtml:
         assert "Watch Strategy" in html
         assert "RepoC drift needs review" in html
         assert "Why It Matters" in html
+
+    def test_html_includes_portfolio_catalog_and_intent_alignment(self):
+        html = _render_html(
+            _make_report(
+                portfolio_catalog_summary={
+                    "summary": "1/3 repos have an explicit catalog contract.",
+                },
+                intent_alignment_summary={
+                    "summary": "1 aligned, 0 needing review, and 2 missing a contract.",
+                },
+                operator_queue=[
+                    {
+                        "repo": "RepoC",
+                        "title": "RepoC drift needs review",
+                        "lane": "urgent",
+                        "lane_label": "Urgent",
+                        "lane_reason": "Live drift still needs review.",
+                        "summary": "Operator pressure is active.",
+                        "recommended_action": "Inspect the managed issue before closing the campaign.",
+                        "catalog_line": "operator-loop | flagship repo | lifecycle active | criticality high | cadence weekly | disposition maintain",
+                        "intent_alignment": "aligned",
+                        "intent_alignment_reason": "The repo is holding a maintain posture without urgent or revalidation pressure.",
+                    }
+                ],
+            )
+        )
+        assert "Portfolio Catalog:" in html
+        assert "Intent Alignment:" in html
+        assert "operator-loop | flagship repo" in html
+        assert "aligned: The repo is holding a maintain posture" in html
         assert "What To Do Next" in html
         assert "Follow-Through" in html
         assert "Operator Focus" in html
@@ -801,6 +831,54 @@ class TestRenderHtml:
         assert "Revalidation Recovery" in html
         assert "Last movement:" in html
         assert no_linked_artifact_summary() in html
+
+    def test_html_includes_scorecards_when_present(self):
+        html = _render_html(
+            _make_report(
+                scorecards_summary={
+                    "summary": "0 repos are on track, 1 is below target, and 0 are missing a valid program.",
+                },
+                audits=[
+                    {
+                        **_make_report()["audits"][0],
+                        "scorecard": {
+                            "program": "maintain",
+                            "program_label": "Maintain",
+                            "maturity_level": "operating",
+                            "target_maturity": "strong",
+                            "status": "below-target",
+                            "top_gaps": ["Testing", "CI"],
+                            "summary": "Maintain is at Operating and still below the Strong target because testing and ci are behind.",
+                        },
+                    }
+                ],
+                operator_queue=[
+                    {
+                        "repo": "RepoA",
+                        "title": "RepoA needs attention",
+                        "lane": "ready",
+                        "lane_label": "Ready",
+                        "lane_reason": "Maturity still needs work.",
+                        "summary": "Operator pressure is active.",
+                        "recommended_action": "Review the repo.",
+                        "scorecard": {
+                            "program": "maintain",
+                            "program_label": "Maintain",
+                            "maturity_level": "operating",
+                            "target_maturity": "strong",
+                            "status": "below-target",
+                            "top_gaps": ["Testing", "CI"],
+                            "summary": "Maintain is at Operating and still below the Strong target because testing and ci are behind.",
+                        },
+                    }
+                ],
+            )
+        )
+
+        assert "Scorecards:" in html
+        assert "Scorecard: Maintain" in html
+        assert "Maturity Gap:" in html
+        assert "below the maintain bar" in html
 
     def test_data_embedded_as_json(self):
         html = _render_html(_make_report())

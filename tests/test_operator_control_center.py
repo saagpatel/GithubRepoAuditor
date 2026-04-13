@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import src.operator_control_center as operator_control_center
-from src.operator_control_center import build_operator_snapshot, normalize_review_state
+from src.operator_control_center import build_operator_snapshot, normalize_review_state, render_control_center_markdown
 
 
 def _make_report(**overrides) -> dict:
@@ -138,6 +138,7 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
     assert summary["primary_target_confidence_label"] == "high"
     assert summary["primary_target_confidence_score"] >= 0.75
     assert summary["next_action_confidence_label"] == "high"
+
     assert summary["primary_target_trust_policy"] == "act-now"
     assert "blocked" in summary["primary_target_trust_policy_reason"].lower()
     assert summary["primary_target_exception_status"] == "none"
@@ -713,6 +714,50 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
     assert summary["closure_forecast_reset_reentry_rebuild_window_runs"] == 4
     assert "guidance" in summary["adaptive_confidence_summary"].lower() or "immediate action" in summary["adaptive_confidence_summary"].lower()
     assert summary["recommendation_quality_summary"].startswith("Strong recommendation because")
+
+
+def test_operator_snapshot_attaches_portfolio_catalog_context(tmp_path: Path):
+    report = _make_report(
+        audits=[
+            {
+                "metadata": {"name": "RepoC", "archived": False},
+                "completeness_tier": "functional",
+                "portfolio_catalog": {
+                    "has_explicit_entry": True,
+                    "owner": "d",
+                    "team": "operator-loop",
+                    "purpose": "flagship queue item",
+                    "lifecycle_state": "active",
+                    "criticality": "high",
+                    "review_cadence": "weekly",
+                    "intended_disposition": "maintain",
+                    "catalog_line": "operator-loop | flagship queue item | lifecycle active | criticality high | cadence weekly | disposition maintain",
+                },
+                "scorecard": {
+                    "program": "maintain",
+                    "program_label": "Maintain",
+                    "maturity_level": "operating",
+                    "target_maturity": "strong",
+                    "status": "below-target",
+                    "top_gaps": ["Testing", "CI"],
+                    "summary": "Maintain is at Operating and still below the Strong target because testing and ci are behind.",
+                },
+            }
+        ]
+    )
+
+    snapshot = build_operator_snapshot(report, output_dir=tmp_path)
+    urgent_item = next(item for item in snapshot["operator_queue"] if item.get("repo") == "RepoC")
+    markdown = render_control_center_markdown(snapshot, "testuser", "2026-03-29")
+
+    assert urgent_item["catalog_line"].startswith("operator-loop | flagship queue item")
+    assert urgent_item["intent_alignment"] == "needs-review"
+    assert urgent_item["scorecard_line"] == "Scorecard: Maintain — Operating (target Strong)"
+    assert urgent_item["maturity_gap_summary"] == "testing, ci are still below the maintain bar."
+    assert "Catalog: operator-loop | flagship queue item" in markdown
+    assert "Intent Alignment: needs-review" in markdown
+    assert "Scorecard: Maintain — Operating (target Strong)" in markdown
+    assert "Maturity Gap: testing, ci are still below the maintain bar." in markdown
 
 
 def test_operator_snapshot_adds_follow_through_from_recent_history(tmp_path: Path, monkeypatch):

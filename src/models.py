@@ -102,6 +102,8 @@ class RepoAudit:
     action_candidates: list[dict] = field(default_factory=list)
     security_posture: dict = field(default_factory=dict)
     score_explanation: dict = field(default_factory=dict)
+    portfolio_catalog: dict = field(default_factory=dict)
+    scorecard: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
@@ -121,6 +123,8 @@ class RepoAudit:
             "action_candidates": self.action_candidates,
             "security_posture": self.security_posture,
             "score_explanation": self.score_explanation,
+            "portfolio_catalog": self.portfolio_catalog,
+            "scorecard": self.scorecard,
         }
 
 
@@ -180,6 +184,10 @@ class AuditReport:
     watch_state: dict = field(default_factory=dict)
     operator_summary: dict = field(default_factory=dict)
     operator_queue: list[dict] = field(default_factory=list)
+    portfolio_catalog_summary: dict = field(default_factory=dict)
+    intent_alignment_summary: dict = field(default_factory=dict)
+    scorecards_summary: dict = field(default_factory=dict)
+    scorecard_programs: dict = field(default_factory=dict)
     run_change_summary: str = ""
     run_change_counts: dict = field(default_factory=dict)
     runtime_breakdown: dict = field(default_factory=dict)
@@ -341,6 +349,10 @@ class AuditReport:
             watch_state={},
             operator_summary={},
             operator_queue=[],
+            portfolio_catalog_summary={},
+            intent_alignment_summary={},
+            scorecards_summary={},
+            scorecard_programs={},
             run_change_summary="",
             run_change_counts={},
             runtime_breakdown={},
@@ -392,6 +404,10 @@ class AuditReport:
             "watch_state": self.watch_state,
             "operator_summary": self.operator_summary,
             "operator_queue": self.operator_queue,
+            "portfolio_catalog_summary": self.portfolio_catalog_summary,
+            "intent_alignment_summary": self.intent_alignment_summary,
+            "scorecards_summary": self.scorecards_summary,
+            "scorecard_programs": self.scorecard_programs,
             "run_change_summary": self.run_change_summary,
             "run_change_counts": self.run_change_counts,
             "runtime_breakdown": self.runtime_breakdown,

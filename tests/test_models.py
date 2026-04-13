@@ -164,3 +164,27 @@ class TestAuditReport:
         assert "review_summary" in d
         assert "operator_summary" in d
         assert "operator_queue" in d
+
+    def test_repo_and_report_dict_include_scorecards(self, sample_metadata):
+        audit = RepoAudit(
+            metadata=sample_metadata,
+            analyzer_results=[],
+            overall_score=0.5,
+            completeness_tier="wip",
+            scorecard={
+                "program": "maintain",
+                "program_label": "Maintain",
+                "maturity_level": "operating",
+                "target_maturity": "strong",
+                "status": "below-target",
+            },
+        )
+        report = AuditReport.from_audits("user", [audit], [], 1)
+        report.scorecards_summary = {"summary": "0 repos are on track and 1 is below target."}
+        report.scorecard_programs = {"maintain": {"label": "Maintain", "rule_count": 8}}
+
+        data = report.to_dict()
+
+        assert data["audits"][0]["scorecard"]["program"] == "maintain"
+        assert data["scorecards_summary"]["summary"] == "0 repos are on track and 1 is below target."
+        assert data["scorecard_programs"]["maintain"]["rule_count"] == 8

@@ -1,0 +1,30 @@
+levels:
+  - key: missing-basics
+    label: Missing Basics
+    threshold: 0.0
+  - key: foundation
+    label: Foundation
+    threshold: 0.35
+  - key: operating
+    label: Operating
+    threshold: 0.60
+  - key: strong
+    label: Strong
+    threshold: 0.80
+  - key: leading
+    label: Leading
+    threshold: 0.92
+
+programs:
+  default:
+    label: Default
+    description: Balanced scorecard for actively maintained repos.
+    target_maturity: operating
+    rules:
+      - key: readme
+        label: README
+        check: dimension_at_least
+        dimension: readme
+        threshold: 0.60
+        partial_threshold: 0.45
+        weight: 1.0

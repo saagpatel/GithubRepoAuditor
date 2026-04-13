@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from pathlib import Path
 
 from src.models import AuditReport
 
 WAREHOUSE_FILENAME = "portfolio-warehouse.db"
-WAREHOUSE_SCHEMA_VERSION = 7
+WAREHOUSE_SCHEMA_VERSION = 9
 
 
 def write_warehouse_snapshot(
@@ -56,6 +57,10 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             security_summary_json TEXT NOT NULL,
             security_governance_preview_json TEXT NOT NULL,
             collections_json TEXT NOT NULL,
+            portfolio_catalog_summary_json TEXT NOT NULL DEFAULT '{}',
+            intent_alignment_summary_json TEXT NOT NULL DEFAULT '{}',
+            scorecards_summary_json TEXT NOT NULL DEFAULT '{}',
+            scorecard_programs_json TEXT NOT NULL DEFAULT '{}',
             scenario_summary_json TEXT NOT NULL,
             campaign_summary_json TEXT NOT NULL DEFAULT '{}',
             writeback_preview_json TEXT NOT NULL DEFAULT '{}',
@@ -409,6 +414,39 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             projected_tier_promotions INTEGER NOT NULL,
             PRIMARY KEY (run_id, lever_key)
         );
+
+        CREATE TABLE IF NOT EXISTS portfolio_catalog_entries (
+            run_id TEXT NOT NULL,
+            repo_id TEXT NOT NULL,
+            owner TEXT NOT NULL,
+            team TEXT NOT NULL,
+            purpose TEXT NOT NULL,
+            lifecycle_state TEXT NOT NULL,
+            criticality TEXT NOT NULL,
+            review_cadence TEXT NOT NULL,
+            intended_disposition TEXT NOT NULL,
+            notes TEXT NOT NULL,
+            intent_alignment TEXT NOT NULL,
+            intent_alignment_reason TEXT NOT NULL,
+            catalog_line TEXT NOT NULL,
+            maturity_program TEXT NOT NULL,
+            target_maturity TEXT NOT NULL,
+            PRIMARY KEY (run_id, repo_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS repo_scorecards (
+            run_id TEXT NOT NULL,
+            repo_id TEXT NOT NULL,
+            program TEXT NOT NULL,
+            program_label TEXT NOT NULL,
+            target_maturity TEXT NOT NULL,
+            maturity_level TEXT NOT NULL,
+            score REAL NOT NULL,
+            status TEXT NOT NULL,
+            failed_rule_keys_json TEXT NOT NULL,
+            summary TEXT NOT NULL,
+            PRIMARY KEY (run_id, repo_id)
+        );
         """
     )
     conn.execute(
@@ -416,7 +454,9 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
         ("schema_version", str(WAREHOUSE_SCHEMA_VERSION)),
     )
     _ensure_column(conn, "audit_runs", "report_path", "TEXT")
-    _ensure_column(conn, "audit_runs", "security_governance_preview_json", "TEXT NOT NULL DEFAULT '[]'")
+    _ensure_column(
+        conn, "audit_runs", "security_governance_preview_json", "TEXT NOT NULL DEFAULT '[]'"
+    )
     _ensure_column(conn, "audit_runs", "campaign_summary_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(conn, "audit_runs", "writeback_preview_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(conn, "audit_runs", "writeback_results_json", "TEXT NOT NULL DEFAULT '{}'")
@@ -432,6 +472,18 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     _ensure_column(conn, "audit_runs", "preflight_summary_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(conn, "audit_runs", "baseline_signature", "TEXT NOT NULL DEFAULT ''")
     _ensure_column(conn, "audit_runs", "baseline_context_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(
+        conn, "audit_runs", "portfolio_catalog_summary_json", "TEXT NOT NULL DEFAULT '{}'"
+    )
+    _ensure_column(
+        conn, "audit_runs", "intent_alignment_summary_json", "TEXT NOT NULL DEFAULT '{}'"
+    )
+    _ensure_column(conn, "audit_runs", "scorecards_summary_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(conn, "audit_runs", "scorecard_programs_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(
+        conn, "portfolio_catalog_entries", "maturity_program", "TEXT NOT NULL DEFAULT ''"
+    )
+    _ensure_column(conn, "portfolio_catalog_entries", "target_maturity", "TEXT NOT NULL DEFAULT ''")
     _ensure_column(conn, "audit_runs", "review_summary_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(conn, "audit_runs", "review_alerts_json", "TEXT NOT NULL DEFAULT '[]'")
     _ensure_column(conn, "audit_runs", "material_changes_json", "TEXT NOT NULL DEFAULT '[]'")
@@ -449,11 +501,20 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     _ensure_column(conn, "action_runs", "rollback_state", "TEXT")
 
 
-def _ensure_column(conn: sqlite3.Connection, table_name: str, column_name: str, column_def: str) -> None:
-    existing = {
-        row[1]
-        for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()
-    }
+_ALLOWED_TABLES = frozenset({"audit_runs", "action_runs", "portfolio_catalog_entries"})
+
+
+def _ensure_column(
+    conn: sqlite3.Connection,
+    table_name: str,
+    column_name: str,
+    column_def: str,
+) -> None:
+    if table_name not in _ALLOWED_TABLES:
+        raise ValueError(f"Unknown table: {table_name!r}")
+    if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", column_name):
+        raise ValueError(f"Invalid column name: {column_name!r}")
+    existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()}
     if column_name not in existing:
         conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_def}")
 
@@ -467,13 +528,14 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             total_repos, repos_audited, average_score, portfolio_baseline_size, baseline_signature, baseline_context_json,
             tier_distribution_json, language_distribution_json, lens_summary_json,
             security_summary_json, security_governance_preview_json, collections_json, scenario_summary_json,
+            portfolio_catalog_summary_json, intent_alignment_summary_json, scorecards_summary_json, scorecard_programs_json,
             campaign_summary_json, writeback_preview_json, writeback_results_json,
             managed_state_drift_json, rollback_preview_json, campaign_history_json,
             governance_preview_json, governance_approval_json, governance_results_json,
             governance_history_json, governance_drift_json, governance_summary_json, review_summary_json, review_alerts_json,
             preflight_summary_json, material_changes_json, review_targets_json, review_history_json, watch_state_json,
             operator_summary_json, operator_queue_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             run_id,
@@ -496,6 +558,10 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             json.dumps(report.security_governance_preview),
             json.dumps(report.collections),
             json.dumps(report.scenario_summary),
+            json.dumps(report.portfolio_catalog_summary),
+            json.dumps(report.intent_alignment_summary),
+            json.dumps(report.scorecards_summary),
+            json.dumps(report.scorecard_programs),
             json.dumps(report.campaign_summary),
             json.dumps(report.writeback_preview),
             json.dumps(report.writeback_results),
@@ -698,12 +764,18 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             "code_scanning": {
                 "open_count": security.get("github", {}).get("code_scanning_alerts") or 0,
                 "source": "github",
-                "details": {"status": security.get("github", {}).get("code_scanning_status", "unavailable")},
+                "details": {
+                    "status": security.get("github", {}).get("code_scanning_status", "unavailable")
+                },
             },
             "secret_scanning": {
                 "open_count": security.get("github", {}).get("secret_scanning_alerts") or 0,
                 "source": "github",
-                "details": {"status": security.get("github", {}).get("secret_scanning_status", "unavailable")},
+                "details": {
+                    "status": security.get("github", {}).get(
+                        "secret_scanning_status", "unavailable"
+                    )
+                },
             },
         }
         for alert_type, alert_data in alerts.items():
@@ -724,7 +796,11 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             )
 
         for provider_name, provider_data in (security.get("providers") or {}).items():
-            details = security.get(provider_name, {}) if provider_name in {"local", "github", "scorecard"} else {}
+            details = (
+                security.get(provider_name, {})
+                if provider_name in {"local", "github", "scorecard"}
+                else {}
+            )
             conn.execute(
                 """
                 INSERT OR REPLACE INTO security_providers (
@@ -762,10 +838,15 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
                 ),
             )
 
-        dep_result = next((result for result in audit.analyzer_results if result.dimension == "dependencies"), None)
+        dep_result = next(
+            (result for result in audit.analyzer_results if result.dimension == "dependencies"),
+            None,
+        )
         dep_details = dep_result.details if dep_result else {}
         manifest_files = dep_details.get("manifest_files", []) or dep_details.get("manifests", [])
-        dependency_count = dep_details.get("total_dependencies", dep_details.get("manifest_count", 0)) or 0
+        dependency_count = (
+            dep_details.get("total_dependencies", dep_details.get("manifest_count", 0)) or 0
+        )
         libyears = dep_details.get("total_libyears", 0.0) or 0.0
         conn.execute(
             """
@@ -803,6 +884,58 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
                     action.get("expected_tier_movement", ""),
                     action.get("rationale", ""),
                     action.get("action", ""),
+                ),
+            )
+
+        portfolio_catalog = audit.portfolio_catalog or {}
+        if portfolio_catalog:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO portfolio_catalog_entries (
+                    run_id, repo_id, owner, team, purpose, lifecycle_state, criticality,
+                    review_cadence, intended_disposition, notes, intent_alignment,
+                    intent_alignment_reason, catalog_line, maturity_program, target_maturity
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run_id,
+                    repo_id,
+                    portfolio_catalog.get("owner", ""),
+                    portfolio_catalog.get("team", ""),
+                    portfolio_catalog.get("purpose", ""),
+                    portfolio_catalog.get("lifecycle_state", ""),
+                    portfolio_catalog.get("criticality", ""),
+                    portfolio_catalog.get("review_cadence", ""),
+                    portfolio_catalog.get("intended_disposition", ""),
+                    portfolio_catalog.get("notes", ""),
+                    portfolio_catalog.get("intent_alignment", ""),
+                    portfolio_catalog.get("intent_alignment_reason", ""),
+                    portfolio_catalog.get("catalog_line", ""),
+                    portfolio_catalog.get("maturity_program", ""),
+                    portfolio_catalog.get("target_maturity", ""),
+                ),
+            )
+
+        scorecard = audit.scorecard or {}
+        if scorecard:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO repo_scorecards (
+                    run_id, repo_id, program, program_label, target_maturity,
+                    maturity_level, score, status, failed_rule_keys_json, summary
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run_id,
+                    repo_id,
+                    scorecard.get("program", ""),
+                    scorecard.get("program_label", ""),
+                    scorecard.get("target_maturity", ""),
+                    scorecard.get("maturity_level", ""),
+                    scorecard.get("score", 0.0),
+                    scorecard.get("status", ""),
+                    json.dumps(scorecard.get("failed_rule_keys", [])),
+                    scorecard.get("summary", ""),
                 ),
             )
 
@@ -862,7 +995,11 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
         )
 
     if report.campaign_summary:
-        campaign_run = report.writeback_results.get("campaign_run", {}) if isinstance(report.writeback_results, dict) else {}
+        campaign_run = (
+            report.writeback_results.get("campaign_run", {})
+            if isinstance(report.writeback_results, dict)
+            else {}
+        )
         conn.execute(
             """
             INSERT OR REPLACE INTO campaign_runs (
@@ -874,9 +1011,13 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
                 run_id,
                 report.campaign_summary.get("campaign_type", ""),
                 report.campaign_summary.get("label", ""),
-                campaign_run.get("portfolio_profile", report.campaign_summary.get("portfolio_profile", "default")),
+                campaign_run.get(
+                    "portfolio_profile", report.campaign_summary.get("portfolio_profile", "default")
+                ),
                 campaign_run.get("collection_name"),
-                campaign_run.get("writeback_target", report.writeback_results.get("target", "preview-only")),
+                campaign_run.get(
+                    "writeback_target", report.writeback_results.get("target", "preview-only")
+                ),
                 campaign_run.get("mode", report.writeback_results.get("mode", "preview")),
                 campaign_run.get("generated_at", report.generated_at.isoformat()),
                 json.dumps(campaign_run.get("generated_action_ids", [])),
@@ -955,7 +1096,11 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             ),
         )
 
-    for item in report.rollback_preview.get("items", []) if isinstance(report.rollback_preview, dict) else []:
+    for item in (
+        report.rollback_preview.get("items", [])
+        if isinstance(report.rollback_preview, dict)
+        else []
+    ):
         conn.execute(
             """
             INSERT OR REPLACE INTO rollback_runs (
@@ -971,7 +1116,11 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             ),
         )
 
-    for result in report.writeback_results.get("results", []) if isinstance(report.writeback_results, dict) else []:
+    for result in (
+        report.writeback_results.get("results", [])
+        if isinstance(report.writeback_results, dict)
+        else []
+    ):
         target = result.get("target", "")
         if target.startswith("github"):
             conn.execute(
@@ -1092,7 +1241,12 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             (
                 governance_run_id,
                 report.governance_results.get("source_run_id", ""),
-                report.governance_results.get("scope", report.governance_approval.get("scope", "all") if isinstance(report.governance_approval, dict) else "all"),
+                report.governance_results.get(
+                    "scope",
+                    report.governance_approval.get("scope", "all")
+                    if isinstance(report.governance_approval, dict)
+                    else "all",
+                ),
                 report.governance_results.get("fingerprint", ""),
                 report.governance_results.get("mode", "apply"),
                 json.dumps(report.governance_results),
@@ -1112,7 +1266,12 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
                     result.get("repo_full_name", ""),
                     result.get("control_key", ""),
                     result.get("status", "unknown"),
-                    result.get("rollback_state", "rollback-available" if result.get("rollback_available") else "non-reversible"),
+                    result.get(
+                        "rollback_state",
+                        "rollback-available"
+                        if result.get("rollback_available")
+                        else "non-reversible",
+                    ),
                     json.dumps(result.get("before", {})),
                     json.dumps(result.get("after", {})),
                     json.dumps(result),
@@ -1393,7 +1552,8 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
             """
             SELECT run_id, username, generated_at, run_mode, scoring_profile,
                    portfolio_baseline_size, baseline_signature, baseline_context_json, report_path, preflight_summary_json,
-                   governance_summary_json,
+                   governance_summary_json, portfolio_catalog_summary_json, intent_alignment_summary_json,
+                   scorecards_summary_json, scorecard_programs_json,
                    review_summary_json, operator_summary_json
             FROM audit_runs
             WHERE username = ?
@@ -1419,6 +1579,14 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
                 "report_path": row["report_path"],
                 "preflight_summary": json.loads(row["preflight_summary_json"] or "{}"),
                 "governance_summary": json.loads(row["governance_summary_json"] or "{}"),
+                "portfolio_catalog_summary": json.loads(
+                    row["portfolio_catalog_summary_json"] or "{}"
+                ),
+                "intent_alignment_summary": json.loads(
+                    row["intent_alignment_summary_json"] or "{}"
+                ),
+                "scorecards_summary": json.loads(row["scorecards_summary_json"] or "{}"),
+                "scorecard_programs": json.loads(row["scorecard_programs_json"] or "{}"),
                 "review_summary": json.loads(row["review_summary_json"] or "{}"),
                 "operator_summary": json.loads(row["operator_summary_json"] or "{}"),
             }
@@ -1487,7 +1655,8 @@ def load_latest_operator_state(output_dir: Path, username: str) -> dict | None:
             """
             SELECT run_id, generated_at, report_path, preflight_summary_json,
                    baseline_signature, baseline_context_json,
-                   governance_summary_json,
+                   governance_summary_json, portfolio_catalog_summary_json, intent_alignment_summary_json,
+                   scorecards_summary_json, scorecard_programs_json,
                    review_summary_json, review_alerts_json, material_changes_json,
                    review_targets_json, review_history_json, watch_state_json,
                    operator_summary_json, operator_queue_json
@@ -1510,6 +1679,10 @@ def load_latest_operator_state(output_dir: Path, username: str) -> dict | None:
         "baseline_context": json.loads(row["baseline_context_json"] or "{}"),
         "preflight_summary": json.loads(row["preflight_summary_json"] or "{}"),
         "governance_summary": json.loads(row["governance_summary_json"] or "{}"),
+        "portfolio_catalog_summary": json.loads(row["portfolio_catalog_summary_json"] or "{}"),
+        "intent_alignment_summary": json.loads(row["intent_alignment_summary_json"] or "{}"),
+        "scorecards_summary": json.loads(row["scorecards_summary_json"] or "{}"),
+        "scorecard_programs": json.loads(row["scorecard_programs_json"] or "{}"),
         "review_summary": json.loads(row["review_summary_json"] or "{}"),
         "review_alerts": json.loads(row["review_alerts_json"] or "[]"),
         "material_changes": json.loads(row["material_changes_json"] or "[]"),
@@ -1584,7 +1757,9 @@ def load_operator_state_history(output_dir: Path, username: str, limit: int = 5)
     return history
 
 
-def load_operator_calibration_history(output_dir: Path, username: str, limit: int = 20) -> list[dict]:
+def load_operator_calibration_history(
+    output_dir: Path, username: str, limit: int = 20
+) -> list[dict]:
     conn = _connect(output_dir)
     if conn is None:
         return []
@@ -1693,14 +1868,22 @@ def _normalize_operator_evidence_event(row: sqlite3.Row) -> dict:
     target = details.get("target") or details.get("control_key") or row["event_group"] or ""
     source = row["source"]
     if source == "campaign" and action_id:
-        item_id = f"campaign-drift:{action_id}:{target}" if target else f"campaign-drift:{action_id}"
+        item_id = (
+            f"campaign-drift:{action_id}:{target}" if target else f"campaign-drift:{action_id}"
+        )
         title = details.get("title") or f"{repo or 'Campaign'} drift needs review"
     elif source == "governance":
         governance_key = action_id or repo_full_name or repo or "governance"
-        item_id = f"governance-drift:{governance_key}:{target}" if target else f"governance-drift:{governance_key}"
+        item_id = (
+            f"governance-drift:{governance_key}:{target}"
+            if target
+            else f"governance-drift:{governance_key}"
+        )
         title = details.get("title") or f"{repo or 'Governance'} drift needs review"
     else:
-        title = details.get("title") or (f"{repo}: {row['event_type']}" if repo else row["event_type"])
+        title = details.get("title") or (
+            f"{repo}: {row['event_type']}" if repo else row["event_type"]
+        )
         item_id = details.get("item_id") or f"{repo}:{title}".strip(":")
     summary = (
         details.get("summary")

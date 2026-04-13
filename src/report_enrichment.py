@@ -48,6 +48,10 @@ NO_FOLLOW_THROUGH_REACQUISITION_SOFTENING_DECAY = "No reacquisition softening-de
 NO_FOLLOW_THROUGH_REACQUISITION_CONFIDENCE_RETIREMENT = "No reacquisition confidence-retirement signal is currently surfaced."
 NO_FOLLOW_THROUGH_REACQUISITION_REVALIDATION_RECOVERY = "No post-revalidation recovery or confidence re-earning signal is currently surfaced."
 NO_OPERATOR_FOCUS_SUMMARY = "No operator focus bucket is currently surfaced."
+NO_PORTFOLIO_CATALOG_SUMMARY = "No portfolio catalog contract is recorded yet."
+NO_INTENT_ALIGNMENT_SUMMARY = "Intent alignment cannot be judged until a portfolio catalog contract exists."
+NO_SCORECARD_SUMMARY = "No maturity scorecard is recorded yet."
+NO_MATURITY_GAP_SUMMARY = "No maturity gap summary is recorded yet."
 
 OPERATOR_FOCUS_LABELS = {
     "act-now": "Act Now",
@@ -400,6 +404,13 @@ def build_repo_briefing(
     operator_focus = build_operator_focus(handoff_source)
     operator_focus_summary = build_operator_focus_summary(handoff_source)
     operator_focus_line = build_operator_focus_line(handoff_source)
+    portfolio_catalog = build_portfolio_catalog_entry(audit)
+    catalog_line = build_portfolio_catalog_line(audit)
+    intent_alignment = build_intent_alignment_status(audit)
+    intent_alignment_reason = build_intent_alignment_summary(audit)
+    scorecard = build_scorecard_entry(audit)
+    scorecard_line = build_scorecard_line(audit)
+    maturity_gap_summary = build_maturity_gap_summary(audit)
     follow_through_resurfacing_reason = build_follow_through_resurfacing_reason(handoff_source)
     return {
         "repo": repo_name,
@@ -488,6 +499,15 @@ def build_repo_briefing(
         "operator_focus": operator_focus,
         "operator_focus_summary": operator_focus_summary,
         "operator_focus_line": operator_focus_line,
+        "portfolio_catalog": portfolio_catalog,
+        "catalog_line": catalog_line,
+        "intent_alignment": intent_alignment,
+        "intent_alignment_reason": intent_alignment_reason,
+        "intent_alignment_line": f"{intent_alignment}: {intent_alignment_reason}",
+        "scorecard": scorecard,
+        "scorecard_line": scorecard_line,
+        "maturity_gap_summary": maturity_gap_summary,
+        "maturity_gap_line": f"Maturity Gap: {maturity_gap_summary}",
         "resurfacing_reason_line": follow_through_resurfacing_reason,
     }
 
@@ -544,8 +564,12 @@ def build_weekly_review_pack(
         "trust_actionability_summary": build_trust_actionability_summary(data),
         "top_recommendation_summary": top_recommendation,
         "operator_focus_summary": _build_operator_focus_summary_from_groups(grouped_focus_items),
+        "portfolio_catalog_summary": build_portfolio_catalog_summary(data),
+        "intent_alignment_summary": build_portfolio_intent_alignment_summary(data),
+        "scorecards_summary": build_scorecards_summary(data),
         "top_attention": top_attention,
         "repo_briefings": repo_briefings,
+        "top_below_target_scorecard_items": list(_mapping(data).get("scorecards_summary", {}).get("top_below_target_repos") or []),
         "what_to_do_this_week": what_to_do_this_week,
         "follow_through_summary": str(operator_summary.get("follow_through_summary") or NO_FOLLOW_THROUGH_SUMMARY),
         "follow_through_checkpoint_summary": str(
@@ -1222,6 +1246,73 @@ def build_operator_focus_line(value: Any) -> str:
     return f"{build_operator_focus(value)}: {build_operator_focus_summary(value)}"
 
 
+def build_portfolio_catalog_entry(value: Any) -> dict[str, Any]:
+    mapped = _mapping(value)
+    entry = mapped.get("portfolio_catalog")
+    return _mapping(entry)
+
+
+def build_portfolio_catalog_line(value: Any) -> str:
+    entry = build_portfolio_catalog_entry(value)
+    return str(entry.get("catalog_line") or NO_PORTFOLIO_CATALOG_SUMMARY)
+
+
+def build_intent_alignment_status(value: Any) -> str:
+    entry = build_portfolio_catalog_entry(value)
+    return str(entry.get("intent_alignment") or "missing-contract")
+
+
+def build_intent_alignment_summary(value: Any) -> str:
+    entry = build_portfolio_catalog_entry(value)
+    return str(entry.get("intent_alignment_reason") or NO_INTENT_ALIGNMENT_SUMMARY)
+
+
+def build_portfolio_catalog_summary(report_data: Any) -> str:
+    summary = _mapping(_mapping(report_data).get("portfolio_catalog_summary"))
+    return str(summary.get("summary") or NO_PORTFOLIO_CATALOG_SUMMARY)
+
+
+def build_portfolio_intent_alignment_summary(report_data: Any) -> str:
+    summary = _mapping(_mapping(report_data).get("intent_alignment_summary"))
+    return str(summary.get("summary") or NO_INTENT_ALIGNMENT_SUMMARY)
+
+
+def build_scorecard_entry(value: Any) -> dict[str, Any]:
+    mapped = _mapping(value)
+    entry = mapped.get("scorecard")
+    return _mapping(entry)
+
+
+def build_scorecard_line(value: Any) -> str:
+    entry = build_scorecard_entry(value)
+    if not entry:
+        return f"Scorecard: {NO_SCORECARD_SUMMARY}"
+    program_label = str(entry.get("program_label") or "Default")
+    maturity_level = str(entry.get("maturity_level") or "missing-basics").replace("-", " ").title()
+    target = str(entry.get("target_maturity") or "operating").replace("-", " ").title()
+    return f"Scorecard: {program_label} — {maturity_level} (target {target})"
+
+
+def build_maturity_gap_summary(value: Any) -> str:
+    entry = build_scorecard_entry(value)
+    if not entry:
+        return NO_MATURITY_GAP_SUMMARY
+    status = str(entry.get("status") or "").strip()
+    program_label = str(entry.get("program_label") or entry.get("program") or "Default")
+    target = str(entry.get("target_maturity") or "operating").replace("-", " ").title()
+    if status == "on-track":
+        return f"No active maturity gap. {program_label} is already meeting the {target} target."
+    top_gaps = [str(item).strip() for item in entry.get("top_gaps", []) if str(item).strip()]
+    if top_gaps:
+        return f"{', '.join(top_gaps[:3]).lower()} are still below the {program_label.lower()} bar."
+    return str(entry.get("summary") or NO_MATURITY_GAP_SUMMARY)
+
+
+def build_scorecards_summary(report_data: Any) -> str:
+    summary = _mapping(_mapping(report_data).get("scorecards_summary"))
+    return str(summary.get("summary") or NO_SCORECARD_SUMMARY)
+
+
 def _build_operator_focus_item(mapped: dict[str, Any], review_summary: dict[str, Any]) -> dict[str, Any]:
     return {
         "repo": mapped.get("repo") or mapped.get("repo_name") or "Portfolio",
@@ -1269,6 +1360,11 @@ def _build_operator_focus_item(mapped: dict[str, Any], review_summary: dict[str,
         "operator_focus": build_operator_focus(mapped),
         "operator_focus_summary": build_operator_focus_summary(mapped),
         "operator_focus_line": build_operator_focus_line(mapped),
+        "catalog_line": build_portfolio_catalog_line(mapped),
+        "intent_alignment": build_intent_alignment_status(mapped),
+        "intent_alignment_summary": build_intent_alignment_summary(mapped),
+        "scorecard_line": build_scorecard_line(mapped),
+        "maturity_gap_summary": build_maturity_gap_summary(mapped),
     }
 
 

@@ -85,14 +85,19 @@ from src.report_enrichment import (
     build_follow_through_relapse_churn_status_label,
     build_follow_through_relapse_churn_summary,
     build_last_movement_label,
+    build_maturity_gap_summary,
     build_operator_focus,
     build_operator_focus_line,
     build_operator_focus_summary,
+    build_portfolio_catalog_summary,
+    build_portfolio_intent_alignment_summary,
     build_queue_pressure_summary,
     build_repo_briefing,
     build_run_change_counts,
     build_run_change_summary,
     build_score_explanation,
+    build_scorecard_line,
+    build_scorecards_summary,
     build_top_recommendation_summary,
     build_trust_actionability_summary,
     build_weekly_review_pack,
@@ -109,6 +114,8 @@ CORE_VISIBLE_SHEETS = {
     "Dashboard",
     "All Repos",
     "Portfolio Explorer",
+    "Portfolio Catalog",
+    "Scorecards",
     "Repo Detail",
     "By Lens",
     "By Collection",
@@ -1161,6 +1168,11 @@ def _build_workbook_rollups(data: dict) -> tuple[list[list[object]], list[list[o
                 item.get("follow_through_reacquisition_revalidation_recovery_status", ""),
                 item.get("follow_through_reacquisition_revalidation_recovery_summary", ""),
                 item.get("follow_through_reacquisition_revalidation_recovery_reason", ""),
+                item.get("catalog_line", ""),
+                item.get("intent_alignment", ""),
+                item.get("intent_alignment_reason", ""),
+                item.get("scorecard_line", ""),
+                item.get("maturity_gap_summary", ""),
             ]
         )
 
@@ -1622,6 +1634,9 @@ def _build_dashboard(
         ("Operator Focus", operator_focus),
         ("Focus Summary", operator_focus_summary),
         ("Focus Line", operator_focus_line),
+        ("Portfolio Catalog", build_portfolio_catalog_summary(data)),
+        ("Intent Alignment", build_portfolio_intent_alignment_summary(data)),
+        ("Scorecards", build_scorecards_summary(data)),
         ("Next Action", next_action),
         ("Top Recommendation", top_recommendation_summary),
     ]
@@ -3461,7 +3476,7 @@ def _set_internal_hyperlink(cell, sheet_name: str, *, target_cell: str = "A1", d
 
 def _repo_detail_lookup_formula(column_index: int, fallback: str, *, allow_blank: bool = False) -> str:
     escaped_fallback = fallback.replace('"', '""')
-    lookup = f"VLOOKUP($B$4,Data_RepoDetail!$A:$BI,{column_index},FALSE)"
+    lookup = f"VLOOKUP($B$4,Data_RepoDetail!$A:$BZ,{column_index},FALSE)"
     if allow_blank:
         return f'=IFERROR({lookup},"{escaped_fallback}")'
     return f'=IFERROR(IF({lookup}="","{escaped_fallback}",{lookup}),"{escaped_fallback}")'
@@ -3577,6 +3592,10 @@ def _repo_detail_rows(data: dict, score_history: dict[str, list[float]] | None) 
             briefing.get("what_to_do_next", {}).get("revalidation_recovery", "None"),
             briefing.get("what_to_do_next", {}).get("revalidation_recovery_summary", "No post-revalidation recovery or confidence re-earning signal is currently surfaced."),
             briefing.get("what_to_do_next", {}).get("what_would_count_as_progress", "Use the next run or linked artifact to confirm whether the recommendation moved."),
+            briefing.get("catalog_line", "No portfolio catalog contract is recorded yet."),
+            briefing.get("intent_alignment_line", "missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists."),
+            briefing.get("scorecard_line", "Scorecard: No maturity scorecard is recorded yet."),
+            briefing.get("maturity_gap_summary", "No maturity gap summary is recorded yet."),
         ])
 
         ranked_dimensions = sorted(
@@ -3689,6 +3708,8 @@ def _build_hidden_data_sheets(
     governance_rows: list[list[object]] = []
     campaign_rows: list[list[object]] = []
     writeback_rows: list[list[object]] = []
+    portfolio_catalog_rows: list[list[object]] = []
+    scorecard_rows: list[list[object]] = []
     lookup_rows: list[list[object]] = []
     repo_detail_rows, repo_dimension_rollup_rows, repo_history_rollup_rows = _repo_detail_rows(data, score_history)
     run_change_rollup_rows, run_change_repo_rows = _run_change_rows(data, diff_data)
@@ -3716,6 +3737,40 @@ def _build_hidden_data_sheets(
             lenses.get("security_posture", {}).get("score", 0.0),
             lenses.get("momentum", {}).get("score", 0.0),
             lenses.get("portfolio_fit", {}).get("score", 0.0),
+        ])
+        catalog = audit.get("portfolio_catalog", {})
+        portfolio_catalog_rows.append([
+            repo_name,
+            metadata.get("full_name", ""),
+            catalog.get("owner", ""),
+            catalog.get("team", ""),
+            catalog.get("purpose", ""),
+            catalog.get("lifecycle_state", ""),
+            catalog.get("criticality", ""),
+            catalog.get("review_cadence", ""),
+            catalog.get("intended_disposition", ""),
+            catalog.get("maturity_program", ""),
+            catalog.get("target_maturity", ""),
+            catalog.get("notes", ""),
+            catalog.get("intent_alignment", "missing-contract"),
+            catalog.get("intent_alignment_reason", ""),
+            catalog.get("catalog_line", ""),
+        ])
+        scorecard = audit.get("scorecard", {})
+        scorecard_rows.append([
+            repo_name,
+            metadata.get("full_name", ""),
+            scorecard.get("program", ""),
+            scorecard.get("program_label", ""),
+            scorecard.get("score", 0.0),
+            scorecard.get("maturity_level", ""),
+            scorecard.get("target_maturity", ""),
+            scorecard.get("status", ""),
+            scorecard.get("passed_rules", 0),
+            scorecard.get("applicable_rules", 0),
+            ", ".join(scorecard.get("failed_rule_keys", [])),
+            ", ".join(scorecard.get("top_gaps", [])),
+            scorecard.get("summary", ""),
         ])
 
         for result in audit.get("analyzer_results", []):
@@ -4075,6 +4130,50 @@ def _build_hidden_data_sheets(
     )
     _write_hidden_table_sheet(
         wb,
+        "Data_PortfolioCatalog",
+        "tblPortfolioCatalogData",
+        [
+            "Repo",
+            "Full Name",
+            "Owner",
+            "Team",
+            "Purpose",
+            "Lifecycle",
+            "Criticality",
+            "Review Cadence",
+            "Disposition",
+            "Maturity Program",
+            "Target Maturity",
+            "Notes",
+            "Intent Alignment",
+            "Intent Alignment Reason",
+            "Catalog Line",
+        ],
+        portfolio_catalog_rows,
+    )
+    _write_hidden_table_sheet(
+        wb,
+        "Data_Scorecards",
+        "tblScorecardsData",
+        [
+            "Repo",
+            "Full Name",
+            "Program",
+            "Program Label",
+            "Score",
+            "Maturity Level",
+            "Target Maturity",
+            "Status",
+            "Passed Rules",
+            "Applicable Rules",
+            "Failed Rule Keys",
+            "Top Gaps",
+            "Summary",
+        ],
+        scorecard_rows,
+    )
+    _write_hidden_table_sheet(
+        wb,
         "Data_Scenarios",
         "tblScenarios",
         ["Key", "Title", "Lens", "Repo Count", "Average Expected Lens Delta", "Projected Tier Promotions"],
@@ -4173,6 +4272,11 @@ def _build_hidden_data_sheets(
             "Follow-Through Reacquisition Revalidation Recovery Status",
             "Follow-Through Reacquisition Revalidation Recovery Summary",
             "Follow-Through Reacquisition Revalidation Recovery Reason",
+            "Catalog Line",
+            "Intent Alignment",
+            "Intent Alignment Reason",
+            "Scorecard Line",
+            "Maturity Gap Summary",
         ],
         operator_queue_rows,
     )
@@ -4256,6 +4360,10 @@ def _build_hidden_data_sheets(
             "Revalidation Recovery",
             "Revalidation Recovery Summary",
             "What Would Count As Progress",
+            "Catalog",
+            "Intent Alignment",
+            "Scorecard",
+            "Maturity Gap",
         ],
         repo_detail_rows,
     )
@@ -4539,13 +4647,13 @@ def _build_portfolio_explorer(
         "Use this sheet to rank the portfolio, sort by profile-aware score, and drill from summary into repo-level facts.",
         width=10,
     )
-    ws.merge_cells("A3:J3")
-    ws["A3"] = "How to use this sheet: sort by Profile Score first, then filter by tier or collection when you want to narrow the drill-down."
+    ws.merge_cells("A3:O3")
+    ws["A3"] = "How to use this sheet: sort by Profile Score first, then use the catalog columns to separate intentional experiments from maintained assets before drilling in."
     ws["A3"].font = SUBTITLE_FONT
     ws["A3"].alignment = WRAP
     headers = [
         "Repo", "Profile Score", "Overall", "Interest", "Tier", "Collections",
-        "Security", "Hotspots", "Top Hotspot", "Primary Action",
+        "Lifecycle", "Criticality", "Disposition", "Maturity", "Scorecard Gap", "Security", "Hotspots", "Top Hotspot", "Primary Action",
     ]
     start_row = 5
     for col, header in enumerate(headers, 1):
@@ -4563,6 +4671,11 @@ def _build_portfolio_explorer(
             entry["interest_score"],
             entry["tier"],
             ", ".join(entry["collections"]),
+            audit.get("portfolio_catalog", {}).get("lifecycle_state", "") or "—",
+            audit.get("portfolio_catalog", {}).get("criticality", "") or "—",
+            audit.get("portfolio_catalog", {}).get("intended_disposition", "") or "—",
+            audit.get("scorecard", {}).get("maturity_level", "") or "—",
+            build_maturity_gap_summary(audit),
             entry["security_label"],
             entry["hotspot_count"],
             entry["primary_hotspot"],
@@ -4575,6 +4688,124 @@ def _build_portfolio_explorer(
     if max_row > start_row:
         apply_zebra_stripes(ws, start_row + 1, max_row, len(headers))
         _add_table(ws, "tblPortfolioExplorer", len(headers), max_row, start_row=start_row)
+    auto_width(ws, len(headers), max_row)
+
+
+def _build_portfolio_catalog_sheet(wb: Workbook, data: dict) -> None:
+    ws = _get_or_create_sheet(wb, "Portfolio Catalog")
+    ws.sheet_properties.tabColor = "4F46E5"
+    _configure_sheet_view(ws, zoom=110, show_grid_lines=True)
+    _set_sheet_header(
+        ws,
+        "Portfolio Catalog",
+        "Use this sheet to see what each repo is supposed to be, who owns it, and whether its current state still matches that intent.",
+        width=10,
+    )
+    ws.merge_cells("A3:L3")
+    ws["A3"] = build_portfolio_catalog_summary(data)
+    ws["A3"].font = SUBTITLE_FONT
+    ws["A3"].alignment = WRAP
+    ws.merge_cells("A4:L4")
+    ws["A4"] = build_portfolio_intent_alignment_summary(data)
+    ws["A4"].font = SUBTITLE_FONT
+    ws["A4"].alignment = WRAP
+    headers = [
+        "Repo",
+        "Owner",
+        "Team",
+        "Purpose",
+        "Lifecycle",
+        "Criticality",
+        "Review Cadence",
+        "Disposition",
+        "Maturity Program",
+        "Target Maturity",
+        "Intent Alignment",
+        "Notes",
+    ]
+    start_row = 6
+    for col, header in enumerate(headers, 1):
+        ws.cell(row=start_row, column=col, value=header)
+    style_header_row(ws, start_row, len(headers))
+    ws.freeze_panes = "B7"
+
+    audits = sorted(data.get("audits", []), key=lambda item: item.get("metadata", {}).get("name", ""))
+    for row, audit in enumerate(audits, start_row + 1):
+        catalog = audit.get("portfolio_catalog", {})
+        values = [
+            audit.get("metadata", {}).get("name", ""),
+            catalog.get("owner", ""),
+            catalog.get("team", ""),
+            catalog.get("purpose", ""),
+            catalog.get("lifecycle_state", "") or "—",
+            catalog.get("criticality", "") or "—",
+            catalog.get("review_cadence", "") or "—",
+            catalog.get("intended_disposition", "") or "—",
+            catalog.get("maturity_program", "") or "—",
+            catalog.get("target_maturity", "") or "—",
+            catalog.get("intent_alignment", "missing-contract"),
+            catalog.get("notes", "") or "—",
+        ]
+        for col, value in enumerate(values, 1):
+            style_data_cell(ws.cell(row=row, column=col, value=value), "left")
+
+    max_row = start_row + len(audits)
+    if audits:
+        apply_zebra_stripes(ws, start_row + 1, max_row, len(headers))
+        _add_table(ws, "tblPortfolioCatalog", len(headers), max_row, start_row=start_row)
+    auto_width(ws, len(headers), max_row)
+
+
+def _build_scorecards_sheet(wb: Workbook, data: dict) -> None:
+    ws = _get_or_create_sheet(wb, "Scorecards")
+    ws.sheet_properties.tabColor = "7C3AED"
+    _configure_sheet_view(ws, zoom=110, show_grid_lines=True)
+    _set_sheet_header(
+        ws,
+        "Scorecards",
+        "Use this sheet to compare each repo against the maturity bar that matches its intended role.",
+        width=10,
+    )
+    ws.merge_cells("A3:H3")
+    ws["A3"] = build_scorecards_summary(data)
+    ws["A3"].font = SUBTITLE_FONT
+    ws["A3"].alignment = WRAP
+    headers = [
+        "Repo",
+        "Program",
+        "Maturity",
+        "Target",
+        "Status",
+        "Score",
+        "Top Gaps",
+        "Summary",
+    ]
+    start_row = 5
+    for col, header in enumerate(headers, 1):
+        ws.cell(row=start_row, column=col, value=header)
+    style_header_row(ws, start_row, len(headers))
+    ws.freeze_panes = "B6"
+
+    audits = sorted(data.get("audits", []), key=lambda item: item.get("metadata", {}).get("name", ""))
+    for row, audit in enumerate(audits, start_row + 1):
+        scorecard = audit.get("scorecard", {})
+        values = [
+            audit.get("metadata", {}).get("name", ""),
+            scorecard.get("program_label", "") or "—",
+            scorecard.get("maturity_level", "") or "—",
+            scorecard.get("target_maturity", "") or "—",
+            scorecard.get("status", "") or "—",
+            scorecard.get("score", 0.0),
+            ", ".join(scorecard.get("top_gaps", [])) or "—",
+            scorecard.get("summary", "") or "—",
+        ]
+        for col, value in enumerate(values, 1):
+            style_data_cell(ws.cell(row=row, column=col, value=value), "center" if col in {3, 4, 5, 6} else "left")
+
+    max_row = start_row + len(audits)
+    if audits:
+        apply_zebra_stripes(ws, start_row + 1, max_row, len(headers))
+        _add_table(ws, "tblScorecards", len(headers), max_row, start_row=start_row)
     auto_width(ws, len(headers), max_row)
 
 
@@ -4779,7 +5010,7 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
         ws.add_data_validation(dv)
     ws["D4"] = "GitHub"
     ws["D4"].font = SUBHEADER_FONT
-    ws["E4"] = '=IFERROR(IF(VLOOKUP($B$4,Data_RepoDetail!$A:$BG,2,FALSE)="","Repo URL unavailable",HYPERLINK(VLOOKUP($B$4,Data_RepoDetail!$A:$BG,2,FALSE),"Open Repo")),"Repo URL unavailable")'
+    ws["E4"] = '=IFERROR(IF(VLOOKUP($B$4,Data_RepoDetail!$A:$BZ,2,FALSE)="","Repo URL unavailable",HYPERLINK(VLOOKUP($B$4,Data_RepoDetail!$A:$BZ,2,FALSE),"Open Repo")),"Repo URL unavailable")'
     ws["E4"].font = Font("Calibri", 10, bold=True, color=TEAL, underline="single")
 
     summary_fields = [
@@ -4895,6 +5126,10 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
         ("Revalidation Recovery", 59, "None"),
         ("Revalidation Recovery Summary", 60, "No post-revalidation recovery or confidence re-earning signal is currently surfaced."),
         ("Progress Checkpoint", 61, "Use the next run or linked artifact to confirm whether the recommendation moved."),
+        ("Portfolio Catalog", 62, "No portfolio catalog contract is recorded yet."),
+        ("Intent Alignment", 63, "missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists."),
+        ("Scorecard", 64, "Scorecard: No maturity scorecard is recorded yet."),
+        ("Maturity Gap", 65, "No maturity gap summary is recorded yet."),
         ("Action Candidate 2", 28, "No second action candidate recorded yet."),
         ("Action Candidate 3", 29, "No third action candidate recorded yet."),
     ]
@@ -5187,6 +5422,10 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
         "Priority",
         "Why This Is Here",
         "What To Do Next",
+        "Catalog",
+        "Intent Alignment",
+        "Maturity",
+        "Scorecard Gap",
         "Last Movement",
         "Follow-Through",
         "Next Checkpoint",
@@ -5239,6 +5478,13 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
             item.get("priority", item.get("severity", 0.0)),
             why_this_is_here,
             next_step,
+            item.get("catalog_line", "No portfolio catalog contract is recorded yet."),
+            (
+                f"{item.get('intent_alignment', 'missing-contract')} — "
+                f"{item.get('intent_alignment_reason', 'Intent alignment cannot be judged until a portfolio catalog contract exists.')}"
+            ),
+            item.get("scorecard", {}).get("maturity_level", "") or "—",
+            item.get("maturity_gap_summary", "No maturity gap summary is recorded yet."),
             last_movement,
             item.get("follow_through_summary", "No follow-through evidence is recorded yet."),
             item.get("follow_through_next_checkpoint", "Use the next run or linked artifact to confirm whether the recommendation moved."),
@@ -5270,13 +5516,13 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
             "yes" if safe_to_defer else "no",
         ]
         for col, value in enumerate(values, 1):
-            align = "center" if col in {3, 4, 5, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 39} else "left"
+            align = "center" if col in {3, 4, 5, 10, 15, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 43} else "left"
             style_data_cell(ws.cell(row=row, column=col, value=value), align)
         repo_cell = ws.cell(row=row, column=1)
         if item.get("repo_url"):
             repo_cell.hyperlink = item.get("repo_url")
             repo_cell.font = Font("Calibri", 10, color=TEAL, underline="single")
-        artifact_cell = ws.cell(row=row, column=38)
+        artifact_cell = ws.cell(row=row, column=40)
         if primary_link:
             artifact_cell.hyperlink = primary_link
             artifact_cell.font = Font("Calibri", 10, color=TEAL, underline="single")
@@ -5718,6 +5964,10 @@ def _build_executive_summary(
         ),
         ("What Changed", what_changed or change_summary),
         ("Why It Matters", why_it_matters),
+        ("Top Recommendation", top_recommendation),
+        ("Portfolio Catalog", build_portfolio_catalog_summary(data)),
+        ("Intent Alignment", build_portfolio_intent_alignment_summary(data)),
+        ("Scorecards", build_scorecards_summary(data)),
         ("Follow-Through", follow_through),
         ("Next Checkpoint", follow_through_checkpoint),
         ("Escalation", follow_through_escalation),
@@ -5734,7 +5984,6 @@ def _build_executive_summary(
         ("Focus Summary", operator_focus_summary),
         ("Focus Line", operator_focus_line),
         ("Trust Summary", trust_actionability_summary),
-        ("Top Recommendation", top_recommendation),
         ("Biggest Opportunity", biggest_opportunity),
         ("Focus This Week", next_action or recommended_focus or "Review the top queue items first, then protect the highest-value repos from drift."),
     ]
@@ -6348,6 +6597,8 @@ def _build_excel_workbook(
         portfolio_profile=portfolio_profile,
         collection=collection,
     )
+    _build_portfolio_catalog_sheet(wb, data)
+    _build_scorecards_sheet(wb, data)
     _build_repo_detail(wb, data)
     _build_by_lens(
         wb,

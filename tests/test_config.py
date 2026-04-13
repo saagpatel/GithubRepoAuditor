@@ -104,6 +104,11 @@ class TestMergeConfig:
         assert args.preflight_mode == "strict"
         assert args.watch_strategy == "full"
 
+    def test_config_fills_scorecards_path(self):
+        args = argparse.Namespace(scorecards=None)
+        merge_config_with_args(args, {"scorecards": "config/custom-scorecards.yaml"})
+        assert args.scorecards == "config/custom-scorecards.yaml"
+
 
 class TestValidateConfigData:
     def test_flags_unknown_key_as_warning(self):
