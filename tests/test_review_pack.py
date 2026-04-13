@@ -97,6 +97,13 @@ def _make_report() -> dict:
                 "summary": "Action Sync is preview-ready: Security Review is the strongest next campaign to preview from the current local facts.",
             },
             "next_action_sync_step": "Preview Security Review next, then decide whether it is ready to sync to all.",
+            "apply_readiness_summary": {
+                "summary": "Apply handoff says preview Security Review next before deciding on apply to all."
+            },
+            "next_apply_candidate": {
+                "summary": "Preview Security Review next, then decide whether it is ready to apply to all.",
+                "preview_command": "audit user --campaign security-review --writeback-target all",
+            },
             "top_preview_ready_campaigns": [
                 {
                     "label": "Security Review",
@@ -104,6 +111,9 @@ def _make_report() -> dict:
                     "recommended_target": "all",
                 }
             ],
+            "top_ready_to_apply_packets": [],
+            "top_needs_approval_packets": [],
+            "top_review_drift_packets": [],
             "follow_through_reacquisition_revalidation_recovery_summary": "1 restored-confidence path has only just been re-earned and still needs another confirming run.",
             "top_just_reearned_confidence_items": [
                 {"repo": "RepoC", "title": "RepoC drift needs review"}
@@ -150,6 +160,7 @@ def _make_report() -> dict:
                     "summary": "Maintain is at Operating and still below the Strong target because testing and ci are behind.",
                 },
                 "action_sync_line": "Action Sync: Security Review is preview-ready — recommended target all.",
+                "apply_packet_line": "Apply Packet: Security Review is the best campaign to preview next before deciding on apply to all. Command: audit user --campaign security-review --writeback-target all",
             }
         ],
     }
@@ -174,6 +185,9 @@ def test_review_pack_includes_revalidation_recovery_section(tmp_path):
     assert "Operator Effectiveness:" in content
     assert "High-Pressure Queue Trend:" in content
     assert "Action Sync Readiness:" in content
+    assert "Apply Packet:" in content
+    assert "Next Apply Candidate:" in content
+    assert "Action Sync Command Hint:" in content
     assert "Preview Ready" in content
     assert "Catalog: operator-loop | flagship workbook-first flow" in content
     assert "Where To Start: Start in src/core.py." in content

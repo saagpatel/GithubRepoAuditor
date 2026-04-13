@@ -9,9 +9,9 @@ from src.governance_activation import build_governance_summary
 from src.operator_effectiveness import build_operator_effectiveness_bundle
 from src.recurring_review import build_review_bundle
 from src.warehouse import (
-    load_recent_campaign_history,
     load_operator_calibration_history,
     load_operator_state_history,
+    load_recent_campaign_history,
     load_recent_operator_changes,
     load_recent_operator_evidence,
     load_review_history,
@@ -373,10 +373,16 @@ def build_operator_snapshot(
         current_generated_at=report_data.get("generated_at", ""),
     )
     queue = _attach_portfolio_catalog_context(queue, report_data)
+    from src.action_sync_packets import build_action_sync_packets_bundle
     from src.action_sync_readiness import build_action_sync_readiness_bundle
 
     action_sync = build_action_sync_readiness_bundle(report_data, queue)
-    queue = action_sync.get("operator_queue", queue)
+    action_sync_packets = build_action_sync_packets_bundle(
+        report_data,
+        action_sync,
+        action_sync.get("operator_queue", queue),
+    )
+    queue = action_sync_packets.get("operator_queue", action_sync.get("operator_queue", queue))
     follow_through = _build_follow_through_with_queue(resolution_trend, queue)
     raw_next_action = _next_operator_action(
         resolution_trend.get("primary_target") or (queue[0] if queue else {}),
@@ -886,10 +892,16 @@ def build_operator_snapshot(
         "campaign_readiness_summary": action_sync["campaign_readiness_summary"],
         "action_sync_summary": action_sync["action_sync_summary"],
         "next_action_sync_step": action_sync["next_action_sync_step"],
+        "action_sync_packets": action_sync_packets["action_sync_packets"],
+        "apply_readiness_summary": action_sync_packets["apply_readiness_summary"],
+        "next_apply_candidate": action_sync_packets["next_apply_candidate"],
         "top_apply_ready_campaigns": action_sync["top_apply_ready_campaigns"],
         "top_preview_ready_campaigns": action_sync["top_preview_ready_campaigns"],
         "top_drift_review_campaigns": action_sync["top_drift_review_campaigns"],
         "top_blocked_campaigns": action_sync["top_blocked_campaigns"],
+        "top_ready_to_apply_packets": action_sync_packets["top_ready_to_apply_packets"],
+        "top_needs_approval_packets": action_sync_packets["top_needs_approval_packets"],
+        "top_review_drift_packets": action_sync_packets["top_review_drift_packets"],
     }
     return {
         "operator_summary": summary,
@@ -902,6 +914,12 @@ def build_operator_snapshot(
         "campaign_readiness_summary": action_sync["campaign_readiness_summary"],
         "action_sync_summary": action_sync["action_sync_summary"],
         "next_action_sync_step": action_sync["next_action_sync_step"],
+        "action_sync_packets": action_sync_packets["action_sync_packets"],
+        "apply_readiness_summary": action_sync_packets["apply_readiness_summary"],
+        "next_apply_candidate": action_sync_packets["next_apply_candidate"],
+        "top_ready_to_apply_packets": action_sync_packets["top_ready_to_apply_packets"],
+        "top_needs_approval_packets": action_sync_packets["top_needs_approval_packets"],
+        "top_review_drift_packets": action_sync_packets["top_review_drift_packets"],
     }
 
 
@@ -935,6 +953,13 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
         lines.append(f"*Action Sync Readiness:* {(summary.get('action_sync_summary') or {}).get('summary')}")
     if summary.get("next_action_sync_step"):
         lines.append(f"*Next Action Sync Step:* {summary['next_action_sync_step']}")
+    if (summary.get("apply_readiness_summary") or {}).get("summary"):
+        lines.append(f"*Apply Packet:* {(summary.get('apply_readiness_summary') or {}).get('summary')}")
+    if (summary.get("next_apply_candidate") or {}).get("summary"):
+        lines.append(f"*Next Apply Candidate:* {(summary.get('next_apply_candidate') or {}).get('summary')}")
+    if (summary.get("next_apply_candidate") or {}).get("preview_command") or (summary.get("next_apply_candidate") or {}).get("apply_command"):
+        command_hint = (summary.get("next_apply_candidate") or {}).get("apply_command") or (summary.get("next_apply_candidate") or {}).get("preview_command")
+        lines.append(f"*Action Sync Command Hint:* `{command_hint}`")
     if summary.get("trend_summary"):
         lines.append(f"*Trend:* {summary['trend_summary']}")
     if summary.get("accountability_summary"):

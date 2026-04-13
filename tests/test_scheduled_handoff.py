@@ -515,6 +515,13 @@ def test_build_scheduled_handoff_includes_github_projects_campaign_status(tmp_pa
         "summary": "Action Sync is preview-ready: Security Review is the strongest next campaign to preview from the current local facts.",
     }
     payload["operator_summary"]["next_action_sync_step"] = "Preview Security Review next, then decide whether it is ready to sync to all."
+    payload["operator_summary"]["apply_readiness_summary"] = {
+        "summary": "Apply handoff says preview Security Review next before deciding on apply to all."
+    }
+    payload["operator_summary"]["next_apply_candidate"] = {
+        "summary": "Preview Security Review next, then decide whether it is ready to apply to all.",
+        "preview_command": "audit testuser --campaign security-review --writeback-target all",
+    }
     payload["campaign_summary"] = {
         "campaign_type": "security-review",
         "label": "Security Review",
@@ -548,6 +555,8 @@ def test_build_scheduled_handoff_includes_github_projects_campaign_status(tmp_pa
     assert "GitHub Projects: configured (octo-org #7, 2 items, 1 project drift)" in markdown
     assert "Action Sync readiness: Action Sync is preview-ready" in markdown
     assert "Next Action Sync step: Preview Security Review next" in markdown
+    assert "Apply packet: Apply handoff says preview Security Review next" in markdown
+    assert "Action Sync command hint: audit testuser --campaign security-review --writeback-target all" in markdown
 
 
 def test_build_scheduled_handoff_stays_quiet_for_quiet_runs(tmp_path):

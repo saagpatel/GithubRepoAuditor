@@ -67,6 +67,19 @@ Use the shared `Action Sync Readiness` summary in the workbook, HTML, Markdown, 
 - `preview-ready` means the campaign is worth previewing next, but the product is still nudging you to stay preview-first.
 - `idle` means there is no good reason to leave the local weekly loop yet.
 
+Then use the shared `Apply Packet` handoff to decide the exact next move:
+
+- `review-drift` means stop and review managed drift before you sync anything else.
+- `needs-approval` means the campaign is close, but governance approval or rollback review still blocks apply.
+- `ready-to-apply` means the local story is settled enough that an explicit apply command is reasonable if you choose it.
+- `preview-next` means use the suggested preview command next, then decide whether the campaign is really ready to apply.
+- `stay-local` means keep working in the local weekly loop for now.
+
+If the packet shows a command hint:
+- preview commands never include `--writeback-apply`
+- apply commands always include `--writeback-apply`
+- the command is a recommendation, not an automatic action
+
 ## Workbook gate reminder
 
 Use `make workbook-gate` only when you changed workbook-facing code or layout. Normal portfolio use does not require the workbook gate.

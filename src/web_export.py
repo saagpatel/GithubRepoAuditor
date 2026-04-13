@@ -525,6 +525,7 @@ def _top_attention_section(data: dict) -> str:
             f"<br><span class='muted'><strong>{escape(item.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.'))}</strong></span>"
             f"<br><span class='muted'><strong>Maturity Gap:</strong> {escape(item.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.'))}</span>"
             f"<br><span class='muted'><strong>Action Sync:</strong> {escape(item.get('action_sync_line', 'Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.'))}</span>"
+            f"<br><span class='muted'><strong>Apply Packet:</strong> {escape(item.get('apply_packet_line', 'Apply Packet: no current execution handoff is surfaced.'))}</span>"
             f"<br><span class='muted'><strong>Checkpoint timing:</strong> {escape(build_follow_through_checkpoint_status_label(item))}</span>"
             "</li>"
         )
@@ -558,6 +559,7 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
             f"<br><span class='muted'><strong>{escape(item.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.'))}</strong></span>"
             f"<br><span class='muted'><strong>Maturity Gap:</strong> {escape(item.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.'))}</span>"
             f"<br><span class='muted'><strong>Action Sync:</strong> {escape(item.get('action_sync_line', 'Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.'))}</span>"
+            f"<br><span class='muted'><strong>Apply Packet:</strong> {escape(item.get('apply_packet_line', 'Apply Packet: no current execution handoff is surfaced.'))}</span>"
             f"<br><span class='muted'><strong>Checkpoint Timing:</strong> {escape(item.get('follow_through_checkpoint_timing', 'Unknown'))}</span>"
             f"<br><span class='muted'><strong>Next Checkpoint:</strong> {escape(item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</span>"
             "</li>"
@@ -618,6 +620,7 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
               <div class="meta-line"><strong>{escape(briefing.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.'))}</strong></div>
               <div class="meta-line"><strong>Maturity Gap:</strong> {escape(briefing.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.'))}</div>
               <div class="meta-line"><strong>Action Sync:</strong> {escape(briefing.get('action_sync_line', 'Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.'))}</div>
+              <div class="meta-line"><strong>Apply Packet:</strong> {escape(briefing.get('apply_packet_line', 'Apply Packet: no current execution handoff is surfaced.'))}</div>
               <div class="meta-line"><strong>Checkpoint Timing:</strong> {escape(briefing.get('checkpoint_timing_line', 'Unknown'))}</div>
               <div class="meta-line"><strong>What Would Count As Progress:</strong> {escape(briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</div>
             </div>
@@ -646,8 +649,17 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
           <div class="meta-line"><strong>High-Pressure Queue Trend:</strong> {escape(weekly_pack.get('high_pressure_queue_trend_line', 'High-pressure queue trend is not ready yet.'))}</div>
           <div class="meta-line"><strong>Action Sync Readiness:</strong> {escape(weekly_pack.get('action_sync_summary', 'No current campaign needs Action Sync yet, so the safest next move is to keep the story local.'))}</div>
           <div class="meta-line"><strong>Next Action Sync Step:</strong> {escape(weekly_pack.get('next_action_sync_step', 'Stay local for now; no current campaign needs preview or apply.'))}</div>
+          <div class="meta-line"><strong>Apply Packet:</strong> {escape(weekly_pack.get('apply_readiness_summary', 'No current campaign has a safe execution handoff yet, so the local story should stay local for now.'))}</div>
+          <div class="meta-line"><strong>Next Apply Candidate:</strong> {escape(weekly_pack.get('next_apply_candidate', 'Stay local for now; no current campaign has a safe execution handoff.'))}</div>
+          <div class="meta-line"><strong>Action Sync Command Hint:</strong> {escape(weekly_pack.get('action_sync_command_hint', 'No Action Sync command is recommended yet.'))}</div>
           <h3>Action Sync Readiness</h3>
           {''.join(readiness_blocks)}
+          <div class="meta-line"><strong>Apply Packet Summary:</strong> {escape(weekly_pack.get('apply_readiness_summary', 'No current campaign has a safe execution handoff yet, so the local story should stay local for now.'))}</div>
+          <div class="meta-line"><strong>Next Apply Candidate:</strong> {escape(weekly_pack.get('next_apply_candidate', 'Stay local for now; no current campaign has a safe execution handoff.'))}</div>
+          <div class="meta-line"><strong>Action Sync Command Hint:</strong> {escape(weekly_pack.get('action_sync_command_hint', 'No Action Sync command is recommended yet.'))}</div>
+          {''.join(f"<div class='meta-line'><strong>Ready To Apply:</strong> {escape(item.get('label', item.get('campaign_type', 'Campaign')))} — {escape(item.get('summary', 'No packet summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_ready_to_apply_packets', [])[:3])}
+          {''.join(f"<div class='meta-line'><strong>Needs Approval:</strong> {escape(item.get('label', item.get('campaign_type', 'Campaign')))} — {escape(item.get('summary', 'No packet summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_needs_approval_packets', [])[:3])}
+          {''.join(f"<div class='meta-line'><strong>Review Drift:</strong> {escape(item.get('label', item.get('campaign_type', 'Campaign')))} — {escape(item.get('summary', 'No packet summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_review_drift_packets', [])[:3])}
           <div class="meta-line"><strong>Operator Focus:</strong> {escape(weekly_pack.get('operator_focus_summary', 'No operator focus bucket is currently surfaced.'))}</div>
           <div class="meta-line"><strong>Next Checkpoint:</strong> {escape(weekly_pack.get('follow_through_checkpoint_summary', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</div>
           <h3>Operator Focus</h3>
@@ -1011,6 +1023,8 @@ def _campaign_section(report_data: dict) -> str:
           <div class="meta-line"><strong>Sync mode:</strong> {escape(report_data.get('writeback_preview', {}).get('sync_mode', 'reconcile'))}</div>
           <div class="meta-line"><strong>Drift:</strong> {len(report_data.get('managed_state_drift', []) or [])}</div>
           <div class="meta-line"><strong>Action Sync:</strong> {escape(report_data.get('next_action_sync_step', (report_data.get('operator_summary', {}).get('next_action_sync_step') or 'Stay local for now; no current campaign needs preview or apply.')))}</div>
+          <div class="meta-line"><strong>Apply Packet:</strong> {escape((report_data.get('apply_readiness_summary') or {}).get('summary', (report_data.get('operator_summary', {}).get('apply_readiness_summary', {}) or {}).get('summary', 'No current campaign has a safe execution handoff yet, so the local story should stay local for now.')))}</div>
+          <div class="meta-line"><strong>Command Hint:</strong> {escape((report_data.get('next_apply_candidate') or {}).get('apply_command') or (report_data.get('next_apply_candidate') or {}).get('preview_command') or ((report_data.get('operator_summary', {}).get('next_apply_candidate', {}) or {}).get('apply_command') or ((report_data.get('operator_summary', {}).get('next_apply_candidate', {}) or {}).get('preview_command') or 'No Action Sync command is recommended yet.')))}</div>
           <div class="meta-line"><strong>GitHub Projects:</strong> {escape(github_projects.get('status', 'disabled'))}
             ({escape(github_projects.get('project_owner', '—'))} #{github_projects.get('project_number', 0)}, {github_projects.get('item_count', 0)} items)</div>
         </div>

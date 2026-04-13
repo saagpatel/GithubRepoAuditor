@@ -1017,6 +1017,13 @@ class TestRenderHtml:
                         "summary": "Action Sync is preview-ready: Security Review is the strongest next campaign to preview from the current local facts.",
                     },
                     "next_action_sync_step": "Preview Security Review next, then decide whether it is ready to sync to all.",
+                    "apply_readiness_summary": {
+                        "summary": "Apply handoff says preview Security Review next before deciding on apply to all."
+                    },
+                    "next_apply_candidate": {
+                        "summary": "Preview Security Review next, then decide whether it is ready to apply to all.",
+                        "preview_command": "audit user --campaign security-review --writeback-target all",
+                    },
                     "top_preview_ready_campaigns": [
                         {
                             "label": "Security Review",
@@ -1024,6 +1031,9 @@ class TestRenderHtml:
                             "recommended_target": "all",
                         }
                     ],
+                    "top_ready_to_apply_packets": [],
+                    "top_needs_approval_packets": [],
+                    "top_review_drift_packets": [],
                 },
                 operator_queue=[
                     {
@@ -1034,6 +1044,7 @@ class TestRenderHtml:
                         "summary": "A campaign preview is available.",
                         "recommended_action": "Review the repo detail page.",
                         "action_sync_line": "Action Sync: Security Review is preview-ready — recommended target all.",
+                        "apply_packet_line": "Apply Packet: Security Review is the best campaign to preview next before deciding on apply to all. Command: audit user --campaign security-review --writeback-target all",
                     }
                 ],
             )
@@ -1041,5 +1052,8 @@ class TestRenderHtml:
 
         assert "Action Sync Readiness:" in html
         assert "Next Action Sync Step:" in html
+        assert "Apply Packet Summary:" in html
+        assert "Next Apply Candidate:" in html
+        assert "Action Sync Command Hint:" in html
         assert "Preview Ready" in html
         assert "recommended target all" in html
