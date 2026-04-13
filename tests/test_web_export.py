@@ -1036,6 +1036,12 @@ class TestRenderHtml:
                     "next_tuned_campaign": {
                         "summary": "Security Review should win ties inside the preview-ready group because recent outcome history is proven.",
                     },
+                    "intervention_ledger_summary": {
+                        "summary": "RepoC is improving after intervention while one repo still looks relapsing.",
+                    },
+                    "next_historical_focus": {
+                        "summary": "Read RepoC next: it is the clearest current example of improvement after intervention.",
+                    },
                     "top_preview_ready_campaigns": [
                         {
                             "label": "Security Review",
@@ -1059,6 +1065,7 @@ class TestRenderHtml:
                         "apply_packet_line": "Apply Packet: Security Review is the best campaign to preview next before deciding on apply to all. Command: audit user --campaign security-review --writeback-target all",
                         "post_apply_line": "Post-Apply Monitoring: Security Review was applied recently; monitor it now before treating it as stable.",
                         "campaign_tuning_line": "Campaign Tuning: Security Review should win ties because recent outcomes are proven.",
+                        "historical_intelligence_line": "Historical Portfolio Intelligence: RepoC is improving after intervention and should be watched for durable quieting.",
                     }
                 ],
             )
@@ -1076,4 +1083,7 @@ class TestRenderHtml:
         assert "Campaign Tuning:" in html
         assert "Next Tie-Break Candidate:" in html
         assert "Next Tuned Campaign:" not in html
+        assert "Historical Portfolio Intelligence:" in html
+        assert "Next Historical Focus:" in html
         assert "Security Review should win ties because recent outcomes are proven." in html
+        assert "RepoC is improving after intervention" in html

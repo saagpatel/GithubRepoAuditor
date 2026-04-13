@@ -118,6 +118,7 @@ CORE_VISIBLE_SHEETS = {
     "Scorecards",
     "Implementation Hotspots",
     "Operator Outcomes",
+    "Historical Intelligence",
     "Repo Detail",
     "By Lens",
     "By Collection",
@@ -263,6 +264,7 @@ def _reorder_workbook_sheets(wb: Workbook) -> None:
         "Portfolio Explorer",
         "Implementation Hotspots",
         "Operator Outcomes",
+        "Historical Intelligence",
         "Repo Detail",
         "Executive Summary",
         "By Lens",
@@ -1191,6 +1193,9 @@ def _build_workbook_rollups(data: dict) -> tuple[list[list[object]], list[list[o
                 item.get("campaign_tuning_status", ""),
                 item.get("campaign_tuning_summary", ""),
                 item.get("campaign_tuning_line", ""),
+                item.get("historical_intelligence_status", ""),
+                item.get("historical_intelligence_summary", ""),
+                item.get("historical_intelligence_line", ""),
             ]
         )
 
@@ -3659,6 +3664,70 @@ def _build_operator_outcomes(wb: Workbook, data: dict) -> None:
     auto_width(ws, 6, max_row)
 
 
+def _build_historical_intelligence(wb: Workbook, data: dict) -> None:
+    ws = _get_or_create_sheet(wb, "Historical Intelligence")
+    ws.sheet_properties.tabColor = "0F766E"
+    _configure_sheet_view(ws, zoom=105, show_grid_lines=True)
+
+    summary = (data.get("intervention_ledger_summary") or {}).get(
+        "summary",
+        "Historical portfolio intelligence is still thin, so the weekly story should stay grounded in the current run and recent operator queue.",
+    )
+    next_focus = (data.get("next_historical_focus") or {}).get(
+        "summary",
+        "Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet.",
+    )
+
+    ws.merge_cells("A1:F1")
+    ws["A1"].value = ACTION_SYNC_CANONICAL_LABELS["historical_portfolio_intelligence"]
+    ws["A1"].font = SECTION_FONT
+    ws.merge_cells("A2:F2")
+    ws["A2"].value = summary
+    ws["A2"].alignment = WRAP
+    ws.merge_cells("A3:F3")
+    ws["A3"].value = next_focus
+    ws["A3"].alignment = WRAP
+
+    headers = ["Repo", "Status", "Pressure Trend", "Hotspot Persistence", "Scorecard Trend", "Summary"]
+    for col, header in enumerate(headers, 1):
+        ws.cell(row=5, column=col, value=header)
+    style_header_row(ws, 5, len(headers))
+    ws.freeze_panes = "A6"
+
+    row = 6
+    for label, items in (
+        ("Relapsing", data.get("top_relapsing_repos", []) or []),
+        ("Persistent Pressure", data.get("top_persistent_pressure_repos", []) or []),
+        ("Improving After Intervention", data.get("top_improving_repos", []) or []),
+        ("Holding Steady", data.get("top_holding_repos", []) or []),
+    ):
+        ws.cell(row=row, column=1, value=label)
+        ws.cell(row=row, column=1).font = SUBTITLE_FONT
+        row += 1
+        if not items:
+            ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=6)
+            ws.cell(row=row, column=1, value=f"No repos currently show a {label.lower()} story.")
+            ws.cell(row=row, column=1).alignment = WRAP
+            row += 2
+            continue
+        for item in items[:5]:
+            values = [
+                item.get("repo", ""),
+                item.get("historical_intelligence_status", "insufficient-evidence"),
+                item.get("pressure_trend", "insufficient-evidence"),
+                item.get("hotspot_persistence", "insufficient-evidence"),
+                item.get("scorecard_trend", "insufficient-evidence"),
+                item.get("summary", ""),
+            ]
+            for col, value in enumerate(values, 1):
+                cell = ws.cell(row=row, column=col, value=value)
+                style_data_cell(cell, "center" if col in {2, 3, 4, 5} else "left")
+            row += 1
+        row += 1
+
+    auto_width(ws, len(headers), max(row - 1, 5))
+
+
 def _join_outcome_examples(items: list[dict]) -> str:
     if not items:
         return "No recent examples are recorded yet."
@@ -3952,6 +4021,7 @@ def _build_hidden_data_sheets(
     operator_outcome_rows: list[list[object]] = []
     action_sync_outcome_rows: list[list[object]] = []
     campaign_tuning_rows: list[list[object]] = []
+    intervention_ledger_rows: list[list[object]] = []
     lookup_rows: list[list[object]] = []
     repo_detail_rows, repo_dimension_rollup_rows, repo_history_rollup_rows = _repo_detail_rows(data, score_history)
     run_change_rollup_rows, run_change_repo_rows = _run_change_rows(data, diff_data)
@@ -4027,6 +4097,20 @@ def _build_hidden_data_sheets(
             item.get("reopen_rate", 0.0),
             item.get("rollback_watch_rate", 0.0),
             item.get("pressure_reduction_rate", 0.0),
+            item.get("summary", ""),
+        ])
+    for item in data.get("historical_portfolio_intelligence", []) or []:
+        intervention_ledger_rows.append([
+            item.get("repo", ""),
+            item.get("latest_tier", ""),
+            item.get("latest_score", 0.0),
+            item.get("recent_intervention_count", 0),
+            item.get("last_intervention", ""),
+            item.get("pressure_trend", "insufficient-evidence"),
+            item.get("hotspot_persistence", "insufficient-evidence"),
+            item.get("scorecard_trend", "insufficient-evidence"),
+            item.get("campaign_follow_through", "insufficient-evidence"),
+            item.get("historical_intelligence_status", "insufficient-evidence"),
             item.get("summary", ""),
         ])
 
@@ -4571,6 +4655,25 @@ def _build_hidden_data_sheets(
     )
     _write_hidden_table_sheet(
         wb,
+        "Data_InterventionLedger",
+        "tblInterventionLedgerData",
+        [
+            "Repo",
+            "Latest Tier",
+            "Latest Score",
+            "Recent Intervention Count",
+            "Last Intervention",
+            "Pressure Trend",
+            "Hotspot Persistence",
+            "Scorecard Trend",
+            "Campaign Follow Through",
+            "Historical Intelligence Status",
+            "Summary",
+        ],
+        intervention_ledger_rows,
+    )
+    _write_hidden_table_sheet(
+        wb,
         "Data_Scenarios",
         "tblScenarios",
         ["Key", "Title", "Lens", "Repo Count", "Average Expected Lens Delta", "Projected Tier Promotions"],
@@ -4688,6 +4791,9 @@ def _build_hidden_data_sheets(
             "Campaign Tuning Status",
             "Campaign Tuning Summary",
             "Campaign Tuning Line",
+            "Historical Intelligence Status",
+            "Historical Intelligence Summary",
+            "Historical Intelligence Line",
         ],
         operator_queue_rows,
     )
@@ -5020,6 +5126,20 @@ def _build_campaigns(wb: Workbook, data: dict) -> None:
                     "No current campaign needs a tuning tie-break yet.",
                 ),
             ),
+            (
+                ACTION_SYNC_CANONICAL_LABELS["historical_portfolio_intelligence"],
+                (data.get("intervention_ledger_summary") or {}).get(
+                    "summary",
+                    "Historical portfolio intelligence is still thin, so the weekly story should stay grounded in the current run and recent operator queue.",
+                ),
+            ),
+            (
+                "Next Historical Focus",
+                (data.get("next_historical_focus") or {}).get(
+                    "summary",
+                    "Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet.",
+                ),
+            ),
         ],
         title=ACTION_SYNC_CANONICAL_LABELS["readiness"],
     )
@@ -5139,6 +5259,20 @@ def _build_writeback_audit(wb: Workbook, data: dict) -> None:
                 (data.get("next_tuned_campaign") or {}).get(
                     "summary",
                     "No current campaign needs a tuning tie-break yet.",
+                ),
+            ),
+            (
+                ACTION_SYNC_CANONICAL_LABELS["historical_portfolio_intelligence"],
+                (data.get("intervention_ledger_summary") or {}).get(
+                    "summary",
+                    "Historical portfolio intelligence is still thin, so the weekly story should stay grounded in the current run and recent operator queue.",
+                ),
+            ),
+            (
+                "Next Historical Focus",
+                (data.get("next_historical_focus") or {}).get(
+                    "summary",
+                    "Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet.",
                 ),
             ),
         ],
@@ -6954,6 +7088,16 @@ def _build_print_pack(
         "next_tuned_campaign",
         "No current campaign needs a tuning tie-break yet.",
     )
+    ws["D17"] = ACTION_SYNC_CANONICAL_LABELS["historical_portfolio_intelligence"]
+    ws["E17"] = weekly_pack.get(
+        "historical_portfolio_intelligence",
+        "Historical portfolio intelligence is still thin, so the weekly story should stay grounded in the current run and recent operator queue.",
+    )
+    ws["D18"] = "Next Historical Focus"
+    ws["E18"] = weekly_pack.get(
+        "next_historical_focus",
+        "Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet.",
+    )
     ws["A7"] = "Portfolio Headline"
     ws["B7"] = weekly_pack.get("portfolio_headline", operator_summary.get("headline", "Review the latest workbook surfaces for change and drift."))
     ws["A8"] = "Queue Pressure"
@@ -7249,6 +7393,7 @@ def _build_excel_workbook(
     _build_hotspots(wb, data)
     _build_implementation_hotspots(wb, data)
     _build_operator_outcomes(wb, data)
+    _build_historical_intelligence(wb, data)
     _build_compare_sheet(wb, diff_data)
     _build_scenario_planner(
         wb,

@@ -102,6 +102,19 @@ That overlay is intentionally bounded:
 - it never changes queue order or trust behavior
 - it only biases which tied campaign should be recommended first, surfaced as `Next Tie-Break Candidate`
 
+If the weekly question becomes “is this repo actually getting better over time?”, read the new historical layer after the Action Sync sections:
+
+- `Historical Portfolio Intelligence` tells the cross-run repo story
+- `Relapsing` means recent intervention did not hold and the repo is turning back upward
+- `Persistent Pressure` means the repo keeps resurfacing without durable quieting
+- `Improving After Intervention` means recent pressure, hotspot direction, or maturity evidence is moving the right way
+- `Holding Steady` means earlier pressure has quieted enough to monitor instead of re-escalating
+
+That historical layer is powered by the `Intervention Ledger`. It is descriptive only:
+- it does not create a new queue
+- it does not change Action Sync precedence
+- it helps you decide whether to keep investing attention in the same repo or treat the improvement as real
+
 ## Workbook gate reminder
 
 Use `make workbook-gate` only when you changed workbook-facing code or layout. Normal portfolio use does not require the workbook gate.

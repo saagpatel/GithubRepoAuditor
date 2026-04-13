@@ -59,6 +59,8 @@ The current module boundaries are intentionally explicit:
   Post-apply monitoring logic that judges whether a recent sync is holding, drifting back, reopening, or still needs monitoring.
 - `src/action_sync_tuning.py`
   Bounded tie-break layer that uses post-apply history to rank tied campaigns without changing stage precedence.
+- `src/intervention_ledger.py`
+  Cross-run repo intelligence synthesis that connects intervention history, recurring pressure, hotspot persistence, scorecard direction, and campaign aftermath.
 - `src/implementation_hotspots.py`
   Repo-level implementation pressure and “where to start” guidance.
 - `src/warehouse.py`
@@ -182,6 +184,37 @@ Phase 89 added one bounded overlay on top of the three operational layers.
 
 The visible pick for that layer is `Next Tie-Break Candidate`.
 
+## Historical Portfolio Intelligence
+
+Phase 91 adds one bounded historical layer on top of the current workbook and operator story: `Historical Portfolio Intelligence`.
+
+It is powered by the `Intervention Ledger`, which connects:
+
+- recurring operator attention
+- implementation hotspot recurrence
+- repo scorecard direction
+- Action Sync aftermath that intersects with the repo
+
+This layer is descriptive only. It does not create:
+
+- a new queue
+- a new score
+- a new writeback authority
+
+Instead it explains whether a repo currently looks:
+
+- relapsing
+- under persistent pressure
+- improving after intervention
+- holding steady
+
+Architecturally, this keeps the split clean:
+
+- `src/portfolio_intelligence.py` remains the current-state portfolio layer
+- `src/intervention_ledger.py` owns cross-run historical synthesis
+- `src/operator_control_center.py` carries those results into `operator_summary` and queue items
+- `src/report_enrichment.py` packages the same historical story across workbook, Markdown, HTML, review-pack, and scheduled handoff
+
 ## Warehouse And Regeneration
 
 Warehouse-backed history is now part of the normal architecture, not an optional afterthought.
@@ -191,6 +224,7 @@ The warehouse supports:
 - control-center regeneration from prior runs
 - operator outcomes and effectiveness history
 - Action Sync readiness, packets, outcomes, and tuning summaries
+- Historical Portfolio Intelligence and intervention-ledger snapshots
 - weekly trend work without re-auditing every repo
 
 Historical compatibility remains a design constraint. Older rows and older reports must stay readable even when newer additive fields exist.
@@ -227,6 +261,7 @@ src/
   action_sync_packets.py
   action_sync_outcomes.py
   action_sync_tuning.py
+  intervention_ledger.py
   warehouse.py
 
 docs/
@@ -247,4 +282,4 @@ output/
 
 The current architecture is optimized for one outcome: make the weekly portfolio loop clear enough that operators can trust the workbook, understand the control-center, and only move into managed execution when the local story is already coherent.
 
-That is the baseline Phase 91 should build on.
+That is the baseline the next historical-intelligence and automation phases should build on.

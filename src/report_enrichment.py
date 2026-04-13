@@ -68,6 +68,9 @@ NO_POST_APPLY_MONITORING_LINE = "Post-Apply Monitoring: no recent Action Sync ap
 NO_CAMPAIGN_TUNING_SUMMARY = "Campaign tuning stays neutral until there is enough outcome history to bias tied recommendations."
 NO_NEXT_TUNED_CAMPAIGN = "No current campaign needs a tie-break candidate yet."
 NO_CAMPAIGN_TUNING_LINE = "Campaign Tuning: recommendations stay neutral until more outcome history is available."
+NO_HISTORICAL_PORTFOLIO_INTELLIGENCE_SUMMARY = "Historical portfolio intelligence is still thin, so the weekly story should stay grounded in the current run and recent operator queue."
+NO_NEXT_HISTORICAL_FOCUS = "Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet."
+NO_HISTORICAL_INTELLIGENCE_LINE = "Historical Portfolio Intelligence: keep the weekly story anchored in the current run until more cross-run evidence accumulates."
 
 OPERATOR_FOCUS_LABELS = {
     "act-now": "Act Now",
@@ -564,6 +567,7 @@ def build_repo_briefing(
     apply_packet_line = build_apply_packet_line(handoff_source)
     post_apply_line = build_post_apply_monitoring_line(handoff_source)
     campaign_tuning_line = build_campaign_tuning_line(handoff_source)
+    historical_intelligence_line = build_historical_intelligence_line(handoff_source)
     follow_through_resurfacing_reason = build_follow_through_resurfacing_reason(handoff_source)
     implementation_hotspots = _implementation_hotspots(audit)[:3]
     where_to_start_summary = _where_to_start_summary(audit)
@@ -661,6 +665,7 @@ def build_repo_briefing(
         "apply_packet_line": apply_packet_line,
         "post_apply_line": post_apply_line,
         "campaign_tuning_line": campaign_tuning_line,
+        "historical_intelligence_line": historical_intelligence_line,
         "portfolio_catalog": portfolio_catalog,
         "catalog_line": catalog_line,
         "intent_alignment": intent_alignment,
@@ -681,6 +686,8 @@ def build_repo_briefing(
         "post_apply_summary": str(handoff_source.get("post_apply_summary") or "No post-apply monitoring is surfaced for this repo yet."),
         "campaign_tuning_status": str(handoff_source.get("campaign_tuning_status") or "insufficient-evidence"),
         "campaign_tuning_summary": str(handoff_source.get("campaign_tuning_summary") or "No campaign tuning evidence is surfaced for this repo yet."),
+        "historical_intelligence_status": str(handoff_source.get("historical_intelligence_status") or "insufficient-evidence"),
+        "historical_intelligence_summary": str(handoff_source.get("historical_intelligence_summary") or "No historical intelligence evidence is surfaced for this repo yet."),
         "resurfacing_reason_line": follow_through_resurfacing_reason,
     }
 
@@ -778,6 +785,8 @@ def build_weekly_review_pack(
             or build_next_tuned_campaign_line(data) != NO_NEXT_TUNED_CAMPAIGN
             else NO_CAMPAIGN_TUNING_LINE
         ),
+        "historical_portfolio_intelligence": build_historical_portfolio_intelligence_summary(data),
+        "next_historical_focus": build_next_historical_focus_line(data),
         "top_apply_ready_campaigns": list(operator_summary.get("top_apply_ready_campaigns") or []),
         "top_preview_ready_campaigns": list(operator_summary.get("top_preview_ready_campaigns") or []),
         "top_drift_review_campaigns": list(operator_summary.get("top_drift_review_campaigns") or []),
@@ -792,6 +801,10 @@ def build_weekly_review_pack(
         "top_proven_campaigns": list(operator_summary.get("top_proven_campaigns") or []),
         "top_caution_campaigns": list(operator_summary.get("top_caution_campaigns") or []),
         "top_thin_evidence_campaigns": list(operator_summary.get("top_thin_evidence_campaigns") or []),
+        "top_relapsing_repos": list(operator_summary.get("top_relapsing_repos") or []),
+        "top_persistent_pressure_repos": list(operator_summary.get("top_persistent_pressure_repos") or []),
+        "top_improving_repos": list(operator_summary.get("top_improving_repos") or []),
+        "top_holding_repos": list(operator_summary.get("top_holding_repos") or []),
         "top_attention": top_attention,
         "repo_briefings": repo_briefings,
         "top_below_target_scorecard_items": list(_mapping(data).get("scorecards_summary", {}).get("top_below_target_repos") or []),
@@ -1633,6 +1646,34 @@ def build_next_tuned_campaign_line(report_data: Any) -> str:
 
 def build_next_tie_break_candidate_line(report_data: Any) -> str:
     return build_next_tuned_campaign_line(report_data)
+
+
+def build_historical_portfolio_intelligence_summary(report_data: Any) -> str:
+    summary = _mapping(_mapping(report_data).get("intervention_ledger_summary"))
+    if not summary:
+        summary = _mapping(_mapping(report_data).get("operator_summary")).get("intervention_ledger_summary") or {}
+    return str(_mapping(summary).get("summary") or NO_HISTORICAL_PORTFOLIO_INTELLIGENCE_SUMMARY)
+
+
+def build_next_historical_focus_line(report_data: Any) -> str:
+    focus = _mapping(_mapping(report_data).get("next_historical_focus"))
+    if not focus:
+        focus = _mapping(_mapping(report_data).get("operator_summary")).get("next_historical_focus") or {}
+    return str(_mapping(focus).get("summary") or NO_NEXT_HISTORICAL_FOCUS)
+
+
+def build_historical_intelligence_line(value: Any) -> str:
+    mapped = _mapping(value)
+    direct = str(mapped.get("historical_intelligence_line") or "").strip()
+    if direct:
+        return direct
+    summary = str(mapped.get("historical_intelligence_summary") or "").strip()
+    if summary:
+        return f"Historical Portfolio Intelligence: {summary}"
+    status = str(mapped.get("historical_intelligence_status") or "").strip()
+    if status:
+        return f"Historical Portfolio Intelligence: {status}."
+    return NO_HISTORICAL_INTELLIGENCE_LINE
 
 
 def build_action_sync_line(value: Any) -> str:

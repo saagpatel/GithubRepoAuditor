@@ -10,10 +10,13 @@ from src.warehouse import (
     load_campaign_history,
     load_campaign_outcomes,
     load_campaign_tuning,
+    load_intervention_ledger,
     load_latest_audit_runs,
     load_latest_campaign_state,
     load_latest_operator_state,
     load_recent_campaign_history,
+    load_recent_implementation_hotspots,
+    load_recent_repo_scorecards,
     load_review_history,
     load_watch_checkpoint,
     write_warehouse_snapshot,
@@ -89,6 +92,19 @@ def _make_results() -> list[AnalyzerResult]:
 
 def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     audit = score_repo(_make_metadata(), _make_results())
+    audit.implementation_hotspots = [
+        {
+            "scope": "file",
+            "path": "src/core.py",
+            "module": "src",
+            "category": "code-complexity",
+            "pressure_score": 0.74,
+            "suggestion_type": "refactor",
+            "why_it_matters": "src/core.py is carrying concentrated complexity.",
+            "suggested_first_move": "Split the biggest function and add one regression test.",
+            "signal_summary": "Complexity pressure 0.74 across 2 complex blocks.",
+        }
+    ]
 
     from src.models import AuditReport
 
@@ -301,6 +317,30 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
         "campaign_type": "promotion-push",
         "summary": "Promotion Push should win ties inside the current group because recent outcome history is proven.",
     }
+    report.historical_portfolio_intelligence = [
+        {
+            "repo": "warehouse-repo",
+            "latest_tier": "functional",
+            "latest_score": 0.74,
+            "recent_intervention_count": 1,
+            "last_intervention": report.generated_at.isoformat(),
+            "pressure_trend": "improving",
+            "hotspot_persistence": "changing",
+            "scorecard_trend": "improving",
+            "campaign_follow_through": "helping",
+            "historical_intelligence_status": "improving-after-intervention",
+            "summary": "warehouse-repo is improving after intervention.",
+        }
+    ]
+    report.intervention_ledger_summary = {
+        "summary": "warehouse-repo is improving after intervention while no repos currently look relapsing.",
+        "counts": {"improving-after-intervention": 1},
+    }
+    report.next_historical_focus = {
+        "repo": "warehouse-repo",
+        "historical_intelligence_status": "improving-after-intervention",
+        "summary": "Read warehouse-repo next: it is the clearest current example of improvement after intervention.",
+    }
     report.operator_summary.update(
         {
             "action_sync_outcomes": report.action_sync_outcomes,
@@ -309,6 +349,9 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
             "action_sync_tuning": report.action_sync_tuning,
             "campaign_tuning_summary": report.campaign_tuning_summary,
             "next_tuned_campaign": report.next_tuned_campaign,
+            "historical_portfolio_intelligence": report.historical_portfolio_intelligence,
+            "intervention_ledger_summary": report.intervention_ledger_summary,
+            "next_historical_focus": report.next_historical_focus,
         }
     )
     db_path = write_warehouse_snapshot(report, tmp_path)
@@ -327,6 +370,8 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
         campaign_history_rows = conn.execute("SELECT COUNT(*) FROM campaign_history").fetchone()[0]
         campaign_outcome_rows = conn.execute("SELECT COUNT(*) FROM campaign_outcomes").fetchone()[0]
         campaign_tuning_rows = conn.execute("SELECT COUNT(*) FROM campaign_tuning").fetchone()[0]
+        intervention_ledger_rows = conn.execute("SELECT COUNT(*) FROM intervention_ledger").fetchone()[0]
+        hotspot_history_rows = conn.execute("SELECT COUNT(*) FROM repo_implementation_hotspots").fetchone()[0]
         catalog_rows = conn.execute("SELECT COUNT(*) FROM portfolio_catalog_entries").fetchone()[0]
         scorecard_rows = conn.execute("SELECT COUNT(*) FROM repo_scorecards").fetchone()[0]
     finally:
@@ -344,13 +389,18 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     assert campaign_history_rows == 1
     assert campaign_outcome_rows == 1
     assert campaign_tuning_rows == 1
+    assert intervention_ledger_rows == 1
+    assert hotspot_history_rows == 1
     assert catalog_rows == 1
     assert scorecard_rows == 1
 
     campaign_outcomes = load_campaign_outcomes(tmp_path, "user", limit=5)
     campaign_tuning = load_campaign_tuning(tmp_path, "user", limit=5)
+    intervention_ledger = load_intervention_ledger(tmp_path, "user", limit=5)
     history = load_campaign_history(tmp_path, "promotion-push")
     recent_campaign_history = load_recent_campaign_history(tmp_path, "user", limit=5)
+    hotspot_history = load_recent_implementation_hotspots(tmp_path, "user", limit=5)
+    repo_scorecards = load_recent_repo_scorecards(tmp_path, "user", limit=5)
     latest_state = load_latest_campaign_state(tmp_path, "promotion-push")
     latest_runs = load_latest_audit_runs(tmp_path, "user", limit=5)
     review_history = load_review_history(tmp_path, "user", limit=5)
@@ -375,6 +425,10 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     assert campaign_outcomes[0]["monitoring_state"] == "monitor-now"
     assert campaign_tuning[0]["campaign_type"] == "promotion-push"
     assert campaign_tuning[0]["tuning_status"] == "proven"
+    assert intervention_ledger[0]["repo"] == "warehouse-repo"
+    assert intervention_ledger[0]["historical_intelligence_status"] == "improving-after-intervention"
+    assert hotspot_history[0]["repo"] == "warehouse-repo"
+    assert repo_scorecards[0]["repo"] == "warehouse-repo"
     assert review_history[0]["review_id"] == "review-1"
     assert watch_checkpoint["filter_signature"] == "abc123"
     assert operator_state["operator_summary"]["headline"] == "Campaign work is ready for review."
@@ -388,6 +442,8 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     assert operator_state["campaign_outcomes_summary"]["summary"].startswith("Promotion Push was applied recently")
     assert operator_state["campaign_tuning_summary"]["summary"].startswith("Promotion Push should win ties")
     assert operator_state["next_tuned_campaign"]["summary"].startswith("Promotion Push should win ties")
+    assert operator_state["intervention_ledger_summary"]["summary"].startswith("warehouse-repo is improving after intervention")
+    assert operator_state["next_historical_focus"]["summary"].startswith("Read warehouse-repo next")
     assert recent_campaign_history[0]["action_id"] == "promotion-push-abc123"
 
 
@@ -404,5 +460,7 @@ def test_write_warehouse_snapshot_defaults_empty_campaign_outcomes_for_older_sty
 
     assert latest_runs[0]["campaign_outcomes_summary"] == {}
     assert latest_runs[0]["campaign_tuning_summary"] == {}
+    assert latest_runs[0]["intervention_ledger_summary"] == {}
     assert operator_state["campaign_outcomes_summary"] == {}
     assert operator_state["campaign_tuning_summary"] == {}
+    assert operator_state["intervention_ledger_summary"] == {}

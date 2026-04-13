@@ -6,6 +6,7 @@ from typing import Any
 
 from src.baseline_context import build_watch_guidance
 from src.governance_activation import build_governance_summary
+from src.intervention_ledger import load_intervention_ledger_bundle
 from src.operator_effectiveness import build_operator_effectiveness_bundle
 from src.recurring_review import build_review_bundle
 from src.terminology import ACTION_SYNC_CANONICAL_LABELS
@@ -397,6 +398,8 @@ def build_operator_snapshot(
         queue,
     )
     queue = action_sync_tuning.get("operator_queue", queue)
+    intervention_ledger = load_intervention_ledger_bundle(output_dir, report_data, queue)
+    queue = intervention_ledger.get("operator_queue", queue) or queue
     follow_through = _build_follow_through_with_queue(resolution_trend, queue)
     raw_next_action = _next_operator_action(
         resolution_trend.get("primary_target") or (queue[0] if queue else {}),
@@ -929,6 +932,13 @@ def build_operator_snapshot(
         "top_proven_campaigns": action_sync_tuning["top_proven_campaigns"],
         "top_caution_campaigns": action_sync_tuning["top_caution_campaigns"],
         "top_thin_evidence_campaigns": action_sync_tuning["top_thin_evidence_campaigns"],
+        "historical_portfolio_intelligence": intervention_ledger["historical_portfolio_intelligence"],
+        "intervention_ledger_summary": intervention_ledger["intervention_ledger_summary"],
+        "next_historical_focus": intervention_ledger["next_historical_focus"],
+        "top_relapsing_repos": intervention_ledger["top_relapsing_repos"],
+        "top_persistent_pressure_repos": intervention_ledger["top_persistent_pressure_repos"],
+        "top_improving_repos": intervention_ledger["top_improving_repos"],
+        "top_holding_repos": intervention_ledger["top_holding_repos"],
     }
     return {
         "operator_summary": summary,
@@ -964,6 +974,13 @@ def build_operator_snapshot(
         "top_proven_campaigns": action_sync_tuning["top_proven_campaigns"],
         "top_caution_campaigns": action_sync_tuning["top_caution_campaigns"],
         "top_thin_evidence_campaigns": action_sync_tuning["top_thin_evidence_campaigns"],
+        "historical_portfolio_intelligence": intervention_ledger["historical_portfolio_intelligence"],
+        "intervention_ledger_summary": intervention_ledger["intervention_ledger_summary"],
+        "next_historical_focus": intervention_ledger["next_historical_focus"],
+        "top_relapsing_repos": intervention_ledger["top_relapsing_repos"],
+        "top_persistent_pressure_repos": intervention_ledger["top_persistent_pressure_repos"],
+        "top_improving_repos": intervention_ledger["top_improving_repos"],
+        "top_holding_repos": intervention_ledger["top_holding_repos"],
     }
 
 
@@ -1012,6 +1029,10 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
         lines.append(f"*{ACTION_SYNC_CANONICAL_LABELS['campaign_tuning']}:* {(summary.get('campaign_tuning_summary') or {}).get('summary')}")
     if (summary.get("next_tuned_campaign") or {}).get("summary"):
         lines.append(f"*{ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}:* {(summary.get('next_tuned_campaign') or {}).get('summary')}")
+    if (summary.get("intervention_ledger_summary") or {}).get("summary"):
+        lines.append(f"*{ACTION_SYNC_CANONICAL_LABELS['historical_portfolio_intelligence']}:* {(summary.get('intervention_ledger_summary') or {}).get('summary')}")
+    if (summary.get("next_historical_focus") or {}).get("summary"):
+        lines.append(f"*Next Historical Focus:* {(summary.get('next_historical_focus') or {}).get('summary')}")
     if summary.get("trend_summary"):
         lines.append(f"*Trend:* {summary['trend_summary']}")
     if summary.get("accountability_summary"):

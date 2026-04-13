@@ -2,13 +2,13 @@
 
 **Date:** 2026-04-12
 **Current Status Snapshot:**
-- Shipped through **Phase 89**
+- Shipped through **Phase 90**
 - Current baseline is `main`
 - No open PRs
 - Workbook automated gate passes; manual desktop Excel signoff remains a separate release step
 - Only intentional local residue is untracked `.serena/`
 - [2026-04-12-roadmap-phases-78-85.md](/Users/d/Projects/GithubRepoAuditor/docs/plans/2026-04-12-roadmap-phases-78-85.md) is now historical context only
-- **Phase 90** is now the active target
+- **Phase 91** is now the active target
 
 ---
 
@@ -93,8 +93,8 @@ Phase 89 added one bounded recommendation overlay on top of those three layers:
 
 That overlay uses post-apply history to break ties only when campaigns are already in the same readiness or execution group.
 
-The main remaining gap is no longer actionability or outcome visibility.
-It is making the architecture story, visible terminology, and module boundaries match the product that is already shipped.
+The main remaining gap is no longer actionability, outcome visibility, or terminology coherence.
+It is connecting the growing history across hotspots, outcomes, interventions, and repo maturity into one bounded historical portfolio story.
 
 ---
 
@@ -191,29 +191,45 @@ Phase 90 should specifically:
 
 This phase is cleanup and simplification work, not a new capability layer.
 
+### Status
+
+Shipped. Phase 90 refreshed the architecture story, standardized visible Action Sync terminology, preserved compatibility for stored field names, and aligned workbook/Markdown/HTML/review-pack/control-center wording around one coherent mental model.
+
 ---
 
 ## Phase 91: Historical Portfolio Intelligence
 
 ### Goal
 
-Connect the longer-term signals that now exist across the product.
+Connect the longer-term signals that now exist across the product through one bounded `Intervention Ledger`.
 
 ### Target
 
 Bring together:
 
 - implementation hotspots
-- operator outcomes
-- campaign outcomes
+- operator attention and reopen history
+- campaign outcomes and tuning context
 - scorecards and maturity signals
 - repeated regressions and recurring pressure
 
-The product should begin answering which repos improve after intervention and which ones repeatedly regress.
+The product should begin answering:
+
+- which repos improved after intervention
+- which repos are relapsing after intervention
+- which repos keep consuming attention without durable progress
+- which repos are now holding steady
+
+This phase should specifically:
+
+- add a cross-run historical intelligence builder through `src/intervention_ledger.py`
+- persist implementation hotspot history additively so recurrence can be assessed credibly
+- surface a `Historical Portfolio Intelligence` block across workbook, Markdown, HTML, review-pack, control-center, and scheduled handoff
+- keep the synthesis path inside `AuditReport` -> `operator_control_center` -> `report_enrichment`
 
 ### Constraint
 
-Prefer additive historical insight over new automation.
+Prefer additive historical insight over new automation, new queues, or new scoring.
 
 ---
 
