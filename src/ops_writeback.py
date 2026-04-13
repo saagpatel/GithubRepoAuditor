@@ -5,6 +5,11 @@ from collections import defaultdict
 from datetime import datetime, timezone
 
 from src.analyst_views import build_analyst_context
+from src.github_projects import (
+    build_project_field_values,
+    build_project_preview_summary,
+    is_github_projects_config_valid,
+)
 
 MANAGED_TOPIC_PREFIX = "ghra-"
 MANAGED_ISSUE_MARKER = "ghra-action-bundle"
@@ -129,6 +134,7 @@ def _make_base_action(
         "collections": collections,
         "profile_score": round(profile_score, 3),
         "state": "preview",
+        "portfolio_catalog": dict(audit.get("portfolio_catalog") or {}),
         "metadata": metadata or {},
     }
 
@@ -352,6 +358,7 @@ def build_campaign_bundle(
     for index, action in enumerate(actions, start=1):
         action["rank"] = index
         action["writeback_targets"] = _preview_targets_for_action(action, writeback_target)
+        action["managed_issue_title"] = managed_issue_title(action["campaign_type"])
 
     definition = CAMPAIGN_DEFINITIONS[campaign_type]
     summary = {
@@ -450,10 +457,23 @@ def build_writeback_preview(
     apply: bool,
     previous_state: dict | None = None,
     sync_mode: str = "reconcile",
+    github_projects_config: dict | None = None,
+    operator_context: dict[str, dict] | None = None,
 ) -> dict:
     grouped = group_actions_by_repo(actions)
     preview_repos = []
+    github_projects_preview = build_project_preview_summary(
+        github_projects_config,
+        campaign_summary,
+        grouped,
+        operator_context=operator_context,
+    )
+    github_projects_rows = {
+        item.get("repo_full_name", ""): item
+        for item in github_projects_preview.get("repos", [])
+    }
     for repo_full_name, repo_actions in grouped.items():
+        project_row = github_projects_rows.get(repo_full_name, {})
         preview_repos.append({
             "repo_full_name": repo_full_name,
             "repo": repo_actions[0]["repo"],
@@ -461,6 +481,8 @@ def build_writeback_preview(
             "issue_title": managed_issue_title(repo_actions[0]["campaign_type"]) if writeback_target in {"github", "all"} else None,
             "notion_action_count": len(repo_actions) if writeback_target in {"notion", "all"} else 0,
             "action_ids": [action["action_id"] for action in repo_actions],
+            "github_project_field_count": project_row.get("field_count", 0),
+            "github_project_fields": project_row.get("fields", {}),
         })
     current_action_ids = {action["action_id"] for action in actions}
     stale_actions = [
@@ -477,6 +499,7 @@ def build_writeback_preview(
         "repos": preview_repos,
         "stale_action_count": len(stale_actions),
         "stale_repos": sorted({item.get("repo_full_name", "") for item in stale_actions if item.get("repo_full_name")}),
+        "github_projects": github_projects_preview,
     }
 
 
@@ -542,12 +565,149 @@ def _result_for_repo(sample: dict, action_ids: list[str], *, target: str, before
     }
 
 
+def _find_project_item_by_id(items_result: dict, item_id: str | None) -> dict | None:
+    if not item_id:
+        return None
+    item = items_result.get("item")
+    if isinstance(item, dict) and item.get("id") == item_id:
+        return item
+    return None
+
+
+def _project_item_snapshot(previous_actions: dict[str, dict], repo_full_name: str) -> dict:
+    for previous in previous_actions.values():
+        if previous.get("repo_full_name") != repo_full_name:
+            continue
+        snapshot = previous.get("snapshots", {}).get("github-project-item", {})
+        if snapshot:
+            return snapshot
+    return {}
+
+
+def _project_external_item_id(previous_actions: dict[str, dict], repo_full_name: str) -> str:
+    snapshot = _project_item_snapshot(previous_actions, repo_full_name)
+    external_key = str(snapshot.get("external_key") or "").strip()
+    if external_key and not external_key.startswith("https://"):
+        return external_key
+    return ""
+
+
+def _normalize_project_field_type(field: dict) -> str:
+    field_type = str(field.get("data_type") or "").strip().lower()
+    if field_type in {"single_select", "single-select", "singleselect"}:
+        return "single_select"
+    return "text"
+
+
+def _sync_project_fields(
+    client,
+    *,
+    sample: dict,
+    action_ids: list[str],
+    project: dict,
+    item_id: str,
+    desired_values: dict[str, str],
+    fields_mapping: dict[str, str],
+) -> tuple[dict, list[dict]]:
+    expected_updates: dict[str, str] = {}
+    applied_updates: dict[str, str] = {}
+    drift_events: list[dict] = []
+    unsupported_fields: list[str] = []
+    inaccessible_fields: list[str] = []
+
+    for internal_key, field_name in fields_mapping.items():
+        desired_value = str(desired_values.get(internal_key) or "").strip()
+        if not desired_value:
+            continue
+        field = (project.get("fields") or {}).get(field_name)
+        if not field:
+            inaccessible_fields.append(field_name)
+            drift_events.append(
+                {
+                    "action_id": sample["action_id"],
+                    "repo_full_name": sample["repo_full_name"],
+                    "campaign_type": sample["campaign_type"],
+                    "target": "github-project-fields",
+                    "drift_state": "managed-project-field-missing",
+                    "field_name": field_name,
+                }
+            )
+            continue
+        field_type = _normalize_project_field_type(field)
+        if field_type == "single_select":
+            option_id = (field.get("options") or {}).get(desired_value)
+            if not option_id:
+                unsupported_fields.append(field_name)
+                drift_events.append(
+                    {
+                        "action_id": sample["action_id"],
+                        "repo_full_name": sample["repo_full_name"],
+                        "campaign_type": sample["campaign_type"],
+                        "target": "github-project-fields",
+                        "drift_state": "managed-project-field-value-unsupported",
+                        "field_name": field_name,
+                        "expected": desired_value,
+                    }
+                )
+                continue
+            update = client.update_project_v2_item_field(
+                project_id=project.get("id", ""),
+                item_id=item_id,
+                field_id=field.get("id", ""),
+                field_type=field_type,
+                value=option_id,
+            )
+        else:
+            update = client.update_project_v2_item_field(
+                project_id=project.get("id", ""),
+                item_id=item_id,
+                field_id=field.get("id", ""),
+                field_type=field_type,
+                value=desired_value,
+            )
+        expected_updates[field_name] = desired_value
+        if update.get("ok"):
+            applied_updates[field_name] = desired_value
+
+    if inaccessible_fields and not expected_updates:
+        status = "skipped"
+    elif unsupported_fields and not applied_updates:
+        status = "skipped"
+    elif applied_updates == expected_updates and expected_updates:
+        status = "updated"
+    elif expected_updates:
+        status = "failed"
+    else:
+        status = "skipped"
+
+    result = _result_for_repo(
+        sample,
+        action_ids,
+        target="github-project-fields",
+        before={},
+        after=applied_updates,
+        expected=expected_updates,
+    )
+    result["status"] = status
+    result["item_id"] = item_id
+    result["details"] = {
+        "project_owner": project.get("owner", ""),
+        "project_number": project.get("project_number", 0),
+        "missing_fields": inaccessible_fields,
+        "unsupported_fields": unsupported_fields,
+    }
+    return result, drift_events
+
+
 def apply_github_writeback(
     client,
     actions: list[dict],
     *,
     previous_state: dict | None = None,
     sync_mode: str = "reconcile",
+    campaign_summary: dict | None = None,
+    github_projects_config: dict | None = None,
+    operator_context: dict[str, dict] | None = None,
 ) -> tuple[list[dict], dict[str, dict], list[dict], list[dict]]:
     results: list[dict] = []
     external_refs: dict[str, dict] = {}
@@ -556,6 +716,16 @@ def apply_github_writeback(
     grouped = group_actions_by_repo(actions)
     previous_actions = (previous_state or {}).get("actions", {})
     current_action_ids = {action["action_id"] for action in actions}
+    mirror_projects = is_github_projects_config_valid(github_projects_config)
+    operator_context = operator_context or {}
+    project = {}
+    if mirror_projects:
+        project = client.get_project_v2(
+            github_projects_config.get("owner", ""),
+            int(github_projects_config.get("project_number") or 0),
+        )
+        project["owner"] = github_projects_config.get("owner", "")
+        project["project_number"] = github_projects_config.get("project_number", 0)
 
     for repo_full_name, repo_actions in grouped.items():
         owner, repo = repo_full_name.split("/", 1)
@@ -698,11 +868,13 @@ def apply_github_writeback(
                 issue_result["status"] = "reopened" if existing_issue.get("state") == "closed" and updated.get("ok") else ("updated" if updated.get("ok") else "failed")
                 issue_result["number"] = existing_issue["number"]
                 issue_result["url"] = updated.get("html_url", existing_issue.get("html_url"))
+                issue_result["node_id"] = updated.get("node_id") or existing_issue.get("node_id")
                 issue_result["details"] = updated
             else:
                 issue_result["status"] = "unchanged"
                 issue_result["number"] = existing_issue["number"]
                 issue_result["url"] = existing_issue.get("html_url")
+                issue_result["node_id"] = existing_issue.get("node_id")
         else:
             created = client.create_issue(
                 owner,
@@ -715,6 +887,7 @@ def apply_github_writeback(
             issue_result["status"] = "created" if created.get("ok") else "failed"
             issue_result["number"] = created.get("number")
             issue_result["url"] = created.get("html_url")
+            issue_result["node_id"] = created.get("node_id")
             issue_result["details"] = created
         results.append(issue_result)
         for action in repo_actions:
@@ -723,6 +896,138 @@ def apply_github_writeback(
                 "github_issue_number": issue_result.get("number"),
                 "repo_full_name": repo_full_name,
             }
+
+        if mirror_projects:
+            desired_values = build_project_field_values(
+                repo_actions,
+                campaign_summary or {},
+                operator_item=operator_context.get(repo_full_name),
+            )
+            project_item_result = _result_for_repo(
+                sample,
+                action_ids,
+                target="github-project-item",
+                before={},
+                after={},
+                expected={"project_owner": project.get("owner", ""), "project_number": project.get("project_number", 0)},
+            )
+            project_fields_result = _result_for_repo(
+                sample,
+                action_ids,
+                target="github-project-fields",
+                before={},
+                after={},
+                expected=desired_values,
+            )
+            project_fields_result["status"] = "skipped"
+            project_fields_result["details"] = {}
+
+            if not project.get("available"):
+                project_item_result["status"] = "skipped"
+                project_item_result["reason"] = "project-unavailable"
+                project_item_result["details"] = {
+                    "project_owner": project.get("owner", ""),
+                    "project_number": project.get("project_number", 0),
+                }
+                project_fields_result["reason"] = "project-unavailable"
+                project_fields_result["details"] = {
+                    "project_owner": project.get("owner", ""),
+                    "project_number": project.get("project_number", 0),
+                }
+                results.append(project_item_result)
+                results.append(project_fields_result)
+                managed_state_drift.append(
+                    {
+                        "action_id": sample["action_id"],
+                        "repo_full_name": repo_full_name,
+                        "campaign_type": sample["campaign_type"],
+                        "target": "github-project-item",
+                        "drift_state": "managed-project-unavailable",
+                    }
+                )
+            else:
+                issue_node_id = (
+                    (existing_issue or {}).get("node_id")
+                    or issue_result.get("node_id")
+                    or (issue_result.get("details") or {}).get("node_id")
+                )
+                if not issue_node_id:
+                    project_item_result["status"] = "skipped"
+                    project_item_result["reason"] = "issue-node-id-unavailable"
+                    project_fields_result["reason"] = "issue-node-id-unavailable"
+                    results.append(project_item_result)
+                    results.append(project_fields_result)
+                    managed_state_drift.append(
+                        {
+                            "action_id": sample["action_id"],
+                            "repo_full_name": repo_full_name,
+                            "campaign_type": sample["campaign_type"],
+                            "target": "github-project-item",
+                            "drift_state": "managed-project-issue-link-missing",
+                        }
+                    )
+                else:
+                    previous_item_id = _project_external_item_id(previous_actions, repo_full_name)
+                    existing_item_result = (
+                        client.find_project_v2_item_by_id(project.get("id", ""), previous_item_id)
+                        if previous_item_id
+                        else {"available": True, "item": None}
+                    )
+                    if not existing_item_result.get("available"):
+                        existing_item_result = {"available": True, "item": None}
+                    existing_item = existing_item_result.get("item")
+                    if existing_item and issue_node_id and existing_item.get("issue_node_id") not in {"", issue_node_id}:
+                        managed_state_drift.append(
+                            {
+                                "action_id": sample["action_id"],
+                                "repo_full_name": repo_full_name,
+                                "campaign_type": sample["campaign_type"],
+                                "target": "github-project-item",
+                                "drift_state": "managed-project-item-link-mismatch",
+                                "expected": issue_node_id,
+                                "observed": existing_item.get("issue_node_id"),
+                            }
+                        )
+                        existing_item = None
+                    if not existing_item:
+                        issue_lookup = client.find_project_v2_item_by_issue(project.get("id", ""), issue_node_id)
+                        existing_item = issue_lookup.get("item") if issue_lookup.get("available") else None
+
+                    project_item_result["before"] = existing_item or {}
+                    if existing_item:
+                        project_item_result["status"] = "unchanged"
+                        project_item_result["item_id"] = existing_item.get("id", "")
+                        project_item_result["url"] = project.get("url", "")
+                    else:
+                        created_item = client.add_issue_to_project_v2(project.get("id", ""), issue_node_id)
+                        project_item_result["status"] = created_item.get("status", "created" if created_item.get("ok") else "failed")
+                        project_item_result["item_id"] = created_item.get("item_id", "")
+                        project_item_result["url"] = project.get("url", "")
+                        project_item_result["details"] = created_item
+                        existing_item = {"id": created_item.get("item_id", ""), "issue_node_id": issue_node_id}
+
+                    if project_item_result.get("item_id"):
+                        for action in repo_actions:
+                            external_refs[action["action_id"]]["github_project_item_id"] = project_item_result.get("item_id")
+                            external_refs[action["action_id"]]["github_project_url"] = project.get("url", "")
+
+                    if project_item_result["status"] in {"created", "unchanged"} and existing_item.get("id"):
+                        project_fields_result, field_drift = _sync_project_fields(
+                            client,
+                            sample=sample,
+                            action_ids=action_ids,
+                            project=project,
+                            item_id=existing_item.get("id", ""),
+                            desired_values=desired_values,
+                            fields_mapping=github_projects_config.get("fields", {}),
+                        )
+                        project_fields_result["url"] = project.get("url", "")
+                        managed_state_drift.extend(field_drift)
+                    elif project_item_result["status"] == "failed":
+                        project_fields_result["status"] = "skipped"
+                        project_fields_result["reason"] = "project-item-failed"
+                    results.append(project_item_result)
+                    results.append(project_fields_result)
 
     for action_id, previous in previous_actions.items():
         if action_id in current_action_ids:
@@ -742,6 +1047,18 @@ def apply_github_writeback(
             event["status"] = "stale"
             event["reason"] = "append-only"
             results.append(event)
+            if mirror_projects:
+                project_event = {
+                    "action_id": action_id,
+                    "repo_full_name": repo_full_name,
+                    "target": "github-project-item",
+                    "before": {},
+                    "after": {},
+                    "expected": {"state": "archived"},
+                    "status": "stale",
+                    "reason": "append-only",
+                }
+                results.append(project_event)
             closure_events.append(
                 {
                     "action_id": action_id,
@@ -798,6 +1115,40 @@ def apply_github_writeback(
                 "rollback_state": "rollback-available",
             }
         )
+
+        if mirror_projects and project.get("available"):
+            project_item_id = _project_external_item_id(previous_actions, repo_full_name)
+            project_item = None
+            if project_item_id:
+                item_lookup = client.find_project_v2_item_by_id(project.get("id", ""), project_item_id)
+                project_item = item_lookup.get("item") if item_lookup.get("available") else None
+            project_event = {
+                "action_id": action_id,
+                "repo_full_name": repo_full_name,
+                "target": "github-project-item",
+                "before": project_item or {},
+                "after": {"state": "archived"},
+                "expected": {"state": "archived"},
+            }
+            if not project_item:
+                project_event["status"] = "drifted"
+                project_event["drift_state"] = "managed-project-item-missing"
+                managed_state_drift.append(
+                    {
+                        "action_id": action_id,
+                        "repo_full_name": repo_full_name,
+                        "campaign_type": previous.get("campaign_type", ""),
+                        "target": "github-project-item",
+                        "drift_state": "managed-project-item-missing",
+                    }
+                )
+            else:
+                archived = client.archive_project_v2_item(project_item.get("id", ""))
+                project_event["status"] = archived.get("status", "archived" if archived.get("ok") else "failed")
+                project_event["item_id"] = project_item.get("id", "")
+                project_event["url"] = project.get("url", "")
+                project_event["details"] = archived
+            results.append(project_event)
 
     return results, external_refs, managed_state_drift, closure_events
 

@@ -46,6 +46,8 @@ def _make_args(**overrides) -> Namespace:
         "campaign": None,
         "writeback_target": None,
         "writeback_apply": False,
+        "github_projects": False,
+        "github_projects_config": None,
         "campaign_sync_mode": "reconcile",
         "governance_view": "all",
         "max_actions": 20,
@@ -151,6 +153,21 @@ def test_main_rejects_writeback_apply_without_target(monkeypatch):
     assert exc.value.code == 2
 
 
+def test_main_rejects_github_projects_without_github_writeback(monkeypatch):
+    args = _make_args(
+        campaign="security-review",
+        writeback_target="notion",
+        github_projects=True,
+    )
+
+    monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
+
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+
+    assert exc.value.code == 2
+
+
 def test_main_forwards_scoring_profile_to_targeted_audit(monkeypatch, sample_metadata):
     args = _make_args(
         repos=["test-repo"],
@@ -187,6 +204,13 @@ def test_build_parser_accepts_scorecards_path():
     parser = cli.build_parser()
     args = parser.parse_args(["testuser", "--scorecards", "config/custom-scorecards.yaml"])
     assert str(args.scorecards) == "config/custom-scorecards.yaml"
+
+
+def test_build_parser_accepts_github_projects_config_path():
+    parser = cli.build_parser()
+    args = parser.parse_args(["testuser", "--github-projects", "--github-projects-config", "config/custom-github-projects.yaml"])
+    assert args.github_projects is True
+    assert str(args.github_projects_config) == "config/custom-github-projects.yaml"
 
 
 def test_main_forwards_scoring_profile_to_incremental_audit(monkeypatch, sample_metadata):

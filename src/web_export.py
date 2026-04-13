@@ -952,6 +952,7 @@ def _campaign_section(report_data: dict) -> str:
     summary = report_data.get("campaign_summary", {})
     if not summary:
         return ""
+    github_projects = report_data.get("writeback_preview", {}).get("github_projects", {}) or {}
     rows = []
     for item in report_data.get("writeback_preview", {}).get("repos", [])[:10]:
         topic_count = len(item.get("topics", []))
@@ -959,6 +960,7 @@ def _campaign_section(report_data: dict) -> str:
             f"<tr><td>{escape(item.get('repo', '—'))}</td>"
             f"<td>{escape(item.get('issue_title', '—') or '—')}</td>"
             f"<td class=\"num\">{topic_count}</td>"
+            f"<td class=\"num\">{item.get('github_project_field_count', 0)}</td>"
             f"<td class=\"num\">{item.get('notion_action_count', 0)}</td></tr>"
         )
     return f"""
@@ -971,10 +973,12 @@ def _campaign_section(report_data: dict) -> str:
           <div class="meta-line"><strong>Repos:</strong> {summary.get('repo_count', 0)}</div>
           <div class="meta-line"><strong>Sync mode:</strong> {escape(report_data.get('writeback_preview', {}).get('sync_mode', 'reconcile'))}</div>
           <div class="meta-line"><strong>Drift:</strong> {len(report_data.get('managed_state_drift', []) or [])}</div>
+          <div class="meta-line"><strong>GitHub Projects:</strong> {escape(github_projects.get('status', 'disabled'))}
+            ({escape(github_projects.get('project_owner', '—'))} #{github_projects.get('project_number', 0)}, {github_projects.get('item_count', 0)} items)</div>
         </div>
         <div class="panel">
           <table class="compact-table">
-            <thead><tr><th>Repo</th><th>Managed Issue</th><th>Topics</th><th>Notion</th></tr></thead>
+            <thead><tr><th>Repo</th><th>Managed Issue</th><th>Topics</th><th>Projects</th><th>Notion</th></tr></thead>
             <tbody>{''.join(rows)}</tbody>
           </table>
         </div>

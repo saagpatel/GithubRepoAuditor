@@ -1395,7 +1395,38 @@ class TestAnalystWorkbookSheets:
         report["writeback_preview"] = {"repos": []}
         _build_campaigns(wb, report)
         ws = wb["Campaigns"]
-        assert "No active campaign rows" in ws["A13"].value
+        values = [ws.cell(row=row, column=1).value for row in range(1, 30)]
+        assert any(isinstance(value, str) and "No active campaign rows" in value for value in values)
+
+    def test_campaigns_show_github_projects_status_and_counts(self):
+        wb = Workbook()
+        report = _make_report()
+        report["writeback_preview"] = {
+            "sync_mode": "reconcile",
+            "github_projects": {
+                "enabled": True,
+                "status": "configured",
+                "project_owner": "octo-org",
+                "project_number": 7,
+            },
+            "repos": [
+                {
+                    "repo": "RepoC",
+                    "issue_title": "[Repo Auditor] Security Review",
+                    "topics": ["ghra-call-security-review"],
+                    "github_project_field_count": 3,
+                    "notion_action_count": 1,
+                    "action_ids": ["security-review-abc123"],
+                }
+            ],
+        }
+        _build_campaigns(wb, report)
+        ws = wb["Campaigns"]
+
+        assert ws["A13"].value == "GitHub Projects"
+        assert ws["B13"].value == "configured (octo-org #7)"
+        assert ws["D15"].value == "Projects"
+        assert ws["D16"].value == 3
 
     def test_writeback_audit_shows_empty_state_when_no_results(self):
         wb = Workbook()

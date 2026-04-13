@@ -1102,6 +1102,7 @@ def write_markdown_report(
         _w("")
 
     if report.campaign_summary:
+        github_projects = report.writeback_preview.get("github_projects", {}) if isinstance(report.writeback_preview, dict) else {}
         _w("### Campaign Summary")
         _w("")
         _w(f"- Campaign: {report.campaign_summary.get('label', report.campaign_summary.get('campaign_type', '—'))}")
@@ -1110,18 +1111,29 @@ def write_markdown_report(
         _w(f"- Mode: {report.writeback_results.get('mode', 'preview')}")
         _w(f"- Target: {report.writeback_results.get('target', 'preview-only')}")
         _w(f"- Sync Mode: {report.writeback_preview.get('sync_mode', 'reconcile')}")
+        if github_projects.get("enabled"):
+            _w(
+                f"- GitHub Projects: {github_projects.get('status', 'disabled')} "
+                f"({github_projects.get('project_owner', '—')} #{github_projects.get('project_number', 0)}, "
+                f"{github_projects.get('item_count', 0)} items)"
+            )
         _w("")
 
     if report.writeback_preview.get("repos"):
         _w("### Next Actions")
         _w("")
-        _w("| Repo | Topics | Issue | Notion Actions |")
-        _w("|------|--------|-------|----------------|")
+        _w("| Repo | Topics | Issue | GitHub Projects | Notion Actions |")
+        _w("|------|--------|-------|-----------------|----------------|")
         for item in report.writeback_preview.get("repos", [])[:8]:
             topics = ", ".join(item.get("topics", [])[:4]) or "—"
+            project_status = (
+                f"{item.get('github_project_field_count', 0)} field(s)"
+                if item.get("github_project_field_count")
+                else "—"
+            )
             _w(
                 f"| {item.get('repo', '—')} | {topics} | "
-                f"{item.get('issue_title', '—') or '—'} | {item.get('notion_action_count', 0)} |"
+                f"{item.get('issue_title', '—') or '—'} | {project_status} | {item.get('notion_action_count', 0)} |"
             )
         _w("")
 

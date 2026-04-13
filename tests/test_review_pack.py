@@ -144,3 +144,38 @@ def test_review_pack_includes_revalidation_recovery_section(tmp_path):
     assert "Scorecard: Maintain — Operating (target Strong)" in content
     assert "Maturity Gap: testing, ci are still below the maintain bar." in content
     assert "Follow-Through Revalidation Recovery and Confidence Re-Earning" not in content
+
+
+def test_review_pack_includes_github_projects_campaign_context(tmp_path):
+    report = _make_report()
+    report["campaign_summary"] = {
+        "campaign_type": "security-review",
+        "label": "Security Review",
+        "action_count": 1,
+        "repo_count": 1,
+    }
+    report["writeback_preview"] = {
+        "sync_mode": "reconcile",
+        "github_projects": {
+            "enabled": True,
+            "status": "configured",
+            "project_owner": "octo-org",
+            "project_number": 7,
+            "item_count": 1,
+        },
+        "repos": [
+            {
+                "repo": "RepoC",
+                "issue_title": "[Repo Auditor] Security Review",
+                "topics": ["ghra-call-security-review"],
+                "github_project_field_count": 3,
+                "notion_action_count": 1,
+            }
+        ],
+    }
+
+    path = export_review_pack(report, tmp_path)["review_pack_path"]
+    content = path.read_text()
+
+    assert "GitHub Projects: configured (octo-org #7, 1 items)" in content
+    assert "RepoC: [Repo Auditor] Security Review | 3 project fields | 1 managed topics | 1 Notion actions" in content

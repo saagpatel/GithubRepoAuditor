@@ -4513,6 +4513,7 @@ def _build_campaigns(wb: Workbook, data: dict) -> None:
         width=8,
     )
     preview_rows = data.get("writeback_preview", {}).get("repos", [])
+    github_projects = data.get("writeback_preview", {}).get("github_projects", {}) or {}
     campaign_requested = bool(summary.get("campaign_type") or summary.get("label"))
     if not campaign_requested:
         request_state = "No campaign requested in this run."
@@ -4522,7 +4523,7 @@ def _build_campaigns(wb: Workbook, data: dict) -> None:
         row_state = "Campaign requested but no current rows matched." if campaign_requested else "No current rows because no managed campaign was requested."
     else:
         row_state = "Campaign rows are present. External mutation stays manual until writeback apply is explicitly requested."
-    _write_key_value_block(
+    summary_end_row = _write_key_value_block(
         ws,
         4,
         1,
@@ -4535,15 +4536,24 @@ def _build_campaigns(wb: Workbook, data: dict) -> None:
             ("Actions", summary.get("action_count", 0)),
             ("Repos", summary.get("repo_count", 0)),
             ("Sync Mode", data.get("writeback_preview", {}).get("sync_mode", "reconcile")),
+            (
+                "GitHub Projects",
+                (
+                    f"{github_projects.get('status', 'disabled')} "
+                    f"({github_projects.get('project_owner', '—')} #{github_projects.get('project_number', 0)})"
+                    if github_projects.get("enabled")
+                    else "disabled"
+                ),
+            ),
         ],
         title="Current Campaign State",
     )
-    headers = ["Repo", "Issue", "Topics", "Notion Actions", "Action IDs", "Drift", "Sync Mode"]
-    start_row = 12
+    headers = ["Repo", "Issue", "Topics", "Projects", "Notion Actions", "Action IDs", "Drift", "Sync Mode"]
+    start_row = summary_end_row + 2
     for col, header in enumerate(headers, 1):
         ws.cell(row=start_row, column=col, value=header)
     style_header_row(ws, start_row, len(headers))
-    ws.freeze_panes = "A13"
+    ws.freeze_panes = f"A{start_row + 1}"
 
     drift_repo_keys = {
         drift.get("repo_full_name") or drift.get("repo") or ""
@@ -4554,17 +4564,18 @@ def _build_campaigns(wb: Workbook, data: dict) -> None:
         ws.cell(row=row, column=1, value=item.get("repo", ""))
         ws.cell(row=row, column=2, value=item.get("issue_title", ""))
         ws.cell(row=row, column=3, value=", ".join(item.get("topics", [])))
-        ws.cell(row=row, column=4, value=item.get("notion_action_count", 0))
-        ws.cell(row=row, column=5, value=", ".join(item.get("action_ids", [])))
-        ws.cell(row=row, column=6, value="yes" if repo_key in drift_repo_keys else "no")
-        ws.cell(row=row, column=7, value=data.get("writeback_preview", {}).get("sync_mode", "reconcile"))
+        ws.cell(row=row, column=4, value=item.get("github_project_field_count", 0))
+        ws.cell(row=row, column=5, value=item.get("notion_action_count", 0))
+        ws.cell(row=row, column=6, value=", ".join(item.get("action_ids", [])))
+        ws.cell(row=row, column=7, value="yes" if repo_key in drift_repo_keys else "no")
+        ws.cell(row=row, column=8, value=data.get("writeback_preview", {}).get("sync_mode", "reconcile"))
 
     max_row = start_row + len(preview_rows)
     if preview_rows:
         apply_zebra_stripes(ws, start_row + 1, max_row, len(headers))
         _add_table(ws, "tblCampaignView", len(headers), max_row, start_row)
     else:
-        ws.merge_cells(start_row=start_row + 1, start_column=1, end_row=start_row + 2, end_column=7)
+        ws.merge_cells(start_row=start_row + 1, start_column=1, end_row=start_row + 2, end_column=8)
         ws.cell(
             row=start_row + 1,
             column=1,

@@ -951,3 +951,32 @@ class TestRenderHtml:
         assert "Compare" in html
         assert "Scenario Preview" in html
         assert "showcase" in html
+
+    def test_campaign_section_includes_github_projects_summary(self):
+        html = _render_html(
+            _make_report(
+                writeback_preview={
+                    "sync_mode": "reconcile",
+                    "github_projects": {
+                        "enabled": True,
+                        "status": "configured",
+                        "project_owner": "octo-org",
+                        "project_number": 7,
+                        "item_count": 1,
+                    },
+                    "repos": [
+                        {
+                            "repo": "RepoC",
+                            "issue_title": "[Repo Auditor] Security Review",
+                            "topics": ["ghra-call-security-review"],
+                            "github_project_field_count": 3,
+                            "notion_action_count": 1,
+                        }
+                    ],
+                }
+            )
+        )
+
+        assert "GitHub Projects:</strong> configured" in html
+        assert "octo-org #7, 1 items" in html
+        assert '<td class="num">3</td>' in html

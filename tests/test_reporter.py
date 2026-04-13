@@ -153,6 +153,39 @@ class TestMarkdownReport:
         assert "Managed State Drift" in content
         assert "Rollback Preview" in content
 
+    def test_campaign_section_includes_github_projects_summary(self, tmp_path):
+        report = _make_report()
+        report.campaign_summary = {
+            "campaign_type": "security-review",
+            "label": "Security Review",
+            "action_count": 1,
+            "repo_count": 1,
+        }
+        report.writeback_preview = {
+            "sync_mode": "reconcile",
+            "github_projects": {
+                "enabled": True,
+                "status": "configured",
+                "project_owner": "octo-org",
+                "project_number": 7,
+                "item_count": 1,
+            },
+            "repos": [
+                {
+                    "repo": "test-repo",
+                    "topics": ["ghra-call-security-review"],
+                    "issue_title": "[Repo Auditor] Security Review",
+                    "github_project_field_count": 3,
+                    "notion_action_count": 0,
+                }
+            ],
+        }
+        path = write_markdown_report(report, tmp_path)
+        content = path.read_text()
+
+        assert "GitHub Projects: configured (octo-org #7, 1 items)" in content
+        assert "| test-repo | ghra-call-security-review | [Repo Auditor] Security Review | 3 field(s) | 0 |" in content
+
     def test_includes_preflight_diagnostics_when_present(self, tmp_path):
         report = _make_report()
         report.preflight_summary = {

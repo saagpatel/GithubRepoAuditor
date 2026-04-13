@@ -114,3 +114,83 @@ class TestGitHubClientHardening:
         result = client.update_repo_custom_property_values("o", "r", {"portfolio_call": "new"})
         assert result["status"] == "skipped"
         assert result["before"] == {"portfolio_call": "old"}
+
+    def test_get_project_v2_returns_field_schema(self, monkeypatch):
+        client = GitHubClient()
+        monkeypatch.setattr(
+            client,
+            "_graphql_query",
+            lambda *_a, **_k: {
+                "organization": {
+                    "projectV2": {
+                        "id": "PVT_1",
+                        "title": "Ops Board",
+                        "url": "https://github.com/orgs/o/projects/7",
+                        "fields": {
+                            "nodes": [
+                                {
+                                    "id": "field-1",
+                                    "name": "Priority",
+                                    "dataType": "SINGLE_SELECT",
+                                    "options": [{"id": "opt-1", "name": "high"}],
+                                },
+                                {
+                                    "id": "field-2",
+                                    "name": "Repository",
+                                    "dataType": "TEXT",
+                                },
+                            ]
+                        },
+                    }
+                }
+            },
+        )
+
+        result = client.get_project_v2("o", 7)
+
+        assert result["available"] is True
+        assert result["fields"]["Priority"]["options"]["high"] == "opt-1"
+        assert result["fields"]["Repository"]["data_type"] == "TEXT"
+
+    def test_find_project_v2_item_by_issue_reads_linked_issue(self, monkeypatch):
+        client = GitHubClient()
+        monkeypatch.setattr(
+            client,
+            "_graphql_query",
+            lambda *_a, **_k: {
+                "node": {
+                    "items": {
+                        "nodes": [
+                            {
+                                "id": "PVTI_1",
+                                "isArchived": False,
+                                "content": {"id": "ISSUE_1", "number": 12, "url": "https://github.com/o/r/issues/12"},
+                            }
+                        ],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                    }
+                }
+            },
+        )
+
+        result = client.find_project_v2_item_by_issue("PVT_1", "ISSUE_1")
+
+        assert result["available"] is True
+        assert result["item"]["id"] == "PVTI_1"
+
+    def test_add_and_archive_project_v2_item_return_normalized_payloads(self, monkeypatch):
+        client = GitHubClient()
+        responses = iter(
+            [
+                {"addProjectV2ItemById": {"item": {"id": "PVTI_1"}}},
+                {"archiveProjectV2Item": {"item": {"id": "PVTI_1", "isArchived": True}}},
+            ]
+        )
+        monkeypatch.setattr(client, "_graphql_query", lambda *_a, **_k: next(responses))
+
+        created = client.add_issue_to_project_v2("PVT_1", "ISSUE_1")
+        archived = client.archive_project_v2_item("PVTI_1")
+
+        assert created["ok"] is True
+        assert created["item_id"] == "PVTI_1"
+        assert archived["status"] == "archived"

@@ -110,6 +110,26 @@ def test_operator_snapshot_assigns_expected_lanes(tmp_path: Path):
     assert lanes["Review RepoB"] == "deferred"
 
 
+def test_operator_snapshot_treats_project_mirror_drift_as_campaign_drift(tmp_path: Path):
+    snapshot = build_operator_snapshot(
+        _make_report(
+            managed_state_drift=[
+                {
+                    "action_id": "campaign-1",
+                    "repo_full_name": "user/RepoD",
+                    "target": "github-project-item",
+                    "drift_state": "managed-project-item-missing",
+                }
+            ]
+        ),
+        output_dir=tmp_path,
+    )
+
+    project_item = next(item for item in snapshot["operator_queue"] if item["repo"] == "RepoD")
+    assert project_item["title"] == "RepoD drift needs review"
+    assert project_item["lane"] == "urgent"
+
+
 def test_operator_snapshot_filters_by_triage_view(tmp_path: Path):
     snapshot = build_operator_snapshot(_make_report(), output_dir=tmp_path, triage_view="ready")
     assert snapshot["operator_queue"]
