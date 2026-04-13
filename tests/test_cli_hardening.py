@@ -485,6 +485,12 @@ def test_print_output_summary_emits_post_apply_monitoring_hints(capsys, sample_m
     report.next_monitoring_step = {
         "summary": "Monitor Security Review for at least 2 post-apply runs before treating it as stable.",
     }
+    report.campaign_tuning_summary = {
+        "summary": "Security Review should win ties because recent outcomes are proven.",
+    }
+    report.next_tuned_campaign = {
+        "summary": "Security Review should win ties inside the preview-ready group because recent outcome history is proven.",
+    }
 
     cli._print_output_summary(
         "Audited 1 repos for testuser",
@@ -511,6 +517,8 @@ def test_print_output_summary_emits_post_apply_monitoring_hints(capsys, sample_m
     combined = captured.out + captured.err
     assert "Post-apply monitoring: Security Review was applied recently" in combined
     assert "Next monitoring step: Monitor Security Review for at least 2 post-apply runs" in combined
+    assert "Campaign tuning: Security Review should win ties" in combined
+    assert "Next tuned campaign: Security Review should win ties inside" in combined
 
 
 def test_incremental_noop_regenerates_from_latest_report(monkeypatch, tmp_path, sample_metadata):
@@ -719,6 +727,61 @@ def test_report_from_dict_keeps_legacy_reports_readable(sample_metadata):
 
     assert report.baseline_context == {}
     assert report.baseline_signature == ""
+
+
+def test_report_from_dict_preserves_action_sync_packet_outcome_and_tuning_layers(sample_metadata):
+    report_data = _make_report_dict(sample_metadata)
+    report_data["action_sync_packets"] = [
+        {
+            "campaign_type": "security-review",
+            "summary": "Preview Security Review next.",
+            "execution_state": "preview-next",
+        }
+    ]
+    report_data["apply_readiness_summary"] = {"summary": "Preview Security Review next."}
+    report_data["next_apply_candidate"] = {
+        "summary": "Preview Security Review next.",
+        "preview_command": "audit testuser --campaign security-review --writeback-target all",
+    }
+    report_data["action_sync_outcomes"] = [
+        {
+            "campaign_type": "security-review",
+            "summary": "Security Review was applied recently; monitor it now before treating it as stable.",
+            "monitoring_state": "monitor-now",
+        }
+    ]
+    report_data["campaign_outcomes_summary"] = {
+        "summary": "Security Review was applied recently; monitor it now before treating it as stable."
+    }
+    report_data["next_monitoring_step"] = {
+        "summary": "Monitor Security Review for at least 2 post-apply runs before treating it as stable."
+    }
+    report_data["action_sync_tuning"] = [
+        {
+            "campaign_type": "security-review",
+            "summary": "Security Review is proven.",
+            "tuning_status": "proven",
+            "recommendation_bias": "promote",
+        }
+    ]
+    report_data["campaign_tuning_summary"] = {
+        "summary": "Security Review should win ties because recent outcomes are proven."
+    }
+    report_data["next_tuned_campaign"] = {
+        "summary": "Security Review should win ties inside the preview-ready group because recent outcome history is proven."
+    }
+
+    report = cli._report_from_dict(report_data)
+
+    assert report.action_sync_packets[0]["campaign_type"] == "security-review"
+    assert report.apply_readiness_summary["summary"] == "Preview Security Review next."
+    assert report.next_apply_candidate["preview_command"].endswith("--writeback-target all")
+    assert report.action_sync_outcomes[0]["monitoring_state"] == "monitor-now"
+    assert report.campaign_outcomes_summary["summary"].startswith("Security Review was applied recently")
+    assert report.next_monitoring_step["summary"].startswith("Monitor Security Review")
+    assert report.action_sync_tuning[0]["tuning_status"] == "proven"
+    assert report.campaign_tuning_summary["summary"].startswith("Security Review should win ties")
+    assert report.next_tuned_campaign["summary"].startswith("Security Review should win ties")
 
 
 def test_regenerate_outputs_from_latest_report_uses_existing_json(monkeypatch, tmp_path, sample_metadata):

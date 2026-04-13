@@ -1187,6 +1187,9 @@ def _build_workbook_rollups(data: dict) -> tuple[list[list[object]], list[list[o
                 item.get("post_apply_state", ""),
                 item.get("post_apply_summary", ""),
                 item.get("post_apply_line", ""),
+                item.get("campaign_tuning_status", ""),
+                item.get("campaign_tuning_summary", ""),
+                item.get("campaign_tuning_line", ""),
             ]
         )
 
@@ -3539,6 +3542,14 @@ def _build_operator_outcomes(wb: Workbook, data: dict) -> None:
         "summary",
         "Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.",
     )
+    campaign_tuning_summary = (data.get("campaign_tuning_summary") or {}).get(
+        "summary",
+        "Campaign tuning is neutral because there is not enough outcome history yet to bias tied recommendations.",
+    )
+    next_tuned_campaign = (data.get("next_tuned_campaign") or {}).get(
+        "summary",
+        "No current campaign needs a tuning tie-break yet.",
+    )
     ws.merge_cells("A1:F1")
     ws["A1"].value = "Operator Outcomes"
     ws["A1"].font = SECTION_FONT
@@ -3557,12 +3568,18 @@ def _build_operator_outcomes(wb: Workbook, data: dict) -> None:
     ws.merge_cells("A6:F6")
     ws["A6"].value = next_monitoring_step
     ws["A6"].alignment = WRAP
+    ws.merge_cells("A7:F7")
+    ws["A7"].value = campaign_tuning_summary
+    ws["A7"].alignment = WRAP
+    ws.merge_cells("A8:F8")
+    ws["A8"].value = next_tuned_campaign
+    ws["A8"].alignment = WRAP
 
     headers = ["Metric", "Status", "Value", "Numerator", "Denominator", "Summary"]
     for col, header in enumerate(headers, 1):
-        ws.cell(row=8, column=col, value=header)
-    style_header_row(ws, 8, len(headers))
-    ws.freeze_panes = "A9"
+        ws.cell(row=10, column=col, value=header)
+    style_header_row(ws, 10, len(headers))
+    ws.freeze_panes = "A11"
 
     metrics = [
         ("Review To Action Closure Rate", data.get("portfolio_outcomes_summary", {}).get("review_to_action_closure_rate", {})),
@@ -3571,7 +3588,7 @@ def _build_operator_outcomes(wb: Workbook, data: dict) -> None:
         ("Recommendation Validation Rate", data.get("operator_effectiveness_summary", {}).get("recommendation_validation_rate", {})),
         ("Noisy Guidance Rate", data.get("operator_effectiveness_summary", {}).get("noisy_guidance_rate", {})),
     ]
-    for row, (label, metric) in enumerate(metrics, 9):
+    for row, (label, metric) in enumerate(metrics, 11):
         value = metric.get("value")
         if isinstance(value, float):
             display_value = round(value, 3)
@@ -3589,7 +3606,7 @@ def _build_operator_outcomes(wb: Workbook, data: dict) -> None:
             cell = ws.cell(row=row, column=col, value=item)
             style_data_cell(cell, "center" if col in {2, 3, 4, 5} else "left")
 
-    monitoring_row = 16
+    monitoring_row = 18
     ws.cell(row=monitoring_row, column=1, value="Post-Apply Monitoring")
     style_header_row(ws, monitoring_row, 6)
     monitoring_headers = ["Campaign", "State", "Pressure Effect", "Drift", "Reopen", "Summary"]
@@ -3933,6 +3950,7 @@ def _build_hidden_data_sheets(
     implementation_hotspot_rows: list[list[object]] = []
     operator_outcome_rows: list[list[object]] = []
     action_sync_outcome_rows: list[list[object]] = []
+    campaign_tuning_rows: list[list[object]] = []
     lookup_rows: list[list[object]] = []
     repo_detail_rows, repo_dimension_rollup_rows, repo_history_rollup_rows = _repo_detail_rows(data, score_history)
     run_change_rollup_rows, run_change_repo_rows = _run_change_rows(data, diff_data)
@@ -3993,6 +4011,21 @@ def _build_hidden_data_sheets(
             item.get("rollback_state", "not-applicable"),
             item.get("follow_up_recommendation", ""),
             ", ".join(item.get("top_repos", []) or []),
+            item.get("summary", ""),
+        ])
+    for item in data.get("action_sync_tuning", []) or []:
+        campaign_tuning_rows.append([
+            item.get("campaign_type", ""),
+            item.get("label", ""),
+            item.get("tuning_status", "insufficient-evidence"),
+            item.get("recommendation_bias", "neutral"),
+            item.get("judged_count", 0),
+            item.get("monitor_now_count", 0),
+            item.get("holding_clean_rate", 0.0),
+            item.get("drift_return_rate", 0.0),
+            item.get("reopen_rate", 0.0),
+            item.get("rollback_watch_rate", 0.0),
+            item.get("pressure_reduction_rate", 0.0),
             item.get("summary", ""),
         ])
 
@@ -4517,6 +4550,26 @@ def _build_hidden_data_sheets(
     )
     _write_hidden_table_sheet(
         wb,
+        "Data_CampaignTuning",
+        "tblCampaignTuningData",
+        [
+            "Campaign Type",
+            "Label",
+            "Tuning Status",
+            "Recommendation Bias",
+            "Judged Count",
+            "Monitor Now Count",
+            "Holding Clean Rate",
+            "Drift Return Rate",
+            "Reopen Rate",
+            "Rollback Watch Rate",
+            "Pressure Reduction Rate",
+            "Summary",
+        ],
+        campaign_tuning_rows,
+    )
+    _write_hidden_table_sheet(
+        wb,
         "Data_Scenarios",
         "tblScenarios",
         ["Key", "Title", "Lens", "Repo Count", "Average Expected Lens Delta", "Projected Tier Promotions"],
@@ -4631,6 +4684,9 @@ def _build_hidden_data_sheets(
             "Post-Apply State",
             "Post-Apply Summary",
             "Post-Apply Line",
+            "Campaign Tuning Status",
+            "Campaign Tuning Summary",
+            "Campaign Tuning Line",
         ],
         operator_queue_rows,
     )
@@ -4949,6 +5005,20 @@ def _build_campaigns(wb: Workbook, data: dict) -> None:
                     "Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.",
                 ),
             ),
+            (
+                "Campaign Tuning",
+                (data.get("campaign_tuning_summary") or {}).get(
+                    "summary",
+                    "Campaign tuning is neutral because there is not enough outcome history yet to bias tied recommendations.",
+                ),
+            ),
+            (
+                "Next Tuned Campaign",
+                (data.get("next_tuned_campaign") or {}).get(
+                    "summary",
+                    "No current campaign needs a tuning tie-break yet.",
+                ),
+            ),
         ],
         title="Action Sync Readiness",
     )
@@ -5054,6 +5124,20 @@ def _build_writeback_audit(wb: Workbook, data: dict) -> None:
                 (data.get("next_monitoring_step") or {}).get(
                     "summary",
                     "Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.",
+                ),
+            ),
+            (
+                "Campaign Tuning",
+                (data.get("campaign_tuning_summary") or {}).get(
+                    "summary",
+                    "Campaign tuning is neutral because there is not enough outcome history yet to bias tied recommendations.",
+                ),
+            ),
+            (
+                "Next Tuned Campaign",
+                (data.get("next_tuned_campaign") or {}).get(
+                    "summary",
+                    "No current campaign needs a tuning tie-break yet.",
                 ),
             ),
         ],
@@ -6858,6 +6942,16 @@ def _build_print_pack(
     ws["E14"] = weekly_pack.get(
         "next_monitoring_step",
         "Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.",
+    )
+    ws["D15"] = "Campaign Tuning"
+    ws["E15"] = weekly_pack.get(
+        "campaign_tuning_summary",
+        "Campaign tuning is neutral because there is not enough outcome history yet to bias tied recommendations.",
+    )
+    ws["D16"] = "Next Tuned Campaign"
+    ws["E16"] = weekly_pack.get(
+        "next_tuned_campaign",
+        "No current campaign needs a tuning tie-break yet.",
     )
     ws["A7"] = "Portfolio Headline"
     ws["B7"] = weekly_pack.get("portfolio_headline", operator_summary.get("headline", "Review the latest workbook surfaces for change and drift."))

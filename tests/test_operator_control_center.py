@@ -7403,6 +7403,8 @@ def test_operator_snapshot_includes_action_sync_readiness_and_queue_handoff(tmp_
     assert "next_apply_candidate" in summary
     assert "campaign_outcomes_summary" in summary
     assert "next_monitoring_step" in summary
+    assert "campaign_tuning_summary" in summary
+    assert "next_tuned_campaign" in summary
     repo_item = next(item for item in snapshot["operator_queue"] if item.get("repo") == "RepoSecure")
     assert repo_item["suggested_campaign"] == "security-review"
     assert repo_item["action_sync_stage"] == "preview-ready"
@@ -7412,3 +7414,5 @@ def test_operator_snapshot_includes_action_sync_readiness_and_queue_handoff(tmp_
     assert repo_item["apply_packet_command"].startswith("audit testuser --campaign security-review")
     assert repo_item["post_apply_state"] == "no-recent-apply"
     assert "Post-Apply Monitoring:" in repo_item["post_apply_line"]
+    assert repo_item["campaign_tuning_status"] == "insufficient-evidence"
+    assert "Campaign Tuning:" in repo_item["campaign_tuning_line"]

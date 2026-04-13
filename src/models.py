@@ -171,6 +171,9 @@ class AuditReport:
     action_sync_outcomes: list[dict] = field(default_factory=list)
     campaign_outcomes_summary: dict = field(default_factory=dict)
     next_monitoring_step: dict = field(default_factory=dict)
+    action_sync_tuning: list[dict] = field(default_factory=list)
+    campaign_tuning_summary: dict = field(default_factory=dict)
+    next_tuned_campaign: dict = field(default_factory=dict)
     security_posture: dict = field(default_factory=dict)
     security_governance_preview: list[dict] = field(default_factory=list)
     collections: dict[str, dict] = field(default_factory=dict)
@@ -353,6 +356,9 @@ class AuditReport:
             action_sync_outcomes=[],
             campaign_outcomes_summary={},
             next_monitoring_step={},
+            action_sync_tuning=[],
+            campaign_tuning_summary={},
+            next_tuned_campaign={},
             security_posture=portfolio_security,
             security_governance_preview=security_governance_preview,
             collections=collections,
@@ -422,6 +428,9 @@ class AuditReport:
             "action_sync_outcomes": self.action_sync_outcomes,
             "campaign_outcomes_summary": self.campaign_outcomes_summary,
             "next_monitoring_step": self.next_monitoring_step,
+            "action_sync_tuning": self.action_sync_tuning,
+            "campaign_tuning_summary": self.campaign_tuning_summary,
+            "next_tuned_campaign": self.next_tuned_campaign,
             "security_posture": self.security_posture,
             "security_governance_preview": self.security_governance_preview,
             "collections": self.collections,

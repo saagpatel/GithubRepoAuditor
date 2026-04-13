@@ -298,6 +298,8 @@ def write_markdown_report(
     _w(f"- Action Sync Command Hint: {weekly_pack.get('action_sync_command_hint', 'No Action Sync command is recommended yet.')}")
     _w(f"- Post-Apply Monitoring: {weekly_pack.get('campaign_outcomes_summary', 'No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.')}")
     _w(f"- Next Monitoring Step: {weekly_pack.get('next_monitoring_step', 'Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.')}")
+    _w(f"- Campaign Tuning: {weekly_pack.get('campaign_tuning_summary', 'Campaign tuning stays neutral until there is enough outcome history to bias tied recommendations.')}")
+    _w(f"- Next Tuned Campaign: {weekly_pack.get('next_tuned_campaign', 'No current campaign needs a tie-break candidate yet.')}")
     _w("")
     _w("### Action Sync Readiness")
     _w("")
@@ -350,6 +352,21 @@ def write_markdown_report(
                 _w(f"  - {item.get('label', item.get('campaign_type', 'Campaign'))} — {item.get('summary', 'No post-apply monitoring summary is recorded yet.')}")
         else:
             _w(f"  - {empty_message}")
+    _w("- Campaign Tuning:")
+    _w(f"  - Summary: {weekly_pack.get('campaign_tuning_summary', 'Campaign tuning stays neutral until there is enough outcome history to bias tied recommendations.')}")
+    _w(f"  - Next Tuned Campaign: {weekly_pack.get('next_tuned_campaign', 'No current campaign needs a tie-break candidate yet.')}")
+    tuning_sections = [
+        ("Proven", weekly_pack.get("top_proven_campaigns", []), "No campaigns have enough clean evidence to be called proven yet."),
+        ("Caution", weekly_pack.get("top_caution_campaigns", []), "No campaigns currently show caution-level outcome risk."),
+        ("Thin Evidence", weekly_pack.get("top_thin_evidence_campaigns", []), "No campaigns are currently limited mainly by thin evidence."),
+    ]
+    for label, items, empty_message in tuning_sections:
+        _w(f"- {label}:")
+        if items:
+            for item in items[:3]:
+                _w(f"  - {item.get('label', item.get('campaign_type', 'Campaign'))} — {item.get('summary', 'No campaign tuning summary is recorded yet.')}")
+        else:
+            _w(f"  - {empty_message}")
     _w("")
     _w("### Top Attention")
     _w("")
@@ -368,6 +385,7 @@ def write_markdown_report(
         _w(f"  - {item.get('action_sync_line', 'Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.')}")
         _w(f"  - {item.get('apply_packet_line', 'Apply Packet: no current execution handoff is surfaced.')}")
         _w(f"  - {item.get('post_apply_line', 'Post-Apply Monitoring: no recent Action Sync apply needs follow-up yet.')}")
+        _w(f"  - {item.get('campaign_tuning_line', 'Campaign Tuning: recommendations stay neutral until more outcome history is available.')}")
         _w(f"  - Checkpoint Timing: {item.get('follow_through_checkpoint_timing', 'Unknown')}")
         _w(
             f"  - Next Checkpoint: {item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}"
@@ -415,6 +433,8 @@ def write_markdown_report(
         _w(f"- Maturity Gap: {briefing.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.')}")
         _w(f"- {briefing.get('action_sync_line', 'Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.')}")
         _w(f"- {briefing.get('apply_packet_line', 'Apply Packet: no current execution handoff is surfaced.')}")
+        _w(f"- {briefing.get('post_apply_line', 'Post-Apply Monitoring: no recent Action Sync apply needs follow-up yet.')}")
+        _w(f"- {briefing.get('campaign_tuning_line', 'Campaign Tuning: recommendations stay neutral until more outcome history is available.')}")
         _w(f"- Checkpoint Timing: {briefing.get('checkpoint_timing_line', 'Unknown')}")
         _w(f"- What Would Count As Progress: {briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
         _w("")
@@ -1216,6 +1236,10 @@ def write_markdown_report(
             _w(f"- Post-Apply Monitoring: {report.campaign_outcomes_summary.get('summary')}")
         if report.next_monitoring_step.get("summary"):
             _w(f"- Next Monitoring Step: {report.next_monitoring_step.get('summary')}")
+        if report.campaign_tuning_summary.get("summary"):
+            _w(f"- Campaign Tuning: {report.campaign_tuning_summary.get('summary')}")
+        if report.next_tuned_campaign.get("summary"):
+            _w(f"- Next Tuned Campaign: {report.next_tuned_campaign.get('summary')}")
         if github_projects.get("enabled"):
             _w(
                 f"- GitHub Projects: {github_projects.get('status', 'disabled')} "
