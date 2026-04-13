@@ -1,6 +1,6 @@
 # GitHub Repo Auditor Roadmap: Phases 88-92
 
-**Date:** 2026-04-12  
+**Date:** 2026-04-12
 **Current Status Snapshot:**
 - Shipped through **Phase 87**
 - Current baseline is `main`
@@ -77,7 +77,7 @@ The shipped product shape now includes:
 - operator effectiveness and outcomes summaries
 - action sync readiness and apply-packet guidance
 
-The main remaining gap is no longer deciding what to do next.  
+The main remaining gap is no longer deciding what to do next.
 It is proving whether the action actually helped after preview or apply.
 
 ---
