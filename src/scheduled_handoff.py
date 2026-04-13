@@ -4,6 +4,8 @@ import argparse
 import json
 from pathlib import Path
 
+from src.terminology import ACTION_SYNC_CANONICAL_LABELS
+
 ISSUE_LABEL = "scheduled-audit-handoff"
 
 
@@ -131,7 +133,7 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Post-apply monitoring: {(summary.get('campaign_outcomes_summary') or {}).get('summary', 'No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.')}",
         f"- Next monitoring step: {(summary.get('next_monitoring_step') or {}).get('summary', 'Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.')}",
         f"- Campaign tuning: {(summary.get('campaign_tuning_summary') or {}).get('summary', 'Campaign tuning is neutral because there is not enough outcome history yet to bias tied recommendations.')}",
-        f"- Next tuned campaign: {(summary.get('next_tuned_campaign') or {}).get('summary', 'No current campaign needs a tuning tie-break yet.')}",
+        f"- {ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}: {(summary.get('next_tuned_campaign') or {}).get('summary', 'No current campaign needs a tuning tie-break yet.')}",
         f"- Trend: `{summary.get('trend_status', 'stable')}` — {summary.get('trend_summary', 'No trend summary is recorded yet.')}",
         f"- Aging status: `{summary.get('aging_status', 'fresh')}`",
         f"- Attention counts: new={summary.get('new_attention_count', 0)}, resolved={resolved_count}, persisting={persisting_count}, reopened={summary.get('reopened_attention_count', 0)}",

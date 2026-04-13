@@ -90,17 +90,17 @@ Then read the third shared layer: `Post-Apply Monitoring`.
 
 That layer is there to answer one question plainly: did the sync actually help, and what is the next human follow-up step?
 
-If two campaigns are otherwise tied, read the `Campaign Tuning` overlay last:
+If two campaigns are otherwise tied, read `Campaign Tuning` last:
 
 - `proven` means recent judged outcomes are clean enough that the campaign should win ties
 - `mixed` means keep the recommendation neutral
-- `caution` means recent drift, reopen, or rollback-watch history should make the campaign lose ties
+- `caution` means recent drift, reopen, or rollback-watch history should make the campaign rank later in ties
 - `insufficient-evidence` means there still is not enough judged history to bias the recommendation
 
 That overlay is intentionally bounded:
 - it never moves a weaker readiness stage ahead of a stronger one
 - it never changes queue order or trust behavior
-- it only biases which tied campaign should be recommended first
+- it only biases which tied campaign should be recommended first, surfaced as `Next Tie-Break Candidate`
 
 ## Workbook gate reminder
 

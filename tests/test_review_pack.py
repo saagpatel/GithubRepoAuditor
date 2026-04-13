@@ -205,7 +205,8 @@ def test_review_pack_includes_revalidation_recovery_section(tmp_path):
     assert "Post-Apply Monitoring:" in content
     assert "Next Monitoring Step:" in content
     assert "Campaign Tuning:" in content
-    assert "Next Tuned Campaign:" in content
+    assert "Next Tie-Break Candidate:" in content
+    assert "Next Tuned Campaign:" not in content
     assert "Preview Ready" in content
     assert "Catalog: operator-loop | flagship workbook-first flow" in content
     assert "Where To Start: Start in src/core.py." in content

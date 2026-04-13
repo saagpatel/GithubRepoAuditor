@@ -8,6 +8,7 @@ from src.baseline_context import build_watch_guidance
 from src.governance_activation import build_governance_summary
 from src.operator_effectiveness import build_operator_effectiveness_bundle
 from src.recurring_review import build_review_bundle
+from src.terminology import ACTION_SYNC_CANONICAL_LABELS
 from src.warehouse import (
     load_operator_calibration_history,
     load_operator_state_history,
@@ -993,24 +994,24 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
     if summary.get("what_to_do_next"):
         lines.append(f"*What To Do Next:* {summary['what_to_do_next']}")
     if (summary.get("action_sync_summary") or {}).get("summary"):
-        lines.append(f"*Action Sync Readiness:* {(summary.get('action_sync_summary') or {}).get('summary')}")
+        lines.append(f"*{ACTION_SYNC_CANONICAL_LABELS['readiness']}:* {(summary.get('action_sync_summary') or {}).get('summary')}")
     if summary.get("next_action_sync_step"):
         lines.append(f"*Next Action Sync Step:* {summary['next_action_sync_step']}")
     if (summary.get("apply_readiness_summary") or {}).get("summary"):
-        lines.append(f"*Apply Packet:* {(summary.get('apply_readiness_summary') or {}).get('summary')}")
+        lines.append(f"*{ACTION_SYNC_CANONICAL_LABELS['apply_packet']}:* {(summary.get('apply_readiness_summary') or {}).get('summary')}")
     if (summary.get("next_apply_candidate") or {}).get("summary"):
         lines.append(f"*Next Apply Candidate:* {(summary.get('next_apply_candidate') or {}).get('summary')}")
     if (summary.get("next_apply_candidate") or {}).get("preview_command") or (summary.get("next_apply_candidate") or {}).get("apply_command"):
         command_hint = (summary.get("next_apply_candidate") or {}).get("apply_command") or (summary.get("next_apply_candidate") or {}).get("preview_command")
         lines.append(f"*Action Sync Command Hint:* `{command_hint}`")
     if (summary.get("campaign_outcomes_summary") or {}).get("summary"):
-        lines.append(f"*Post-Apply Monitoring:* {(summary.get('campaign_outcomes_summary') or {}).get('summary')}")
+        lines.append(f"*{ACTION_SYNC_CANONICAL_LABELS['post_apply_monitoring']}:* {(summary.get('campaign_outcomes_summary') or {}).get('summary')}")
     if (summary.get("next_monitoring_step") or {}).get("summary"):
         lines.append(f"*Next Monitoring Step:* {(summary.get('next_monitoring_step') or {}).get('summary')}")
     if (summary.get("campaign_tuning_summary") or {}).get("summary"):
-        lines.append(f"*Campaign Tuning:* {(summary.get('campaign_tuning_summary') or {}).get('summary')}")
+        lines.append(f"*{ACTION_SYNC_CANONICAL_LABELS['campaign_tuning']}:* {(summary.get('campaign_tuning_summary') or {}).get('summary')}")
     if (summary.get("next_tuned_campaign") or {}).get("summary"):
-        lines.append(f"*Next Tuned Campaign:* {(summary.get('next_tuned_campaign') or {}).get('summary')}")
+        lines.append(f"*{ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}:* {(summary.get('next_tuned_campaign') or {}).get('summary')}")
     if summary.get("trend_summary"):
         lines.append(f"*Trend:* {summary['trend_summary']}")
     if summary.get("accountability_summary"):

@@ -572,7 +572,7 @@ def test_build_scheduled_handoff_includes_github_projects_campaign_status(tmp_pa
     assert "Post-apply monitoring: Security Review was applied recently" in markdown
     assert "Next monitoring step: Monitor Security Review for at least 2 post-apply runs" in markdown
     assert "Campaign tuning: Security Review should win ties because recent outcomes are proven." in markdown
-    assert "Next tuned campaign: Security Review should win ties inside the preview-ready group" in markdown
+    assert "Next Tie-Break Candidate: Security Review should win ties inside the preview-ready group" in markdown
 
 
 def test_build_scheduled_handoff_stays_quiet_for_quiet_runs(tmp_path):

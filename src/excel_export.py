@@ -104,6 +104,7 @@ from src.report_enrichment import (
     no_linked_artifact_summary,
 )
 from src.sparkline import sparkline as render_sparkline
+from src.terminology import ACTION_SYNC_CANONICAL_LABELS
 
 # Tier display order
 TIER_ORDER = ["shipped", "functional", "wip", "skeleton", "abandoned"]
@@ -4968,7 +4969,7 @@ def _build_campaigns(wb: Workbook, data: dict) -> None:
         10,
         [
             (
-                "Action Sync Readiness",
+                ACTION_SYNC_CANONICAL_LABELS["readiness"],
                 (data.get("action_sync_summary") or {}).get(
                     "summary",
                     "No current campaign needs Action Sync yet, so the safest next move is to keep the story local.",
@@ -4992,7 +4993,7 @@ def _build_campaigns(wb: Workbook, data: dict) -> None:
                 or "No Action Sync command is recommended yet.",
             ),
             (
-                "Post-Apply Monitoring",
+                ACTION_SYNC_CANONICAL_LABELS["post_apply_monitoring"],
                 (data.get("campaign_outcomes_summary") or {}).get(
                     "summary",
                     "No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.",
@@ -5006,21 +5007,21 @@ def _build_campaigns(wb: Workbook, data: dict) -> None:
                 ),
             ),
             (
-                "Campaign Tuning",
+                ACTION_SYNC_CANONICAL_LABELS["campaign_tuning"],
                 (data.get("campaign_tuning_summary") or {}).get(
                     "summary",
                     "Campaign tuning is neutral because there is not enough outcome history yet to bias tied recommendations.",
                 ),
             ),
             (
-                "Next Tuned Campaign",
+                ACTION_SYNC_CANONICAL_LABELS["next_tie_break_candidate"],
                 (data.get("next_tuned_campaign") or {}).get(
                     "summary",
                     "No current campaign needs a tuning tie-break yet.",
                 ),
             ),
         ],
-        title="Action Sync Readiness",
+        title=ACTION_SYNC_CANONICAL_LABELS["readiness"],
     )
     headers = ["Repo", "Issue", "Topics", "Projects", "Notion Actions", "Action IDs", "Drift", "Sync Mode"]
     start_row = summary_end_row + 2
@@ -5089,7 +5090,7 @@ def _build_writeback_audit(wb: Workbook, data: dict) -> None:
         5,
         [
             (
-                "Action Sync Readiness",
+                ACTION_SYNC_CANONICAL_LABELS["readiness"],
                 (data.get("action_sync_summary") or {}).get(
                     "summary",
                     "No current campaign needs Action Sync yet, so the safest next move is to keep the story local.",
@@ -5113,7 +5114,7 @@ def _build_writeback_audit(wb: Workbook, data: dict) -> None:
                 or "No Action Sync command is recommended yet.",
             ),
             (
-                "Post-Apply Monitoring",
+                ACTION_SYNC_CANONICAL_LABELS["post_apply_monitoring"],
                 (data.get("campaign_outcomes_summary") or {}).get(
                     "summary",
                     "No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.",
@@ -5127,21 +5128,21 @@ def _build_writeback_audit(wb: Workbook, data: dict) -> None:
                 ),
             ),
             (
-                "Campaign Tuning",
+                ACTION_SYNC_CANONICAL_LABELS["campaign_tuning"],
                 (data.get("campaign_tuning_summary") or {}).get(
                     "summary",
                     "Campaign tuning is neutral because there is not enough outcome history yet to bias tied recommendations.",
                 ),
             ),
             (
-                "Next Tuned Campaign",
+                ACTION_SYNC_CANONICAL_LABELS["next_tie_break_candidate"],
                 (data.get("next_tuned_campaign") or {}).get(
                     "summary",
                     "No current campaign needs a tuning tie-break yet.",
                 ),
             ),
         ],
-        title="Action Sync Readiness",
+        title=ACTION_SYNC_CANONICAL_LABELS["readiness"],
     )
     headers = ["Repo", "Target", "Status", "Rollback", "URL", "Details"]
     start_row = 10
@@ -6913,7 +6914,7 @@ def _build_print_pack(
         "next_best_workflow_step",
         "Open the standard workbook first, then use --control-center for read-only triage.",
     )
-    ws["D9"] = "Action Sync Readiness"
+    ws["D9"] = ACTION_SYNC_CANONICAL_LABELS["readiness"]
     ws["E9"] = weekly_pack.get(
         "action_sync_summary",
         "No current campaign needs Action Sync yet, so the safest next move is to keep the story local.",
@@ -6933,7 +6934,7 @@ def _build_print_pack(
         "action_sync_command_hint",
         "No Action Sync command is recommended yet.",
     )
-    ws["D13"] = "Post-Apply Monitoring"
+    ws["D13"] = ACTION_SYNC_CANONICAL_LABELS["post_apply_monitoring"]
     ws["E13"] = weekly_pack.get(
         "campaign_outcomes_summary",
         "No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.",
@@ -6943,12 +6944,12 @@ def _build_print_pack(
         "next_monitoring_step",
         "Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.",
     )
-    ws["D15"] = "Campaign Tuning"
+    ws["D15"] = ACTION_SYNC_CANONICAL_LABELS["campaign_tuning"]
     ws["E15"] = weekly_pack.get(
         "campaign_tuning_summary",
         "Campaign tuning is neutral because there is not enough outcome history yet to bias tied recommendations.",
     )
-    ws["D16"] = "Next Tuned Campaign"
+    ws["D16"] = ACTION_SYNC_CANONICAL_LABELS["next_tie_break_candidate"]
     ws["E16"] = weekly_pack.get(
         "next_tuned_campaign",
         "No current campaign needs a tuning tie-break yet.",

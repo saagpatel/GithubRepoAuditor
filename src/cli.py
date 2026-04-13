@@ -47,6 +47,7 @@ from src.reporter import (
     write_raw_metadata,
 )
 from src.scorer import score_repo
+from src.terminology import ACTION_SYNC_CANONICAL_LABELS
 
 ANALYSIS_WORKERS = 4
 CLI_MODE_GUIDE = """GitHub portfolio operating system with four product modes:
@@ -2257,7 +2258,7 @@ def _print_output_summary(
     if report.campaign_tuning_summary.get("summary"):
         print_info(f"Campaign tuning: {report.campaign_tuning_summary.get('summary')}")
     if report.next_tuned_campaign.get("summary"):
-        print_info(f"Next tuned campaign: {report.next_tuned_campaign.get('summary')}")
+        print_info(f"{ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}: {report.next_tuned_campaign.get('summary')}")
     print_info(_normal_audit_next_step_hint(report.username))
 
 

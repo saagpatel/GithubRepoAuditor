@@ -119,14 +119,14 @@ Post-apply monitoring is still descriptive:
 
 Phase 89 adds one bounded recommendation overlay on top of those three layers:
 - `Campaign Tuning` only breaks ties when multiple campaigns are already in the same readiness or execution group
-- `proven` campaigns rank first inside those ties
-- `caution` campaigns rank later inside those ties
+- `proven` campaigns win ties
+- `caution` campaigns are ranked later in ties
 - `insufficient-evidence` stays neutral until enough judged outcomes exist
 
 Use that overlay as a ranking hint, not a new execution layer:
 - it never moves a weaker stage ahead of a stronger one
 - it never changes queue order or write authority
-- it helps the product explain which tied campaign should be recommended first
+- it helps the product explain which tied campaign should be recommended first through the `Next Tie-Break Candidate` line
 
 ## Default guidance
 

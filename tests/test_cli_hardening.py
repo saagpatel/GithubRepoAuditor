@@ -518,7 +518,7 @@ def test_print_output_summary_emits_post_apply_monitoring_hints(capsys, sample_m
     assert "Post-apply monitoring: Security Review was applied recently" in combined
     assert "Next monitoring step: Monitor Security Review for at least 2 post-apply runs" in combined
     assert "Campaign tuning: Security Review should win ties" in combined
-    assert "Next tuned campaign: Security Review should win ties inside" in combined
+    assert "Next Tie-Break Candidate: Security Review should win ties inside" in combined
 
 
 def test_incremental_noop_regenerates_from_latest_report(monkeypatch, tmp_path, sample_metadata):
