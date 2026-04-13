@@ -2,13 +2,13 @@
 
 **Date:** 2026-04-12
 **Current Status Snapshot:**
-- Shipped through **Phase 88**
+- Shipped through **Phase 89**
 - Current baseline is `main`
 - No open PRs
 - Workbook automated gate passes; manual desktop Excel signoff remains a separate release step
 - Only intentional local residue is untracked `.serena/`
 - [2026-04-12-roadmap-phases-78-85.md](/Users/d/Projects/GithubRepoAuditor/docs/plans/2026-04-12-roadmap-phases-78-85.md) is now historical context only
-- **Phase 89** is now the active target
+- **Phase 90** is now the active target
 
 ---
 
@@ -78,15 +78,23 @@ The shipped product shape now includes:
 - implementation hotspot guidance
 - operator effectiveness and outcomes summaries
 - action sync readiness and apply-packet guidance
+- post-apply monitoring
+- bounded campaign tuning for same-stage recommendation ties
 
-The Action Sync stack now has three layers:
+The Action Sync stack now has three operational layers:
 
 - readiness
 - apply packet
 - post-apply monitoring
 
-The main remaining gap is no longer deciding what to do next or seeing what happened after apply.
-It is using that post-apply history to recommend which campaign should be preferred first when the operational stage is otherwise tied.
+Phase 89 added one bounded recommendation overlay on top of those three layers:
+
+- campaign tuning
+
+That overlay uses post-apply history to break ties only when campaigns are already in the same readiness or execution group.
+
+The main remaining gap is no longer actionability or outcome visibility.
+It is making the architecture story, visible terminology, and module boundaries match the product that is already shipped.
 
 ---
 
@@ -150,6 +158,10 @@ This phase should stay bounded:
 
 Keep this descriptive first. Do not auto-retune campaign execution or add self-modifying behavior.
 
+### Status
+
+Shipped. Phase 89 added bounded recommendation tuning, warehouse persistence for campaign tuning snapshots, and surface parity for the new `Campaign Tuning` story.
+
 ---
 
 ## Phase 90: Architecture and Naming Coherence
@@ -167,6 +179,13 @@ Refresh the architecture story across:
 - surface wording
 - docs
 - campaign and writeback language
+
+Phase 90 should specifically:
+
+- refresh `docs/architecture.md` so it matches the shipped operator and Action Sync system
+- standardize visible Action Sync labels across workbook, Markdown, HTML, review-pack, control-center, CLI, and scheduled handoff
+- keep backward compatibility for stored and historical field names while cleaning up visible terminology
+- make the role boundaries between `operator_control_center`, `report_enrichment`, and the Action Sync modules explicit
 
 ### Constraint
 

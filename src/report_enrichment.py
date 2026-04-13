@@ -89,8 +89,6 @@ PRODUCT_MODE_LABELS = {
     "deep-dive": "Deep Dive",
     "action-sync": "Action Sync",
 }
-
-
 def _metadata(audit: Any) -> dict[str, Any]:
     metadata = getattr(audit, "metadata", None)
     if metadata is None:
@@ -773,6 +771,7 @@ def build_weekly_review_pack(
         ),
         "campaign_tuning_summary": build_campaign_tuning_summary(data),
         "next_tuned_campaign": build_next_tuned_campaign_line(data),
+        "next_tie_break_candidate": build_next_tie_break_candidate_line(data),
         "campaign_tuning_line": (
             f"{build_campaign_tuning_summary(data)} Next tie-break: {build_next_tuned_campaign_line(data)}"
             if build_campaign_tuning_summary(data) != NO_CAMPAIGN_TUNING_SUMMARY
@@ -1630,6 +1629,10 @@ def build_next_tuned_campaign_line(report_data: Any) -> str:
     if not campaign:
         campaign = _mapping(_mapping(report_data).get("operator_summary")).get("next_tuned_campaign") or {}
     return str(_mapping(campaign).get("summary") or NO_NEXT_TUNED_CAMPAIGN)
+
+
+def build_next_tie_break_candidate_line(report_data: Any) -> str:
+    return build_next_tuned_campaign_line(report_data)
 
 
 def build_action_sync_line(value: Any) -> str:

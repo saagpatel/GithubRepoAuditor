@@ -38,6 +38,7 @@ from src.report_enrichment import (
     build_follow_through_status_label,
     build_follow_through_summary,
     build_last_movement_label,
+    build_next_tie_break_candidate_line,
     build_queue_pressure_summary,
     build_repo_briefing,
     build_run_change_counts,
@@ -47,6 +48,7 @@ from src.report_enrichment import (
     build_weekly_review_pack,
     no_linked_artifact_summary,
 )
+from src.terminology import ACTION_SYNC_CANONICAL_LABELS
 
 TIER_ORDER = ["shipped", "functional", "wip", "skeleton", "abandoned"]
 
@@ -291,17 +293,17 @@ def write_markdown_report(
     _w(f"- Operator Outcomes: {weekly_pack.get('operator_outcomes_summary', 'Not enough operator history is recorded yet to judge outcomes.')}")
     _w(f"- Operator Effectiveness: {weekly_pack.get('operator_effectiveness_line', 'Not enough judged recommendation history is recorded yet to judge operator effectiveness.')}")
     _w(f"- High-Pressure Queue Trend: {weekly_pack.get('high_pressure_queue_trend_line', 'High-pressure queue trend is not ready yet.')}")
-    _w(f"- Action Sync Readiness: {weekly_pack.get('action_sync_summary', 'No current campaign needs Action Sync yet, so the safest next move is to keep the story local.')}")
+    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['readiness']}: {weekly_pack.get('action_sync_summary', 'No current campaign needs Action Sync yet, so the safest next move is to keep the story local.')}")
     _w(f"- Next Action Sync Step: {weekly_pack.get('next_action_sync_step', 'Stay local for now; no current campaign needs preview or apply.')}")
-    _w(f"- Apply Packet: {weekly_pack.get('apply_readiness_summary', 'No current campaign has a safe execution handoff yet, so the local story should stay local for now.')}")
+    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['apply_packet']}: {weekly_pack.get('apply_readiness_summary', 'No current campaign has a safe execution handoff yet, so the local story should stay local for now.')}")
     _w(f"- Next Apply Candidate: {weekly_pack.get('next_apply_candidate', 'Stay local for now; no current campaign has a safe execution handoff.')}")
     _w(f"- Action Sync Command Hint: {weekly_pack.get('action_sync_command_hint', 'No Action Sync command is recommended yet.')}")
-    _w(f"- Post-Apply Monitoring: {weekly_pack.get('campaign_outcomes_summary', 'No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.')}")
+    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['post_apply_monitoring']}: {weekly_pack.get('campaign_outcomes_summary', 'No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.')}")
     _w(f"- Next Monitoring Step: {weekly_pack.get('next_monitoring_step', 'Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.')}")
-    _w(f"- Campaign Tuning: {weekly_pack.get('campaign_tuning_summary', 'Campaign tuning stays neutral until there is enough outcome history to bias tied recommendations.')}")
-    _w(f"- Next Tuned Campaign: {weekly_pack.get('next_tuned_campaign', 'No current campaign needs a tie-break candidate yet.')}")
+    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['campaign_tuning']}: {weekly_pack.get('campaign_tuning_summary', 'Campaign tuning stays neutral until there is enough outcome history to bias tied recommendations.')}")
+    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}: {weekly_pack.get('next_tie_break_candidate', build_next_tie_break_candidate_line(weekly_pack))}")
     _w("")
-    _w("### Action Sync Readiness")
+    _w(f"### {ACTION_SYNC_CANONICAL_LABELS['readiness']}")
     _w("")
     readiness_sections = [
         ("Apply Ready", weekly_pack.get("top_apply_ready_campaigns", []), "No campaigns are currently apply-ready."),
@@ -319,7 +321,7 @@ def write_markdown_report(
                 )
         else:
             _w(f"  - {empty_message}")
-    _w("- Apply Packet:")
+    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['apply_packet']}:")
     _w(f"  - Summary: {weekly_pack.get('apply_readiness_summary', 'No current campaign has a safe execution handoff yet, so the local story should stay local for now.')}")
     _w(f"  - Next Candidate: {weekly_pack.get('next_apply_candidate', 'Stay local for now; no current campaign has a safe execution handoff.')}")
     _w(f"  - Command Hint: {weekly_pack.get('action_sync_command_hint', 'No Action Sync command is recommended yet.')}")
@@ -336,7 +338,7 @@ def write_markdown_report(
                 _w(f"  - {item.get('label', item.get('campaign_type', 'Campaign'))} — {item.get('summary', 'No packet summary is recorded yet.')} [{command}]")
         else:
             _w(f"  - {empty_message}")
-    _w("- Post-Apply Monitoring:")
+    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['post_apply_monitoring']}:")
     _w(f"  - Summary: {weekly_pack.get('campaign_outcomes_summary', 'No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.')}")
     _w(f"  - Next Step: {weekly_pack.get('next_monitoring_step', 'Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.')}")
     monitoring_sections = [
@@ -352,9 +354,9 @@ def write_markdown_report(
                 _w(f"  - {item.get('label', item.get('campaign_type', 'Campaign'))} — {item.get('summary', 'No post-apply monitoring summary is recorded yet.')}")
         else:
             _w(f"  - {empty_message}")
-    _w("- Campaign Tuning:")
+    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['campaign_tuning']}:")
     _w(f"  - Summary: {weekly_pack.get('campaign_tuning_summary', 'Campaign tuning stays neutral until there is enough outcome history to bias tied recommendations.')}")
-    _w(f"  - Next Tuned Campaign: {weekly_pack.get('next_tuned_campaign', 'No current campaign needs a tie-break candidate yet.')}")
+    _w(f"  - {ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}: {weekly_pack.get('next_tie_break_candidate', build_next_tie_break_candidate_line(weekly_pack))}")
     tuning_sections = [
         ("Proven", weekly_pack.get("top_proven_campaigns", []), "No campaigns have enough clean evidence to be called proven yet."),
         ("Caution", weekly_pack.get("top_caution_campaigns", []), "No campaigns currently show caution-level outcome risk."),
@@ -470,7 +472,7 @@ def write_markdown_report(
             _w(f"- Next Checkpoint: {report.operator_summary.get('follow_through_checkpoint_summary')}")
         if (report.operator_summary.get("action_sync_summary") or {}).get("summary"):
             _w(
-                f"- Action Sync Readiness: {(report.operator_summary.get('action_sync_summary') or {}).get('summary')}"
+                f"- {ACTION_SYNC_CANONICAL_LABELS['readiness']}: {(report.operator_summary.get('action_sync_summary') or {}).get('summary')}"
             )
         if report.operator_summary.get("next_action_sync_step"):
             _w(f"- Next Action Sync Step: {report.operator_summary.get('next_action_sync_step')}")
@@ -482,7 +484,7 @@ def write_markdown_report(
         if command_hint:
             _w(f"- Action Sync Command Hint: `{command_hint}`")
         if (report.operator_summary.get("campaign_outcomes_summary") or {}).get("summary"):
-            _w(f"- Post-Apply Monitoring: {(report.operator_summary.get('campaign_outcomes_summary') or {}).get('summary')}")
+            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['post_apply_monitoring']}: {(report.operator_summary.get('campaign_outcomes_summary') or {}).get('summary')}")
         if (report.operator_summary.get("next_monitoring_step") or {}).get("summary"):
             _w(f"- Next Monitoring Step: {(report.operator_summary.get('next_monitoring_step') or {}).get('summary')}")
         if report.operator_summary.get("follow_through_escalation_summary"):
@@ -1233,13 +1235,13 @@ def write_markdown_report(
         if command_hint:
             _w(f"- Action Sync Command Hint: `{command_hint}`")
         if report.campaign_outcomes_summary.get("summary"):
-            _w(f"- Post-Apply Monitoring: {report.campaign_outcomes_summary.get('summary')}")
+            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['post_apply_monitoring']}: {report.campaign_outcomes_summary.get('summary')}")
         if report.next_monitoring_step.get("summary"):
             _w(f"- Next Monitoring Step: {report.next_monitoring_step.get('summary')}")
         if report.campaign_tuning_summary.get("summary"):
-            _w(f"- Campaign Tuning: {report.campaign_tuning_summary.get('summary')}")
+            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['campaign_tuning']}: {report.campaign_tuning_summary.get('summary')}")
         if report.next_tuned_campaign.get("summary"):
-            _w(f"- Next Tuned Campaign: {report.next_tuned_campaign.get('summary')}")
+            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}: {report.next_tuned_campaign.get('summary')}")
         if github_projects.get("enabled"):
             _w(
                 f"- GitHub Projects: {github_projects.get('status', 'disabled')} "

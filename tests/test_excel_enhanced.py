@@ -1563,7 +1563,7 @@ class TestAnalystWorkbookSheets:
         assert ws["D14"].value == "Next Monitoring Step"
         assert ws["D15"].value == "Campaign Tuning"
         assert "win ties" in str(ws["E15"].value).lower()
-        assert ws["D16"].value == "Next Tuned Campaign"
+        assert ws["D16"].value == "Next Tie-Break Candidate"
 
     def test_writeback_audit_shows_empty_state_when_no_results(self):
         wb = Workbook()

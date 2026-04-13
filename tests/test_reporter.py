@@ -267,7 +267,8 @@ class TestMarkdownReport:
         assert "Post-Apply Monitoring" in content
         assert "Next Monitoring Step" in content
         assert "Campaign Tuning" in content
-        assert "Next Tuned Campaign" in content
+        assert "Next Tie-Break Candidate" in content
+        assert "Next Tuned Campaign" not in content
         assert "Preview Ready" in content
         assert "recommended target all" in content
         assert "Security Review should win ties because recent outcomes are proven." in content

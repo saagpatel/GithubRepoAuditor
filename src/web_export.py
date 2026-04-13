@@ -57,6 +57,7 @@ from src.report_enrichment import (
     no_linked_artifact_summary,
 )
 from src.sparkline import sparkline as render_sparkline
+from src.terminology import ACTION_SYNC_CANONICAL_LABELS
 
 # ── Color constants (matching Excel design system) ──────────────────
 
@@ -653,24 +654,24 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
           <div class="meta-line"><strong>Operator Outcomes:</strong> {escape(weekly_pack.get('operator_outcomes_summary', 'Not enough operator history is recorded yet to judge outcomes.'))}</div>
           <div class="meta-line"><strong>Operator Effectiveness:</strong> {escape(weekly_pack.get('operator_effectiveness_line', 'Not enough judged recommendation history is recorded yet to judge operator effectiveness.'))}</div>
           <div class="meta-line"><strong>High-Pressure Queue Trend:</strong> {escape(weekly_pack.get('high_pressure_queue_trend_line', 'High-pressure queue trend is not ready yet.'))}</div>
-          <div class="meta-line"><strong>Action Sync Readiness:</strong> {escape(weekly_pack.get('action_sync_summary', 'No current campaign needs Action Sync yet, so the safest next move is to keep the story local.'))}</div>
+          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['readiness']}:</strong> {escape(weekly_pack.get('action_sync_summary', 'No current campaign needs Action Sync yet, so the safest next move is to keep the story local.'))}</div>
           <div class="meta-line"><strong>Next Action Sync Step:</strong> {escape(weekly_pack.get('next_action_sync_step', 'Stay local for now; no current campaign needs preview or apply.'))}</div>
           <div class="meta-line"><strong>Apply Packet:</strong> {escape(weekly_pack.get('apply_readiness_summary', 'No current campaign has a safe execution handoff yet, so the local story should stay local for now.'))}</div>
           <div class="meta-line"><strong>Next Apply Candidate:</strong> {escape(weekly_pack.get('next_apply_candidate', 'Stay local for now; no current campaign has a safe execution handoff.'))}</div>
           <div class="meta-line"><strong>Action Sync Command Hint:</strong> {escape(weekly_pack.get('action_sync_command_hint', 'No Action Sync command is recommended yet.'))}</div>
-          <div class="meta-line"><strong>Post-Apply Monitoring:</strong> {escape(weekly_pack.get('campaign_outcomes_summary', 'No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.'))}</div>
+          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['post_apply_monitoring']}:</strong> {escape(weekly_pack.get('campaign_outcomes_summary', 'No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.'))}</div>
           <div class="meta-line"><strong>Next Monitoring Step:</strong> {escape(weekly_pack.get('next_monitoring_step', 'Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.'))}</div>
-          <div class="meta-line"><strong>Campaign Tuning:</strong> {escape(weekly_pack.get('campaign_tuning_summary', 'Campaign tuning stays neutral until there is enough outcome history to bias tied recommendations.'))}</div>
-          <div class="meta-line"><strong>Next Tuned Campaign:</strong> {escape(weekly_pack.get('next_tuned_campaign', 'No current campaign needs a tie-break candidate yet.'))}</div>
-          <h3>Action Sync Readiness</h3>
+          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['campaign_tuning']}:</strong> {escape(weekly_pack.get('campaign_tuning_summary', 'Campaign tuning stays neutral until there is enough outcome history to bias tied recommendations.'))}</div>
+          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}:</strong> {escape(weekly_pack.get('next_tie_break_candidate', weekly_pack.get('next_tuned_campaign', 'No current campaign needs a tie-break candidate yet.')))}</div>
+          <h3>{ACTION_SYNC_CANONICAL_LABELS['readiness']}</h3>
           {''.join(readiness_blocks)}
-          <div class="meta-line"><strong>Apply Packet Summary:</strong> {escape(weekly_pack.get('apply_readiness_summary', 'No current campaign has a safe execution handoff yet, so the local story should stay local for now.'))}</div>
+          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['apply_packet']}:</strong> {escape(weekly_pack.get('apply_readiness_summary', 'No current campaign has a safe execution handoff yet, so the local story should stay local for now.'))}</div>
           <div class="meta-line"><strong>Next Apply Candidate:</strong> {escape(weekly_pack.get('next_apply_candidate', 'Stay local for now; no current campaign has a safe execution handoff.'))}</div>
           <div class="meta-line"><strong>Action Sync Command Hint:</strong> {escape(weekly_pack.get('action_sync_command_hint', 'No Action Sync command is recommended yet.'))}</div>
-          <div class="meta-line"><strong>Post-Apply Monitoring Summary:</strong> {escape(weekly_pack.get('campaign_outcomes_summary', 'No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.'))}</div>
+          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['post_apply_monitoring']}:</strong> {escape(weekly_pack.get('campaign_outcomes_summary', 'No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.'))}</div>
           <div class="meta-line"><strong>Next Monitoring Step:</strong> {escape(weekly_pack.get('next_monitoring_step', 'Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.'))}</div>
-          <div class="meta-line"><strong>Campaign Tuning:</strong> {escape(weekly_pack.get('campaign_tuning_summary', 'Campaign tuning stays neutral until there is enough outcome history to bias tied recommendations.'))}</div>
-          <div class="meta-line"><strong>Next Tuned Campaign:</strong> {escape(weekly_pack.get('next_tuned_campaign', 'No current campaign needs a tie-break candidate yet.'))}</div>
+          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['campaign_tuning']}:</strong> {escape(weekly_pack.get('campaign_tuning_summary', 'Campaign tuning stays neutral until there is enough outcome history to bias tied recommendations.'))}</div>
+          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}:</strong> {escape(weekly_pack.get('next_tie_break_candidate', weekly_pack.get('next_tuned_campaign', 'No current campaign needs a tie-break candidate yet.')))}</div>
           {''.join(f"<div class='meta-line'><strong>Ready To Apply:</strong> {escape(item.get('label', item.get('campaign_type', 'Campaign')))} — {escape(item.get('summary', 'No packet summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_ready_to_apply_packets', [])[:3])}
           {''.join(f"<div class='meta-line'><strong>Needs Approval:</strong> {escape(item.get('label', item.get('campaign_type', 'Campaign')))} — {escape(item.get('summary', 'No packet summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_needs_approval_packets', [])[:3])}
           {''.join(f"<div class='meta-line'><strong>Review Drift:</strong> {escape(item.get('label', item.get('campaign_type', 'Campaign')))} — {escape(item.get('summary', 'No packet summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_review_drift_packets', [])[:3])}
@@ -1048,8 +1049,8 @@ def _campaign_section(report_data: dict) -> str:
           <div class="meta-line"><strong>Command Hint:</strong> {escape((report_data.get('next_apply_candidate') or {}).get('apply_command') or (report_data.get('next_apply_candidate') or {}).get('preview_command') or ((report_data.get('operator_summary', {}).get('next_apply_candidate', {}) or {}).get('apply_command') or ((report_data.get('operator_summary', {}).get('next_apply_candidate', {}) or {}).get('preview_command') or 'No Action Sync command is recommended yet.')))}</div>
           <div class="meta-line"><strong>Post-Apply Monitoring:</strong> {escape((report_data.get('campaign_outcomes_summary') or {}).get('summary', (report_data.get('operator_summary', {}).get('campaign_outcomes_summary', {}) or {}).get('summary', 'No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.')))}</div>
           <div class="meta-line"><strong>Next Monitoring Step:</strong> {escape((report_data.get('next_monitoring_step') or {}).get('summary', (report_data.get('operator_summary', {}).get('next_monitoring_step', {}) or {}).get('summary', 'Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.')))}</div>
-          <div class="meta-line"><strong>Campaign Tuning:</strong> {escape((report_data.get('campaign_tuning_summary') or {}).get('summary', (report_data.get('operator_summary', {}).get('campaign_tuning_summary', {}) or {}).get('summary', 'Campaign tuning stays neutral until there is enough outcome history to bias tied recommendations.')))}</div>
-          <div class="meta-line"><strong>Next Tuned Campaign:</strong> {escape((report_data.get('next_tuned_campaign') or {}).get('summary', (report_data.get('operator_summary', {}).get('next_tuned_campaign', {}) or {}).get('summary', 'No current campaign needs a tie-break candidate yet.')))}</div>
+          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['campaign_tuning']}:</strong> {escape((report_data.get('campaign_tuning_summary') or {}).get('summary', (report_data.get('operator_summary', {}).get('campaign_tuning_summary', {}) or {}).get('summary', 'Campaign tuning stays neutral until there is enough outcome history to bias tied recommendations.')))}</div>
+          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}:</strong> {escape((report_data.get('next_tuned_campaign') or {}).get('summary', (report_data.get('operator_summary', {}).get('next_tuned_campaign', {}) or {}).get('summary', 'No current campaign needs a tie-break candidate yet.')))}</div>
           <div class="meta-line"><strong>GitHub Projects:</strong> {escape(github_projects.get('status', 'disabled'))}
             ({escape(github_projects.get('project_owner', '—'))} #{github_projects.get('project_number', 0)}, {github_projects.get('item_count', 0)} items)</div>
         </div>

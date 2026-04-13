@@ -1066,7 +1066,7 @@ class TestRenderHtml:
 
         assert "Action Sync Readiness:" in html
         assert "Next Action Sync Step:" in html
-        assert "Apply Packet Summary:" in html
+        assert "Apply Packet:" in html
         assert "Post-Apply Monitoring:" in html
         assert "Next Monitoring Step:" in html
         assert "Next Apply Candidate:" in html
@@ -1074,5 +1074,6 @@ class TestRenderHtml:
         assert "Preview Ready" in html
         assert "recommended target all" in html
         assert "Campaign Tuning:" in html
-        assert "Next Tuned Campaign:" in html
+        assert "Next Tie-Break Candidate:" in html
+        assert "Next Tuned Campaign:" not in html
         assert "Security Review should win ties because recent outcomes are proven." in html
