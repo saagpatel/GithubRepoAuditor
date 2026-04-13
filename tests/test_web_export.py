@@ -1030,6 +1030,12 @@ class TestRenderHtml:
                     "next_monitoring_step": {
                         "summary": "Monitor Security Review for at least 2 post-apply runs before treating it as stable.",
                     },
+                    "campaign_tuning_summary": {
+                        "summary": "Security Review should win ties because recent outcomes are proven.",
+                    },
+                    "next_tuned_campaign": {
+                        "summary": "Security Review should win ties inside the preview-ready group because recent outcome history is proven.",
+                    },
                     "top_preview_ready_campaigns": [
                         {
                             "label": "Security Review",
@@ -1052,6 +1058,7 @@ class TestRenderHtml:
                         "action_sync_line": "Action Sync: Security Review is preview-ready — recommended target all.",
                         "apply_packet_line": "Apply Packet: Security Review is the best campaign to preview next before deciding on apply to all. Command: audit user --campaign security-review --writeback-target all",
                         "post_apply_line": "Post-Apply Monitoring: Security Review was applied recently; monitor it now before treating it as stable.",
+                        "campaign_tuning_line": "Campaign Tuning: Security Review should win ties because recent outcomes are proven.",
                     }
                 ],
             )
@@ -1066,3 +1073,6 @@ class TestRenderHtml:
         assert "Action Sync Command Hint:" in html
         assert "Preview Ready" in html
         assert "recommended target all" in html
+        assert "Campaign Tuning:" in html
+        assert "Next Tuned Campaign:" in html
+        assert "Security Review should win ties because recent outcomes are proven." in html

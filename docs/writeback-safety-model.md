@@ -96,6 +96,24 @@ The monitoring states are intentionally narrow:
 
 Post-apply monitoring is descriptive only. It does not trigger another sync, rollback, or mutation by itself. It exists to keep the operator loop honest after execution.
 
+## Campaign Tuning Overlay
+
+Phase 89 adds a bounded recommendation overlay on top of readiness, apply packets, and post-apply monitoring.
+
+The overlay uses observed post-apply track record to bias tied recommendations only:
+
+- `proven` campaigns can win ties
+- `mixed` campaigns stay neutral
+- `caution` campaigns should lose ties
+- `insufficient-evidence` stays neutral until enough judged outcomes exist
+
+This layer does not widen authority:
+
+- it does not create a new execution state
+- it does not change queue order, scoring, or trust policy
+- it does not move a weaker readiness or execution stage ahead of a stronger one
+- it does not trigger automatic preview, apply, or rollback
+
 ## Audit Trail
 
 Every campaign run records:

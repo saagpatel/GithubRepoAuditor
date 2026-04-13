@@ -8,7 +8,7 @@ from pathlib import Path
 from src.models import AuditReport
 
 WAREHOUSE_FILENAME = "portfolio-warehouse.db"
-WAREHOUSE_SCHEMA_VERSION = 11
+WAREHOUSE_SCHEMA_VERSION = 12
 
 
 def write_warehouse_snapshot(
@@ -65,6 +65,7 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             operator_effectiveness_summary_json TEXT NOT NULL DEFAULT '{}',
             high_pressure_queue_history_json TEXT NOT NULL DEFAULT '[]',
             action_sync_outcomes_summary_json TEXT NOT NULL DEFAULT '{}',
+            campaign_tuning_summary_json TEXT NOT NULL DEFAULT '{}',
             scenario_summary_json TEXT NOT NULL,
             campaign_summary_json TEXT NOT NULL DEFAULT '{}',
             writeback_preview_json TEXT NOT NULL DEFAULT '{}',
@@ -333,6 +334,21 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             PRIMARY KEY (run_id, campaign_type)
         );
 
+        CREATE TABLE IF NOT EXISTS campaign_tuning (
+            run_id TEXT NOT NULL,
+            campaign_type TEXT NOT NULL,
+            tuning_status TEXT NOT NULL,
+            recommendation_bias TEXT NOT NULL,
+            judged_count INTEGER NOT NULL,
+            holding_clean_rate REAL NOT NULL,
+            drift_return_rate REAL NOT NULL,
+            reopen_rate REAL NOT NULL,
+            rollback_watch_rate REAL NOT NULL,
+            pressure_reduction_rate REAL NOT NULL,
+            details_json TEXT NOT NULL DEFAULT '{}',
+            PRIMARY KEY (run_id, campaign_type)
+        );
+
         CREATE TABLE IF NOT EXISTS governance_approvals (
             source_run_id TEXT PRIMARY KEY,
             approved_at TEXT NOT NULL,
@@ -501,6 +517,7 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     _ensure_column(conn, "audit_runs", "operator_effectiveness_summary_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(conn, "audit_runs", "high_pressure_queue_history_json", "TEXT NOT NULL DEFAULT '[]'")
     _ensure_column(conn, "audit_runs", "action_sync_outcomes_summary_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(conn, "audit_runs", "campaign_tuning_summary_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(
         conn, "portfolio_catalog_entries", "maturity_program", "TEXT NOT NULL DEFAULT ''"
     )
@@ -552,13 +569,14 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             portfolio_catalog_summary_json, intent_alignment_summary_json, scorecards_summary_json, scorecard_programs_json,
             portfolio_outcomes_summary_json, operator_effectiveness_summary_json, high_pressure_queue_history_json,
             action_sync_outcomes_summary_json,
+            campaign_tuning_summary_json,
             campaign_summary_json, writeback_preview_json, writeback_results_json,
             managed_state_drift_json, rollback_preview_json, campaign_history_json,
             governance_preview_json, governance_approval_json, governance_results_json,
             governance_history_json, governance_drift_json, governance_summary_json, review_summary_json, review_alerts_json,
             preflight_summary_json, material_changes_json, review_targets_json, review_history_json, watch_state_json,
             operator_summary_json, operator_queue_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             run_id,
@@ -589,6 +607,7 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             json.dumps(report.operator_effectiveness_summary),
             json.dumps(report.high_pressure_queue_history),
             json.dumps(report.campaign_outcomes_summary),
+            json.dumps(report.campaign_tuning_summary),
             json.dumps(report.campaign_summary),
             json.dumps(report.writeback_preview),
             json.dumps(report.writeback_results),
@@ -1164,6 +1183,30 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             ),
         )
 
+    for tuning in report.action_sync_tuning:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO campaign_tuning (
+                run_id, campaign_type, tuning_status, recommendation_bias, judged_count,
+                holding_clean_rate, drift_return_rate, reopen_rate, rollback_watch_rate,
+                pressure_reduction_rate, details_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                run_id,
+                tuning.get("campaign_type", ""),
+                tuning.get("tuning_status", "insufficient-evidence"),
+                tuning.get("recommendation_bias", "neutral"),
+                int(tuning.get("judged_count", 0) or 0),
+                float(tuning.get("holding_clean_rate", 0.0) or 0.0),
+                float(tuning.get("drift_return_rate", 0.0) or 0.0),
+                float(tuning.get("reopen_rate", 0.0) or 0.0),
+                float(tuning.get("rollback_watch_rate", 0.0) or 0.0),
+                float(tuning.get("pressure_reduction_rate", 0.0) or 0.0),
+                json.dumps(tuning),
+            ),
+        )
+
     for result in (
         report.writeback_results.get("results", [])
         if isinstance(report.writeback_results, dict)
@@ -1592,6 +1635,13 @@ def load_latest_campaign_state(output_dir: Path, campaign_type: str) -> dict:
     return {"campaign_type": campaign_type, "actions": actions, "run_id": run_id}
 
 
+def _coerce_action_sync_snapshot_field(operator_summary: dict, key: str, default):
+    value = operator_summary.get(key, default)
+    if value is None:
+        return default
+    return value
+
+
 def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> list[dict]:
     conn = _connect(output_dir)
     if conn is None:
@@ -1604,7 +1654,8 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
                    governance_summary_json, portfolio_catalog_summary_json, intent_alignment_summary_json,
                    scorecards_summary_json, scorecard_programs_json,
                    portfolio_outcomes_summary_json, operator_effectiveness_summary_json, high_pressure_queue_history_json,
-                   action_sync_outcomes_summary_json, campaign_summary_json, writeback_preview_json, writeback_results_json,
+                   action_sync_outcomes_summary_json, campaign_tuning_summary_json,
+                   campaign_summary_json, writeback_preview_json, writeback_results_json,
                    managed_state_drift_json, rollback_preview_json, campaign_history_json,
                    review_summary_json, operator_summary_json
             FROM audit_runs
@@ -1618,6 +1669,7 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
         conn.close()
     results: list[dict] = []
     for row in rows:
+        operator_summary = json.loads(row["operator_summary_json"] or "{}")
         results.append(
             {
                 "run_id": row["run_id"],
@@ -1643,6 +1695,7 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
                 "operator_effectiveness_summary": json.loads(row["operator_effectiveness_summary_json"] or "{}"),
                 "high_pressure_queue_history": json.loads(row["high_pressure_queue_history_json"] or "[]"),
                 "campaign_outcomes_summary": json.loads(row["action_sync_outcomes_summary_json"] or "{}"),
+                "campaign_tuning_summary": json.loads(row["campaign_tuning_summary_json"] or "{}"),
                 "campaign_summary": json.loads(row["campaign_summary_json"] or "{}"),
                 "writeback_preview": json.loads(row["writeback_preview_json"] or "{}"),
                 "writeback_results": json.loads(row["writeback_results_json"] or "{}"),
@@ -1650,7 +1703,37 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
                 "rollback_preview": json.loads(row["rollback_preview_json"] or "{}"),
                 "campaign_history": json.loads(row["campaign_history_json"] or "[]"),
                 "review_summary": json.loads(row["review_summary_json"] or "{}"),
-                "operator_summary": json.loads(row["operator_summary_json"] or "{}"),
+                "operator_summary": operator_summary,
+                "campaign_readiness_summary": _coerce_action_sync_snapshot_field(
+                    operator_summary, "campaign_readiness_summary", {}
+                ),
+                "action_sync_summary": _coerce_action_sync_snapshot_field(
+                    operator_summary, "action_sync_summary", {}
+                ),
+                "next_action_sync_step": _coerce_action_sync_snapshot_field(
+                    operator_summary, "next_action_sync_step", ""
+                ),
+                "action_sync_packets": _coerce_action_sync_snapshot_field(
+                    operator_summary, "action_sync_packets", []
+                ),
+                "apply_readiness_summary": _coerce_action_sync_snapshot_field(
+                    operator_summary, "apply_readiness_summary", {}
+                ),
+                "next_apply_candidate": _coerce_action_sync_snapshot_field(
+                    operator_summary, "next_apply_candidate", {}
+                ),
+                "action_sync_outcomes": _coerce_action_sync_snapshot_field(
+                    operator_summary, "action_sync_outcomes", []
+                ),
+                "next_monitoring_step": _coerce_action_sync_snapshot_field(
+                    operator_summary, "next_monitoring_step", {}
+                ),
+                "action_sync_tuning": _coerce_action_sync_snapshot_field(
+                    operator_summary, "action_sync_tuning", []
+                ),
+                "next_tuned_campaign": _coerce_action_sync_snapshot_field(
+                    operator_summary, "next_tuned_campaign", {}
+                ),
             }
         )
     return results
@@ -1911,6 +1994,43 @@ def load_campaign_outcomes(output_dir: Path, username: str, limit: int = 50) -> 
     return outcomes
 
 
+def load_campaign_tuning(output_dir: Path, username: str, limit: int = 60) -> list[dict]:
+    conn = _connect(output_dir)
+    if conn is None:
+        return []
+    try:
+        rows = conn.execute(
+            """
+            SELECT campaign_tuning.run_id,
+                   audit_runs.generated_at,
+                   campaign_tuning.campaign_type,
+                   campaign_tuning.tuning_status,
+                   campaign_tuning.recommendation_bias,
+                   campaign_tuning.judged_count,
+                   campaign_tuning.holding_clean_rate,
+                   campaign_tuning.drift_return_rate,
+                   campaign_tuning.reopen_rate,
+                   campaign_tuning.rollback_watch_rate,
+                   campaign_tuning.pressure_reduction_rate,
+                   campaign_tuning.details_json
+            FROM campaign_tuning
+            JOIN audit_runs ON audit_runs.run_id = campaign_tuning.run_id
+            WHERE audit_runs.username = ?
+            ORDER BY audit_runs.generated_at DESC
+            LIMIT ?
+            """,
+            (username, limit),
+        ).fetchall()
+    finally:
+        conn.close()
+    tuning_rows: list[dict] = []
+    for row in rows:
+        payload = dict(row)
+        payload["details"] = json.loads(row["details_json"] or "{}")
+        tuning_rows.append(payload)
+    return tuning_rows
+
+
 def load_watch_checkpoint(output_dir: Path, username: str) -> dict | None:
     conn = _connect(output_dir)
     if conn is None:
@@ -1949,6 +2069,7 @@ def load_latest_operator_state(output_dir: Path, username: str) -> dict | None:
                    scorecards_summary_json, scorecard_programs_json,
                    portfolio_outcomes_summary_json, operator_effectiveness_summary_json, high_pressure_queue_history_json,
                    action_sync_outcomes_summary_json,
+                   campaign_tuning_summary_json,
                    review_summary_json, review_alerts_json, material_changes_json,
                    review_targets_json, review_history_json, watch_state_json,
                    operator_summary_json, operator_queue_json
@@ -1963,6 +2084,7 @@ def load_latest_operator_state(output_dir: Path, username: str) -> dict | None:
         conn.close()
     if not row:
         return None
+    operator_summary = json.loads(row["operator_summary_json"] or "{}")
     return {
         "run_id": row["run_id"],
         "generated_at": row["generated_at"],
@@ -1979,14 +2101,45 @@ def load_latest_operator_state(output_dir: Path, username: str) -> dict | None:
         "operator_effectiveness_summary": json.loads(row["operator_effectiveness_summary_json"] or "{}"),
         "high_pressure_queue_history": json.loads(row["high_pressure_queue_history_json"] or "[]"),
         "campaign_outcomes_summary": json.loads(row["action_sync_outcomes_summary_json"] or "{}"),
+        "campaign_tuning_summary": json.loads(row["campaign_tuning_summary_json"] or "{}"),
         "review_summary": json.loads(row["review_summary_json"] or "{}"),
         "review_alerts": json.loads(row["review_alerts_json"] or "[]"),
         "material_changes": json.loads(row["material_changes_json"] or "[]"),
         "review_targets": json.loads(row["review_targets_json"] or "[]"),
         "review_history": json.loads(row["review_history_json"] or "[]"),
         "watch_state": json.loads(row["watch_state_json"] or "{}"),
-        "operator_summary": json.loads(row["operator_summary_json"] or "{}"),
+        "operator_summary": operator_summary,
         "operator_queue": json.loads(row["operator_queue_json"] or "[]"),
+        "campaign_readiness_summary": _coerce_action_sync_snapshot_field(
+            operator_summary, "campaign_readiness_summary", {}
+        ),
+        "action_sync_summary": _coerce_action_sync_snapshot_field(
+            operator_summary, "action_sync_summary", {}
+        ),
+        "next_action_sync_step": _coerce_action_sync_snapshot_field(
+            operator_summary, "next_action_sync_step", ""
+        ),
+        "action_sync_packets": _coerce_action_sync_snapshot_field(
+            operator_summary, "action_sync_packets", []
+        ),
+        "apply_readiness_summary": _coerce_action_sync_snapshot_field(
+            operator_summary, "apply_readiness_summary", {}
+        ),
+        "next_apply_candidate": _coerce_action_sync_snapshot_field(
+            operator_summary, "next_apply_candidate", {}
+        ),
+        "action_sync_outcomes": _coerce_action_sync_snapshot_field(
+            operator_summary, "action_sync_outcomes", []
+        ),
+        "next_monitoring_step": _coerce_action_sync_snapshot_field(
+            operator_summary, "next_monitoring_step", {}
+        ),
+        "action_sync_tuning": _coerce_action_sync_snapshot_field(
+            operator_summary, "action_sync_tuning", []
+        ),
+        "next_tuned_campaign": _coerce_action_sync_snapshot_field(
+            operator_summary, "next_tuned_campaign", {}
+        ),
     }
 
 

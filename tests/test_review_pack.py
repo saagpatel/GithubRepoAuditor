@@ -110,6 +110,12 @@ def _make_report() -> dict:
             "next_monitoring_step": {
                 "summary": "Monitor Security Review for at least 2 post-apply runs before treating it as stable.",
             },
+            "campaign_tuning_summary": {
+                "summary": "Security Review should win ties because recent outcomes are proven.",
+            },
+            "next_tuned_campaign": {
+                "summary": "Security Review should win ties inside the preview-ready group because recent outcome history is proven.",
+            },
             "top_preview_ready_campaigns": [
                 {
                     "label": "Security Review",
@@ -168,6 +174,7 @@ def _make_report() -> dict:
                 "action_sync_line": "Action Sync: Security Review is preview-ready — recommended target all.",
                 "apply_packet_line": "Apply Packet: Security Review is the best campaign to preview next before deciding on apply to all. Command: audit user --campaign security-review --writeback-target all",
                 "post_apply_line": "Post-Apply Monitoring: Security Review was applied recently; monitor it now before treating it as stable.",
+                "campaign_tuning_line": "Campaign Tuning: Security Review should win ties because recent outcomes are proven.",
             }
         ],
     }
@@ -197,6 +204,8 @@ def test_review_pack_includes_revalidation_recovery_section(tmp_path):
     assert "Action Sync Command Hint:" in content
     assert "Post-Apply Monitoring:" in content
     assert "Next Monitoring Step:" in content
+    assert "Campaign Tuning:" in content
+    assert "Next Tuned Campaign:" in content
     assert "Preview Ready" in content
     assert "Catalog: operator-loop | flagship workbook-first flow" in content
     assert "Where To Start: Start in src/core.py." in content
@@ -204,6 +213,7 @@ def test_review_pack_includes_revalidation_recovery_section(tmp_path):
     assert "Scorecard: Maintain — Operating (target Strong)" in content
     assert "Maturity Gap: testing, ci are still below the maintain bar." in content
     assert "Action Sync: Security Review is preview-ready — recommended target all." in content
+    assert "Campaign Tuning: Security Review should win ties because recent outcomes are proven." in content
     assert "Follow-Through Revalidation Recovery and Confidence Re-Earning" not in content
 
 

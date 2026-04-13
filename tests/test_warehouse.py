@@ -9,6 +9,7 @@ from src.scorer import WEIGHTS, score_repo
 from src.warehouse import (
     load_campaign_history,
     load_campaign_outcomes,
+    load_campaign_tuning,
     load_latest_audit_runs,
     load_latest_campaign_state,
     load_latest_operator_state,
@@ -276,11 +277,38 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
         "monitoring_state": "monitor-now",
         "summary": "Monitor Promotion Push for at least 2 post-apply runs before treating it as stable.",
     }
+    report.action_sync_tuning = [
+        {
+            "campaign_type": "promotion-push",
+            "label": "Promotion Push",
+            "judged_count": 3,
+            "monitor_now_count": 1,
+            "holding_clean_rate": 0.67,
+            "drift_return_rate": 0.0,
+            "reopen_rate": 0.0,
+            "rollback_watch_rate": 0.33,
+            "pressure_reduction_rate": 0.67,
+            "tuning_status": "proven",
+            "recommendation_bias": "promote",
+            "summary": "Promotion Push should win ties because recent outcomes are proven.",
+        }
+    ]
+    report.campaign_tuning_summary = {
+        "summary": "Promotion Push should win ties because recent outcomes are proven.",
+        "counts": {"proven": 1, "mixed": 0, "caution": 0, "insufficient-evidence": 0},
+    }
+    report.next_tuned_campaign = {
+        "campaign_type": "promotion-push",
+        "summary": "Promotion Push should win ties inside the current group because recent outcome history is proven.",
+    }
     report.operator_summary.update(
         {
             "action_sync_outcomes": report.action_sync_outcomes,
             "campaign_outcomes_summary": report.campaign_outcomes_summary,
             "next_monitoring_step": report.next_monitoring_step,
+            "action_sync_tuning": report.action_sync_tuning,
+            "campaign_tuning_summary": report.campaign_tuning_summary,
+            "next_tuned_campaign": report.next_tuned_campaign,
         }
     )
     db_path = write_warehouse_snapshot(report, tmp_path)
@@ -298,6 +326,7 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
         recommendation_rows = conn.execute("SELECT COUNT(*) FROM security_recommendations").fetchone()[0]
         campaign_history_rows = conn.execute("SELECT COUNT(*) FROM campaign_history").fetchone()[0]
         campaign_outcome_rows = conn.execute("SELECT COUNT(*) FROM campaign_outcomes").fetchone()[0]
+        campaign_tuning_rows = conn.execute("SELECT COUNT(*) FROM campaign_tuning").fetchone()[0]
         catalog_rows = conn.execute("SELECT COUNT(*) FROM portfolio_catalog_entries").fetchone()[0]
         scorecard_rows = conn.execute("SELECT COUNT(*) FROM repo_scorecards").fetchone()[0]
     finally:
@@ -314,10 +343,12 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     assert recommendation_rows >= 1
     assert campaign_history_rows == 1
     assert campaign_outcome_rows == 1
+    assert campaign_tuning_rows == 1
     assert catalog_rows == 1
     assert scorecard_rows == 1
 
     campaign_outcomes = load_campaign_outcomes(tmp_path, "user", limit=5)
+    campaign_tuning = load_campaign_tuning(tmp_path, "user", limit=5)
     history = load_campaign_history(tmp_path, "promotion-push")
     recent_campaign_history = load_recent_campaign_history(tmp_path, "user", limit=5)
     latest_state = load_latest_campaign_state(tmp_path, "promotion-push")
@@ -337,10 +368,13 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     assert latest_runs[0]["operator_effectiveness_summary"]["summary"].startswith("recommendation validation")
     assert latest_runs[0]["high_pressure_queue_history"][0]["high_pressure_count"] == 1
     assert latest_runs[0]["campaign_outcomes_summary"]["summary"].startswith("Promotion Push was applied recently")
+    assert latest_runs[0]["campaign_tuning_summary"]["summary"].startswith("Promotion Push should win ties")
     assert latest_runs[0]["baseline_signature"] == report.baseline_signature
     assert latest_runs[0]["baseline_context"]["portfolio_baseline_size"] == 1
     assert campaign_outcomes[0]["campaign_type"] == "promotion-push"
     assert campaign_outcomes[0]["monitoring_state"] == "monitor-now"
+    assert campaign_tuning[0]["campaign_type"] == "promotion-push"
+    assert campaign_tuning[0]["tuning_status"] == "proven"
     assert review_history[0]["review_id"] == "review-1"
     assert watch_checkpoint["filter_signature"] == "abc123"
     assert operator_state["operator_summary"]["headline"] == "Campaign work is ready for review."
@@ -352,6 +386,8 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     assert operator_state["operator_effectiveness_summary"]["summary"].startswith("recommendation validation")
     assert operator_state["high_pressure_queue_history"][0]["high_pressure_count"] == 1
     assert operator_state["campaign_outcomes_summary"]["summary"].startswith("Promotion Push was applied recently")
+    assert operator_state["campaign_tuning_summary"]["summary"].startswith("Promotion Push should win ties")
+    assert operator_state["next_tuned_campaign"]["summary"].startswith("Promotion Push should win ties")
     assert recent_campaign_history[0]["action_id"] == "promotion-push-abc123"
 
 
@@ -367,4 +403,6 @@ def test_write_warehouse_snapshot_defaults_empty_campaign_outcomes_for_older_sty
     operator_state = load_latest_operator_state(tmp_path, "user")
 
     assert latest_runs[0]["campaign_outcomes_summary"] == {}
+    assert latest_runs[0]["campaign_tuning_summary"] == {}
     assert operator_state["campaign_outcomes_summary"] == {}
+    assert operator_state["campaign_tuning_summary"] == {}

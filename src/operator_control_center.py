@@ -376,6 +376,7 @@ def build_operator_snapshot(
     from src.action_sync_outcomes import load_action_sync_outcomes_bundle
     from src.action_sync_packets import build_action_sync_packets_bundle
     from src.action_sync_readiness import build_action_sync_readiness_bundle
+    from src.action_sync_tuning import load_action_sync_tuning_bundle
 
     action_sync = build_action_sync_readiness_bundle(report_data, queue)
     action_sync_packets = build_action_sync_packets_bundle(
@@ -386,6 +387,15 @@ def build_operator_snapshot(
     queue = action_sync_packets.get("operator_queue", action_sync.get("operator_queue", queue))
     action_sync_outcomes = load_action_sync_outcomes_bundle(output_dir, report_data, queue)
     queue = action_sync_outcomes.get("operator_queue", queue)
+    action_sync_tuning = load_action_sync_tuning_bundle(
+        output_dir,
+        report_data,
+        action_sync,
+        action_sync_packets,
+        action_sync_outcomes,
+        queue,
+    )
+    queue = action_sync_tuning.get("operator_queue", queue)
     follow_through = _build_follow_through_with_queue(resolution_trend, queue)
     raw_next_action = _next_operator_action(
         resolution_trend.get("primary_target") or (queue[0] if queue else {}),
@@ -894,17 +904,17 @@ def build_operator_snapshot(
         "recent_regression_examples": operator_effectiveness["recent_regression_examples"],
         "campaign_readiness_summary": action_sync["campaign_readiness_summary"],
         "action_sync_summary": action_sync["action_sync_summary"],
-        "next_action_sync_step": action_sync["next_action_sync_step"],
+        "next_action_sync_step": action_sync_tuning["next_action_sync_step"],
         "action_sync_packets": action_sync_packets["action_sync_packets"],
         "apply_readiness_summary": action_sync_packets["apply_readiness_summary"],
-        "next_apply_candidate": action_sync_packets["next_apply_candidate"],
-        "top_apply_ready_campaigns": action_sync["top_apply_ready_campaigns"],
-        "top_preview_ready_campaigns": action_sync["top_preview_ready_campaigns"],
-        "top_drift_review_campaigns": action_sync["top_drift_review_campaigns"],
-        "top_blocked_campaigns": action_sync["top_blocked_campaigns"],
-        "top_ready_to_apply_packets": action_sync_packets["top_ready_to_apply_packets"],
-        "top_needs_approval_packets": action_sync_packets["top_needs_approval_packets"],
-        "top_review_drift_packets": action_sync_packets["top_review_drift_packets"],
+        "next_apply_candidate": action_sync_tuning["next_apply_candidate"],
+        "top_apply_ready_campaigns": action_sync_tuning["top_apply_ready_campaigns"],
+        "top_preview_ready_campaigns": action_sync_tuning["top_preview_ready_campaigns"],
+        "top_drift_review_campaigns": action_sync_tuning["top_drift_review_campaigns"],
+        "top_blocked_campaigns": action_sync_tuning["top_blocked_campaigns"],
+        "top_ready_to_apply_packets": action_sync_tuning["top_ready_to_apply_packets"],
+        "top_needs_approval_packets": action_sync_tuning["top_needs_approval_packets"],
+        "top_review_drift_packets": action_sync_tuning["top_review_drift_packets"],
         "action_sync_outcomes": action_sync_outcomes["action_sync_outcomes"],
         "campaign_outcomes_summary": action_sync_outcomes["campaign_outcomes_summary"],
         "next_monitoring_step": action_sync_outcomes["next_monitoring_step"],
@@ -912,6 +922,12 @@ def build_operator_snapshot(
         "top_holding_clean_campaigns": action_sync_outcomes["top_holding_clean_campaigns"],
         "top_reopened_campaigns": action_sync_outcomes["top_reopened_campaigns"],
         "top_drift_returned_campaigns": action_sync_outcomes["top_drift_returned_campaigns"],
+        "action_sync_tuning": action_sync_tuning["action_sync_tuning"],
+        "campaign_tuning_summary": action_sync_tuning["campaign_tuning_summary"],
+        "next_tuned_campaign": action_sync_tuning["next_tuned_campaign"],
+        "top_proven_campaigns": action_sync_tuning["top_proven_campaigns"],
+        "top_caution_campaigns": action_sync_tuning["top_caution_campaigns"],
+        "top_thin_evidence_campaigns": action_sync_tuning["top_thin_evidence_campaigns"],
     }
     return {
         "operator_summary": summary,
@@ -923,20 +939,30 @@ def build_operator_snapshot(
         "high_pressure_queue_history": operator_effectiveness["high_pressure_queue_history"],
         "campaign_readiness_summary": action_sync["campaign_readiness_summary"],
         "action_sync_summary": action_sync["action_sync_summary"],
-        "next_action_sync_step": action_sync["next_action_sync_step"],
+        "next_action_sync_step": action_sync_tuning["next_action_sync_step"],
         "action_sync_packets": action_sync_packets["action_sync_packets"],
         "apply_readiness_summary": action_sync_packets["apply_readiness_summary"],
-        "next_apply_candidate": action_sync_packets["next_apply_candidate"],
+        "next_apply_candidate": action_sync_tuning["next_apply_candidate"],
         "action_sync_outcomes": action_sync_outcomes["action_sync_outcomes"],
         "campaign_outcomes_summary": action_sync_outcomes["campaign_outcomes_summary"],
         "next_monitoring_step": action_sync_outcomes["next_monitoring_step"],
-        "top_ready_to_apply_packets": action_sync_packets["top_ready_to_apply_packets"],
-        "top_needs_approval_packets": action_sync_packets["top_needs_approval_packets"],
-        "top_review_drift_packets": action_sync_packets["top_review_drift_packets"],
+        "action_sync_tuning": action_sync_tuning["action_sync_tuning"],
+        "campaign_tuning_summary": action_sync_tuning["campaign_tuning_summary"],
+        "next_tuned_campaign": action_sync_tuning["next_tuned_campaign"],
+        "top_ready_to_apply_packets": action_sync_tuning["top_ready_to_apply_packets"],
+        "top_needs_approval_packets": action_sync_tuning["top_needs_approval_packets"],
+        "top_review_drift_packets": action_sync_tuning["top_review_drift_packets"],
         "top_monitor_now_campaigns": action_sync_outcomes["top_monitor_now_campaigns"],
         "top_holding_clean_campaigns": action_sync_outcomes["top_holding_clean_campaigns"],
         "top_reopened_campaigns": action_sync_outcomes["top_reopened_campaigns"],
         "top_drift_returned_campaigns": action_sync_outcomes["top_drift_returned_campaigns"],
+        "top_apply_ready_campaigns": action_sync_tuning["top_apply_ready_campaigns"],
+        "top_preview_ready_campaigns": action_sync_tuning["top_preview_ready_campaigns"],
+        "top_drift_review_campaigns": action_sync_tuning["top_drift_review_campaigns"],
+        "top_blocked_campaigns": action_sync_tuning["top_blocked_campaigns"],
+        "top_proven_campaigns": action_sync_tuning["top_proven_campaigns"],
+        "top_caution_campaigns": action_sync_tuning["top_caution_campaigns"],
+        "top_thin_evidence_campaigns": action_sync_tuning["top_thin_evidence_campaigns"],
     }
 
 
@@ -981,6 +1007,10 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
         lines.append(f"*Post-Apply Monitoring:* {(summary.get('campaign_outcomes_summary') or {}).get('summary')}")
     if (summary.get("next_monitoring_step") or {}).get("summary"):
         lines.append(f"*Next Monitoring Step:* {(summary.get('next_monitoring_step') or {}).get('summary')}")
+    if (summary.get("campaign_tuning_summary") or {}).get("summary"):
+        lines.append(f"*Campaign Tuning:* {(summary.get('campaign_tuning_summary') or {}).get('summary')}")
+    if (summary.get("next_tuned_campaign") or {}).get("summary"):
+        lines.append(f"*Next Tuned Campaign:* {(summary.get('next_tuned_campaign') or {}).get('summary')}")
     if summary.get("trend_summary"):
         lines.append(f"*Trend:* {summary['trend_summary']}")
     if summary.get("accountability_summary"):
@@ -1238,6 +1268,14 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
                 lines.append(f"  {item.get('scorecard_line')}")
             if item.get("maturity_gap_summary"):
                 lines.append(f"  Maturity Gap: {item.get('maturity_gap_summary')}")
+            if item.get("action_sync_line"):
+                lines.append(f"  {item.get('action_sync_line')}")
+            if item.get("apply_packet_line"):
+                lines.append(f"  {item.get('apply_packet_line')}")
+            if item.get("post_apply_line"):
+                lines.append(f"  {item.get('post_apply_line')}")
+            if item.get("campaign_tuning_line"):
+                lines.append(f"  {item.get('campaign_tuning_line')}")
         lines.append("")
     recent_changes = snapshot.get("operator_recent_changes") or []
     if recent_changes:

@@ -644,9 +644,15 @@ def _report_from_dict(data: dict) -> AuditReport:
         campaign_readiness_summary=data.get("campaign_readiness_summary", {}),
         action_sync_summary=data.get("action_sync_summary", {}),
         next_action_sync_step=data.get("next_action_sync_step", ""),
+        action_sync_packets=data.get("action_sync_packets", []),
+        apply_readiness_summary=data.get("apply_readiness_summary", {}),
+        next_apply_candidate=data.get("next_apply_candidate", {}),
         action_sync_outcomes=data.get("action_sync_outcomes", []),
         campaign_outcomes_summary=data.get("campaign_outcomes_summary", {}),
         next_monitoring_step=data.get("next_monitoring_step", {}),
+        action_sync_tuning=data.get("action_sync_tuning", []),
+        campaign_tuning_summary=data.get("campaign_tuning_summary", {}),
+        next_tuned_campaign=data.get("next_tuned_campaign", {}),
         security_posture=data.get("security_posture", {}),
         security_governance_preview=data.get("security_governance_preview", []),
         collections=data.get("collections", {}),
@@ -1937,9 +1943,15 @@ def _enrich_report_with_operator_state(
     report.campaign_readiness_summary = snapshot.get("campaign_readiness_summary", {})
     report.action_sync_summary = snapshot.get("action_sync_summary", {})
     report.next_action_sync_step = snapshot.get("next_action_sync_step", "")
+    report.action_sync_packets = snapshot.get("action_sync_packets", [])
+    report.apply_readiness_summary = snapshot.get("apply_readiness_summary", {})
+    report.next_apply_candidate = snapshot.get("next_apply_candidate", {})
     report.action_sync_outcomes = snapshot.get("action_sync_outcomes", [])
     report.campaign_outcomes_summary = snapshot.get("campaign_outcomes_summary", {})
     report.next_monitoring_step = snapshot.get("next_monitoring_step", {})
+    report.action_sync_tuning = snapshot.get("action_sync_tuning", [])
+    report.campaign_tuning_summary = snapshot.get("campaign_tuning_summary", {})
+    report.next_tuned_campaign = snapshot.get("next_tuned_campaign", {})
     return report
 
 
@@ -2242,6 +2254,10 @@ def _print_output_summary(
         print_info(f"Post-apply monitoring: {report.campaign_outcomes_summary.get('summary')}")
     if report.next_monitoring_step.get("summary"):
         print_info(f"Next monitoring step: {report.next_monitoring_step.get('summary')}")
+    if report.campaign_tuning_summary.get("summary"):
+        print_info(f"Campaign tuning: {report.campaign_tuning_summary.get('summary')}")
+    if report.next_tuned_campaign.get("summary"):
+        print_info(f"Next tuned campaign: {report.next_tuned_campaign.get('summary')}")
     print_info(_normal_audit_next_step_hint(report.username))
 
 

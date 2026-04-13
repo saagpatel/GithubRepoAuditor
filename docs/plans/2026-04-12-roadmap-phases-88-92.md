@@ -2,11 +2,13 @@
 
 **Date:** 2026-04-12
 **Current Status Snapshot:**
-- Shipped through **Phase 87**
+- Shipped through **Phase 88**
 - Current baseline is `main`
 - No open PRs
 - Workbook automated gate passes; manual desktop Excel signoff remains a separate release step
+- Only intentional local residue is untracked `.serena/`
 - [2026-04-12-roadmap-phases-78-85.md](/Users/d/Projects/GithubRepoAuditor/docs/plans/2026-04-12-roadmap-phases-78-85.md) is now historical context only
+- **Phase 89** is now the active target
 
 ---
 
@@ -77,8 +79,14 @@ The shipped product shape now includes:
 - operator effectiveness and outcomes summaries
 - action sync readiness and apply-packet guidance
 
-The main remaining gap is no longer deciding what to do next.
-It is proving whether the action actually helped after preview or apply.
+The Action Sync stack now has three layers:
+
+- readiness
+- apply packet
+- post-apply monitoring
+
+The main remaining gap is no longer deciding what to do next or seeing what happened after apply.
+It is using that post-apply history to recommend which campaign should be preferred first when the operational stage is otherwise tied.
 
 ---
 
@@ -130,6 +138,13 @@ The system should start showing which campaign types:
 - reopen often
 - drift back quickly
 - need more approval or rollback caution
+
+This phase should stay bounded:
+
+- tuning is a recommendation overlay, not a fourth Action Sync execution layer
+- tuning may break ties inside the same readiness or execution group
+- tuning must not move a weaker stage ahead of a stronger one
+- queue order, lane semantics, trust policy, scoring, and write authority stay unchanged
 
 ### Constraint
 
