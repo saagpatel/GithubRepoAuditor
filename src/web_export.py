@@ -606,6 +606,10 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
       <h2>Weekly Review Pack</h2>
       <div class="analyst-grid">
         <div class="panel">
+          <div class="meta-line"><strong>Product Mode:</strong> {escape(weekly_pack.get('product_mode_summary', 'Weekly Review: use this artifact for the normal workbook-first operator loop.'))}</div>
+          <div class="meta-line"><strong>Artifact Role:</strong> {escape(weekly_pack.get('artifact_role_summary', 'This artifact is the shared weekly handoff across workbook, HTML, Markdown, and review-pack.'))}</div>
+          <div class="meta-line"><strong>Suggested Reading Order:</strong> {escape(weekly_pack.get('suggested_reading_order', 'Read Dashboard, then Run Changes, then Review Queue.'))}</div>
+          <div class="meta-line"><strong>Next Best Workflow Step:</strong> {escape(weekly_pack.get('next_best_workflow_step', 'Open the standard workbook first, then use --control-center for read-only triage.'))}</div>
           <div class="meta-line"><strong>Portfolio Headline:</strong> {escape(weekly_pack.get('portfolio_headline', 'No weekly headline is recorded yet.'))}</div>
           <div class="meta-line"><strong>Run Changes:</strong> {escape(weekly_pack.get('run_change_summary', build_run_change_summary(diff_data)))}</div>
           <div class="meta-line"><strong>Queue Pressure:</strong> {escape(weekly_pack.get('queue_pressure_summary', build_queue_pressure_summary(report_data, diff_data)))}</div>
@@ -615,6 +619,9 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
           <div class="meta-line"><strong>Intent Alignment:</strong> {escape(weekly_pack.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.'))}</div>
           <div class="meta-line"><strong>Scorecards:</strong> {escape(weekly_pack.get('scorecards_summary', 'No maturity scorecard is recorded yet.'))}</div>
           <div class="meta-line"><strong>Implementation Hotspots:</strong> {escape(weekly_pack.get('implementation_hotspots_summary', 'No meaningful implementation hotspots are currently surfaced.'))}</div>
+          <div class="meta-line"><strong>Operator Outcomes:</strong> {escape(weekly_pack.get('operator_outcomes_summary', 'Not enough operator history is recorded yet to judge outcomes.'))}</div>
+          <div class="meta-line"><strong>Operator Effectiveness:</strong> {escape(weekly_pack.get('operator_effectiveness_line', 'Not enough judged recommendation history is recorded yet to judge operator effectiveness.'))}</div>
+          <div class="meta-line"><strong>High-Pressure Queue Trend:</strong> {escape(weekly_pack.get('high_pressure_queue_trend_line', 'High-pressure queue trend is not ready yet.'))}</div>
           <div class="meta-line"><strong>Operator Focus:</strong> {escape(weekly_pack.get('operator_focus_summary', 'No operator focus bucket is currently surfaced.'))}</div>
           <div class="meta-line"><strong>Next Checkpoint:</strong> {escape(weekly_pack.get('follow_through_checkpoint_summary', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</div>
           <h3>Operator Focus</h3>

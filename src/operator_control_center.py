@@ -6,12 +6,15 @@ from typing import Any
 
 from src.baseline_context import build_watch_guidance
 from src.governance_activation import build_governance_summary
+from src.operator_effectiveness import build_operator_effectiveness_bundle
 from src.recurring_review import build_review_bundle
 from src.warehouse import (
+    load_recent_campaign_history,
     load_operator_calibration_history,
     load_operator_state_history,
     load_recent_operator_changes,
     load_recent_operator_evidence,
+    load_review_history,
 )
 
 LANE_ORDER = {"blocked": 0, "urgent": 1, "ready": 2, "deferred": 3}
@@ -331,12 +334,29 @@ def build_operator_snapshot(
     }
     counts = {lane: sum(1 for item in queue if item["lane"] == lane) for lane in LANE_ORDER}
     watch_guidance = build_watch_guidance(report_data.get("watch_state") or {})
-    confidence_calibration = _build_confidence_calibration(
-        load_operator_calibration_history(
+    calibration_history = load_operator_calibration_history(
+        output_dir,
+        report_data.get("username", ""),
+        limit=CALIBRATION_WINDOW_RUNS,
+    )
+    confidence_calibration = _build_confidence_calibration(calibration_history)
+    operator_effectiveness = build_operator_effectiveness_bundle(
+        state_history=[
+            _snapshot_from_queue(queue, generated_at=report_data.get("generated_at", ""))
+        ]
+        + history[: CALIBRATION_WINDOW_RUNS - 1],
+        calibration_history=calibration_history,
+        campaign_history=load_recent_campaign_history(
+            output_dir,
+            report_data.get("username", ""),
+            limit=200,
+        ),
+        review_history=load_review_history(
             output_dir,
             report_data.get("username", ""),
             limit=CALIBRATION_WINDOW_RUNS,
-        )
+        ),
+        evidence_events=evidence_bundle.get("events") or [],
     )
     resolution_trend = _build_resolution_trend(
         queue,
@@ -851,12 +871,23 @@ def build_operator_snapshot(
         "low_confidence_caution_rate": confidence_calibration["low_confidence_caution_rate"],
         "recent_validation_outcomes": confidence_calibration["recent_validation_outcomes"],
         "confidence_calibration_summary": confidence_calibration["confidence_calibration_summary"],
+        "portfolio_outcomes_summary": operator_effectiveness["portfolio_outcomes_summary"],
+        "operator_effectiveness_summary": operator_effectiveness["operator_effectiveness_summary"],
+        "high_pressure_queue_history": operator_effectiveness["high_pressure_queue_history"],
+        "high_pressure_queue_trend_status": operator_effectiveness["high_pressure_queue_trend_status"],
+        "high_pressure_queue_trend_summary": operator_effectiveness["high_pressure_queue_trend_summary"],
+        "recent_reopened_recommendations": operator_effectiveness["recent_reopened_recommendations"],
+        "recent_closed_actions": operator_effectiveness["recent_closed_actions"],
+        "recent_regression_examples": operator_effectiveness["recent_regression_examples"],
     }
     return {
         "operator_summary": summary,
         "operator_queue": queue,
         "operator_setup_health": setup_health,
         "operator_recent_changes": recent_changes,
+        "portfolio_outcomes_summary": operator_effectiveness["portfolio_outcomes_summary"],
+        "operator_effectiveness_summary": operator_effectiveness["operator_effectiveness_summary"],
+        "high_pressure_queue_history": operator_effectiveness["high_pressure_queue_history"],
     }
 
 
@@ -1087,6 +1118,31 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
     recent_outcomes_line = _recent_validation_outcomes_line(summary.get("recent_validation_outcomes") or [])
     if recent_outcomes_line:
         lines.append(f"*Recent Confidence Outcomes:* {recent_outcomes_line}")
+    if summary.get("portfolio_outcomes_summary"):
+        lines.append(
+            f"*Operator Outcomes:* {(summary.get('portfolio_outcomes_summary') or {}).get('summary', 'No operator outcomes summary is recorded yet.')}"
+        )
+    if summary.get("operator_effectiveness_summary"):
+        lines.append(
+            f"*Operator Effectiveness:* {(summary.get('operator_effectiveness_summary') or {}).get('summary', 'No operator effectiveness summary is recorded yet.')}"
+        )
+    if summary.get("high_pressure_queue_trend_status"):
+        lines.append(
+            f"*High-Pressure Queue Trend:* {summary.get('high_pressure_queue_trend_status')} — "
+            f"{summary.get('high_pressure_queue_trend_summary', 'No high-pressure queue trend is recorded yet.')}"
+        )
+    if summary.get("recent_closed_actions"):
+        lines.append(
+            f"*Recent Closed Actions:* {_operator_outcome_examples_line(summary.get('recent_closed_actions') or [])}"
+        )
+    if summary.get("recent_reopened_recommendations"):
+        lines.append(
+            f"*Recent Reopened Recommendations:* {_operator_outcome_examples_line(summary.get('recent_reopened_recommendations') or [])}"
+        )
+    if summary.get("recent_regression_examples"):
+        lines.append(
+            f"*Recent Regression Examples:* {_operator_outcome_examples_line(summary.get('recent_regression_examples') or [])}"
+        )
     if summary.get("control_center_reference"):
         lines.append(f"*Control Center Artifact:* `{summary['control_center_reference']}`")
     lines.append(
@@ -1143,6 +1199,9 @@ def control_center_artifact_payload(report_data: dict, snapshot: dict) -> dict:
         "managed_state_drift": report_data.get("managed_state_drift", []),
         "operator_summary": snapshot.get("operator_summary", {}),
         "operator_queue": snapshot.get("operator_queue", []),
+        "portfolio_outcomes_summary": snapshot.get("portfolio_outcomes_summary", {}),
+        "operator_effectiveness_summary": snapshot.get("operator_effectiveness_summary", {}),
+        "high_pressure_queue_history": snapshot.get("high_pressure_queue_history", []),
         "operator_setup_health": snapshot.get("operator_setup_health", {}),
         "operator_recent_changes": snapshot.get("operator_recent_changes", []),
         "review_summary": report_data.get("review_summary", {}),
@@ -34210,6 +34269,18 @@ def _recent_validation_outcomes_line(outcomes: list[dict]) -> str:
         confidence_label = item.get("confidence_label", "low")
         outcome = str(item.get("outcome", "unresolved")).replace("_", " ")
         parts.append(f"{target_label} [{confidence_label}] -> {outcome}")
+    return "; ".join(parts)
+
+
+def _operator_outcome_examples_line(items: list[dict]) -> str:
+    if not items:
+        return ""
+    parts = []
+    for item in items[:3]:
+        repo = str(item.get("repo") or "").strip()
+        title = str(item.get("title") or item.get("action_id") or "Operator outcome").strip()
+        label = f"{repo}: {title}" if repo else title
+        parts.append(label)
     return "; ".join(parts)
 
 

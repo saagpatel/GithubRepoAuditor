@@ -147,6 +147,10 @@ def test_review_pack_includes_revalidation_recovery_section(tmp_path):
     path = export_review_pack(_make_report(), tmp_path)["review_pack_path"]
     content = path.read_text()
 
+    assert "Product Mode:" in content
+    assert "Artifact Role:" in content
+    assert "Suggested Reading Order:" in content
+    assert "Next Best Workflow Step:" in content
     assert "### Operator Focus" in content
     assert "Operator Focus:" in content
     assert "Act Now" in content
@@ -154,6 +158,9 @@ def test_review_pack_includes_revalidation_recovery_section(tmp_path):
     assert "Intent Alignment: 1 aligned, 0 needing review, and 0 missing a contract." in content
     assert "Scorecards: 0 repos are on track, 1 is below target" in content
     assert "Implementation Hotspots: 1 repos have concrete implementation pressure." in content
+    assert "Operator Outcomes:" in content
+    assert "Operator Effectiveness:" in content
+    assert "High-Pressure Queue Trend:" in content
     assert "Catalog: operator-loop | flagship workbook-first flow" in content
     assert "Where To Start: Start in src/core.py." in content
     assert "Intent Alignment: aligned: The repo is holding a maintain posture" in content

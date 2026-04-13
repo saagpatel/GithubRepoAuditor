@@ -151,6 +151,7 @@ def test_main_rejects_writeback_apply_without_target(monkeypatch):
         cli.main()
 
     assert exc.value.code == 2
+    assert args.writeback_target is None
 
 
 def test_main_rejects_github_projects_without_github_writeback(monkeypatch):
@@ -159,13 +160,28 @@ def test_main_rejects_github_projects_without_github_writeback(monkeypatch):
         writeback_target="notion",
         github_projects=True,
     )
+    parser = FakeParser(args)
 
-    monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
+    monkeypatch.setattr(cli, "build_parser", lambda: parser)
 
     with pytest.raises(SystemExit) as exc:
         cli.main()
 
     assert exc.value.code == 2
+    assert "Action Sync" in parser.error_message
+
+
+def test_build_parser_help_groups_examples_by_mode():
+    parser = cli.build_parser()
+    help_text = parser.format_help()
+
+    assert "First Run" in help_text
+    assert "Weekly Review" in help_text
+    assert "Deep Dive" in help_text
+    assert "Action Sync" in help_text
+    assert "--doctor" in help_text
+    assert "--control-center" in help_text
+    assert "--github-projects" in help_text
 
 
 def test_main_forwards_scoring_profile_to_targeted_audit(monkeypatch, sample_metadata):
@@ -211,6 +227,32 @@ def test_build_parser_accepts_github_projects_config_path():
     args = parser.parse_args(["testuser", "--github-projects", "--github-projects-config", "config/custom-github-projects.yaml"])
     assert args.github_projects is True
     assert str(args.github_projects_config) == "config/custom-github-projects.yaml"
+
+
+def test_main_rejects_writeback_target_without_campaign_with_mode_guidance(monkeypatch):
+    args = _make_args(writeback_target="github")
+    parser = FakeParser(args)
+
+    monkeypatch.setattr(cli, "build_parser", lambda: parser)
+
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+
+    assert exc.value.code == 2
+    assert "Action Sync mode" in parser.error_message
+
+
+def test_main_rejects_control_center_with_action_sync_flags(monkeypatch):
+    args = _make_args(control_center=True, campaign="security-review", writeback_target="github")
+    parser = FakeParser(args)
+
+    monkeypatch.setattr(cli, "build_parser", lambda: parser)
+
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+
+    assert exc.value.code == 2
+    assert "read-only Weekly Review entrypoint" in parser.error_message
 
 
 def test_main_forwards_scoring_profile_to_incremental_audit(monkeypatch, sample_metadata):
@@ -307,7 +349,7 @@ programs:
     assert updated.operator_queue[0]["scorecard_line"].startswith("Scorecard: Maintain")
 
 
-def test_main_doctor_writes_artifact_and_exits_cleanly(monkeypatch, tmp_path):
+def test_main_doctor_writes_artifact_and_exits_cleanly(monkeypatch, tmp_path, capsys):
     args = _make_args(doctor=True, output_dir=str(tmp_path))
     artifact_path = tmp_path / "diagnostics-testuser-2026-03-29.json"
 
@@ -320,9 +362,11 @@ def test_main_doctor_writes_artifact_and_exits_cleanly(monkeypatch, tmp_path):
     monkeypatch.setattr("src.diagnostics.write_diagnostics_report", lambda result, output_dir, username: artifact_path)
 
     cli.main()
+    captured = capsys.readouterr()
+    assert "Next step: run `audit testuser --html`" in (captured.out + captured.err)
 
 
-def test_main_control_center_writes_artifacts_without_audit(monkeypatch, tmp_path, sample_metadata):
+def test_main_control_center_writes_artifacts_without_audit(monkeypatch, tmp_path, sample_metadata, capsys):
     args = _make_args(control_center=True, output_dir=str(tmp_path))
     report_path = tmp_path / "audit-report-testuser-2026-03-29.json"
     report_data = _make_report_dict(sample_metadata)
@@ -338,6 +382,10 @@ def test_main_control_center_writes_artifacts_without_audit(monkeypatch, tmp_pat
     md_artifact = tmp_path / "operator-control-center-testuser-2026-03-29.md"
     assert json_artifact.is_file()
     assert md_artifact.is_file()
+    captured = capsys.readouterr()
+    combined = captured.out + captured.err
+    assert "Reading order: workbook Dashboard" in combined
+    assert "Move into Action Sync only when the local weekly story is already" in combined
 
 
 def test_main_control_center_requires_latest_report(monkeypatch):
@@ -387,6 +435,40 @@ def test_main_preflight_off_skips_auto_preflight(monkeypatch, sample_metadata):
     cli.main()
 
     assert captured["all_repos"] == [sample_metadata]
+
+
+def test_print_output_summary_emits_normal_audit_hint(capsys, sample_metadata):
+    audit = RepoAudit(
+        metadata=sample_metadata,
+        analyzer_results=[],
+        overall_score=0.5,
+        completeness_tier="functional",
+    )
+    report = AuditReport.from_audits("testuser", [audit], [], 1)
+
+    cli._print_output_summary(
+        "Audited 1 repos for testuser",
+        report,
+        {
+            "cache_info": "",
+            "json_path": "output/audit-report.json",
+            "md_path": "output/audit-report.md",
+            "excel_path": "output/audit-report.xlsx",
+            "pcc_path": "output/pcc.json",
+            "raw_path": "output/raw.json",
+            "warehouse_path": "output/history.db",
+            "badge_info": "",
+            "notion_info": "",
+            "readme_info": "",
+            "suggestions_info": "",
+            "html_info": "",
+            "pdf_info": "",
+            "review_pack_info": "",
+        },
+    )
+
+    captured = capsys.readouterr()
+    assert "Next step: open the standard workbook first" in (captured.out + captured.err)
 
 
 def test_incremental_noop_regenerates_from_latest_report(monkeypatch, tmp_path, sample_metadata):

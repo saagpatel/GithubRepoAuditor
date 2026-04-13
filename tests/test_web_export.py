@@ -793,6 +793,10 @@ class TestRenderHtml:
         html = _render_html(_make_report())
         assert "Operator Control Center" in html
         assert "Weekly Review Pack" in html
+        assert "Product Mode:" in html
+        assert "Artifact Role:" in html
+        assert "Suggested Reading Order:" in html
+        assert "Next Best Workflow Step:" in html
         assert "Repo Drilldowns" in html
         assert "Top Repo Drilldowns" in html
         assert 'href="#repo-' in html
@@ -847,6 +851,9 @@ class TestRenderHtml:
         assert "Reacquisition Confidence Retirement" in html
         assert "Revalidation Recovery" in html
         assert "Implementation Hotspots:" in html
+        assert "Operator Outcomes:" in html
+        assert "Operator Effectiveness:" in html
+        assert "High-Pressure Queue Trend:" in html
         assert "src/core.py" in html
         assert "Last movement:" in html
         assert no_linked_artifact_summary() in html

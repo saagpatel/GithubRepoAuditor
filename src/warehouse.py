@@ -8,7 +8,7 @@ from pathlib import Path
 from src.models import AuditReport
 
 WAREHOUSE_FILENAME = "portfolio-warehouse.db"
-WAREHOUSE_SCHEMA_VERSION = 9
+WAREHOUSE_SCHEMA_VERSION = 10
 
 
 def write_warehouse_snapshot(
@@ -61,6 +61,9 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             intent_alignment_summary_json TEXT NOT NULL DEFAULT '{}',
             scorecards_summary_json TEXT NOT NULL DEFAULT '{}',
             scorecard_programs_json TEXT NOT NULL DEFAULT '{}',
+            portfolio_outcomes_summary_json TEXT NOT NULL DEFAULT '{}',
+            operator_effectiveness_summary_json TEXT NOT NULL DEFAULT '{}',
+            high_pressure_queue_history_json TEXT NOT NULL DEFAULT '[]',
             scenario_summary_json TEXT NOT NULL,
             campaign_summary_json TEXT NOT NULL DEFAULT '{}',
             writeback_preview_json TEXT NOT NULL DEFAULT '{}',
@@ -480,6 +483,9 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     )
     _ensure_column(conn, "audit_runs", "scorecards_summary_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(conn, "audit_runs", "scorecard_programs_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(conn, "audit_runs", "portfolio_outcomes_summary_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(conn, "audit_runs", "operator_effectiveness_summary_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(conn, "audit_runs", "high_pressure_queue_history_json", "TEXT NOT NULL DEFAULT '[]'")
     _ensure_column(
         conn, "portfolio_catalog_entries", "maturity_program", "TEXT NOT NULL DEFAULT ''"
     )
@@ -529,13 +535,14 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             tier_distribution_json, language_distribution_json, lens_summary_json,
             security_summary_json, security_governance_preview_json, collections_json, scenario_summary_json,
             portfolio_catalog_summary_json, intent_alignment_summary_json, scorecards_summary_json, scorecard_programs_json,
+            portfolio_outcomes_summary_json, operator_effectiveness_summary_json, high_pressure_queue_history_json,
             campaign_summary_json, writeback_preview_json, writeback_results_json,
             managed_state_drift_json, rollback_preview_json, campaign_history_json,
             governance_preview_json, governance_approval_json, governance_results_json,
             governance_history_json, governance_drift_json, governance_summary_json, review_summary_json, review_alerts_json,
             preflight_summary_json, material_changes_json, review_targets_json, review_history_json, watch_state_json,
             operator_summary_json, operator_queue_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             run_id,
@@ -562,6 +569,9 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             json.dumps(report.intent_alignment_summary),
             json.dumps(report.scorecards_summary),
             json.dumps(report.scorecard_programs),
+            json.dumps(report.portfolio_outcomes_summary),
+            json.dumps(report.operator_effectiveness_summary),
+            json.dumps(report.high_pressure_queue_history),
             json.dumps(report.campaign_summary),
             json.dumps(report.writeback_preview),
             json.dumps(report.writeback_results),
@@ -1554,6 +1564,7 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
                    portfolio_baseline_size, baseline_signature, baseline_context_json, report_path, preflight_summary_json,
                    governance_summary_json, portfolio_catalog_summary_json, intent_alignment_summary_json,
                    scorecards_summary_json, scorecard_programs_json,
+                   portfolio_outcomes_summary_json, operator_effectiveness_summary_json, high_pressure_queue_history_json,
                    review_summary_json, operator_summary_json
             FROM audit_runs
             WHERE username = ?
@@ -1587,6 +1598,9 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
                 ),
                 "scorecards_summary": json.loads(row["scorecards_summary_json"] or "{}"),
                 "scorecard_programs": json.loads(row["scorecard_programs_json"] or "{}"),
+                "portfolio_outcomes_summary": json.loads(row["portfolio_outcomes_summary_json"] or "{}"),
+                "operator_effectiveness_summary": json.loads(row["operator_effectiveness_summary_json"] or "{}"),
+                "high_pressure_queue_history": json.loads(row["high_pressure_queue_history_json"] or "[]"),
                 "review_summary": json.loads(row["review_summary_json"] or "{}"),
                 "operator_summary": json.loads(row["operator_summary_json"] or "{}"),
             }
@@ -1618,6 +1632,56 @@ def load_review_history(output_dir: Path, username: str, limit: int = 10) -> lis
         item = json.loads(row["review_summary_json"] or "{}")
         if item:
             history.append(item)
+    return history
+
+
+def load_recent_campaign_history(output_dir: Path, username: str, limit: int = 200) -> list[dict]:
+    conn = _connect(output_dir)
+    if conn is None:
+        return []
+    try:
+        rows = conn.execute(
+            """
+            SELECT audit_runs.generated_at,
+                   campaign_history.action_id,
+                   campaign_history.repo_id,
+                   campaign_history.campaign_type,
+                   campaign_history.lifecycle_state,
+                   campaign_history.reconciliation_outcome,
+                   campaign_history.closed_at,
+                   campaign_history.closed_reason,
+                   campaign_history.reopened_at,
+                   campaign_history.details_json
+            FROM campaign_history
+            JOIN audit_runs ON audit_runs.run_id = campaign_history.run_id
+            WHERE audit_runs.username = ?
+            ORDER BY audit_runs.generated_at DESC, campaign_history.action_id
+            LIMIT ?
+            """,
+            (username, limit),
+        ).fetchall()
+    finally:
+        conn.close()
+    history: list[dict] = []
+    for row in rows:
+        details = json.loads(row["details_json"] or "{}")
+        history.append(
+            {
+                "generated_at": row["generated_at"],
+                "action_id": row["action_id"],
+                "repo_id": row["repo_id"],
+                "repo": details.get("repo") or row["repo_id"],
+                "campaign_type": row["campaign_type"],
+                "lifecycle_state": row["lifecycle_state"],
+                "reconciliation_outcome": row["reconciliation_outcome"],
+                "closed_at": row["closed_at"],
+                "closed_reason": row["closed_reason"],
+                "reopened_at": row["reopened_at"],
+                "title": details.get("title", ""),
+                "summary": details.get("summary", ""),
+                **details,
+            }
+        )
     return history
 
 
@@ -1657,6 +1721,7 @@ def load_latest_operator_state(output_dir: Path, username: str) -> dict | None:
                    baseline_signature, baseline_context_json,
                    governance_summary_json, portfolio_catalog_summary_json, intent_alignment_summary_json,
                    scorecards_summary_json, scorecard_programs_json,
+                   portfolio_outcomes_summary_json, operator_effectiveness_summary_json, high_pressure_queue_history_json,
                    review_summary_json, review_alerts_json, material_changes_json,
                    review_targets_json, review_history_json, watch_state_json,
                    operator_summary_json, operator_queue_json
@@ -1683,6 +1748,9 @@ def load_latest_operator_state(output_dir: Path, username: str) -> dict | None:
         "intent_alignment_summary": json.loads(row["intent_alignment_summary_json"] or "{}"),
         "scorecards_summary": json.loads(row["scorecards_summary_json"] or "{}"),
         "scorecard_programs": json.loads(row["scorecard_programs_json"] or "{}"),
+        "portfolio_outcomes_summary": json.loads(row["portfolio_outcomes_summary_json"] or "{}"),
+        "operator_effectiveness_summary": json.loads(row["operator_effectiveness_summary_json"] or "{}"),
+        "high_pressure_queue_history": json.loads(row["high_pressure_queue_history_json"] or "[]"),
         "review_summary": json.loads(row["review_summary_json"] or "{}"),
         "review_alerts": json.loads(row["review_alerts_json"] or "[]"),
         "material_changes": json.loads(row["material_changes_json"] or "[]"),

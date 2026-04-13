@@ -11,6 +11,7 @@ from src.warehouse import (
     load_latest_audit_runs,
     load_latest_campaign_state,
     load_latest_operator_state,
+    load_recent_campaign_history,
     load_review_history,
     load_watch_checkpoint,
     write_warehouse_snapshot,
@@ -218,6 +219,35 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     }
     report.scorecards_summary = {"summary": "0 repos are on track, 1 is below target, and 0 are missing a valid program."}
     report.scorecard_programs = {"maintain": {"label": "Maintain", "rule_count": 8}}
+    report.portfolio_outcomes_summary = {
+        "summary": "Managed action closure is at 50%; blocked and urgent pressure quiets in about 2.0 run(s); repeated regression is running at 25%.",
+        "review_to_action_closure_rate": {"status": "measured", "value": 0.5},
+    }
+    report.operator_effectiveness_summary = {
+        "summary": "recommendation validation is at 75%; guidance noise is at 25%.",
+        "recommendation_validation_rate": {"status": "measured", "value": 0.75},
+    }
+    report.high_pressure_queue_history = [
+        {
+            "run_id": "user:2026-03-20T00:00:00+00:00",
+            "generated_at": "2026-03-20T00:00:00+00:00",
+            "blocked_count": 0,
+            "urgent_count": 1,
+            "high_pressure_count": 1,
+        }
+    ]
+    report.operator_summary.update(
+        {
+            "portfolio_outcomes_summary": report.portfolio_outcomes_summary,
+            "operator_effectiveness_summary": report.operator_effectiveness_summary,
+            "high_pressure_queue_history": report.high_pressure_queue_history,
+            "high_pressure_queue_trend_status": "stable",
+            "high_pressure_queue_trend_summary": "Blocked and urgent queue pressure is stable.",
+            "recent_closed_actions": [{"repo": "warehouse-repo", "title": "Close warehouse follow-up"}],
+            "recent_reopened_recommendations": [{"repo": "warehouse-repo", "title": "warehouse recommendation"}],
+            "recent_regression_examples": [{"repo": "warehouse-repo", "title": "warehouse regression"}],
+        }
+    )
     db_path = write_warehouse_snapshot(report, tmp_path)
 
     conn = sqlite3.connect(db_path)
@@ -251,6 +281,7 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     assert scorecard_rows == 1
 
     history = load_campaign_history(tmp_path, "promotion-push")
+    recent_campaign_history = load_recent_campaign_history(tmp_path, "user", limit=5)
     latest_state = load_latest_campaign_state(tmp_path, "promotion-push")
     latest_runs = load_latest_audit_runs(tmp_path, "user", limit=5)
     review_history = load_review_history(tmp_path, "user", limit=5)
@@ -264,6 +295,9 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     assert latest_runs[0]["intent_alignment_summary"]["summary"] == "1 aligned, 0 needing review, and 0 missing a contract."
     assert latest_runs[0]["scorecards_summary"]["summary"].startswith("0 repos are on track")
     assert latest_runs[0]["scorecard_programs"]["maintain"]["label"] == "Maintain"
+    assert latest_runs[0]["portfolio_outcomes_summary"]["summary"].startswith("Managed action closure")
+    assert latest_runs[0]["operator_effectiveness_summary"]["summary"].startswith("recommendation validation")
+    assert latest_runs[0]["high_pressure_queue_history"][0]["high_pressure_count"] == 1
     assert latest_runs[0]["baseline_signature"] == report.baseline_signature
     assert latest_runs[0]["baseline_context"]["portfolio_baseline_size"] == 1
     assert review_history[0]["review_id"] == "review-1"
@@ -273,3 +307,7 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     assert operator_state["portfolio_catalog_summary"]["summary"] == "1/1 repos have an explicit catalog contract."
     assert operator_state["scorecards_summary"]["summary"].startswith("0 repos are on track")
     assert operator_state["scorecard_programs"]["maintain"]["label"] == "Maintain"
+    assert operator_state["portfolio_outcomes_summary"]["summary"].startswith("Managed action closure")
+    assert operator_state["operator_effectiveness_summary"]["summary"].startswith("recommendation validation")
+    assert operator_state["high_pressure_queue_history"][0]["high_pressure_count"] == 1
+    assert recent_campaign_history[0]["action_id"] == "promotion-push-abc123"
