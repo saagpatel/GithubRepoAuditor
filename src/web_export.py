@@ -13,7 +13,6 @@ from urllib.parse import urlparse
 
 from src.analyst_views import build_analyst_context
 from src.report_enrichment import (
-    build_operator_focus_line,
     build_follow_through_checkpoint,
     build_follow_through_checkpoint_status_label,
     build_follow_through_escalation_status_label,
@@ -45,6 +44,7 @@ from src.report_enrichment import (
     build_follow_through_status_label,
     build_follow_through_summary,
     build_last_movement_label,
+    build_operator_focus_line,
     build_queue_pressure_summary,
     build_repo_briefing,
     build_run_change_counts,
