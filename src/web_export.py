@@ -589,6 +589,7 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
               <div class="meta-line"><strong>Current State:</strong> {escape(briefing.get('current_state_line', 'No current-state summary is recorded yet.'))}</div>
               <div class="meta-line"><strong>What Changed:</strong> {escape(briefing.get('what_changed_line', 'No change summary is recorded yet.'))}</div>
               <div class="meta-line"><strong>Why It Matters:</strong> {escape(briefing.get('why_it_matters_line', 'No explanation summary is recorded yet.'))}</div>
+              <div class="meta-line"><strong>Where To Start:</strong> {escape(briefing.get('where_to_start_summary', 'No meaningful implementation hotspot is currently surfaced.'))}</div>
               <div class="meta-line"><strong>What To Do Next:</strong> {escape(briefing.get('what_to_do_next_line', 'No next action is recorded yet.'))}</div>
               <div class="meta-line"><strong>Operator Focus:</strong> {escape(briefing.get('operator_focus_line', 'Watch Closely: No operator focus bucket is currently surfaced.'))}</div>
               <div class="meta-line"><strong>Catalog:</strong> {escape(briefing.get('catalog_line', 'No portfolio catalog contract is recorded yet.'))}</div>
@@ -613,6 +614,7 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
           <div class="meta-line"><strong>Portfolio Catalog:</strong> {escape(weekly_pack.get('portfolio_catalog_summary', 'No portfolio catalog contract is recorded yet.'))}</div>
           <div class="meta-line"><strong>Intent Alignment:</strong> {escape(weekly_pack.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.'))}</div>
           <div class="meta-line"><strong>Scorecards:</strong> {escape(weekly_pack.get('scorecards_summary', 'No maturity scorecard is recorded yet.'))}</div>
+          <div class="meta-line"><strong>Implementation Hotspots:</strong> {escape(weekly_pack.get('implementation_hotspots_summary', 'No meaningful implementation hotspots are currently surfaced.'))}</div>
           <div class="meta-line"><strong>Operator Focus:</strong> {escape(weekly_pack.get('operator_focus_summary', 'No operator focus bucket is currently surfaced.'))}</div>
           <div class="meta-line"><strong>Next Checkpoint:</strong> {escape(weekly_pack.get('follow_through_checkpoint_summary', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</div>
           <h3>Operator Focus</h3>
@@ -858,6 +860,8 @@ def _repo_drilldown_section(report_data: dict, diff_data: dict | None) -> str:
               <div class="meta-line"><strong>Why This Repo Looks This Way:</strong> Strongest drivers: {escape(why.get('strongest_drivers', 'No strong positive drivers recorded yet.'))}. Biggest drags: {escape(why.get('biggest_drags', 'No major drag factors recorded yet.'))}. Next tier gap: {escape(why.get('next_tier_gap', 'No next-tier gap is recorded yet.'))}</div>
               <div class="meta-line"><strong>What Changed:</strong> {escape(changed.get('last_movement', 'No change timing is recorded yet.'))} {escape(changed.get('recent_change_summary', 'No recent change summary is recorded yet.'))}</div>
               <div class="meta-line"><strong>Hotspot Context:</strong> {escape(changed.get('top_hotspot_context', 'No hotspot context is recorded yet.'))}</div>
+              <div class="meta-line"><strong>Where To Start:</strong> {escape(briefing.get('where_to_start_summary', 'No meaningful implementation hotspot is currently surfaced.'))}</div>
+              <ul class="bullet-list">{''.join(f"<li>{escape(item.get('path', 'repo root'))}: {escape(item.get('signal_summary', 'No signal summary recorded yet.'))}</li>" for item in briefing.get('implementation_hotspots', [])[:3]) or '<li>No implementation hotspots are currently surfaced.</li>'}</ul>
               <div class="meta-line"><strong>What To Do Next:</strong> {escape(next_steps.get('next_best_action', 'No clear next action is recorded yet.'))}</div>
               <div class="meta-line"><strong>Rationale:</strong> {escape(next_steps.get('rationale', 'No action rationale is recorded yet.'))}</div>
               <div class="meta-line"><strong>Follow-Through:</strong> {escape(briefing.get('follow_through_line', 'No follow-through evidence is recorded yet.'))}</div>

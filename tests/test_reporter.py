@@ -41,6 +41,19 @@ def _make_report() -> AuditReport:
         interest_score=0.45,
         interest_tier="notable",
     )
+    audit.implementation_hotspots = [
+        {
+            "scope": "file",
+            "path": "src/core.py",
+            "module": "src",
+            "category": "code-complexity",
+            "pressure_score": 0.74,
+            "suggestion_type": "refactor",
+            "why_it_matters": "src/core.py is carrying concentrated complexity.",
+            "suggested_first_move": "Split the biggest function and add one regression test.",
+            "signal_summary": "Complexity pressure 0.74 across 2 complex blocks.",
+        }
+    ]
     return AuditReport.from_audits("user", [audit], [], 1)
 
 
@@ -68,6 +81,7 @@ class TestJsonReport:
         assert "lenses" in data
         assert "security_governance_preview" in data
         assert "campaign_summary" in data
+        assert "implementation_hotspots_summary" in data
 
     def test_filename_format(self, tmp_path):
         report = _make_report()
@@ -84,6 +98,7 @@ class TestMarkdownReport:
         assert "## Summary" in content
         assert "### Decision Lenses" in content
         assert "### Security Overview" in content
+        assert "Implementation Hotspots" in content
         assert "## Functional" in content
         assert "<details>" in content
         assert "Interest" in content  # Interest column in tables
@@ -94,6 +109,8 @@ class TestMarkdownReport:
         content = path.read_text()
         assert "test-repo" in content
         assert "https://github.com/user/test-repo" in content
+        assert "Where To Start" in content
+        assert "src/core.py" in content
 
     def test_includes_compare_summary_when_diff_passed(self, tmp_path):
         report = _make_report()

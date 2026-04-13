@@ -23,6 +23,7 @@ from src.excel_export import (
     _build_governance_controls,
     _build_hidden_data_sheets,
     _build_hotspots,
+    _build_implementation_hotspots,
     _build_portfolio_explorer,
     _build_print_pack,
     _build_repo_detail,
@@ -103,6 +104,19 @@ def _make_audit(name: str, score: float, grade: str = "C", tier: str = "function
                 "recommended_action": "Strengthen tests",
             }
         ],
+        "implementation_hotspots": [
+            {
+                "scope": "file",
+                "path": "src/core.py",
+                "module": "src",
+                "category": "code-complexity",
+                "pressure_score": 0.74,
+                "suggestion_type": "refactor",
+                "why_it_matters": "src/core.py is carrying concentrated complexity.",
+                "suggested_first_move": "Split the biggest function and add one regression test.",
+                "signal_summary": "Complexity pressure 0.74 across 2 complex blocks.",
+            }
+        ],
         "analyzer_results": results,
     }
 
@@ -132,6 +146,23 @@ def _make_report(audits=None) -> dict:
                 "tier": "wip",
             }
         ],
+        "implementation_hotspots": [
+            {
+                "repo": "RepoC",
+                "scope": "file",
+                "path": "src/core.py",
+                "module": "src",
+                "category": "code-complexity",
+                "pressure_score": 0.74,
+                "suggestion_type": "refactor",
+                "why_it_matters": "src/core.py is carrying concentrated complexity.",
+                "suggested_first_move": "Split the biggest function and add one regression test.",
+                "signal_summary": "Complexity pressure 0.74 across 2 complex blocks.",
+            }
+        ],
+        "implementation_hotspots_summary": {
+            "summary": "1 repos have concrete implementation pressure. Start with RepoC in file src/core.py.",
+        },
         "collections": {
             "showcase": {
                 "description": "Worth showing",
@@ -822,6 +853,14 @@ class TestHotspotsAndDataSheets:
         _build_hotspots(wb, _make_report())
         assert "Hotspots" in wb.sheetnames
 
+    def test_creates_implementation_hotspots_sheet(self):
+        wb = Workbook()
+        _build_implementation_hotspots(wb, _make_report())
+        assert "Implementation Hotspots" in wb.sheetnames
+        ws = wb["Implementation Hotspots"]
+        assert ws["A1"].value == "Implementation Hotspots"
+        assert "Start with RepoC" in str(ws["A2"].value)
+
     def test_hidden_data_sheets_are_created(self):
         wb = Workbook()
         _build_hidden_data_sheets(wb, _make_report(), trend_data=[{"average_score": 0.6}], score_history={"RepoA": [0.5, 0.8]})
@@ -835,6 +874,7 @@ class TestHotspotsAndDataSheets:
         assert "Data_OperatorRepoRollups" in wb.sheetnames
         assert "Data_MaterialChangeRollups" in wb.sheetnames
         assert "Data_RepoDetail" in wb.sheetnames
+        assert "Data_ImplementationHotspots" in wb.sheetnames
         assert "Data_RepoDimensionRollups" in wb.sheetnames
         assert "Data_RepoHistoryRollups" in wb.sheetnames
         assert "Data_RunChangeRollups" in wb.sheetnames
@@ -895,6 +935,8 @@ class TestAnalystWorkbookSheets:
         assert ws["E13"].value == "Why This Repo Looks This Way"
         assert ws["F20"].value == "What Changed"
         assert ws["F25"].value == "What To Do Next"
+        assert ws["A28"].value == "Where To Start"
+        assert ws["A29"].value == "Summary"
         assert ws["F28"].value == "Follow-Through Status"
         assert ws["F29"].value == "Follow-Through Summary"
         assert ws["F30"].value == "Checkpoint Timing"
@@ -911,6 +953,7 @@ class TestAnalystWorkbookSheets:
         assert ws.data_validations.dataValidation
         assert "VLOOKUP" in str(ws["B6"].value)
         assert "No description recorded yet." in str(ws["B11"].value)
+        assert "VLOOKUP" in str(ws["B29"].value)
 
     def test_repo_detail_preserves_existing_selection_when_still_valid(self):
         wb = Workbook()
@@ -1546,6 +1589,7 @@ class TestWorkbookModes:
         assert "Trend Summary" in wb.sheetnames
         assert "Run Changes" in wb.sheetnames
         assert "Review Queue" in wb.sheetnames
+        assert "Implementation Hotspots" in wb.sheetnames
         assert "Repo Detail" in wb.sheetnames
         assert "Governance Controls" in wb.sheetnames
         assert "Print Pack" in wb.sheetnames
@@ -1570,6 +1614,7 @@ class TestWorkbookModes:
             "Portfolio Explorer",
             "Portfolio Catalog",
             "Scorecards",
+            "Implementation Hotspots",
             "Repo Detail",
             "Executive Summary",
             "By Lens",

@@ -121,6 +121,8 @@ def write_raw_metadata(report: AuditReport, output_dir: Path) -> Path:
         "baseline_context": report.baseline_context,
         "lenses": report.lenses,
         "hotspots": report.hotspots,
+        "implementation_hotspots": report.implementation_hotspots,
+        "implementation_hotspots_summary": report.implementation_hotspots_summary,
         "security_posture": report.security_posture,
         "security_governance_preview": report.security_governance_preview,
         "collections": report.collections,
@@ -278,6 +280,7 @@ def write_markdown_report(
     _w(f"- Portfolio Catalog: {weekly_pack.get('portfolio_catalog_summary', 'No portfolio catalog contract is recorded yet.')}")
     _w(f"- Intent Alignment: {weekly_pack.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.')}")
     _w(f"- Scorecards: {weekly_pack.get('scorecards_summary', 'No maturity scorecard is recorded yet.')}")
+    _w(f"- Implementation Hotspots: {weekly_pack.get('implementation_hotspots_summary', 'No meaningful implementation hotspots are currently surfaced.')}")
     _w("")
     _w("### Top Attention")
     _w("")
@@ -1324,6 +1327,11 @@ def write_markdown_report(
         _w(f"- Biggest drags: {briefing.get('why_this_repo_looks_this_way', {}).get('biggest_drags', 'No major drag factors recorded yet.')}")
         _w(f"- Next tier gap: {briefing.get('why_this_repo_looks_this_way', {}).get('next_tier_gap', 'No next-tier gap is recorded yet.')}")
         _w("")
+        _w("**Where To Start**")
+        _w(f"- {briefing.get('where_to_start_summary', 'No meaningful implementation hotspot is currently surfaced.')}")
+        for hotspot in briefing.get("implementation_hotspots", [])[:3]:
+            _w(f"- {_truncate(hotspot.get('path', 'repo root'), 80)}: {hotspot.get('signal_summary', 'No signal summary recorded yet.')}")
+        _w("")
         _w("**What To Do Next**")
         _w(f"- Next best action: {briefing.get('what_to_do_next', {}).get('next_best_action', 'No clear next action is recorded yet.')}")
         _w(f"- Rationale: {briefing.get('what_to_do_next', {}).get('rationale', 'No action rationale is recorded yet.')}")
@@ -1361,6 +1369,7 @@ def write_markdown_report(
             _w("**Repo Briefing Summary:**")
             _w(f"- What Changed: {briefing.get('what_changed_line', 'No change summary is recorded yet.')}")
             _w(f"- Why It Matters: {briefing.get('why_it_matters_line', 'No explanation summary is recorded yet.')}")
+            _w(f"- Where To Start: {briefing.get('where_to_start_summary', 'No meaningful implementation hotspot is currently surfaced.')}")
             _w(f"- What To Do Next: {briefing.get('what_to_do_next_line', 'No next action is recorded yet.')}")
             _w(f"- Follow-Through: {briefing.get('follow_through_line', 'No follow-through evidence is recorded yet.')}")
             _w(f"- Catalog: {briefing.get('catalog_line', 'No portfolio catalog contract is recorded yet.')}")

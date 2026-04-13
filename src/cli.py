@@ -1553,6 +1553,7 @@ def _analyze_repos(
         return score_repo(
             repo_meta,
             results,
+            repo_path=repo_path,
             portfolio_lang_freq=portfolio_lang_freq,
             custom_weights=custom_weights,
             github_client=worker_client,

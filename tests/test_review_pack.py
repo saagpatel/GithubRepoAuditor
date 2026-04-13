@@ -26,6 +26,7 @@ def _make_report() -> dict:
         "portfolio_catalog_summary": {"summary": "1/1 repos have an explicit catalog contract."},
         "intent_alignment_summary": {"summary": "1 aligned, 0 needing review, and 0 missing a contract."},
         "scorecards_summary": {"summary": "0 repos are on track, 1 is below target, and 0 are missing a valid program."},
+        "implementation_hotspots_summary": {"summary": "1 repos have concrete implementation pressure. Start with RepoC in file src/core.py."},
         "audits": [
             {
                 "metadata": {
@@ -51,6 +52,19 @@ def _make_report() -> dict:
                 "security_posture": {"label": "watch", "score": 0.55},
                 "action_candidates": [{"title": "Recheck restored evidence"}],
                 "hotspots": [{"title": "Restored confidence still needs confirmation"}],
+                "implementation_hotspots": [
+                    {
+                        "scope": "file",
+                        "path": "src/core.py",
+                        "module": "src",
+                        "category": "code-complexity",
+                        "pressure_score": 0.74,
+                        "suggestion_type": "refactor",
+                        "why_it_matters": "src/core.py is carrying concentrated complexity.",
+                        "suggested_first_move": "Split the biggest function and add one regression test.",
+                        "signal_summary": "Complexity pressure 0.74 across 2 complex blocks.",
+                    }
+                ],
                 "portfolio_catalog": {
                     "has_explicit_entry": True,
                     "owner": "d",
@@ -139,7 +153,9 @@ def test_review_pack_includes_revalidation_recovery_section(tmp_path):
     assert "Portfolio Catalog: 1/1 repos have an explicit catalog contract." in content
     assert "Intent Alignment: 1 aligned, 0 needing review, and 0 missing a contract." in content
     assert "Scorecards: 0 repos are on track, 1 is below target" in content
+    assert "Implementation Hotspots: 1 repos have concrete implementation pressure." in content
     assert "Catalog: operator-loop | flagship workbook-first flow" in content
+    assert "Where To Start: Start in src/core.py." in content
     assert "Intent Alignment: aligned: The repo is holding a maintain posture" in content
     assert "Scorecard: Maintain — Operating (target Strong)" in content
     assert "Maturity Gap: testing, ci are still below the maintain bar." in content

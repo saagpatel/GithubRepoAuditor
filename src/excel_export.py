@@ -116,6 +116,7 @@ CORE_VISIBLE_SHEETS = {
     "Portfolio Explorer",
     "Portfolio Catalog",
     "Scorecards",
+    "Implementation Hotspots",
     "Repo Detail",
     "By Lens",
     "By Collection",
@@ -259,6 +260,7 @@ def _reorder_workbook_sheets(wb: Workbook) -> None:
         "Dashboard",
         "Review Queue",
         "Portfolio Explorer",
+        "Implementation Hotspots",
         "Repo Detail",
         "Executive Summary",
         "By Lens",
@@ -3440,6 +3442,66 @@ def _build_hotspots(wb: Workbook, data: dict) -> None:
     auto_width(ws, len(headers), max_row)
 
 
+def _build_implementation_hotspots(wb: Workbook, data: dict) -> None:
+    ws = _get_or_create_sheet(wb, "Implementation Hotspots")
+    ws.sheet_properties.tabColor = "B45309"
+    _configure_sheet_view(ws, zoom=105, show_grid_lines=True)
+
+    summary = (data.get("implementation_hotspots_summary") or {}).get(
+        "summary",
+        "No meaningful implementation hotspots are currently surfaced.",
+    )
+    ws.merge_cells("A1:I1")
+    ws["A1"].value = "Implementation Hotspots"
+    ws["A1"].font = SECTION_FONT
+    ws.merge_cells("A2:I2")
+    ws["A2"].value = summary
+    ws["A2"].alignment = WRAP
+
+    headers = [
+        "Repo",
+        "Scope",
+        "Path",
+        "Module",
+        "Category",
+        "Pressure",
+        "Suggestion",
+        "Why It Matters",
+        "Suggested First Move",
+    ]
+    for col, header in enumerate(headers, 1):
+        ws.cell(row=4, column=col, value=header)
+    style_header_row(ws, 4, len(headers))
+    ws.freeze_panes = "A5"
+
+    hotspots = data.get("implementation_hotspots", [])
+    for row, hotspot in enumerate(hotspots, 5):
+        values = [
+            hotspot.get("repo", ""),
+            hotspot.get("scope", ""),
+            hotspot.get("path", ""),
+            hotspot.get("module", ""),
+            hotspot.get("category", ""),
+            round(hotspot.get("pressure_score", 0), 3),
+            hotspot.get("suggestion_type", ""),
+            hotspot.get("why_it_matters", ""),
+            hotspot.get("suggested_first_move", ""),
+        ]
+        for col, value in enumerate(values, 1):
+            cell = ws.cell(row=row, column=col, value=value)
+            style_data_cell(cell, "center" if col in {2, 6} else "left")
+
+    max_row = len(hotspots) + 4
+    if max_row > 4:
+        ws.conditional_formatting.add(
+            f"F5:F{max_row}",
+            DataBarRule(start_type="num", start_value=0, end_type="num", end_value=1, color="B45309"),
+        )
+        apply_zebra_stripes(ws, 5, max_row, len(headers))
+        _add_table(ws, "tblImplementationHotspots", len(headers), max_row, start_row=4)
+    auto_width(ws, len(headers), max_row)
+
+
 def _write_hidden_table_sheet(
     wb: Workbook,
     title: str,
@@ -3527,6 +3589,10 @@ def _repo_detail_rows(data: dict, score_history: dict[str, list[float]] | None) 
         explanation = _score_explanation_for_audit(audit)
         briefing = build_repo_briefing(audit, data, None)
         hotspot_titles = [item.get("title", "") for item in (audit.get("hotspots") or [])[:3]]
+        implementation_hotspot_lines = [
+            f"{item.get('path', 'repo root')}: {item.get('signal_summary', 'No signal summary recorded yet.')}"
+            for item in (briefing.get("implementation_hotspots") or [])[:3]
+        ]
         action_titles = [item.get("title", "") for item in (audit.get("action_candidates") or [])[:3]]
         lenses = audit.get("lenses", {})
         scores = history.get(repo_name, [])
@@ -3596,6 +3662,10 @@ def _repo_detail_rows(data: dict, score_history: dict[str, list[float]] | None) 
             briefing.get("intent_alignment_line", "missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists."),
             briefing.get("scorecard_line", "Scorecard: No maturity scorecard is recorded yet."),
             briefing.get("maturity_gap_summary", "No maturity gap summary is recorded yet."),
+            briefing.get("where_to_start_summary", "No meaningful implementation hotspot is currently surfaced."),
+            implementation_hotspot_lines[0] if len(implementation_hotspot_lines) > 0 else "No implementation hotspot is currently surfaced.",
+            implementation_hotspot_lines[1] if len(implementation_hotspot_lines) > 1 else "No second implementation hotspot is currently surfaced.",
+            implementation_hotspot_lines[2] if len(implementation_hotspot_lines) > 2 else "No third implementation hotspot is currently surfaced.",
         ])
 
         ranked_dimensions = sorted(
@@ -3710,6 +3780,7 @@ def _build_hidden_data_sheets(
     writeback_rows: list[list[object]] = []
     portfolio_catalog_rows: list[list[object]] = []
     scorecard_rows: list[list[object]] = []
+    implementation_hotspot_rows: list[list[object]] = []
     lookup_rows: list[list[object]] = []
     repo_detail_rows, repo_dimension_rollup_rows, repo_history_rollup_rows = _repo_detail_rows(data, score_history)
     run_change_rollup_rows, run_change_repo_rows = _run_change_rows(data, diff_data)
@@ -3772,6 +3843,20 @@ def _build_hidden_data_sheets(
             ", ".join(scorecard.get("top_gaps", [])),
             scorecard.get("summary", ""),
         ])
+        for hotspot in audit.get("implementation_hotspots", []):
+            implementation_hotspot_rows.append([
+                repo_name,
+                metadata.get("full_name", ""),
+                hotspot.get("scope", ""),
+                hotspot.get("path", ""),
+                hotspot.get("module", ""),
+                hotspot.get("category", ""),
+                hotspot.get("pressure_score", 0.0),
+                hotspot.get("suggestion_type", ""),
+                hotspot.get("why_it_matters", ""),
+                hotspot.get("suggested_first_move", ""),
+                hotspot.get("signal_summary", ""),
+            ])
 
         for result in audit.get("analyzer_results", []):
             dimension_rows.append([
@@ -4174,6 +4259,25 @@ def _build_hidden_data_sheets(
     )
     _write_hidden_table_sheet(
         wb,
+        "Data_ImplementationHotspots",
+        "tblImplementationHotspotsData",
+        [
+            "Repo",
+            "Full Name",
+            "Scope",
+            "Path",
+            "Module",
+            "Category",
+            "Pressure Score",
+            "Suggestion Type",
+            "Why It Matters",
+            "Suggested First Move",
+            "Signal Summary",
+        ],
+        implementation_hotspot_rows,
+    )
+    _write_hidden_table_sheet(
+        wb,
         "Data_Scenarios",
         "tblScenarios",
         ["Key", "Title", "Lens", "Repo Count", "Average Expected Lens Delta", "Projected Tier Promotions"],
@@ -4364,6 +4468,10 @@ def _build_hidden_data_sheets(
             "Intent Alignment",
             "Scorecard",
             "Maturity Gap",
+            "Where To Start Summary",
+            "Implementation Hotspot 1",
+            "Implementation Hotspot 2",
+            "Implementation Hotspot 3",
         ],
         repo_detail_rows,
     )
@@ -5101,6 +5209,19 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
         row = 20 + idx
         ws.cell(row=row, column=6, value=f"Hotspot {idx}").font = SUBHEADER_FONT
         style_data_cell(ws.cell(row=row, column=7, value=_repo_detail_lookup_formula(23 + idx, "No hotspot recorded yet.")), "left")
+
+    ws["A28"] = "Where To Start"
+    ws["A28"].font = SECTION_FONT
+    implementation_rows = [
+        ("Summary", 66, "No meaningful implementation hotspot is currently surfaced."),
+        ("Implementation Hotspot 1", 67, "No implementation hotspot is currently surfaced."),
+        ("Implementation Hotspot 2", 68, "No second implementation hotspot is currently surfaced."),
+        ("Implementation Hotspot 3", 69, "No third implementation hotspot is currently surfaced."),
+    ]
+    for offset, (label, column_index, fallback) in enumerate(implementation_rows, 1):
+        row = 28 + offset
+        ws.cell(row=row, column=1, value=label).font = SUBHEADER_FONT
+        style_data_cell(ws.cell(row=row, column=2, value=_repo_detail_lookup_formula(column_index, fallback)), "left")
 
     ws["F25"] = "What To Do Next"
     ws["F25"].font = SECTION_FONT
@@ -6643,6 +6764,7 @@ def _build_excel_workbook(
     _build_review_queue(wb, data, excel_mode=excel_mode)
     _build_review_history_sheet(wb, data)
     _build_hotspots(wb, data)
+    _build_implementation_hotspots(wb, data)
     _build_compare_sheet(wb, diff_data)
     _build_scenario_planner(
         wb,

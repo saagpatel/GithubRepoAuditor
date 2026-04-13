@@ -154,7 +154,7 @@ class TestPortfolioNovelty:
 
 
 class TestNextPhaseSignals:
-    def test_populates_lenses_actions_hotspots_and_security_posture(self):
+    def test_populates_lenses_actions_hotspots_security_posture_and_implementation_hotspots(self, tmp_path):
         results = _make_results({dim: 0.55 for dim in WEIGHTS})
         results.append(
             AnalyzerResult(
@@ -179,7 +179,13 @@ class TestNextPhaseSignals:
                 details={"tech_novelty": 0.15},
             )
         )
-        audit = score_repo(_make_metadata(stars=7), results)
+        repo_path = tmp_path / "repo"
+        repo_path.mkdir()
+        (repo_path / "src").mkdir()
+        (repo_path / "src" / "core.py").write_text(
+            "# TODO: tighten flow\n# FIXME: split branches\n\ndef run(value):\n    if value:\n        return value\n    return 0\n"
+        )
+        audit = score_repo(_make_metadata(stars=7), results, repo_path=repo_path)
 
         assert "ship_readiness" in audit.lenses
         assert "maintenance_risk" in audit.lenses
@@ -188,6 +194,7 @@ class TestNextPhaseSignals:
         assert "providers" in audit.security_posture
         assert audit.action_candidates
         assert audit.hotspots
+        assert audit.implementation_hotspots
 
     def test_maintenance_risk_uses_risk_orientation(self):
         results = _make_results({dim: 0.45 for dim in WEIGHTS})
