@@ -151,6 +151,8 @@ def write_raw_metadata(report: AuditReport, output_dir: Path) -> Path:
         "operator_queue": report.operator_queue,
         "portfolio_catalog_summary": report.portfolio_catalog_summary,
         "intent_alignment_summary": report.intent_alignment_summary,
+        "scorecards_summary": report.scorecards_summary,
+        "scorecard_programs": report.scorecard_programs,
         "run_change_summary": report.run_change_summary,
         "run_change_counts": report.run_change_counts,
         "runtime_breakdown": report.runtime_breakdown,
@@ -275,6 +277,7 @@ def write_markdown_report(
     _w(f"- What To Do This Week: {weekly_pack.get('what_to_do_this_week', top_recommendation_summary)}")
     _w(f"- Portfolio Catalog: {weekly_pack.get('portfolio_catalog_summary', 'No portfolio catalog contract is recorded yet.')}")
     _w(f"- Intent Alignment: {weekly_pack.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.')}")
+    _w(f"- Scorecards: {weekly_pack.get('scorecards_summary', 'No maturity scorecard is recorded yet.')}")
     _w("")
     _w("### Top Attention")
     _w("")
@@ -288,6 +291,8 @@ def write_markdown_report(
         _w(f"  - Operator Focus: {item.get('operator_focus_line', 'Watch Closely: No operator focus bucket is currently surfaced.')}")
         _w(f"  - Catalog: {item.get('catalog_line', 'No portfolio catalog contract is recorded yet.')}")
         _w(f"  - Intent Alignment: {item.get('intent_alignment', 'missing-contract')} — {item.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.')}")
+        _w(f"  - {item.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.')}")
+        _w(f"  - Maturity Gap: {item.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.')}")
         _w(f"  - Checkpoint Timing: {item.get('follow_through_checkpoint_timing', 'Unknown')}")
         _w(
             f"  - Next Checkpoint: {item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}"
@@ -298,6 +303,10 @@ def write_markdown_report(
     _w("### Operator Focus")
     _w("")
     _w(f"- Summary: {weekly_pack.get('operator_focus_summary', 'No operator focus bucket is currently surfaced.')}")
+    if weekly_pack.get("top_below_target_scorecard_items"):
+        _w("- Scorecard Gaps:")
+        for item in weekly_pack.get("top_below_target_scorecard_items", [])[:5]:
+            _w(f"  - {item.get('repo', 'Repo')} — {item.get('summary', 'Below target.')}")
     _w(f"- Next Checkpoint: {weekly_pack.get('follow_through_checkpoint_summary', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
     focus_sections = [
         ("Act Now", weekly_pack.get("top_act_now_items", []), "No immediate-action hotspots are currently surfaced."),
@@ -327,6 +336,8 @@ def write_markdown_report(
         _w(f"- Operator Focus: {briefing.get('operator_focus_line', 'Watch Closely: No operator focus bucket is currently surfaced.')}")
         _w(f"- Catalog: {briefing.get('catalog_line', 'No portfolio catalog contract is recorded yet.')}")
         _w(f"- Intent Alignment: {briefing.get('intent_alignment_line', 'missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.')}")
+        _w(f"- {briefing.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.')}")
+        _w(f"- Maturity Gap: {briefing.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.')}")
         _w(f"- Checkpoint Timing: {briefing.get('checkpoint_timing_line', 'Unknown')}")
         _w(f"- What Would Count As Progress: {briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
         _w("")

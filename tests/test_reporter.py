@@ -853,6 +853,25 @@ class TestRawMetadata:
         assert data["intent_alignment_summary"]["summary"] == "1 aligned, 0 needing review, and 0 missing a contract."
         assert data["audits"][0]["portfolio_catalog"]["intent_alignment"] == "aligned"
 
+    def test_writes_scorecard_summaries_when_present(self, tmp_path):
+        report = _make_report()
+        report.scorecards_summary = {"summary": "0 repos are on track, 1 is below target, and 0 are missing a valid program."}
+        report.scorecard_programs = {"maintain": {"label": "Maintain", "rule_count": 8}}
+        report.audits[0].scorecard = {
+            "program": "maintain",
+            "program_label": "Maintain",
+            "maturity_level": "operating",
+            "target_maturity": "strong",
+            "status": "below-target",
+            "top_gaps": ["Testing", "CI"],
+            "summary": "Maintain is at Operating and still below the Strong target because testing and ci are behind.",
+        }
+        path = write_raw_metadata(report, tmp_path)
+        data = json.loads(path.read_text())
+        assert data["scorecards_summary"]["summary"].startswith("0 repos are on track")
+        assert data["scorecard_programs"]["maintain"]["label"] == "Maintain"
+        assert data["audits"][0]["scorecard"]["program"] == "maintain"
+
 
 class TestPortfolioCatalogMarkdown:
     def test_includes_portfolio_catalog_and_intent_alignment_when_present(self, tmp_path):
@@ -896,6 +915,40 @@ class TestPortfolioCatalogMarkdown:
         assert "Intent Alignment: 1 aligned, 0 needing review, and 0 missing a contract." in content
         assert "Catalog: operator-loop | flagship workbook" in content
         assert "Intent Alignment: aligned: The repo is holding a maintain posture" in content
+
+
+class TestScorecardsMarkdown:
+    def test_includes_scorecard_summary_and_repo_lines_when_present(self, tmp_path):
+        report = _make_report()
+        report.scorecards_summary = {
+            "summary": "0 repos are on track, 1 is below target, and 0 are missing a valid program.",
+        }
+        report.audits[0].scorecard = {
+            "program": "maintain",
+            "program_label": "Maintain",
+            "maturity_level": "operating",
+            "target_maturity": "strong",
+            "status": "below-target",
+            "top_gaps": ["Testing", "CI"],
+            "summary": "Maintain is at Operating and still below the Strong target because testing and ci are behind.",
+        }
+        report.operator_queue = [
+            {
+                "repo": "test-repo",
+                "title": "Protect flagship repo",
+                "lane": "ready",
+                "lane_reason": "Portfolio-critical repo needs a quick review.",
+                "recommended_action": "Review the latest state.",
+                "scorecard": report.audits[0].scorecard,
+            }
+        ]
+
+        path = write_markdown_report(report, tmp_path)
+        content = path.read_text()
+
+        assert "Scorecards: 0 repos are on track, 1 is below target" in content
+        assert "Scorecard: Maintain — Operating (target Strong)" in content
+        assert "Maturity Gap: testing, ci are still below the maintain bar." in content
 
 
 class TestPccExport:

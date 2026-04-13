@@ -1114,6 +1114,10 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
                     f"  Intent Alignment: {item.get('intent_alignment')} — "
                     f"{item.get('intent_alignment_reason', 'No alignment reason is recorded yet.')}"
                 )
+            if item.get("scorecard_line"):
+                lines.append(f"  {item.get('scorecard_line')}")
+            if item.get("maturity_gap_summary"):
+                lines.append(f"  Maturity Gap: {item.get('maturity_gap_summary')}")
         lines.append("")
     recent_changes = snapshot.get("operator_recent_changes") or []
     if recent_changes:
@@ -34150,7 +34154,11 @@ def _format_intervention(intervention: dict) -> str:
 
 def _attach_portfolio_catalog_context(queue: list[dict], report_data: dict) -> list[dict]:
     from src.portfolio_catalog import build_catalog_line, evaluate_intent_alignment
-    from src.report_enrichment import build_operator_focus
+    from src.report_enrichment import (
+        build_maturity_gap_summary,
+        build_operator_focus,
+        build_scorecard_line,
+    )
 
     audits_by_name = {
         str((audit.get("metadata") or {}).get("name", "")).strip(): audit
@@ -34180,6 +34188,11 @@ def _attach_portfolio_catalog_context(queue: list[dict], report_data: dict) -> l
         enriched_item["catalog_line"] = catalog_entry.get("catalog_line") or build_catalog_line(catalog_entry)
         enriched_item["intent_alignment"] = intent_alignment
         enriched_item["intent_alignment_reason"] = intent_alignment_reason
+        scorecard = dict(audit.get("scorecard") or {})
+        if scorecard:
+            enriched_item["scorecard"] = scorecard
+            enriched_item["scorecard_line"] = build_scorecard_line(enriched_item)
+            enriched_item["maturity_gap_summary"] = build_maturity_gap_summary(enriched_item)
         enriched.append(enriched_item)
     return enriched
 

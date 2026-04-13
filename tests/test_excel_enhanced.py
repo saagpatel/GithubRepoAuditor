@@ -985,36 +985,38 @@ class TestAnalystWorkbookSheets:
         assert ws.freeze_panes == f"A{header_row + 1}"
         assert ws.cell(row=header_row, column=8).value == "Catalog"
         assert ws.cell(row=header_row, column=9).value == "Intent Alignment"
-        assert ws.cell(row=header_row, column=10).value == "Last Movement"
-        assert ws.cell(row=header_row, column=11).value == "Follow-Through"
-        assert ws.cell(row=header_row, column=12).value == "Next Checkpoint"
-        assert ws.cell(row=header_row, column=13).value == "Checkpoint Timing"
-        assert ws.cell(row=header_row, column=14).value == "Escalation"
-        assert ws.cell(row=header_row, column=15).value == "Escalation Summary"
-        assert ws.cell(row=header_row, column=16).value == "Recovery / Retirement"
-        assert ws.cell(row=header_row, column=17).value == "Recovery Summary"
-        assert ws.cell(row=header_row, column=18).value == "Recovery Persistence"
-        assert ws.cell(row=header_row, column=19).value == "Persistence Summary"
-        assert ws.cell(row=header_row, column=20).value == "Relapse Churn"
-        assert ws.cell(row=header_row, column=21).value == "Churn Summary"
-        assert ws.cell(row=header_row, column=22).value == "Recovery Freshness"
-        assert ws.cell(row=header_row, column=23).value == "Freshness Summary"
-        assert ws.cell(row=header_row, column=24).value == "Recovery Memory Reset"
-        assert ws.cell(row=header_row, column=25).value == "Reset Summary"
-        assert ws.cell(row=header_row, column=26).value == "Recovery Rebuild Strength"
-        assert ws.cell(row=header_row, column=27).value == "Rebuild Summary"
-        assert ws.cell(row=header_row, column=28).value == "Recovery Reacquisition"
-        assert ws.cell(row=header_row, column=29).value == "Reacquisition Summary"
-        assert ws.cell(row=header_row, column=30).value == "Reacquisition Durability"
-        assert ws.cell(row=header_row, column=31).value == "Durability Summary"
-        assert ws.cell(row=header_row, column=32).value == "Reacquisition Confidence"
-        assert ws.cell(row=header_row, column=33).value == "Confidence Summary"
-        assert ws.cell(row=header_row, column=34).value == "Operator Focus"
-        assert ws.cell(row=header_row, column=35).value == "Focus Summary"
-        assert ws.cell(row=header_row, column=36).value == "Focus Line"
-        assert ws.cell(row=header_row, column=37).value == "Open Artifact"
+        assert ws.cell(row=header_row, column=10).value == "Maturity"
+        assert ws.cell(row=header_row, column=11).value == "Scorecard Gap"
+        assert ws.cell(row=header_row, column=12).value == "Last Movement"
+        assert ws.cell(row=header_row, column=13).value == "Follow-Through"
+        assert ws.cell(row=header_row, column=14).value == "Next Checkpoint"
+        assert ws.cell(row=header_row, column=15).value == "Checkpoint Timing"
+        assert ws.cell(row=header_row, column=16).value == "Escalation"
+        assert ws.cell(row=header_row, column=17).value == "Escalation Summary"
+        assert ws.cell(row=header_row, column=18).value == "Recovery / Retirement"
+        assert ws.cell(row=header_row, column=19).value == "Recovery Summary"
+        assert ws.cell(row=header_row, column=20).value == "Recovery Persistence"
+        assert ws.cell(row=header_row, column=21).value == "Persistence Summary"
+        assert ws.cell(row=header_row, column=22).value == "Relapse Churn"
+        assert ws.cell(row=header_row, column=23).value == "Churn Summary"
+        assert ws.cell(row=header_row, column=24).value == "Recovery Freshness"
+        assert ws.cell(row=header_row, column=25).value == "Freshness Summary"
+        assert ws.cell(row=header_row, column=26).value == "Recovery Memory Reset"
+        assert ws.cell(row=header_row, column=27).value == "Reset Summary"
+        assert ws.cell(row=header_row, column=28).value == "Recovery Rebuild Strength"
+        assert ws.cell(row=header_row, column=29).value == "Rebuild Summary"
+        assert ws.cell(row=header_row, column=30).value == "Recovery Reacquisition"
+        assert ws.cell(row=header_row, column=31).value == "Reacquisition Summary"
+        assert ws.cell(row=header_row, column=32).value == "Reacquisition Durability"
+        assert ws.cell(row=header_row, column=33).value == "Durability Summary"
+        assert ws.cell(row=header_row, column=34).value == "Reacquisition Confidence"
+        assert ws.cell(row=header_row, column=35).value == "Confidence Summary"
+        assert ws.cell(row=header_row, column=36).value == "Operator Focus"
+        assert ws.cell(row=header_row, column=37).value == "Focus Summary"
+        assert ws.cell(row=header_row, column=38).value == "Focus Line"
+        assert ws.cell(row=header_row, column=39).value == "Open Artifact"
         assert no_linked_artifact_summary() in {
-            ws.cell(row=row, column=37).value
+            ws.cell(row=row, column=39).value
             for row in range(header_row + 1, header_row + 10)
         }
         assert "No portfolio catalog contract is recorded yet." in {
@@ -1025,68 +1027,76 @@ class TestAnalystWorkbookSheets:
             str(ws.cell(row=row, column=9).value)
             for row in range(header_row + 1, header_row + 10)
         })
-        assert "RepoC has recent follow-up recorded and is now waiting for confirming evidence." in {
+        assert "—" in {
+            ws.cell(row=row, column=10).value
+            for row in range(header_row + 1, header_row + 10)
+        }
+        assert "No maturity gap summary is recorded yet." in {
             ws.cell(row=row, column=11).value
             for row in range(header_row + 1, header_row + 10)
         }
-        assert "Due Soon" in {
+        assert "RepoC has recent follow-up recorded and is now waiting for confirming evidence." in {
             ws.cell(row=row, column=13).value
             for row in range(header_row + 1, header_row + 10)
         }
-        assert "Recovering" in {
-            ws.cell(row=row, column=16).value
+        assert "Due Soon" in {
+            ws.cell(row=row, column=15).value
             for row in range(header_row + 1, header_row + 10)
         }
-        assert "Fragile Recovery" in {
+        assert "Recovering" in {
             ws.cell(row=row, column=18).value
             for row in range(header_row + 1, header_row + 10)
         }
-        assert "Fragile" in {
+        assert "Fragile Recovery" in {
             ws.cell(row=row, column=20).value
             for row in range(header_row + 1, header_row + 10)
         }
-        assert "Mixed Age" in {
+        assert "Fragile" in {
             ws.cell(row=row, column=22).value
             for row in range(header_row + 1, header_row + 10)
         }
-        assert "Reset Watch" in {
+        assert "Mixed Age" in {
             ws.cell(row=row, column=24).value
             for row in range(header_row + 1, header_row + 10)
         }
-        assert "None" in {
-            ws.cell(row=row, column=30).value
-            for row in range(header_row + 1, header_row + 10)
-        }
-        assert "None" in {
-            ws.cell(row=row, column=30).value
-            for row in range(header_row + 1, header_row + 10)
-        }
-        assert "Act Now" in {
-            ws.cell(row=row, column=34).value
-            for row in range(header_row + 1, header_row + 10)
-        }
-        assert any(
-            "Act Now:" in str(ws.cell(row=row, column=36).value)
-            for row in range(header_row + 1, header_row + 10)
-        )
-        assert "no" in {
-            ws.cell(row=row, column=38).value
-            for row in range(header_row + 1, header_row + 10)
-        }
-        assert any(
-            "stay visible" in str(ws.cell(row=row, column=35).value).lower()
-            for row in range(header_row + 1, header_row + 10)
-        )
-        assert "None" in {
+        assert "Reset Watch" in {
             ws.cell(row=row, column=26).value
             for row in range(header_row + 1, header_row + 10)
         }
+        assert "None" in {
+            ws.cell(row=row, column=32).value
+            for row in range(header_row + 1, header_row + 10)
+        }
+        assert "None" in {
+            ws.cell(row=row, column=34).value
+            for row in range(header_row + 1, header_row + 10)
+        }
+        assert "Act Now" in {
+            ws.cell(row=row, column=36).value
+            for row in range(header_row + 1, header_row + 10)
+        }
+        assert any(
+            "Act Now:" in str(ws.cell(row=row, column=38).value)
+            for row in range(header_row + 1, header_row + 10)
+        )
+        assert "no" in {
+            ws.cell(row=row, column=40).value
+            for row in range(header_row + 1, header_row + 10)
+        }
+        assert any(
+            "stay visible" in str(ws.cell(row=row, column=37).value).lower()
+            for row in range(header_row + 1, header_row + 10)
+        )
         assert "None" in {
             ws.cell(row=row, column=28).value
             for row in range(header_row + 1, header_row + 10)
         }
         assert "None" in {
-            ws.cell(row=row, column=32).value
+            ws.cell(row=row, column=30).value
+            for row in range(header_row + 1, header_row + 10)
+        }
+        assert "None" in {
+            ws.cell(row=row, column=34).value
             for row in range(header_row + 1, header_row + 10)
         }
 
@@ -1238,7 +1248,7 @@ class TestAnalystWorkbookSheets:
         assert print_ws["E70"].value == "Top Repo Drilldowns"
         executive_labels = {
             cell
-            for row in executive_ws.iter_rows(min_row=20, max_row=90, min_col=1, max_col=20, values_only=True)
+            for row in executive_ws.iter_rows(min_row=20, max_row=110, min_col=1, max_col=20, values_only=True)
             for cell in row
             if isinstance(cell, str)
         }
@@ -1528,6 +1538,7 @@ class TestWorkbookModes:
             "Review Queue",
             "Portfolio Explorer",
             "Portfolio Catalog",
+            "Scorecards",
             "Repo Detail",
             "Executive Summary",
             "By Lens",
@@ -1616,10 +1627,10 @@ class TestWorkbookModes:
         wb = load_workbook(output)
         ws = wb["Review Queue"]
         header_row = next(row for row in range(20, 70) if ws.cell(row=row, column=1).value == "Repo")
-        assert ws.auto_filter.ref == f"A{header_row}:AL{header_row + 1}"
+        assert ws.auto_filter.ref == f"A{header_row}:AN{header_row + 1}"
         assert not ws.tables
 
-    def test_portfolio_catalog_sheet_and_hidden_data_are_present(self, tmp_path):
+    def test_portfolio_catalog_and_scorecards_sheets_are_present(self, tmp_path):
         report_path = tmp_path / "report.json"
         report_path.write_text(json.dumps(_make_report()))
 
@@ -1632,7 +1643,7 @@ class TestWorkbookModes:
         assert "Intent alignment cannot be judged" in str(catalog_ws["A4"].value)
 
         hidden_ws = wb["Data_PortfolioCatalog"]
-        headers = [hidden_ws.cell(row=1, column=col).value for col in range(1, 14)]
+        headers = [hidden_ws.cell(row=1, column=col).value for col in range(1, 16)]
         assert headers == [
             "Repo",
             "Full Name",
@@ -1643,10 +1654,34 @@ class TestWorkbookModes:
             "Criticality",
             "Review Cadence",
             "Disposition",
+            "Maturity Program",
+            "Target Maturity",
             "Notes",
             "Intent Alignment",
             "Intent Alignment Reason",
             "Catalog Line",
+        ]
+
+        scorecards_ws = wb["Scorecards"]
+        assert scorecards_ws["A1"].value == "Scorecards"
+        assert "No maturity scorecard is recorded yet." in str(scorecards_ws["A3"].value)
+
+        hidden_scorecards_ws = wb["Data_Scorecards"]
+        scorecard_headers = [hidden_scorecards_ws.cell(row=1, column=col).value for col in range(1, 14)]
+        assert scorecard_headers == [
+            "Repo",
+            "Full Name",
+            "Program",
+            "Program Label",
+            "Score",
+            "Maturity Level",
+            "Target Maturity",
+            "Status",
+            "Passed Rules",
+            "Applicable Rules",
+            "Failed Rule Keys",
+            "Top Gaps",
+            "Summary",
         ]
 
     def test_visible_sheets_use_filters_while_hidden_data_sheets_keep_tables(self, tmp_path):

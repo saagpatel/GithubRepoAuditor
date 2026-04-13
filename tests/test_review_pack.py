@@ -25,6 +25,7 @@ def _make_report() -> dict:
         "scenario_summary": {"top_levers": [], "portfolio_projection": {}},
         "portfolio_catalog_summary": {"summary": "1/1 repos have an explicit catalog contract."},
         "intent_alignment_summary": {"summary": "1 aligned, 0 needing review, and 0 missing a contract."},
+        "scorecards_summary": {"summary": "0 repos are on track, 1 is below target, and 0 are missing a valid program."},
         "audits": [
             {
                 "metadata": {
@@ -62,6 +63,15 @@ def _make_report() -> dict:
                     "catalog_line": "operator-loop | flagship workbook-first flow | lifecycle active | criticality high | cadence weekly | disposition maintain",
                     "intent_alignment": "aligned",
                     "intent_alignment_reason": "The repo is holding a maintain posture without urgent or revalidation pressure.",
+                },
+                "scorecard": {
+                    "program": "maintain",
+                    "program_label": "Maintain",
+                    "maturity_level": "operating",
+                    "target_maturity": "strong",
+                    "status": "below-target",
+                    "top_gaps": ["Testing", "CI"],
+                    "summary": "Maintain is at Operating and still below the Strong target because testing and ci are behind.",
                 },
                 "analyzer_results": [],
             }
@@ -105,6 +115,15 @@ def _make_report() -> dict:
                 "catalog_line": "operator-loop | flagship workbook-first flow | lifecycle active | criticality high | cadence weekly | disposition maintain",
                 "intent_alignment": "aligned",
                 "intent_alignment_reason": "The repo is holding a maintain posture without urgent or revalidation pressure.",
+                "scorecard": {
+                    "program": "maintain",
+                    "program_label": "Maintain",
+                    "maturity_level": "operating",
+                    "target_maturity": "strong",
+                    "status": "below-target",
+                    "top_gaps": ["Testing", "CI"],
+                    "summary": "Maintain is at Operating and still below the Strong target because testing and ci are behind.",
+                },
             }
         ],
     }
@@ -119,6 +138,9 @@ def test_review_pack_includes_revalidation_recovery_section(tmp_path):
     assert "Act Now" in content
     assert "Portfolio Catalog: 1/1 repos have an explicit catalog contract." in content
     assert "Intent Alignment: 1 aligned, 0 needing review, and 0 missing a contract." in content
+    assert "Scorecards: 0 repos are on track, 1 is below target" in content
     assert "Catalog: operator-loop | flagship workbook-first flow" in content
     assert "Intent Alignment: aligned: The repo is holding a maintain posture" in content
+    assert "Scorecard: Maintain — Operating (target Strong)" in content
+    assert "Maturity Gap: testing, ci are still below the maintain bar." in content
     assert "Follow-Through Revalidation Recovery and Confidence Re-Earning" not in content

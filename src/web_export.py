@@ -522,6 +522,8 @@ def _top_attention_section(data: dict) -> str:
             f"<br><span class='muted'><strong>Operator Focus:</strong> {escape(build_operator_focus_line(item))}</span>"
             f"<br><span class='muted'><strong>Catalog:</strong> {escape(item.get('catalog_line', 'No portfolio catalog contract is recorded yet.'))}</span>"
             f"<br><span class='muted'><strong>Intent Alignment:</strong> {escape(intent_alignment)}</span>"
+            f"<br><span class='muted'><strong>{escape(item.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.'))}</strong></span>"
+            f"<br><span class='muted'><strong>Maturity Gap:</strong> {escape(item.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.'))}</span>"
             f"<br><span class='muted'><strong>Checkpoint timing:</strong> {escape(build_follow_through_checkpoint_status_label(item))}</span>"
             "</li>"
         )
@@ -552,6 +554,8 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
             f"<br><span class='muted'><strong>Operator Focus:</strong> {escape(item.get('operator_focus_line', 'Watch Closely: No operator focus bucket is currently surfaced.'))}</span>"
             f"<br><span class='muted'><strong>Catalog:</strong> {escape(item.get('catalog_line', 'No portfolio catalog contract is recorded yet.'))}</span>"
             f"<br><span class='muted'><strong>Intent Alignment:</strong> {escape(intent_alignment)}</span>"
+            f"<br><span class='muted'><strong>{escape(item.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.'))}</strong></span>"
+            f"<br><span class='muted'><strong>Maturity Gap:</strong> {escape(item.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.'))}</span>"
             f"<br><span class='muted'><strong>Checkpoint Timing:</strong> {escape(item.get('follow_through_checkpoint_timing', 'Unknown'))}</span>"
             f"<br><span class='muted'><strong>Next Checkpoint:</strong> {escape(item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</span>"
             "</li>"
@@ -589,6 +593,8 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
               <div class="meta-line"><strong>Operator Focus:</strong> {escape(briefing.get('operator_focus_line', 'Watch Closely: No operator focus bucket is currently surfaced.'))}</div>
               <div class="meta-line"><strong>Catalog:</strong> {escape(briefing.get('catalog_line', 'No portfolio catalog contract is recorded yet.'))}</div>
               <div class="meta-line"><strong>Intent Alignment:</strong> {escape(briefing.get('intent_alignment_line', 'missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.'))}</div>
+              <div class="meta-line"><strong>{escape(briefing.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.'))}</strong></div>
+              <div class="meta-line"><strong>Maturity Gap:</strong> {escape(briefing.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.'))}</div>
               <div class="meta-line"><strong>Checkpoint Timing:</strong> {escape(briefing.get('checkpoint_timing_line', 'Unknown'))}</div>
               <div class="meta-line"><strong>What Would Count As Progress:</strong> {escape(briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</div>
             </div>
@@ -606,10 +612,12 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
           <div class="meta-line"><strong>What To Do This Week:</strong> {escape(weekly_pack.get('what_to_do_this_week', build_top_recommendation_summary(report_data)))}</div>
           <div class="meta-line"><strong>Portfolio Catalog:</strong> {escape(weekly_pack.get('portfolio_catalog_summary', 'No portfolio catalog contract is recorded yet.'))}</div>
           <div class="meta-line"><strong>Intent Alignment:</strong> {escape(weekly_pack.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.'))}</div>
+          <div class="meta-line"><strong>Scorecards:</strong> {escape(weekly_pack.get('scorecards_summary', 'No maturity scorecard is recorded yet.'))}</div>
           <div class="meta-line"><strong>Operator Focus:</strong> {escape(weekly_pack.get('operator_focus_summary', 'No operator focus bucket is currently surfaced.'))}</div>
           <div class="meta-line"><strong>Next Checkpoint:</strong> {escape(weekly_pack.get('follow_through_checkpoint_summary', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</div>
           <h3>Operator Focus</h3>
           <div class="meta-line"><strong>Summary:</strong> {escape(weekly_pack.get('operator_focus_summary', 'No operator focus bucket is currently surfaced.'))}</div>
+          {''.join(f"<div class='meta-line'><strong>Scorecard Gap:</strong> {escape(item.get('repo', 'Repo'))} — {escape(item.get('summary', 'Below target.'))}</div>" for item in weekly_pack.get('top_below_target_scorecard_items', [])[:5])}
           <div class="meta-line"><strong>Next Checkpoint:</strong> {escape(weekly_pack.get('follow_through_checkpoint_summary', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</div>
           {''.join(focus_blocks)}
           <h3>Top Attention</h3>

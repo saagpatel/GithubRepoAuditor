@@ -216,6 +216,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Use a custom scoring profile from config/scoring-profiles/NAME.json",
     )
     parser.add_argument(
+        "--scorecards",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help="Use a custom scorecards config file (default: config/scorecards.yaml)",
+    )
+    parser.add_argument(
         "--portfolio-profile",
         type=str,
         default="default",
@@ -550,6 +557,7 @@ def _audit_from_dict(data: dict) -> RepoAudit:
         security_posture=data.get("security_posture", {}),
         score_explanation=data.get("score_explanation", {}),
         portfolio_catalog=data.get("portfolio_catalog", {}),
+        scorecard=data.get("scorecard", {}),
     )
 
 
@@ -618,6 +626,8 @@ def _report_from_dict(data: dict) -> AuditReport:
         operator_queue=data.get("operator_queue", []),
         portfolio_catalog_summary=data.get("portfolio_catalog_summary", {}),
         intent_alignment_summary=data.get("intent_alignment_summary", {}),
+        scorecards_summary=data.get("scorecards_summary", {}),
+        scorecard_programs=data.get("scorecard_programs", {}),
         reconciliation=reconciliation,
     )
 
@@ -680,6 +690,31 @@ def _apply_portfolio_catalog(report: AuditReport, args) -> AuditReport:
     report.portfolio_catalog_summary["errors"] = catalog_data.get("errors", [])
     report.portfolio_catalog_summary["warnings"] = catalog_data.get("warnings", [])
     report.intent_alignment_summary = build_intent_alignment_summary(report.audits)
+    return report
+
+
+def _apply_scorecards(report: AuditReport, args) -> AuditReport:
+    from src.scorecards import DEFAULT_SCORECARDS_PATH, evaluate_scorecards_for_report, load_scorecards
+    from src.report_enrichment import build_maturity_gap_summary, build_scorecard_line
+
+    scorecards_path = getattr(args, "scorecards", None) or DEFAULT_SCORECARDS_PATH
+    scorecards_data = load_scorecards(Path(scorecards_path))
+    repo_results, summary, programs = evaluate_scorecards_for_report(report, scorecards_data)
+    by_repo = {result.get("repo", ""): result for result in repo_results}
+    for audit in report.audits:
+        result = by_repo.get(audit.metadata.name, {})
+        audit.scorecard = dict(result)
+        if audit.portfolio_catalog:
+            audit.portfolio_catalog["scorecard"] = dict(result)
+    for item in report.operator_queue:
+        repo_name = str(item.get("repo") or item.get("repo_name") or "").strip()
+        result = by_repo.get(repo_name, {})
+        if result:
+            item["scorecard"] = dict(result)
+            item["scorecard_line"] = build_scorecard_line(item)
+            item["maturity_gap_summary"] = build_maturity_gap_summary(item)
+    report.scorecards_summary = summary
+    report.scorecard_programs = programs
     return report
 
 
@@ -1856,6 +1891,7 @@ def _write_report_outputs(
         collection=args.collection,
     )
     report = _apply_portfolio_catalog(report, args)
+    report = _apply_scorecards(report, args)
     report.run_change_summary = build_run_change_summary(diff_dict)
     report.run_change_counts = build_run_change_counts(diff_dict)
     report_data = report.to_dict()

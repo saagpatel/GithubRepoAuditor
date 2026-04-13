@@ -206,6 +206,18 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     }
     report.portfolio_catalog_summary = {"summary": "1/1 repos have an explicit catalog contract."}
     report.intent_alignment_summary = {"summary": "1 aligned, 0 needing review, and 0 missing a contract."}
+    audit.scorecard = {
+        "program": "maintain",
+        "program_label": "Maintain",
+        "target_maturity": "strong",
+        "maturity_level": "operating",
+        "score": 0.74,
+        "status": "below-target",
+        "failed_rule_keys": ["testing", "ci"],
+        "summary": "Maintain is at Operating and still below the Strong target because testing and ci are behind.",
+    }
+    report.scorecards_summary = {"summary": "0 repos are on track, 1 is below target, and 0 are missing a valid program."}
+    report.scorecard_programs = {"maintain": {"label": "Maintain", "rule_count": 8}}
     db_path = write_warehouse_snapshot(report, tmp_path)
 
     conn = sqlite3.connect(db_path)
@@ -221,6 +233,7 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
         recommendation_rows = conn.execute("SELECT COUNT(*) FROM security_recommendations").fetchone()[0]
         campaign_history_rows = conn.execute("SELECT COUNT(*) FROM campaign_history").fetchone()[0]
         catalog_rows = conn.execute("SELECT COUNT(*) FROM portfolio_catalog_entries").fetchone()[0]
+        scorecard_rows = conn.execute("SELECT COUNT(*) FROM repo_scorecards").fetchone()[0]
     finally:
         conn.close()
 
@@ -235,6 +248,7 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     assert recommendation_rows >= 1
     assert campaign_history_rows == 1
     assert catalog_rows == 1
+    assert scorecard_rows == 1
 
     history = load_campaign_history(tmp_path, "promotion-push")
     latest_state = load_latest_campaign_state(tmp_path, "promotion-push")
@@ -248,6 +262,8 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     assert latest_runs[0]["governance_summary"]["status"] == "blocked"
     assert latest_runs[0]["portfolio_catalog_summary"]["summary"] == "1/1 repos have an explicit catalog contract."
     assert latest_runs[0]["intent_alignment_summary"]["summary"] == "1 aligned, 0 needing review, and 0 missing a contract."
+    assert latest_runs[0]["scorecards_summary"]["summary"].startswith("0 repos are on track")
+    assert latest_runs[0]["scorecard_programs"]["maintain"]["label"] == "Maintain"
     assert latest_runs[0]["baseline_signature"] == report.baseline_signature
     assert latest_runs[0]["baseline_context"]["portfolio_baseline_size"] == 1
     assert review_history[0]["review_id"] == "review-1"
@@ -255,3 +271,5 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     assert operator_state["operator_summary"]["headline"] == "Campaign work is ready for review."
     assert operator_state["governance_summary"]["needs_reapproval"] is True
     assert operator_state["portfolio_catalog_summary"]["summary"] == "1/1 repos have an explicit catalog contract."
+    assert operator_state["scorecards_summary"]["summary"].startswith("0 repos are on track")
+    assert operator_state["scorecard_programs"]["maintain"]["label"] == "Maintain"

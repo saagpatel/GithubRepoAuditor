@@ -2,6 +2,8 @@ defaults:
   lifecycle_state: maintenance
   criticality: medium
   review_cadence: monthly
+  maturity_program: default
+  target_maturity: operating
 
 repos:
   sample-user/RepoA:
@@ -12,6 +14,8 @@ repos:
     criticality: high
     review_cadence: weekly
     intended_disposition: maintain
+    maturity_program: maintain
+    target_maturity: strong
     notes: Keep this repo polished because it anchors the current product story.
   RepoB:
     owner: d
@@ -20,6 +24,8 @@ repos:
     criticality: medium
     review_cadence: monthly
     intended_disposition: finish
+    maturity_program: finish
+    target_maturity: operating
   RepoC:
     team: experiments
     purpose: risky exploratory work
@@ -27,3 +33,5 @@ repos:
     criticality: low
     review_cadence: ad-hoc
     intended_disposition: experiment
+    maturity_program: experiment
+    target_maturity: foundation

@@ -733,6 +733,15 @@ def test_operator_snapshot_attaches_portfolio_catalog_context(tmp_path: Path):
                     "intended_disposition": "maintain",
                     "catalog_line": "operator-loop | flagship queue item | lifecycle active | criticality high | cadence weekly | disposition maintain",
                 },
+                "scorecard": {
+                    "program": "maintain",
+                    "program_label": "Maintain",
+                    "maturity_level": "operating",
+                    "target_maturity": "strong",
+                    "status": "below-target",
+                    "top_gaps": ["Testing", "CI"],
+                    "summary": "Maintain is at Operating and still below the Strong target because testing and ci are behind.",
+                },
             }
         ]
     )
@@ -743,8 +752,12 @@ def test_operator_snapshot_attaches_portfolio_catalog_context(tmp_path: Path):
 
     assert urgent_item["catalog_line"].startswith("operator-loop | flagship queue item")
     assert urgent_item["intent_alignment"] == "needs-review"
+    assert urgent_item["scorecard_line"] == "Scorecard: Maintain — Operating (target Strong)"
+    assert urgent_item["maturity_gap_summary"] == "testing, ci are still below the maintain bar."
     assert "Catalog: operator-loop | flagship queue item" in markdown
     assert "Intent Alignment: needs-review" in markdown
+    assert "Scorecard: Maintain — Operating (target Strong)" in markdown
+    assert "Maturity Gap: testing, ci are still below the maintain bar." in markdown
 
 
 def test_operator_snapshot_adds_follow_through_from_recent_history(tmp_path: Path, monkeypatch):

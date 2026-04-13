@@ -2,5 +2,7 @@ defaults:
   lifecycle_state: maintenance
   criticality: medium
   review_cadence: monthly
+  maturity_program: maintain
+  target_maturity: operating
 
 repos: {}

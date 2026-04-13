@@ -94,6 +94,8 @@ def _normalize_defaults(defaults: Any, errors: list[str]) -> dict[str, str]:
         "lifecycle_state": _normalize_enum(defaults.get("lifecycle_state"), VALID_LIFECYCLE_STATES),
         "criticality": _normalize_enum(defaults.get("criticality"), VALID_CRITICALITY),
         "review_cadence": _normalize_enum(defaults.get("review_cadence"), VALID_REVIEW_CADENCE),
+        "maturity_program": _safe_text(defaults.get("maturity_program")).lower(),
+        "target_maturity": _safe_text(defaults.get("target_maturity")).lower(),
     }
     for key, allowed in (
         ("lifecycle_state", VALID_LIFECYCLE_STATES),
@@ -135,6 +137,8 @@ def _normalize_repo_entries(
             "criticality": _normalize_enum(raw_value.get("criticality"), VALID_CRITICALITY) or defaults.get("criticality", ""),
             "review_cadence": _normalize_enum(raw_value.get("review_cadence"), VALID_REVIEW_CADENCE) or defaults.get("review_cadence", ""),
             "intended_disposition": _normalize_enum(raw_value.get("intended_disposition"), VALID_INTENDED_DISPOSITIONS),
+            "maturity_program": _safe_text(raw_value.get("maturity_program")).lower() or defaults.get("maturity_program", ""),
+            "target_maturity": _safe_text(raw_value.get("target_maturity")).lower() or defaults.get("target_maturity", ""),
             "notes": _safe_text(raw_value.get("notes")),
             "catalog_key": key,
             "matched_by": "full-name" if "/" in key else "bare-name",
@@ -166,10 +170,13 @@ def catalog_entry_for_repo(
     catalog_data: dict[str, Any],
 ) -> dict[str, Any]:
     repos = catalog_data.get("repos") or {}
+    defaults = catalog_data.get("defaults") or {}
     full_name = _safe_text(metadata.get("full_name"))
     repo_name = _safe_text(metadata.get("name"))
     normalized_full_name = _normalize_key(full_name)
     normalized_repo_name = _normalize_key(repo_name)
+    default_program = _safe_text(defaults.get("maturity_program")).lower()
+    default_target = _safe_text(defaults.get("target_maturity")).lower()
 
     matched = repos.get(normalized_full_name)
     if matched:
@@ -177,6 +184,8 @@ def catalog_entry_for_repo(
             **matched,
             "repo": repo_name,
             "repo_full_name": full_name,
+            "catalog_default_maturity_program": default_program,
+            "catalog_default_target_maturity": default_target,
         }
 
     if normalized_repo_name and normalized_repo_name in repos:
@@ -184,6 +193,8 @@ def catalog_entry_for_repo(
             **repos[normalized_repo_name],
             "repo": repo_name,
             "repo_full_name": full_name,
+            "catalog_default_maturity_program": default_program,
+            "catalog_default_target_maturity": default_target,
         }
 
     return {
@@ -197,6 +208,10 @@ def catalog_entry_for_repo(
         "review_cadence": "",
         "intended_disposition": "",
         "notes": "",
+        "maturity_program": "",
+        "target_maturity": "",
+        "catalog_default_maturity_program": default_program,
+        "catalog_default_target_maturity": default_target,
         "catalog_key": "",
         "matched_by": "",
         "has_explicit_entry": False,
@@ -220,6 +235,10 @@ def build_catalog_line(entry: dict[str, Any]) -> str:
         segments.append(f"cadence {entry['review_cadence']}")
     if entry.get("intended_disposition"):
         segments.append(f"disposition {entry['intended_disposition']}")
+    if entry.get("maturity_program"):
+        segments.append(f"program {entry['maturity_program']}")
+    if entry.get("target_maturity"):
+        segments.append(f"target {entry['target_maturity']}")
     return " | ".join(segments) if segments else "Portfolio catalog contract is present."
 
 
@@ -273,6 +292,8 @@ def build_portfolio_catalog_summary(audits: list[Any], *, catalog_path: str = ""
             cadence[entry["review_cadence"]] += 1
         if entry.get("intended_disposition"):
             disposition[entry["intended_disposition"]] += 1
+        if entry.get("maturity_program"):
+            disposition[f"program:{entry['maturity_program']}"] += 1
         if entry.get("team") or entry.get("owner"):
             owners[_safe_text(entry.get("team")) or _safe_text(entry.get("owner"))] += 1
 

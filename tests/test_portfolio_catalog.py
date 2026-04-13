@@ -20,6 +20,8 @@ defaults:
   lifecycle_state: maintenance
   criticality: medium
   review_cadence: monthly
+  maturity_program: default
+  target_maturity: operating
 
 repos:
   user/RepoA:
@@ -27,6 +29,8 @@ repos:
     team: operator-loop
     purpose: flagship surface
     intended_disposition: maintain
+    maturity_program: maintain
+    target_maturity: strong
   RepoB:
     purpose: finishing push
     lifecycle_state: active
@@ -40,6 +44,8 @@ repos:
     assert catalog["errors"] == []
     assert catalog["repos"]["user/repoa"]["criticality"] == "medium"
     assert catalog["repos"]["repob"]["review_cadence"] == "monthly"
+    assert catalog["repos"]["user/repoa"]["maturity_program"] == "maintain"
+    assert catalog["repos"]["repob"]["target_maturity"] == "operating"
 
 
 def test_catalog_entry_matches_full_name_then_bare_name():
@@ -53,6 +59,8 @@ def test_catalog_entry_matches_full_name_then_bare_name():
                 "criticality": "high",
                 "review_cadence": "weekly",
                 "intended_disposition": "maintain",
+                "maturity_program": "maintain",
+                "target_maturity": "strong",
                 "notes": "",
                 "catalog_key": "user/RepoA",
                 "matched_by": "full-name",
@@ -66,6 +74,8 @@ def test_catalog_entry_matches_full_name_then_bare_name():
                 "criticality": "medium",
                 "review_cadence": "monthly",
                 "intended_disposition": "finish",
+                "maturity_program": "finish",
+                "target_maturity": "operating",
                 "notes": "",
                 "catalog_key": "RepoB",
                 "matched_by": "bare-name",

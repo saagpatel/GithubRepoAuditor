@@ -8,7 +8,7 @@ import pytest
 
 from src import cli
 from src.baseline_context import build_baseline_context
-from src.models import AuditReport, RepoAudit
+from src.models import AnalyzerResult, AuditReport, RepoAudit
 
 
 def _make_args(**overrides) -> Namespace:
@@ -37,6 +37,7 @@ def _make_args(**overrides) -> Namespace:
         "html": False,
         "excel_mode": "standard",
         "scoring_profile": None,
+        "scorecards": None,
         "portfolio_profile": "default",
         "collection": None,
         "review_pack": False,
@@ -182,6 +183,12 @@ def test_build_parser_defaults_watch_strategy_to_adaptive():
     assert args.watch_strategy == "adaptive"
 
 
+def test_build_parser_accepts_scorecards_path():
+    parser = cli.build_parser()
+    args = parser.parse_args(["testuser", "--scorecards", "config/custom-scorecards.yaml"])
+    assert str(args.scorecards) == "config/custom-scorecards.yaml"
+
+
 def test_main_forwards_scoring_profile_to_incremental_audit(monkeypatch, sample_metadata):
     args = _make_args(
         incremental=True,
@@ -227,6 +234,53 @@ def test_main_watch_uses_chosen_watch_plan(monkeypatch, sample_metadata, tmp_pat
 
     assert captured["watch_plan"] is watch_plan
     assert captured["latest_trusted_baseline"] == watch_plan.latest_trusted_baseline
+
+
+def test_apply_scorecards_populates_report(monkeypatch, sample_metadata, tmp_path):
+    scorecards_path = tmp_path / "scorecards.yaml"
+    scorecards_path.write_text(
+        """
+programs:
+  maintain:
+    label: Maintain
+    target_maturity: strong
+    rules:
+      - key: testing
+        label: Testing
+        check: dimension_at_least
+        dimension: testing
+        threshold: 0.80
+        partial_threshold: 0.60
+        weight: 1.0
+"""
+    )
+
+    audit = RepoAudit(
+        metadata=sample_metadata,
+        analyzer_results=[
+            AnalyzerResult("testing", 0.7, 1.0, [], {}),
+            AnalyzerResult("activity", 0.8, 1.0, [], {"days_since_push": 30}),
+        ],
+        overall_score=0.7,
+        completeness_tier="functional",
+        flags=[],
+        lenses={"ship_readiness": {"score": 0.75}},
+        security_posture={"score": 0.8},
+        portfolio_catalog={
+            "has_explicit_entry": True,
+            "intended_disposition": "maintain",
+            "maturity_program": "maintain",
+            "target_maturity": "strong",
+        },
+    )
+    report = AuditReport.from_audits("testuser", [audit], [], 1)
+    report.operator_queue = [{"repo": "test-repo", "title": "Review test-repo"}]
+
+    updated = cli._apply_scorecards(report, _make_args(scorecards=scorecards_path))
+
+    assert updated.audits[0].scorecard["program"] == "maintain"
+    assert updated.scorecards_summary["status_counts"]["below-target"] == 1
+    assert updated.operator_queue[0]["scorecard_line"].startswith("Scorecard: Maintain")
 
 
 def test_main_doctor_writes_artifact_and_exits_cleanly(monkeypatch, tmp_path):
