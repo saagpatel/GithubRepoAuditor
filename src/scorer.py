@@ -167,12 +167,12 @@ def score_repo(
     # Compute badges and suggestions
     audit.badges = compute_badges(audit)
     audit.next_badges = suggest_next_badges(audit)
+    from src.implementation_hotspots import build_implementation_hotspots
     from src.portfolio_intelligence import (
         build_action_candidates,
         build_hotspots,
         compute_lens_scores,
     )
-    from src.implementation_hotspots import build_implementation_hotspots
     from src.report_enrichment import build_score_explanation
     from src.security_intelligence import build_security_posture
 

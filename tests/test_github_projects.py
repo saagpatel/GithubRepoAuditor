@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from src.github_projects import (
     build_project_field_values,
     build_project_preview_summary,

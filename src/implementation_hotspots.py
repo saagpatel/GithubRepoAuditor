@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import re
 from collections import Counter, defaultdict
 from pathlib import Path
-import re
 
 from src.analyzers.code_quality import TODO_PATTERN
 from src.analyzers.dependencies import LOCKFILES, MANIFESTS

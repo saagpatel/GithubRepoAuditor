@@ -96,7 +96,6 @@ from src.report_enrichment import (
     build_run_change_counts,
     build_run_change_summary,
     build_score_explanation,
-    build_scorecard_line,
     build_scorecards_summary,
     build_top_recommendation_summary,
     build_trust_actionability_summary,

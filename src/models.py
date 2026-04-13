@@ -213,6 +213,10 @@ class AuditReport:
     ) -> AuditReport:
         """Construct an AuditReport with all derived statistics."""
         now = datetime.now(tz=__import__("datetime").timezone.utc)
+        from src.implementation_hotspots import (
+            build_implementation_hotspots_summary,
+            build_portfolio_implementation_hotspots,
+        )
         from src.portfolio_intelligence import (
             DEFAULT_PROFILES,
             REPORT_SCHEMA_VERSION,
@@ -222,10 +226,6 @@ class AuditReport:
             build_portfolio_security_governance_preview,
             build_portfolio_security_posture,
             build_scenario_summary,
-        )
-        from src.implementation_hotspots import (
-            build_implementation_hotspots_summary,
-            build_portfolio_implementation_hotspots,
         )
 
         # Tier distribution

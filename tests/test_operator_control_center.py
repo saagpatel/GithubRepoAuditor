@@ -3,7 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 
 import src.operator_control_center as operator_control_center
-from src.operator_control_center import build_operator_snapshot, normalize_review_state, render_control_center_markdown
+from src.operator_control_center import (
+    build_operator_snapshot,
+    normalize_review_state,
+    render_control_center_markdown,
+)
 
 
 def _make_report(**overrides) -> dict:

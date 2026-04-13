@@ -705,8 +705,12 @@ def _apply_portfolio_catalog(report: AuditReport, args) -> AuditReport:
 
 
 def _apply_scorecards(report: AuditReport, args) -> AuditReport:
-    from src.scorecards import DEFAULT_SCORECARDS_PATH, evaluate_scorecards_for_report, load_scorecards
     from src.report_enrichment import build_maturity_gap_summary, build_scorecard_line
+    from src.scorecards import (
+        DEFAULT_SCORECARDS_PATH,
+        evaluate_scorecards_for_report,
+        load_scorecards,
+    )
 
     scorecards_path = getattr(args, "scorecards", None) or DEFAULT_SCORECARDS_PATH
     scorecards_data = load_scorecards(Path(scorecards_path))
