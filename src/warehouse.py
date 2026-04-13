@@ -8,7 +8,7 @@ from pathlib import Path
 from src.models import AuditReport
 
 WAREHOUSE_FILENAME = "portfolio-warehouse.db"
-WAREHOUSE_SCHEMA_VERSION = 10
+WAREHOUSE_SCHEMA_VERSION = 11
 
 
 def write_warehouse_snapshot(
@@ -64,6 +64,7 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             portfolio_outcomes_summary_json TEXT NOT NULL DEFAULT '{}',
             operator_effectiveness_summary_json TEXT NOT NULL DEFAULT '{}',
             high_pressure_queue_history_json TEXT NOT NULL DEFAULT '[]',
+            action_sync_outcomes_summary_json TEXT NOT NULL DEFAULT '{}',
             scenario_summary_json TEXT NOT NULL,
             campaign_summary_json TEXT NOT NULL DEFAULT '{}',
             writeback_preview_json TEXT NOT NULL DEFAULT '{}',
@@ -319,6 +320,19 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             status TEXT NOT NULL DEFAULT 'preview'
         );
 
+        CREATE TABLE IF NOT EXISTS campaign_outcomes (
+            run_id TEXT NOT NULL,
+            campaign_type TEXT NOT NULL,
+            monitoring_state TEXT NOT NULL,
+            pressure_effect TEXT NOT NULL,
+            drift_state TEXT NOT NULL,
+            reopen_state TEXT NOT NULL,
+            rollback_state TEXT NOT NULL,
+            latest_target TEXT NOT NULL DEFAULT '',
+            details_json TEXT NOT NULL DEFAULT '{}',
+            PRIMARY KEY (run_id, campaign_type)
+        );
+
         CREATE TABLE IF NOT EXISTS governance_approvals (
             source_run_id TEXT PRIMARY KEY,
             approved_at TEXT NOT NULL,
@@ -486,6 +500,7 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     _ensure_column(conn, "audit_runs", "portfolio_outcomes_summary_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(conn, "audit_runs", "operator_effectiveness_summary_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(conn, "audit_runs", "high_pressure_queue_history_json", "TEXT NOT NULL DEFAULT '[]'")
+    _ensure_column(conn, "audit_runs", "action_sync_outcomes_summary_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(
         conn, "portfolio_catalog_entries", "maturity_program", "TEXT NOT NULL DEFAULT ''"
     )
@@ -536,13 +551,14 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             security_summary_json, security_governance_preview_json, collections_json, scenario_summary_json,
             portfolio_catalog_summary_json, intent_alignment_summary_json, scorecards_summary_json, scorecard_programs_json,
             portfolio_outcomes_summary_json, operator_effectiveness_summary_json, high_pressure_queue_history_json,
+            action_sync_outcomes_summary_json,
             campaign_summary_json, writeback_preview_json, writeback_results_json,
             managed_state_drift_json, rollback_preview_json, campaign_history_json,
             governance_preview_json, governance_approval_json, governance_results_json,
             governance_history_json, governance_drift_json, governance_summary_json, review_summary_json, review_alerts_json,
             preflight_summary_json, material_changes_json, review_targets_json, review_history_json, watch_state_json,
             operator_summary_json, operator_queue_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             run_id,
@@ -572,6 +588,7 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             json.dumps(report.portfolio_outcomes_summary),
             json.dumps(report.operator_effectiveness_summary),
             json.dumps(report.high_pressure_queue_history),
+            json.dumps(report.campaign_outcomes_summary),
             json.dumps(report.campaign_summary),
             json.dumps(report.writeback_preview),
             json.dumps(report.writeback_results),
@@ -1126,6 +1143,27 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             ),
         )
 
+    for outcome in report.action_sync_outcomes:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO campaign_outcomes (
+                run_id, campaign_type, monitoring_state, pressure_effect, drift_state,
+                reopen_state, rollback_state, latest_target, details_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                run_id,
+                outcome.get("campaign_type", ""),
+                outcome.get("monitoring_state", "no-recent-apply"),
+                outcome.get("pressure_effect", "insufficient-evidence"),
+                outcome.get("drift_state", "insufficient-evidence"),
+                outcome.get("reopen_state", "insufficient-evidence"),
+                outcome.get("rollback_state", "not-applicable"),
+                outcome.get("latest_target", ""),
+                json.dumps(outcome),
+            ),
+        )
+
     for result in (
         report.writeback_results.get("results", [])
         if isinstance(report.writeback_results, dict)
@@ -1316,6 +1354,7 @@ def _connect(output_dir: Path) -> sqlite3.Connection | None:
         return None
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
+    _ensure_schema(conn)
     return conn
 
 
@@ -1565,6 +1604,8 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
                    governance_summary_json, portfolio_catalog_summary_json, intent_alignment_summary_json,
                    scorecards_summary_json, scorecard_programs_json,
                    portfolio_outcomes_summary_json, operator_effectiveness_summary_json, high_pressure_queue_history_json,
+                   action_sync_outcomes_summary_json, campaign_summary_json, writeback_preview_json, writeback_results_json,
+                   managed_state_drift_json, rollback_preview_json, campaign_history_json,
                    review_summary_json, operator_summary_json
             FROM audit_runs
             WHERE username = ?
@@ -1601,6 +1642,13 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
                 "portfolio_outcomes_summary": json.loads(row["portfolio_outcomes_summary_json"] or "{}"),
                 "operator_effectiveness_summary": json.loads(row["operator_effectiveness_summary_json"] or "{}"),
                 "high_pressure_queue_history": json.loads(row["high_pressure_queue_history_json"] or "[]"),
+                "campaign_outcomes_summary": json.loads(row["action_sync_outcomes_summary_json"] or "{}"),
+                "campaign_summary": json.loads(row["campaign_summary_json"] or "{}"),
+                "writeback_preview": json.loads(row["writeback_preview_json"] or "{}"),
+                "writeback_results": json.loads(row["writeback_results_json"] or "{}"),
+                "managed_state_drift": json.loads(row["managed_state_drift_json"] or "[]"),
+                "rollback_preview": json.loads(row["rollback_preview_json"] or "{}"),
+                "campaign_history": json.loads(row["campaign_history_json"] or "[]"),
                 "review_summary": json.loads(row["review_summary_json"] or "{}"),
                 "operator_summary": json.loads(row["operator_summary_json"] or "{}"),
             }
@@ -1685,6 +1733,184 @@ def load_recent_campaign_history(output_dir: Path, username: str, limit: int = 2
     return history
 
 
+def load_recent_campaign_runs(output_dir: Path, username: str, limit: int = 50) -> list[dict]:
+    conn = _connect(output_dir)
+    if conn is None:
+        return []
+    try:
+        rows = conn.execute(
+            """
+            SELECT campaign_runs.run_id,
+                   audit_runs.generated_at,
+                   campaign_runs.campaign_type,
+                   campaign_runs.label,
+                   campaign_runs.writeback_target,
+                   campaign_runs.mode,
+                   campaign_runs.generated_action_ids_json
+            FROM campaign_runs
+            JOIN audit_runs ON audit_runs.run_id = campaign_runs.run_id
+            WHERE audit_runs.username = ?
+            ORDER BY audit_runs.generated_at DESC
+            LIMIT ?
+            """,
+            (username, limit),
+        ).fetchall()
+    finally:
+        conn.close()
+    return [
+        {
+            "run_id": row["run_id"],
+            "generated_at": row["generated_at"],
+            "campaign_type": row["campaign_type"],
+            "label": row["label"],
+            "writeback_target": row["writeback_target"],
+            "mode": row["mode"],
+            "generated_action_ids": json.loads(row["generated_action_ids_json"] or "[]"),
+        }
+        for row in rows
+    ]
+
+
+def load_recent_action_runs(output_dir: Path, username: str, limit: int = 400) -> list[dict]:
+    conn = _connect(output_dir)
+    if conn is None:
+        return []
+    try:
+        rows = conn.execute(
+            """
+            SELECT action_runs.run_id,
+                   audit_runs.generated_at,
+                   action_runs.action_id,
+                   action_runs.repo_id,
+                   action_runs.campaign_type,
+                   action_runs.target,
+                   action_runs.status,
+                   action_runs.lifecycle_state,
+                   action_runs.reconciliation_outcome,
+                   action_runs.closed_at,
+                   action_runs.closed_reason,
+                   action_runs.reopened_at,
+                   action_runs.drift_state,
+                   action_runs.rollback_state
+            FROM action_runs
+            JOIN audit_runs ON audit_runs.run_id = action_runs.run_id
+            WHERE audit_runs.username = ?
+            ORDER BY audit_runs.generated_at DESC, action_runs.repo_id, action_runs.action_id
+            LIMIT ?
+            """,
+            (username, limit),
+        ).fetchall()
+    finally:
+        conn.close()
+    return [dict(row) for row in rows]
+
+
+def load_recent_campaign_drift_events(output_dir: Path, username: str, limit: int = 200) -> list[dict]:
+    conn = _connect(output_dir)
+    if conn is None:
+        return []
+    try:
+        rows = conn.execute(
+            """
+            SELECT campaign_drift_events.run_id,
+                   audit_runs.generated_at,
+                   campaign_drift_events.action_id,
+                   campaign_drift_events.repo_id,
+                   campaign_drift_events.campaign_type,
+                   campaign_drift_events.target,
+                   campaign_drift_events.drift_state,
+                   campaign_drift_events.details_json
+            FROM campaign_drift_events
+            JOIN audit_runs ON audit_runs.run_id = campaign_drift_events.run_id
+            WHERE audit_runs.username = ?
+            ORDER BY audit_runs.generated_at DESC
+            LIMIT ?
+            """,
+            (username, limit),
+        ).fetchall()
+    finally:
+        conn.close()
+    events: list[dict] = []
+    for row in rows:
+        payload = dict(row)
+        payload["details"] = json.loads(row["details_json"] or "{}")
+        events.append(payload)
+    return events
+
+
+def load_recent_rollback_runs(output_dir: Path, username: str, limit: int = 200) -> list[dict]:
+    conn = _connect(output_dir)
+    if conn is None:
+        return []
+    try:
+        rows = conn.execute(
+            """
+            SELECT rollback_runs.run_id,
+                   rollback_runs.source_run_id,
+                   rollback_runs.preview_json,
+                   rollback_runs.results_json,
+                   rollback_runs.status,
+                   audit_runs.generated_at
+            FROM rollback_runs
+            JOIN audit_runs ON audit_runs.run_id = rollback_runs.source_run_id
+            WHERE audit_runs.username = ?
+            ORDER BY audit_runs.generated_at DESC
+            LIMIT ?
+            """,
+            (username, limit),
+        ).fetchall()
+    finally:
+        conn.close()
+    rollback_runs: list[dict] = []
+    for row in rows:
+        rollback_runs.append(
+            {
+                "run_id": row["run_id"],
+                "source_run_id": row["source_run_id"],
+                "generated_at": row["generated_at"],
+                "preview": json.loads(row["preview_json"] or "{}"),
+                "results": json.loads(row["results_json"] or "{}"),
+                "status": row["status"],
+            }
+        )
+    return rollback_runs
+
+
+def load_campaign_outcomes(output_dir: Path, username: str, limit: int = 50) -> list[dict]:
+    conn = _connect(output_dir)
+    if conn is None:
+        return []
+    try:
+        rows = conn.execute(
+            """
+            SELECT campaign_outcomes.run_id,
+                   audit_runs.generated_at,
+                   campaign_outcomes.campaign_type,
+                   campaign_outcomes.monitoring_state,
+                   campaign_outcomes.pressure_effect,
+                   campaign_outcomes.drift_state,
+                   campaign_outcomes.reopen_state,
+                   campaign_outcomes.rollback_state,
+                   campaign_outcomes.latest_target,
+                   campaign_outcomes.details_json
+            FROM campaign_outcomes
+            JOIN audit_runs ON audit_runs.run_id = campaign_outcomes.run_id
+            WHERE audit_runs.username = ?
+            ORDER BY audit_runs.generated_at DESC
+            LIMIT ?
+            """,
+            (username, limit),
+        ).fetchall()
+    finally:
+        conn.close()
+    outcomes: list[dict] = []
+    for row in rows:
+        payload = dict(row)
+        payload["details"] = json.loads(row["details_json"] or "{}")
+        outcomes.append(payload)
+    return outcomes
+
+
 def load_watch_checkpoint(output_dir: Path, username: str) -> dict | None:
     conn = _connect(output_dir)
     if conn is None:
@@ -1722,6 +1948,7 @@ def load_latest_operator_state(output_dir: Path, username: str) -> dict | None:
                    governance_summary_json, portfolio_catalog_summary_json, intent_alignment_summary_json,
                    scorecards_summary_json, scorecard_programs_json,
                    portfolio_outcomes_summary_json, operator_effectiveness_summary_json, high_pressure_queue_history_json,
+                   action_sync_outcomes_summary_json,
                    review_summary_json, review_alerts_json, material_changes_json,
                    review_targets_json, review_history_json, watch_state_json,
                    operator_summary_json, operator_queue_json
@@ -1751,6 +1978,7 @@ def load_latest_operator_state(output_dir: Path, username: str) -> dict | None:
         "portfolio_outcomes_summary": json.loads(row["portfolio_outcomes_summary_json"] or "{}"),
         "operator_effectiveness_summary": json.loads(row["operator_effectiveness_summary_json"] or "{}"),
         "high_pressure_queue_history": json.loads(row["high_pressure_queue_history_json"] or "[]"),
+        "campaign_outcomes_summary": json.loads(row["action_sync_outcomes_summary_json"] or "{}"),
         "review_summary": json.loads(row["review_summary_json"] or "{}"),
         "review_alerts": json.loads(row["review_alerts_json"] or "[]"),
         "material_changes": json.loads(row["material_changes_json"] or "[]"),

@@ -644,6 +644,9 @@ def _report_from_dict(data: dict) -> AuditReport:
         campaign_readiness_summary=data.get("campaign_readiness_summary", {}),
         action_sync_summary=data.get("action_sync_summary", {}),
         next_action_sync_step=data.get("next_action_sync_step", ""),
+        action_sync_outcomes=data.get("action_sync_outcomes", []),
+        campaign_outcomes_summary=data.get("campaign_outcomes_summary", {}),
+        next_monitoring_step=data.get("next_monitoring_step", {}),
         security_posture=data.get("security_posture", {}),
         security_governance_preview=data.get("security_governance_preview", []),
         collections=data.get("collections", {}),
@@ -1934,6 +1937,9 @@ def _enrich_report_with_operator_state(
     report.campaign_readiness_summary = snapshot.get("campaign_readiness_summary", {})
     report.action_sync_summary = snapshot.get("action_sync_summary", {})
     report.next_action_sync_step = snapshot.get("next_action_sync_step", "")
+    report.action_sync_outcomes = snapshot.get("action_sync_outcomes", [])
+    report.campaign_outcomes_summary = snapshot.get("campaign_outcomes_summary", {})
+    report.next_monitoring_step = snapshot.get("next_monitoring_step", {})
     return report
 
 
@@ -2232,6 +2238,10 @@ def _print_output_summary(
         f"{outputs['pdf_info']}"
         f"{outputs['review_pack_info']}",
     )
+    if report.campaign_outcomes_summary.get("summary"):
+        print_info(f"Post-apply monitoring: {report.campaign_outcomes_summary.get('summary')}")
+    if report.next_monitoring_step.get("summary"):
+        print_info(f"Next monitoring step: {report.next_monitoring_step.get('summary')}")
     print_info(_normal_audit_next_step_hint(report.username))
 
 

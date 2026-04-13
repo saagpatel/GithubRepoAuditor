@@ -72,6 +72,30 @@ Execution states are intentionally narrow:
 
 `ready-to-apply` does not widen authority and does not trigger automatic mutation. It only means the product can now hand you a concrete command suggestion with fewer unresolved safety concerns.
 
+## Post-Apply Monitoring
+
+Phase 88 adds a third layer after readiness and apply-packet handoff: post-apply monitoring.
+
+That layer answers whether a recent campaign apply:
+
+- stayed clean
+- drifted again
+- reopened work
+- needs rollback watch
+- still needs a short follow-up window
+
+The monitoring states are intentionally narrow:
+
+- `drift-returned`: managed drift reappeared after apply
+- `reopened`: lifecycle later reopened after apply
+- `rollback-watch`: rollback coverage was partial or missing, or rollback was later used
+- `monitor-now`: apply happened recently and still needs follow-up runs
+- `holding-clean`: enough post-apply runs exist and the campaign is currently holding
+- `insufficient-evidence`: some evidence exists, but the history is still too thin to judge cleanly
+- `no-recent-apply`: there is no recent apply to monitor
+
+Post-apply monitoring is descriptive only. It does not trigger another sync, rollback, or mutation by itself. It exists to keep the operator loop honest after execution.
+
 ## Audit Trail
 
 Every campaign run records:

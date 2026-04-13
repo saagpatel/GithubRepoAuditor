@@ -62,6 +62,9 @@ NO_ACTION_SYNC_LINE = "Action Sync: stay local until a campaign has meaningful a
 NO_APPLY_READINESS_SUMMARY = "No current campaign has a safe execution handoff yet, so the local story should stay local for now."
 NO_NEXT_APPLY_CANDIDATE = "Stay local for now; no current campaign has a safe execution handoff."
 NO_ACTION_SYNC_COMMAND_HINT = "No Action Sync command is recommended yet."
+NO_CAMPAIGN_OUTCOMES_SUMMARY = "No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local."
+NO_NEXT_MONITORING_STEP = "Stay local for now; no recent Action Sync apply needs post-apply follow-up yet."
+NO_POST_APPLY_MONITORING_LINE = "Post-Apply Monitoring: no recent Action Sync apply needs follow-up yet."
 
 OPERATOR_FOCUS_LABELS = {
     "act-now": "Act Now",
@@ -558,6 +561,7 @@ def build_repo_briefing(
     maturity_gap_summary = build_maturity_gap_summary(audit)
     action_sync_line = build_action_sync_line(handoff_source)
     apply_packet_line = build_apply_packet_line(handoff_source)
+    post_apply_line = build_post_apply_monitoring_line(handoff_source)
     follow_through_resurfacing_reason = build_follow_through_resurfacing_reason(handoff_source)
     implementation_hotspots = _implementation_hotspots(audit)[:3]
     where_to_start_summary = _where_to_start_summary(audit)
@@ -653,6 +657,7 @@ def build_repo_briefing(
         "operator_focus_line": operator_focus_line,
         "action_sync_line": action_sync_line,
         "apply_packet_line": apply_packet_line,
+        "post_apply_line": post_apply_line,
         "portfolio_catalog": portfolio_catalog,
         "catalog_line": catalog_line,
         "intent_alignment": intent_alignment,
@@ -669,6 +674,8 @@ def build_repo_briefing(
         "apply_packet_state": str(handoff_source.get("apply_packet_state") or "stay-local"),
         "apply_packet_summary": str(handoff_source.get("apply_packet_summary") or "No current apply packet is surfaced for this repo."),
         "apply_packet_command": str(handoff_source.get("apply_packet_command") or ""),
+        "post_apply_state": str(handoff_source.get("post_apply_state") or "no-recent-apply"),
+        "post_apply_summary": str(handoff_source.get("post_apply_summary") or "No post-apply monitoring is surfaced for this repo yet."),
         "resurfacing_reason_line": follow_through_resurfacing_reason,
     }
 
@@ -749,6 +756,14 @@ def build_weekly_review_pack(
         "apply_readiness_summary": build_apply_readiness_summary(data),
         "next_apply_candidate": build_next_apply_candidate_line(data),
         "action_sync_command_hint": build_action_sync_command_hint(data),
+        "campaign_outcomes_summary": build_campaign_outcomes_summary(data),
+        "next_monitoring_step": build_next_monitoring_step_line(data),
+        "post_apply_monitoring_line": (
+            f"{build_campaign_outcomes_summary(data)} Next step: {build_next_monitoring_step_line(data)}"
+            if build_campaign_outcomes_summary(data) != NO_CAMPAIGN_OUTCOMES_SUMMARY
+            or build_next_monitoring_step_line(data) != NO_NEXT_MONITORING_STEP
+            else NO_POST_APPLY_MONITORING_LINE
+        ),
         "top_apply_ready_campaigns": list(operator_summary.get("top_apply_ready_campaigns") or []),
         "top_preview_ready_campaigns": list(operator_summary.get("top_preview_ready_campaigns") or []),
         "top_drift_review_campaigns": list(operator_summary.get("top_drift_review_campaigns") or []),
@@ -756,6 +771,10 @@ def build_weekly_review_pack(
         "top_ready_to_apply_packets": list(operator_summary.get("top_ready_to_apply_packets") or []),
         "top_needs_approval_packets": list(operator_summary.get("top_needs_approval_packets") or []),
         "top_review_drift_packets": list(operator_summary.get("top_review_drift_packets") or []),
+        "top_monitor_now_campaigns": list(operator_summary.get("top_monitor_now_campaigns") or []),
+        "top_holding_clean_campaigns": list(operator_summary.get("top_holding_clean_campaigns") or []),
+        "top_reopened_campaigns": list(operator_summary.get("top_reopened_campaigns") or []),
+        "top_drift_returned_campaigns": list(operator_summary.get("top_drift_returned_campaigns") or []),
         "top_attention": top_attention,
         "repo_briefings": repo_briefings,
         "top_below_target_scorecard_items": list(_mapping(data).get("scorecards_summary", {}).get("top_below_target_repos") or []),
@@ -1567,6 +1586,20 @@ def build_action_sync_command_hint(report_data: Any) -> str:
     )
 
 
+def build_campaign_outcomes_summary(report_data: Any) -> str:
+    summary = _mapping(_mapping(report_data).get("campaign_outcomes_summary"))
+    if not summary:
+        summary = _mapping(_mapping(report_data).get("operator_summary")).get("campaign_outcomes_summary") or {}
+    return str(_mapping(summary).get("summary") or NO_CAMPAIGN_OUTCOMES_SUMMARY)
+
+
+def build_next_monitoring_step_line(report_data: Any) -> str:
+    step = _mapping(_mapping(report_data).get("next_monitoring_step"))
+    if not step:
+        step = _mapping(_mapping(report_data).get("operator_summary")).get("next_monitoring_step") or {}
+    return str(_mapping(step).get("summary") or NO_NEXT_MONITORING_STEP)
+
+
 def build_action_sync_line(value: Any) -> str:
     mapped = _mapping(value)
     direct = str(mapped.get("action_sync_line") or "").strip()
@@ -1593,6 +1626,18 @@ def build_apply_packet_line(value: Any) -> str:
     if command:
         return f"Apply Packet: {summary} Command: {command}"
     return f"Apply Packet: {summary or state.replace('-', ' ').title()}"
+
+
+def build_post_apply_monitoring_line(value: Any) -> str:
+    mapped = _mapping(value)
+    direct = str(mapped.get("post_apply_line") or "").strip()
+    if direct:
+        return direct
+    summary = str(mapped.get("post_apply_summary") or "").strip()
+    state = str(mapped.get("post_apply_state") or "").strip()
+    if not summary and not state:
+        return NO_POST_APPLY_MONITORING_LINE
+    return f"Post-Apply Monitoring: {summary or state.replace('-', ' ').title()}"
 
 
 def _build_operator_focus_item(mapped: dict[str, Any], review_summary: dict[str, Any]) -> dict[str, Any]:
@@ -1656,6 +1701,9 @@ def _build_operator_focus_item(mapped: dict[str, Any], review_summary: dict[str,
         "apply_packet_summary": str(mapped.get("apply_packet_summary") or "No current apply packet is surfaced for this item."),
         "apply_packet_command": str(mapped.get("apply_packet_command") or ""),
         "apply_packet_line": build_apply_packet_line(mapped),
+        "post_apply_state": str(mapped.get("post_apply_state") or "no-recent-apply"),
+        "post_apply_summary": str(mapped.get("post_apply_summary") or "No post-apply monitoring is surfaced for this item yet."),
+        "post_apply_line": build_post_apply_monitoring_line(mapped),
     }
 
 

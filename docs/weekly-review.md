@@ -80,6 +80,16 @@ If the packet shows a command hint:
 - apply commands always include `--writeback-apply`
 - the command is a recommendation, not an automatic action
 
+Then read the third shared layer: `Post-Apply Monitoring`.
+
+- `drift-returned` means a managed mirror drifted again after apply and needs review before another sync.
+- `reopened` means the lifecycle reopened after apply and the earlier sync did not hold.
+- `rollback-watch` means rollback coverage was incomplete or rollback was later used.
+- `monitor-now` means the campaign was applied recently and still needs a short follow-up window.
+- `holding-clean` means the campaign has enough follow-up history and is currently staying quiet.
+
+That layer is there to answer one question plainly: did the sync actually help, and what is the next human follow-up step?
+
 ## Workbook gate reminder
 
 Use `make workbook-gate` only when you changed workbook-facing code or layout. Normal portfolio use does not require the workbook gate.

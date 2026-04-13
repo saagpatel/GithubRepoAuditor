@@ -128,6 +128,8 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- Apply packet: {(summary.get('apply_readiness_summary') or {}).get('summary', 'No current campaign has a safe execution handoff yet, so the local story should stay local for now.')}",
         f"- Next apply candidate: {(summary.get('next_apply_candidate') or {}).get('summary', 'Stay local for now; no current campaign has a safe execution handoff.')}",
         f"- Action Sync command hint: {(summary.get('next_apply_candidate') or {}).get('apply_command') or (summary.get('next_apply_candidate') or {}).get('preview_command') or 'No Action Sync command is recommended yet.'}",
+        f"- Post-apply monitoring: {(summary.get('campaign_outcomes_summary') or {}).get('summary', 'No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.')}",
+        f"- Next monitoring step: {(summary.get('next_monitoring_step') or {}).get('summary', 'Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.')}",
         f"- Trend: `{summary.get('trend_status', 'stable')}` — {summary.get('trend_summary', 'No trend summary is recorded yet.')}",
         f"- Aging status: `{summary.get('aging_status', 'fresh')}`",
         f"- Attention counts: new={summary.get('new_attention_count', 0)}, resolved={resolved_count}, persisting={persisting_count}, reopened={summary.get('reopened_attention_count', 0)}",

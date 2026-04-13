@@ -1176,6 +1176,17 @@ def _build_workbook_rollups(data: dict) -> tuple[list[list[object]], list[list[o
                 item.get("intent_alignment_reason", ""),
                 item.get("scorecard_line", ""),
                 item.get("maturity_gap_summary", ""),
+                item.get("action_sync_stage", ""),
+                item.get("action_sync_reason", ""),
+                item.get("suggested_campaign", ""),
+                item.get("suggested_writeback_target", ""),
+                item.get("action_sync_line", ""),
+                item.get("apply_packet_state", ""),
+                item.get("apply_packet_summary", ""),
+                item.get("apply_packet_command", ""),
+                item.get("post_apply_state", ""),
+                item.get("post_apply_summary", ""),
+                item.get("post_apply_line", ""),
             ]
         )
 
@@ -3520,6 +3531,14 @@ def _build_operator_outcomes(wb: Workbook, data: dict) -> None:
         "high_pressure_queue_trend_summary",
         "High-pressure queue trend is not ready yet.",
     )
+    campaign_outcomes_summary = (data.get("campaign_outcomes_summary") or {}).get(
+        "summary",
+        "No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.",
+    )
+    next_monitoring_step = (data.get("next_monitoring_step") or {}).get(
+        "summary",
+        "Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.",
+    )
     ws.merge_cells("A1:F1")
     ws["A1"].value = "Operator Outcomes"
     ws["A1"].font = SECTION_FONT
@@ -3532,12 +3551,18 @@ def _build_operator_outcomes(wb: Workbook, data: dict) -> None:
     ws.merge_cells("A4:F4")
     ws["A4"].value = trend_summary
     ws["A4"].alignment = WRAP
+    ws.merge_cells("A5:F5")
+    ws["A5"].value = campaign_outcomes_summary
+    ws["A5"].alignment = WRAP
+    ws.merge_cells("A6:F6")
+    ws["A6"].value = next_monitoring_step
+    ws["A6"].alignment = WRAP
 
     headers = ["Metric", "Status", "Value", "Numerator", "Denominator", "Summary"]
     for col, header in enumerate(headers, 1):
-        ws.cell(row=6, column=col, value=header)
-    style_header_row(ws, 6, len(headers))
-    ws.freeze_panes = "A7"
+        ws.cell(row=8, column=col, value=header)
+    style_header_row(ws, 8, len(headers))
+    ws.freeze_panes = "A9"
 
     metrics = [
         ("Review To Action Closure Rate", data.get("portfolio_outcomes_summary", {}).get("review_to_action_closure_rate", {})),
@@ -3546,7 +3571,7 @@ def _build_operator_outcomes(wb: Workbook, data: dict) -> None:
         ("Recommendation Validation Rate", data.get("operator_effectiveness_summary", {}).get("recommendation_validation_rate", {})),
         ("Noisy Guidance Rate", data.get("operator_effectiveness_summary", {}).get("noisy_guidance_rate", {})),
     ]
-    for row, (label, metric) in enumerate(metrics, 7):
+    for row, (label, metric) in enumerate(metrics, 9):
         value = metric.get("value")
         if isinstance(value, float):
             display_value = round(value, 3)
@@ -3564,7 +3589,27 @@ def _build_operator_outcomes(wb: Workbook, data: dict) -> None:
             cell = ws.cell(row=row, column=col, value=item)
             style_data_cell(cell, "center" if col in {2, 3, 4, 5} else "left")
 
-    example_row = 14
+    monitoring_row = 16
+    ws.cell(row=monitoring_row, column=1, value="Post-Apply Monitoring")
+    style_header_row(ws, monitoring_row, 6)
+    monitoring_headers = ["Campaign", "State", "Pressure Effect", "Drift", "Reopen", "Summary"]
+    for col, header in enumerate(monitoring_headers, 1):
+        ws.cell(row=monitoring_row + 1, column=col, value=header)
+    style_header_row(ws, monitoring_row + 1, len(monitoring_headers))
+    for row, item in enumerate(data.get("action_sync_outcomes", []) or [], monitoring_row + 2):
+        values = [
+            item.get("label", item.get("campaign_type", "Campaign")),
+            item.get("monitoring_state", "no-recent-apply"),
+            item.get("pressure_effect", "insufficient-evidence"),
+            item.get("drift_state", "insufficient-evidence"),
+            item.get("reopen_state", "insufficient-evidence"),
+            item.get("summary", ""),
+        ]
+        for col, value in enumerate(values, 1):
+            cell = ws.cell(row=row, column=col, value=value)
+            style_data_cell(cell, "center" if col in {2, 3, 4, 5} else "left")
+
+    example_row = monitoring_row + 8
     ws.cell(row=example_row, column=1, value="Recent Examples")
     style_header_row(ws, example_row, 3)
     ws.cell(row=example_row + 1, column=1, value="Closed Actions")
@@ -3574,7 +3619,7 @@ def _build_operator_outcomes(wb: Workbook, data: dict) -> None:
     ws.cell(row=example_row + 3, column=1, value="Regression Examples")
     ws.cell(row=example_row + 3, column=2, value=_join_outcome_examples(data.get("operator_summary", {}).get("recent_regression_examples", [])))
 
-    history_row = 20
+    history_row = example_row + 6
     history_headers = ["Run", "Generated", "Blocked", "Urgent", "High Pressure"]
     for col, header in enumerate(history_headers, 1):
         ws.cell(row=history_row, column=col, value=header)
@@ -3592,7 +3637,7 @@ def _build_operator_outcomes(wb: Workbook, data: dict) -> None:
             cell = ws.cell(row=row, column=col, value=value)
             style_data_cell(cell, "center" if col >= 3 else "left")
 
-    max_row = max(history_row + len(history), example_row + 3, 11)
+    max_row = max(history_row + len(history), example_row + 3, monitoring_row + 3, 13)
     auto_width(ws, 6, max_row)
 
 
@@ -3887,6 +3932,7 @@ def _build_hidden_data_sheets(
     scorecard_rows: list[list[object]] = []
     implementation_hotspot_rows: list[list[object]] = []
     operator_outcome_rows: list[list[object]] = []
+    action_sync_outcome_rows: list[list[object]] = []
     lookup_rows: list[list[object]] = []
     repo_detail_rows, repo_dimension_rollup_rows, repo_history_rollup_rows = _repo_detail_rows(data, score_history)
     run_change_rollup_rows, run_change_repo_rows = _run_change_rows(data, diff_data)
@@ -3932,6 +3978,23 @@ def _build_hidden_data_sheets(
                 item.get("action_id", ""),
                 item.get("summary", ""),
             ])
+    for item in data.get("action_sync_outcomes", []) or []:
+        action_sync_outcome_rows.append([
+            item.get("campaign_type", ""),
+            item.get("label", ""),
+            item.get("latest_target", ""),
+            item.get("latest_run_mode", ""),
+            item.get("recent_apply_count", 0),
+            item.get("monitored_repo_count", 0),
+            item.get("monitoring_state", "no-recent-apply"),
+            item.get("pressure_effect", "insufficient-evidence"),
+            item.get("drift_state", "insufficient-evidence"),
+            item.get("reopen_state", "insufficient-evidence"),
+            item.get("rollback_state", "not-applicable"),
+            item.get("follow_up_recommendation", ""),
+            ", ".join(item.get("top_repos", []) or []),
+            item.get("summary", ""),
+        ])
 
     for audit in audits:
         metadata = audit.get("metadata", {})
@@ -4432,6 +4495,28 @@ def _build_hidden_data_sheets(
     )
     _write_hidden_table_sheet(
         wb,
+        "Data_ActionSyncOutcomes",
+        "tblActionSyncOutcomesData",
+        [
+            "Campaign Type",
+            "Label",
+            "Latest Target",
+            "Latest Run Mode",
+            "Recent Apply Count",
+            "Monitored Repo Count",
+            "Monitoring State",
+            "Pressure Effect",
+            "Drift State",
+            "Reopen State",
+            "Rollback State",
+            "Follow-Up Recommendation",
+            "Top Repos",
+            "Summary",
+        ],
+        action_sync_outcome_rows,
+    )
+    _write_hidden_table_sheet(
+        wb,
         "Data_Scenarios",
         "tblScenarios",
         ["Key", "Title", "Lens", "Repo Count", "Average Expected Lens Delta", "Projected Tier Promotions"],
@@ -4535,6 +4620,17 @@ def _build_hidden_data_sheets(
             "Intent Alignment Reason",
             "Scorecard Line",
             "Maturity Gap Summary",
+            "Action Sync Stage",
+            "Action Sync Reason",
+            "Suggested Campaign",
+            "Suggested Writeback Target",
+            "Action Sync Line",
+            "Apply Packet State",
+            "Apply Packet Summary",
+            "Apply Packet Command",
+            "Post-Apply State",
+            "Post-Apply Summary",
+            "Post-Apply Line",
         ],
         operator_queue_rows,
     )
@@ -4839,6 +4935,20 @@ def _build_campaigns(wb: Workbook, data: dict) -> None:
                 or (data.get("next_apply_candidate") or {}).get("preview_command")
                 or "No Action Sync command is recommended yet.",
             ),
+            (
+                "Post-Apply Monitoring",
+                (data.get("campaign_outcomes_summary") or {}).get(
+                    "summary",
+                    "No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.",
+                ),
+            ),
+            (
+                "Next Monitoring Step",
+                (data.get("next_monitoring_step") or {}).get(
+                    "summary",
+                    "Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.",
+                ),
+            ),
         ],
         title="Action Sync Readiness",
     )
@@ -4931,6 +5041,20 @@ def _build_writeback_audit(wb: Workbook, data: dict) -> None:
                 (data.get("next_apply_candidate") or {}).get("apply_command")
                 or (data.get("next_apply_candidate") or {}).get("preview_command")
                 or "No Action Sync command is recommended yet.",
+            ),
+            (
+                "Post-Apply Monitoring",
+                (data.get("campaign_outcomes_summary") or {}).get(
+                    "summary",
+                    "No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.",
+                ),
+            ),
+            (
+                "Next Monitoring Step",
+                (data.get("next_monitoring_step") or {}).get(
+                    "summary",
+                    "Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.",
+                ),
             ),
         ],
         title="Action Sync Readiness",
@@ -6724,6 +6848,16 @@ def _build_print_pack(
     ws["E12"] = weekly_pack.get(
         "action_sync_command_hint",
         "No Action Sync command is recommended yet.",
+    )
+    ws["D13"] = "Post-Apply Monitoring"
+    ws["E13"] = weekly_pack.get(
+        "campaign_outcomes_summary",
+        "No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.",
+    )
+    ws["D14"] = "Next Monitoring Step"
+    ws["E14"] = weekly_pack.get(
+        "next_monitoring_step",
+        "Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.",
     )
     ws["A7"] = "Portfolio Headline"
     ws["B7"] = weekly_pack.get("portfolio_headline", operator_summary.get("headline", "Review the latest workbook surfaces for change and drift."))

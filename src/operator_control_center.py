@@ -373,6 +373,7 @@ def build_operator_snapshot(
         current_generated_at=report_data.get("generated_at", ""),
     )
     queue = _attach_portfolio_catalog_context(queue, report_data)
+    from src.action_sync_outcomes import load_action_sync_outcomes_bundle
     from src.action_sync_packets import build_action_sync_packets_bundle
     from src.action_sync_readiness import build_action_sync_readiness_bundle
 
@@ -383,6 +384,8 @@ def build_operator_snapshot(
         action_sync.get("operator_queue", queue),
     )
     queue = action_sync_packets.get("operator_queue", action_sync.get("operator_queue", queue))
+    action_sync_outcomes = load_action_sync_outcomes_bundle(output_dir, report_data, queue)
+    queue = action_sync_outcomes.get("operator_queue", queue)
     follow_through = _build_follow_through_with_queue(resolution_trend, queue)
     raw_next_action = _next_operator_action(
         resolution_trend.get("primary_target") or (queue[0] if queue else {}),
@@ -902,6 +905,13 @@ def build_operator_snapshot(
         "top_ready_to_apply_packets": action_sync_packets["top_ready_to_apply_packets"],
         "top_needs_approval_packets": action_sync_packets["top_needs_approval_packets"],
         "top_review_drift_packets": action_sync_packets["top_review_drift_packets"],
+        "action_sync_outcomes": action_sync_outcomes["action_sync_outcomes"],
+        "campaign_outcomes_summary": action_sync_outcomes["campaign_outcomes_summary"],
+        "next_monitoring_step": action_sync_outcomes["next_monitoring_step"],
+        "top_monitor_now_campaigns": action_sync_outcomes["top_monitor_now_campaigns"],
+        "top_holding_clean_campaigns": action_sync_outcomes["top_holding_clean_campaigns"],
+        "top_reopened_campaigns": action_sync_outcomes["top_reopened_campaigns"],
+        "top_drift_returned_campaigns": action_sync_outcomes["top_drift_returned_campaigns"],
     }
     return {
         "operator_summary": summary,
@@ -917,9 +927,16 @@ def build_operator_snapshot(
         "action_sync_packets": action_sync_packets["action_sync_packets"],
         "apply_readiness_summary": action_sync_packets["apply_readiness_summary"],
         "next_apply_candidate": action_sync_packets["next_apply_candidate"],
+        "action_sync_outcomes": action_sync_outcomes["action_sync_outcomes"],
+        "campaign_outcomes_summary": action_sync_outcomes["campaign_outcomes_summary"],
+        "next_monitoring_step": action_sync_outcomes["next_monitoring_step"],
         "top_ready_to_apply_packets": action_sync_packets["top_ready_to_apply_packets"],
         "top_needs_approval_packets": action_sync_packets["top_needs_approval_packets"],
         "top_review_drift_packets": action_sync_packets["top_review_drift_packets"],
+        "top_monitor_now_campaigns": action_sync_outcomes["top_monitor_now_campaigns"],
+        "top_holding_clean_campaigns": action_sync_outcomes["top_holding_clean_campaigns"],
+        "top_reopened_campaigns": action_sync_outcomes["top_reopened_campaigns"],
+        "top_drift_returned_campaigns": action_sync_outcomes["top_drift_returned_campaigns"],
     }
 
 
@@ -960,6 +977,10 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
     if (summary.get("next_apply_candidate") or {}).get("preview_command") or (summary.get("next_apply_candidate") or {}).get("apply_command"):
         command_hint = (summary.get("next_apply_candidate") or {}).get("apply_command") or (summary.get("next_apply_candidate") or {}).get("preview_command")
         lines.append(f"*Action Sync Command Hint:* `{command_hint}`")
+    if (summary.get("campaign_outcomes_summary") or {}).get("summary"):
+        lines.append(f"*Post-Apply Monitoring:* {(summary.get('campaign_outcomes_summary') or {}).get('summary')}")
+    if (summary.get("next_monitoring_step") or {}).get("summary"):
+        lines.append(f"*Next Monitoring Step:* {(summary.get('next_monitoring_step') or {}).get('summary')}")
     if summary.get("trend_summary"):
         lines.append(f"*Trend:* {summary['trend_summary']}")
     if summary.get("accountability_summary"):

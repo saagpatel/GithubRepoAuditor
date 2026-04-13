@@ -219,6 +219,12 @@ class TestMarkdownReport:
                 "summary": "Preview Security Review next, then decide whether it is ready to apply to all.",
                 "preview_command": "audit testuser --campaign security-review --writeback-target all",
             },
+            "campaign_outcomes_summary": {
+                "summary": "Security Review was applied recently; monitor it now before treating it as stable.",
+            },
+            "next_monitoring_step": {
+                "summary": "Monitor Security Review for at least 2 post-apply runs before treating it as stable.",
+            },
             "top_preview_ready_campaigns": [
                 {
                     "label": "Security Review",
@@ -239,6 +245,7 @@ class TestMarkdownReport:
                 "recommended_action": "Review the repo detail page.",
                 "action_sync_line": "Action Sync: Security Review is preview-ready — recommended target all.",
                 "apply_packet_line": "Apply Packet: Security Review is the best campaign to preview next before deciding on apply to all. Command: audit testuser --campaign security-review --writeback-target all",
+                "post_apply_line": "Post-Apply Monitoring: Security Review was applied recently; monitor it now before treating it as stable.",
             }
         ]
 
@@ -250,6 +257,8 @@ class TestMarkdownReport:
         assert "Apply Packet" in content
         assert "Next Apply Candidate" in content
         assert "Action Sync Command Hint" in content
+        assert "Post-Apply Monitoring" in content
+        assert "Next Monitoring Step" in content
         assert "Preview Ready" in content
         assert "recommended target all" in content
 

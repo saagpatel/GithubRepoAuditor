@@ -8,6 +8,7 @@ from src.models import AnalyzerResult, RepoMetadata
 from src.scorer import WEIGHTS, score_repo
 from src.warehouse import (
     load_campaign_history,
+    load_campaign_outcomes,
     load_latest_audit_runs,
     load_latest_campaign_state,
     load_latest_operator_state,
@@ -248,6 +249,40 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
             "recent_regression_examples": [{"repo": "warehouse-repo", "title": "warehouse regression"}],
         }
     )
+    report.action_sync_outcomes = [
+        {
+            "campaign_type": "promotion-push",
+            "label": "Promotion Push",
+            "latest_target": "github",
+            "latest_run_mode": "apply",
+            "recent_apply_count": 1,
+            "monitored_repo_count": 1,
+            "monitoring_state": "monitor-now",
+            "pressure_effect": "flat",
+            "drift_state": "clear",
+            "reopen_state": "none",
+            "rollback_state": "ready",
+            "follow_up_recommendation": "Monitor Promotion Push for at least 2 post-apply runs before treating it as stable.",
+            "top_repos": ["user/warehouse-repo"],
+            "summary": "Promotion Push was applied recently; monitor it now before treating it as stable.",
+        }
+    ]
+    report.campaign_outcomes_summary = {
+        "summary": "Promotion Push was applied recently; monitor it now before treating it as stable.",
+        "counts": {"monitor-now": 1},
+    }
+    report.next_monitoring_step = {
+        "campaign_type": "promotion-push",
+        "monitoring_state": "monitor-now",
+        "summary": "Monitor Promotion Push for at least 2 post-apply runs before treating it as stable.",
+    }
+    report.operator_summary.update(
+        {
+            "action_sync_outcomes": report.action_sync_outcomes,
+            "campaign_outcomes_summary": report.campaign_outcomes_summary,
+            "next_monitoring_step": report.next_monitoring_step,
+        }
+    )
     db_path = write_warehouse_snapshot(report, tmp_path)
 
     conn = sqlite3.connect(db_path)
@@ -262,6 +297,7 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
         provider_rows = conn.execute("SELECT COUNT(*) FROM security_providers").fetchone()[0]
         recommendation_rows = conn.execute("SELECT COUNT(*) FROM security_recommendations").fetchone()[0]
         campaign_history_rows = conn.execute("SELECT COUNT(*) FROM campaign_history").fetchone()[0]
+        campaign_outcome_rows = conn.execute("SELECT COUNT(*) FROM campaign_outcomes").fetchone()[0]
         catalog_rows = conn.execute("SELECT COUNT(*) FROM portfolio_catalog_entries").fetchone()[0]
         scorecard_rows = conn.execute("SELECT COUNT(*) FROM repo_scorecards").fetchone()[0]
     finally:
@@ -277,9 +313,11 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     assert provider_rows >= 1
     assert recommendation_rows >= 1
     assert campaign_history_rows == 1
+    assert campaign_outcome_rows == 1
     assert catalog_rows == 1
     assert scorecard_rows == 1
 
+    campaign_outcomes = load_campaign_outcomes(tmp_path, "user", limit=5)
     history = load_campaign_history(tmp_path, "promotion-push")
     recent_campaign_history = load_recent_campaign_history(tmp_path, "user", limit=5)
     latest_state = load_latest_campaign_state(tmp_path, "promotion-push")
@@ -298,8 +336,11 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     assert latest_runs[0]["portfolio_outcomes_summary"]["summary"].startswith("Managed action closure")
     assert latest_runs[0]["operator_effectiveness_summary"]["summary"].startswith("recommendation validation")
     assert latest_runs[0]["high_pressure_queue_history"][0]["high_pressure_count"] == 1
+    assert latest_runs[0]["campaign_outcomes_summary"]["summary"].startswith("Promotion Push was applied recently")
     assert latest_runs[0]["baseline_signature"] == report.baseline_signature
     assert latest_runs[0]["baseline_context"]["portfolio_baseline_size"] == 1
+    assert campaign_outcomes[0]["campaign_type"] == "promotion-push"
+    assert campaign_outcomes[0]["monitoring_state"] == "monitor-now"
     assert review_history[0]["review_id"] == "review-1"
     assert watch_checkpoint["filter_signature"] == "abc123"
     assert operator_state["operator_summary"]["headline"] == "Campaign work is ready for review."
@@ -310,4 +351,20 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     assert operator_state["portfolio_outcomes_summary"]["summary"].startswith("Managed action closure")
     assert operator_state["operator_effectiveness_summary"]["summary"].startswith("recommendation validation")
     assert operator_state["high_pressure_queue_history"][0]["high_pressure_count"] == 1
+    assert operator_state["campaign_outcomes_summary"]["summary"].startswith("Promotion Push was applied recently")
     assert recent_campaign_history[0]["action_id"] == "promotion-push-abc123"
+
+
+def test_write_warehouse_snapshot_defaults_empty_campaign_outcomes_for_older_style_rows(tmp_path):
+    audit = score_repo(_make_metadata(), _make_results())
+
+    from src.models import AuditReport
+
+    report = AuditReport.from_audits("user", [audit], [], 1)
+    write_warehouse_snapshot(report, tmp_path)
+
+    latest_runs = load_latest_audit_runs(tmp_path, "user", limit=1)
+    operator_state = load_latest_operator_state(tmp_path, "user")
+
+    assert latest_runs[0]["campaign_outcomes_summary"] == {}
+    assert operator_state["campaign_outcomes_summary"] == {}
