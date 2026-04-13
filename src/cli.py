@@ -92,6 +92,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Directory for output files (default: output/)",
     )
     parser.add_argument(
+        "--catalog",
+        type=Path,
+        default=None,
+        help="Path to portfolio-catalog.yaml for local repo ownership and lifecycle contracts",
+    )
+    parser.add_argument(
         "--skip-forks",
         action="store_true",
         help="Exclude forked repos from the audit",
@@ -542,6 +548,8 @@ def _audit_from_dict(data: dict) -> RepoAudit:
         hotspots=data.get("hotspots", []),
         action_candidates=data.get("action_candidates", []),
         security_posture=data.get("security_posture", {}),
+        score_explanation=data.get("score_explanation", {}),
+        portfolio_catalog=data.get("portfolio_catalog", {}),
     )
 
 
@@ -608,8 +616,71 @@ def _report_from_dict(data: dict) -> AuditReport:
         watch_state=data.get("watch_state", {}),
         operator_summary=data.get("operator_summary", {}),
         operator_queue=data.get("operator_queue", []),
+        portfolio_catalog_summary=data.get("portfolio_catalog_summary", {}),
+        intent_alignment_summary=data.get("intent_alignment_summary", {}),
         reconciliation=reconciliation,
     )
+
+
+def _apply_portfolio_catalog(report: AuditReport, args) -> AuditReport:
+    from src.portfolio_catalog import (
+        DEFAULT_CATALOG_PATH,
+        build_catalog_line,
+        build_intent_alignment_summary,
+        build_portfolio_catalog_summary,
+        catalog_entry_for_repo,
+        evaluate_intent_alignment,
+        load_portfolio_catalog,
+    )
+    from src.report_enrichment import build_operator_focus
+
+    catalog_path = getattr(args, "catalog", None) or DEFAULT_CATALOG_PATH
+    catalog_data = load_portfolio_catalog(Path(catalog_path))
+    queue_by_repo = {
+        str(item.get("repo") or item.get("repo_name") or "").strip(): item
+        for item in (report.operator_queue or [])
+        if str(item.get("repo") or item.get("repo_name") or "").strip()
+    }
+
+    for audit in report.audits:
+        metadata = audit.metadata.to_dict()
+        base_entry = catalog_entry_for_repo(metadata, catalog_data)
+        focus_source = queue_by_repo.get(audit.metadata.name, {})
+        operator_focus = build_operator_focus(focus_source)
+        intent_alignment, intent_alignment_reason = evaluate_intent_alignment(
+            base_entry,
+            completeness_tier=audit.completeness_tier,
+            archived=audit.metadata.archived,
+            operator_focus=operator_focus,
+        )
+        audit.portfolio_catalog = {
+            **base_entry,
+            "catalog_line": build_catalog_line(base_entry),
+            "intent_alignment": intent_alignment,
+            "intent_alignment_reason": intent_alignment_reason,
+            "intent_alignment_line": f"{intent_alignment}: {intent_alignment_reason}",
+            "operator_focus": operator_focus,
+        }
+
+    audit_lookup = {audit.metadata.name: audit.portfolio_catalog for audit in report.audits}
+    for item in report.operator_queue:
+        repo_name = str(item.get("repo") or item.get("repo_name") or "").strip()
+        catalog_entry = audit_lookup.get(repo_name, {})
+        if catalog_entry:
+            item["portfolio_catalog"] = dict(catalog_entry)
+            item["catalog_line"] = catalog_entry.get("catalog_line", "")
+            item["intent_alignment"] = catalog_entry.get("intent_alignment", "missing-contract")
+            item["intent_alignment_reason"] = catalog_entry.get("intent_alignment_reason", "")
+
+    report.portfolio_catalog_summary = build_portfolio_catalog_summary(
+        report.audits,
+        catalog_path=str(catalog_path),
+    )
+    report.portfolio_catalog_summary["catalog_exists"] = catalog_data.get("exists", False)
+    report.portfolio_catalog_summary["errors"] = catalog_data.get("errors", [])
+    report.portfolio_catalog_summary["warnings"] = catalog_data.get("warnings", [])
+    report.intent_alignment_summary = build_intent_alignment_summary(report.audits)
+    return report
 
 
 def _load_latest_report(output_dir: Path) -> tuple[Path | None, dict | None]:
@@ -1331,6 +1402,13 @@ def _print_control_center_summary(snapshot: dict) -> None:
             print(f"    {item.get('summary', '')}")
             print(f"    Why: {item.get('lane_reason', item.get('lane_label', ''))}")
             print(f"    Next: {item.get('recommended_action', '')}")
+            if item.get("catalog_line"):
+                print(f"    Catalog: {item.get('catalog_line')}")
+            if item.get("intent_alignment"):
+                print(
+                    "    Intent alignment: "
+                    f"{item.get('intent_alignment')} ({item.get('intent_alignment_reason', 'No alignment reason is recorded yet.')})"
+                )
     if recent_changes:
         print("\nRecently Changed")
         for item in recent_changes[:5]:
@@ -1777,6 +1855,7 @@ def _write_report_outputs(
         portfolio_profile=args.portfolio_profile,
         collection=args.collection,
     )
+    report = _apply_portfolio_catalog(report, args)
     report.run_change_summary = build_run_change_summary(diff_dict)
     report.run_change_counts = build_run_change_counts(diff_dict)
     report_data = report.to_dict()

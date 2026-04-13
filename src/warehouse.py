@@ -7,7 +7,7 @@ from pathlib import Path
 from src.models import AuditReport
 
 WAREHOUSE_FILENAME = "portfolio-warehouse.db"
-WAREHOUSE_SCHEMA_VERSION = 7
+WAREHOUSE_SCHEMA_VERSION = 8
 
 
 def write_warehouse_snapshot(
@@ -56,6 +56,8 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             security_summary_json TEXT NOT NULL,
             security_governance_preview_json TEXT NOT NULL,
             collections_json TEXT NOT NULL,
+            portfolio_catalog_summary_json TEXT NOT NULL DEFAULT '{}',
+            intent_alignment_summary_json TEXT NOT NULL DEFAULT '{}',
             scenario_summary_json TEXT NOT NULL,
             campaign_summary_json TEXT NOT NULL DEFAULT '{}',
             writeback_preview_json TEXT NOT NULL DEFAULT '{}',
@@ -409,6 +411,23 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             projected_tier_promotions INTEGER NOT NULL,
             PRIMARY KEY (run_id, lever_key)
         );
+
+        CREATE TABLE IF NOT EXISTS portfolio_catalog_entries (
+            run_id TEXT NOT NULL,
+            repo_id TEXT NOT NULL,
+            owner TEXT NOT NULL,
+            team TEXT NOT NULL,
+            purpose TEXT NOT NULL,
+            lifecycle_state TEXT NOT NULL,
+            criticality TEXT NOT NULL,
+            review_cadence TEXT NOT NULL,
+            intended_disposition TEXT NOT NULL,
+            notes TEXT NOT NULL,
+            intent_alignment TEXT NOT NULL,
+            intent_alignment_reason TEXT NOT NULL,
+            catalog_line TEXT NOT NULL,
+            PRIMARY KEY (run_id, repo_id)
+        );
         """
     )
     conn.execute(
@@ -432,6 +451,8 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     _ensure_column(conn, "audit_runs", "preflight_summary_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(conn, "audit_runs", "baseline_signature", "TEXT NOT NULL DEFAULT ''")
     _ensure_column(conn, "audit_runs", "baseline_context_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(conn, "audit_runs", "portfolio_catalog_summary_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(conn, "audit_runs", "intent_alignment_summary_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(conn, "audit_runs", "review_summary_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(conn, "audit_runs", "review_alerts_json", "TEXT NOT NULL DEFAULT '[]'")
     _ensure_column(conn, "audit_runs", "material_changes_json", "TEXT NOT NULL DEFAULT '[]'")
@@ -467,13 +488,14 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             total_repos, repos_audited, average_score, portfolio_baseline_size, baseline_signature, baseline_context_json,
             tier_distribution_json, language_distribution_json, lens_summary_json,
             security_summary_json, security_governance_preview_json, collections_json, scenario_summary_json,
+            portfolio_catalog_summary_json, intent_alignment_summary_json,
             campaign_summary_json, writeback_preview_json, writeback_results_json,
             managed_state_drift_json, rollback_preview_json, campaign_history_json,
             governance_preview_json, governance_approval_json, governance_results_json,
             governance_history_json, governance_drift_json, governance_summary_json, review_summary_json, review_alerts_json,
             preflight_summary_json, material_changes_json, review_targets_json, review_history_json, watch_state_json,
             operator_summary_json, operator_queue_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             run_id,
@@ -496,6 +518,8 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             json.dumps(report.security_governance_preview),
             json.dumps(report.collections),
             json.dumps(report.scenario_summary),
+            json.dumps(report.portfolio_catalog_summary),
+            json.dumps(report.intent_alignment_summary),
             json.dumps(report.campaign_summary),
             json.dumps(report.writeback_preview),
             json.dumps(report.writeback_results),
@@ -803,6 +827,33 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
                     action.get("expected_tier_movement", ""),
                     action.get("rationale", ""),
                     action.get("action", ""),
+                ),
+            )
+
+        portfolio_catalog = audit.portfolio_catalog or {}
+        if portfolio_catalog:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO portfolio_catalog_entries (
+                    run_id, repo_id, owner, team, purpose, lifecycle_state, criticality,
+                    review_cadence, intended_disposition, notes, intent_alignment,
+                    intent_alignment_reason, catalog_line
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run_id,
+                    repo_id,
+                    portfolio_catalog.get("owner", ""),
+                    portfolio_catalog.get("team", ""),
+                    portfolio_catalog.get("purpose", ""),
+                    portfolio_catalog.get("lifecycle_state", ""),
+                    portfolio_catalog.get("criticality", ""),
+                    portfolio_catalog.get("review_cadence", ""),
+                    portfolio_catalog.get("intended_disposition", ""),
+                    portfolio_catalog.get("notes", ""),
+                    portfolio_catalog.get("intent_alignment", ""),
+                    portfolio_catalog.get("intent_alignment_reason", ""),
+                    portfolio_catalog.get("catalog_line", ""),
                 ),
             )
 
@@ -1393,7 +1444,7 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
             """
             SELECT run_id, username, generated_at, run_mode, scoring_profile,
                    portfolio_baseline_size, baseline_signature, baseline_context_json, report_path, preflight_summary_json,
-                   governance_summary_json,
+                   governance_summary_json, portfolio_catalog_summary_json, intent_alignment_summary_json,
                    review_summary_json, operator_summary_json
             FROM audit_runs
             WHERE username = ?
@@ -1419,6 +1470,8 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
                 "report_path": row["report_path"],
                 "preflight_summary": json.loads(row["preflight_summary_json"] or "{}"),
                 "governance_summary": json.loads(row["governance_summary_json"] or "{}"),
+                "portfolio_catalog_summary": json.loads(row["portfolio_catalog_summary_json"] or "{}"),
+                "intent_alignment_summary": json.loads(row["intent_alignment_summary_json"] or "{}"),
                 "review_summary": json.loads(row["review_summary_json"] or "{}"),
                 "operator_summary": json.loads(row["operator_summary_json"] or "{}"),
             }
@@ -1487,7 +1540,7 @@ def load_latest_operator_state(output_dir: Path, username: str) -> dict | None:
             """
             SELECT run_id, generated_at, report_path, preflight_summary_json,
                    baseline_signature, baseline_context_json,
-                   governance_summary_json,
+                   governance_summary_json, portfolio_catalog_summary_json, intent_alignment_summary_json,
                    review_summary_json, review_alerts_json, material_changes_json,
                    review_targets_json, review_history_json, watch_state_json,
                    operator_summary_json, operator_queue_json
@@ -1510,6 +1563,8 @@ def load_latest_operator_state(output_dir: Path, username: str) -> dict | None:
         "baseline_context": json.loads(row["baseline_context_json"] or "{}"),
         "preflight_summary": json.loads(row["preflight_summary_json"] or "{}"),
         "governance_summary": json.loads(row["governance_summary_json"] or "{}"),
+        "portfolio_catalog_summary": json.loads(row["portfolio_catalog_summary_json"] or "{}"),
+        "intent_alignment_summary": json.loads(row["intent_alignment_summary_json"] or "{}"),
         "review_summary": json.loads(row["review_summary_json"] or "{}"),
         "review_alerts": json.loads(row["review_alerts_json"] or "[]"),
         "material_changes": json.loads(row["material_changes_json"] or "[]"),

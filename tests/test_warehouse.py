@@ -190,6 +190,22 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
             "links": [],
         }
     ]
+    audit.portfolio_catalog = {
+        "has_explicit_entry": True,
+        "owner": "d",
+        "team": "operator-loop",
+        "purpose": "warehouse verification",
+        "lifecycle_state": "active",
+        "criticality": "high",
+        "review_cadence": "weekly",
+        "intended_disposition": "maintain",
+        "notes": "",
+        "intent_alignment": "aligned",
+        "intent_alignment_reason": "The repo is holding a maintain posture without urgent or revalidation pressure.",
+        "catalog_line": "operator-loop | warehouse verification | lifecycle active | criticality high | cadence weekly | disposition maintain",
+    }
+    report.portfolio_catalog_summary = {"summary": "1/1 repos have an explicit catalog contract."}
+    report.intent_alignment_summary = {"summary": "1 aligned, 0 needing review, and 0 missing a contract."}
     db_path = write_warehouse_snapshot(report, tmp_path)
 
     conn = sqlite3.connect(db_path)
@@ -204,6 +220,7 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
         provider_rows = conn.execute("SELECT COUNT(*) FROM security_providers").fetchone()[0]
         recommendation_rows = conn.execute("SELECT COUNT(*) FROM security_recommendations").fetchone()[0]
         campaign_history_rows = conn.execute("SELECT COUNT(*) FROM campaign_history").fetchone()[0]
+        catalog_rows = conn.execute("SELECT COUNT(*) FROM portfolio_catalog_entries").fetchone()[0]
     finally:
         conn.close()
 
@@ -217,6 +234,7 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     assert provider_rows >= 1
     assert recommendation_rows >= 1
     assert campaign_history_rows == 1
+    assert catalog_rows == 1
 
     history = load_campaign_history(tmp_path, "promotion-push")
     latest_state = load_latest_campaign_state(tmp_path, "promotion-push")
@@ -228,9 +246,12 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     assert latest_state["actions"]["promotion-push-abc123"]["repo_full_name"] == "user/warehouse-repo"
     assert latest_runs[0]["review_summary"]["review_id"] == "review-1"
     assert latest_runs[0]["governance_summary"]["status"] == "blocked"
+    assert latest_runs[0]["portfolio_catalog_summary"]["summary"] == "1/1 repos have an explicit catalog contract."
+    assert latest_runs[0]["intent_alignment_summary"]["summary"] == "1 aligned, 0 needing review, and 0 missing a contract."
     assert latest_runs[0]["baseline_signature"] == report.baseline_signature
     assert latest_runs[0]["baseline_context"]["portfolio_baseline_size"] == 1
     assert review_history[0]["review_id"] == "review-1"
     assert watch_checkpoint["filter_signature"] == "abc123"
     assert operator_state["operator_summary"]["headline"] == "Campaign work is ready for review."
     assert operator_state["governance_summary"]["needs_reapproval"] is True
+    assert operator_state["portfolio_catalog_summary"]["summary"] == "1/1 repos have an explicit catalog contract."

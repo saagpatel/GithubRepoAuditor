@@ -352,6 +352,7 @@ def build_operator_snapshot(
         resolution_trend=resolution_trend,
         current_generated_at=report_data.get("generated_at", ""),
     )
+    queue = _attach_portfolio_catalog_context(queue, report_data)
     follow_through = _build_follow_through_with_queue(resolution_trend, queue)
     raw_next_action = _next_operator_action(
         resolution_trend.get("primary_target") or (queue[0] if queue else {}),
@@ -1106,6 +1107,13 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
             lines.append(f"- {repo}{item['title']} — {item['summary']}")
             lines.append(f"  Why this lane: {item.get('lane_reason', item.get('lane_label', LANE_LABELS.get(item['lane'], item['lane'])))}")
             lines.append(f"  Action: {item['recommended_action']}")
+            if item.get("catalog_line"):
+                lines.append(f"  Catalog: {item['catalog_line']}")
+            if item.get("intent_alignment"):
+                lines.append(
+                    f"  Intent Alignment: {item.get('intent_alignment')} — "
+                    f"{item.get('intent_alignment_reason', 'No alignment reason is recorded yet.')}"
+                )
         lines.append("")
     recent_changes = snapshot.get("operator_recent_changes") or []
     if recent_changes:
@@ -34138,6 +34146,42 @@ def _format_intervention(intervention: dict) -> str:
     if subject:
         return f"{when} — {event_type} for {subject} ({outcome})"
     return f"{when} — {event_type} ({outcome})"
+
+
+def _attach_portfolio_catalog_context(queue: list[dict], report_data: dict) -> list[dict]:
+    from src.portfolio_catalog import build_catalog_line, evaluate_intent_alignment
+    from src.report_enrichment import build_operator_focus
+
+    audits_by_name = {
+        str((audit.get("metadata") or {}).get("name", "")).strip(): audit
+        for audit in (report_data.get("audits") or [])
+        if str((audit.get("metadata") or {}).get("name", "")).strip()
+    }
+    enriched: list[dict] = []
+    for item in queue:
+        repo_name = str(item.get("repo") or item.get("repo_name") or "").strip()
+        audit = audits_by_name.get(repo_name)
+        if not audit:
+            enriched.append(item)
+            continue
+        catalog_entry = dict(audit.get("portfolio_catalog") or {})
+        if not catalog_entry:
+            enriched.append(item)
+            continue
+        operator_focus = build_operator_focus(item)
+        intent_alignment, intent_alignment_reason = evaluate_intent_alignment(
+            catalog_entry,
+            completeness_tier=str(audit.get("completeness_tier", "")),
+            archived=bool((audit.get("metadata") or {}).get("archived")),
+            operator_focus=operator_focus,
+        )
+        enriched_item = dict(item)
+        enriched_item["portfolio_catalog"] = catalog_entry
+        enriched_item["catalog_line"] = catalog_entry.get("catalog_line") or build_catalog_line(catalog_entry)
+        enriched_item["intent_alignment"] = intent_alignment
+        enriched_item["intent_alignment_reason"] = intent_alignment_reason
+        enriched.append(enriched_item)
+    return enriched
 
 
 def _recent_validation_outcomes_line(outcomes: list[dict]) -> str:
