@@ -49,6 +49,34 @@ from src.reporter import (
 from src.scorer import score_repo
 
 ANALYSIS_WORKERS = 4
+CLI_MODE_GUIDE = """GitHub portfolio operating system with four product modes:
+  First Run     setup, baseline creation, first workbook, first control-center read
+  Weekly Review normal workbook-first operator loop
+  Deep Dive     repo-level drilldown and investigation
+  Action Sync   campaign, writeback, GitHub Projects, and Notion mirroring
+
+Recommended defaults:
+  - Start with --doctor before the first real run
+  - Prefer --excel-mode standard for the stable workbook path
+  - Use --control-center for read-only daily triage
+  - Treat campaigns, writeback, catalog overrides, scorecards overrides, and GitHub Projects as advanced workflows"""
+
+CLI_MODE_EXAMPLES = """Examples by mode:
+  First Run:
+    audit <github-username> --doctor
+    audit <github-username> --html
+    audit <github-username> --control-center
+
+  Weekly Review:
+    audit <github-username> --html
+    audit <github-username> --control-center
+
+  Deep Dive:
+    audit <github-username> --repos <repo-name> --html
+
+  Action Sync:
+    audit <github-username> --campaign security-review --writeback-target github
+    audit <github-username> --campaign security-review --writeback-target all --github-projects"""
 
 
 def _date_str(dt: datetime) -> str:
@@ -75,7 +103,9 @@ def _gh_auth_token() -> str | None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="github-repo-auditor",
-        description="Audit all GitHub repos for a user and generate a structured report.",
+        description=CLI_MODE_GUIDE,
+        epilog=CLI_MODE_EXAMPLES,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "username",
@@ -606,6 +636,11 @@ def _report_from_dict(data: dict) -> AuditReport:
         schema_version=data.get("schema_version", "3.7"),
         lenses=data.get("lenses", {}),
         hotspots=data.get("hotspots", []),
+        implementation_hotspots=data.get("implementation_hotspots", []),
+        implementation_hotspots_summary=data.get("implementation_hotspots_summary", {}),
+        portfolio_outcomes_summary=data.get("portfolio_outcomes_summary", {}),
+        operator_effectiveness_summary=data.get("operator_effectiveness_summary", {}),
+        high_pressure_queue_history=data.get("high_pressure_queue_history", []),
         security_posture=data.get("security_posture", {}),
         security_governance_preview=data.get("security_governance_preview", []),
         collections=data.get("collections", {}),
@@ -761,6 +796,27 @@ def _report_artifact_datetime(report_path: Path | None, fallback: datetime) -> d
             if parsed:
                 return parsed
     return fallback
+
+
+def _doctor_next_step_hint(username: str) -> str:
+    return (
+        f"Next step: run `audit {username} --html` for the standard workbook, then "
+        f"`audit {username} --control-center` for read-only weekly triage."
+    )
+
+
+def _control_center_next_step_hint() -> str:
+    return (
+        "Reading order: workbook Dashboard -> Run Changes -> Review Queue -> Repo Detail. "
+        "Move into Action Sync only when the local weekly story is already settled."
+    )
+
+
+def _normal_audit_next_step_hint(username: str) -> str:
+    return (
+        f"Next step: open the standard workbook first, then run `audit {username} --control-center` "
+        "for the read-only operator queue."
+    )
 
 
 def _print_control_center_summary(snapshot: dict) -> None:
@@ -1869,6 +1925,9 @@ def _enrich_report_with_operator_state(
     report.watch_state = normalized.get("watch_state", {})
     report.operator_summary = snapshot.get("operator_summary", {})
     report.operator_queue = snapshot.get("operator_queue", [])
+    report.portfolio_outcomes_summary = snapshot.get("portfolio_outcomes_summary", {})
+    report.operator_effectiveness_summary = snapshot.get("operator_effectiveness_summary", {})
+    report.high_pressure_queue_history = snapshot.get("high_pressure_queue_history", [])
     return report
 
 
@@ -2167,6 +2226,7 @@ def _print_output_summary(
         f"{outputs['pdf_info']}"
         f"{outputs['review_pack_info']}",
     )
+    print_info(_normal_audit_next_step_hint(report.username))
 
 
 # ── Partial run modes ─────────────────────────────────────────────────
@@ -2512,11 +2572,21 @@ def main() -> None:
     if args.writeback_apply and not args.writeback_target:
         parser.error("--writeback-apply requires --writeback-target")
     if args.writeback_target and not args.campaign:
-        parser.error("--writeback-target requires --campaign")
+        parser.error(
+            "--writeback-target belongs to Action Sync mode. Add --campaign <name> before choosing a writeback target."
+        )
     if args.github_projects and not args.campaign:
-        parser.error("--github-projects requires --campaign")
+        parser.error(
+            "--github-projects belongs to Action Sync mode. Add --campaign <name> before enabling GitHub Projects mirroring."
+        )
     if args.github_projects and args.writeback_target not in {"github", "all"}:
-        parser.error("--github-projects requires --writeback-target github or all")
+        parser.error(
+            "--github-projects only runs inside Action Sync with --writeback-target github or all."
+        )
+    if args.control_center and (args.campaign or args.writeback_target or args.writeback_apply or args.github_projects):
+        parser.error(
+            "--control-center is the read-only Weekly Review entrypoint. Remove campaign/writeback flags or run a normal audit for Action Sync."
+        )
 
     if args.doctor:
         result = run_diagnostics(args, config_inspection=config_inspection, full=True)
@@ -2524,6 +2594,7 @@ def main() -> None:
         artifact_path = write_diagnostics_report(result, output_dir, args.username)
         print(format_diagnostics_report(result))
         print_info(f"Diagnostics artifact: {artifact_path}")
+        print_info(_doctor_next_step_hint(args.username))
         if result.blocking_errors:
             raise SystemExit(1)
         return
@@ -2589,6 +2660,7 @@ def main() -> None:
         _print_control_center_summary(snapshot)
         print_info(f"Control center JSON: {json_artifact}")
         print_info(f"Control center Markdown: {md_artifact}")
+        print_info(_control_center_next_step_hint())
         return
 
     # ── Improvement campaign workflow (standalone, no audit needed) ────

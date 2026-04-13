@@ -15,51 +15,34 @@ Today the project is best understood as a GitHub portfolio operating system:
 
 ## What This Project Is Today
 
-This project started as a repo auditing tool and has grown into a portfolio operating system for GitHub work.
+This project started as a repo auditing tool and has grown into a workbook-first GitHub portfolio operating system.
 
-Today it can:
+Today it:
 
-- audit repositories across documentation, testing, CI, dependencies, activity, security, structure, community profile, completeness, and interest signals
-- score repos on dual axes, classify them into useful tiers, and surface quick wins that move each repo forward
-- generate multiple operator-facing outputs from the same audit facts: JSON, Markdown, HTML dashboard, and Excel workbook
-- keep historical state in SQLite so you can compare runs, detect regressions, and support incremental and watch-mode workflows
-- provide a read-only `--control-center` workflow that turns the latest audit state into a practical queue of what needs attention now, what is blocked, and what can safely wait
-- support workbook-based review with a stable `standard` mode, optional `template` mode, and a workbook release gate for changes that touch Excel surfaces
-- build repo drilldowns and weekly review packs that mirror the same story across workbook, HTML, and Markdown
-- track follow-through, escalation, recovery, rebuild, reacquisition, and confidence step-down so the operator loop can show not just what to do next, but whether it is actually working
-- sync selected audit and campaign signals into Notion when that integration is enabled
+- audits repositories across documentation, testing, CI, dependencies, activity, security, structure, community profile, completeness, and interest signals
+- scores repos on dual axes, classifies them into useful tiers, and surfaces quick wins
+- generates aligned JSON, Markdown, HTML, workbook, review-pack, and control-center outputs from the same audit facts
+- preserves historical state in SQLite so the operator loop can show change, regression, recovery, and follow-through
+- keeps the workbook and `--control-center` as the main day-to-day operating surfaces
 
 If you are new here, the simplest way to think about it is: this project tells you which repos are healthy, which ones are drifting, and what to look at next.
 
-## How It Helps Right Now
+## Mode Map
 
-If you already have a lot of repos, the hard part is usually not gathering data. The hard part is deciding:
+The product now works best when you use one of four explicit modes:
 
-- which projects are healthy enough to leave alone
-- which ones are close enough to finishing that they deserve focus
-- which recommendations were already attempted
-- whether a repo is actually recovering or only looks calmer for the moment
-- what one thing is worth doing this week
+- `First Run` for setup, baseline creation, the first workbook, and the first control-center read
+- `Weekly Review` for the normal ongoing operator loop
+- `Deep Dive` for repo-level investigation and implementation hotspots
+- `Action Sync` for campaigns, writeback, GitHub Projects, and Notion mirroring
 
-This project helps with that by turning raw repo inspection into a practical review loop:
+The flags stay the same underneath. The modes are the easiest way to understand when to use which workflow.
 
-- `--doctor` catches setup, config, workbook, and baseline issues before you waste time on a run
-- the main audit gives you a full portfolio snapshot
-- the workbook gives you the big-picture and one-repo drilldown views
-- `--control-center` gives you a read-only action queue from the latest state
-- the follow-through and review-pack layers tell you whether earlier recommendations are still active, recovering, softening, or resolved
+See [docs/modes.md](/Users/d/Projects/GithubRepoAuditor/docs/modes.md) for the canonical mode guide.
 
-## 5-Minute Review
+## Recommended Default Path
 
-If you just want to understand the product quickly:
-
-```bash
-make demo
-```
-
-That generates a demo JSON report, HTML dashboard, workbook, and control-center artifact in `output/demo/` from the committed fixture at [fixtures/demo/sample-report.json](/Users/d/Projects/GithubRepoAuditor/fixtures/demo/sample-report.json).
-
-For the real workflow, the fastest review loop is:
+If you are starting fresh, use this sequence:
 
 ```bash
 audit <github-username> --doctor
@@ -67,7 +50,8 @@ audit <github-username> --html
 audit <github-username> --control-center
 ```
 
-Then open the workbook and move in this order:
+Then open the workbook and read it in this order:
+
 - `Dashboard`
 - `Run Changes`
 - `Review Queue`
@@ -75,7 +59,49 @@ Then open the workbook and move in this order:
 - `Repo Detail`
 - `Executive Summary`
 
-If one repo needs a deeper decision, use `Repo Detail`. If you want the short shareable operator story, use the weekly review pack and `Executive Summary`.
+That is the default path the product is optimized around.
+
+## Commands By Mode
+
+### First Run
+
+```bash
+audit <github-username> --doctor
+audit <github-username> --html
+audit <github-username> --control-center
+```
+
+### Weekly Review
+
+```bash
+audit <github-username> --html
+audit <github-username> --control-center
+```
+
+### Deep Dive
+
+```bash
+audit <github-username> --html --repos <repo-name>
+audit <github-username> --control-center
+```
+
+### Action Sync
+
+```bash
+audit <github-username> --campaign security-review --writeback-target github
+audit <github-username> --campaign security-review --writeback-target all --github-projects
+```
+
+Treat campaign/writeback, GitHub Projects, Notion sync, catalog overrides, scorecards overrides, and `--excel-mode template` as advanced paths.
+
+## Demo and Guides
+
+- Demo fixture: [fixtures/demo/sample-report.json](/Users/d/Projects/GithubRepoAuditor/fixtures/demo/sample-report.json)
+- Product modes: [docs/modes.md](/Users/d/Projects/GithubRepoAuditor/docs/modes.md)
+- Weekly operator workflow: [docs/weekly-review.md](/Users/d/Projects/GithubRepoAuditor/docs/weekly-review.md)
+- Operator troubleshooting: [docs/operator-troubleshooting.md](/Users/d/Projects/GithubRepoAuditor/docs/operator-troubleshooting.md)
+- Workbook tour: [docs/workbook-tour.md](/Users/d/Projects/GithubRepoAuditor/docs/workbook-tour.md)
+- Extending analyzers: [docs/extending-analyzers.md](/Users/d/Projects/GithubRepoAuditor/docs/extending-analyzers.md)
 
 ## Features
 
@@ -117,29 +143,20 @@ python3 -m pip install -e ".[dev,config]"
 ### Run
 
 ```bash
-# Doctor mode — validate setup before auditing
+# Doctor mode — recommended first step
 audit <github-username> --doctor
 
-# Control center — daily read-only triage from the latest state
-audit <github-username> --control-center
-
-# Watch mode — let the tool choose full vs incremental each cycle
-audit <github-username> --watch --watch-strategy adaptive
-
-# Audit a GitHub user's repos
-audit <github-username>
-
-# Generate the native workbook + HTML dashboard
+# Weekly Review — generate the native workbook + HTML dashboard
 audit <github-username> --html
 
-# Optional curated presentation workbook path
-audit <github-username> --html --excel-mode template
+# Weekly Review — daily read-only triage from the latest state
+audit <github-username> --control-center
 
-# Dry run — no cloning, no writes
-audit <github-username> --dry-run
+# Deep Dive — targeted repo rerun merged into the latest baseline
+audit <github-username> --repos <repo-name> --html
 
-# Supported fallback if you prefer module execution
-python -m src <github-username> --doctor
+# Action Sync — managed campaign preview / writeback
+audit <github-username> --campaign security-review --writeback-target github
 ```
 
 Normal runs now perform a lightweight automatic preflight before fetching repos. By default the run stops on blocking errors and continues on warnings. Use `--preflight-mode strict` to fail on warnings too, or `--preflight-mode off` to skip the automatic preflight.
@@ -147,43 +164,6 @@ Normal runs now perform a lightweight automatic preflight before fetching repos.
 The new `--control-center` path is read-only. It loads the latest report + warehouse state, groups open work into `Blocked`, `Needs Attention Now`, `Ready for Manual Action`, and `Safe to Defer`, and writes `operator-control-center-<username>-<date>.json` plus `.md`.
 
 Watch mode now supports `--watch-strategy adaptive|incremental|full`. `adaptive` is the default and uses the stored baseline contract plus the scheduled full-refresh interval to decide whether each watch cycle should run full or incremental.
-
-## Demo and Guides
-
-- Demo fixture: [fixtures/demo/sample-report.json](/Users/d/Projects/GithubRepoAuditor/fixtures/demo/sample-report.json)
-- Workbook tour: [docs/workbook-tour.md](/Users/d/Projects/GithubRepoAuditor/docs/workbook-tour.md)
-- Weekly operator workflow: [docs/weekly-review.md](/Users/d/Projects/GithubRepoAuditor/docs/weekly-review.md)
-- Extending analyzers: [docs/extending-analyzers.md](/Users/d/Projects/GithubRepoAuditor/docs/extending-analyzers.md)
-
-### Best First Run
-
-If you are new to the project, use this flow:
-
-```bash
-audit <github-username> --doctor
-audit <github-username> --html
-audit <github-username> --control-center
-```
-
-That gives you:
-
-- a setup check so you can fix token, config, or workbook issues early
-- a full audit with the main report artifacts
-- an HTML dashboard and workbook-friendly output
-- a read-only operator queue that helps you decide what to work on next
-- a clean weekly-review path that lets you go from big-picture portfolio read to one-repo decision without switching formats
-
-### First-Run Flow
-
-```bash
-make install
-cp .env.example .env
-cp config/examples/audit-config.example.yaml audit-config.yaml
-audit <github-username> --doctor
-audit <github-username>
-audit <github-username> --control-center
-make workbook-gate
-```
 
 ### Run tests
 

@@ -24,6 +24,7 @@ from src.excel_export import (
     _build_hidden_data_sheets,
     _build_hotspots,
     _build_implementation_hotspots,
+    _build_operator_outcomes,
     _build_portfolio_explorer,
     _build_print_pack,
     _build_repo_detail,
@@ -861,6 +862,13 @@ class TestHotspotsAndDataSheets:
         assert ws["A1"].value == "Implementation Hotspots"
         assert "Start with RepoC" in str(ws["A2"].value)
 
+    def test_creates_operator_outcomes_sheet(self):
+        wb = Workbook()
+        _build_operator_outcomes(wb, _make_report())
+        assert "Operator Outcomes" in wb.sheetnames
+        ws = wb["Operator Outcomes"]
+        assert ws["A1"].value == "Operator Outcomes"
+
     def test_hidden_data_sheets_are_created(self):
         wb = Workbook()
         _build_hidden_data_sheets(wb, _make_report(), trend_data=[{"average_score": 0.6}], score_history={"RepoA": [0.5, 0.8]})
@@ -871,6 +879,7 @@ class TestHotspotsAndDataSheets:
         assert "Data_Rollups" in wb.sheetnames
         assert "Data_ReviewTargets" in wb.sheetnames
         assert "Data_OperatorQueue" in wb.sheetnames
+        assert "Data_OperatorOutcomes" in wb.sheetnames
         assert "Data_OperatorRepoRollups" in wb.sheetnames
         assert "Data_MaterialChangeRollups" in wb.sheetnames
         assert "Data_RepoDetail" in wb.sheetnames
@@ -1283,6 +1292,12 @@ class TestAnalystWorkbookSheets:
         assert trust_summary in executive_values
         assert "No portfolio catalog contract is recorded yet." in executive_values
         assert "Intent alignment cannot be judged until a portfolio catalog contract exists." in executive_values
+        assert print_ws["D4"].value == "Workflow Guidance"
+        assert print_ws["D5"].value == "Product Mode"
+        assert any(label in str(print_ws["E5"].value) for label in ("First Run:", "Weekly Review:", "Deep Dive:", "Action Sync:"))
+        assert print_ws["D6"].value == "Artifact Role"
+        assert print_ws["D7"].value == "Reading Order"
+        assert print_ws["D8"].value == "Next Best Step"
         assert print_ws["B7"].value == weekly_pack["portfolio_headline"]
         assert print_ws["B8"].value == weekly_pack["queue_pressure_summary"]
         assert print_ws["B9"].value == weekly_pack["run_change_summary"]
@@ -1590,6 +1605,7 @@ class TestWorkbookModes:
         assert "Run Changes" in wb.sheetnames
         assert "Review Queue" in wb.sheetnames
         assert "Implementation Hotspots" in wb.sheetnames
+        assert "Operator Outcomes" in wb.sheetnames
         assert "Repo Detail" in wb.sheetnames
         assert "Governance Controls" in wb.sheetnames
         assert "Print Pack" in wb.sheetnames
@@ -1615,6 +1631,7 @@ class TestWorkbookModes:
             "Portfolio Catalog",
             "Scorecards",
             "Implementation Hotspots",
+            "Operator Outcomes",
             "Repo Detail",
             "Executive Summary",
             "By Lens",

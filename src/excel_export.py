@@ -116,6 +116,7 @@ CORE_VISIBLE_SHEETS = {
     "Portfolio Catalog",
     "Scorecards",
     "Implementation Hotspots",
+    "Operator Outcomes",
     "Repo Detail",
     "By Lens",
     "By Collection",
@@ -260,6 +261,7 @@ def _reorder_workbook_sheets(wb: Workbook) -> None:
         "Review Queue",
         "Portfolio Explorer",
         "Implementation Hotspots",
+        "Operator Outcomes",
         "Repo Detail",
         "Executive Summary",
         "By Lens",
@@ -3501,6 +3503,110 @@ def _build_implementation_hotspots(wb: Workbook, data: dict) -> None:
     auto_width(ws, len(headers), max_row)
 
 
+def _build_operator_outcomes(wb: Workbook, data: dict) -> None:
+    ws = _get_or_create_sheet(wb, "Operator Outcomes")
+    ws.sheet_properties.tabColor = "0369A1"
+    _configure_sheet_view(ws, zoom=105, show_grid_lines=True)
+
+    summary = (data.get("portfolio_outcomes_summary") or {}).get(
+        "summary",
+        "Not enough operator history is recorded yet to judge outcomes.",
+    )
+    effectiveness = (data.get("operator_effectiveness_summary") or {}).get(
+        "summary",
+        "Not enough judged recommendation history is recorded yet to judge operator effectiveness.",
+    )
+    trend_summary = (data.get("operator_summary") or {}).get(
+        "high_pressure_queue_trend_summary",
+        "High-pressure queue trend is not ready yet.",
+    )
+    ws.merge_cells("A1:F1")
+    ws["A1"].value = "Operator Outcomes"
+    ws["A1"].font = SECTION_FONT
+    ws.merge_cells("A2:F2")
+    ws["A2"].value = summary
+    ws["A2"].alignment = WRAP
+    ws.merge_cells("A3:F3")
+    ws["A3"].value = effectiveness
+    ws["A3"].alignment = WRAP
+    ws.merge_cells("A4:F4")
+    ws["A4"].value = trend_summary
+    ws["A4"].alignment = WRAP
+
+    headers = ["Metric", "Status", "Value", "Numerator", "Denominator", "Summary"]
+    for col, header in enumerate(headers, 1):
+        ws.cell(row=6, column=col, value=header)
+    style_header_row(ws, 6, len(headers))
+    ws.freeze_panes = "A7"
+
+    metrics = [
+        ("Review To Action Closure Rate", data.get("portfolio_outcomes_summary", {}).get("review_to_action_closure_rate", {})),
+        ("Median Runs To Quiet After Escalation", data.get("portfolio_outcomes_summary", {}).get("median_runs_to_quiet_after_escalation", {})),
+        ("Repeated Regression Rate", data.get("portfolio_outcomes_summary", {}).get("repeated_regression_rate", {})),
+        ("Recommendation Validation Rate", data.get("operator_effectiveness_summary", {}).get("recommendation_validation_rate", {})),
+        ("Noisy Guidance Rate", data.get("operator_effectiveness_summary", {}).get("noisy_guidance_rate", {})),
+    ]
+    for row, (label, metric) in enumerate(metrics, 7):
+        value = metric.get("value")
+        if isinstance(value, float):
+            display_value = round(value, 3)
+        else:
+            display_value = value if value is not None else ""
+        values = [
+            label,
+            metric.get("status", "insufficient-evidence"),
+            display_value,
+            metric.get("numerator", metric.get("episodes", "")),
+            metric.get("denominator", ""),
+            metric.get("summary", ""),
+        ]
+        for col, item in enumerate(values, 1):
+            cell = ws.cell(row=row, column=col, value=item)
+            style_data_cell(cell, "center" if col in {2, 3, 4, 5} else "left")
+
+    example_row = 14
+    ws.cell(row=example_row, column=1, value="Recent Examples")
+    style_header_row(ws, example_row, 3)
+    ws.cell(row=example_row + 1, column=1, value="Closed Actions")
+    ws.cell(row=example_row + 1, column=2, value=_join_outcome_examples(data.get("operator_summary", {}).get("recent_closed_actions", [])))
+    ws.cell(row=example_row + 2, column=1, value="Reopened Recommendations")
+    ws.cell(row=example_row + 2, column=2, value=_join_outcome_examples(data.get("operator_summary", {}).get("recent_reopened_recommendations", [])))
+    ws.cell(row=example_row + 3, column=1, value="Regression Examples")
+    ws.cell(row=example_row + 3, column=2, value=_join_outcome_examples(data.get("operator_summary", {}).get("recent_regression_examples", [])))
+
+    history_row = 20
+    history_headers = ["Run", "Generated", "Blocked", "Urgent", "High Pressure"]
+    for col, header in enumerate(history_headers, 1):
+        ws.cell(row=history_row, column=col, value=header)
+    style_header_row(ws, history_row, len(history_headers))
+    history = data.get("high_pressure_queue_history", []) or []
+    for row, item in enumerate(history, history_row + 1):
+        values = [
+            item.get("run_id", ""),
+            item.get("generated_at", ""),
+            item.get("blocked_count", 0),
+            item.get("urgent_count", 0),
+            item.get("high_pressure_count", 0),
+        ]
+        for col, value in enumerate(values, 1):
+            cell = ws.cell(row=row, column=col, value=value)
+            style_data_cell(cell, "center" if col >= 3 else "left")
+
+    max_row = max(history_row + len(history), example_row + 3, 11)
+    auto_width(ws, 6, max_row)
+
+
+def _join_outcome_examples(items: list[dict]) -> str:
+    if not items:
+        return "No recent examples are recorded yet."
+    labels = []
+    for item in items[:3]:
+        repo = str(item.get("repo") or "").strip()
+        title = str(item.get("title") or item.get("action_id") or "Operator outcome").strip()
+        labels.append(f"{repo}: {title}" if repo else title)
+    return "; ".join(labels)
+
+
 def _write_hidden_table_sheet(
     wb: Workbook,
     title: str,
@@ -3780,10 +3886,52 @@ def _build_hidden_data_sheets(
     portfolio_catalog_rows: list[list[object]] = []
     scorecard_rows: list[list[object]] = []
     implementation_hotspot_rows: list[list[object]] = []
+    operator_outcome_rows: list[list[object]] = []
     lookup_rows: list[list[object]] = []
     repo_detail_rows, repo_dimension_rollup_rows, repo_history_rollup_rows = _repo_detail_rows(data, score_history)
     run_change_rollup_rows, run_change_repo_rows = _run_change_rows(data, diff_data)
     operator_queue_rows, operator_repo_rollups, material_rollups = _build_workbook_rollups(data)
+    portfolio_outcomes = data.get("portfolio_outcomes_summary", {}) or {}
+    operator_effectiveness = data.get("operator_effectiveness_summary", {}) or {}
+    operator_summary = data.get("operator_summary", {}) or {}
+    for label, metric in (
+        ("review_to_action_closure_rate", portfolio_outcomes.get("review_to_action_closure_rate", {})),
+        ("median_runs_to_quiet_after_escalation", portfolio_outcomes.get("median_runs_to_quiet_after_escalation", {})),
+        ("repeated_regression_rate", portfolio_outcomes.get("repeated_regression_rate", {})),
+        ("recommendation_validation_rate", operator_effectiveness.get("recommendation_validation_rate", {})),
+        ("noisy_guidance_rate", operator_effectiveness.get("noisy_guidance_rate", {})),
+    ):
+        operator_outcome_rows.append([
+            label,
+            metric.get("status", "insufficient-evidence"),
+            metric.get("value", ""),
+            metric.get("numerator", metric.get("episodes", "")),
+            metric.get("denominator", ""),
+            metric.get("summary", ""),
+        ])
+    for item in data.get("high_pressure_queue_history", []) or []:
+        operator_outcome_rows.append([
+            "high_pressure_queue_history",
+            operator_summary.get("high_pressure_queue_trend_status", ""),
+            item.get("high_pressure_count", 0),
+            item.get("blocked_count", 0),
+            item.get("urgent_count", 0),
+            item.get("generated_at", ""),
+        ])
+    for label, items in (
+        ("recent_closed_actions", operator_summary.get("recent_closed_actions", [])),
+        ("recent_reopened_recommendations", operator_summary.get("recent_reopened_recommendations", [])),
+        ("recent_regression_examples", operator_summary.get("recent_regression_examples", [])),
+    ):
+        for item in items[:3]:
+            operator_outcome_rows.append([
+                label,
+                "example",
+                item.get("repo", ""),
+                item.get("title", ""),
+                item.get("action_id", ""),
+                item.get("summary", ""),
+            ])
 
     for audit in audits:
         metadata = audit.get("metadata", {})
@@ -4274,6 +4422,13 @@ def _build_hidden_data_sheets(
             "Signal Summary",
         ],
         implementation_hotspot_rows,
+    )
+    _write_hidden_table_sheet(
+        wb,
+        "Data_OperatorOutcomes",
+        "tblOperatorOutcomesData",
+        ["Metric", "Status", "Value", "Numerator", "Denominator", "Summary"],
+        operator_outcome_rows,
     )
     _write_hidden_table_sheet(
         wb,
@@ -6470,6 +6625,22 @@ def _build_print_pack(
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
     weekly_pack = build_weekly_review_pack(data, diff_data)
     operator_focus, operator_focus_summary, operator_focus_line = _operator_focus_snapshot(weekly_pack)
+    ws["D4"] = "Workflow Guidance"
+    ws["D4"].font = SECTION_FONT
+    ws["D5"] = "Product Mode"
+    ws["E5"] = weekly_pack.get("product_mode_summary", "Weekly Review: use this artifact for the normal workbook-first operator loop.")
+    ws["D6"] = "Artifact Role"
+    ws["E6"] = weekly_pack.get(
+        "artifact_role_summary",
+        "This artifact is the shared weekly handoff across workbook, HTML, Markdown, and review-pack.",
+    )
+    ws["D7"] = "Reading Order"
+    ws["E7"] = weekly_pack.get("suggested_reading_order", "Read Dashboard, then Run Changes, then Review Queue.")
+    ws["D8"] = "Next Best Step"
+    ws["E8"] = weekly_pack.get(
+        "next_best_workflow_step",
+        "Open the standard workbook first, then use --control-center for read-only triage.",
+    )
     ws["A7"] = "Portfolio Headline"
     ws["B7"] = weekly_pack.get("portfolio_headline", operator_summary.get("headline", "Review the latest workbook surfaces for change and drift."))
     ws["A8"] = "Queue Pressure"
@@ -6764,6 +6935,7 @@ def _build_excel_workbook(
     _build_review_history_sheet(wb, data)
     _build_hotspots(wb, data)
     _build_implementation_hotspots(wb, data)
+    _build_operator_outcomes(wb, data)
     _build_compare_sheet(wb, diff_data)
     _build_scenario_planner(
         wb,

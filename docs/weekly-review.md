@@ -1,37 +1,62 @@
 # Weekly Review
 
-## How to review your portfolio in 5 minutes
+Use this guide for the normal ongoing operator loop. If you need the broader product map first, start with [modes.md](/Users/d/Projects/GithubRepoAuditor/docs/modes.md). If something is broken, jump to [operator-troubleshooting.md](/Users/d/Projects/GithubRepoAuditor/docs/operator-troubleshooting.md).
 
-1. Run `audit <github-username> --doctor` to catch setup or baseline issues first.
-2. Run `audit <github-username> --html` to generate the current workbook and dashboard.
-3. Run `audit <github-username> --control-center` to refresh the operator queue.
-4. Open the workbook and move in this order:
-   - `Dashboard` for the big picture
-   - `Run Changes` for what moved this run and whether the movement is healthy or concerning
-   - `Review Queue` for what needs action now and the exact next step
-   - `Repo Detail` for a single-repo briefing
-   - `Executive Summary` when you need a short shareable readout
+## Weekly cadence
 
-## Recommended cadence
+1. Run `audit <github-username> --doctor` if setup, baseline, or workbook health is in doubt.
+2. Run `audit <github-username> --html` to refresh the workbook, Markdown, HTML, JSON, and weekly-pack story.
+3. Run `audit <github-username> --control-center` for read-only operator triage from the latest state.
+4. Open the workbook and read it in this order:
+   - `Dashboard`
+   - `Run Changes`
+   - `Review Queue`
+   - `Portfolio Explorer`
+   - `Repo Detail`
+   - `Executive Summary`
 
-- Start with anything in `Blocked`
-- Use `Run Changes` before `Review Queue` when you want to understand what changed instead of jumping straight into action
-- Clear `Needs Attention Now` before lower-pressure work
-- Use `Repo Detail` when one repo needs a deeper decision
-- Leave `Safe to Defer` alone unless priorities changed
+## How to read the weekly surfaces
 
-## Operator focus reading order
+The primary workbook, HTML, Markdown, and review-pack surfaces all tell the same compressed operator story:
 
-Primary workbook, HTML, Markdown, and review-pack surfaces now compress the deeper follow-through model into five buckets:
+- `Act Now` means blocked or urgent pressure is active right now.
+- `Watch Closely` means the repo is active and deserves attention, but it does not outrank the highest-pressure work yet.
+- `Improving` means the path is stabilizing and recent action is helping.
+- `Fragile` means progress is real but easy to lose.
+- `Revalidate` means confidence still needs to be rebuilt before the repo should be treated as restored.
 
-1. `Act Now` for blocked or urgent operator pressure
-2. `Watch Closely` for active items that need more evidence but do not yet outrank the rest
-3. `Improving` for paths that are stabilizing and rebuilding trust
-4. `Fragile` for progress that is real but still easy to lose
-5. `Revalidate` for items that still need confidence rebuilt before they can be treated as restored
+Read those buckets in exactly that order. The hidden workbook sheets and raw JSON still keep the richer lifecycle detail underneath.
 
-Read those buckets in exactly that order on the primary surfaces. The hidden workbook data and raw JSON still keep the richer lifecycle detail underneath.
+## Workbook reading order
 
-## When to run workbook gate
+- `Dashboard` tells you whether the portfolio is quiet, worsening, or moving in the right direction.
+- `Run Changes` tells you what moved this run before you jump into action.
+- `Review Queue` tells you what deserves time now.
+- `Portfolio Explorer` helps compare repos after you know where the pressure is.
+- `Repo Detail` is where one-repo decisions happen.
+- `Executive Summary` is the short shareable readout once you already understand the weekly story.
 
-Use `make workbook-gate` only when you changed workbook-facing code or layout. The normal audit workflow does not require the gate every time.
+## Control-center reading order
+
+When you open the control-center artifact, read it in this order:
+
+1. `Headline`
+2. `Trend`
+3. `Why it matters`
+4. `What to do next`
+5. `Primary target`
+6. `Queue lanes`
+
+That sequence tells you whether the portfolio is actually changing, why the top target is still the top target, and whether the next move belongs in normal weekly review or in Action Sync.
+
+## What a good weekly review looks like
+
+- Clear `Blocked` work before everything else.
+- Treat `Needs Attention Now` as the main weekly closure lane.
+- Use `Repo Detail` when one repo needs a real decision instead of a quick pass.
+- Leave `Safe to Defer` alone unless your priorities changed.
+- Only move into campaigns, writeback, GitHub Projects, or Notion sync when the local workbook and control-center story is already settled.
+
+## Workbook gate reminder
+
+Use `make workbook-gate` only when you changed workbook-facing code or layout. Normal portfolio use does not require the workbook gate.

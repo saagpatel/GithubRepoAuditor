@@ -238,6 +238,99 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
         "neutral",
         "supporting-clearance",
     }
+
+
+def test_operator_snapshot_includes_phase_84_outcomes(monkeypatch, tmp_path: Path):
+    monkeypatch.setattr(
+        operator_control_center,
+        "load_operator_calibration_history",
+        lambda *args, **kwargs: [
+            {
+                "run_id": "run-4",
+                "generated_at": "2026-04-04T00:00:00+00:00",
+                "operator_summary": {
+                    "validated_recommendation_count": 2,
+                    "partially_validated_recommendation_count": 1,
+                    "unresolved_recommendation_count": 1,
+                    "reopened_recommendation_count": 1,
+                    "recent_validation_outcomes": [
+                        {
+                            "repo": "RepoA",
+                            "target_label": "RepoA blocker",
+                            "confidence_label": "high",
+                            "outcome": "reopened",
+                        }
+                    ],
+                },
+                "operator_queue": [],
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        operator_control_center,
+        "load_recent_campaign_history",
+        lambda *args, **kwargs: [
+            {
+                "generated_at": "2026-04-02T00:00:00+00:00",
+                "action_id": "action-1",
+                "repo": "RepoA",
+                "lifecycle_state": "resolved",
+                "reconciliation_outcome": "closed",
+                "closed_reason": "Completed",
+                "title": "Close RepoA follow-up",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        operator_control_center,
+        "load_review_history",
+        lambda *args, **kwargs: [{"repo": "RepoA", "title": "RepoA", "summary": "RepoA reopened after review."}],
+    )
+    monkeypatch.setattr(
+        operator_control_center,
+        "load_recent_operator_evidence",
+        lambda *args, **kwargs: {
+            "history": [
+                {
+                    "run_id": "run-1",
+                    "generated_at": "2026-04-01T00:00:00+00:00",
+                    "operator_summary": {"blocked_count": 0, "urgent_count": 0, "resolved_attention_count": 1, "reopened_attention_count": 0},
+                    "operator_queue": [],
+                },
+                {
+                    "run_id": "run-2",
+                    "generated_at": "2026-04-02T00:00:00+00:00",
+                    "operator_summary": {"blocked_count": 0, "urgent_count": 1, "resolved_attention_count": 1, "reopened_attention_count": 1},
+                    "operator_queue": [{"item_id": "a", "repo": "RepoA", "title": "RepoA", "lane": "urgent"}],
+                },
+                {
+                    "run_id": "run-3",
+                    "generated_at": "2026-04-03T00:00:00+00:00",
+                    "operator_summary": {"blocked_count": 0, "urgent_count": 0, "resolved_attention_count": 1, "reopened_attention_count": 0},
+                    "operator_queue": [],
+                },
+            ],
+            "events": [{"repo": "RepoA", "action_id": "action-1", "outcome": "reopened", "event_type": "open", "summary": "RepoA reopened."}],
+        },
+    )
+
+    snapshot = build_operator_snapshot(_make_report(), output_dir=tmp_path)
+    summary = snapshot["operator_summary"]
+
+    assert "portfolio_outcomes_summary" in summary
+    assert "operator_effectiveness_summary" in summary
+    assert "high_pressure_queue_history" in summary
+    assert summary["portfolio_outcomes_summary"]["summary"]
+    assert summary["operator_effectiveness_summary"]["summary"]
+    assert summary["high_pressure_queue_trend_status"] in {
+        "quiet",
+        "improving",
+        "stable",
+        "worsening",
+        "insufficient-evidence",
+    }
+    assert summary["recent_reopened_recommendations"]
+    assert snapshot["operator_queue"][0]["lane"] == "blocked"
     assert summary["primary_target_closure_forecast_momentum_status"] in {
         "sustained-confirmation",
         "sustained-clearance",

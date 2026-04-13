@@ -53,6 +53,9 @@ NO_INTENT_ALIGNMENT_SUMMARY = "Intent alignment cannot be judged until a portfol
 NO_SCORECARD_SUMMARY = "No maturity scorecard is recorded yet."
 NO_MATURITY_GAP_SUMMARY = "No maturity gap summary is recorded yet."
 NO_WHERE_TO_START_SUMMARY = "No meaningful implementation hotspot is currently surfaced."
+NO_OPERATOR_OUTCOMES_SUMMARY = "Not enough operator history is recorded yet to judge whether recent actions are improving portfolio outcomes."
+NO_OPERATOR_EFFECTIVENESS_SUMMARY = "Not enough judged recommendation history is recorded yet to judge operator effectiveness."
+NO_HIGH_PRESSURE_QUEUE_TREND = "High-pressure queue trend is not ready yet."
 
 OPERATOR_FOCUS_LABELS = {
     "act-now": "Act Now",
@@ -68,6 +71,12 @@ OPERATOR_FOCUS_DISPLAY_ORDER = [
     "fragile",
     "revalidate",
 ]
+PRODUCT_MODE_LABELS = {
+    "first-run": "First Run",
+    "weekly-review": "Weekly Review",
+    "deep-dive": "Deep Dive",
+    "action-sync": "Action Sync",
+}
 
 
 def _metadata(audit: Any) -> dict[str, Any]:
@@ -154,6 +163,104 @@ def _repo_queue_item(repo_name: str, report_data: Any) -> dict[str, Any]:
         if (mapped.get("repo") or mapped.get("repo_name") or "").strip() == repo_name:
             return mapped
     return {}
+
+
+def _product_mode_key(report_data: Any, diff_data: dict | None = None) -> str:
+    data = _mapping(report_data)
+    operator_summary = _mapping(data.get("operator_summary"))
+    audits = list(data.get("audits") or [])
+    if (
+        data.get("campaign_summary")
+        or data.get("writeback_preview")
+        or data.get("writeback_results")
+        or data.get("campaign_actions")
+    ):
+        return "action-sync"
+    if len(audits) == 1 and not operator_summary.get("source_run_id"):
+        return "deep-dive"
+    if diff_data is None and not data.get("diff_data") and not operator_summary.get("source_run_id"):
+        return "first-run"
+    return "weekly-review"
+
+
+def build_product_mode_summary(report_data: Any, diff_data: dict | None = None) -> str:
+    mode_key = _product_mode_key(report_data, diff_data)
+    if mode_key == "action-sync":
+        return (
+            "Action Sync: use this artifact to confirm the local campaign story first, then preview or apply "
+            "GitHub, GitHub Projects, or Notion mirrors only after the repo-level decision is settled."
+        )
+    if mode_key == "deep-dive":
+        return (
+            "Deep Dive: use this artifact to stay with one repo long enough to make a clear decision about the "
+            "next move, not just to skim portfolio pressure."
+        )
+    if mode_key == "first-run":
+        return (
+            "First Run: use this artifact to confirm setup, create the baseline workbook, and take the first "
+            "read-only pass through the operator story."
+        )
+    return (
+        "Weekly Review: use this artifact for the normal workbook-first operator loop, then move to the "
+        "read-only control center when you want a tighter triage queue."
+    )
+
+
+def build_artifact_role_summary(report_data: Any, diff_data: dict | None = None) -> str:
+    mode_key = _product_mode_key(report_data, diff_data)
+    if mode_key == "action-sync":
+        return (
+            "Local report remains authoritative; campaigns, writeback, and GitHub Projects are managed mirrors of "
+            "the decision already made here."
+        )
+    if mode_key == "deep-dive":
+        return (
+            "This artifact is the repo drilldown handoff: use it to connect score, hotspots, follow-through, and "
+            "maturity into one concrete next step."
+        )
+    if mode_key == "first-run":
+        return (
+            "This artifact is the onboarding handoff: it shows the first reliable portfolio snapshot and the "
+            "reading order that will become the normal weekly loop."
+        )
+    return (
+        "This artifact is the shared weekly handoff across workbook, HTML, Markdown, and review-pack: orient the "
+        "portfolio here, then choose repo drilldown or Action Sync only when needed."
+    )
+
+
+def build_suggested_reading_order(report_data: Any, diff_data: dict | None = None) -> str:
+    mode_key = _product_mode_key(report_data, diff_data)
+    if mode_key == "action-sync":
+        return (
+            "Read Review Queue first, then the control-center headline and primary target, then the campaign preview "
+            "or writeback section before syncing outward."
+        )
+    if mode_key == "deep-dive":
+        return (
+            "Read Repo Detail first, then Where To Start, implementation hotspots, maturity gap, and the next "
+            "follow-through checkpoint."
+        )
+    if mode_key == "first-run":
+        return (
+            "Read Dashboard, then Run Changes, then Review Queue, then Repo Detail, and finish with "
+            "--control-center for the read-only queue."
+        )
+    return (
+        "Read Dashboard, then Run Changes, then Review Queue, then Portfolio Explorer, then Repo Detail, and finish "
+        "with Executive Summary or --control-center if you need a tighter queue."
+    )
+
+
+def build_next_best_workflow_step(report_data: Any, diff_data: dict | None = None) -> str:
+    mode_key = _product_mode_key(report_data, diff_data)
+    if mode_key == "action-sync":
+        return "Keep the local artifact as the source of truth, then use campaign preview or writeback only when the repo decision is already clear."
+    if mode_key == "deep-dive":
+        return "Stay with the single-repo drilldown until the hotspot, maturity gap, and follow-through checkpoint all point to the same next move."
+    if mode_key == "first-run":
+        return "Run --doctor first, generate the standard workbook next, then use --control-center for the first read-only triage pass."
+    return "Open the standard workbook first, then use --control-center for read-only triage and Action Sync only when you are ready to mirror a settled campaign."
 
 
 def _repo_review_target(repo_name: str, report_data: Any) -> dict[str, Any]:
@@ -594,7 +701,15 @@ def build_weekly_review_pack(
     what_to_do_this_week = top_recommendation
     if repo_briefings:
         what_to_do_this_week = f"{top_recommendation} Start with {repo_briefings[0]['repo']} if you need a concrete place to begin."
+    product_mode_summary = build_product_mode_summary(data, diff_data)
+    artifact_role_summary = build_artifact_role_summary(data, diff_data)
+    suggested_reading_order = build_suggested_reading_order(data, diff_data)
+    next_best_workflow_step = build_next_best_workflow_step(data, diff_data)
     return {
+        "product_mode_summary": product_mode_summary,
+        "artifact_role_summary": artifact_role_summary,
+        "suggested_reading_order": suggested_reading_order,
+        "next_best_workflow_step": next_best_workflow_step,
         "portfolio_headline": str(portfolio_headline),
         "run_change_summary": build_run_change_summary(diff_data if diff_data is not None else data.get("diff_data")),
         "queue_pressure_summary": build_queue_pressure_summary(data, diff_data),
@@ -608,6 +723,9 @@ def build_weekly_review_pack(
             _mapping(data.get("implementation_hotspots_summary")).get("summary")
             or "No meaningful implementation hotspots are currently surfaced."
         ),
+        "operator_outcomes_summary": build_operator_outcomes_summary(data),
+        "operator_effectiveness_line": build_operator_effectiveness_line(data),
+        "high_pressure_queue_trend_line": build_high_pressure_queue_trend_line(data),
         "top_attention": top_attention,
         "repo_briefings": repo_briefings,
         "top_below_target_scorecard_items": list(_mapping(data).get("scorecards_summary", {}).get("top_below_target_repos") or []),
@@ -1352,6 +1470,21 @@ def build_maturity_gap_summary(value: Any) -> str:
 def build_scorecards_summary(report_data: Any) -> str:
     summary = _mapping(_mapping(report_data).get("scorecards_summary"))
     return str(summary.get("summary") or NO_SCORECARD_SUMMARY)
+
+
+def build_operator_outcomes_summary(report_data: Any) -> str:
+    summary = _mapping(_mapping(report_data).get("portfolio_outcomes_summary"))
+    return str(summary.get("summary") or NO_OPERATOR_OUTCOMES_SUMMARY)
+
+
+def build_operator_effectiveness_line(report_data: Any) -> str:
+    summary = _mapping(_mapping(report_data).get("operator_effectiveness_summary"))
+    return str(summary.get("summary") or NO_OPERATOR_EFFECTIVENESS_SUMMARY)
+
+
+def build_high_pressure_queue_trend_line(report_data: Any) -> str:
+    operator_summary = _mapping(_mapping(report_data).get("operator_summary"))
+    return str(operator_summary.get("high_pressure_queue_trend_summary") or NO_HIGH_PRESSURE_QUEUE_TREND)
 
 
 def _build_operator_focus_item(mapped: dict[str, Any], review_summary: dict[str, Any]) -> dict[str, Any]:

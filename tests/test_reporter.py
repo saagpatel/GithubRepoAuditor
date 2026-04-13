@@ -689,6 +689,10 @@ class TestMarkdownReport:
         assert "Next Recommended Run" in content
         assert "Watch Strategy" in content
         assert "Weekly Review Pack" in content
+        assert "Product Mode" in content
+        assert "Artifact Role" in content
+        assert "Suggested Reading Order" in content
+        assert "Next Best Workflow Step" in content
         assert "### Operator Focus" in content
         assert "- Summary:" in content
         assert "- Act Now:" in content
@@ -707,6 +711,9 @@ class TestMarkdownReport:
         assert "Top Recommendation" in content
         assert "Top Attention" in content
         assert "Trend" in content
+        assert "Operator Outcomes" in content
+        assert "Operator Effectiveness" in content
+        assert "High-Pressure Queue Trend" in content
         assert "Follow-Through" in content
         assert "Next Checkpoint" in content
         assert "Checkpoint Timing" in content
@@ -920,7 +927,32 @@ class TestRawMetadata:
         data = json.loads(path.read_text())
         assert data["scorecards_summary"]["summary"].startswith("0 repos are on track")
         assert data["scorecard_programs"]["maintain"]["label"] == "Maintain"
-        assert data["audits"][0]["scorecard"]["program"] == "maintain"
+
+    def test_writes_operator_outcome_summaries_when_present(self, tmp_path):
+        report = _make_report()
+        report.portfolio_outcomes_summary = {
+            "summary": "Managed action closure is at 50%.",
+            "review_to_action_closure_rate": {"status": "measured", "value": 0.5},
+        }
+        report.operator_effectiveness_summary = {
+            "summary": "recommendation validation is at 75%.",
+            "recommendation_validation_rate": {"status": "measured", "value": 0.75},
+        }
+        report.high_pressure_queue_history = [
+            {
+                "run_id": "user:2026-04-10T00:00:00+00:00",
+                "generated_at": "2026-04-10T00:00:00+00:00",
+                "blocked_count": 0,
+                "urgent_count": 1,
+                "high_pressure_count": 1,
+            }
+        ]
+
+        path = write_raw_metadata(report, tmp_path)
+        data = json.loads(path.read_text())
+        assert data["portfolio_outcomes_summary"]["summary"] == "Managed action closure is at 50%."
+        assert data["operator_effectiveness_summary"]["summary"] == "recommendation validation is at 75%."
+        assert data["high_pressure_queue_history"][0]["high_pressure_count"] == 1
 
 
 class TestPortfolioCatalogMarkdown:

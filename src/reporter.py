@@ -123,6 +123,9 @@ def write_raw_metadata(report: AuditReport, output_dir: Path) -> Path:
         "hotspots": report.hotspots,
         "implementation_hotspots": report.implementation_hotspots,
         "implementation_hotspots_summary": report.implementation_hotspots_summary,
+        "portfolio_outcomes_summary": report.portfolio_outcomes_summary,
+        "operator_effectiveness_summary": report.operator_effectiveness_summary,
+        "high_pressure_queue_history": report.high_pressure_queue_history,
         "security_posture": report.security_posture,
         "security_governance_preview": report.security_governance_preview,
         "collections": report.collections,
@@ -272,6 +275,10 @@ def write_markdown_report(
 
     _w("## Weekly Review Pack")
     _w("")
+    _w(f"- Product Mode: {weekly_pack.get('product_mode_summary', 'Weekly Review: use this artifact for the normal workbook-first operator loop.')}")
+    _w(f"- Artifact Role: {weekly_pack.get('artifact_role_summary', 'This artifact is the shared weekly handoff across workbook, HTML, Markdown, and review-pack.')}")
+    _w(f"- Suggested Reading Order: {weekly_pack.get('suggested_reading_order', 'Read Dashboard, then Run Changes, then Review Queue.')}")
+    _w(f"- Next Best Workflow Step: {weekly_pack.get('next_best_workflow_step', 'Open the standard workbook first, then use --control-center for read-only triage.')}")
     _w(f"- Portfolio Headline: {weekly_pack.get('portfolio_headline', 'No weekly headline is recorded yet.')}")
     _w(f"- Run Changes: {weekly_pack.get('run_change_summary', build_run_change_summary(diff_data))}")
     _w(f"- Queue Pressure: {weekly_pack.get('queue_pressure_summary', queue_pressure_summary)}")
@@ -281,6 +288,9 @@ def write_markdown_report(
     _w(f"- Intent Alignment: {weekly_pack.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.')}")
     _w(f"- Scorecards: {weekly_pack.get('scorecards_summary', 'No maturity scorecard is recorded yet.')}")
     _w(f"- Implementation Hotspots: {weekly_pack.get('implementation_hotspots_summary', 'No meaningful implementation hotspots are currently surfaced.')}")
+    _w(f"- Operator Outcomes: {weekly_pack.get('operator_outcomes_summary', 'Not enough operator history is recorded yet to judge outcomes.')}")
+    _w(f"- Operator Effectiveness: {weekly_pack.get('operator_effectiveness_line', 'Not enough judged recommendation history is recorded yet to judge operator effectiveness.')}")
+    _w(f"- High-Pressure Queue Trend: {weekly_pack.get('high_pressure_queue_trend_line', 'High-pressure queue trend is not ready yet.')}")
     _w("")
     _w("### Top Attention")
     _w("")

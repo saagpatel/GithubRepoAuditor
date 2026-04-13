@@ -159,6 +159,9 @@ class AuditReport:
     hotspots: list[dict] = field(default_factory=list)
     implementation_hotspots: list[dict] = field(default_factory=list)
     implementation_hotspots_summary: dict = field(default_factory=dict)
+    portfolio_outcomes_summary: dict = field(default_factory=dict)
+    operator_effectiveness_summary: dict = field(default_factory=dict)
+    high_pressure_queue_history: list[dict] = field(default_factory=list)
     security_posture: dict = field(default_factory=dict)
     security_governance_preview: list[dict] = field(default_factory=list)
     collections: dict[str, dict] = field(default_factory=dict)
@@ -332,6 +335,9 @@ class AuditReport:
             hotspots=portfolio_hotspots,
             implementation_hotspots=implementation_hotspots,
             implementation_hotspots_summary=implementation_hotspots_summary,
+            portfolio_outcomes_summary={},
+            operator_effectiveness_summary={},
+            high_pressure_queue_history=[],
             security_posture=portfolio_security,
             security_governance_preview=security_governance_preview,
             collections=collections,
@@ -389,6 +395,9 @@ class AuditReport:
             "hotspots": self.hotspots,
             "implementation_hotspots": self.implementation_hotspots,
             "implementation_hotspots_summary": self.implementation_hotspots_summary,
+            "portfolio_outcomes_summary": self.portfolio_outcomes_summary,
+            "operator_effectiveness_summary": self.operator_effectiveness_summary,
+            "high_pressure_queue_history": self.high_pressure_queue_history,
             "security_posture": self.security_posture,
             "security_governance_preview": self.security_governance_preview,
             "collections": self.collections,
