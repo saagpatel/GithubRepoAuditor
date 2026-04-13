@@ -293,6 +293,9 @@ def write_markdown_report(
     _w(f"- High-Pressure Queue Trend: {weekly_pack.get('high_pressure_queue_trend_line', 'High-pressure queue trend is not ready yet.')}")
     _w(f"- Action Sync Readiness: {weekly_pack.get('action_sync_summary', 'No current campaign needs Action Sync yet, so the safest next move is to keep the story local.')}")
     _w(f"- Next Action Sync Step: {weekly_pack.get('next_action_sync_step', 'Stay local for now; no current campaign needs preview or apply.')}")
+    _w(f"- Apply Packet: {weekly_pack.get('apply_readiness_summary', 'No current campaign has a safe execution handoff yet, so the local story should stay local for now.')}")
+    _w(f"- Next Apply Candidate: {weekly_pack.get('next_apply_candidate', 'Stay local for now; no current campaign has a safe execution handoff.')}")
+    _w(f"- Action Sync Command Hint: {weekly_pack.get('action_sync_command_hint', 'No Action Sync command is recommended yet.')}")
     _w("")
     _w("### Action Sync Readiness")
     _w("")
@@ -312,6 +315,23 @@ def write_markdown_report(
                 )
         else:
             _w(f"  - {empty_message}")
+    _w("- Apply Packet:")
+    _w(f"  - Summary: {weekly_pack.get('apply_readiness_summary', 'No current campaign has a safe execution handoff yet, so the local story should stay local for now.')}")
+    _w(f"  - Next Candidate: {weekly_pack.get('next_apply_candidate', 'Stay local for now; no current campaign has a safe execution handoff.')}")
+    _w(f"  - Command Hint: {weekly_pack.get('action_sync_command_hint', 'No Action Sync command is recommended yet.')}")
+    packet_sections = [
+        ("Ready To Apply", weekly_pack.get("top_ready_to_apply_packets", []), "No campaigns are currently ready to apply."),
+        ("Needs Approval", weekly_pack.get("top_needs_approval_packets", []), "No campaigns currently need approval-only review."),
+        ("Review Drift", weekly_pack.get("top_review_drift_packets", []), "No campaigns currently need drift review before apply."),
+    ]
+    for label, items, empty_message in packet_sections:
+        _w(f"- {label}:")
+        if items:
+            for item in items[:3]:
+                command = item.get("apply_command") or item.get("preview_command") or "No command"
+                _w(f"  - {item.get('label', item.get('campaign_type', 'Campaign'))} — {item.get('summary', 'No packet summary is recorded yet.')} [{command}]")
+        else:
+            _w(f"  - {empty_message}")
     _w("")
     _w("### Top Attention")
     _w("")
@@ -328,6 +348,7 @@ def write_markdown_report(
         _w(f"  - {item.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.')}")
         _w(f"  - Maturity Gap: {item.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.')}")
         _w(f"  - {item.get('action_sync_line', 'Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.')}")
+        _w(f"  - {item.get('apply_packet_line', 'Apply Packet: no current execution handoff is surfaced.')}")
         _w(f"  - Checkpoint Timing: {item.get('follow_through_checkpoint_timing', 'Unknown')}")
         _w(
             f"  - Next Checkpoint: {item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}"
@@ -374,6 +395,7 @@ def write_markdown_report(
         _w(f"- {briefing.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.')}")
         _w(f"- Maturity Gap: {briefing.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.')}")
         _w(f"- {briefing.get('action_sync_line', 'Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.')}")
+        _w(f"- {briefing.get('apply_packet_line', 'Apply Packet: no current execution handoff is surfaced.')}")
         _w(f"- Checkpoint Timing: {briefing.get('checkpoint_timing_line', 'Unknown')}")
         _w(f"- What Would Count As Progress: {briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
         _w("")
@@ -413,6 +435,13 @@ def write_markdown_report(
             )
         if report.operator_summary.get("next_action_sync_step"):
             _w(f"- Next Action Sync Step: {report.operator_summary.get('next_action_sync_step')}")
+        if (report.operator_summary.get("apply_readiness_summary") or {}).get("summary"):
+            _w(f"- Apply Packet: {(report.operator_summary.get('apply_readiness_summary') or {}).get('summary')}")
+        if (report.operator_summary.get("next_apply_candidate") or {}).get("summary"):
+            _w(f"- Next Apply Candidate: {(report.operator_summary.get('next_apply_candidate') or {}).get('summary')}")
+        command_hint = (report.operator_summary.get("next_apply_candidate") or {}).get("apply_command") or (report.operator_summary.get("next_apply_candidate") or {}).get("preview_command")
+        if command_hint:
+            _w(f"- Action Sync Command Hint: `{command_hint}`")
         if report.operator_summary.get("follow_through_escalation_summary"):
             _w(f"- Follow-Through Aging and Escalation: {report.operator_summary.get('follow_through_escalation_summary')}")
         if report.operator_summary.get("follow_through_recovery_summary"):
@@ -1153,6 +1182,13 @@ def write_markdown_report(
         _w(f"- Mode: {report.writeback_results.get('mode', 'preview')}")
         _w(f"- Target: {report.writeback_results.get('target', 'preview-only')}")
         _w(f"- Sync Mode: {report.writeback_preview.get('sync_mode', 'reconcile')}")
+        if report.apply_readiness_summary.get("summary"):
+            _w(f"- Apply Packet: {report.apply_readiness_summary.get('summary')}")
+        if report.next_apply_candidate.get("summary"):
+            _w(f"- Next Apply Candidate: {report.next_apply_candidate.get('summary')}")
+        command_hint = report.next_apply_candidate.get("apply_command") or report.next_apply_candidate.get("preview_command")
+        if command_hint:
+            _w(f"- Action Sync Command Hint: `{command_hint}`")
         if github_projects.get("enabled"):
             _w(
                 f"- GitHub Projects: {github_projects.get('status', 'disabled')} "

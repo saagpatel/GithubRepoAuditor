@@ -7399,7 +7399,12 @@ def test_operator_snapshot_includes_action_sync_readiness_and_queue_handoff(tmp_
     assert "action_sync_summary" in summary
     assert summary["next_action_sync_step"]
     assert summary["top_preview_ready_campaigns"]
+    assert "apply_readiness_summary" in summary
+    assert "next_apply_candidate" in summary
     repo_item = next(item for item in snapshot["operator_queue"] if item.get("repo") == "RepoSecure")
     assert repo_item["suggested_campaign"] == "security-review"
     assert repo_item["action_sync_stage"] == "preview-ready"
     assert "Action Sync:" in repo_item["action_sync_line"]
+    assert repo_item["apply_packet_state"] == "preview-next"
+    assert repo_item["apply_packet_summary"]
+    assert repo_item["apply_packet_command"].startswith("audit testuser --campaign security-review")

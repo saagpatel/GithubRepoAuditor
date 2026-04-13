@@ -87,6 +87,18 @@ Use that as the default rule:
 - only apply when the local story is already settled
 - preview next when there is a good campaign but no reason to push yet
 
+Action Sync execution now adds one second layer on top of readiness:
+- `review-drift`: stop and review managed drift before you sync anything else
+- `needs-approval`: the campaign is close, but governance approval or rollback review still blocks apply
+- `ready-to-apply`: the campaign is healthy enough to apply if you choose
+- `preview-next`: the campaign is worth previewing next, but the product is still nudging you to stay preview-first
+- `stay-local`: there is no safe execution handoff yet
+
+When the product shows an `Apply Packet`, read it as a handoff suggestion:
+- preview commands are safe planning commands only
+- apply commands always require an explicit manual rerun with `--writeback-apply`
+- `ready-to-apply` never means automatic mutation
+
 ## Default guidance
 
 - `--doctor` is the recommended first step.

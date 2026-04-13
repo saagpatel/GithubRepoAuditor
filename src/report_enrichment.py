@@ -59,6 +59,9 @@ NO_HIGH_PRESSURE_QUEUE_TREND = "High-pressure queue trend is not ready yet."
 NO_ACTION_SYNC_SUMMARY = "No current campaign needs Action Sync yet, so the safest next move is to keep the story local."
 NO_ACTION_SYNC_STEP = "Stay local for now; no current campaign needs preview or apply."
 NO_ACTION_SYNC_LINE = "Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites."
+NO_APPLY_READINESS_SUMMARY = "No current campaign has a safe execution handoff yet, so the local story should stay local for now."
+NO_NEXT_APPLY_CANDIDATE = "Stay local for now; no current campaign has a safe execution handoff."
+NO_ACTION_SYNC_COMMAND_HINT = "No Action Sync command is recommended yet."
 
 OPERATOR_FOCUS_LABELS = {
     "act-now": "Act Now",
@@ -554,6 +557,7 @@ def build_repo_briefing(
     scorecard_line = build_scorecard_line(audit)
     maturity_gap_summary = build_maturity_gap_summary(audit)
     action_sync_line = build_action_sync_line(handoff_source)
+    apply_packet_line = build_apply_packet_line(handoff_source)
     follow_through_resurfacing_reason = build_follow_through_resurfacing_reason(handoff_source)
     implementation_hotspots = _implementation_hotspots(audit)[:3]
     where_to_start_summary = _where_to_start_summary(audit)
@@ -648,6 +652,7 @@ def build_repo_briefing(
         "operator_focus_summary": operator_focus_summary,
         "operator_focus_line": operator_focus_line,
         "action_sync_line": action_sync_line,
+        "apply_packet_line": apply_packet_line,
         "portfolio_catalog": portfolio_catalog,
         "catalog_line": catalog_line,
         "intent_alignment": intent_alignment,
@@ -661,6 +666,9 @@ def build_repo_briefing(
         "action_sync_reason": str(handoff_source.get("action_sync_reason") or "No current Action Sync guidance is surfaced for this repo."),
         "suggested_campaign": str(handoff_source.get("suggested_campaign") or ""),
         "suggested_writeback_target": str(handoff_source.get("suggested_writeback_target") or "none"),
+        "apply_packet_state": str(handoff_source.get("apply_packet_state") or "stay-local"),
+        "apply_packet_summary": str(handoff_source.get("apply_packet_summary") or "No current apply packet is surfaced for this repo."),
+        "apply_packet_command": str(handoff_source.get("apply_packet_command") or ""),
         "resurfacing_reason_line": follow_through_resurfacing_reason,
     }
 
@@ -738,10 +746,16 @@ def build_weekly_review_pack(
         "action_sync_summary": build_action_sync_summary(data),
         "next_action_sync_step": build_next_action_sync_step(data),
         "action_sync_readiness_line": build_action_sync_readiness_line(data),
+        "apply_readiness_summary": build_apply_readiness_summary(data),
+        "next_apply_candidate": build_next_apply_candidate_line(data),
+        "action_sync_command_hint": build_action_sync_command_hint(data),
         "top_apply_ready_campaigns": list(operator_summary.get("top_apply_ready_campaigns") or []),
         "top_preview_ready_campaigns": list(operator_summary.get("top_preview_ready_campaigns") or []),
         "top_drift_review_campaigns": list(operator_summary.get("top_drift_review_campaigns") or []),
         "top_blocked_campaigns": list(operator_summary.get("top_blocked_campaigns") or []),
+        "top_ready_to_apply_packets": list(operator_summary.get("top_ready_to_apply_packets") or []),
+        "top_needs_approval_packets": list(operator_summary.get("top_needs_approval_packets") or []),
+        "top_review_drift_packets": list(operator_summary.get("top_review_drift_packets") or []),
         "top_attention": top_attention,
         "repo_briefings": repo_briefings,
         "top_below_target_scorecard_items": list(_mapping(data).get("scorecards_summary", {}).get("top_below_target_repos") or []),
@@ -1528,6 +1542,31 @@ def build_action_sync_readiness_line(report_data: Any) -> str:
     return f"{summary} Next step: {next_step}"
 
 
+def build_apply_readiness_summary(report_data: Any) -> str:
+    summary = _mapping(_mapping(report_data).get("apply_readiness_summary"))
+    if not summary:
+        summary = _mapping(_mapping(report_data).get("operator_summary")).get("apply_readiness_summary") or {}
+    return str(_mapping(summary).get("summary") or NO_APPLY_READINESS_SUMMARY)
+
+
+def build_next_apply_candidate_line(report_data: Any) -> str:
+    candidate = _mapping(_mapping(report_data).get("next_apply_candidate"))
+    if not candidate:
+        candidate = _mapping(_mapping(report_data).get("operator_summary")).get("next_apply_candidate") or {}
+    return str(_mapping(candidate).get("summary") or NO_NEXT_APPLY_CANDIDATE)
+
+
+def build_action_sync_command_hint(report_data: Any) -> str:
+    candidate = _mapping(_mapping(report_data).get("next_apply_candidate"))
+    if not candidate:
+        candidate = _mapping(_mapping(report_data).get("operator_summary")).get("next_apply_candidate") or {}
+    return str(
+        _mapping(candidate).get("apply_command")
+        or _mapping(candidate).get("preview_command")
+        or NO_ACTION_SYNC_COMMAND_HINT
+    )
+
+
 def build_action_sync_line(value: Any) -> str:
     mapped = _mapping(value)
     direct = str(mapped.get("action_sync_line") or "").strip()
@@ -1542,6 +1581,18 @@ def build_action_sync_line(value: Any) -> str:
     if target and target != "none":
         return f"Action Sync: {campaign_label or 'Campaign'} is {stage or 'idle'} — recommended target {target}."
     return f"Action Sync: {campaign_label or 'Campaign'} is {stage or 'idle'} — stay local until prerequisites are healthy."
+
+
+def build_apply_packet_line(value: Any) -> str:
+    mapped = _mapping(value)
+    state = str(mapped.get("apply_packet_state") or "").strip()
+    summary = str(mapped.get("apply_packet_summary") or "").strip()
+    command = str(mapped.get("apply_packet_command") or "").strip()
+    if not state and not summary:
+        return "Apply Packet: no current execution handoff is surfaced."
+    if command:
+        return f"Apply Packet: {summary} Command: {command}"
+    return f"Apply Packet: {summary or state.replace('-', ' ').title()}"
 
 
 def _build_operator_focus_item(mapped: dict[str, Any], review_summary: dict[str, Any]) -> dict[str, Any]:
@@ -1601,6 +1652,10 @@ def _build_operator_focus_item(mapped: dict[str, Any], review_summary: dict[str,
         "suggested_campaign": str(mapped.get("suggested_campaign") or ""),
         "suggested_writeback_target": str(mapped.get("suggested_writeback_target") or "none"),
         "action_sync_line": build_action_sync_line(mapped),
+        "apply_packet_state": str(mapped.get("apply_packet_state") or "stay-local"),
+        "apply_packet_summary": str(mapped.get("apply_packet_summary") or "No current apply packet is surfaced for this item."),
+        "apply_packet_command": str(mapped.get("apply_packet_command") or ""),
+        "apply_packet_line": build_apply_packet_line(mapped),
     }
 
 

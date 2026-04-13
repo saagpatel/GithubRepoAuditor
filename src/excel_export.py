@@ -4826,6 +4826,19 @@ def _build_campaigns(wb: Workbook, data: dict) -> None:
                 "Next Action Sync Step",
                 data.get("next_action_sync_step", "Stay local for now; no current campaign needs preview or apply."),
             ),
+            (
+                "Apply Packet",
+                (data.get("apply_readiness_summary") or {}).get(
+                    "summary",
+                    "No current campaign has a safe execution handoff yet, so the local story should stay local for now.",
+                ),
+            ),
+            (
+                "Command Hint",
+                (data.get("next_apply_candidate") or {}).get("apply_command")
+                or (data.get("next_apply_candidate") or {}).get("preview_command")
+                or "No Action Sync command is recommended yet.",
+            ),
         ],
         title="Action Sync Readiness",
     )
@@ -4905,6 +4918,19 @@ def _build_writeback_audit(wb: Workbook, data: dict) -> None:
             (
                 "Next Action Sync Step",
                 data.get("next_action_sync_step", "Stay local for now; no current campaign needs preview or apply."),
+            ),
+            (
+                "Apply Packet",
+                (data.get("apply_readiness_summary") or {}).get(
+                    "summary",
+                    "No current campaign has a safe execution handoff yet, so the local story should stay local for now.",
+                ),
+            ),
+            (
+                "Command Hint",
+                (data.get("next_apply_candidate") or {}).get("apply_command")
+                or (data.get("next_apply_candidate") or {}).get("preview_command")
+                or "No Action Sync command is recommended yet.",
             ),
         ],
         title="Action Sync Readiness",
@@ -6688,6 +6714,16 @@ def _build_print_pack(
     ws["E10"] = weekly_pack.get(
         "next_action_sync_step",
         "Stay local for now; no current campaign needs preview or apply.",
+    )
+    ws["D11"] = "Apply Packet"
+    ws["E11"] = weekly_pack.get(
+        "apply_readiness_summary",
+        "No current campaign has a safe execution handoff yet, so the local story should stay local for now.",
+    )
+    ws["D12"] = "Command Hint"
+    ws["E12"] = weekly_pack.get(
+        "action_sync_command_hint",
+        "No Action Sync command is recommended yet.",
     )
     ws["A7"] = "Portfolio Headline"
     ws["B7"] = weekly_pack.get("portfolio_headline", operator_summary.get("headline", "Review the latest workbook surfaces for change and drift."))

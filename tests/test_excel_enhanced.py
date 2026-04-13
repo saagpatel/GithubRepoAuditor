@@ -1463,6 +1463,13 @@ class TestAnalystWorkbookSheets:
             "summary": "Action Sync is preview-ready: Security Review is the strongest next campaign to preview from the current local facts.",
         }
         report["next_action_sync_step"] = "Preview Security Review next, then decide whether it is ready to sync to all."
+        report["apply_readiness_summary"] = {
+            "summary": "Apply handoff says preview Security Review next before deciding on apply to all."
+        }
+        report["next_apply_candidate"] = {
+            "summary": "Preview Security Review next, then decide whether it is ready to apply to all.",
+            "preview_command": "audit user --campaign security-review --writeback-target all",
+        }
         report["writeback_preview"] = {
             "sync_mode": "reconcile",
             "github_projects": {
@@ -1489,6 +1496,8 @@ class TestAnalystWorkbookSheets:
         assert ws["B13"].value == "configured (octo-org #7)"
         assert ws["J5"].value == "Action Sync Readiness"
         assert "preview-ready" in str(ws["K5"].value).lower()
+        assert ws["J7"].value == "Apply Packet"
+        assert "preview security review next" in str(ws["K7"].value).lower()
         assert ws["D15"].value == "Projects"
         assert ws["D16"].value == 3
 
@@ -1502,6 +1511,13 @@ class TestAnalystWorkbookSheets:
                 "summary": "Action Sync is preview-ready: Security Review is the strongest next campaign to preview from the current local facts.",
             },
             "next_action_sync_step": "Preview Security Review next, then decide whether it is ready to sync to all.",
+            "apply_readiness_summary": {
+                "summary": "Apply handoff says preview Security Review next before deciding on apply to all."
+            },
+            "next_apply_candidate": {
+                "summary": "Preview Security Review next, then decide whether it is ready to apply to all.",
+                "preview_command": "audit user --campaign security-review --writeback-target all",
+            },
         }
         _build_print_pack(wb, report, None)
         ws = wb["Print Pack"]
@@ -1509,6 +1525,9 @@ class TestAnalystWorkbookSheets:
         assert ws["D9"].value == "Action Sync Readiness"
         assert "preview-ready" in str(ws["E9"].value).lower()
         assert ws["D10"].value == "Next Action Sync Step"
+        assert ws["D11"].value == "Apply Packet"
+        assert "preview security review next" in str(ws["E11"].value).lower()
+        assert ws["D12"].value == "Command Hint"
 
     def test_writeback_audit_shows_empty_state_when_no_results(self):
         wb = Workbook()
