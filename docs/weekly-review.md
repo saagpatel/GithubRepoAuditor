@@ -5,7 +5,7 @@ Use this guide for the normal ongoing operator loop. If you need the broader pro
 ## Weekly cadence
 
 1. Run `audit <github-username> --doctor` if setup, baseline, or workbook health is in doubt.
-2. Run `audit <github-username> --html` to refresh the workbook, Markdown, HTML, JSON, and weekly-pack story.
+2. Run `audit <github-username> --html` to refresh the workbook, Markdown, HTML, JSON, review-pack, and scheduled-handoff story.
 3. Run `audit <github-username> --control-center` for read-only operator triage from the latest state.
 4. Open the workbook and read it in this order:
    - `Dashboard`
@@ -17,7 +17,7 @@ Use this guide for the normal ongoing operator loop. If you need the broader pro
 
 ## How to read the weekly surfaces
 
-The primary workbook, HTML, Markdown, and review-pack surfaces all tell the same compressed operator story:
+The primary workbook, HTML, Markdown, review-pack, and scheduled-handoff surfaces all tell the same compressed operator story:
 
 - `Act Now` means blocked or urgent pressure is active right now.
 - `Watch Closely` means the repo is active and deserves attention, but it does not outrank the highest-pressure work yet.

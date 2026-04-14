@@ -22,7 +22,7 @@ The shipped system now has five major layers:
 - Action Sync execution guidance
 - warehouse-backed history, regeneration, and trend work
 
-That means the architecture is intentionally split between raw state assembly and compressed presentation.
+That means the architecture is intentionally split between raw state assembly and compressed presentation, but the code boundaries are still under active cleanup pressure. The current module map is good enough to explain the shipped system, not yet the final maintainable shape.
 
 ## Core Entry Paths
 
@@ -47,7 +47,7 @@ The CLI does not create separate execution engines for those modes. The modes ar
 
 ## Source Of Truth Modules
 
-The current module boundaries are intentionally explicit:
+The current module boundaries are documented enough to guide work, but they still carry known concentration risk:
 
 - `src/operator_control_center.py`
   Raw operator state assembly, queue shaping, priority logic, and follow-through families.
@@ -70,11 +70,16 @@ The current module boundaries are intentionally explicit:
 - `src/warehouse.py`
   Persistence, history loading, and compatibility handling for regenerated reports and historical trend work.
 
-This separation is deliberate:
+This separation is deliberate, but it is not “finished architecture”:
 
 - operator state stays raw and evidence-rich
 - report enrichment owns user-facing wording and parity
 - Action Sync modules each own one layer of the execution story
+
+The active roadmap already treats two cleanup tracks as real dependencies for later feature work:
+
+- `src/report_enrichment.py` still owns too much of the weekly packaging seam and is scheduled for extraction work in Phase 99
+- `src/operator_control_center.py` is still the largest implementation risk in the repo and is scheduled for decomposition work in Phase 100
 
 ## Shared Artifact Model
 
@@ -94,6 +99,8 @@ Phase 96 tightens that rule:
 - workbook, Markdown, HTML, review-pack, and scheduled handoff should all read from the same `weekly_story_v1` structure
 - renderer-specific formatting is still allowed
 - renderer-specific section selection, local winner selection, and ad hoc summary invention are not
+
+`scheduled_handoff` is inside that shared contract, but it still carries bounded fallback logic when older report payloads do not have the newer weekly packaging fields. That fallback is a compatibility seam, not a second weekly authority.
 
 ## Operator Model
 

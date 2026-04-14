@@ -6,12 +6,26 @@ Brief description of the changes.
 
 Why is this change needed?
 
-## How
+## Review Of What Was Built
 
-How were the changes implemented? Any design decisions worth noting?
+What shipped in this phase? List the user-visible or workflow-visible results.
 
-## Checklist
+## Cleanup Review
 
-- [ ] Tests pass
-- [ ] No new warnings
-- [ ] Documentation updated (if applicable)
+What did you remove, simplify, archive, or intentionally leave out?
+
+## Verification Summary
+
+Commands run, artifact checks performed, and the results.
+
+## Shipped Summary
+
+What is now true on the branch after this change?
+
+## Next Phase
+
+Detailed writeup for the next phase: objective, why it is next, and the main risks or dependencies.
+
+## Remaining Roadmap
+
+One-line summaries for the other phases still left in the roadmap.
