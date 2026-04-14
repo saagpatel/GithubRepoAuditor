@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import shutil
+import warnings
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from xml.etree import ElementTree as ET
+
+from openpyxl import load_workbook
 
 MAIN_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
 REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
@@ -13,6 +16,7 @@ PKG_REL_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
 X14_NS = "http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"
 XM_NS = "http://schemas.microsoft.com/office/excel/2006/main"
 SPARKLINE_URI = "{05C60535-1F16-4fd2-B633-F4F36F0B64E0}"
+SPARKLINE_WARNING_MESSAGE = "Sparkline Group extension is not supported and will be removed"
 TREND_HISTORY_WINDOW = 12
 DEFAULT_TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "assets" / "excel" / "analyst-template.xlsx"
 TEMPLATE_INFO_SHEET = "TemplateInfo"
@@ -46,6 +50,18 @@ class SparklineSpec:
     sheet_name: str
     location: str
     data_range: str
+
+
+def load_workbook_allowing_native_sparklines(workbook_path: Path, **kwargs):
+    """Load a workbook while suppressing the known openpyxl sparkline warning."""
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message=SPARKLINE_WARNING_MESSAGE,
+            category=UserWarning,
+        )
+        return load_workbook(workbook_path, **kwargs)
 
 
 def resolve_template_path(template_path: Path | None = None) -> Path:

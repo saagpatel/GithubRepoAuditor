@@ -25,6 +25,13 @@ Template mode and standard mode should now project the same visible top-line fac
 If one mode changes the visible operator or executive story, update the other mode's
 tests and verify parity before shipping.
 
+Template mode also keeps native Excel sparkline XML so desktop Excel can render real
+sparklines. When Python reopens that workbook, openpyxl emits
+`Sparkline Group extension is not supported and will be removed`. That warning is an
+expected library limitation for our validation path, not workbook corruption, so the
+validation flow should suppress that specific warning instead of treating it as a
+release issue.
+
 Partial reruns also depend on a compatible full-baseline report. Workbook regeneration can continue from older reports, but targeted or incremental merge paths should only proceed when the stored baseline contract matches the current audit-affecting portfolio context.
 
 ## Template-Stable Tables
