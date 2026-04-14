@@ -56,7 +56,7 @@
   - lint passed
   - full repo tests passed: `755 passed`
   - workbook gate automated checks passed
-  - manual desktop Excel signoff remains pending because this environment cannot perform the external desktop Excel-open checklist
+  - manual desktop Excel signoff passed and is recorded in `output/workbook-gate/workbook-gate-result.json`
 
 ## Shipped Summary
 
