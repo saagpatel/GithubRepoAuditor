@@ -5,6 +5,7 @@ from typing import Any
 
 from src.terminology import ACTION_SYNC_CANONICAL_LABELS
 from src.weekly_packaging import finalize_weekly_pack
+from src.weekly_scheduling_overlay import apply_weekly_scheduling_overlay
 
 COMPLETENESS_THRESHOLDS = [
     ("shipped", 0.75),
@@ -941,7 +942,7 @@ def build_weekly_review_pack(
         "top_fragile_items": grouped_focus_items["fragile"][:3],
         "top_revalidate_items": grouped_focus_items["revalidate"][:3],
     }
-    return finalize_weekly_pack(weekly_pack)
+    return finalize_weekly_pack(apply_weekly_scheduling_overlay(weekly_pack, operator_summary))
 
 
 def build_run_change_counts(diff_data: dict | None) -> dict[str, int]:

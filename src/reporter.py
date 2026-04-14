@@ -49,6 +49,7 @@ from src.report_enrichment import (
     no_linked_artifact_summary,
 )
 from src.terminology import ACTION_SYNC_CANONICAL_LABELS
+from src.weekly_scheduling_overlay import resolve_weekly_story_value
 
 TIER_ORDER = ["shipped", "functional", "wip", "skeleton", "abandoned"]
 
@@ -269,11 +270,23 @@ def write_markdown_report(
     top_recommendation_summary = build_top_recommendation_summary(report_dict)
     trust_actionability_summary = build_trust_actionability_summary(report_dict)
     weekly_pack = build_weekly_review_pack(report_dict, diff_data)
+    weekly_reason = resolve_weekly_story_value(
+        weekly_pack,
+        "why_this_week",
+        weekly_pack.get("queue_pressure_summary"),
+        queue_pressure_summary,
+    )
+    weekly_decision = resolve_weekly_story_value(
+        weekly_pack,
+        "decision",
+        weekly_pack.get("what_to_do_this_week"),
+        top_recommendation_summary,
+    )
     _w("### Run Changes")
     _w("")
     _w(f"- Summary: {report.run_change_summary or build_run_change_summary(diff_data)}")
-    _w(f"- Why It Matters: {queue_pressure_summary}")
-    _w(f"- What To Do Next: {top_recommendation_summary}")
+    _w(f"- Why It Matters: {weekly_reason}")
+    _w(f"- What To Do Next: {weekly_decision}")
     _w(
         "- Counts: "
         f"{run_change_counts.get('score_improvements', 0)} improvements, "

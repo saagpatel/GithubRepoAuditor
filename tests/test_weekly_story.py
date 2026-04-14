@@ -198,6 +198,19 @@ def _report() -> dict:
     }
 
 
+def _approval_override_report() -> dict:
+    report = _report()
+    operator_summary = {
+        **report["operator_summary"],
+        "counts": {"blocked": 0, "urgent": 0, "ready": 1, "deferred": 1},
+        "what_to_do_next": "Stabilize RepoA before any approval work.",
+    }
+    return {
+        **report,
+        "operator_summary": operator_summary,
+    }
+
+
 def test_weekly_review_pack_exposes_structured_story_and_compact_explainability() -> None:
     weekly_pack = build_weekly_review_pack(_report())
 
@@ -218,6 +231,23 @@ def test_weekly_review_pack_exposes_structured_story_and_compact_explainability(
     repo_briefing = weekly_pack["repo_briefings"][0]
     assert repo_briefing["why_it_won"]
     assert repo_briefing["evidence_strip"][0]["label"] == "Where To Start"
+
+
+def test_weekly_review_pack_can_override_weekly_decision_with_approval_priority() -> None:
+    weekly_pack = build_weekly_review_pack(_approval_override_report())
+
+    story = weekly_pack["weekly_story_v1"]
+    weekly_priority = next(section for section in story["sections"] if section["id"] == "weekly-priority")
+
+    assert story["decision"] == "Review Governance: all next and decide whether to capture approval."
+    assert story["why_this_week"] == "Governance: all is the strongest approval review candidate right now."
+    assert story["next_step"].startswith("Open the standard workbook first, then review Governance")
+    assert weekly_priority["reason_codes"] == [
+        "approval-aware-scheduling",
+        "approval-workflow",
+        "ready-for-review",
+    ]
+    assert weekly_priority["evidence_items"][0]["label"] == "Ready For Review: Governance: all"
 
 
 def test_weekly_story_sections_render_across_review_pack_html_and_handoff(tmp_path: Path) -> None:
@@ -290,6 +320,44 @@ def test_weekly_story_visible_contract_reaches_workbook_html_markdown_and_handof
     assert approval_section["headline"] in html
     assert weekly_pack["weekly_story_v1"]["decision"] in handoff
     assert approval_section["headline"] in handoff
+
+
+def test_approval_override_reaches_workbook_html_markdown_and_handoff(tmp_path: Path) -> None:
+    report = _approval_override_report()
+    weekly_pack = build_weekly_review_pack(report)
+
+    wb = Workbook()
+    _build_print_pack(wb, report, None, portfolio_profile="default", collection="showcase", excel_mode="standard")
+    print_ws = wb["Print Pack"]
+
+    review_pack = export_review_pack(report, tmp_path)["review_pack_path"].read_text()
+    html = _render_html(report)
+    handoff = render_scheduled_handoff_markdown(
+        {
+            "username": report["username"],
+            "generated_at": report["generated_at"],
+            "operator_summary": report["operator_summary"],
+            "operator_queue": report["operator_queue"],
+            "operator_recent_changes": [],
+            "campaign_summary": {},
+            "writeback_preview": {},
+            "managed_state_drift": [],
+            "issue_candidate": {},
+            "weekly_pack": weekly_pack,
+        }
+    )
+
+    expected_decision = "Review Governance: all next and decide whether to capture approval."
+    expected_reason = "Governance: all is the strongest approval review candidate right now."
+
+    assert print_ws["B8"].value == expected_reason
+    assert print_ws["B10"].value == expected_decision
+    assert expected_reason in review_pack
+    assert expected_decision in review_pack
+    assert expected_reason in html
+    assert expected_decision in html
+    assert expected_reason in handoff
+    assert expected_decision in handoff
 
 
 def test_scheduled_handoff_falls_back_cleanly_when_weekly_story_is_missing() -> None:

@@ -48,8 +48,6 @@ from src.excel_template import (
     load_workbook_allowing_native_sparklines,
 )
 from src.report_enrichment import (
-    build_queue_pressure_summary,
-    build_top_recommendation_summary,
     build_trust_actionability_summary,
     build_weekly_review_pack,
     no_baseline_summary,
@@ -1315,10 +1313,10 @@ class TestAnalystWorkbookSheets:
             if cell is not None
         }
 
-        queue_summary = build_queue_pressure_summary(report)
-        top_recommendation = build_top_recommendation_summary(report)
         trust_summary = build_trust_actionability_summary(report)
         weekly_pack = build_weekly_review_pack(report)
+        queue_summary = weekly_pack["weekly_story_v1"]["why_this_week"]
+        top_recommendation = weekly_pack["weekly_story_v1"]["decision"]
 
         assert queue_summary in dashboard_values
         assert top_recommendation in dashboard_values

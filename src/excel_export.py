@@ -106,6 +106,7 @@ from src.report_enrichment import (
 )
 from src.sparkline import sparkline as render_sparkline
 from src.terminology import ACTION_SYNC_CANONICAL_LABELS
+from src.weekly_scheduling_overlay import resolve_weekly_story_value
 
 # Tier display order
 TIER_ORDER = ["shipped", "functional", "wip", "skeleton", "abandoned"]
@@ -1507,10 +1508,20 @@ def _build_dashboard(
             cell = ws.cell(row=7, column=3, value=f"Trend: {spark}")
             cell.font = SPARKLINE_FONT
     run_change_summary = data.get("run_change_summary") or build_run_change_summary(diff_data)
-    queue_pressure_summary = build_queue_pressure_summary(data, diff_data)
-    trust_actionability_summary = build_trust_actionability_summary(data)
-    top_recommendation_summary = build_top_recommendation_summary(data)
     weekly_pack = build_weekly_review_pack(data, diff_data)
+    queue_pressure_summary = resolve_weekly_story_value(
+        weekly_pack,
+        "why_this_week",
+        weekly_pack.get("queue_pressure_summary"),
+        build_queue_pressure_summary(data, diff_data),
+    )
+    trust_actionability_summary = build_trust_actionability_summary(data)
+    top_recommendation_summary = resolve_weekly_story_value(
+        weekly_pack,
+        "decision",
+        weekly_pack.get("what_to_do_this_week"),
+        build_top_recommendation_summary(data),
+    )
     operator_focus, operator_focus_summary, operator_focus_line = _operator_focus_snapshot(weekly_pack)
     ws["M8"] = "Run Summary"
     ws["M8"].font = SUBHEADER_FONT
@@ -6889,10 +6900,22 @@ def _build_executive_summary(
         )
     run_change_counts = data.get("run_change_counts") or build_run_change_counts(diff_data)
     run_change_summary = data.get("run_change_summary") or build_run_change_summary(diff_data)
-    queue_pressure_summary = build_queue_pressure_summary(data, diff_data)
+    queue_pressure_summary = resolve_weekly_story_value(
+        weekly_pack,
+        "why_this_week",
+        weekly_pack.get("queue_pressure_summary"),
+        build_queue_pressure_summary(data, diff_data),
+    )
     trust_actionability_summary = build_trust_actionability_summary(data)
     top_attention = _build_workbook_rollups(data)[1][:5]
-    top_recommendation = build_top_recommendation_summary(data) or recommended_focus or "Start with the highest-pressure queue item, then protect the current leaders."
+    top_recommendation = resolve_weekly_story_value(
+        weekly_pack,
+        "decision",
+        weekly_pack.get("what_to_do_this_week"),
+        build_top_recommendation_summary(data),
+        recommended_focus,
+        "Start with the highest-pressure queue item, then protect the current leaders.",
+    )
     biggest_opportunity = leaders[0]["name"] if leaders else "Portfolio-wide follow-through"
     narrative_rows = [
         (

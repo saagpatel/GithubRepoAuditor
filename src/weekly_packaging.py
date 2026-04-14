@@ -238,32 +238,44 @@ def _determine_section_state(weekly_pack: dict[str, Any], options: list[tuple[st
 
 
 def _build_weekly_story_v1(weekly_pack: dict[str, Any]) -> dict[str, Any]:
+    weekly_priority_evidence_items = list(weekly_pack.get("weekly_priority_evidence_items") or [])
+    if not weekly_priority_evidence_items:
+        weekly_priority_evidence_items = [
+            _build_story_evidence_item(
+                "Trust / Actionability",
+                str(weekly_pack.get("trust_actionability_summary") or "No trust summary is recorded yet."),
+                "weekly-priority",
+            ),
+            _build_story_evidence_item(
+                "Operator Focus",
+                str(weekly_pack.get("operator_focus_summary") or NO_OPERATOR_FOCUS_SUMMARY),
+                "operator-focus",
+            ),
+            _build_story_evidence_item(
+                "Operator Outcomes",
+                str(weekly_pack.get("operator_outcomes_summary") or NO_OPERATOR_OUTCOMES_SUMMARY),
+                "operator-outcomes",
+            ),
+        ]
+
     sections = [
         {
             "id": "weekly-priority",
             "label": "Weekly Priority",
             "state": "active",
-            "headline": str(weekly_pack.get("queue_pressure_summary") or "No queue-pressure summary is recorded yet."),
-            "next_step": str(weekly_pack.get("what_to_do_this_week") or "Continue the normal operator review loop."),
+            "headline": str(
+                weekly_pack.get("weekly_priority_headline")
+                or weekly_pack.get("queue_pressure_summary")
+                or "No queue-pressure summary is recorded yet."
+            ),
+            "next_step": str(
+                weekly_pack.get("weekly_priority_next_step")
+                or weekly_pack.get("what_to_do_this_week")
+                or "Continue the normal operator review loop."
+            ),
             "next_label": "Decision",
-            "reason_codes": ["queue-pressure", "operator-priority"],
-            "evidence_items": [
-                _build_story_evidence_item(
-                    "Trust / Actionability",
-                    str(weekly_pack.get("trust_actionability_summary") or "No trust summary is recorded yet."),
-                    "weekly-priority",
-                ),
-                _build_story_evidence_item(
-                    "Operator Focus",
-                    str(weekly_pack.get("operator_focus_summary") or NO_OPERATOR_FOCUS_SUMMARY),
-                    "operator-focus",
-                ),
-                _build_story_evidence_item(
-                    "Operator Outcomes",
-                    str(weekly_pack.get("operator_outcomes_summary") or NO_OPERATOR_OUTCOMES_SUMMARY),
-                    "operator-outcomes",
-                ),
-            ],
+            "reason_codes": list(weekly_pack.get("weekly_priority_reason_codes") or ["queue-pressure", "operator-priority"]),
+            "evidence_items": weekly_priority_evidence_items,
         },
         {
             "id": "action-sync-readiness",

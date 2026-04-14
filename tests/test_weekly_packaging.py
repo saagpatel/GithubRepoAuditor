@@ -108,3 +108,37 @@ def test_finalize_weekly_pack_prefers_overdue_follow_up_in_approval_section() ->
         "audit testuser --review-governance --governance-scope all"
     )
     assert approval_section["evidence_items"][0]["safe_posture"] == "local-follow-up-review"
+
+
+def test_finalize_weekly_pack_prefers_overlay_reason_codes_and_evidence_for_weekly_priority() -> None:
+    weekly_pack = {
+        "portfolio_headline": "Portfolio headline",
+        "what_to_do_this_week": "Review Governance: all next and decide whether the approval still matches the packet.",
+        "queue_pressure_summary": "Governance: all is the strongest approval review candidate right now.",
+        "next_best_workflow_step": "Open the standard workbook first, then review Governance: all next and decide whether the approval still matches the packet.",
+        "trust_actionability_summary": "Trust is stable enough for a local review step.",
+        "weekly_priority_headline": "Governance: all is the strongest approval review candidate right now.",
+        "weekly_priority_next_step": "Review Governance: all next and decide whether the approval still matches the packet.",
+        "weekly_priority_reason_codes": ["approval-aware-scheduling", "approval-workflow", "needs-reapproval"],
+        "weekly_priority_evidence_items": [
+            {
+                "label": "Needs Re-Approval: Governance: all",
+                "summary": "Needs re-approval before any further action.",
+                "kind": "approval-workflow",
+                "safe_posture": "local-approval-capture",
+                "command_hint": "audit testuser --approve-governance --governance-scope all",
+            }
+        ],
+        "top_attention": [],
+        "repo_briefings": [],
+    }
+
+    finalized = finalize_weekly_pack(weekly_pack)
+
+    weekly_priority = next(
+        section for section in finalized["weekly_story_v1"]["sections"] if section["id"] == "weekly-priority"
+    )
+    assert weekly_priority["headline"] == weekly_pack["weekly_priority_headline"]
+    assert weekly_priority["next_step"] == weekly_pack["weekly_priority_next_step"]
+    assert weekly_priority["reason_codes"] == ["approval-aware-scheduling", "approval-workflow", "needs-reapproval"]
+    assert weekly_priority["evidence_items"][0]["label"] == "Needs Re-Approval: Governance: all"

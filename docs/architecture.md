@@ -10,7 +10,7 @@ GitHub Repo Auditor is now a workbook-first portfolio operating system, not just
 
 The same weekly story is rendered across workbook, Markdown, HTML, review-pack, and scheduled handoff. The workbook remains the flagship surface, while the other artifacts mirror the same compressed interpretation so operators do not have to relearn the product by surface.
 
-The weekly packaging seam now has an explicit structured contract, `weekly_story_v1`, finalized through `src/weekly_packaging.py` and exposed by `build_weekly_review_pack(...)`. That contract gives the visible weekly surfaces one shared summary, next-step, section order, and evidence-strip model instead of letting each renderer invent its own condensed story.
+The weekly packaging seam now has an explicit structured contract, `weekly_story_v1`, finalized through `src/weekly_packaging.py` and exposed by `build_weekly_review_pack(...)`. That contract gives the visible weekly surfaces one shared summary, next-step, section order, and evidence-strip model instead of letting each renderer invent its own condensed story. The current release also adds a bounded approval-aware weekly overlay in `src/weekly_scheduling_overlay.py`, but that overlay still lives inside the same weekly contract instead of creating a second recommendation engine.
 
 ## Product Shape
 
@@ -109,6 +109,7 @@ The shared-weekly rule is now explicit:
 - workbook, Markdown, HTML, review-pack, and scheduled handoff should all read from the same `weekly_story_v1` structure
 - renderer-specific formatting is still allowed
 - renderer-specific section selection, local winner selection, and ad hoc summary invention are not
+- weekly-facing summary slots such as workbook Dashboard, Executive Summary, and shared run-change summaries should resolve their decision/why/next-step values from that same weekly story before falling back to raw operator summaries
 
 `scheduled_handoff` is inside that shared contract, but it still carries bounded fallback logic when older report payloads do not have the newer weekly packaging fields. That fallback is a compatibility seam, not a second weekly authority.
 
@@ -276,7 +277,7 @@ Each section is intentionally compact:
 
 That contract is not a new source of truth for raw portfolio priority. It is the shared explanation layer that sits on top of the raw operator, Action Sync, and enrichment state so the visible weekly artifacts stay aligned while remaining easier to scan.
 
-The tracked release boundary currently stops there. Approval-aware weekly scheduling remains a deferred design thread and is not a second weekly authority in the shipped architecture.
+The tracked release boundary now includes one bounded approval-aware weekly scheduling overlay. That overlay may promote approval review or follow-up work inside `weekly_story_v1`, but only when blocked or urgent portfolio pressure is not active. It is not a second weekly authority and it does not rewrite `operator_queue`, `primary_target`, or raw operator recommendation state.
 
 ## Warehouse And Regeneration
 
