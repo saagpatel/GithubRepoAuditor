@@ -1,5 +1,7 @@
 # Roadmap: Phases 93-97
 
+This roadmap is retained as historical context for the `93-97` arc. The active forward roadmap now lives in [2026-04-14-roadmap-phases-98-102.md](/Users/d/Projects/GithubRepoAuditor/docs/plans/2026-04-14-roadmap-phases-98-102.md), and the reusable phase closeout workflow now lives in [phase-closeout-template.md](/Users/d/Projects/GithubRepoAuditor/docs/plans/phase-closeout-template.md).
+
 ## Current Status Snapshot
 - Phases 96 and 97 are complete and merged on `main`
 - Phase 95 scheduling remains explicitly deferred and quarantined from the tracked release boundary
@@ -7,23 +9,8 @@
 - The `88-92` roadmap arc is complete and now historical context only
 - The next planning arc begins in [2026-04-14-roadmap-phases-98-102.md](/Users/d/Projects/GithubRepoAuditor/docs/plans/2026-04-14-roadmap-phases-98-102.md)
 
-## Phase Closeout Standard
-Every phase from this roadmap is only complete when all of the following are true:
-
-1. Roadmap status is refreshed first and the active phase is marked clearly.
-2. Planned behavior is implemented and any explicit deferrals are called out.
-3. Verification is recorded, including workbook-gate status and workbook manual signoff state.
-4. Git work is closed end to end:
-   - branch created
-   - commit created
-   - PR opened
-   - PR merged
-   - local `main` synced to `origin/main`
-   - open PR check returns none
-   - merged and stale branches are pruned
-5. Generated artifacts are cleaned up unless intentionally retained.
-6. The phase summary states what shipped and what the next phase will target.
-7. Planning restarts before implementation begins for the next phase.
+## Historical Closeout Note
+The `93-97` arc used a stricter release-closeout checklist because those phases included workbook-facing changes, release-boundary reconciliation, and manual workbook signoff. Keep that history for context, but use the active closeout workflow in [phase-closeout-template.md](/Users/d/Projects/GithubRepoAuditor/docs/plans/phase-closeout-template.md) for future phases.
 
 ## Phase 93: Unified Approval Workflow + Approval Ledger
 Status: Complete
@@ -51,7 +38,7 @@ Goal:
 - Blend approval backlog, follow-up timing, and portfolio pressure into clearer weekly scheduling guidance while keeping execution human-led.
 
 ## Phase 96: Weekly Story Consolidation + Explainability Baseline
-Status: Complete on release branch
+Status: Complete on `main`
 
 Goal:
 - Consolidate the weekly story into one shared `weekly_story_v1` contract, route the weekly-facing artifacts through that contract, and then compress repeated wording into compact evidence packs without rewriting raw operator targeting.

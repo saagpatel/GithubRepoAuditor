@@ -1,6 +1,6 @@
 # Product Modes
 
-GitHub Repo Auditor now works best when you think about it as one operating system with four product modes. The flags stay the same underneath; this guide is the shared map for the docs, CLI help, workbook, HTML, Markdown, and review-pack wording.
+GitHub Repo Auditor now works best when you think about it as one operating system with four product modes. The flags stay the same underneath; this guide is the shared map for the docs, CLI help, workbook, HTML, Markdown, review-pack, and scheduled-handoff wording.
 
 ## First Run
 
