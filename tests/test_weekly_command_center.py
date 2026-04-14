@@ -1,6 +1,76 @@
 from __future__ import annotations
 
-from src.weekly_command_center import build_weekly_command_center_digest
+from src.weekly_command_center import (
+    build_weekly_command_center_digest,
+    render_weekly_command_center_markdown,
+)
+
+
+def _make_portfolio_truth() -> dict:
+    return {
+        "projects": [
+            {
+                "identity": {"display_name": "GithubRepoAuditor"},
+                "declared": {"operating_path": "maintain"},
+                "derived": {
+                    "registry_status": "active",
+                    "activity_status": "active",
+                    "path_override": "investigate",
+                    "path_confidence": "low",
+                    "context_quality": "boilerplate",
+                    "path_rationale": "Still missing enough trustworthy context.",
+                },
+                "risk": {
+                    "risk_tier": "elevated",
+                    "risk_factors": ["weak-context-active", "investigate-override"],
+                    "risk_summary": "2 risk factor(s): weak context quality, investigate override active.",
+                    "doctor_gap": False,
+                    "context_risk": True,
+                    "path_risk": True,
+                },
+            },
+            {
+                "identity": {"display_name": "JobCommandCenter"},
+                "declared": {"operating_path": ""},
+                "derived": {
+                    "registry_status": "active",
+                    "activity_status": "active",
+                    "path_override": "investigate",
+                    "path_confidence": "low",
+                    "context_quality": "boilerplate",
+                    "path_rationale": "No stable path is declared yet.",
+                },
+                "risk": {
+                    "risk_tier": "elevated",
+                    "risk_factors": ["weak-context-active", "missing-operating-path"],
+                    "risk_summary": "2 risk factor(s): weak context quality, no operating path declared.",
+                    "doctor_gap": False,
+                    "context_risk": True,
+                    "path_risk": True,
+                },
+            },
+            {
+                "identity": {"display_name": "ArchiveMe"},
+                "declared": {"operating_path": "archive"},
+                "derived": {
+                    "registry_status": "archived",
+                    "activity_status": "stale",
+                    "path_override": "",
+                    "path_confidence": "high",
+                    "context_quality": "standard",
+                    "path_rationale": "Archive path is settled.",
+                },
+                "risk": {
+                    "risk_tier": "deferred",
+                    "risk_factors": [],
+                    "risk_summary": "Archived or archive-path project.",
+                    "doctor_gap": False,
+                    "context_risk": False,
+                    "path_risk": False,
+                },
+            },
+        ]
+    }
 
 
 def test_build_weekly_command_center_digest_surfaces_truth_and_guardrails() -> None:
@@ -31,43 +101,7 @@ def test_build_weekly_command_center_digest_surfaces_truth_and_guardrails() -> N
         "operator_summary": report_data["operator_summary"],
         "operator_queue": [],
     }
-    portfolio_truth = {
-        "projects": [
-            {
-                "identity": {"display_name": "GithubRepoAuditor"},
-                "declared": {"operating_path": "maintain"},
-                "derived": {
-                    "registry_status": "active",
-                    "path_override": "investigate",
-                    "path_confidence": "low",
-                    "context_quality": "boilerplate",
-                    "path_rationale": "Still missing enough trustworthy context.",
-                },
-            },
-            {
-                "identity": {"display_name": "JobCommandCenter"},
-                "declared": {"operating_path": ""},
-                "derived": {
-                    "registry_status": "active",
-                    "path_override": "investigate",
-                    "path_confidence": "low",
-                    "context_quality": "boilerplate",
-                    "path_rationale": "No stable path is declared yet.",
-                },
-            },
-            {
-                "identity": {"display_name": "ArchiveMe"},
-                "declared": {"operating_path": "archive"},
-                "derived": {
-                    "registry_status": "archived",
-                    "path_override": "",
-                    "path_confidence": "high",
-                    "context_quality": "standard",
-                    "path_rationale": "Archive path is settled.",
-                },
-            },
-        ]
-    }
+    portfolio_truth = _make_portfolio_truth()
 
     digest = build_weekly_command_center_digest(
         report_data,
@@ -87,3 +121,13 @@ def test_build_weekly_command_center_digest_surfaces_truth_and_guardrails() -> N
     assert digest["path_attention"][0]["repo"] == "JobCommandCenter"
     assert digest["path_attention"][0]["headline"] == "Unspecified stable path"
     assert digest["report_only_guardrail"].startswith("This digest is descriptive only.")
+
+    # Risk posture assertions
+    assert digest["risk_posture"]["elevated_count"] == 2
+    assert digest["portfolio_truth"]["risk_tier_counts"]["elevated"] == 2
+    assert digest["portfolio_truth"]["risk_tier_counts"]["deferred"] == 1
+
+    rendered_md = render_weekly_command_center_markdown(digest)
+    assert "## Risk Posture" in rendered_md
+    assert "GithubRepoAuditor" in rendered_md
+    assert "JobCommandCenter" in rendered_md

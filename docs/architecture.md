@@ -155,6 +155,20 @@ The normalized path contract is intentionally strict:
 
 This keeps path semantics advisory and portable without reopening queue, approval, automation, or command authority.
 
+## Portfolio Risk Overlay
+
+Phase 108 adds a structured risk overlay on top of the shipped truth, context, path, and trust layers. `src/portfolio_risk.py` is the single owner of risk tier derivation. Risk tiers are `elevated`, `moderate`, `baseline`, and `deferred`. The overlay is advisory-only and derives from already-present truth fields — no new data collection.
+
+Risk factors are accumulated during reconciliation and written into `RiskFields` on each `PortfolioTruthProject`. Compound factor thresholds keep signal gradation useful: `elevated` requires three or more factors, or the specific compound pair `weak-context-active + investigate-override`. Most repos land at `moderate` or `baseline`. Archived and stale-non-maintain repos are short-circuited to `deferred`.
+
+The weekly command center digest surfaces risk posture via `risk_posture.elevated_count`, `risk_posture.risk_tier_counts`, and `risk_posture.top_elevated`, and renders a `## Risk Posture` section. Risk data is advisory-only and does not widen any automation or approval authority.
+
+## Cross-Repo Doctor Standard
+
+Phase 108 standardizes a minimal doctor/release-check contract for strategic repos. The standard defines `full` and `basic` tiers with stack-specific patterns. Documented in `docs/doctor-release-standard.md`.
+
+`declared.doctor_standard` is set in the catalog for repos that have adopted the standard. `risk.doctor_gap` is a derived boolean that flags strategic repos missing a declared standard. The standard is advisory-only — it documents expected commands and patterns, does not enforce them automatically.
+
 The active roadmap already treats two cleanup tracks as real dependencies for later feature work:
 
 - Phase 99 extracted the weekly packaging seam into `src/weekly_packaging.py`, but `src/report_enrichment.py` still remains a broad raw-assembly module that should not absorb new weekly feature growth casually
@@ -443,7 +457,12 @@ src/
   excel_export.py
   scheduled_handoff.py
   report_enrichment.py
+  weekly_command_center.py       — report-only weekly digest contract and artifact rendering
   operator_control_center.py
+  operator_decision_quality.py   — versioned decision_quality_v1 contract assembly
+  operator_control_center_rendering.py
+  operator_snapshot_packaging.py
+  operator_resolution_trend.py
   implementation_hotspots.py
   action_sync_readiness.py
   action_sync_packets.py
@@ -452,9 +471,21 @@ src/
   action_sync_automation.py
   intervention_ledger.py
   warehouse.py
+  portfolio_truth_types.py       — schema, dataclasses (Identity/Declared/Derived/Advisory/Risk/Truth)
+  portfolio_truth_sources.py     — workspace inspection, context analysis
+  portfolio_truth_reconcile.py   — multi-source reconciliation pipeline
+  portfolio_truth_render.py      — truth table and registry markdown rendering
+  portfolio_truth_validate.py    — snapshot validation
+  portfolio_truth_publish.py     — JSON + markdown file publishing
+  portfolio_catalog.py           — YAML catalog loading and normalization
+  portfolio_context_contract.py  — context quality analysis contract
+  portfolio_context_recovery.py  — context recovery planning and application
+  portfolio_pathing.py           — operating path derivation
+  portfolio_risk.py              — risk tier derivation (Phase 108)
 
 docs/
   architecture.md
+  doctor-release-standard.md     — doctor/release-check standard for strategic repos
   modes.md
   weekly-review.md
   writeback-safety-model.md

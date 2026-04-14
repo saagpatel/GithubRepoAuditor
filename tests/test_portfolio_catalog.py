@@ -57,6 +57,35 @@ groups:
     assert catalog["repos"]["repob"]["target_maturity"] == "operating"
     assert catalog["groups"]["it"]["category"] == "it-work"
     assert catalog["groups"]["it"]["section_marker"] == "ITPRJsViaClaude/"
+    # doctor_standard defaults to empty when not specified
+    assert catalog["repos"]["user/repoa"]["doctor_standard"] == ""
+    assert catalog["repos"]["repob"]["doctor_standard"] == ""
+
+
+def test_load_portfolio_catalog_normalizes_doctor_standard(tmp_path: Path):
+    path = tmp_path / "portfolio-catalog.yaml"
+    path.write_text(
+        """
+defaults:
+  lifecycle_state: maintenance
+
+repos:
+  RepoWithFullStandard:
+    doctor_standard: full
+  RepoWithBasicStandard:
+    doctor_standard: basic
+  RepoWithInvalidStandard:
+    doctor_standard: invalid
+  RepoWithNoStandard: {}
+"""
+    )
+
+    catalog = load_portfolio_catalog(path)
+
+    assert catalog["repos"]["repowithfullstandard"]["doctor_standard"] == "full"
+    assert catalog["repos"]["repowithbasicstandard"]["doctor_standard"] == "basic"
+    assert catalog["repos"]["repowithinvalidstandard"]["doctor_standard"] == ""
+    assert catalog["repos"]["repowithnostandard"]["doctor_standard"] == ""
 
 
 def test_catalog_entry_matches_full_name_then_bare_name():
@@ -138,24 +167,33 @@ def test_evaluate_intent_alignment_uses_disposition_and_focus():
         "intended_disposition": "archive",
     }
 
-    assert evaluate_intent_alignment(
-        maintain_entry,
-        completeness_tier="functional",
-        archived=False,
-        operator_focus="Watch Closely",
-    )[0] == "aligned"
-    assert evaluate_intent_alignment(
-        archive_entry,
-        completeness_tier="abandoned",
-        archived=False,
-        operator_focus="Fragile",
-    )[0] == "aligned"
-    assert evaluate_intent_alignment(
-        maintain_entry,
-        completeness_tier="skeleton",
-        archived=False,
-        operator_focus="Revalidate",
-    )[0] == "needs-review"
+    assert (
+        evaluate_intent_alignment(
+            maintain_entry,
+            completeness_tier="functional",
+            archived=False,
+            operator_focus="Watch Closely",
+        )[0]
+        == "aligned"
+    )
+    assert (
+        evaluate_intent_alignment(
+            archive_entry,
+            completeness_tier="abandoned",
+            archived=False,
+            operator_focus="Fragile",
+        )[0]
+        == "aligned"
+    )
+    assert (
+        evaluate_intent_alignment(
+            maintain_entry,
+            completeness_tier="skeleton",
+            archived=False,
+            operator_focus="Revalidate",
+        )[0]
+        == "needs-review"
+    )
 
 
 def test_catalog_line_and_summaries_cover_missing_contracts():
@@ -172,7 +210,12 @@ def test_catalog_line_and_summaries_cover_missing_contracts():
                 "intent_alignment": "aligned",
             }
         },
-        {"portfolio_catalog": {"has_explicit_entry": False, "intent_alignment": "missing-contract"}},
+        {
+            "portfolio_catalog": {
+                "has_explicit_entry": False,
+                "intent_alignment": "missing-contract",
+            }
+        },
     ]
 
     line = build_catalog_line(audits[0]["portfolio_catalog"])

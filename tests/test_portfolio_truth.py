@@ -74,13 +74,16 @@ Keep the supporting handoff artifacts in sync with the primary context file.
     )
     _write(alpha / "DISCOVERY-SUMMARY.md", "# Discovery\n")
     _write(alpha / "HANDOFF.md", "# Handoff\n")
-    _write(alpha / "package.json", '{"dependencies":{"next":"14.2.0","react":"19.0.0","typescript":"5.0.0"}}')
+    _write(
+        alpha / "package.json",
+        '{"dependencies":{"next":"14.2.0","react":"19.0.0","typescript":"5.0.0"}}',
+    )
     _set_mtime(alpha / "README.md", 1_700_000_000)
 
     beta = workspace / "ITPRJsViaClaude" / "Beta"
     beta.mkdir(parents=True)
     _write(beta / "AGENTS.md", "# AGENTS\n\ncodex-os baseline\n")
-    _write(beta / "Cargo.toml", "[package]\nname = \"beta\"\n")
+    _write(beta / "Cargo.toml", '[package]\nname = "beta"\n')
     _set_mtime(beta / "AGENTS.md", 1_696_000_000)
     _set_mtime(beta / "Cargo.toml", 1_696_000_000)
 
@@ -176,6 +179,9 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     assert alpha.derived.primary_context_file == "CLAUDE.md"
     assert alpha.derived.project_summary_present is True
     assert alpha.derived.next_recommended_move_present is True
+    assert hasattr(alpha.declared, "doctor_standard")
+    assert hasattr(alpha, "risk")
+    assert alpha.risk.risk_tier in {"elevated", "moderate", "baseline", "deferred"}
 
     assert beta.identity.section_marker == "ITPRJsViaClaude/"
     assert beta.declared.category == "it-work"
@@ -184,6 +190,8 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
 
     assert gamma.identity.section_marker == "iOS Projects"
     assert gamma.derived.stack == ["Swift"]
+
+    assert result.snapshot.schema_version == "0.4.0"
 
 
 def test_truth_snapshot_matches_repo_contracts_by_full_name(
@@ -231,7 +239,9 @@ repos:
         now=datetime.fromtimestamp(1_700_200_000, tz=timezone.utc),
     )
 
-    alpha = next(project for project in result.snapshot.projects if project.identity.display_name == "Alpha")
+    alpha = next(
+        project for project in result.snapshot.projects if project.identity.display_name == "Alpha"
+    )
     assert alpha.declared.owner == "portfolio-owner"
     assert alpha.declared.review_cadence == "weekly"
     assert alpha.declared.category == "commercial"

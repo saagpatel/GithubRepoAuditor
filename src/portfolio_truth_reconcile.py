@@ -12,6 +12,7 @@ from src.portfolio_catalog import (
     load_portfolio_catalog,
 )
 from src.portfolio_pathing import build_operating_path_entry
+from src.portfolio_risk import build_risk_entry
 from src.portfolio_truth_sources import (
     discover_workspace_projects,
     load_legacy_registry_rows,
@@ -25,6 +26,7 @@ from src.portfolio_truth_types import (
     IdentityFields,
     PortfolioTruthProject,
     PortfolioTruthSnapshot,
+    RiskFields,
 )
 from src.registry_parser import _normalize
 
@@ -96,7 +98,9 @@ def build_portfolio_truth_snapshot(
         )
         for raw_project in workspace_projects
     ]
-    projects.sort(key=lambda item: (item.identity.section_marker.lower(), item.identity.display_name.lower()))
+    projects.sort(
+        key=lambda item: (item.identity.section_marker.lower(), item.identity.display_name.lower())
+    )
 
     source_summary = {
         "workspace_root": workspace_root.as_posix(),
@@ -105,11 +109,17 @@ def build_portfolio_truth_snapshot(
         "catalog_warnings": list(catalog_data.get("warnings") or []),
         "legacy_registry_rows": len(legacy_rows),
         "notion_context_rows": len(notion_context),
-        "context_quality_counts": dict(Counter(project.derived.context_quality for project in projects)),
-        "registry_status_counts": dict(Counter(project.derived.registry_status for project in projects)),
+        "context_quality_counts": dict(
+            Counter(project.derived.context_quality for project in projects)
+        ),
+        "registry_status_counts": dict(
+            Counter(project.derived.registry_status for project in projects)
+        ),
         "duplicate_display_names": sorted(
             name
-            for name, count in Counter(project.identity.display_name for project in projects).items()
+            for name, count in Counter(
+                project.identity.display_name for project in projects
+            ).items()
             if count > 1
         ),
     }
@@ -130,7 +140,9 @@ def build_portfolio_truth_snapshot(
         warnings=warnings,
         projects=projects,
     )
-    return PortfolioTruthBuildResult(snapshot=snapshot, catalog_data=catalog_data, legacy_rows=legacy_rows)
+    return PortfolioTruthBuildResult(
+        snapshot=snapshot, catalog_data=catalog_data, legacy_rows=legacy_rows
+    )
 
 
 def _build_truth_project(
@@ -175,7 +187,9 @@ def _build_truth_project(
         "lifecycle_state": _select_declared("lifecycle_state", repo_entry, group_entry, provenance),
         "criticality": _select_declared("criticality", repo_entry, group_entry, provenance),
         "review_cadence": _select_declared("review_cadence", repo_entry, group_entry, provenance),
-        "intended_disposition": _select_declared("intended_disposition", repo_entry, group_entry, provenance),
+        "intended_disposition": _select_declared(
+            "intended_disposition", repo_entry, group_entry, provenance
+        ),
         "maturity_program": _select_declared_with_default(
             "maturity_program",
             repo_entry,
@@ -190,16 +204,28 @@ def _build_truth_project(
             default_field="catalog_default_target_maturity",
             provenance=provenance,
         ),
-        "category": _select_with_legacy("category", repo_entry, group_entry, legacy, raw_project, provenance),
-        "tool_provenance": _select_tool_provenance(repo_entry, group_entry, legacy, raw_project, provenance),
-        "notes": _select_with_legacy("notes", repo_entry, group_entry, legacy, raw_project, provenance),
+        "category": _select_with_legacy(
+            "category", repo_entry, group_entry, legacy, raw_project, provenance
+        ),
+        "tool_provenance": _select_tool_provenance(
+            repo_entry, group_entry, legacy, raw_project, provenance
+        ),
+        "notes": _select_with_legacy(
+            "notes", repo_entry, group_entry, legacy, raw_project, provenance
+        ),
+        "doctor_standard": _select_declared("doctor_standard", repo_entry, group_entry, provenance),
     }
 
     context_quality = raw_project["context_quality"]
-    provenance["derived.context_quality"] = {"source": "workspace", "detail": raw_project["context_quality"]}
+    provenance["derived.context_quality"] = {
+        "source": "workspace",
+        "detail": raw_project["context_quality"],
+    }
 
     last_activity = raw_project["last_meaningful_activity_at"]
-    activity_status = _activity_status_for(last_activity, declared_values["lifecycle_state"], now=now)
+    activity_status = _activity_status_for(
+        last_activity, declared_values["lifecycle_state"], now=now
+    )
     registry_status = _registry_status_for(activity_status)
 
     path_entry = build_operating_path_entry(
@@ -208,8 +234,12 @@ def _build_truth_project(
             "has_explicit_entry": bool(
                 repo_entry.get("has_explicit_entry") or group_entry.get("has_explicit_entry")
             ),
-            "catalog_default_maturity_program": repo_entry.get("catalog_default_maturity_program", ""),
-            "catalog_default_target_maturity": repo_entry.get("catalog_default_target_maturity", ""),
+            "catalog_default_maturity_program": repo_entry.get(
+                "catalog_default_maturity_program", ""
+            ),
+            "catalog_default_target_maturity": repo_entry.get(
+                "catalog_default_target_maturity", ""
+            ),
         },
         context_quality=context_quality,
         registry_status=registry_status,
@@ -231,6 +261,20 @@ def _build_truth_project(
         "detail": "derived",
     }
 
+    risk_entry = build_risk_entry(
+        display_name=raw_project["name"],
+        operating_path=path_entry.get("operating_path", ""),
+        path_override=path_entry.get("path_override", ""),
+        path_confidence=path_entry.get("path_confidence", "legacy"),
+        context_quality=context_quality,
+        activity_status=activity_status,
+        registry_status=registry_status,
+        criticality=declared_values["criticality"],
+        doctor_standard=declared_values["doctor_standard"],
+        known_risks_present=bool(raw_project["known_risks_present"]),
+        run_instructions_present=bool(raw_project["run_instructions_present"]),
+    )
+
     declared = DeclaredFields(
         owner=declared_values["owner"],
         team=declared_values["team"],
@@ -245,6 +289,7 @@ def _build_truth_project(
         category=declared_values["category"],
         tool_provenance=declared_values["tool_provenance"],
         notes=declared_values["notes"],
+        doctor_standard=declared_values["doctor_standard"],
     )
     provenance["derived.last_meaningful_activity_at"] = {
         "source": "git" if raw_project["has_git"] and last_activity else "workspace",
@@ -253,8 +298,14 @@ def _build_truth_project(
     provenance["derived.activity_status"] = {"source": "derived", "detail": activity_status}
     provenance["derived.registry_status"] = {"source": "derived", "detail": registry_status}
     provenance["derived.stack"] = {"source": "workspace", "detail": ", ".join(raw_project["stack"])}
-    provenance["derived.context_files"] = {"source": "workspace", "detail": str(len(raw_project["context_files"]))}
-    provenance["derived.primary_context_file"] = {"source": "workspace", "detail": raw_project["primary_context_file"]}
+    provenance["derived.context_files"] = {
+        "source": "workspace",
+        "detail": str(len(raw_project["context_files"])),
+    }
+    provenance["derived.primary_context_file"] = {
+        "source": "workspace",
+        "detail": raw_project["primary_context_file"],
+    }
     for field in (
         "project_summary_present",
         "current_state_present",
@@ -263,7 +314,10 @@ def _build_truth_project(
         "known_risks_present",
         "next_recommended_move_present",
     ):
-        provenance[f"derived.{field}"] = {"source": "workspace", "detail": str(bool(raw_project[field])).lower()}
+        provenance[f"derived.{field}"] = {
+            "source": "workspace",
+            "detail": str(bool(raw_project[field])).lower(),
+        }
 
     if legacy and legacy.get("status") and legacy["status"] != registry_status:
         warnings.append(
@@ -272,7 +326,11 @@ def _build_truth_project(
     if not repo_entry.get("has_explicit_entry") and not group_entry.get("has_explicit_entry"):
         warnings.append("No explicit catalog contract is recorded for this project yet.")
     if path_entry.get("path_override") == "investigate":
-        warnings.append(path_entry.get("path_rationale", "Operating path currently requires investigate override."))
+        warnings.append(
+            path_entry.get(
+                "path_rationale", "Operating path currently requires investigate override."
+            )
+        )
 
     derived = DerivedFields(
         stack=raw_project["stack"],
@@ -302,10 +360,24 @@ def _build_truth_project(
         legacy_category=legacy.get("category", ""),
         legacy_tool_provenance=legacy.get("tool", ""),
     )
+    risk = RiskFields(
+        risk_tier=risk_entry["risk_tier"],
+        risk_factors=risk_entry["risk_factors"],
+        risk_summary=risk_entry["risk_summary"],
+        doctor_gap=risk_entry["doctor_gap"],
+        context_risk=risk_entry["context_risk"],
+        path_risk=risk_entry["path_risk"],
+    )
+    provenance["risk.risk_tier"] = {"source": "derived", "detail": risk_entry["risk_tier"]}
+    provenance["risk.doctor_gap"] = {
+        "source": "derived",
+        "detail": str(risk_entry["doctor_gap"]).lower(),
+    }
     return PortfolioTruthProject(
         identity=identity,
         declared=declared,
         derived=derived,
+        risk=risk,
         advisory=advisory,
         provenance=provenance,
         warnings=warnings,
@@ -321,7 +393,10 @@ def _select_declared(
     for source_name, source in (("catalog_repo", repo_entry), ("catalog_group", group_entry)):
         value = str(source.get(field, "") or "").strip()
         if value:
-            provenance[f"declared.{field}"] = {"source": source_name, "detail": str(source.get("catalog_key") or source.get("group_key") or "")}
+            provenance[f"declared.{field}"] = {
+                "source": source_name,
+                "detail": str(source.get("catalog_key") or source.get("group_key") or ""),
+            }
             return value
     provenance[f"declared.{field}"] = {"source": "fallback", "detail": ""}
     return ""
@@ -358,7 +433,10 @@ def _select_with_legacy(
         return value
     legacy_value = str(legacy.get(field, "") or "").strip()
     if legacy_value:
-        provenance[f"declared.{field}"] = {"source": "legacy_registry", "detail": raw_project["name"]}
+        provenance[f"declared.{field}"] = {
+            "source": "legacy_registry",
+            "detail": raw_project["name"],
+        }
         return legacy_value
     return ""
 
@@ -384,7 +462,9 @@ def _select_tool_provenance(
     return "unknown"
 
 
-def _resolve_group_key(relative_path: str, group_entry: dict[str, Any], raw_project: dict[str, Any]) -> str:
+def _resolve_group_key(
+    relative_path: str, group_entry: dict[str, Any], raw_project: dict[str, Any]
+) -> str:
     if group_entry.get("group_key"):
         return str(group_entry["group_key"])
     if "Swift" in raw_project.get("stack", []):
@@ -400,7 +480,9 @@ def _resolve_group_label(group_entry: dict[str, Any], raw_project: dict[str, Any
     return "Root Level"
 
 
-def _resolve_section_marker(relative_path: str, group_entry: dict[str, Any], raw_project: dict[str, Any]) -> str:
+def _resolve_section_marker(
+    relative_path: str, group_entry: dict[str, Any], raw_project: dict[str, Any]
+) -> str:
     if group_entry.get("section_marker"):
         return str(group_entry["section_marker"])
     if "Swift" in raw_project.get("stack", []):

@@ -97,6 +97,7 @@ repos:
     review_cadence: weekly
     intended_disposition: experiment
     tool_provenance: codex
+    doctor_standard: full
   Devil's Advocate:
     owner: d
     lifecycle_state: active
@@ -154,6 +155,8 @@ repos:
     tool_provenance: codex
     maturity_program: maintain
     target_maturity: operating
+    criticality: high
+    doctor_standard: full
   knowledgecore:
     owner: d
     lifecycle_state: active
@@ -186,6 +189,7 @@ repos:
     review_cadence: weekly
     intended_disposition: maintain
     tool_provenance: codex
+    doctor_standard: basic
   ScreenshottoDataSelect:
     owner: d
     lifecycle_state: active
@@ -221,6 +225,8 @@ repos:
     tool_provenance: codex
     maturity_program: maintain
     target_maturity: operating
+    criticality: high
+    doctor_standard: full
   JobCommandCenter:
     owner: d
     purpose: desktop command-center shell for portfolio and operator workflows
@@ -231,6 +237,8 @@ repos:
     tool_provenance: codex
     maturity_program: maintain
     target_maturity: operating
+    criticality: high
+    doctor_standard: full
   Chromafield:
     owner: d
     lifecycle_state: active

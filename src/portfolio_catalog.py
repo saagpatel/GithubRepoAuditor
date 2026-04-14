@@ -10,6 +10,7 @@ VALID_REVIEW_CADENCE = {"weekly", "monthly", "quarterly", "ad-hoc"}
 VALID_INTENDED_DISPOSITIONS = {"maintain", "finish", "archive", "experiment"}
 VALID_CATEGORY_TAGS = {"commercial", "it-work", "vanity", "fun", "learning", "infrastructure"}
 VALID_TOOL_PROVENANCE = {"claude-code", "codex", "gpt", "grok", "claude-ai", "unknown"}
+VALID_DOCTOR_STANDARDS = {"full", "basic"}
 DEFAULT_CATALOG_PATH = Path("config") / "portfolio-catalog.yaml"
 
 
@@ -116,7 +117,9 @@ def _normalize_defaults(defaults: Any, errors: list[str]) -> dict[str, str]:
     ):
         raw_value = defaults.get(key)
         if raw_value and not normalized[key]:
-            errors.append(f"Portfolio catalog defaults.{key} must be one of: {', '.join(sorted(allowed))}.")
+            errors.append(
+                f"Portfolio catalog defaults.{key} must be one of: {', '.join(sorted(allowed))}."
+            )
     return {key: value for key, value in normalized.items() if value}
 
 
@@ -146,7 +149,9 @@ def _normalize_group_entries(
         if isinstance(raw_prefixes, str):
             raw_prefixes = [raw_prefixes]
         if not isinstance(raw_prefixes, list):
-            errors.append(f"Portfolio catalog group '{key}' path_prefixes must be a list of relative workspace prefixes.")
+            errors.append(
+                f"Portfolio catalog group '{key}' path_prefixes must be a list of relative workspace prefixes."
+            )
             continue
 
         prefixes: list[str] = []
@@ -162,29 +167,49 @@ def _normalize_group_entries(
             prefixes.append(normalized_prefix)
 
         if not prefixes:
-            errors.append(f"Portfolio catalog group '{key}' must declare at least one path_prefixes entry.")
+            errors.append(
+                f"Portfolio catalog group '{key}' must declare at least one path_prefixes entry."
+            )
             continue
 
         normalized = {
             "group_key": key,
             "label": _safe_text(raw_value.get("label")) or key,
             "section_marker": _safe_text(raw_value.get("section_marker")) or key,
-            "section_label": _safe_text(raw_value.get("section_label")) or _safe_text(raw_value.get("label")) or key,
+            "section_label": _safe_text(raw_value.get("section_label"))
+            or _safe_text(raw_value.get("label"))
+            or key,
             "section_note": _safe_text(raw_value.get("section_note")),
             "order": int(raw_value.get("order", order)),
             "path_prefixes": prefixes,
             "owner": _safe_text(raw_value.get("owner")),
             "team": _safe_text(raw_value.get("team")),
             "purpose": _safe_text(raw_value.get("purpose")),
-            "lifecycle_state": _normalize_enum(raw_value.get("lifecycle_state"), VALID_LIFECYCLE_STATES) or defaults.get("lifecycle_state", ""),
-            "criticality": _normalize_enum(raw_value.get("criticality"), VALID_CRITICALITY) or defaults.get("criticality", ""),
-            "review_cadence": _normalize_enum(raw_value.get("review_cadence"), VALID_REVIEW_CADENCE) or defaults.get("review_cadence", ""),
-            "intended_disposition": _normalize_enum(raw_value.get("intended_disposition"), VALID_INTENDED_DISPOSITIONS),
-            "category": _normalize_enum(raw_value.get("category"), VALID_CATEGORY_TAGS) or defaults.get("category", ""),
-            "tool_provenance": _normalize_enum(raw_value.get("tool_provenance"), VALID_TOOL_PROVENANCE) or defaults.get("tool_provenance", ""),
-            "maturity_program": _safe_text(raw_value.get("maturity_program")).lower() or defaults.get("maturity_program", ""),
-            "target_maturity": _safe_text(raw_value.get("target_maturity")).lower() or defaults.get("target_maturity", ""),
+            "lifecycle_state": _normalize_enum(
+                raw_value.get("lifecycle_state"), VALID_LIFECYCLE_STATES
+            )
+            or defaults.get("lifecycle_state", ""),
+            "criticality": _normalize_enum(raw_value.get("criticality"), VALID_CRITICALITY)
+            or defaults.get("criticality", ""),
+            "review_cadence": _normalize_enum(raw_value.get("review_cadence"), VALID_REVIEW_CADENCE)
+            or defaults.get("review_cadence", ""),
+            "intended_disposition": _normalize_enum(
+                raw_value.get("intended_disposition"), VALID_INTENDED_DISPOSITIONS
+            ),
+            "category": _normalize_enum(raw_value.get("category"), VALID_CATEGORY_TAGS)
+            or defaults.get("category", ""),
+            "tool_provenance": _normalize_enum(
+                raw_value.get("tool_provenance"), VALID_TOOL_PROVENANCE
+            )
+            or defaults.get("tool_provenance", ""),
+            "maturity_program": _safe_text(raw_value.get("maturity_program")).lower()
+            or defaults.get("maturity_program", ""),
+            "target_maturity": _safe_text(raw_value.get("target_maturity")).lower()
+            or defaults.get("target_maturity", ""),
             "notes": _safe_text(raw_value.get("notes")),
+            "doctor_standard": _normalize_enum(
+                raw_value.get("doctor_standard"), VALID_DOCTOR_STANDARDS
+            ),
             "has_explicit_entry": True,
         }
         for field_name, allowed in (
@@ -197,7 +222,9 @@ def _normalize_group_entries(
         ):
             raw_enum = raw_value.get(field_name)
             if raw_enum and not normalized[field_name]:
-                errors.append(f"Portfolio catalog group '{key}' has invalid {field_name}: {raw_enum}.")
+                errors.append(
+                    f"Portfolio catalog group '{key}' has invalid {field_name}: {raw_enum}."
+                )
 
         normalized_entries[_normalize_key(key)] = normalized
 
@@ -234,15 +261,31 @@ def _normalize_repo_entries(
             "owner": _safe_text(raw_value.get("owner")),
             "team": _safe_text(raw_value.get("team")),
             "purpose": _safe_text(raw_value.get("purpose")),
-            "lifecycle_state": _normalize_enum(raw_value.get("lifecycle_state"), VALID_LIFECYCLE_STATES) or defaults.get("lifecycle_state", ""),
-            "criticality": _normalize_enum(raw_value.get("criticality"), VALID_CRITICALITY) or defaults.get("criticality", ""),
-            "review_cadence": _normalize_enum(raw_value.get("review_cadence"), VALID_REVIEW_CADENCE) or defaults.get("review_cadence", ""),
-            "intended_disposition": _normalize_enum(raw_value.get("intended_disposition"), VALID_INTENDED_DISPOSITIONS),
-            "category": _normalize_enum(raw_value.get("category"), VALID_CATEGORY_TAGS) or defaults.get("category", ""),
-            "tool_provenance": _normalize_enum(raw_value.get("tool_provenance"), VALID_TOOL_PROVENANCE) or defaults.get("tool_provenance", ""),
-            "maturity_program": _safe_text(raw_value.get("maturity_program")).lower() or defaults.get("maturity_program", ""),
-            "target_maturity": _safe_text(raw_value.get("target_maturity")).lower() or defaults.get("target_maturity", ""),
+            "lifecycle_state": _normalize_enum(
+                raw_value.get("lifecycle_state"), VALID_LIFECYCLE_STATES
+            )
+            or defaults.get("lifecycle_state", ""),
+            "criticality": _normalize_enum(raw_value.get("criticality"), VALID_CRITICALITY)
+            or defaults.get("criticality", ""),
+            "review_cadence": _normalize_enum(raw_value.get("review_cadence"), VALID_REVIEW_CADENCE)
+            or defaults.get("review_cadence", ""),
+            "intended_disposition": _normalize_enum(
+                raw_value.get("intended_disposition"), VALID_INTENDED_DISPOSITIONS
+            ),
+            "category": _normalize_enum(raw_value.get("category"), VALID_CATEGORY_TAGS)
+            or defaults.get("category", ""),
+            "tool_provenance": _normalize_enum(
+                raw_value.get("tool_provenance"), VALID_TOOL_PROVENANCE
+            )
+            or defaults.get("tool_provenance", ""),
+            "maturity_program": _safe_text(raw_value.get("maturity_program")).lower()
+            or defaults.get("maturity_program", ""),
+            "target_maturity": _safe_text(raw_value.get("target_maturity")).lower()
+            or defaults.get("target_maturity", ""),
             "notes": _safe_text(raw_value.get("notes")),
+            "doctor_standard": _normalize_enum(
+                raw_value.get("doctor_standard"), VALID_DOCTOR_STANDARDS
+            ),
             "catalog_key": key,
             "matched_by": "full-name" if "/" in key else "bare-name",
             "has_explicit_entry": True,
@@ -257,12 +300,16 @@ def _normalize_repo_entries(
         ):
             raw_enum = raw_value.get(field_name)
             if raw_enum and not normalized[field_name]:
-                errors.append(f"Portfolio catalog entry '{key}' has invalid {field_name}: {raw_enum}.")
+                errors.append(
+                    f"Portfolio catalog entry '{key}' has invalid {field_name}: {raw_enum}."
+                )
 
         if "/" not in key:
             bare_key = _normalize_key(key)
             if bare_key in seen_bare_names:
-                warnings.append(f"Portfolio catalog bare repo key '{key}' is duplicated and may be ambiguous.")
+                warnings.append(
+                    f"Portfolio catalog bare repo key '{key}' is duplicated and may be ambiguous."
+                )
             seen_bare_names.add(bare_key)
 
         normalized_entries[_normalize_key(key)] = normalized
@@ -315,6 +362,7 @@ def catalog_entry_for_repo(
         "category": "",
         "tool_provenance": "",
         "notes": "",
+        "doctor_standard": "",
         "maturity_program": "",
         "target_maturity": "",
         "catalog_default_maturity_program": default_program,
@@ -362,6 +410,7 @@ def group_entry_for_path(
         "maturity_program": "",
         "target_maturity": "",
         "notes": "",
+        "doctor_standard": "",
         "has_explicit_entry": False,
     }
 
@@ -398,18 +447,36 @@ def evaluate_intent_alignment(
     operator_focus: str,
 ) -> tuple[str, str]:
     if not entry or not entry.get("has_explicit_entry"):
-        return ("missing-contract", "No explicit portfolio catalog contract is recorded for this repo yet.")
+        return (
+            "missing-contract",
+            "No explicit portfolio catalog contract is recorded for this repo yet.",
+        )
 
     disposition = _safe_text(entry.get("intended_disposition")).lower()
     tier = _safe_text(completeness_tier).lower()
     focus = _safe_text(operator_focus)
 
     if disposition == "archive" and (archived or tier in {"abandoned", "skeleton"}):
-        return ("aligned", "The repo posture already matches the plan to archive or let it stay dormant.")
-    if disposition == "experiment" and (tier in {"wip", "skeleton"} or focus in {"Watch Closely", "Improving"}):
-        return ("aligned", "The repo still looks like an experiment rather than a slipped maintenance commitment.")
-    if disposition == "maintain" and tier in {"functional", "shipped"} and focus not in {"Act Now", "Revalidate"}:
-        return ("aligned", "The repo is holding a maintain posture without urgent or revalidation pressure.")
+        return (
+            "aligned",
+            "The repo posture already matches the plan to archive or let it stay dormant.",
+        )
+    if disposition == "experiment" and (
+        tier in {"wip", "skeleton"} or focus in {"Watch Closely", "Improving"}
+    ):
+        return (
+            "aligned",
+            "The repo still looks like an experiment rather than a slipped maintenance commitment.",
+        )
+    if (
+        disposition == "maintain"
+        and tier in {"functional", "shipped"}
+        and focus not in {"Act Now", "Revalidate"}
+    ):
+        return (
+            "aligned",
+            "The repo is holding a maintain posture without urgent or revalidation pressure.",
+        )
     if disposition == "finish" and tier in {"wip", "functional"} and focus != "Revalidate":
         return ("aligned", "The repo still looks finishable rather than fully off-track.")
 
@@ -428,7 +495,11 @@ def build_portfolio_catalog_summary(audits: list[Any], *, catalog_path: str = ""
     explicit_count = 0
 
     for audit in audits:
-        entry = getattr(audit, "portfolio_catalog", None) if hasattr(audit, "portfolio_catalog") else (audit or {}).get("portfolio_catalog", {})
+        entry = (
+            getattr(audit, "portfolio_catalog", None)
+            if hasattr(audit, "portfolio_catalog")
+            else (audit or {}).get("portfolio_catalog", {})
+        )
         if not entry or not entry.get("has_explicit_entry"):
             continue
         explicit_count += 1
@@ -472,7 +543,11 @@ def build_portfolio_catalog_summary(audits: list[Any], *, catalog_path: str = ""
 def build_intent_alignment_summary(audits: list[Any]) -> dict[str, Any]:
     counts = Counter()
     for audit in audits:
-        entry = getattr(audit, "portfolio_catalog", None) if hasattr(audit, "portfolio_catalog") else (audit or {}).get("portfolio_catalog", {})
+        entry = (
+            getattr(audit, "portfolio_catalog", None)
+            if hasattr(audit, "portfolio_catalog")
+            else (audit or {}).get("portfolio_catalog", {})
+        )
         counts[_safe_text(entry.get("intent_alignment")) or "missing-contract"] += 1
 
     summary = (

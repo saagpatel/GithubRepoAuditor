@@ -11,6 +11,7 @@ CONTRACT_VERSION = "weekly_command_center_digest_v1"
 AUTHORITY_CAP = "report-only"
 MAX_PATH_ATTENTION_ITEMS = 5
 MAX_REPO_BRIEFINGS = 3
+MAX_RISK_ATTENTION_ITEMS = 5
 
 
 def _safe_text(value: Any) -> str:
@@ -65,15 +66,22 @@ def build_weekly_command_center_digest(
         "report_reference": report_reference or _safe_text(report_data.get("latest_report_path")),
         "control_center_reference": control_center_reference,
         "portfolio_truth_reference": portfolio_truth_reference,
-        "headline": _safe_text(weekly_story.get("headline")) or "No weekly headline is recorded yet.",
-        "decision": _safe_text(weekly_story.get("decision")) or "Continue the normal operator review loop.",
-        "why_this_week": _safe_text(weekly_story.get("why_this_week")) or "No weekly rationale is recorded yet.",
-        "next_step": _safe_text(weekly_story.get("next_step")) or "Open the workbook first, then use the read-only control center.",
+        "headline": _safe_text(weekly_story.get("headline"))
+        or "No weekly headline is recorded yet.",
+        "decision": _safe_text(weekly_story.get("decision"))
+        or "Continue the normal operator review loop.",
+        "why_this_week": _safe_text(weekly_story.get("why_this_week"))
+        or "No weekly rationale is recorded yet.",
+        "next_step": _safe_text(weekly_story.get("next_step"))
+        or "Open the workbook first, then use the read-only control center.",
         "queue_pressure_summary": _safe_text(weekly_pack.get("queue_pressure_summary")),
         "operating_paths_summary": _safe_text(weekly_pack.get("operating_paths_summary")),
         "decision_quality": {
-            "status": _safe_text(decision_quality.get("decision_quality_status")) or "insufficient-data",
-            "human_skepticism_required": bool(decision_quality.get("human_skepticism_required", True)),
+            "status": _safe_text(decision_quality.get("decision_quality_status"))
+            or "insufficient-data",
+            "human_skepticism_required": bool(
+                decision_quality.get("human_skepticism_required", True)
+            ),
             "summary": _safe_text(decision_quality.get("recommendation_quality_summary"))
             or _safe_text(decision_quality.get("confidence_calibration_summary"))
             or "Decision quality is not available yet.",
@@ -81,12 +89,19 @@ def build_weekly_command_center_digest(
         },
         "portfolio_truth": truth_summary,
         "path_attention": _build_path_attention_items(truth),
+        "risk_posture": {
+            "elevated_count": truth_summary.get("elevated_risk_count", 0),
+            "risk_tier_counts": truth_summary.get("risk_tier_counts", {}),
+            "top_elevated": _build_risk_attention_items(truth),
+        },
         "section_digest": _build_section_digest(weekly_story),
         "top_repo_briefings": [
             {
                 "repo": _safe_text(item.get("repo")) or "Repo",
-                "why_it_matters": _safe_text(item.get("why_it_matters_line")) or "No repo rationale is recorded yet.",
-                "next_step": _safe_text(item.get("what_to_do_next_line")) or "No repo next step is recorded yet.",
+                "why_it_matters": _safe_text(item.get("why_it_matters_line"))
+                or "No repo rationale is recorded yet.",
+                "next_step": _safe_text(item.get("what_to_do_next_line"))
+                or "No repo next step is recorded yet.",
                 "operating_path_line": _safe_text(item.get("operating_path_line")),
                 "operator_focus_line": _safe_text(item.get("operator_focus_line")),
             }
@@ -102,6 +117,8 @@ def build_weekly_command_center_digest(
 def render_weekly_command_center_markdown(digest: dict[str, Any]) -> str:
     decision_quality = _mapping(digest.get("decision_quality"))
     portfolio_truth = _mapping(digest.get("portfolio_truth"))
+    risk_posture = _mapping(digest.get("risk_posture"))
+    tier_counts = _mapping(risk_posture.get("risk_tier_counts"))
     lines = [
         f"# Weekly Command Center: {_safe_text(digest.get('username')) or 'unknown'}",
         "",
@@ -115,6 +132,7 @@ def render_weekly_command_center_markdown(digest: dict[str, Any]) -> str:
         f"- Decision Quality: `{_safe_text(decision_quality.get('status'))}` — {_safe_text(decision_quality.get('summary'))}",
         f"- Operating Paths: {_safe_text(digest.get('operating_paths_summary')) or 'No operating-path summary is recorded yet.'}",
         f"- Portfolio Truth: {portfolio_truth.get('project_count', 0)} projects, {portfolio_truth.get('active_project_count', 0)} active, {portfolio_truth.get('investigate_override_count', 0)} with investigate override, {portfolio_truth.get('low_confidence_path_count', 0)} low-confidence paths",
+        f"- Risk Posture: {risk_posture.get('elevated_count', 0)} elevated, {tier_counts.get('moderate', 0)} moderate, {tier_counts.get('baseline', 0)} baseline",
         "",
         "## Path Attention",
     ]
@@ -128,6 +146,14 @@ def render_weekly_command_center_markdown(digest: dict[str, Any]) -> str:
                 f"- {item['repo']} — {item['headline']} ({item['registry_status']}, {item['context_quality']} context)"
             )
 
+    lines.extend(["", "## Risk Posture"])
+    risk_items = list(risk_posture.get("top_elevated") or [])
+    if not risk_items:
+        lines.append("- No elevated risk items are currently surfaced.")
+    else:
+        for item in risk_items:
+            lines.append(f"- **{item['repo']}** [{item['risk_tier']}]: {item['risk_summary']}")
+
     lines.extend(["", "## Weekly Sections"])
     for section in list(digest.get("section_digest") or []):
         lines.append(
@@ -138,9 +164,7 @@ def render_weekly_command_center_markdown(digest: dict[str, Any]) -> str:
     if repo_briefings:
         lines.extend(["", "## Top Repo Briefings"])
         for item in repo_briefings:
-            lines.append(
-                f"- {item['repo']}: {item['why_it_matters']} Next: {item['next_step']}"
-            )
+            lines.append(f"- {item['repo']}: {item['why_it_matters']} Next: {item['next_step']}")
 
     lines.extend(["", f"_Guardrail: {_safe_text(digest.get('report_only_guardrail'))}_", ""])
     return "\n".join(lines)
@@ -166,18 +190,22 @@ def _build_truth_summary(portfolio_truth: dict[str, Any]) -> dict[str, Any]:
     context_counts: dict[str, int] = {}
     path_counts: dict[str, int] = {}
     override_counts: dict[str, int] = {}
+    risk_tier_counts: dict[str, int] = {}
     active_project_count = 0
     low_confidence_path_count = 0
 
     for project in projects:
         declared = _mapping(project.get("declared"))
         derived = _mapping(project.get("derived"))
+        risk = _mapping(project.get("risk"))
         context_quality = _safe_text(derived.get("context_quality")) or "unknown"
         context_counts[context_quality] = context_counts.get(context_quality, 0) + 1
         operating_path = _safe_text(declared.get("operating_path")) or "unspecified"
         path_counts[operating_path] = path_counts.get(operating_path, 0) + 1
         override = _safe_text(derived.get("path_override")) or "none"
         override_counts[override] = override_counts.get(override, 0) + 1
+        tier = _safe_text(risk.get("risk_tier")) or "baseline"
+        risk_tier_counts[tier] = risk_tier_counts.get(tier, 0) + 1
         if _safe_text(derived.get("registry_status")) == "active":
             active_project_count += 1
         if _safe_text(derived.get("path_confidence")) == "low":
@@ -189,6 +217,8 @@ def _build_truth_summary(portfolio_truth: dict[str, Any]) -> dict[str, Any]:
         "context_quality_counts": context_counts,
         "operating_path_counts": path_counts,
         "path_override_counts": override_counts,
+        "risk_tier_counts": risk_tier_counts,
+        "elevated_risk_count": risk_tier_counts.get("elevated", 0),
         "low_confidence_path_count": low_confidence_path_count,
         "investigate_override_count": override_counts.get("investigate", 0),
     }
@@ -212,8 +242,14 @@ def _build_path_attention_items(portfolio_truth: dict[str, Any]) -> list[dict[st
         if operating_path and override != "investigate":
             continue
         context_quality = _safe_text(derived.get("context_quality")) or "unknown"
-        rationale = _safe_text(derived.get("path_rationale")) or "Path guidance still needs clarification."
-        headline = "Unspecified stable path" if not operating_path else f"{operating_path.title()} with investigate override"
+        rationale = (
+            _safe_text(derived.get("path_rationale")) or "Path guidance still needs clarification."
+        )
+        headline = (
+            "Unspecified stable path"
+            if not operating_path
+            else f"{operating_path.title()} with investigate override"
+        )
         candidates.append(
             {
                 "repo": _safe_text(identity.get("display_name")) or "Repo",
@@ -239,6 +275,34 @@ def _build_path_attention_items(portfolio_truth: dict[str, Any]) -> list[dict[st
     return candidates[:MAX_PATH_ATTENTION_ITEMS]
 
 
+def _build_risk_attention_items(portfolio_truth: dict[str, Any]) -> list[dict[str, Any]]:
+    projects = list(portfolio_truth.get("projects") or [])
+    items: list[dict[str, Any]] = []
+    status_rank = {"active": 0, "recent": 1, "stale": 2, "archived": 3}
+    for project in projects:
+        risk = _mapping(project.get("risk"))
+        if _safe_text(risk.get("risk_tier")) != "elevated":
+            continue
+        identity = _mapping(project.get("identity"))
+        derived = _mapping(project.get("derived"))
+        items.append(
+            {
+                "repo": _safe_text(identity.get("display_name")),
+                "risk_tier": "elevated",
+                "risk_summary": _safe_text(risk.get("risk_summary")),
+                "risk_factors": risk.get("risk_factors") or [],
+                "_sort_key": (
+                    status_rank.get(_safe_text(derived.get("activity_status")), 9),
+                    _safe_text(identity.get("display_name")),
+                ),
+            }
+        )
+    items.sort(key=lambda x: x["_sort_key"])
+    for item in items:
+        del item["_sort_key"]
+    return items[:MAX_RISK_ATTENTION_ITEMS]
+
+
 def _build_section_digest(weekly_story: dict[str, Any]) -> list[dict[str, Any]]:
     sections = list(weekly_story.get("sections") or [])
     return [
@@ -246,8 +310,10 @@ def _build_section_digest(weekly_story: dict[str, Any]) -> list[dict[str, Any]]:
             "id": _safe_text(section.get("id")),
             "label": _safe_text(section.get("label")) or "Section",
             "state": _safe_text(section.get("state")) or "idle",
-            "headline": _safe_text(section.get("headline")) or "No section headline is recorded yet.",
-            "next_step": _safe_text(section.get("next_step")) or "No section next step is recorded yet.",
+            "headline": _safe_text(section.get("headline"))
+            or "No section headline is recorded yet.",
+            "next_step": _safe_text(section.get("next_step"))
+            or "No section next step is recorded yet.",
             "reason_codes": list(section.get("reason_codes") or []),
         }
         for section in sections

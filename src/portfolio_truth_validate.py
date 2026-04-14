@@ -13,8 +13,10 @@ from src.portfolio_truth_types import (
     SCHEMA_VERSION,
     VALID_ACTIVITY_STATUS,
     VALID_CONTEXT_QUALITY,
+    VALID_DOCTOR_STANDARDS,
     VALID_LIFECYCLE_STATES,
     VALID_REGISTRY_STATUS,
+    VALID_RISK_TIERS,
     PortfolioTruthSnapshot,
 )
 from src.registry_parser import _normalize, parse_registry
@@ -32,13 +34,21 @@ def validate_truth_snapshot(snapshot: PortfolioTruthSnapshot) -> None:
         if Path(project.identity.path).is_absolute():
             raise ValueError(f"Project path must stay workspace-relative: {project.identity.path}")
         if project.derived.context_quality not in VALID_CONTEXT_QUALITY:
-            raise ValueError(f"Invalid context quality for {key}: {project.derived.context_quality}")
+            raise ValueError(
+                f"Invalid context quality for {key}: {project.derived.context_quality}"
+            )
         if project.derived.primary_context_file not in {"AGENTS.md", "CLAUDE.md"}:
-            raise ValueError(f"Invalid primary context file for {key}: {project.derived.primary_context_file}")
+            raise ValueError(
+                f"Invalid primary context file for {key}: {project.derived.primary_context_file}"
+            )
         if project.derived.activity_status not in VALID_ACTIVITY_STATUS:
-            raise ValueError(f"Invalid activity status for {key}: {project.derived.activity_status}")
+            raise ValueError(
+                f"Invalid activity status for {key}: {project.derived.activity_status}"
+            )
         if project.derived.registry_status not in VALID_REGISTRY_STATUS:
-            raise ValueError(f"Invalid registry status for {key}: {project.derived.registry_status}")
+            raise ValueError(
+                f"Invalid registry status for {key}: {project.derived.registry_status}"
+            )
         completeness_flags = (
             project.derived.project_summary_present,
             project.derived.current_state_present,
@@ -47,8 +57,12 @@ def validate_truth_snapshot(snapshot: PortfolioTruthSnapshot) -> None:
             project.derived.known_risks_present,
             project.derived.next_recommended_move_present,
         )
-        if project.derived.context_quality in {"minimum-viable", "standard", "full"} and not all(completeness_flags):
-            raise ValueError(f"Context quality for {key} requires all minimum-viable fields to be present.")
+        if project.derived.context_quality in {"minimum-viable", "standard", "full"} and not all(
+            completeness_flags
+        ):
+            raise ValueError(
+                f"Context quality for {key} requires all minimum-viable fields to be present."
+            )
         lifecycle_state = project.declared.lifecycle_state
         if lifecycle_state and lifecycle_state not in VALID_LIFECYCLE_STATES:
             raise ValueError(f"Invalid lifecycle state for {key}: {lifecycle_state}")
@@ -62,7 +76,14 @@ def validate_truth_snapshot(snapshot: PortfolioTruthSnapshot) -> None:
         if path_override and path_override not in VALID_PATH_OVERRIDES:
             raise ValueError(f"Invalid path override for {key}: {path_override}")
         if project.derived.path_confidence not in VALID_PATH_CONFIDENCE:
-            raise ValueError(f"Invalid path confidence for {key}: {project.derived.path_confidence}")
+            raise ValueError(
+                f"Invalid path confidence for {key}: {project.derived.path_confidence}"
+            )
+        if project.risk.risk_tier not in VALID_RISK_TIERS:
+            raise ValueError(f"Invalid risk tier for {key}: {project.risk.risk_tier}")
+        doctor_std = project.declared.doctor_standard
+        if doctor_std and doctor_std not in VALID_DOCTOR_STANDARDS:
+            raise ValueError(f"Invalid doctor standard for {key}: {doctor_std}")
 
 
 def validate_publish_targets(
@@ -83,7 +104,9 @@ def validate_publish_targets(
             raise ValueError(f"Publish target is not available: {path}")
 
 
-def validate_registry_markdown(markdown: str, snapshot: PortfolioTruthSnapshot, temp_path: Path) -> None:
+def validate_registry_markdown(
+    markdown: str, snapshot: PortfolioTruthSnapshot, temp_path: Path
+) -> None:
     temp_path.write_text(markdown)
     try:
         parsed = parse_registry(temp_path)
@@ -100,7 +123,9 @@ def validate_registry_markdown(markdown: str, snapshot: PortfolioTruthSnapshot, 
         )
     missing = sorted(expected - parsed_names)
     if missing:
-        raise ValueError(f"Generated registry markdown lost project rows during round-trip: {', '.join(missing[:5])}")
+        raise ValueError(
+            f"Generated registry markdown lost project rows during round-trip: {', '.join(missing[:5])}"
+        )
     required_headers = (
         "# Project Registry",
         "## Standalone Projects",

@@ -5,14 +5,24 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-SCHEMA_VERSION = "0.3.0"
+SCHEMA_VERSION = "0.4.0"
 
 VALID_CONTEXT_QUALITY = {"full", "standard", "minimum-viable", "boilerplate", "none"}
 VALID_ACTIVITY_STATUS = {"active", "recent", "stale", "archived"}
 VALID_REGISTRY_STATUS = {"active", "recent", "parked", "archived"}
 VALID_LIFECYCLE_STATES = {"active", "maintenance", "dormant", "experimental", "archived"}
-VALID_CATEGORY_TAGS = {"commercial", "it-work", "vanity", "fun", "learning", "infrastructure", "unknown"}
+VALID_CATEGORY_TAGS = {
+    "commercial",
+    "it-work",
+    "vanity",
+    "fun",
+    "learning",
+    "infrastructure",
+    "unknown",
+}
 VALID_TOOL_PROVENANCE = {"claude-code", "codex", "gpt", "grok", "claude-ai", "unknown"}
+VALID_RISK_TIERS = {"elevated", "moderate", "baseline", "deferred"}
+VALID_DOCTOR_STANDARDS = {"full", "basic"}
 
 
 def _serialize_datetime(value: datetime | None) -> str | None:
@@ -52,6 +62,7 @@ class DeclaredFields:
     category: str = ""
     tool_provenance: str = ""
     notes: str = ""
+    doctor_standard: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return dataclasses.asdict(self)
@@ -98,10 +109,24 @@ class AdvisoryFields:
 
 
 @dataclass(frozen=True)
+class RiskFields:
+    risk_tier: str = "baseline"
+    risk_factors: list[str] = field(default_factory=list)
+    risk_summary: str = ""
+    doctor_gap: bool = False
+    context_risk: bool = False
+    path_risk: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return dataclasses.asdict(self)
+
+
+@dataclass(frozen=True)
 class PortfolioTruthProject:
     identity: IdentityFields
     declared: DeclaredFields
     derived: DerivedFields
+    risk: RiskFields = field(default_factory=RiskFields)
     advisory: AdvisoryFields = field(default_factory=AdvisoryFields)
     provenance: dict[str, dict[str, str]] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
@@ -111,6 +136,7 @@ class PortfolioTruthProject:
             "identity": self.identity.to_dict(),
             "declared": self.declared.to_dict(),
             "derived": self.derived.to_dict(),
+            "risk": self.risk.to_dict(),
             "advisory": self.advisory.to_dict(),
             "provenance": self.provenance,
             "warnings": list(self.warnings),

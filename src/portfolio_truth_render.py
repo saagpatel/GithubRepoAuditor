@@ -41,7 +41,9 @@ def render_registry_markdown(snapshot: PortfolioTruthSnapshot) -> str:
     return "\n".join(lines) + "\n"
 
 
-def render_portfolio_report_markdown(snapshot: PortfolioTruthSnapshot, latest_json_path: str) -> str:
+def render_portfolio_report_markdown(
+    snapshot: PortfolioTruthSnapshot, latest_json_path: str
+) -> str:
     generated = snapshot.generated_at.astimezone(timezone.utc).strftime("%Y-%m-%d")
     grouped = _group_projects(snapshot.projects)
     context_counts = Counter(project.derived.context_quality for project in snapshot.projects)
@@ -49,7 +51,12 @@ def render_portfolio_report_markdown(snapshot: PortfolioTruthSnapshot, latest_js
     operating_path_counts = Counter(
         project.declared.operating_path or "unspecified" for project in snapshot.projects
     )
-    override_counts = Counter(project.derived.path_override for project in snapshot.projects if project.derived.path_override)
+    override_counts = Counter(
+        project.derived.path_override
+        for project in snapshot.projects
+        if project.derived.path_override
+    )
+    risk_tier_counts = Counter(project.risk.risk_tier for project in snapshot.projects)
     lines = [
         "# Portfolio Audit Report",
         "",
@@ -88,8 +95,8 @@ def render_portfolio_report_markdown(snapshot: PortfolioTruthSnapshot, latest_js
         "",
         "## Canonical Portfolio Truth Table",
         "",
-        "| Project | Path | Group | Operating Path | Path Status | Lifecycle | Registry Status | Context | Tool | Category |",
-        "|---------|------|-------|----------------|-------------|-----------|-----------------|---------|------|----------|",
+        "| Project | Path | Group | Operating Path | Path Status | Lifecycle | Registry Status | Context | Tool | Category | Risk |",
+        "|---------|------|-------|----------------|-------------|-----------|-----------------|---------|------|----------|------|",
     ]
     for project in snapshot.projects:
         path_status = project.derived.path_confidence
@@ -99,22 +106,25 @@ def render_portfolio_report_markdown(snapshot: PortfolioTruthSnapshot, latest_js
             f"| {project.identity.display_name} | `{project.identity.path}` | {project.identity.section_marker} | "
             f"{project.declared.operating_path or '—'} | {path_status} | "
             f"{project.declared.lifecycle_state or '—'} | {project.derived.registry_status} | "
-            f"{project.derived.context_quality} | {project.declared.tool_provenance or 'unknown'} | {project.declared.category or 'unknown'} |"
+            f"{project.derived.context_quality} | {project.declared.tool_provenance or 'unknown'} | {project.declared.category or 'unknown'} | {project.risk.risk_tier} |"
         )
 
-    lines.extend([
-        "",
-        "## Coverage Summary",
-        "",
-        f"- Context coverage: full `{context_counts.get('full', 0)}`, standard `{context_counts.get('standard', 0)}`, minimum-viable `{context_counts.get('minimum-viable', 0)}`, boilerplate `{context_counts.get('boilerplate', 0)}`, none `{context_counts.get('none', 0)}`",
-        f"- Registry status distribution: active `{registry_counts.get('active', 0)}`, recent `{registry_counts.get('recent', 0)}`, parked `{registry_counts.get('parked', 0)}`, archived `{registry_counts.get('archived', 0)}`",
-        f"- Operating path distribution: maintain `{operating_path_counts.get('maintain', 0)}`, finish `{operating_path_counts.get('finish', 0)}`, archive `{operating_path_counts.get('archive', 0)}`, experiment `{operating_path_counts.get('experiment', 0)}`, unspecified `{operating_path_counts.get('unspecified', 0)}`",
-        f"- Investigate overrides currently surfaced: `{override_counts.get('investigate', 0)}`",
-        f"- Catalog warnings carried into the snapshot: `{len(snapshot.warnings)}`",
-        "",
-        "## Breakdown by Portfolio Signals",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Coverage Summary",
+            "",
+            f"- Context coverage: full `{context_counts.get('full', 0)}`, standard `{context_counts.get('standard', 0)}`, minimum-viable `{context_counts.get('minimum-viable', 0)}`, boilerplate `{context_counts.get('boilerplate', 0)}`, none `{context_counts.get('none', 0)}`",
+            f"- Registry status distribution: active `{registry_counts.get('active', 0)}`, recent `{registry_counts.get('recent', 0)}`, parked `{registry_counts.get('parked', 0)}`, archived `{registry_counts.get('archived', 0)}`",
+            f"- Operating path distribution: maintain `{operating_path_counts.get('maintain', 0)}`, finish `{operating_path_counts.get('finish', 0)}`, archive `{operating_path_counts.get('archive', 0)}`, experiment `{operating_path_counts.get('experiment', 0)}`, unspecified `{operating_path_counts.get('unspecified', 0)}`",
+            f"- Investigate overrides currently surfaced: `{override_counts.get('investigate', 0)}`",
+            f"- Risk posture: elevated `{risk_tier_counts.get('elevated', 0)}`, moderate `{risk_tier_counts.get('moderate', 0)}`, baseline `{risk_tier_counts.get('baseline', 0)}`, deferred `{risk_tier_counts.get('deferred', 0)}`",
+            f"- Catalog warnings carried into the snapshot: `{len(snapshot.warnings)}`",
+            "",
+            "## Breakdown by Portfolio Signals",
+            "",
+        ]
+    )
     for marker, projects in grouped.items():
         lines.append(f"### {marker}")
         lines.append("")
@@ -140,36 +150,51 @@ def render_portfolio_report_markdown(snapshot: PortfolioTruthSnapshot, latest_js
         )
         lines.append("")
 
-    lines.extend([
-        "## Accuracy Findings",
-        "",
-    ])
+    lines.extend(
+        [
+            "## Accuracy Findings",
+            "",
+        ]
+    )
     mismatch_count = 0
     for project in snapshot.projects:
-        if project.advisory.legacy_status and project.advisory.legacy_status != project.derived.registry_status:
+        if (
+            project.advisory.legacy_status
+            and project.advisory.legacy_status != project.derived.registry_status
+        ):
             mismatch_count += 1
             lines.append(
                 f"- `{project.identity.display_name}` legacy status `{project.advisory.legacy_status}` differs from derived status `{project.derived.registry_status}`."
             )
     if mismatch_count == 0:
-        lines.append("- No legacy status drift was detected between the prior registry evidence and the derived truth snapshot.")
-    lines.extend([
-        "",
-        "## Recommended Next Sync Steps",
-        "",
-        "- Use the canonical truth snapshot as the only machine-readable source for future portfolio consumers.",
-        "- Keep `project-registry.md` and `PORTFOLIO-AUDIT-REPORT.md` generated from that truth snapshot rather than editing them directly.",
-        "- Treat operating paths as normalized contract data from the truth layer rather than letting renderers infer path meaning locally.",
-        "- Use catalog repo rules and group/path defaults to fill missing declared lifecycle and ownership data before future operating-path guidance expands.",
-    ])
+        lines.append(
+            "- No legacy status drift was detected between the prior registry evidence and the derived truth snapshot."
+        )
+    lines.extend(
+        [
+            "",
+            "## Recommended Next Sync Steps",
+            "",
+            "- Use the canonical truth snapshot as the only machine-readable source for future portfolio consumers.",
+            "- Keep `project-registry.md` and `PORTFOLIO-AUDIT-REPORT.md` generated from that truth snapshot rather than editing them directly.",
+            "- Treat operating paths as normalized contract data from the truth layer rather than letting renderers infer path meaning locally.",
+            "- Use catalog repo rules and group/path defaults to fill missing declared lifecycle and ownership data before future operating-path guidance expands.",
+        ]
+    )
     return "\n".join(lines) + "\n"
 
 
-def _group_projects(projects: list[PortfolioTruthProject]) -> dict[str, list[PortfolioTruthProject]]:
+def _group_projects(
+    projects: list[PortfolioTruthProject],
+) -> dict[str, list[PortfolioTruthProject]]:
     grouped: dict[str, list[PortfolioTruthProject]] = defaultdict(list)
     for project in projects:
         grouped[project.identity.section_marker].append(project)
-    ordered = dict(sorted(grouped.items(), key=lambda item: (item[0] != "Standalone Projects", item[0].lower())))
+    ordered = dict(
+        sorted(
+            grouped.items(), key=lambda item: (item[0] != "Standalone Projects", item[0].lower())
+        )
+    )
     for marker, members in ordered.items():
         members.sort(key=lambda item: item.identity.display_name.lower())
     return ordered
@@ -231,10 +256,12 @@ def _render_group_section(
     lines = [f"## {title} ({count} projects)", ""]
     if section_note:
         lines.extend([f"> {section_note}", ""])
-    lines.extend([
-        "| Project | Status | Tool | Context Quality | Notes |",
-        "|---------|--------|------|-----------------|-------|",
-    ])
+    lines.extend(
+        [
+            "| Project | Status | Tool | Context Quality | Notes |",
+            "|---------|--------|------|-----------------|-------|",
+        ]
+    )
     for project in projects:
         lines.append(
             f"| {project_labels[project.identity.project_key]} | {project.derived.registry_status} | {project.declared.tool_provenance or 'unknown'} | "
