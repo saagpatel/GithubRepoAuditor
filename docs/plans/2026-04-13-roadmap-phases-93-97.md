@@ -1,13 +1,11 @@
 # Roadmap: Phases 93-97
 
 ## Current Status Snapshot
-- Release branch carries **Phase 96: Weekly Story Consolidation + Explainability Baseline**
-- **Phase 97** is the active closeout phase on this branch
+- Phases 96 and 97 are complete and merged on `main`
 - Phase 95 scheduling remains explicitly deferred and quarantined from the tracked release boundary
-- Workbook automated gate still matters; manual desktop Excel signoff remains the final release step for workbook-facing changes
-- Git closeout is in progress on the Phase 97 release branch
+- The workbook automated gate remains part of the release standard for workbook-facing changes
 - The `88-92` roadmap arc is complete and now historical context only
-- Current dirty `main` work has been moved onto a feature branch for reconciliation and closeout
+- The next planning arc begins in [2026-04-14-roadmap-phases-98-102.md](/Users/d/Projects/GithubRepoAuditor/docs/plans/2026-04-14-roadmap-phases-98-102.md)
 
 ## Phase Closeout Standard
 Every phase from this roadmap is only complete when all of the following are true:
@@ -59,7 +57,7 @@ Goal:
 - Consolidate the weekly story into one shared `weekly_story_v1` contract, route the weekly-facing artifacts through that contract, and then compress repeated wording into compact evidence packs without rewriting raw operator targeting.
 
 ## Phase 97: Stability, Docs, and Release Hardening
-Status: Active on release branch
+Status: Complete
 
 Goal:
 - Reconcile the deferred Phase 94/95 residue, close the current local work end to end, and harden the post-Phase-96 system with stronger regression coverage, docs truthfulness, and release-readiness cleanup.
