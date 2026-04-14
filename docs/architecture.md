@@ -50,7 +50,15 @@ The CLI does not create separate execution engines for those modes. The modes ar
 The current module boundaries are documented enough to guide work, but they still carry known concentration risk:
 
 - `src/operator_control_center.py`
-  Raw operator state assembly, queue shaping, priority logic, and follow-through families.
+  Public façade and orchestration layer for control-center snapshot building.
+- `src/operator_snapshot_packaging.py`
+  Operator summary assembly, handoff packaging, and control-center artifact payload shaping.
+- `src/operator_follow_through.py`
+  Follow-through enrichment, projection, and follow-through summary families.
+- `src/operator_resolution_trend.py`
+  Resolution-trend, trust, closure-forecast, calibration, and queue-history reasoning.
+- `src/operator_control_center_rendering.py`
+  Markdown rendering for the control-center artifact.
 - `src/report_enrichment.py`
   Raw `weekly_pack` assembly plus the compatibility façade that hands off to the extracted weekly packaging seam.
 - `src/weekly_packaging.py`
@@ -81,7 +89,7 @@ This separation is deliberate, but it is not “finished architecture”:
 The active roadmap already treats two cleanup tracks as real dependencies for later feature work:
 
 - Phase 99 extracted the weekly packaging seam into `src/weekly_packaging.py`, but `src/report_enrichment.py` still remains a broad raw-assembly module that should not absorb new weekly feature growth casually
-- `src/operator_control_center.py` is still the largest implementation risk in the repo and is scheduled for decomposition work in Phase 100
+- Phase 100 extracted the highest-risk operator subsystems into dedicated modules, but later approval work should still land on those bounded seams instead of rebuilding concentration inside the façade
 
 ## Shared Artifact Model
 
@@ -108,19 +116,29 @@ The shared-weekly rule is now explicit:
 
 The operator system has two architectural layers:
 
-- raw operator state in `src/operator_control_center.py`
-- compressed operator packaging in `src/report_enrichment.py`
+- raw operator state orchestration in `src/operator_control_center.py`
+- extracted operator subsystem logic in:
+  - `src/operator_resolution_trend.py`
+  - `src/operator_follow_through.py`
+  - `src/operator_snapshot_packaging.py`
+  - `src/operator_control_center_rendering.py`
+- compressed weekly packaging in `src/weekly_packaging.py`
 
-The raw layer keeps:
+The operator façade keeps:
 
-- queue lanes
-- counts
-- follow-through families
-- review history
-- calibration history
-- governance and campaign readiness context
+- queue/bootstrap orchestration
+- warehouse-backed history loading
+- Action Sync / approval bundle orchestration
+- public control-center entrypoints
 
-The compressed layer exposes the primary workbook-friendly story:
+The extracted operator layers keep:
+
+- trust and closure-forecast reasoning
+- follow-through projections and summaries
+- operator handoff and summary packaging
+- rendered control-center Markdown output
+
+The packaging layers expose the primary workbook-friendly story:
 
 - headline
 - queue pressure
