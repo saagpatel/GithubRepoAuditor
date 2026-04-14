@@ -58,6 +58,7 @@ from src.report_enrichment import (
 )
 from src.sparkline import sparkline as render_sparkline
 from src.terminology import ACTION_SYNC_CANONICAL_LABELS
+from src.weekly_scheduling_overlay import resolve_weekly_story_value
 
 # ── Color constants (matching Excel design system) ──────────────────
 
@@ -958,6 +959,19 @@ def _repo_drilldown_section(report_data: dict, diff_data: dict | None) -> str:
 def _run_changes_section(report_data: dict, diff_data: dict | None) -> str:
     counts = report_data.get("run_change_counts") or build_run_change_counts(diff_data)
     summary = report_data.get("run_change_summary") or build_run_change_summary(diff_data)
+    weekly_pack = build_weekly_review_pack(report_data, diff_data)
+    weekly_reason = resolve_weekly_story_value(
+        weekly_pack,
+        "why_this_week",
+        weekly_pack.get("queue_pressure_summary"),
+        build_queue_pressure_summary(report_data, diff_data),
+    )
+    weekly_decision = resolve_weekly_story_value(
+        weekly_pack,
+        "decision",
+        weekly_pack.get("what_to_do_this_week"),
+        build_top_recommendation_summary(report_data),
+    )
     if not summary and not diff_data:
         return ""
 
@@ -974,8 +988,8 @@ def _run_changes_section(report_data: dict, diff_data: dict | None) -> str:
         <div class="analyst-grid">
         <div class="panel">
           <div class="meta-line"><strong>Summary:</strong> {escape(summary)}</div>
-          <div class="meta-line"><strong>Why It Matters:</strong> {escape(build_queue_pressure_summary(report_data, diff_data))}</div>
-          <div class="meta-line"><strong>What To Do Next:</strong> {escape(build_top_recommendation_summary(report_data))}</div>
+          <div class="meta-line"><strong>Why It Matters:</strong> {escape(weekly_reason)}</div>
+          <div class="meta-line"><strong>What To Do Next:</strong> {escape(weekly_decision)}</div>
           <div class="meta-line"><strong>Improving:</strong> {counts.get('score_improvements', 0)} | <strong>Regressing:</strong> {counts.get('score_regressions', 0)}</div>
           <div class="meta-line"><strong>Promotions:</strong> {counts.get('tier_promotions', 0)} | <strong>Demotions:</strong> {counts.get('tier_demotions', 0)}</div>
           <div class="meta-line"><strong>Security / Governance:</strong> {counts.get('security_changes', 0)} / {counts.get('collection_changes', 0)}</div>

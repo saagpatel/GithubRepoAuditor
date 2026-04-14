@@ -3,6 +3,7 @@ from __future__ import annotations
 from src.report_enrichment import (
     build_queue_pressure_summary,
     build_top_recommendation_summary,
+    build_weekly_review_pack,
     no_baseline_summary,
     no_linked_artifact_summary,
 )
@@ -573,12 +574,16 @@ class TestRenderHtml:
         assert "Next:" in html or "Gap:" in html
 
     def test_run_changes_section_is_rendered(self):
+        report = _make_report(run_change_summary="One repo improved and one regressed.")
         html = _render_html(
-            _make_report(run_change_summary="One repo improved and one regressed."),
+            report,
             diff_data={"repo_changes": [], "score_changes": []},
         )
+        weekly_pack = build_weekly_review_pack(report, diff_data={"repo_changes": [], "score_changes": []})
         assert "Run Changes" in html
         assert "One repo improved and one regressed." in html
+        assert f"Why It Matters:</strong> {weekly_pack['weekly_story_v1']['why_this_week']}" in html
+        assert f"What To Do Next:</strong> {weekly_pack['weekly_story_v1']['decision']}" in html
 
     def test_run_changes_uses_shared_fallback_without_diff(self):
         html = _render_html(_make_report(), diff_data=None)

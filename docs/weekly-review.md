@@ -40,7 +40,7 @@ That means the visible surfaces should agree on:
 - the section order
 - the short evidence for why a repo, campaign, or approval path is being surfaced
 
-The current release boundary intentionally stops at that shared weekly-story contract. Approval-aware weekly scheduling remains deferred and is not a second weekly recommendation engine in the shipped weekly surfaces.
+The current release boundary still keeps one shared weekly story, but that story can now apply a bounded approval-aware overlay when local approval work is the best weekly move. That overlay stays inside `weekly_story_v1`: blocked or urgent portfolio pressure still wins, and the product still does not ship a second weekly recommendation engine.
 
 ## Workbook reading order
 
