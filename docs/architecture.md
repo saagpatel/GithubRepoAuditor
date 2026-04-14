@@ -10,7 +10,7 @@ GitHub Repo Auditor is now a workbook-first portfolio operating system, not just
 
 The same weekly story is rendered across workbook, Markdown, HTML, review-pack, and scheduled handoff. The workbook remains the flagship surface, while the other artifacts mirror the same compressed interpretation so operators do not have to relearn the product by surface.
 
-The weekly packaging seam now has an explicit structured contract, `weekly_story_v1`, inside `build_weekly_review_pack(...)`. That contract gives the visible weekly surfaces one shared summary, next-step, section order, and evidence-strip model instead of letting each renderer invent its own condensed story.
+The weekly packaging seam now has an explicit structured contract, `weekly_story_v1`, finalized through `src/weekly_packaging.py` and exposed by `build_weekly_review_pack(...)`. That contract gives the visible weekly surfaces one shared summary, next-step, section order, and evidence-strip model instead of letting each renderer invent its own condensed story.
 
 ## Product Shape
 
@@ -52,7 +52,9 @@ The current module boundaries are documented enough to guide work, but they stil
 - `src/operator_control_center.py`
   Raw operator state assembly, queue shaping, priority logic, and follow-through families.
 - `src/report_enrichment.py`
-  Shared weekly packaging, compact explainability, and parity layer for workbook, Markdown, HTML, review-pack, and scheduled handoff.
+  Raw `weekly_pack` assembly plus the compatibility façade that hands off to the extracted weekly packaging seam.
+- `src/weekly_packaging.py`
+  Shared weekly contract finalization, compact explainability, and parity layer for workbook, Markdown, HTML, review-pack, and scheduled handoff.
 - `src/action_sync_readiness.py`
   Readiness-stage logic for deciding whether a campaign should stay local, preview next, apply next, or stop for drift/blockers.
 - `src/action_sync_packets.py`
@@ -78,7 +80,7 @@ This separation is deliberate, but it is not “finished architecture”:
 
 The active roadmap already treats two cleanup tracks as real dependencies for later feature work:
 
-- `src/report_enrichment.py` still owns too much of the weekly packaging seam and is scheduled for extraction work in Phase 99
+- Phase 99 extracted the weekly packaging seam into `src/weekly_packaging.py`, but `src/report_enrichment.py` still remains a broad raw-assembly module that should not absorb new weekly feature growth casually
 - `src/operator_control_center.py` is still the largest implementation risk in the repo and is scheduled for decomposition work in Phase 100
 
 ## Shared Artifact Model
@@ -94,7 +96,7 @@ The generated artifact set is intentionally parallel:
 
 Those surfaces should not invent different meanings. They all consume the same enriched weekly summary layer so headings, summary lines, and next-step guidance stay aligned.
 
-Phase 96 tightens that rule:
+The shared-weekly rule is now explicit:
 
 - workbook, Markdown, HTML, review-pack, and scheduled handoff should all read from the same `weekly_story_v1` structure
 - renderer-specific formatting is still allowed

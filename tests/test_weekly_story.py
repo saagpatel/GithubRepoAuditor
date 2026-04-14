@@ -317,3 +317,69 @@ def test_scheduled_handoff_falls_back_cleanly_when_weekly_story_is_missing() -> 
     assert weekly_pack["what_to_do_this_week"] in handoff
     assert weekly_pack["approval_workflow_summary"] in handoff
     assert weekly_pack["next_approval_review"] in handoff
+
+
+def test_scheduled_handoff_prefers_shared_weekly_story_fields_before_fallbacks() -> None:
+    report = _report()
+    weekly_pack = build_weekly_review_pack(report)
+    weekly_story = dict(weekly_pack["weekly_story_v1"])
+    weekly_story["headline"] = "Shared weekly headline wins."
+    weekly_story["decision"] = "Shared weekly decision wins."
+    weekly_story["why_this_week"] = "Shared weekly reason wins."
+    weekly_story["next_step"] = "Shared weekly next workflow step wins."
+
+    updated_sections = []
+    for section in weekly_story["sections"]:
+        if section["id"] == "action-sync-readiness":
+            updated_sections.append(
+                {
+                    **section,
+                    "headline": "Shared Action Sync section wins.",
+                    "next_step": "Shared Action Sync next step wins.",
+                }
+            )
+        else:
+            updated_sections.append(section)
+    weekly_story["sections"] = updated_sections
+
+    weekly_pack = {
+        **weekly_pack,
+        "portfolio_headline": "Legacy weekly-pack headline should lose.",
+        "what_to_do_this_week": "Legacy weekly-pack decision should lose.",
+        "queue_pressure_summary": "Legacy weekly-pack reason should lose.",
+        "next_best_workflow_step": "Legacy weekly-pack next step should lose.",
+        "action_sync_summary": "Legacy weekly-pack action sync should lose.",
+        "next_action_sync_step": "Legacy weekly-pack action sync next step should lose.",
+        "weekly_story_v1": weekly_story,
+    }
+
+    handoff = render_scheduled_handoff_markdown(
+        {
+            "username": report["username"],
+            "generated_at": report["generated_at"],
+            "operator_summary": {
+                **report["operator_summary"],
+                "headline": "Operator summary headline should lose.",
+                "what_to_do_next": "Operator summary next step should lose.",
+                "why_it_matters": "Operator summary reason should lose.",
+                "action_sync_summary": {"summary": "Operator summary Action Sync should lose."},
+                "next_action_sync_step": "Operator summary Action Sync next step should lose.",
+            },
+            "operator_queue": report["operator_queue"],
+            "operator_recent_changes": [],
+            "campaign_summary": {},
+            "writeback_preview": {},
+            "managed_state_drift": [],
+            "issue_candidate": {},
+            "weekly_pack": weekly_pack,
+        }
+    )
+
+    assert "Shared weekly headline wins." in handoff
+    assert "Shared weekly decision wins." in handoff
+    assert "Shared weekly reason wins." in handoff
+    assert "Shared weekly next workflow step wins." in handoff
+    assert "Shared Action Sync section wins." in handoff
+    assert "Shared Action Sync next step wins." in handoff
+    assert "Legacy weekly-pack headline should lose." not in handoff
+    assert "Operator summary headline should lose." not in handoff
