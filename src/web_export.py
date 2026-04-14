@@ -523,6 +523,7 @@ def _top_attention_section(data: dict) -> str:
             f"<br><span class='muted'><strong>What to do next:</strong> {escape(item.get('recommended_action') or item.get('next_step') or 'Review the latest state.')}</span>"
             f"<br><span class='muted'><strong>Operator Focus:</strong> {escape(build_operator_focus_line(item))}</span>"
             f"<br><span class='muted'><strong>Catalog:</strong> {escape(item.get('catalog_line', 'No portfolio catalog contract is recorded yet.'))}</span>"
+            f"<br><span class='muted'><strong>{escape(item.get('operating_path_line', 'Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet.'))}</strong></span>"
             f"<br><span class='muted'><strong>Intent Alignment:</strong> {escape(intent_alignment)}</span>"
             f"<br><span class='muted'><strong>{escape(item.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.'))}</strong></span>"
             f"<br><span class='muted'><strong>Maturity Gap:</strong> {escape(item.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.'))}</span>"
@@ -626,6 +627,7 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
             f"<br><span class='muted'><strong>What To Do Next:</strong> {escape(item.get('next_step', 'Review the latest state.'))}</span>"
             f"<br><span class='muted'><strong>Operator Focus:</strong> {escape(item.get('operator_focus_line', 'Watch Closely: No operator focus bucket is currently surfaced.'))}</span>"
             f"<br><span class='muted'><strong>Catalog:</strong> {escape(item.get('catalog_line', 'No portfolio catalog contract is recorded yet.'))}</span>"
+            f"<br><span class='muted'><strong>{escape(item.get('operating_path_line', 'Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet.'))}</strong></span>"
             f"<br><span class='muted'><strong>Intent Alignment:</strong> {escape(intent_alignment)}</span>"
             f"<br><span class='muted'><strong>{escape(item.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.'))}</strong></span>"
             f"<br><span class='muted'><strong>Maturity Gap:</strong> {escape(item.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.'))}</span>"
@@ -648,6 +650,7 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
               <div class="meta-line"><strong>What To Do Next:</strong> {escape(briefing.get('next_step', briefing.get('what_to_do_next_line', 'No next action is recorded yet.')))}</div>
               <div class="meta-line"><strong>Operator Focus:</strong> {escape(briefing.get('operator_focus_line', 'Watch Closely: No operator focus bucket is currently surfaced.'))}</div>
               <div class="meta-line"><strong>Catalog:</strong> {escape(briefing.get('catalog_line', 'No portfolio catalog contract is recorded yet.'))}</div>
+              <div class="meta-line"><strong>{escape(briefing.get('operating_path_line', 'Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet.'))}</strong></div>
               <div class="meta-line"><strong>Intent Alignment:</strong> {escape(briefing.get('intent_alignment_line', 'missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.'))}</div>
               <div class="meta-line"><strong>{escape(briefing.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.'))}</strong></div>
               <div class="meta-line"><strong>Maturity Gap:</strong> {escape(briefing.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.'))}</div>
@@ -672,6 +675,7 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
           <div class="meta-line"><strong>Trust / Actionability:</strong> {escape(weekly_pack.get('trust_actionability_summary', build_trust_actionability_summary(report_data)))}</div>
           <div class="meta-line"><strong>What To Do This Week:</strong> {escape(weekly_pack.get('what_to_do_this_week', build_top_recommendation_summary(report_data)))}</div>
           <div class="meta-line"><strong>Portfolio Catalog:</strong> {escape(weekly_pack.get('portfolio_catalog_summary', 'No portfolio catalog contract is recorded yet.'))}</div>
+          <div class="meta-line"><strong>Operating Paths:</strong> {escape(weekly_pack.get('operating_paths_summary', 'No normalized operating-path contract is recorded yet.'))}</div>
           <div class="meta-line"><strong>Intent Alignment:</strong> {escape(weekly_pack.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.'))}</div>
           <div class="meta-line"><strong>Scorecards:</strong> {escape(weekly_pack.get('scorecards_summary', 'No maturity scorecard is recorded yet.'))}</div>
           <div class="meta-line"><strong>Implementation Hotspots:</strong> {escape(weekly_pack.get('implementation_hotspots_summary', 'No meaningful implementation hotspots are currently surfaced.'))}</div>

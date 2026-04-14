@@ -53,6 +53,7 @@ NO_FOLLOW_THROUGH_REACQUISITION_CONFIDENCE_RETIREMENT = "No reacquisition confid
 NO_FOLLOW_THROUGH_REACQUISITION_REVALIDATION_RECOVERY = "No post-revalidation recovery or confidence re-earning signal is currently surfaced."
 NO_OPERATOR_FOCUS_SUMMARY = "No operator focus bucket is currently surfaced."
 NO_PORTFOLIO_CATALOG_SUMMARY = "No portfolio catalog contract is recorded yet."
+NO_OPERATING_PATHS_SUMMARY = "No normalized operating-path contract is recorded yet."
 NO_INTENT_ALIGNMENT_SUMMARY = "Intent alignment cannot be judged until a portfolio catalog contract exists."
 NO_SCORECARD_SUMMARY = "No maturity scorecard is recorded yet."
 NO_MATURITY_GAP_SUMMARY = "No maturity gap summary is recorded yet."
@@ -572,6 +573,7 @@ def build_repo_briefing(
     intent_alignment_reason = build_intent_alignment_summary(audit)
     scorecard = build_scorecard_entry(audit)
     scorecard_line = build_scorecard_line(audit)
+    operating_path_line = build_operating_path_line(audit)
     maturity_gap_summary = build_maturity_gap_summary(audit)
     action_sync_line = build_action_sync_line(handoff_source)
     apply_packet_line = build_apply_packet_line(handoff_source)
@@ -680,6 +682,11 @@ def build_repo_briefing(
         "automation_line": automation_line,
         "portfolio_catalog": portfolio_catalog,
         "catalog_line": catalog_line,
+        "operating_path": portfolio_catalog.get("operating_path", ""),
+        "path_override": portfolio_catalog.get("path_override", ""),
+        "path_confidence": portfolio_catalog.get("path_confidence", ""),
+        "path_rationale": portfolio_catalog.get("path_rationale", ""),
+        "operating_path_line": operating_path_line,
         "intent_alignment": intent_alignment,
         "intent_alignment_reason": intent_alignment_reason,
         "intent_alignment_line": f"{intent_alignment}: {intent_alignment_reason}",
@@ -768,6 +775,7 @@ def build_weekly_review_pack(
         "top_recommendation_summary": top_recommendation,
         "operator_focus_summary": _build_operator_focus_summary_from_groups(grouped_focus_items),
         "portfolio_catalog_summary": build_portfolio_catalog_summary(data),
+        "operating_paths_summary": build_operating_paths_summary(data),
         "intent_alignment_summary": build_portfolio_intent_alignment_summary(data),
         "scorecards_summary": build_scorecards_summary(data),
         "implementation_hotspots_summary": str(
@@ -1553,6 +1561,11 @@ def build_portfolio_catalog_summary(report_data: Any) -> str:
     return str(summary.get("summary") or NO_PORTFOLIO_CATALOG_SUMMARY)
 
 
+def build_operating_paths_summary(report_data: Any) -> str:
+    summary = _mapping(_mapping(report_data).get("operating_paths_summary"))
+    return str(summary.get("summary") or NO_OPERATING_PATHS_SUMMARY)
+
+
 def build_portfolio_intent_alignment_summary(report_data: Any) -> str:
     summary = _mapping(_mapping(report_data).get("intent_alignment_summary"))
     return str(summary.get("summary") or NO_INTENT_ALIGNMENT_SUMMARY)
@@ -1572,6 +1585,13 @@ def build_scorecard_line(value: Any) -> str:
     maturity_level = str(entry.get("maturity_level") or "missing-basics").replace("-", " ").title()
     target = str(entry.get("target_maturity") or "operating").replace("-", " ").title()
     return f"Scorecard: {program_label} — {maturity_level} (target {target})"
+
+
+def build_operating_path_line(value: Any) -> str:
+    from src.portfolio_pathing import build_operating_path_line as _build_operating_path_line
+
+    entry = build_portfolio_catalog_entry(value)
+    return _build_operating_path_line(entry)
 
 
 def build_maturity_gap_summary(value: Any) -> str:

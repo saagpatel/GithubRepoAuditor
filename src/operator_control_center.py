@@ -368,11 +368,12 @@ def build_operator_snapshot(
         report_data.get("username", ""),
         limit=CALIBRATION_WINDOW_RUNS,
     )
+    from src import operator_decision_quality as _operator_decision_quality
     from src import operator_follow_through as _operator_follow_through
     from src import operator_resolution_trend as _operator_resolution_trend
     from src import operator_snapshot_packaging as _operator_snapshot_packaging
 
-    confidence_calibration = _operator_resolution_trend._build_confidence_calibration(
+    confidence_calibration = _operator_decision_quality.build_confidence_calibration(
         calibration_history
     )
     operator_effectiveness = build_operator_effectiveness_bundle(
@@ -472,6 +473,13 @@ def build_operator_snapshot(
         watch_guidance,
         confidence_calibration,
     )
+    decision_quality = _operator_decision_quality.build_decision_quality_v1(
+        confidence_calibration=confidence_calibration,
+        confidence=confidence,
+        resolution_trend=resolution_trend,
+        evidence_window_runs=CALIBRATION_WINDOW_RUNS,
+        validation_window_runs=VALIDATION_WINDOW_RUNS,
+    )
     handoff = _operator_snapshot_packaging._build_operator_handoff(
         queue,
         recent_changes,
@@ -495,6 +503,7 @@ def build_operator_snapshot(
         resolution_trend=resolution_trend,
         confidence_calibration=confidence_calibration,
         confidence=confidence,
+        decision_quality=decision_quality,
         operator_effectiveness=operator_effectiveness,
         action_sync=action_sync,
         action_sync_packets=action_sync_packets,
@@ -675,110 +684,9 @@ def _normalize_review_history_item(item: dict) -> dict:
 
 
 def _build_confidence_calibration(history: list[dict]) -> dict:
-    ordered_runs = sorted(
-        [
-            {
-                "run_id": entry.get("run_id", ""),
-                "generated_at": entry.get("generated_at", ""),
-                "operator_summary": entry.get("operator_summary") or {},
-                "operator_queue": entry.get("operator_queue") or [],
-            }
-            for entry in history[:CALIBRATION_WINDOW_RUNS]
-        ],
-        key=lambda item: item.get("generated_at", ""),
-    )
-    evaluations: list[dict] = []
-    for index, run in enumerate(ordered_runs):
-        summary = run.get("operator_summary") or {}
-        target = summary.get("primary_target") or {}
-        confidence_label = summary.get("primary_target_confidence_label", "")
-        if not target or confidence_label not in {"high", "medium", "low"}:
-            continue
-        outcome, validated_in_runs = _calibration_outcome(
-            run,
-            ordered_runs[index + 1 : index + 1 + VALIDATION_WINDOW_RUNS],
-        )
-        target_label = _target_label(target)
-        evaluations.append(
-            {
-                "run_id": run.get("run_id", ""),
-                "generated_at": run.get("generated_at", ""),
-                "target_label": target_label,
-                "confidence_label": confidence_label,
-                "outcome": outcome,
-                "validated_in_runs": validated_in_runs,
-                "health_state": _confidence_health_state(confidence_label, outcome),
-            }
-        )
+    from src import operator_decision_quality as _operator_decision_quality
 
-    judged = [item for item in evaluations if item.get("outcome") != "insufficient_future_runs"]
-    high_judged = [item for item in judged if item.get("confidence_label") == "high"]
-    medium_judged = [item for item in judged if item.get("confidence_label") == "medium"]
-    low_all = [item for item in evaluations if item.get("confidence_label") == "low"]
-    high_hits = sum(1 for item in high_judged if item.get("health_state") == "healthy")
-    medium_hits = sum(1 for item in medium_judged if item.get("health_state") == "healthy")
-    low_cautions = sum(1 for item in low_all if item.get("health_state") == "healthy")
-    reopened_high_count = sum(
-        1
-        for item in evaluations
-        if item.get("confidence_label") == "high" and item.get("outcome") == "reopened"
-    )
-    high_confidence_hit_rate = round(high_hits / len(high_judged), 2) if high_judged else 0.0
-    medium_confidence_hit_rate = (
-        round(medium_hits / len(medium_judged), 2) if medium_judged else 0.0
-    )
-    low_confidence_caution_rate = round(low_cautions / len(low_all), 2) if low_all else 0.0
-    confidence_validation_status = _confidence_validation_status(
-        judged_count=len(judged),
-        high_confidence_hit_rate=high_confidence_hit_rate,
-        reopened_recommendation_count=sum(
-            1 for item in judged if item.get("outcome") == "reopened"
-        ),
-        reopened_high_count=reopened_high_count,
-    )
-    recent_validation_outcomes = [
-        {
-            "run_id": item.get("run_id", ""),
-            "target_label": item.get("target_label", ""),
-            "confidence_label": item.get("confidence_label", "low"),
-            "outcome": item.get("outcome", "unresolved"),
-            "validated_in_runs": item.get("validated_in_runs"),
-        }
-        for item in sorted(judged, key=lambda item: item.get("generated_at", ""), reverse=True)[:5]
-    ]
-    return {
-        "confidence_validation_status": confidence_validation_status,
-        "confidence_window_runs": len(ordered_runs),
-        "validated_recommendation_count": sum(
-            1 for item in evaluations if item.get("outcome") == "validated"
-        ),
-        "partially_validated_recommendation_count": sum(
-            1 for item in evaluations if item.get("outcome") == "partially_validated"
-        ),
-        "unresolved_recommendation_count": sum(
-            1 for item in evaluations if item.get("outcome") == "unresolved"
-        ),
-        "reopened_recommendation_count": sum(
-            1 for item in evaluations if item.get("outcome") == "reopened"
-        ),
-        "insufficient_future_runs_count": sum(
-            1 for item in evaluations if item.get("outcome") == "insufficient_future_runs"
-        ),
-        "high_confidence_hit_rate": high_confidence_hit_rate,
-        "medium_confidence_hit_rate": medium_confidence_hit_rate,
-        "low_confidence_caution_rate": low_confidence_caution_rate,
-        "recent_validation_outcomes": recent_validation_outcomes,
-        "confidence_calibration_summary": _confidence_calibration_summary(
-            confidence_validation_status=confidence_validation_status,
-            high_confidence_hit_rate=high_confidence_hit_rate,
-            medium_confidence_hit_rate=medium_confidence_hit_rate,
-            low_confidence_caution_rate=low_confidence_caution_rate,
-            reopened_recommendation_count=sum(
-                1 for item in evaluations if item.get("outcome") == "reopened"
-            ),
-            judged_count=len(judged),
-        ),
-    }
+    return _operator_decision_quality.build_confidence_calibration(history)
 
 
 def _calibration_outcome(run: dict, future_runs: list[dict]) -> tuple[str, int | None]:
@@ -892,13 +800,14 @@ def _confidence_validation_status(
     reopened_recommendation_count: int,
     reopened_high_count: int,
 ) -> str:
-    if judged_count < 4:
-        return "insufficient-data"
-    if high_confidence_hit_rate < 0.50 or reopened_high_count >= 2:
-        return "noisy"
-    if high_confidence_hit_rate >= 0.70 and reopened_recommendation_count == 0:
-        return "healthy"
-    return "mixed"
+    from src import operator_decision_quality as _operator_decision_quality
+
+    return _operator_decision_quality.confidence_validation_status(
+        judged_count=judged_count,
+        high_confidence_hit_rate=high_confidence_hit_rate,
+        reopened_recommendation_count=reopened_recommendation_count,
+        reopened_high_count=reopened_high_count,
+    )
 
 
 def _confidence_calibration_summary(
@@ -910,25 +819,15 @@ def _confidence_calibration_summary(
     reopened_recommendation_count: int,
     judged_count: int,
 ) -> str:
-    if confidence_validation_status == "healthy":
-        return (
-            f"Recent high-confidence recommendations are validating well: "
-            f"{high_confidence_hit_rate:.0%} high-confidence hit rate across {judged_count} judged runs with no reopen noise."
-        )
-    if confidence_validation_status == "mixed":
-        return (
-            f"Confidence is still useful, but recent outcomes are mixed: "
-            f"{high_confidence_hit_rate:.0%} high-confidence hit rate, "
-            f"{medium_confidence_hit_rate:.0%} medium-confidence hit rate, and {reopened_recommendation_count} reopened outcome(s)."
-        )
-    if confidence_validation_status == "noisy":
-        return (
-            f"Recent high-confidence guidance has been noisy: "
-            f"{high_confidence_hit_rate:.0%} high-confidence hit rate and {reopened_recommendation_count} reopened outcome(s) in the judged window."
-        )
-    return (
-        "The confidence model does not have enough judged history yet to say whether recent confidence has been validating. "
-        f"Low-confidence caution rate so far: {low_confidence_caution_rate:.0%}."
+    from src import operator_decision_quality as _operator_decision_quality
+
+    return _operator_decision_quality.confidence_calibration_summary(
+        confidence_validation_status=confidence_validation_status,
+        high_confidence_hit_rate=high_confidence_hit_rate,
+        medium_confidence_hit_rate=medium_confidence_hit_rate,
+        low_confidence_caution_rate=low_confidence_caution_rate,
+        reopened_recommendation_count=reopened_recommendation_count,
+        judged_count=judged_count,
     )
 
 

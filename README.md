@@ -22,6 +22,8 @@ Today it:
 - audits repositories across documentation, testing, CI, dependencies, activity, security, structure, community profile, completeness, and interest signals
 - scores repos on dual axes, classifies them into useful tiers, and surfaces quick wins
 - generates aligned JSON, Markdown, HTML, workbook, review-pack, and control-center outputs from the same audit facts
+- writes a report-only weekly command-center digest beside the control-center artifact so paused automation can consume one bounded summary instead of stale notes
+- generates a canonical workspace-level portfolio truth snapshot for `/Users/d/Projects` and derives the shared registry/report compatibility artifacts from it
 - preserves historical state in SQLite so the operator loop can show change, regression, recovery, and follow-through
 - keeps the workbook and `--control-center` as the main day-to-day operating surfaces
 
@@ -76,6 +78,7 @@ audit <github-username> --control-center
 ```bash
 audit <github-username> --html
 audit <github-username> --control-center
+audit <github-username> --portfolio-truth
 ```
 
 ### Deep Dive
@@ -153,6 +156,9 @@ audit <github-username> --html
 # Weekly Review — daily read-only triage from the latest state
 audit <github-username> --control-center
 
+# Portfolio Truth — regenerate the canonical workspace truth layer and compatibility registry/report
+audit <github-username> --portfolio-truth
+
 # Deep Dive — targeted repo rerun merged into the latest baseline
 audit <github-username> --repos <repo-name> --html
 
@@ -163,6 +169,8 @@ audit <github-username> --campaign security-review --writeback-target github
 Normal runs now perform a lightweight automatic preflight before fetching repos. By default the run stops on blocking errors and continues on warnings. Use `--preflight-mode strict` to fail on warnings too, or `--preflight-mode off` to skip the automatic preflight.
 
 The new `--control-center` path is read-only. It loads the latest report + warehouse state, groups open work into `Blocked`, `Needs Attention Now`, `Ready for Manual Action`, and `Safe to Defer`, and writes `operator-control-center-<username>-<date>.json` plus `.md`.
+
+That same pass now also writes `weekly-command-center-<username>-<date>.json` plus `.md`. This digest stays workbook-first and report-only: it summarizes the shared weekly story, decision-quality posture, and live portfolio-truth/path attention without creating a second weekly authority or any new mutation path.
 
 The new `--approval-center` path is also read-only. It loads the latest report plus approval history, groups work into `Needs Re-Approval`, `Ready For Review`, `Approved But Manual`, and `Blocked`, and writes `approval-center-<username>-<date>.json` plus `.md`. Local approval capture stays separate from writeback apply.
 
@@ -196,6 +204,10 @@ Partial reruns now require a compatible full-baseline report, not just any previ
 Before normal runs start, the CLI now performs a shared preflight that checks config validity, token/config readiness for requested integrations, template/workbook availability, output writability, and whether targeted or incremental paths have a usable baseline. `--doctor` runs the broader diagnostics set without auditing repos and writes a machine-readable JSON artifact to `output/diagnostics-<username>-<date>.json`.
 
 For day-to-day operations, `--control-center` is now the clean read-only entrypoint. It reuses the latest report, review state, campaign history, governance drift, and setup health to build one shared operator queue without running a new audit or mutating any external system.
+
+The portfolio truth layer now has its own dedicated generation path. `--portfolio-truth` scans the broader workspace, produces `output/portfolio-truth-latest.json` plus dated historical truth snapshots, and regenerates `/Users/d/Projects/project-registry.md` and `/Users/d/Projects/PORTFOLIO-AUDIT-REPORT.md` as compatibility outputs from that same truth contract instead of treating either markdown file as canonical.
+
+Phase 104 added a second standalone workspace mode: `--portfolio-context-recovery`. That mode freezes the active/recent weak-context cohort from the live truth snapshot, writes dry-run recovery plan artifacts into `output/`, skips dirty or temporary repos automatically, and can apply bounded minimum-context upgrades plus repo-level catalog seeds before regenerating the truth snapshot and compatibility outputs.
 
 Watch mode now uses that same baseline contract in live execution. Each cycle records the requested watch strategy, the chosen mode, and the reason a full refresh was required or an incremental rerun remained safe.
 

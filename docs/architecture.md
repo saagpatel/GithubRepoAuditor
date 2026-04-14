@@ -12,6 +12,14 @@ The same weekly story is rendered across workbook, Markdown, HTML, review-pack, 
 
 The weekly packaging seam now has an explicit structured contract, `weekly_story_v1`, finalized through `src/weekly_packaging.py` and exposed by `build_weekly_review_pack(...)`. That contract gives the visible weekly surfaces one shared summary, next-step, section order, and evidence-strip model instead of letting each renderer invent its own condensed story. The current release also adds a bounded approval-aware weekly overlay in `src/weekly_scheduling_overlay.py`, but that overlay still lives inside the same weekly contract instead of creating a second recommendation engine.
 
+Phase 107 adds one more bounded read model on top of that same weekly seam: `weekly_command_center_digest_v1` in `src/weekly_command_center.py`. The digest is derived from `weekly_story_v1`, the latest operator summary, and the current portfolio-truth snapshot. It is explicitly report-only and workbook-first. Its job is to give a future weekly loop one canonical digest artifact without creating a second weekly authority or widening automation power.
+
+The portfolio layer now has its own explicit truth contract too. `--portfolio-truth` builds a versioned machine-readable snapshot for the broader `/Users/d/Projects` workspace and treats the legacy markdown registry/report files as derived compatibility surfaces rather than as canonical inputs.
+
+Phase 104 extends that contract with a minimum-context recovery layer. The truth snapshot now distinguishes `none`, `boilerplate`, `minimum-viable`, `standard`, and `full`, and the workspace recovery workflow writes context only into one primary repo-local file (`CLAUDE.md` first, otherwise `AGENTS.md`) instead of inventing a second mutable database for portfolio context.
+
+Phase 106 extends the truth layer again with a normalized operating-path contract. Stable path semantics now live in one machine-facing seam instead of being split across portfolio catalog entries, maturity programs, tactical collections, and renderer-local wording. The stable path vocabulary is `maintain`, `finish`, `archive`, and `experiment`; `investigate` exists only as a temporary derived override when confidence is too weak to trust the stable path presentation.
+
 ## Product Shape
 
 The shipped system now has five major layers:
@@ -45,6 +53,16 @@ The CLI does not create separate execution engines for those modes. The modes ar
 
 `--control-center` is the read-only operator entrypoint. It consumes the latest report plus warehouse-backed history to assemble one current triage view without running a new audit.
 
+Phase 107 extends that same read-only path. A control-center refresh now also writes `weekly-command-center-<username>-<date>.json` plus `.md`, so the paused weekly loop has one bounded digest contract that already speaks in terms of truth, trust, and path attention.
+
+### `--portfolio-truth`
+
+`--portfolio-truth` is the workspace-truth entrypoint. It does not run the GitHub audit pipeline. Instead it scans the local workspace, reconciles declared catalog metadata with local activity and context signals, writes `portfolio-truth-latest.json` plus a dated history snapshot, and regenerates the external compatibility artifacts for the shared project registry and portfolio audit report.
+
+### `--portfolio-context-recovery`
+
+`--portfolio-context-recovery` is the bounded workspace write path for Phase 104. It freezes the active/recent weak-context cohort from the truth snapshot, writes dry-run recovery plan artifacts into `output/`, skips dirty and temporary repos automatically, and can apply managed context blocks plus bounded catalog seeds before regenerating the truth snapshot and compatibility outputs.
+
 ## Source Of Truth Modules
 
 The current module boundaries are documented enough to guide work, but they still carry known concentration risk:
@@ -53,12 +71,16 @@ The current module boundaries are documented enough to guide work, but they stil
   Public façade and orchestration layer for control-center snapshot building.
 - `src/operator_snapshot_packaging.py`
   Operator summary assembly, handoff packaging, and control-center artifact payload shaping.
+- `src/operator_decision_quality.py`
+  Versioned `decision_quality_v1` contract assembly, historical downgrade rules, and the single ownership seam for decision-quality derivation.
 - `src/operator_follow_through.py`
   Follow-through enrichment, projection, and follow-through summary families.
 - `src/operator_resolution_trend.py`
   Resolution-trend, trust, closure-forecast, calibration, and queue-history reasoning.
 - `src/operator_control_center_rendering.py`
   Markdown rendering for the control-center artifact.
+- `src/weekly_command_center.py`
+  Report-only weekly digest contract and artifact rendering for the bounded command-center loop.
 - `src/report_enrichment.py`
   Raw `weekly_pack` assembly plus the compatibility façade that hands off to the extracted weekly packaging seam.
 - `src/weekly_packaging.py`
@@ -79,12 +101,73 @@ The current module boundaries are documented enough to guide work, but they stil
   Repo-level implementation pressure and “where to start” guidance.
 - `src/warehouse.py`
   Persistence, history loading, and compatibility handling for regenerated reports and historical trend work.
+- `src/portfolio_truth_types.py`
+  Versioned public truth contract for workspace projects.
+- `src/portfolio_truth_sources.py`
+  Safe local workspace, legacy-registry, and optional Notion source adapters for portfolio truth generation.
+- `src/portfolio_truth_reconcile.py`
+  Field-by-field precedence, derived status mapping, and truth snapshot assembly.
+- `src/portfolio_truth_validate.py`
+  Truth contract, compatibility, and external-path safety validation.
+- `src/portfolio_truth_render.py`
+  Compatibility rendering for `project-registry.md` and `PORTFOLIO-AUDIT-REPORT.md`.
+- `src/portfolio_truth_publish.py`
+  Publish orchestration with temp-file staging, validation, and replace-on-success semantics.
+- `src/portfolio_context_contract.py`
+  Semantic contract for minimum-viable context, accepted heading aliases, managed context blocks, and context-band classification.
+- `src/portfolio_context_recovery.py`
+  Frozen-cohort planning, dirty/temp skip rules, managed context block application, and bounded catalog seed handling for workspace recovery.
+- `src/portfolio_pathing.py`
+  Single owner for normalized operating-path derivation, confidence, override, and rationale assembly.
 
 This separation is deliberate, but it is not “finished architecture”:
 
 - operator state stays raw and evidence-rich
 - report enrichment owns user-facing wording and parity
 - Action Sync modules each own one layer of the execution story
+
+## Operating Path Normalization
+
+Phase 106 turns path-like portfolio semantics into one explicit truth-layer contract. Before this phase, the repo already had path-adjacent concepts in several places:
+
+- declared intent via `intended_disposition`
+- scorecard and maturity semantics via `maturity_program` and `target_maturity`
+- tactical prioritization collections such as `finish-next` and `archive-soon`
+- renderer-local weekly/report wording
+
+Those concepts remain useful, but they no longer compete as separate machine-facing path owners.
+
+The architecture rule is now:
+
+- declared portfolio metadata stays in the catalog
+- scorecards still own maturity evaluation
+- tactical collections remain derived views
+- `src/portfolio_pathing.py` normalizes stable path, temporary override, confidence, and rationale
+- the truth snapshot is the one machine-facing surface that other renderers consume
+
+The normalized path contract is intentionally strict:
+
+- stable declared `operating_path` is one of `maintain`, `finish`, `archive`, or `experiment`
+- `path_override` may currently only be `investigate`
+- contradictory or weak inputs lower `path_confidence` and extend `path_rationale`
+- weak confidence never silently rewrites the stable path
+- tactical views may filter or group by path, but they may not redefine it
+
+This keeps path semantics advisory and portable without reopening queue, approval, automation, or command authority.
+
+## Portfolio Risk Overlay
+
+Phase 108 adds a structured risk overlay on top of the shipped truth, context, path, and trust layers. `src/portfolio_risk.py` is the single owner of risk tier derivation. Risk tiers are `elevated`, `moderate`, `baseline`, and `deferred`. The overlay is advisory-only and derives from already-present truth fields — no new data collection.
+
+Risk factors are accumulated during reconciliation and written into `RiskFields` on each `PortfolioTruthProject`. Compound factor thresholds keep signal gradation useful: `elevated` requires three or more factors, or the specific compound pair `weak-context-active + investigate-override`. Most repos land at `moderate` or `baseline`. Archived and stale-non-maintain repos are short-circuited to `deferred`.
+
+The weekly command center digest surfaces risk posture via `risk_posture.elevated_count`, `risk_posture.risk_tier_counts`, and `risk_posture.top_elevated`, and renders a `## Risk Posture` section. Risk data is advisory-only and does not widen any automation or approval authority.
+
+## Cross-Repo Doctor Standard
+
+Phase 108 standardizes a minimal doctor/release-check contract for strategic repos. The standard defines `full` and `basic` tiers with stack-specific patterns. Documented in `docs/doctor-release-standard.md`.
+
+`declared.doctor_standard` is set in the catalog for repos that have adopted the standard. `risk.doctor_gap` is a derived boolean that flags strategic repos missing a declared standard. The standard is advisory-only — it documents expected commands and patterns, does not enforce them automatically.
 
 The active roadmap already treats two cleanup tracks as real dependencies for later feature work:
 
@@ -168,6 +251,33 @@ The product now measures whether recent operator activity appears to be helping 
 - effectiveness describes whether recommendations are validating cleanly or becoming noisy
 
 These are warehouse-backed descriptive summaries. They inform the weekly read but do not create a new scorecard or trust engine.
+
+## Decision Quality And Trust Calibration
+
+Phase 105 adds a bounded trust-contract layer on top of the existing effectiveness and calibration evidence. The goal is not to invent a second recommendation engine. The goal is to make the existing trust posture explicit, reusable, and historically comparable.
+
+The new contract is `decision_quality_v1`. It is assembled in `src/operator_decision_quality.py`, stored inside `operator_summary`, and also persisted as a compact warehouse-backed summary so later runs do not have to scrape prose to compare recommendation quality.
+
+`decision_quality_v1` is intentionally narrow:
+
+- it summarizes measured recommendation quality and trust posture
+- it exposes downgrade reasons and a `human_skepticism_required` flag
+- it carries a hard `authority_cap` of `advisory-only`
+- it does not grant stronger automation, approval, or execution rights
+
+The architecture rule for this layer is strict:
+
+- raw evidence may come from operator history, calibration history, trend history, and current operator state
+- `src/operator_decision_quality.py` is the only owner that turns that evidence into a decision-quality contract
+- workbook, Markdown, HTML, review-pack, scheduled handoff, and control-center surfaces consume the same contract through packaged summary fields instead of recomputing trust locally
+- older warehouse runs that predate the contract are explicitly downgraded to `insufficient-data` rather than guessed into compatibility
+
+This keeps decision quality descriptive and measured, while preserving the existing authority boundaries:
+
+- `weekly_story_v1` remains the only weekly authority
+- Action Sync posture remains bounded by existing readiness and approval seams
+- decision quality may add caution, skepticism, or downgrade language
+- decision quality may not widen command exposure or execution posture
 
 ## Action Sync Model
 
@@ -347,7 +457,12 @@ src/
   excel_export.py
   scheduled_handoff.py
   report_enrichment.py
+  weekly_command_center.py       — report-only weekly digest contract and artifact rendering
   operator_control_center.py
+  operator_decision_quality.py   — versioned decision_quality_v1 contract assembly
+  operator_control_center_rendering.py
+  operator_snapshot_packaging.py
+  operator_resolution_trend.py
   implementation_hotspots.py
   action_sync_readiness.py
   action_sync_packets.py
@@ -356,9 +471,21 @@ src/
   action_sync_automation.py
   intervention_ledger.py
   warehouse.py
+  portfolio_truth_types.py       — schema, dataclasses (Identity/Declared/Derived/Advisory/Risk/Truth)
+  portfolio_truth_sources.py     — workspace inspection, context analysis
+  portfolio_truth_reconcile.py   — multi-source reconciliation pipeline
+  portfolio_truth_render.py      — truth table and registry markdown rendering
+  portfolio_truth_validate.py    — snapshot validation
+  portfolio_truth_publish.py     — JSON + markdown file publishing
+  portfolio_catalog.py           — YAML catalog loading and normalization
+  portfolio_context_contract.py  — context quality analysis contract
+  portfolio_context_recovery.py  — context recovery planning and application
+  portfolio_pathing.py           — operating path derivation
+  portfolio_risk.py              — risk tier derivation (Phase 108)
 
 docs/
   architecture.md
+  doctor-release-standard.md     — doctor/release-check standard for strategic repos
   modes.md
   weekly-review.md
   writeback-safety-model.md

@@ -50,6 +50,7 @@ from src.scorer import score_repo
 from src.terminology import ACTION_SYNC_CANONICAL_LABELS
 
 ANALYSIS_WORKERS = 4
+DEFAULT_PORTFOLIO_WORKSPACE = Path.home() / "Projects"
 CLI_MODE_GUIDE = """GitHub portfolio operating system with four product modes:
   First Run     setup, baseline creation, first workbook, first control-center read
   Weekly Review normal workbook-first operator loop
@@ -121,6 +122,45 @@ def build_parser() -> argparse.ArgumentParser:
         "--output-dir",
         default="output",
         help="Directory for output files (default: output/)",
+    )
+    parser.add_argument(
+        "--portfolio-truth",
+        action="store_true",
+        help="Generate the canonical portfolio truth snapshot and compatibility portfolio artifacts",
+    )
+    parser.add_argument(
+        "--portfolio-context-recovery",
+        action="store_true",
+        help="Build the active/recent weak-context recovery plan and optionally apply the safe context upgrades",
+    )
+    parser.add_argument(
+        "--apply-context-recovery",
+        action="store_true",
+        help="Apply eligible context recovery updates after building the recovery plan",
+    )
+    parser.add_argument(
+        "--context-recovery-limit",
+        type=int,
+        default=None,
+        help="Optional cap on how many eligible recovery targets to apply in one run",
+    )
+    parser.add_argument(
+        "--workspace-root",
+        type=Path,
+        default=DEFAULT_PORTFOLIO_WORKSPACE,
+        help="Workspace root to scan for portfolio truth generation (default: ~/Projects)",
+    )
+    parser.add_argument(
+        "--registry-output",
+        type=Path,
+        default=None,
+        help="Where to publish the generated project-registry.md compatibility artifact",
+    )
+    parser.add_argument(
+        "--portfolio-report-output",
+        type=Path,
+        default=None,
+        help="Where to publish the generated PORTFOLIO-AUDIT-REPORT.md compatibility artifact",
     )
     parser.add_argument(
         "--catalog",
@@ -742,6 +782,7 @@ def _report_from_dict(data: dict) -> AuditReport:
         operator_summary=data.get("operator_summary", {}),
         operator_queue=data.get("operator_queue", []),
         portfolio_catalog_summary=data.get("portfolio_catalog_summary", {}),
+        operating_paths_summary=data.get("operating_paths_summary", {}),
         intent_alignment_summary=data.get("intent_alignment_summary", {}),
         scorecards_summary=data.get("scorecards_summary", {}),
         scorecard_programs=data.get("scorecard_programs", {}),
@@ -768,7 +809,6 @@ def _apply_portfolio_catalog(report: AuditReport, args) -> AuditReport:
         for item in (report.operator_queue or [])
         if str(item.get("repo") or item.get("repo_name") or "").strip()
     }
-
     for audit in report.audits:
         metadata = audit.metadata.to_dict()
         base_entry = catalog_entry_for_repo(metadata, catalog_data)
@@ -839,6 +879,53 @@ def _apply_scorecards(report: AuditReport, args) -> AuditReport:
     return report
 
 
+def _apply_operating_paths(report: AuditReport) -> AuditReport:
+    from src.portfolio_pathing import (
+        build_operating_path_entry,
+        build_operating_path_line,
+        build_operating_paths_summary,
+    )
+
+    for audit in report.audits:
+        catalog_entry = dict(audit.portfolio_catalog or {})
+        if not catalog_entry:
+            continue
+        path_entry = build_operating_path_entry(
+            catalog_entry,
+            intent_alignment=catalog_entry.get("intent_alignment", ""),
+            archived=audit.metadata.archived,
+            completeness_tier=audit.completeness_tier,
+            decision_quality_status=(report.operator_summary or {}).get("decision_quality_v1", {}).get(
+                "decision_quality_status",
+                "",
+            ),
+        )
+        path_line = build_operating_path_line(path_entry)
+        audit.portfolio_catalog = {
+            **path_entry,
+            "operating_path_line": path_line,
+            "operator_focus": catalog_entry.get("operator_focus", ""),
+        }
+        if audit.scorecard:
+            audit.portfolio_catalog["scorecard"] = dict(audit.scorecard)
+
+    audit_lookup = {audit.metadata.name: audit.portfolio_catalog for audit in report.audits}
+    for item in report.operator_queue:
+        repo_name = str(item.get("repo") or item.get("repo_name") or "").strip()
+        catalog_entry = audit_lookup.get(repo_name, {})
+        if not catalog_entry:
+            continue
+        item["portfolio_catalog"] = dict(catalog_entry)
+        item["operating_path"] = catalog_entry.get("operating_path", "")
+        item["path_override"] = catalog_entry.get("path_override", "")
+        item["path_confidence"] = catalog_entry.get("path_confidence", "")
+        item["path_rationale"] = catalog_entry.get("path_rationale", "")
+        item["operating_path_line"] = catalog_entry.get("operating_path_line", "")
+
+    report.operating_paths_summary = build_operating_paths_summary(report.audits)
+    return report
+
+
 def _load_latest_report(output_dir: Path) -> tuple[Path | None, dict | None]:
     reports = sorted(
         output_dir.glob("audit-report-*.json"),
@@ -856,6 +943,14 @@ def _latest_control_center_paths(output_dir: Path, username: str, generated_at: 
     return (
         output_dir / f"operator-control-center-{username}-{stamp}.json",
         output_dir / f"operator-control-center-{username}-{stamp}.md",
+    )
+
+
+def _latest_weekly_command_center_paths(output_dir: Path, username: str, generated_at: datetime) -> tuple[Path, Path]:
+    stamp = _date_str(generated_at)
+    return (
+        output_dir / f"weekly-command-center-{username}-{stamp}.json",
+        output_dir / f"weekly-command-center-{username}-{stamp}.md",
     )
 
 
@@ -1063,6 +1158,11 @@ def _refresh_shared_artifacts_from_report(
     from src.review_pack import export_review_pack
     from src.warehouse import write_warehouse_snapshot
     from src.web_export import export_html_dashboard
+    from src.weekly_command_center import (
+        build_weekly_command_center_digest,
+        load_latest_portfolio_truth,
+        write_weekly_command_center_artifacts,
+    )
 
     approval_json, approval_md, _payload = _write_approval_center_artifacts(
         report,
@@ -1105,7 +1205,30 @@ def _refresh_shared_artifacts_from_report(
     control_json, control_md = _latest_control_center_paths(output_dir, report.username, artifact_generated_at)
     report.operator_summary["control_center_reference"] = str(control_json)
     snapshot = {"operator_summary": report.operator_summary, "operator_queue": report.operator_queue}
-    control_json.write_text(json.dumps(control_center_artifact_payload(report.to_dict(), snapshot), indent=2))
+    portfolio_truth_path, portfolio_truth = load_latest_portfolio_truth(output_dir)
+    weekly_digest = build_weekly_command_center_digest(
+        report.to_dict(),
+        snapshot,
+        diff_data=diff_dict,
+        portfolio_truth=portfolio_truth,
+        portfolio_truth_reference=str(portfolio_truth_path) if portfolio_truth_path else "",
+        control_center_reference=str(control_json),
+        report_reference=str(json_path),
+        generated_at=artifact_generated_at.isoformat(),
+    )
+    weekly_json, weekly_md = write_weekly_command_center_artifacts(
+        output_dir,
+        username=report.username,
+        generated_at=artifact_generated_at,
+        digest=weekly_digest,
+    )
+    control_payload = control_center_artifact_payload(report.to_dict(), snapshot)
+    control_payload["weekly_command_center_digest_v1"] = weekly_digest
+    control_payload["weekly_command_center_reference"] = {
+        "json_path": str(weekly_json),
+        "markdown_path": str(weekly_md),
+    }
+    control_json.write_text(json.dumps(control_payload, indent=2))
     control_md.write_text(
         render_control_center_markdown(snapshot, report.username, artifact_generated_at.isoformat())
     )
@@ -1114,6 +1237,8 @@ def _refresh_shared_artifacts_from_report(
         "json_path": json_path,
         "control_center_json": control_json,
         "control_center_md": control_md,
+        "weekly_command_center_json": weekly_json,
+        "weekly_command_center_md": weekly_md,
         "approval_center_json": approval_json,
         "approval_center_md": approval_md,
     }
@@ -2052,6 +2177,110 @@ def _apply_requested_reconciliation(report: AuditReport, args, audits: list[Repo
             )
 
 
+def _run_portfolio_truth_mode(args) -> None:
+    from src.portfolio_truth_publish import publish_portfolio_truth
+
+    output_dir = Path(args.output_dir)
+    workspace_root = Path(args.workspace_root)
+    registry_output = Path(args.registry_output) if args.registry_output else workspace_root / "project-registry.md"
+    portfolio_report_output = (
+        Path(args.portfolio_report_output)
+        if args.portfolio_report_output
+        else workspace_root / "PORTFOLIO-AUDIT-REPORT.md"
+    )
+    legacy_registry_path = Path(args.registry) if args.registry else registry_output
+
+    result = publish_portfolio_truth(
+        workspace_root=workspace_root,
+        output_dir=output_dir,
+        registry_output=registry_output,
+        portfolio_report_output=portfolio_report_output,
+        catalog_path=Path(args.catalog) if args.catalog else None,
+        legacy_registry_path=legacy_registry_path,
+        include_notion=True,
+    )
+    print_info(f"Portfolio truth snapshot: {result.latest_path}")
+    print_info(f"Portfolio truth history snapshot: {result.snapshot_path}")
+    print_info(f"Project registry compatibility output: {result.registry_output}")
+    print_info(f"Portfolio audit compatibility output: {result.portfolio_report_output}")
+    print_info(
+        f"Portfolio truth generated for {result.project_count} projects "
+        f"(registry {'updated' if result.registry_changed else 'unchanged'}, "
+        f"report {'updated' if result.report_changed else 'unchanged'})"
+    )
+
+
+def _run_portfolio_context_recovery_mode(args) -> None:
+    from src.portfolio_context_recovery import (
+        apply_context_recovery_plan,
+        build_context_recovery_plan,
+        write_context_recovery_plan_artifacts,
+    )
+    from src.portfolio_truth_publish import publish_portfolio_truth
+    from src.portfolio_truth_reconcile import build_portfolio_truth_snapshot
+
+    output_dir = Path(args.output_dir)
+    workspace_root = Path(args.workspace_root)
+    registry_output = Path(args.registry_output) if args.registry_output else workspace_root / "project-registry.md"
+    portfolio_report_output = (
+        Path(args.portfolio_report_output)
+        if args.portfolio_report_output
+        else workspace_root / "PORTFOLIO-AUDIT-REPORT.md"
+    )
+    legacy_registry_path = Path(args.registry) if args.registry else registry_output
+    catalog_path = Path(args.catalog) if args.catalog else None
+
+    build_result = build_portfolio_truth_snapshot(
+        workspace_root=workspace_root,
+        catalog_path=catalog_path,
+        legacy_registry_path=legacy_registry_path,
+        include_notion=True,
+    )
+    plan = build_context_recovery_plan(build_result.snapshot, workspace_root=workspace_root)
+    plan_json, plan_markdown = write_context_recovery_plan_artifacts(plan, output_dir=output_dir)
+    print_info(f"Context recovery plan JSON: {plan_json}")
+    print_info(f"Context recovery plan Markdown: {plan_markdown}")
+    eligible_count = sum(1 for project in plan.projects if project.status == "eligible")
+    skipped_count = sum(1 for project in plan.projects if project.status == "skipped")
+    excluded_count = sum(1 for project in plan.projects if project.status == "excluded")
+    print_info(
+        f"Frozen context-recovery cohort: {plan.target_project_count} targets "
+        f"({eligible_count} eligible, {skipped_count} skipped, {excluded_count} excluded)"
+    )
+
+    if not args.apply_context_recovery:
+        return
+
+    apply_result = apply_context_recovery_plan(
+        build_result.snapshot,
+        plan,
+        workspace_root=workspace_root,
+        catalog_path=catalog_path,
+        limit=args.context_recovery_limit,
+    )
+    if apply_result.failed_projects:
+        raise SystemExit(
+            "Context recovery failed for: " + ", ".join(apply_result.failed_projects)
+        )
+
+    truth_result = publish_portfolio_truth(
+        workspace_root=workspace_root,
+        output_dir=output_dir,
+        registry_output=registry_output,
+        portfolio_report_output=portfolio_report_output,
+        catalog_path=catalog_path,
+        legacy_registry_path=legacy_registry_path,
+        include_notion=True,
+    )
+    print_info(
+        f"Applied context recovery to {len(apply_result.updated_projects)} projects "
+        f"(skipped/excluded {len(apply_result.skipped_projects)})."
+    )
+    print_info(f"Portfolio truth snapshot: {truth_result.latest_path}")
+    print_info(f"Project registry compatibility output: {truth_result.registry_output}")
+    print_info(f"Portfolio audit compatibility output: {truth_result.portfolio_report_output}")
+
+
 def _apply_governance_view_filter(report: AuditReport, governance_view: str) -> None:
     if not isinstance(report.governance_preview, dict):
         report.governance_preview = {}
@@ -2337,6 +2566,7 @@ def _write_report_outputs(
     )
     report = _apply_portfolio_catalog(report, args)
     report = _apply_scorecards(report, args)
+    report = _apply_operating_paths(report)
     report.run_change_summary = build_run_change_summary(diff_dict)
     report.run_change_counts = build_run_change_counts(diff_dict)
     report_data = report.to_dict()
@@ -2924,6 +3154,34 @@ def main() -> None:
     # Validate mutually exclusive registry flags
     if args.registry and args.notion_registry:
         parser.error("--registry and --notion-registry cannot be used together")
+    if args.sync_registry:
+        parser.error(
+            "--sync-registry has been retired. Use --portfolio-truth to regenerate project-registry.md from the canonical truth snapshot."
+        )
+    portfolio_truth_mode = bool(getattr(args, "portfolio_truth", False))
+    portfolio_context_recovery_mode = bool(getattr(args, "portfolio_context_recovery", False))
+    apply_context_recovery = bool(getattr(args, "apply_context_recovery", False))
+    context_recovery_limit = getattr(args, "context_recovery_limit", None)
+
+    if portfolio_truth_mode and portfolio_context_recovery_mode:
+        parser.error("--portfolio-truth and --portfolio-context-recovery are separate standalone modes; run one at a time.")
+    standalone_portfolio_modes = portfolio_truth_mode or portfolio_context_recovery_mode
+    if apply_context_recovery and not portfolio_context_recovery_mode:
+        parser.error("--apply-context-recovery requires --portfolio-context-recovery.")
+    if context_recovery_limit is not None and context_recovery_limit <= 0:
+        parser.error("--context-recovery-limit must be a positive integer.")
+    if standalone_portfolio_modes and (
+        args.control_center
+        or args.approval_center
+        or args.campaign
+        or args.writeback_apply
+        or args.writeback_target
+        or args.github_projects
+        or args.doctor
+    ):
+        parser.error(
+            "Portfolio truth and context recovery are standalone workspace modes and cannot be combined with control-center, doctor, or Action Sync flags."
+        )
 
     # Implied flag dependencies
     if args.upload_badges:
@@ -3091,6 +3349,13 @@ def main() -> None:
         print_info(f"Approval center Markdown: {approval_md}")
         return
 
+    if portfolio_truth_mode:
+        _run_portfolio_truth_mode(args)
+        return
+    if portfolio_context_recovery_mode:
+        _run_portfolio_context_recovery_mode(args)
+        return
+
     if args.doctor:
         result = run_diagnostics(args, config_inspection=config_inspection, full=True)
         output_dir = Path(args.output_dir)
@@ -3111,6 +3376,11 @@ def main() -> None:
             control_center_artifact_payload,
             normalize_review_state,
             render_control_center_markdown,
+        )
+        from src.weekly_command_center import (
+            build_weekly_command_center_digest,
+            load_latest_portfolio_truth,
+            write_weekly_command_center_artifacts,
         )
 
         output_dir = Path(args.output_dir)
@@ -3152,7 +3422,30 @@ def main() -> None:
             artifact_generated_at,
         )
         snapshot.setdefault("operator_summary", {})["control_center_reference"] = str(json_artifact)
-        json_artifact.write_text(json.dumps(control_center_artifact_payload(normalized, snapshot), indent=2))
+        portfolio_truth_path, portfolio_truth = load_latest_portfolio_truth(output_dir)
+        weekly_digest = build_weekly_command_center_digest(
+            normalized,
+            snapshot,
+            diff_data=diff_dict,
+            portfolio_truth=portfolio_truth,
+            portfolio_truth_reference=str(portfolio_truth_path) if portfolio_truth_path else "",
+            control_center_reference=str(json_artifact),
+            report_reference=str(report_path),
+            generated_at=artifact_generated_at.isoformat(),
+        )
+        weekly_json, weekly_md = write_weekly_command_center_artifacts(
+            output_dir,
+            username=normalized.get("username", args.username),
+            generated_at=artifact_generated_at,
+            digest=weekly_digest,
+        )
+        control_payload = control_center_artifact_payload(normalized, snapshot)
+        control_payload["weekly_command_center_digest_v1"] = weekly_digest
+        control_payload["weekly_command_center_reference"] = {
+            "json_path": str(weekly_json),
+            "markdown_path": str(weekly_md),
+        }
+        json_artifact.write_text(json.dumps(control_payload, indent=2))
         md_artifact.write_text(
             render_control_center_markdown(
                 snapshot,
@@ -3163,6 +3456,8 @@ def main() -> None:
         _print_control_center_summary(snapshot)
         print_info(f"Control center JSON: {json_artifact}")
         print_info(f"Control center Markdown: {md_artifact}")
+        print_info(f"Weekly command center JSON: {weekly_json}")
+        print_info(f"Weekly command center Markdown: {weekly_md}")
         print_info(_control_center_next_step_hint())
         return
 

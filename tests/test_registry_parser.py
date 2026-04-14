@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from pathlib import Path
 
 from src.models import RepoAudit, RepoMetadata
 from src.registry_parser import _normalize, parse_registry, reconcile
@@ -83,15 +82,21 @@ class TestParseRegistry:
         # "Total projects" should be skipped (status is "64", a digit)
         assert "Total projects" not in result
 
-    def test_real_registry(self):
-        """Test against the actual registry file if it exists."""
-        path = Path.home() / "Projects" / "project-registry.md"
-        if not path.exists():
-            return
-        result = parse_registry(path)
-        assert len(result) > 50
-        assert "AssistSupport" in result
-        assert result["AssistSupport"] == "active"
+    def test_generated_style_registry(self, tmp_path):
+        registry = tmp_path / "registry.md"
+        registry.write_text(
+            "# Project Registry\n\n"
+            "## Standalone Projects (Root Level)\n\n"
+            "| Project | Status | Tool | Context Quality | Stack | Context Files | Category | Notes |\n"
+            "|---------|--------|------|-----------------|-------|---------------|----------|-------|\n"
+            "| AssistSupport | active | codex | boilerplate | Tauri 2 | AGENTS.md | it-work | Example |\n\n"
+            "## Portfolio Summary\n\n"
+            "| Metric | Count |\n"
+            "|--------|-------|\n"
+            "| Total projects | 1 |\n"
+        )
+        result = parse_registry(registry)
+        assert result == {"AssistSupport": "active"}
 
 
 class TestReconcile:

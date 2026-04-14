@@ -32260,6 +32260,7 @@ def _format_intervention(intervention: dict) -> str:
 
 def _attach_portfolio_catalog_context(queue: list[dict], report_data: dict) -> list[dict]:
     from src.portfolio_catalog import build_catalog_line, evaluate_intent_alignment
+    from src.portfolio_pathing import build_operating_path_entry, build_operating_path_line
     from src.report_enrichment import (
         build_maturity_gap_summary,
         build_operator_focus,
@@ -32301,6 +32302,18 @@ def _attach_portfolio_catalog_context(queue: list[dict], report_data: dict) -> l
             enriched_item["scorecard"] = scorecard
             enriched_item["scorecard_line"] = build_scorecard_line(enriched_item)
             enriched_item["maturity_gap_summary"] = build_maturity_gap_summary(enriched_item)
+        path_entry = build_operating_path_entry(
+            catalog_entry,
+            intent_alignment=intent_alignment,
+            archived=bool((audit.get("metadata") or {}).get("archived")),
+            completeness_tier=str(audit.get("completeness_tier", "")),
+        )
+        enriched_item["portfolio_catalog"] = path_entry
+        enriched_item["operating_path"] = path_entry.get("operating_path", "")
+        enriched_item["path_override"] = path_entry.get("path_override", "")
+        enriched_item["path_confidence"] = path_entry.get("path_confidence", "")
+        enriched_item["path_rationale"] = path_entry.get("path_rationale", "")
+        enriched_item["operating_path_line"] = build_operating_path_line(path_entry)
         enriched.append(enriched_item)
     return enriched
 

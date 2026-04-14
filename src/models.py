@@ -213,6 +213,7 @@ class AuditReport:
     operator_summary: dict = field(default_factory=dict)
     operator_queue: list[dict] = field(default_factory=list)
     portfolio_catalog_summary: dict = field(default_factory=dict)
+    operating_paths_summary: dict = field(default_factory=dict)
     intent_alignment_summary: dict = field(default_factory=dict)
     scorecards_summary: dict = field(default_factory=dict)
     scorecard_programs: dict = field(default_factory=dict)
@@ -407,6 +408,7 @@ class AuditReport:
             operator_summary={},
             operator_queue=[],
             portfolio_catalog_summary={},
+            operating_paths_summary={},
             intent_alignment_summary={},
             scorecards_summary={},
             scorecard_programs={},
@@ -488,6 +490,7 @@ class AuditReport:
             "operator_summary": self.operator_summary,
             "operator_queue": self.operator_queue,
             "portfolio_catalog_summary": self.portfolio_catalog_summary,
+            "operating_paths_summary": self.operating_paths_summary,
             "intent_alignment_summary": self.intent_alignment_summary,
             "scorecards_summary": self.scorecards_summary,
             "scorecard_programs": self.scorecard_programs,

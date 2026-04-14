@@ -24,6 +24,7 @@ def _make_report() -> dict:
         },
         "scenario_summary": {"top_levers": [], "portfolio_projection": {}},
         "portfolio_catalog_summary": {"summary": "1/1 repos have an explicit catalog contract."},
+        "operating_paths_summary": {"summary": "Maintain 1"},
         "intent_alignment_summary": {"summary": "1 aligned, 0 needing review, and 0 missing a contract."},
         "scorecards_summary": {"summary": "0 repos are on track, 1 is below target, and 0 are missing a valid program."},
         "implementation_hotspots_summary": {"summary": "1 repos have concrete implementation pressure. Start with RepoC in file src/core.py."},
@@ -74,6 +75,12 @@ def _make_report() -> dict:
                     "criticality": "high",
                     "review_cadence": "weekly",
                     "intended_disposition": "maintain",
+                    "maturity_program": "maintain",
+                    "target_maturity": "strong",
+                    "operating_path": "maintain",
+                    "path_override": "",
+                    "path_confidence": "high",
+                    "path_rationale": "Stable path is Maintain from intended disposition.",
                     "catalog_line": "operator-loop | flagship workbook-first flow | lifecycle active | criticality high | cadence weekly | disposition maintain",
                     "intent_alignment": "aligned",
                     "intent_alignment_reason": "The repo is holding a maintain posture without urgent or revalidation pressure.",
@@ -160,6 +167,11 @@ def _make_report() -> dict:
                 "follow_through_reacquisition_revalidation_recovery_status": "just-reearned-confidence",
                 "follow_through_reacquisition_revalidation_recovery_summary": "RepoC has only just re-earned restored confidence after revalidation.",
                 "catalog_line": "operator-loop | flagship workbook-first flow | lifecycle active | criticality high | cadence weekly | disposition maintain",
+                "operating_path": "maintain",
+                "path_override": "",
+                "path_confidence": "high",
+                "path_rationale": "Stable path is Maintain from intended disposition.",
+                "operating_path_line": "Operating Path: Maintain (high confidence) — Stable path is Maintain from intended disposition.",
                 "intent_alignment": "aligned",
                 "intent_alignment_reason": "The repo is holding a maintain posture without urgent or revalidation pressure.",
                 "scorecard": {
@@ -194,6 +206,7 @@ def test_review_pack_includes_revalidation_recovery_section(tmp_path):
     assert "Operator Focus:" in content
     assert "Act Now" in content
     assert "Portfolio Catalog: 1/1 repos have an explicit catalog contract." in content
+    assert "Operating Paths: Maintain 1" in content
     assert "Intent Alignment: 1 aligned, 0 needing review, and 0 missing a contract." in content
     assert "Scorecards: 0 repos are on track, 1 is below target" in content
     assert "Implementation Hotspots: 1 repos have concrete implementation pressure." in content
@@ -215,6 +228,7 @@ def test_review_pack_includes_revalidation_recovery_section(tmp_path):
     assert "Next Safe Automation Step:" in content
     assert "Preview Ready" in content
     assert "Catalog: operator-loop | flagship workbook-first flow" in content
+    assert "Operating Path: Maintain (high confidence)" in content
     assert "Where To Start: Start in src/core.py." in content
     assert "Intent Alignment: aligned: The repo is holding a maintain posture" in content
     assert "Scorecard: Maintain — Operating (target Strong)" in content
