@@ -387,6 +387,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Capture a local campaign approval for the selected campaign packet",
     )
     parser.add_argument(
+        "--review-governance",
+        action="store_true",
+        help="Capture a local follow-up review for an already-approved governance scope",
+    )
+    parser.add_argument(
+        "--review-packet",
+        action="store_true",
+        help="Capture a local follow-up review for an already-approved campaign packet",
+    )
+    parser.add_argument(
         "--approval-reviewer",
         type=str,
         default=None,
@@ -865,6 +875,14 @@ def _latest_approval_receipt_paths(output_dir: Path, username: str, generated_at
     )
 
 
+def _latest_followup_review_receipt_paths(output_dir: Path, username: str, generated_at: datetime) -> tuple[Path, Path]:
+    stamp = _date_str(generated_at)
+    return (
+        output_dir / f"approval-followup-receipt-{username}-{stamp}.json",
+        output_dir / f"approval-followup-receipt-{username}-{stamp}.md",
+    )
+
+
 def _report_artifact_datetime(report_path: Path | None, fallback: datetime) -> datetime:
     if report_path:
         stem = report_path.stem
@@ -944,6 +962,8 @@ def _write_approval_center_artifacts(
         "next_approval_review": bundle["next_approval_review"],
         "top_ready_for_review_approvals": bundle["top_ready_for_review_approvals"],
         "top_needs_reapproval_approvals": bundle["top_needs_reapproval_approvals"],
+        "top_overdue_approval_followups": bundle["top_overdue_approval_followups"],
+        "top_due_soon_approval_followups": bundle["top_due_soon_approval_followups"],
         "top_approved_manual_approvals": bundle["top_approved_manual_approvals"],
         "top_blocked_approvals": bundle["top_blocked_approvals"],
     }
@@ -957,6 +977,12 @@ def _write_approval_center_artifacts(
         "approval_workflow_summary": bundle["approval_workflow_summary"],
         "next_approval_review": bundle["next_approval_review"],
         "approval_ledger": bundle["approval_ledger"],
+        "top_ready_for_review_approvals": bundle["top_ready_for_review_approvals"],
+        "top_needs_reapproval_approvals": bundle["top_needs_reapproval_approvals"],
+        "top_overdue_approval_followups": bundle["top_overdue_approval_followups"],
+        "top_due_soon_approval_followups": bundle["top_due_soon_approval_followups"],
+        "top_approved_manual_approvals": bundle["top_approved_manual_approvals"],
+        "top_blocked_approvals": bundle["top_blocked_approvals"],
         "operator_summary": report.operator_summary,
     }
     json_path.write_text(json.dumps(payload, indent=2))
@@ -986,6 +1012,35 @@ def _write_approval_receipt(
     ]
     if receipt.get("approval_command"):
         lines.append(f"- Approval Command: `{receipt.get('approval_command')}`")
+    if receipt.get("manual_apply_command"):
+        lines.append(f"- Manual Apply Command: `{receipt.get('manual_apply_command')}`")
+    md_path.write_text("\n".join(lines) + "\n")
+    return json_path, md_path
+
+
+def _write_followup_review_receipt(
+    output_dir: Path,
+    username: str,
+    *,
+    generated_at: datetime,
+    receipt: dict,
+) -> tuple[Path, Path]:
+    json_path, md_path = _latest_followup_review_receipt_paths(output_dir, username, generated_at)
+    json_path.write_text(json.dumps(receipt, indent=2))
+    lines = [
+        f"# Approval Follow-Up Receipt: {username}",
+        "",
+        f"- Generated: `{generated_at.isoformat()}`",
+        f"- Subject: {receipt.get('label', 'Approval')}",
+        f"- State: {receipt.get('approval_state', 'approved')} / {receipt.get('follow_up_state', 'not-applicable')}",
+        f"- Reviewer: {receipt.get('reviewed_by', '') or 'local-operator'}",
+        f"- Reviewed At: `{receipt.get('reviewed_at', '')}`",
+        f"- Next Follow-Up Due: `{receipt.get('next_follow_up_due_at', '') or '—'}`",
+        f"- Note: {receipt.get('review_note', '') or '—'}",
+        f"- Summary: {receipt.get('summary', 'Local follow-up review captured.')}",
+    ]
+    if receipt.get("follow_up_command"):
+        lines.append(f"- Follow-Up Command: `{receipt.get('follow_up_command')}`")
     if receipt.get("manual_apply_command"):
         lines.append(f"- Manual Apply Command: `{receipt.get('manual_apply_command')}`")
     md_path.write_text("\n".join(lines) + "\n")
@@ -2891,12 +2946,22 @@ def main() -> None:
         )
     if args.approve_packet and not args.campaign:
         parser.error("--approve-packet requires --campaign")
+    if args.review_packet and not args.campaign:
+        parser.error("--review-packet requires --campaign")
     if args.approve_packet and args.writeback_apply:
         parser.error("--approve-packet captures local approval only. Remove --writeback-apply and run apply separately.")
+    if args.review_packet and args.writeback_apply:
+        parser.error("--review-packet captures a local follow-up review only. Remove --writeback-apply and run apply separately.")
     if args.approve_governance and args.approval_center:
         parser.error("--approve-governance captures a local approval. Remove --approval-center for read-only mode.")
+    if args.review_governance and args.approval_center:
+        parser.error("--review-governance captures a local follow-up review. Remove --approval-center for read-only mode.")
     if args.approval_center and args.control_center:
         parser.error("--approval-center and --control-center are separate read-only views; run one at a time.")
+    if args.approve_governance and args.review_governance:
+        parser.error("--approve-governance and --review-governance are separate local actions; run one at a time.")
+    if args.approve_packet and args.review_packet:
+        parser.error("--approve-packet and --review-packet are separate local actions; run one at a time.")
     if args.approval_center and (
         args.campaign
         or args.writeback_target
@@ -2904,6 +2969,8 @@ def main() -> None:
         or args.github_projects
         or args.approve_governance
         or args.approve_packet
+        or args.review_governance
+        or args.review_packet
     ):
         parser.error(
             "--approval-center is the read-only approval view. Remove campaign, writeback, or approval-capture flags."
@@ -2930,9 +2997,13 @@ def main() -> None:
         print_info(f"Approval center Markdown: {approval_md}")
         return
 
-    if args.approve_governance or args.approve_packet:
-        from src.approval_ledger import build_approval_record, load_approval_ledger_bundle
-        from src.warehouse import save_approval_record
+    if args.approve_governance or args.approve_packet or args.review_governance or args.review_packet:
+        from src.approval_ledger import (
+            build_approval_followup_record,
+            build_approval_record,
+            load_approval_ledger_bundle,
+        )
+        from src.warehouse import save_approval_followup_event, save_approval_record
 
         report_output_dir = Path(args.output_dir)
         try:
@@ -2946,20 +3017,37 @@ def main() -> None:
             approval_view="all",
         )
         ledger = {str(item.get("approval_id") or ""): item for item in bundle.get("approval_ledger", [])}
-        approval_id = f"governance:{args.governance_scope}" if args.approve_governance else f"campaign:{args.campaign}"
+        if args.approve_governance or args.review_governance:
+            approval_id = f"governance:{args.governance_scope}"
+        else:
+            approval_id = f"campaign:{args.campaign}"
         ledger_record = ledger.get(approval_id)
         if not ledger_record:
             parser.error("No matching approval subject is surfaced in the latest report.")
-        if ledger_record.get("approval_state") == "blocked":
-            parser.error("That approval subject is blocked by non-approval prerequisites and cannot be approved yet.")
-        if ledger_record.get("approval_state") == "not-applicable":
-            parser.error("That approval subject is not part of the current approval workflow.")
-        approval_record = build_approval_record(
-            ledger_record,
-            reviewer=args.approval_reviewer,
-            note=args.approval_note or "",
-        )
-        save_approval_record(report_output_dir, approval_record)
+        if args.approve_governance or args.approve_packet:
+            if ledger_record.get("approval_state") == "blocked":
+                parser.error("That approval subject is blocked by non-approval prerequisites and cannot be approved yet.")
+            if ledger_record.get("approval_state") == "not-applicable":
+                parser.error("That approval subject is not part of the current approval workflow.")
+            approval_record = build_approval_record(
+                ledger_record,
+                reviewer=args.approval_reviewer,
+                note=args.approval_note or "",
+            )
+            save_approval_record(report_output_dir, approval_record)
+        else:
+            if ledger_record.get("approval_state") in {"ready-for-review", "needs-reapproval", "blocked", "not-applicable"}:
+                parser.error(
+                    "That approval subject is not currently eligible for a recurring local follow-up review."
+                )
+            if str(ledger_record.get("follow_up_command") or "").strip() == "":
+                parser.error("That approval subject does not currently expose a follow-up review command.")
+            followup_event = build_approval_followup_record(
+                ledger_record,
+                reviewer=args.approval_reviewer,
+                note=args.approval_note or "",
+            )
+            save_approval_followup_event(report_output_dir, followup_event)
         _report_path, diff_dict, report = _refresh_latest_report_state(report_output_dir, args)
         _refresh_shared_artifacts_from_report(report, report_output_dir, args, diff_dict=diff_dict)
         approval_json, approval_md, payload = _write_approval_center_artifacts(
@@ -2977,16 +3065,28 @@ def main() -> None:
             (item for item in updated_bundle.get("approval_ledger", []) if item.get("approval_id") == approval_id),
             ledger_record,
         )
-        receipt_payload = {**updated_record, **approval_record}
-        receipt_json, receipt_md = _write_approval_receipt(
-            report_output_dir,
-            report.username,
-            generated_at=datetime.now(timezone.utc),
-            receipt=receipt_payload,
-        )
-        print_info(receipt_payload.get("summary", "Local approval captured."))
-        print_info(f"Approval receipt JSON: {receipt_json}")
-        print_info(f"Approval receipt Markdown: {receipt_md}")
+        if args.approve_governance or args.approve_packet:
+            receipt_payload = {**updated_record, **approval_record}
+            receipt_json, receipt_md = _write_approval_receipt(
+                report_output_dir,
+                report.username,
+                generated_at=datetime.now(timezone.utc),
+                receipt=receipt_payload,
+            )
+            print_info(receipt_payload.get("summary", "Local approval captured."))
+            print_info(f"Approval receipt JSON: {receipt_json}")
+            print_info(f"Approval receipt Markdown: {receipt_md}")
+        else:
+            receipt_payload = {**updated_record, **followup_event}
+            receipt_json, receipt_md = _write_followup_review_receipt(
+                report_output_dir,
+                report.username,
+                generated_at=datetime.now(timezone.utc),
+                receipt=receipt_payload,
+            )
+            print_info(receipt_payload.get("summary", "Local follow-up review captured."))
+            print_info(f"Approval follow-up receipt JSON: {receipt_json}")
+            print_info(f"Approval follow-up receipt Markdown: {receipt_md}")
         print_info(f"Approval center JSON: {approval_json}")
         print_info(f"Approval center Markdown: {approval_md}")
         return

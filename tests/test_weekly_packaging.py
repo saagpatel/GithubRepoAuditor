@@ -75,3 +75,36 @@ def test_finalize_weekly_pack_adds_story_and_compact_explainability() -> None:
     assert finalized["repo_briefings"][0]["evidence_strip"][2]["command_hint"] == (
         "audit testuser --campaign security-review --writeback-target all"
     )
+
+
+def test_finalize_weekly_pack_prefers_overdue_follow_up_in_approval_section() -> None:
+    weekly_pack = {
+        "portfolio_headline": "Portfolio headline",
+        "what_to_do_this_week": "Review approvals next.",
+        "queue_pressure_summary": "Approval follow-up is overdue.",
+        "next_best_workflow_step": "Open the workbook, then use --control-center.",
+        "trust_actionability_summary": "Trust is stable enough for a local review step.",
+        "approval_workflow_summary": "Governance: all is the strongest approval follow-up candidate right now because its local review is overdue.",
+        "next_approval_review": "Review Governance: all next because its local follow-up review is overdue.",
+        "top_overdue_approval_followups": [
+            {
+                "label": "Governance: all",
+                "subject_key": "all",
+                "summary": "Governance: all is still approved, but its local follow-up review is overdue.",
+                "follow_up_command": "audit testuser --review-governance --governance-scope all",
+            }
+        ],
+        "top_attention": [],
+        "repo_briefings": [],
+    }
+
+    finalized = finalize_weekly_pack(weekly_pack)
+
+    approval_section = next(
+        section for section in finalized["weekly_story_v1"]["sections"] if section["id"] == "approval-workflow"
+    )
+    assert approval_section["state"] == "overdue-follow-up"
+    assert approval_section["evidence_items"][0]["command_hint"] == (
+        "audit testuser --review-governance --governance-scope all"
+    )
+    assert approval_section["evidence_items"][0]["safe_posture"] == "local-follow-up-review"

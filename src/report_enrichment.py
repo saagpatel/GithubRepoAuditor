@@ -819,6 +819,8 @@ def build_weekly_review_pack(
         ),
         "top_ready_for_review_approvals": list(operator_summary.get("top_ready_for_review_approvals") or []),
         "top_needs_reapproval_approvals": list(operator_summary.get("top_needs_reapproval_approvals") or []),
+        "top_overdue_approval_followups": list(operator_summary.get("top_overdue_approval_followups") or []),
+        "top_due_soon_approval_followups": list(operator_summary.get("top_due_soon_approval_followups") or []),
         "top_approved_manual_approvals": list(operator_summary.get("top_approved_manual_approvals") or []),
         "top_blocked_approvals": list(operator_summary.get("top_blocked_approvals") or []),
         "top_apply_ready_campaigns": list(operator_summary.get("top_apply_ready_campaigns") or []),

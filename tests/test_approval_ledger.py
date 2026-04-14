@@ -2,8 +2,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.approval_ledger import build_approval_record, load_approval_ledger_bundle
-from src.warehouse import load_approval_records, save_approval_record
+from src.approval_ledger import (
+    build_approval_followup_record,
+    build_approval_record,
+    load_approval_ledger_bundle,
+)
+from src.warehouse import (
+    load_approval_followup_events,
+    load_approval_records,
+    save_approval_followup_event,
+    save_approval_record,
+)
 
 
 def _base_report() -> dict:
@@ -130,6 +139,82 @@ def test_campaign_approval_can_become_approved_but_manual(tmp_path: Path) -> Non
 
     assert second_record["approval_state"] == "approved-manual"
     assert second_record["manual_apply_command"].endswith("--writeback-apply")
+
+
+def test_approved_campaign_can_surface_overdue_follow_up_review(tmp_path: Path) -> None:
+    report = _base_report()
+    report["generated_at"] = "2026-04-21T12:00:00+00:00"
+    report["run_id"] = "testuser:2026-04-21T12:00:00+00:00"
+    report["operator_summary"] = {
+        "action_sync_packets": [
+            {
+                "campaign_type": "security-review",
+                "label": "Security Review",
+                "execution_state": "needs-approval",
+                "recommended_target": "all",
+                "sync_mode": "reconcile",
+                "action_count": 2,
+                "blocker_types": ["governance-approval"],
+                "rollback_status": "ready",
+                "apply_command": "audit testuser --campaign security-review --writeback-target all --writeback-apply",
+                "top_repos": ["user/RepoA"],
+                "actions": [{"action_id": "action-1"}],
+            }
+        ],
+        "action_sync_automation": [
+            {
+                "campaign_type": "security-review",
+                "automation_posture": "approval-first",
+            }
+        ],
+    }
+
+    first_bundle = load_approval_ledger_bundle(tmp_path, report, [])
+    first_record = next(item for item in first_bundle["approval_ledger"] if item["approval_id"] == "campaign:security-review")
+    approval_record = build_approval_record(first_record, reviewer="sam", note="Approved manually")
+    approval_record["approved_at"] = "2026-04-01T12:00:00+00:00"
+    save_approval_record(tmp_path, approval_record)
+
+    second_bundle = load_approval_ledger_bundle(tmp_path, report, [])
+    second_record = next(item for item in second_bundle["approval_ledger"] if item["approval_id"] == "campaign:security-review")
+
+    assert second_record["follow_up_state"] == "overdue-follow-up"
+    assert second_record["stale_approval"] is True
+    assert second_record["follow_up_command"].endswith("--review-packet")
+    assert second_bundle["next_approval_review"]["approval_id"] == "campaign:security-review"
+
+
+def test_follow_up_event_round_trip_and_due_soon_state(tmp_path: Path) -> None:
+    report = _base_report()
+    report["generated_at"] = "2026-04-13T12:00:00+00:00"
+    report["run_id"] = "testuser:2026-04-13T12:00:00+00:00"
+    bundle = load_approval_ledger_bundle(tmp_path, report, [])
+    ledger_record = next(item for item in bundle["approval_ledger"] if item["approval_id"] == "governance:all")
+    approval_record = build_approval_record(ledger_record, reviewer="sam", note="Approved locally")
+    approval_record["approved_at"] = "2026-04-07T18:00:00+00:00"
+    save_approval_record(tmp_path, approval_record)
+
+    approved_bundle = load_approval_ledger_bundle(tmp_path, report, [])
+    approved_record = next(item for item in approved_bundle["approval_ledger"] if item["approval_id"] == "governance:all")
+    followup_event = build_approval_followup_record(
+        approved_record,
+        reviewer="sam",
+        note="Still valid",
+    )
+    followup_event["reviewed_at"] = "2026-04-08T18:00:00+00:00"
+    save_approval_followup_event(tmp_path, followup_event)
+
+    refreshed_report = dict(report)
+    refreshed_report["generated_at"] = "2026-04-14T12:00:00+00:00"
+    refreshed_report["run_id"] = "testuser:2026-04-14T12:00:00+00:00"
+    refreshed_bundle = load_approval_ledger_bundle(tmp_path, refreshed_report, [])
+    refreshed_record = next(item for item in refreshed_bundle["approval_ledger"] if item["approval_id"] == "governance:all")
+    loaded_events = load_approval_followup_events(tmp_path, "testuser")
+
+    assert loaded_events[0]["review_note"] == "Still valid"
+    assert refreshed_record["follow_up_state"] == "due-soon-follow-up"
+    assert refreshed_record["last_reviewed_by"] == "sam"
+    assert refreshed_record["next_follow_up_due_at"].startswith("2026-04-15T18:00:00")
 
 
 def test_save_and_load_approval_record_preserves_note(tmp_path: Path) -> None:

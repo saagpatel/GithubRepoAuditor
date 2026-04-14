@@ -150,8 +150,9 @@ If the next question becomes “does this need approval, re-approval, or explici
 - `ready-for-review` means the approval can be reviewed now, but approval still does not mutate anything
 - `approved-manual` means approval is current and the next move is still an explicit manual apply
 - `blocked` means approval alone cannot help yet because drift, access, or other blockers still exist
+- `overdue-follow-up` and `due-soon-follow-up` mean the subject is still approved, but its local review freshness now matters before scheduling pressure should grow around it
 
-Use `audit <github-username> --approval-center` when you want the read-only approval view. Use `--approve-governance` or `--approve-packet` only to capture local approval records; those actions regenerate artifacts, but they do not perform external mutation.
+Use `audit <github-username> --approval-center` when you want the read-only approval view. Use `--approve-governance` or `--approve-packet` only to capture initial local approval records. Use `--review-governance` or `--review-packet` only to capture recurring local follow-up review. Those actions may regenerate artifacts, but they do not perform external mutation.
 
 ## Weekly section order
 
