@@ -57,7 +57,14 @@ def _make_args(**overrides) -> Namespace:
         "config": None,
         "doctor": False,
         "control_center": False,
+        "approval_center": False,
         "triage_view": "all",
+        "approval_view": "all",
+        "approve_governance": False,
+        "approve_packet": False,
+        "governance_scope": "all",
+        "approval_reviewer": None,
+        "approval_note": "",
         "preflight_mode": "auto",
         "watch": False,
         "watch_interval": 3600,
@@ -253,6 +260,45 @@ def test_main_rejects_control_center_with_action_sync_flags(monkeypatch):
 
     assert exc.value.code == 2
     assert "read-only Weekly Review entrypoint" in parser.error_message
+
+
+def test_main_rejects_approval_center_with_action_sync_flags(monkeypatch):
+    args = _make_args(approval_center=True, campaign="security-review", writeback_target="github")
+    parser = FakeParser(args)
+
+    monkeypatch.setattr(cli, "build_parser", lambda: parser)
+
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+
+    assert exc.value.code == 2
+    assert "read-only approval view" in parser.error_message
+
+
+def test_main_rejects_approve_packet_without_campaign(monkeypatch):
+    args = _make_args(approve_packet=True)
+    parser = FakeParser(args)
+
+    monkeypatch.setattr(cli, "build_parser", lambda: parser)
+
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+
+    assert exc.value.code == 2
+    assert "--approve-packet requires --campaign" in parser.error_message
+
+
+def test_main_rejects_approve_packet_with_writeback_apply(monkeypatch):
+    args = _make_args(approve_packet=True, campaign="security-review", writeback_apply=True, writeback_target="all")
+    parser = FakeParser(args)
+
+    monkeypatch.setattr(cli, "build_parser", lambda: parser)
+
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+
+    assert exc.value.code == 2
+    assert "Remove --writeback-apply" in parser.error_message
 
 
 def test_main_forwards_scoring_profile_to_incremental_audit(monkeypatch, sample_metadata):

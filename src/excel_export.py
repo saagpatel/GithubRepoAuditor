@@ -118,6 +118,7 @@ CORE_VISIBLE_SHEETS = {
     "Scorecards",
     "Implementation Hotspots",
     "Operator Outcomes",
+    "Approval Ledger",
     "Historical Intelligence",
     "Repo Detail",
     "By Lens",
@@ -264,6 +265,7 @@ def _reorder_workbook_sheets(wb: Workbook) -> None:
         "Portfolio Explorer",
         "Implementation Hotspots",
         "Operator Outcomes",
+        "Approval Ledger",
         "Historical Intelligence",
         "Repo Detail",
         "Executive Summary",
@@ -1196,6 +1198,9 @@ def _build_workbook_rollups(data: dict) -> tuple[list[list[object]], list[list[o
                 item.get("historical_intelligence_status", ""),
                 item.get("historical_intelligence_summary", ""),
                 item.get("historical_intelligence_line", ""),
+                item.get("approval_state", ""),
+                item.get("approval_summary", ""),
+                item.get("approval_line", ""),
             ]
         )
 
@@ -3564,6 +3569,14 @@ def _build_operator_outcomes(wb: Workbook, data: dict) -> None:
         "summary",
         "Stay local for now; no current campaign has a stronger safe automation posture than manual review.",
     )
+    approval_workflow_summary = (data.get("approval_workflow_summary") or {}).get(
+        "summary",
+        "No current approval needs review yet, so the approval workflow can stay local for now.",
+    )
+    next_approval_review = (data.get("next_approval_review") or {}).get(
+        "summary",
+        "Stay local for now; no current approval needs review.",
+    )
     ws.merge_cells("A1:F1")
     ws["A1"].value = "Operator Outcomes"
     ws["A1"].font = SECTION_FONT
@@ -3594,12 +3607,18 @@ def _build_operator_outcomes(wb: Workbook, data: dict) -> None:
     ws.merge_cells("A10:F10")
     ws["A10"].value = next_safe_automation_step
     ws["A10"].alignment = WRAP
+    ws.merge_cells("A11:F11")
+    ws["A11"].value = approval_workflow_summary
+    ws["A11"].alignment = WRAP
+    ws.merge_cells("A12:F12")
+    ws["A12"].value = next_approval_review
+    ws["A12"].alignment = WRAP
 
     headers = ["Metric", "Status", "Value", "Numerator", "Denominator", "Summary"]
     for col, header in enumerate(headers, 1):
-        ws.cell(row=12, column=col, value=header)
-    style_header_row(ws, 12, len(headers))
-    ws.freeze_panes = "A13"
+        ws.cell(row=14, column=col, value=header)
+    style_header_row(ws, 14, len(headers))
+    ws.freeze_panes = "A15"
 
     metrics = [
         ("Review To Action Closure Rate", data.get("portfolio_outcomes_summary", {}).get("review_to_action_closure_rate", {})),
@@ -3608,7 +3627,7 @@ def _build_operator_outcomes(wb: Workbook, data: dict) -> None:
         ("Recommendation Validation Rate", data.get("operator_effectiveness_summary", {}).get("recommendation_validation_rate", {})),
         ("Noisy Guidance Rate", data.get("operator_effectiveness_summary", {}).get("noisy_guidance_rate", {})),
     ]
-    for row, (label, metric) in enumerate(metrics, 13):
+    for row, (label, metric) in enumerate(metrics, 15):
         value = metric.get("value")
         if isinstance(value, float):
             display_value = round(value, 3)
@@ -3626,7 +3645,7 @@ def _build_operator_outcomes(wb: Workbook, data: dict) -> None:
             cell = ws.cell(row=row, column=col, value=item)
             style_data_cell(cell, "center" if col in {2, 3, 4, 5} else "left")
 
-    monitoring_row = 20
+    monitoring_row = 22
     ws.cell(row=monitoring_row, column=1, value="Post-Apply Monitoring")
     style_header_row(ws, monitoring_row, 6)
     monitoring_headers = ["Campaign", "State", "Pressure Effect", "Drift", "Reopen", "Summary"]
@@ -3674,8 +3693,69 @@ def _build_operator_outcomes(wb: Workbook, data: dict) -> None:
             cell = ws.cell(row=row, column=col, value=value)
             style_data_cell(cell, "center" if col >= 3 else "left")
 
-    max_row = max(history_row + len(history), example_row + 3, monitoring_row + 3, 13)
+    max_row = max(history_row + len(history), example_row + 3, monitoring_row + 3, 15)
     auto_width(ws, 6, max_row)
+
+
+def _build_approval_ledger(wb: Workbook, data: dict) -> None:
+    ws = _get_or_create_sheet(wb, "Approval Ledger")
+    ws.sheet_properties.tabColor = "6D28D9"
+    _configure_sheet_view(ws, zoom=105, show_grid_lines=True)
+
+    summary = (data.get("approval_workflow_summary") or {}).get(
+        "summary",
+        "No current approval needs review yet, so the approval workflow can stay local for now.",
+    )
+    next_review = (data.get("next_approval_review") or {}).get(
+        "summary",
+        "Stay local for now; no current approval needs review.",
+    )
+
+    ws.merge_cells("A1:F1")
+    ws["A1"].value = ACTION_SYNC_CANONICAL_LABELS["approval_ledger"]
+    ws["A1"].font = SECTION_FONT
+    ws.merge_cells("A2:F2")
+    ws["A2"].value = summary
+    ws["A2"].alignment = WRAP
+    ws.merge_cells("A3:F3")
+    ws["A3"].value = next_review
+    ws["A3"].alignment = WRAP
+
+    headers = ["Label", "State", "Subject", "Reviewer", "Approved At", "Summary"]
+    for col, header in enumerate(headers, 1):
+        ws.cell(row=5, column=col, value=header)
+    style_header_row(ws, 5, len(headers))
+    ws.freeze_panes = "A6"
+
+    row = 6
+    for label, items in (
+        ("Needs Re-Approval", data.get("top_needs_reapproval_approvals", []) or []),
+        ("Ready For Review", data.get("top_ready_for_review_approvals", []) or []),
+        (ACTION_SYNC_CANONICAL_LABELS["approved_but_manual"], data.get("top_approved_manual_approvals", []) or []),
+        ("Blocked", data.get("top_blocked_approvals", []) or []),
+    ):
+        ws.cell(row=row, column=1, value=label)
+        ws.cell(row=row, column=1).font = SUBTITLE_FONT
+        row += 1
+        if not items:
+            ws.cell(row=row, column=1, value="None")
+            row += 1
+            continue
+        for item in items[:8]:
+            values = [
+                item.get("label", item.get("subject_key", "Approval")),
+                item.get("approval_state", "not-applicable"),
+                item.get("approval_subject_type", ""),
+                item.get("approved_by", ""),
+                item.get("approved_at", ""),
+                item.get("summary", ""),
+            ]
+            for col, value in enumerate(values, 1):
+                cell = ws.cell(row=row, column=col, value=value)
+                style_data_cell(cell, "center" if col in {2, 3, 4, 5} else "left")
+            row += 1
+
+    auto_width(ws, 6, row)
 
 
 def _build_historical_intelligence(wb: Workbook, data: dict) -> None:
@@ -4037,6 +4117,7 @@ def _build_hidden_data_sheets(
     campaign_tuning_rows: list[list[object]] = []
     intervention_ledger_rows: list[list[object]] = []
     action_sync_automation_rows: list[list[object]] = []
+    approval_ledger_rows: list[list[object]] = []
     lookup_rows: list[list[object]] = []
     repo_detail_rows, repo_dimension_rollup_rows, repo_history_rollup_rows = _repo_detail_rows(data, score_history)
     run_change_rollup_rows, run_change_repo_rows = _run_change_rows(data, diff_data)
@@ -4137,6 +4218,23 @@ def _build_hidden_data_sheets(
             "yes" if item.get("requires_approval") else "no",
             item.get("recommended_command", ""),
             item.get("recommended_follow_up", ""),
+            item.get("summary", ""),
+        ])
+    for item in data.get("approval_ledger", []) or []:
+        approval_ledger_rows.append([
+            item.get("approval_id", ""),
+            item.get("approval_subject_type", ""),
+            item.get("subject_key", ""),
+            item.get("label", ""),
+            item.get("approval_state", "not-applicable"),
+            item.get("source_run_id", ""),
+            item.get("fingerprint", ""),
+            item.get("approved_at", ""),
+            item.get("approved_by", ""),
+            "yes" if item.get("approval_ready") else "no",
+            "yes" if item.get("apply_ready_after_approval") else "no",
+            item.get("approval_command", ""),
+            item.get("manual_apply_command", ""),
             item.get("summary", ""),
         ])
 
@@ -4716,6 +4814,28 @@ def _build_hidden_data_sheets(
     )
     _write_hidden_table_sheet(
         wb,
+        "Data_ApprovalLedger",
+        "tblApprovalLedgerData",
+        [
+            "Approval ID",
+            "Subject Type",
+            "Subject Key",
+            "Label",
+            "Approval State",
+            "Source Run ID",
+            "Fingerprint",
+            "Approved At",
+            "Approved By",
+            "Approval Ready",
+            "Apply Ready After Approval",
+            "Approval Command",
+            "Manual Apply Command",
+            "Summary",
+        ],
+        approval_ledger_rows,
+    )
+    _write_hidden_table_sheet(
+        wb,
         "Data_Scenarios",
         "tblScenarios",
         ["Key", "Title", "Lens", "Repo Count", "Average Expected Lens Delta", "Projected Tier Promotions"],
@@ -4836,6 +4956,9 @@ def _build_hidden_data_sheets(
             "Historical Intelligence Status",
             "Historical Intelligence Summary",
             "Historical Intelligence Line",
+            "Approval State",
+            "Approval Summary",
+            "Approval Line",
         ],
         operator_queue_rows,
     )
@@ -5196,6 +5319,20 @@ def _build_campaigns(wb: Workbook, data: dict) -> None:
                     "Stay local for now; no current campaign has a stronger safe automation posture than manual review.",
                 ),
             ),
+            (
+                ACTION_SYNC_CANONICAL_LABELS["approval_workflow"],
+                (data.get("approval_workflow_summary") or {}).get(
+                    "summary",
+                    "No current approval needs review yet, so the approval workflow can stay local for now.",
+                ),
+            ),
+            (
+                ACTION_SYNC_CANONICAL_LABELS["next_approval_review"],
+                (data.get("next_approval_review") or {}).get(
+                    "summary",
+                    "Stay local for now; no current approval needs review.",
+                ),
+            ),
         ],
         title=ACTION_SYNC_CANONICAL_LABELS["readiness"],
     )
@@ -5343,6 +5480,20 @@ def _build_writeback_audit(wb: Workbook, data: dict) -> None:
                 (data.get("next_safe_automation_step") or {}).get(
                     "summary",
                     "Stay local for now; no current campaign has a stronger safe automation posture than manual review.",
+                ),
+            ),
+            (
+                ACTION_SYNC_CANONICAL_LABELS["approval_workflow"],
+                (data.get("approval_workflow_summary") or {}).get(
+                    "summary",
+                    "No current approval needs review yet, so the approval workflow can stay local for now.",
+                ),
+            ),
+            (
+                ACTION_SYNC_CANONICAL_LABELS["next_approval_review"],
+                (data.get("next_approval_review") or {}).get(
+                    "summary",
+                    "Stay local for now; no current approval needs review.",
                 ),
             ),
         ],
@@ -6373,6 +6524,20 @@ def _build_governance_controls(wb: Workbook, data: dict) -> None:
             ("Needs Re-Approval", "yes" if governance_summary.get("needs_reapproval") else "no"),
             ("Rollback Available", governance_summary.get("rollback_available_count", 0)),
             ("Headline", governance_summary.get("headline", "Governed controls are being tracked locally.")),
+            (
+                ACTION_SYNC_CANONICAL_LABELS["approval_workflow"],
+                (data.get("approval_workflow_summary") or {}).get(
+                    "summary",
+                    "No current approval needs review yet, so the approval workflow can stay local for now.",
+                ),
+            ),
+            (
+                ACTION_SYNC_CANONICAL_LABELS["next_approval_review"],
+                (data.get("next_approval_review") or {}).get(
+                    "summary",
+                    "Stay local for now; no current approval needs review.",
+                ),
+            ),
         ],
         title="Governance Snapshot",
     )
@@ -7178,6 +7343,16 @@ def _build_print_pack(
         "next_safe_automation_step",
         "Stay local for now; no current campaign has a stronger safe automation posture than manual review.",
     )
+    ws["D21"] = ACTION_SYNC_CANONICAL_LABELS["approval_workflow"]
+    ws["E21"] = weekly_pack.get(
+        "approval_workflow_summary",
+        "No current approval needs review yet, so the approval workflow can stay local for now.",
+    )
+    ws["D22"] = ACTION_SYNC_CANONICAL_LABELS["next_approval_review"]
+    ws["E22"] = weekly_pack.get(
+        "next_approval_review",
+        "Stay local for now; no current approval needs review.",
+    )
     ws["A7"] = "Portfolio Headline"
     ws["B7"] = weekly_pack.get("portfolio_headline", operator_summary.get("headline", "Review the latest workbook surfaces for change and drift."))
     ws["A8"] = "Queue Pressure"
@@ -7473,6 +7648,7 @@ def _build_excel_workbook(
     _build_hotspots(wb, data)
     _build_implementation_hotspots(wb, data)
     _build_operator_outcomes(wb, data)
+    _build_approval_ledger(wb, data)
     _build_historical_intelligence(wb, data)
     _build_compare_sheet(wb, diff_data)
     _build_scenario_planner(

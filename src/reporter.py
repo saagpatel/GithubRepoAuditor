@@ -144,6 +144,9 @@ def write_raw_metadata(report: AuditReport, output_dir: Path) -> Path:
         "action_sync_automation": report.action_sync_automation,
         "automation_guidance_summary": report.automation_guidance_summary,
         "next_safe_automation_step": report.next_safe_automation_step,
+        "approval_ledger": report.approval_ledger,
+        "approval_workflow_summary": report.approval_workflow_summary,
+        "next_approval_review": report.next_approval_review,
         "external_refs": report.external_refs,
         "managed_state_drift": report.managed_state_drift,
         "rollback_preview": report.rollback_preview,
@@ -433,6 +436,7 @@ def write_markdown_report(
         _w(f"  - {item.get('campaign_tuning_line', 'Campaign Tuning: recommendations stay neutral until more outcome history is available.')}")
         _w(f"  - {item.get('historical_intelligence_line', 'Historical Portfolio Intelligence: keep the weekly story anchored in the current run until more cross-run evidence accumulates.')}")
         _w(f"  - {item.get('automation_line', 'Automation Guidance: keep the next step human-led until a bounded safe posture is surfaced.')}")
+        _w(f"  - {item.get('approval_line', 'Approval Workflow: no current approval needs review yet.')}")
         _w(f"  - Checkpoint Timing: {item.get('follow_through_checkpoint_timing', 'Unknown')}")
         _w(
             f"  - Next Checkpoint: {item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}"
@@ -484,6 +488,7 @@ def write_markdown_report(
         _w(f"- {briefing.get('campaign_tuning_line', 'Campaign Tuning: recommendations stay neutral until more outcome history is available.')}")
         _w(f"- {briefing.get('historical_intelligence_line', 'Historical Portfolio Intelligence: keep the weekly story anchored in the current run until more cross-run evidence accumulates.')}")
         _w(f"- {briefing.get('automation_line', 'Automation Guidance: keep the next step human-led until a bounded safe posture is surfaced.')}")
+        _w(f"- {briefing.get('approval_line', 'Approval Workflow: no current approval needs review yet.')}")
         _w(f"- Checkpoint Timing: {briefing.get('checkpoint_timing_line', 'Unknown')}")
         _w(f"- What Would Count As Progress: {briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
         _w("")
@@ -542,6 +547,10 @@ def write_markdown_report(
             _w(f"- {ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}: {(report.operator_summary.get('automation_guidance_summary') or {}).get('summary')}")
         if (report.operator_summary.get("next_safe_automation_step") or {}).get("summary"):
             _w(f"- Next Safe Automation Step: {(report.operator_summary.get('next_safe_automation_step') or {}).get('summary')}")
+        if (report.operator_summary.get("approval_workflow_summary") or {}).get("summary"):
+            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}: {(report.operator_summary.get('approval_workflow_summary') or {}).get('summary')}")
+        if (report.operator_summary.get("next_approval_review") or {}).get("summary"):
+            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['next_approval_review']}: {(report.operator_summary.get('next_approval_review') or {}).get('summary')}")
         if report.operator_summary.get("follow_through_escalation_summary"):
             _w(f"- Follow-Through Aging and Escalation: {report.operator_summary.get('follow_through_escalation_summary')}")
         if report.operator_summary.get("follow_through_recovery_summary"):
@@ -1305,6 +1314,10 @@ def write_markdown_report(
             _w(f"- {ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}: {report.automation_guidance_summary.get('summary')}")
         if report.next_safe_automation_step.get("summary"):
             _w(f"- Next Safe Automation Step: {report.next_safe_automation_step.get('summary')}")
+        if report.approval_workflow_summary.get("summary"):
+            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}: {report.approval_workflow_summary.get('summary')}")
+        if report.next_approval_review.get("summary"):
+            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['next_approval_review']}: {report.next_approval_review.get('summary')}")
         if github_projects.get("enabled"):
             _w(
                 f"- GitHub Projects: {github_projects.get('status', 'disabled')} "

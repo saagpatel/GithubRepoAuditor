@@ -380,6 +380,7 @@ def build_operator_snapshot(
     from src.action_sync_packets import build_action_sync_packets_bundle
     from src.action_sync_readiness import build_action_sync_readiness_bundle
     from src.action_sync_tuning import load_action_sync_tuning_bundle
+    from src.approval_ledger import load_approval_ledger_bundle
 
     action_sync = build_action_sync_readiness_bundle(report_data, queue)
     action_sync_packets = build_action_sync_packets_bundle(
@@ -411,6 +412,8 @@ def build_operator_snapshot(
         queue,
     )
     queue = action_sync_automation.get("operator_queue", queue) or queue
+    approval_ledger = load_approval_ledger_bundle(output_dir, report_data, queue)
+    queue = approval_ledger.get("operator_queue", queue) or queue
     follow_through = _build_follow_through_with_queue(resolution_trend, queue)
     raw_next_action = _next_operator_action(
         resolution_trend.get("primary_target") or (queue[0] if queue else {}),
@@ -958,6 +961,13 @@ def build_operator_snapshot(
         "top_approval_first_campaigns": action_sync_automation["top_approval_first_campaigns"],
         "top_follow_up_safe_campaigns": action_sync_automation["top_follow_up_safe_campaigns"],
         "top_manual_only_campaigns": action_sync_automation["top_manual_only_campaigns"],
+        "approval_ledger": approval_ledger["approval_ledger"],
+        "approval_workflow_summary": approval_ledger["approval_workflow_summary"],
+        "next_approval_review": approval_ledger["next_approval_review"],
+        "top_ready_for_review_approvals": approval_ledger["top_ready_for_review_approvals"],
+        "top_needs_reapproval_approvals": approval_ledger["top_needs_reapproval_approvals"],
+        "top_approved_manual_approvals": approval_ledger["top_approved_manual_approvals"],
+        "top_blocked_approvals": approval_ledger["top_blocked_approvals"],
     }
     return {
         "operator_summary": summary,
@@ -1008,6 +1018,13 @@ def build_operator_snapshot(
         "top_approval_first_campaigns": action_sync_automation["top_approval_first_campaigns"],
         "top_follow_up_safe_campaigns": action_sync_automation["top_follow_up_safe_campaigns"],
         "top_manual_only_campaigns": action_sync_automation["top_manual_only_campaigns"],
+        "approval_ledger": approval_ledger["approval_ledger"],
+        "approval_workflow_summary": approval_ledger["approval_workflow_summary"],
+        "next_approval_review": approval_ledger["next_approval_review"],
+        "top_ready_for_review_approvals": approval_ledger["top_ready_for_review_approvals"],
+        "top_needs_reapproval_approvals": approval_ledger["top_needs_reapproval_approvals"],
+        "top_approved_manual_approvals": approval_ledger["top_approved_manual_approvals"],
+        "top_blocked_approvals": approval_ledger["top_blocked_approvals"],
     }
 
 
@@ -1066,6 +1083,10 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
         lines.append(f"*Next Safe Automation Step:* {(summary.get('next_safe_automation_step') or {}).get('summary')}")
     if (summary.get("next_safe_automation_step") or {}).get("recommended_command"):
         lines.append(f"*Safe Automation Command:* `{(summary.get('next_safe_automation_step') or {}).get('recommended_command')}`")
+    if (summary.get("approval_workflow_summary") or {}).get("summary"):
+        lines.append(f"*{ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}:* {(summary.get('approval_workflow_summary') or {}).get('summary')}")
+    if (summary.get("next_approval_review") or {}).get("summary"):
+        lines.append(f"*{ACTION_SYNC_CANONICAL_LABELS['next_approval_review']}:* {(summary.get('next_approval_review') or {}).get('summary')}")
     if summary.get("trend_summary"):
         lines.append(f"*Trend:* {summary['trend_summary']}")
     if summary.get("accountability_summary"):

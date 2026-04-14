@@ -8,6 +8,7 @@ from src.models import AnalyzerResult, RepoMetadata
 from src.scorer import WEIGHTS, score_repo
 from src.warehouse import (
     load_action_sync_automation,
+    load_approval_records,
     load_campaign_history,
     load_campaign_outcomes,
     load_campaign_tuning,
@@ -20,6 +21,7 @@ from src.warehouse import (
     load_recent_repo_scorecards,
     load_review_history,
     load_watch_checkpoint,
+    save_approval_record,
     write_warehouse_snapshot,
 )
 
@@ -498,3 +500,55 @@ def test_write_warehouse_snapshot_defaults_empty_campaign_outcomes_for_older_sty
     assert operator_state["campaign_outcomes_summary"] == {}
     assert operator_state["campaign_tuning_summary"] == {}
     assert operator_state["intervention_ledger_summary"] == {}
+
+
+def test_approval_workflow_summary_and_records_round_trip(tmp_path):
+    audit = score_repo(_make_metadata(), _make_results())
+
+    from src.models import AuditReport
+
+    report = AuditReport.from_audits("user", [audit], [], 1)
+    report.approval_workflow_summary = {
+        "summary": "Governance: all is the strongest approval review candidate right now."
+    }
+    report.approval_ledger = [
+        {
+            "approval_id": "governance:all",
+            "approval_subject_type": "governance",
+            "subject_key": "all",
+            "label": "Governance: all",
+            "approval_state": "ready-for-review",
+            "source_run_id": f"{report.username}:{report.generated_at.isoformat()}",
+            "fingerprint": "fingerprint-1",
+            "approved_at": "",
+            "approved_by": "",
+            "apply_ready_after_approval": True,
+            "summary": "Governance scope all is ready for review.",
+        }
+    ]
+    report.operator_summary = {
+        "approval_ledger": report.approval_ledger,
+        "approval_workflow_summary": report.approval_workflow_summary,
+        "next_approval_review": {"summary": "Review Governance: all next."},
+    }
+    write_warehouse_snapshot(report, tmp_path)
+
+    latest = load_latest_audit_runs(tmp_path, "user", limit=1)[0]
+    assert latest["approval_workflow_summary"]["summary"].startswith("Governance: all")
+
+    save_approval_record(
+        tmp_path,
+        {
+            "approval_id": "governance:all",
+            "approval_subject_type": "governance",
+            "subject_key": "all",
+            "source_run_id": f"{report.username}:{report.generated_at.isoformat()}",
+            "fingerprint": "fingerprint-1",
+            "approved_at": report.generated_at.isoformat(),
+            "approved_by": "sam",
+            "approval_note": "Reviewed locally",
+            "details_json": {"action_count": 1, "applyable_count": 1},
+        },
+    )
+    loaded = load_approval_records(tmp_path, "user")
+    assert loaded[0]["approval_note"] == "Reviewed locally"

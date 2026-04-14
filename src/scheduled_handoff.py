@@ -139,6 +139,8 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"- {ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}: {(summary.get('automation_guidance_summary') or {}).get('summary', 'Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture.')}",
         f"- Next safe automation step: {(summary.get('next_safe_automation_step') or {}).get('summary', 'Stay local for now; no current campaign has a stronger safe automation posture than manual review.')}",
         f"- Safe automation command: {(summary.get('next_safe_automation_step') or {}).get('recommended_command', 'No safe automation command is recommended yet.')}",
+        f"- {ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}: {(summary.get('approval_workflow_summary') or {}).get('summary', 'No current approval needs review yet, so the approval workflow can stay local for now.')}",
+        f"- {ACTION_SYNC_CANONICAL_LABELS['next_approval_review']}: {(summary.get('next_approval_review') or {}).get('summary', 'Stay local for now; no current approval needs review.')}",
         f"- Trend: `{summary.get('trend_status', 'stable')}` — {summary.get('trend_summary', 'No trend summary is recorded yet.')}",
         f"- Aging status: `{summary.get('aging_status', 'fresh')}`",
         f"- Attention counts: new={summary.get('new_attention_count', 0)}, resolved={resolved_count}, persisting={persisting_count}, reopened={summary.get('reopened_attention_count', 0)}",

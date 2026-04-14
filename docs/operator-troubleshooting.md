@@ -161,3 +161,14 @@ If the product surfaces `Automation Guidance`, treat it as a safety posture, not
 - `follow-up-safe` means only non-mutating refresh or monitoring is appropriate
 
 If the wording ever implies that `--writeback-apply` will run automatically, treat that as a bug and fall back to the workbook plus control-center review path.
+
+## Approval workflow cues
+
+If the product surfaces `Approval Workflow`, read it as local approval memory, not as a mutation path.
+
+- `needs-reapproval` means the earlier approval fingerprint or blocker story changed
+- `ready-for-review` means approval can be reviewed now, but nothing will be applied automatically
+- `approved-manual` means approval is current and the next move is still a human-run apply command
+- `blocked` means approval alone cannot solve the current path
+
+If approval wording ever suggests that approval capture will also execute writeback, treat that as a bug and fall back to the workbook plus control-center review path.

@@ -90,6 +90,7 @@ audit <github-username> --control-center
 ```bash
 audit <github-username> --campaign security-review --writeback-target github
 audit <github-username> --campaign security-review --writeback-target all --github-projects
+audit <github-username> --approval-center
 ```
 
 Treat campaign/writeback, GitHub Projects, Notion sync, catalog overrides, scorecards overrides, and `--excel-mode template` as advanced paths.
@@ -162,6 +163,8 @@ audit <github-username> --campaign security-review --writeback-target github
 Normal runs now perform a lightweight automatic preflight before fetching repos. By default the run stops on blocking errors and continues on warnings. Use `--preflight-mode strict` to fail on warnings too, or `--preflight-mode off` to skip the automatic preflight.
 
 The new `--control-center` path is read-only. It loads the latest report + warehouse state, groups open work into `Blocked`, `Needs Attention Now`, `Ready for Manual Action`, and `Safe to Defer`, and writes `operator-control-center-<username>-<date>.json` plus `.md`.
+
+The new `--approval-center` path is also read-only. It loads the latest report plus approval history, groups work into `Needs Re-Approval`, `Ready For Review`, `Approved But Manual`, and `Blocked`, and writes `approval-center-<username>-<date>.json` plus `.md`. Local approval capture stays separate from writeback apply.
 
 Watch mode now supports `--watch-strategy adaptive|incremental|full`. `adaptive` is the default and uses the stored baseline contract plus the scheduled full-refresh interval to decide whether each watch cycle should run full or incremental.
 

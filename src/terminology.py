@@ -8,4 +8,8 @@ ACTION_SYNC_CANONICAL_LABELS = {
     "next_tie_break_candidate": "Next Tie-Break Candidate",
     "historical_portfolio_intelligence": "Historical Portfolio Intelligence",
     "automation_guidance": "Automation Guidance",
+    "approval_workflow": "Approval Workflow",
+    "next_approval_review": "Next Approval Review",
+    "approval_ledger": "Approval Ledger",
+    "approved_but_manual": "Approved But Manual",
 }

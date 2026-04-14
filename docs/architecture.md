@@ -59,6 +59,8 @@ The current module boundaries are intentionally explicit:
   Post-apply monitoring logic that judges whether a recent sync is holding, drifting back, reopening, or still needs monitoring.
 - `src/action_sync_tuning.py`
   Bounded tie-break layer that uses post-apply history to rank tied campaigns without changing stage precedence.
+- `src/approval_ledger.py`
+  Local approval workflow synthesis, fingerprinting, approval receipts, and approval-center packaging.
 - `src/intervention_ledger.py`
   Cross-run repo intelligence synthesis that connects intervention history, recurring pressure, hotspot persistence, scorecard direction, and campaign aftermath.
 - `src/implementation_hotspots.py`
@@ -228,6 +230,31 @@ The warehouse supports:
 - weekly trend work without re-auditing every repo
 
 Historical compatibility remains a design constraint. Older rows and older reports must stay readable even when newer additive fields exist.
+
+## Approval Workflow
+
+Phase 93 adds one local, artifact-first approval layer: `Approval Workflow`.
+
+That layer does not widen write authority. It exists to answer:
+
+- what needs review now
+- what needs re-approval because the fingerprint changed
+- what is approved but still waits on an explicit manual apply
+- what is blocked for reasons approval alone cannot solve
+
+Architecturally:
+
+- `src/approval_ledger.py` owns approval synthesis and fingerprinting
+- `src/operator_control_center.py` carries approval state into the operator summary and queue items
+- `src/report_enrichment.py` packages the same approval story across workbook, Markdown, HTML, review-pack, scheduled handoff, and approval-center artifacts
+- `src/warehouse.py` persists approval ledger snapshots and approval records while keeping legacy governance approvals readable
+
+Approval stays local-authoritative:
+
+- approval capture writes a local attestation
+- it may regenerate shared artifacts
+- it never auto-runs `--writeback-apply`
+- explicit apply remains a separate human action
 
 ## Compatibility Rules
 

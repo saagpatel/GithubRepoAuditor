@@ -129,6 +129,15 @@ That layer is intentionally bounded:
 - it does not create a new executor
 - it helps the product decide whether a command hint is safe to surface, not whether a mutation should happen automatically
 
+If the next question becomes “does this need approval, re-approval, or explicit manual apply?”, read `Approval Workflow` after automation guidance:
+
+- `needs-reapproval` means the earlier approval no longer matches the current packet or governance fingerprint
+- `ready-for-review` means the approval can be reviewed now, but approval still does not mutate anything
+- `approved-manual` means approval is current and the next move is still an explicit manual apply
+- `blocked` means approval alone cannot help yet because drift, access, or other blockers still exist
+
+Use `audit <github-username> --approval-center` when you want the read-only approval view. Use `--approve-governance` or `--approve-packet` only to capture local approval records; those actions regenerate artifacts, but they do not perform external mutation.
+
 ## Workbook gate reminder
 
 Use `make workbook-gate` only when you changed workbook-facing code or layout. Normal portfolio use does not require the workbook gate.
