@@ -176,6 +176,7 @@ def _make_report() -> dict:
                 "post_apply_line": "Post-Apply Monitoring: Security Review was applied recently; monitor it now before treating it as stable.",
                 "campaign_tuning_line": "Campaign Tuning: Security Review should win ties because recent outcomes are proven.",
                 "historical_intelligence_line": "Historical Portfolio Intelligence: RepoC is improving after intervention and should be watched for durable quieting.",
+                "automation_line": "Automation Guidance: Security Review is preview-safe: use a preview-only step first. Safe preview command: audit user --campaign security-review --writeback-target all.",
             }
         ],
     }
@@ -210,6 +211,8 @@ def test_review_pack_includes_revalidation_recovery_section(tmp_path):
     assert "Next Tuned Campaign:" not in content
     assert "Historical Portfolio Intelligence:" in content
     assert "Next Historical Focus:" in content
+    assert "Automation Guidance:" in content
+    assert "Next Safe Automation Step:" in content
     assert "Preview Ready" in content
     assert "Catalog: operator-loop | flagship workbook-first flow" in content
     assert "Where To Start: Start in src/core.py." in content
@@ -219,6 +222,7 @@ def test_review_pack_includes_revalidation_recovery_section(tmp_path):
     assert "Action Sync: Security Review is preview-ready — recommended target all." in content
     assert "Campaign Tuning: Security Review should win ties because recent outcomes are proven." in content
     assert "Historical Portfolio Intelligence: RepoC is improving after intervention and should be watched for durable quieting." in content
+    assert "Automation Guidance: Security Review is preview-safe: use a preview-only step first." in content
     assert "Follow-Through Revalidation Recovery and Confidence Re-Earning" not in content
 
 

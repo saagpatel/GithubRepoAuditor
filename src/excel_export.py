@@ -3556,6 +3556,14 @@ def _build_operator_outcomes(wb: Workbook, data: dict) -> None:
         "summary",
         "No current campaign needs a tuning tie-break yet.",
     )
+    automation_guidance_summary = (data.get("automation_guidance_summary") or {}).get(
+        "summary",
+        "Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture.",
+    )
+    next_safe_automation_step = (data.get("next_safe_automation_step") or {}).get(
+        "summary",
+        "Stay local for now; no current campaign has a stronger safe automation posture than manual review.",
+    )
     ws.merge_cells("A1:F1")
     ws["A1"].value = "Operator Outcomes"
     ws["A1"].font = SECTION_FONT
@@ -3580,12 +3588,18 @@ def _build_operator_outcomes(wb: Workbook, data: dict) -> None:
     ws.merge_cells("A8:F8")
     ws["A8"].value = next_tuned_campaign
     ws["A8"].alignment = WRAP
+    ws.merge_cells("A9:F9")
+    ws["A9"].value = automation_guidance_summary
+    ws["A9"].alignment = WRAP
+    ws.merge_cells("A10:F10")
+    ws["A10"].value = next_safe_automation_step
+    ws["A10"].alignment = WRAP
 
     headers = ["Metric", "Status", "Value", "Numerator", "Denominator", "Summary"]
     for col, header in enumerate(headers, 1):
-        ws.cell(row=10, column=col, value=header)
-    style_header_row(ws, 10, len(headers))
-    ws.freeze_panes = "A11"
+        ws.cell(row=12, column=col, value=header)
+    style_header_row(ws, 12, len(headers))
+    ws.freeze_panes = "A13"
 
     metrics = [
         ("Review To Action Closure Rate", data.get("portfolio_outcomes_summary", {}).get("review_to_action_closure_rate", {})),
@@ -3594,7 +3608,7 @@ def _build_operator_outcomes(wb: Workbook, data: dict) -> None:
         ("Recommendation Validation Rate", data.get("operator_effectiveness_summary", {}).get("recommendation_validation_rate", {})),
         ("Noisy Guidance Rate", data.get("operator_effectiveness_summary", {}).get("noisy_guidance_rate", {})),
     ]
-    for row, (label, metric) in enumerate(metrics, 11):
+    for row, (label, metric) in enumerate(metrics, 13):
         value = metric.get("value")
         if isinstance(value, float):
             display_value = round(value, 3)
@@ -3612,7 +3626,7 @@ def _build_operator_outcomes(wb: Workbook, data: dict) -> None:
             cell = ws.cell(row=row, column=col, value=item)
             style_data_cell(cell, "center" if col in {2, 3, 4, 5} else "left")
 
-    monitoring_row = 18
+    monitoring_row = 20
     ws.cell(row=monitoring_row, column=1, value="Post-Apply Monitoring")
     style_header_row(ws, monitoring_row, 6)
     monitoring_headers = ["Campaign", "State", "Pressure Effect", "Drift", "Reopen", "Summary"]
@@ -4022,6 +4036,7 @@ def _build_hidden_data_sheets(
     action_sync_outcome_rows: list[list[object]] = []
     campaign_tuning_rows: list[list[object]] = []
     intervention_ledger_rows: list[list[object]] = []
+    action_sync_automation_rows: list[list[object]] = []
     lookup_rows: list[list[object]] = []
     repo_detail_rows, repo_dimension_rollup_rows, repo_history_rollup_rows = _repo_detail_rows(data, score_history)
     run_change_rollup_rows, run_change_repo_rows = _run_change_rows(data, diff_data)
@@ -4111,6 +4126,17 @@ def _build_hidden_data_sheets(
             item.get("scorecard_trend", "insufficient-evidence"),
             item.get("campaign_follow_through", "insufficient-evidence"),
             item.get("historical_intelligence_status", "insufficient-evidence"),
+            item.get("summary", ""),
+        ])
+    for item in data.get("action_sync_automation", []) or []:
+        action_sync_automation_rows.append([
+            item.get("campaign_type", ""),
+            item.get("label", ""),
+            item.get("automation_posture", "manual-only"),
+            "yes" if item.get("review_required") else "no",
+            "yes" if item.get("requires_approval") else "no",
+            item.get("recommended_command", ""),
+            item.get("recommended_follow_up", ""),
             item.get("summary", ""),
         ])
 
@@ -4674,6 +4700,22 @@ def _build_hidden_data_sheets(
     )
     _write_hidden_table_sheet(
         wb,
+        "Data_ActionSyncAutomation",
+        "tblActionSyncAutomationData",
+        [
+            "Campaign Type",
+            "Label",
+            "Automation Posture",
+            "Review Required",
+            "Requires Approval",
+            "Recommended Command",
+            "Recommended Follow Up",
+            "Summary",
+        ],
+        action_sync_automation_rows,
+    )
+    _write_hidden_table_sheet(
+        wb,
         "Data_Scenarios",
         "tblScenarios",
         ["Key", "Title", "Lens", "Repo Count", "Average Expected Lens Delta", "Projected Tier Promotions"],
@@ -5140,6 +5182,20 @@ def _build_campaigns(wb: Workbook, data: dict) -> None:
                     "Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet.",
                 ),
             ),
+            (
+                ACTION_SYNC_CANONICAL_LABELS["automation_guidance"],
+                (data.get("automation_guidance_summary") or {}).get(
+                    "summary",
+                    "Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture.",
+                ),
+            ),
+            (
+                "Next Safe Automation Step",
+                (data.get("next_safe_automation_step") or {}).get(
+                    "summary",
+                    "Stay local for now; no current campaign has a stronger safe automation posture than manual review.",
+                ),
+            ),
         ],
         title=ACTION_SYNC_CANONICAL_LABELS["readiness"],
     )
@@ -5273,6 +5329,20 @@ def _build_writeback_audit(wb: Workbook, data: dict) -> None:
                 (data.get("next_historical_focus") or {}).get(
                     "summary",
                     "Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet.",
+                ),
+            ),
+            (
+                ACTION_SYNC_CANONICAL_LABELS["automation_guidance"],
+                (data.get("automation_guidance_summary") or {}).get(
+                    "summary",
+                    "Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture.",
+                ),
+            ),
+            (
+                "Next Safe Automation Step",
+                (data.get("next_safe_automation_step") or {}).get(
+                    "summary",
+                    "Stay local for now; no current campaign has a stronger safe automation posture than manual review.",
                 ),
             ),
         ],
@@ -7097,6 +7167,16 @@ def _build_print_pack(
     ws["E18"] = weekly_pack.get(
         "next_historical_focus",
         "Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet.",
+    )
+    ws["D19"] = ACTION_SYNC_CANONICAL_LABELS["automation_guidance"]
+    ws["E19"] = weekly_pack.get(
+        "automation_guidance_summary",
+        "Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture.",
+    )
+    ws["D20"] = "Next Safe Automation Step"
+    ws["E20"] = weekly_pack.get(
+        "next_safe_automation_step",
+        "Stay local for now; no current campaign has a stronger safe automation posture than manual review.",
     )
     ws["A7"] = "Portfolio Headline"
     ws["B7"] = weekly_pack.get("portfolio_headline", operator_summary.get("headline", "Review the latest workbook surfaces for change and drift."))

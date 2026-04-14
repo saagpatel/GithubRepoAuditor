@@ -2,13 +2,13 @@
 
 **Date:** 2026-04-12
 **Current Status Snapshot:**
-- Shipped through **Phase 90**
+- Shipped through **Phase 92**
 - Current baseline is `main`
 - No open PRs
 - Workbook automated gate passes; manual desktop Excel signoff remains a separate release step
 - Only intentional local residue is untracked `.serena/`
 - [2026-04-12-roadmap-phases-78-85.md](/Users/d/Projects/GithubRepoAuditor/docs/plans/2026-04-12-roadmap-phases-78-85.md) is now historical context only
-- **Phase 91** is now the active target
+- This `88-92` roadmap arc is now complete; the next phase should start by opening a new roadmap file and reassessing the next arc
 
 ---
 
@@ -22,7 +22,7 @@ GitHub Repo Auditor now has a strong operator loop:
 - managed writeback and GitHub Projects mirroring
 - workbook, Markdown, HTML, review-pack, and scheduled handoff parity
 
-The next roadmap arc should focus on closing the loop after execution, then using that evidence to improve the system deliberately.
+The next roadmap arc has now closed the loop after execution, tuned tied campaign recommendations, cleaned up terminology, and connected longer-run repo history through the Intervention Ledger.
 
 The healthiest next sequence is:
 
@@ -93,8 +93,8 @@ Phase 89 added one bounded recommendation overlay on top of those three layers:
 
 That overlay uses post-apply history to break ties only when campaigns are already in the same readiness or execution group.
 
-The main remaining gap is no longer actionability, outcome visibility, or terminology coherence.
-It is connecting the growing history across hotspots, outcomes, interventions, and repo maturity into one bounded historical portfolio story.
+The main remaining gap is no longer actionability, outcome visibility, terminology coherence, or bounded historical synthesis.
+It is helping the product say what execution guidance is safe to automate, what still requires manual review, and what should remain explicitly human-only.
 
 ---
 
@@ -238,6 +238,31 @@ Prefer additive historical insight over new automation, new queues, or new scori
 ### Goal
 
 Add safer execution helpers only after the outcome loop is trustworthy.
+
+### Target
+
+Phase 92 should stay bounded. The product should tell the operator:
+
+- what is safe to automate as a preview-only step
+- what still requires approval or human review first
+- what is safe to treat as non-mutating follow-up
+- what must stay explicitly manual
+
+This phase should specifically:
+
+- add one `Automation Guidance` layer on top of Action Sync readiness, apply packets, post-apply monitoring, campaign tuning, and historical portfolio intelligence
+- keep scheduled handoff and issue automation artifact-first
+- surface safe command hints only when the posture is clearly bounded
+- keep `--writeback-apply` human-only even when a campaign is otherwise ready
+
+### Constraint
+
+No new command tree, no background mutation runner, and no widening of write authority.
+`apply-manual` remains an explicit human action, not an automatic one.
+
+### Status
+
+Shipped. Phase 92 added bounded `Automation Guidance`, automation-safe command/posture packaging across the Action Sync stack, scheduled-handoff parity for safe execution hints, workbook/Markdown/HTML/review-pack/control-center parity, and additive warehouse persistence for automation guidance snapshots.
 
 ### Target
 

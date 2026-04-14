@@ -66,6 +66,8 @@ def export_review_pack(
     _w(f"- {ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}: {weekly_pack.get('next_tie_break_candidate', weekly_pack.get('next_tuned_campaign', 'No current campaign needs a tie-break candidate yet.'))}")
     _w(f"- {ACTION_SYNC_CANONICAL_LABELS['historical_portfolio_intelligence']}: {weekly_pack.get('historical_portfolio_intelligence', 'Historical portfolio intelligence is still thin, so the weekly story should stay grounded in the current run and recent operator queue.')}")
     _w(f"- Next Historical Focus: {weekly_pack.get('next_historical_focus', 'Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet.')}")
+    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}: {weekly_pack.get('automation_guidance_summary', 'Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture.')}")
+    _w(f"- Next Safe Automation Step: {weekly_pack.get('next_safe_automation_step', 'Stay local for now; no current campaign has a stronger safe automation posture than manual review.')}")
     _w("")
     _w(f"### {ACTION_SYNC_CANONICAL_LABELS['readiness']}")
     _w("")
@@ -133,6 +135,23 @@ def export_review_pack(
                 _w(f"  - {item.get('label', item.get('campaign_type', 'Campaign'))} — {item.get('summary', 'No campaign tuning summary is recorded yet.')}")
         else:
             _w(f"  - {empty_message}")
+    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}:")
+    _w(f"  Summary: {weekly_pack.get('automation_guidance_summary', 'Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture.')}")
+    _w(f"  Next Step: {weekly_pack.get('next_safe_automation_step', 'Stay local for now; no current campaign has a stronger safe automation posture than manual review.')}")
+    for label, items, empty_message in (
+        ("Preview Safe", weekly_pack.get("top_preview_safe_campaigns", []), "No campaigns are currently safe to automate as preview-only."),
+        ("Apply Manual", weekly_pack.get("top_apply_manual_campaigns", []), "No campaigns are currently in a manual-apply posture."),
+        ("Approval First", weekly_pack.get("top_approval_first_campaigns", []), "No campaigns are currently waiting on approval-first review."),
+        ("Follow-Up Safe", weekly_pack.get("top_follow_up_safe_campaigns", []), "No campaigns are currently in a non-mutating follow-up posture."),
+        ("Manual Only", weekly_pack.get("top_manual_only_campaigns", []), "No campaigns are currently constrained to manual-only review."),
+    ):
+        _w(f"- {label}:")
+        if items:
+            for item in items[:3]:
+                command = item.get("recommended_command") or "No command"
+                _w(f"  - {item.get('label', item.get('campaign_type', 'Campaign'))} — {item.get('summary', 'No automation guidance summary is recorded yet.')} [{command}]")
+        else:
+            _w(f"  - {empty_message}")
     _w(f"- {ACTION_SYNC_CANONICAL_LABELS['historical_portfolio_intelligence']}:")
     _w(f"  Summary: {weekly_pack.get('historical_portfolio_intelligence', 'Historical portfolio intelligence is still thin, so the weekly story should stay grounded in the current run and recent operator queue.')}")
     _w(f"  Next Focus: {weekly_pack.get('next_historical_focus', 'Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet.')}")
@@ -165,6 +184,7 @@ def export_review_pack(
         _w(f"  {item.get('post_apply_line', 'Post-Apply Monitoring: no recent Action Sync apply needs follow-up yet.')}")
         _w(f"  {item.get('campaign_tuning_line', 'Campaign Tuning: recommendations stay neutral until more outcome history is available.')}")
         _w(f"  {item.get('historical_intelligence_line', 'Historical Portfolio Intelligence: keep the weekly story anchored in the current run until more cross-run evidence accumulates.')}")
+        _w(f"  {item.get('automation_line', 'Automation Guidance: keep the next step human-led until a bounded safe posture is surfaced.')}")
         _w(f"  Checkpoint Timing: {item.get('follow_through_checkpoint_timing', 'Unknown')}")
         _w(f"  Next Checkpoint: {item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
     if not weekly_pack.get("top_attention"):
@@ -213,6 +233,7 @@ def export_review_pack(
         _w(f"  {briefing.get('post_apply_line', 'Post-Apply Monitoring: no recent Action Sync apply needs follow-up yet.')}")
         _w(f"  {briefing.get('campaign_tuning_line', 'Campaign Tuning: recommendations stay neutral until more outcome history is available.')}")
         _w(f"  {briefing.get('historical_intelligence_line', 'Historical Portfolio Intelligence: keep the weekly story anchored in the current run until more cross-run evidence accumulates.')}")
+        _w(f"  {briefing.get('automation_line', 'Automation Guidance: keep the next step human-led until a bounded safe posture is surfaced.')}")
         _w(f"  Checkpoint Timing: {briefing.get('checkpoint_timing_line', 'Unknown')}")
         _w(f"  What Would Count As Progress: {briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
     _w("")
@@ -253,6 +274,10 @@ def export_review_pack(
             _w(f"- {ACTION_SYNC_CANONICAL_LABELS['historical_portfolio_intelligence']}: {(operator_summary.get('intervention_ledger_summary') or {}).get('summary')}")
         if (operator_summary.get("next_historical_focus") or {}).get("summary"):
             _w(f"- Next Historical Focus: {(operator_summary.get('next_historical_focus') or {}).get('summary')}")
+        if (operator_summary.get("automation_guidance_summary") or {}).get("summary"):
+            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}: {(operator_summary.get('automation_guidance_summary') or {}).get('summary')}")
+        if (operator_summary.get("next_safe_automation_step") or {}).get("summary"):
+            _w(f"- Next Safe Automation Step: {(operator_summary.get('next_safe_automation_step') or {}).get('summary')}")
         for item in operator_queue[:8]:
             repo = f"{item.get('repo', '')}: " if item.get("repo") else ""
             _w(f"- [{item.get('lane_label', item.get('lane', 'ready'))}] {repo}{item.get('title', 'Triage item')}")
@@ -262,6 +287,7 @@ def export_review_pack(
             _w(f"  {item.get('action_sync_line', 'Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.')}")
             _w(f"  {item.get('apply_packet_line', 'Apply Packet: no current execution handoff is surfaced.')}")
             _w(f"  {item.get('historical_intelligence_line', 'Historical Portfolio Intelligence: keep the weekly story anchored in the current run until more cross-run evidence accumulates.')}")
+            _w(f"  {item.get('automation_line', 'Automation Guidance: keep the next step human-led until a bounded safe posture is surfaced.')}")
         recent_changes = operator_summary.get("operator_recent_changes", [])
         for change in recent_changes[:3]:
             subject = change.get("repo") or change.get("repo_full_name") or change.get("item_id") or "portfolio"

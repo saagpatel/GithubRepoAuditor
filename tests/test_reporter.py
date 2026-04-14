@@ -237,6 +237,13 @@ class TestMarkdownReport:
             "next_historical_focus": {
                 "summary": "Read test-repo next: it is the clearest current example of improvement after intervention.",
             },
+            "automation_guidance_summary": {
+                "summary": "Preview Security Review next; that is the strongest safe automation step right now.",
+            },
+            "next_safe_automation_step": {
+                "summary": "Preview Security Review next; that is the strongest safe automation step right now.",
+                "recommended_command": "audit testuser --campaign security-review --writeback-target all",
+            },
             "top_preview_ready_campaigns": [
                 {
                     "label": "Security Review",
@@ -247,6 +254,16 @@ class TestMarkdownReport:
             "top_review_drift_packets": [],
             "top_needs_approval_packets": [],
             "top_ready_to_apply_packets": [],
+            "top_preview_safe_campaigns": [
+                {
+                    "label": "Security Review",
+                    "summary": "Security Review is preview-safe: use a preview-only step first. Safe preview command: audit testuser --campaign security-review --writeback-target all.",
+                }
+            ],
+            "top_apply_manual_campaigns": [],
+            "top_approval_first_campaigns": [],
+            "top_follow_up_safe_campaigns": [],
+            "top_manual_only_campaigns": [],
         }
         report.operator_queue = [
             {
@@ -260,6 +277,7 @@ class TestMarkdownReport:
                 "post_apply_line": "Post-Apply Monitoring: Security Review was applied recently; monitor it now before treating it as stable.",
                 "campaign_tuning_line": "Campaign Tuning: Security Review should win ties because recent outcomes are proven.",
                 "historical_intelligence_line": "Historical Portfolio Intelligence: test-repo is improving after intervention and should be watched for durable quieting.",
+                "automation_line": "Automation Guidance: Security Review is preview-safe: use a preview-only step first. Safe preview command: audit testuser --campaign security-review --writeback-target all.",
             }
         ]
 
@@ -278,10 +296,13 @@ class TestMarkdownReport:
         assert "Next Tuned Campaign" not in content
         assert "Historical Portfolio Intelligence" in content
         assert "Next Historical Focus" in content
+        assert "Automation Guidance" in content
+        assert "Next Safe Automation Step" in content
         assert "Preview Ready" in content
         assert "recommended target all" in content
         assert "Security Review should win ties because recent outcomes are proven." in content
         assert "test-repo is improving after intervention" in content
+        assert "Preview Security Review next; that is the strongest safe automation step right now." in content
 
     def test_includes_preflight_diagnostics_when_present(self, tmp_path):
         report = _make_report()

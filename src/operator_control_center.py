@@ -375,6 +375,7 @@ def build_operator_snapshot(
         current_generated_at=report_data.get("generated_at", ""),
     )
     queue = _attach_portfolio_catalog_context(queue, report_data)
+    from src.action_sync_automation import build_action_sync_automation_bundle
     from src.action_sync_outcomes import load_action_sync_outcomes_bundle
     from src.action_sync_packets import build_action_sync_packets_bundle
     from src.action_sync_readiness import build_action_sync_readiness_bundle
@@ -400,6 +401,16 @@ def build_operator_snapshot(
     queue = action_sync_tuning.get("operator_queue", queue)
     intervention_ledger = load_intervention_ledger_bundle(output_dir, report_data, queue)
     queue = intervention_ledger.get("operator_queue", queue) or queue
+    action_sync_automation = build_action_sync_automation_bundle(
+        report_data,
+        action_sync,
+        action_sync_packets,
+        action_sync_outcomes,
+        action_sync_tuning,
+        intervention_ledger,
+        queue,
+    )
+    queue = action_sync_automation.get("operator_queue", queue) or queue
     follow_through = _build_follow_through_with_queue(resolution_trend, queue)
     raw_next_action = _next_operator_action(
         resolution_trend.get("primary_target") or (queue[0] if queue else {}),
@@ -939,6 +950,14 @@ def build_operator_snapshot(
         "top_persistent_pressure_repos": intervention_ledger["top_persistent_pressure_repos"],
         "top_improving_repos": intervention_ledger["top_improving_repos"],
         "top_holding_repos": intervention_ledger["top_holding_repos"],
+        "action_sync_automation": action_sync_automation["action_sync_automation"],
+        "automation_guidance_summary": action_sync_automation["automation_guidance_summary"],
+        "next_safe_automation_step": action_sync_automation["next_safe_automation_step"],
+        "top_preview_safe_campaigns": action_sync_automation["top_preview_safe_campaigns"],
+        "top_apply_manual_campaigns": action_sync_automation["top_apply_manual_campaigns"],
+        "top_approval_first_campaigns": action_sync_automation["top_approval_first_campaigns"],
+        "top_follow_up_safe_campaigns": action_sync_automation["top_follow_up_safe_campaigns"],
+        "top_manual_only_campaigns": action_sync_automation["top_manual_only_campaigns"],
     }
     return {
         "operator_summary": summary,
@@ -981,6 +1000,14 @@ def build_operator_snapshot(
         "top_persistent_pressure_repos": intervention_ledger["top_persistent_pressure_repos"],
         "top_improving_repos": intervention_ledger["top_improving_repos"],
         "top_holding_repos": intervention_ledger["top_holding_repos"],
+        "action_sync_automation": action_sync_automation["action_sync_automation"],
+        "automation_guidance_summary": action_sync_automation["automation_guidance_summary"],
+        "next_safe_automation_step": action_sync_automation["next_safe_automation_step"],
+        "top_preview_safe_campaigns": action_sync_automation["top_preview_safe_campaigns"],
+        "top_apply_manual_campaigns": action_sync_automation["top_apply_manual_campaigns"],
+        "top_approval_first_campaigns": action_sync_automation["top_approval_first_campaigns"],
+        "top_follow_up_safe_campaigns": action_sync_automation["top_follow_up_safe_campaigns"],
+        "top_manual_only_campaigns": action_sync_automation["top_manual_only_campaigns"],
     }
 
 
@@ -1033,6 +1060,12 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
         lines.append(f"*{ACTION_SYNC_CANONICAL_LABELS['historical_portfolio_intelligence']}:* {(summary.get('intervention_ledger_summary') or {}).get('summary')}")
     if (summary.get("next_historical_focus") or {}).get("summary"):
         lines.append(f"*Next Historical Focus:* {(summary.get('next_historical_focus') or {}).get('summary')}")
+    if (summary.get("automation_guidance_summary") or {}).get("summary"):
+        lines.append(f"*{ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}:* {(summary.get('automation_guidance_summary') or {}).get('summary')}")
+    if (summary.get("next_safe_automation_step") or {}).get("summary"):
+        lines.append(f"*Next Safe Automation Step:* {(summary.get('next_safe_automation_step') or {}).get('summary')}")
+    if (summary.get("next_safe_automation_step") or {}).get("recommended_command"):
+        lines.append(f"*Safe Automation Command:* `{(summary.get('next_safe_automation_step') or {}).get('recommended_command')}`")
     if summary.get("trend_summary"):
         lines.append(f"*Trend:* {summary['trend_summary']}")
     if summary.get("accountability_summary"):

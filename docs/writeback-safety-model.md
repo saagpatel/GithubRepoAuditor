@@ -115,6 +115,26 @@ This layer does not widen authority:
 - it does not trigger automatic preview, apply, or rollback
 - it is surfaced to operators as `Campaign Tuning` plus `Next Tie-Break Candidate`
 
+## Automation Guidance
+
+Phase 92 adds one bounded automation-posture layer on top of readiness, apply packets, post-apply monitoring, campaign tuning, and historical portfolio intelligence.
+
+The automation postures are intentionally narrow:
+
+- `approval-first`: approval or governance review must happen before any execution step should be treated as safe
+- `manual-only`: drift, reopen, relapse, or persistent-pressure signals still require human judgment first
+- `preview-safe`: an explicit preview command is the strongest safe next step
+- `apply-manual`: an apply command may be shown, but it remains an explicit human-only action
+- `follow-up-safe`: only non-mutating follow-up such as rerun, workbook refresh, control-center review, or monitoring is appropriate
+- `quiet-safe`: only quiet-state or housekeeping automation is appropriate
+
+This layer does not widen authority:
+
+- it never auto-runs `--writeback-apply`
+- it does not create a new executor or background mutation path
+- it does not override stronger readiness, execution, monitoring, tuning, or historical-intelligence signals
+- it exists to keep surfaced execution guidance bounded and honest
+
 ## Audit Trail
 
 Every campaign run records:

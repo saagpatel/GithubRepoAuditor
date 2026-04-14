@@ -139,6 +139,20 @@ Use that layer to decide whether the same repo is truly getting better over time
 - it does not change readiness or apply precedence
 - it complements the current weekly/operator story rather than replacing it
 
+Phase 92 adds one final bounded guidance read after those layers: `Automation Guidance`.
+
+- `approval-first` means approvals must be reviewed before any execution command should be treated as safe
+- `manual-only` means relapse, reopen, drift, or persistent-pressure signals still require human judgment first
+- `preview-safe` means the strongest safe next move is an explicit preview command
+- `apply-manual` means apply is available, but it stays an explicit human-only action
+- `follow-up-safe` means only non-mutating follow-up like rerun, workbook refresh, control-center review, or monitoring is appropriate
+- `quiet-safe` means the safest automation is housekeeping or quiet-state behavior only
+
+Use that layer as a posture label, not as permission:
+- it never auto-runs `--writeback-apply`
+- it never changes readiness or execution precedence
+- it only tells you whether surfacing a command is safe and bounded
+
 ## Default guidance
 
 - `--doctor` is the recommended first step.

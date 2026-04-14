@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from src.terminology import ACTION_SYNC_CANONICAL_LABELS
+
 COMPLETENESS_THRESHOLDS = [
     ("shipped", 0.75),
     ("functional", 0.55),
@@ -71,6 +73,9 @@ NO_CAMPAIGN_TUNING_LINE = "Campaign Tuning: recommendations stay neutral until m
 NO_HISTORICAL_PORTFOLIO_INTELLIGENCE_SUMMARY = "Historical portfolio intelligence is still thin, so the weekly story should stay grounded in the current run and recent operator queue."
 NO_NEXT_HISTORICAL_FOCUS = "Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet."
 NO_HISTORICAL_INTELLIGENCE_LINE = "Historical Portfolio Intelligence: keep the weekly story anchored in the current run until more cross-run evidence accumulates."
+NO_AUTOMATION_GUIDANCE_SUMMARY = "Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture."
+NO_NEXT_SAFE_AUTOMATION_STEP = "Stay local for now; no current campaign has a stronger safe automation posture than manual review."
+NO_AUTOMATION_GUIDANCE_LINE = "Automation Guidance: keep the next step human-led until a bounded safe posture is surfaced."
 
 OPERATOR_FOCUS_LABELS = {
     "act-now": "Act Now",
@@ -568,6 +573,7 @@ def build_repo_briefing(
     post_apply_line = build_post_apply_monitoring_line(handoff_source)
     campaign_tuning_line = build_campaign_tuning_line(handoff_source)
     historical_intelligence_line = build_historical_intelligence_line(handoff_source)
+    automation_line = build_automation_line(handoff_source)
     follow_through_resurfacing_reason = build_follow_through_resurfacing_reason(handoff_source)
     implementation_hotspots = _implementation_hotspots(audit)[:3]
     where_to_start_summary = _where_to_start_summary(audit)
@@ -666,6 +672,7 @@ def build_repo_briefing(
         "post_apply_line": post_apply_line,
         "campaign_tuning_line": campaign_tuning_line,
         "historical_intelligence_line": historical_intelligence_line,
+        "automation_line": automation_line,
         "portfolio_catalog": portfolio_catalog,
         "catalog_line": catalog_line,
         "intent_alignment": intent_alignment,
@@ -686,6 +693,9 @@ def build_repo_briefing(
         "post_apply_summary": str(handoff_source.get("post_apply_summary") or "No post-apply monitoring is surfaced for this repo yet."),
         "campaign_tuning_status": str(handoff_source.get("campaign_tuning_status") or "insufficient-evidence"),
         "campaign_tuning_summary": str(handoff_source.get("campaign_tuning_summary") or "No campaign tuning evidence is surfaced for this repo yet."),
+        "automation_posture": str(handoff_source.get("automation_posture") or "manual-only"),
+        "automation_summary": str(handoff_source.get("automation_summary") or "No automation guidance is surfaced for this repo yet."),
+        "automation_command": str(handoff_source.get("automation_command") or ""),
         "historical_intelligence_status": str(handoff_source.get("historical_intelligence_status") or "insufficient-evidence"),
         "historical_intelligence_summary": str(handoff_source.get("historical_intelligence_summary") or "No historical intelligence evidence is surfaced for this repo yet."),
         "resurfacing_reason_line": follow_through_resurfacing_reason,
@@ -787,6 +797,14 @@ def build_weekly_review_pack(
         ),
         "historical_portfolio_intelligence": build_historical_portfolio_intelligence_summary(data),
         "next_historical_focus": build_next_historical_focus_line(data),
+        "automation_guidance_summary": build_automation_guidance_summary(data),
+        "next_safe_automation_step": build_next_safe_automation_step_line(data),
+        "automation_guidance_line": (
+            f"{build_automation_guidance_summary(data)} Next step: {build_next_safe_automation_step_line(data)}"
+            if build_automation_guidance_summary(data) != NO_AUTOMATION_GUIDANCE_SUMMARY
+            or build_next_safe_automation_step_line(data) != NO_NEXT_SAFE_AUTOMATION_STEP
+            else NO_AUTOMATION_GUIDANCE_LINE
+        ),
         "top_apply_ready_campaigns": list(operator_summary.get("top_apply_ready_campaigns") or []),
         "top_preview_ready_campaigns": list(operator_summary.get("top_preview_ready_campaigns") or []),
         "top_drift_review_campaigns": list(operator_summary.get("top_drift_review_campaigns") or []),
@@ -805,6 +823,11 @@ def build_weekly_review_pack(
         "top_persistent_pressure_repos": list(operator_summary.get("top_persistent_pressure_repos") or []),
         "top_improving_repos": list(operator_summary.get("top_improving_repos") or []),
         "top_holding_repos": list(operator_summary.get("top_holding_repos") or []),
+        "top_preview_safe_campaigns": list(operator_summary.get("top_preview_safe_campaigns") or []),
+        "top_apply_manual_campaigns": list(operator_summary.get("top_apply_manual_campaigns") or []),
+        "top_approval_first_campaigns": list(operator_summary.get("top_approval_first_campaigns") or []),
+        "top_follow_up_safe_campaigns": list(operator_summary.get("top_follow_up_safe_campaigns") or []),
+        "top_manual_only_campaigns": list(operator_summary.get("top_manual_only_campaigns") or []),
         "top_attention": top_attention,
         "repo_briefings": repo_briefings,
         "top_below_target_scorecard_items": list(_mapping(data).get("scorecards_summary", {}).get("top_below_target_repos") or []),
@@ -1662,6 +1685,20 @@ def build_next_historical_focus_line(report_data: Any) -> str:
     return str(_mapping(focus).get("summary") or NO_NEXT_HISTORICAL_FOCUS)
 
 
+def build_automation_guidance_summary(report_data: Any) -> str:
+    summary = _mapping(_mapping(report_data).get("automation_guidance_summary"))
+    if not summary:
+        summary = _mapping(_mapping(report_data).get("operator_summary")).get("automation_guidance_summary") or {}
+    return str(_mapping(summary).get("summary") or NO_AUTOMATION_GUIDANCE_SUMMARY)
+
+
+def build_next_safe_automation_step_line(report_data: Any) -> str:
+    step = _mapping(_mapping(report_data).get("next_safe_automation_step"))
+    if not step:
+        step = _mapping(_mapping(report_data).get("operator_summary")).get("next_safe_automation_step") or {}
+    return str(_mapping(step).get("summary") or NO_NEXT_SAFE_AUTOMATION_STEP)
+
+
 def build_historical_intelligence_line(value: Any) -> str:
     mapped = _mapping(value)
     direct = str(mapped.get("historical_intelligence_line") or "").strip()
@@ -1674,6 +1711,20 @@ def build_historical_intelligence_line(value: Any) -> str:
     if status:
         return f"Historical Portfolio Intelligence: {status}."
     return NO_HISTORICAL_INTELLIGENCE_LINE
+
+
+def build_automation_line(value: Any) -> str:
+    mapped = _mapping(value)
+    direct = str(mapped.get("automation_line") or "").strip()
+    if direct:
+        return direct
+    summary = str(mapped.get("automation_summary") or "").strip()
+    if summary:
+        return f"{ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}: {summary}"
+    posture = str(mapped.get("automation_posture") or "").strip()
+    if posture:
+        return f"{ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}: {posture.replace('-', ' ')}."
+    return NO_AUTOMATION_GUIDANCE_LINE
 
 
 def build_action_sync_line(value: Any) -> str:
@@ -1795,6 +1846,10 @@ def _build_operator_focus_item(mapped: dict[str, Any], review_summary: dict[str,
         "campaign_tuning_status": str(mapped.get("campaign_tuning_status") or "insufficient-evidence"),
         "campaign_tuning_summary": str(mapped.get("campaign_tuning_summary") or "No campaign tuning evidence is surfaced for this item yet."),
         "campaign_tuning_line": build_campaign_tuning_line(mapped),
+        "automation_posture": str(mapped.get("automation_posture") or "manual-only"),
+        "automation_summary": str(mapped.get("automation_summary") or "No automation guidance is surfaced for this item yet."),
+        "automation_command": str(mapped.get("automation_command") or ""),
+        "automation_line": build_automation_line(mapped),
     }
 
 

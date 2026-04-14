@@ -150,3 +150,14 @@ If scheduled output looks wrong:
 - confirm queue pressure actually changed before expecting a new noisy issue
 
 Quiet runs can close the canonical scheduled handoff issue after writing the quiet-state artifact. That is expected behavior now, not a failure.
+
+## Automation guidance cues
+
+If the product surfaces `Automation Guidance`, treat it as a safety posture, not an auto-run signal.
+
+- `preview-safe` means the surfaced preview command is a safe planning step
+- `apply-manual` means the command is still human-only even if it is shown
+- `approval-first` and `manual-only` mean review work should happen before execution
+- `follow-up-safe` means only non-mutating refresh or monitoring is appropriate
+
+If the wording ever implies that `--writeback-apply` will run automatically, treat that as a bug and fall back to the workbook plus control-center review path.
