@@ -5,7 +5,7 @@ import xml.etree.ElementTree as ET
 import zipfile
 
 import pytest
-from openpyxl import Workbook, load_workbook
+from openpyxl import Workbook
 
 from src.excel_export import (
     RADAR_DIMS,
@@ -42,7 +42,11 @@ from src.excel_export import (
     _build_writeback_audit,
     export_excel,
 )
-from src.excel_template import DEFAULT_TEMPLATE_PATH, TEMPLATE_INFO_SHEET
+from src.excel_template import (
+    DEFAULT_TEMPLATE_PATH,
+    TEMPLATE_INFO_SHEET,
+    load_workbook_allowing_native_sparklines,
+)
 from src.report_enrichment import (
     build_queue_pressure_summary,
     build_top_recommendation_summary,
@@ -1189,7 +1193,7 @@ class TestAnalystWorkbookSheets:
         report_path.write_text(json.dumps(_make_report()))
 
         output = export_excel(report_path, tmp_path / "out.xlsx", excel_mode="standard")
-        wb = load_workbook(output)
+        wb = load_workbook_allowing_native_sparklines(output)
 
         for sheet_name in ["Dashboard", "Run Changes", "Review Queue", "Repo Detail", "Executive Summary"]:
             ws = wb[sheet_name]
@@ -1744,7 +1748,7 @@ class TestWorkbookModes:
             excel_mode="standard",
         )
 
-        wb = load_workbook(output)
+        wb = load_workbook_allowing_native_sparklines(output)
         assert "Dashboard" in wb.sheetnames
         assert "By Collection" in wb.sheetnames
         assert "Trend Summary" in wb.sheetnames
@@ -1766,7 +1770,7 @@ class TestWorkbookModes:
             excel_mode="standard",
         )
 
-        wb = load_workbook(output)
+        wb = load_workbook_allowing_native_sparklines(output)
         visible_sheets = [ws.title for ws in wb.worksheets if ws.sheet_state == "visible"]
         assert set(visible_sheets) == {
             "Index",
@@ -1806,7 +1810,7 @@ class TestWorkbookModes:
             template_path=DEFAULT_TEMPLATE_PATH,
         )
 
-        wb = load_workbook(output)
+        wb = load_workbook_allowing_native_sparklines(output)
         assert TEMPLATE_INFO_SHEET in wb.sheetnames
         assert "nrReviewOpenCount" in wb.defined_names
         assert "nrSelectedProfileLabel" in wb.defined_names
@@ -1830,8 +1834,8 @@ class TestWorkbookModes:
             template_path=DEFAULT_TEMPLATE_PATH,
         )
 
-        standard_wb = load_workbook(standard_output)
-        template_wb = load_workbook(template_output)
+        standard_wb = load_workbook_allowing_native_sparklines(standard_output)
+        template_wb = load_workbook_allowing_native_sparklines(template_output)
 
         assert standard_wb["Dashboard"]["A1"].value == template_wb["Dashboard"]["A1"].value
         assert standard_wb["Review Queue"]["B6"].value == template_wb["Review Queue"]["B6"].value
@@ -1865,7 +1869,7 @@ class TestWorkbookModes:
 
         output = export_excel(report_path, tmp_path / "out.xlsx", excel_mode="standard")
 
-        wb = load_workbook(output)
+        wb = load_workbook_allowing_native_sparklines(output)
         ws = wb["Review Queue"]
         header_row = next(row for row in range(20, 70) if ws.cell(row=row, column=1).value == "Repo")
         assert ws.auto_filter.ref == f"A{header_row}:AN{header_row + 1}"
@@ -1877,7 +1881,7 @@ class TestWorkbookModes:
 
         output = export_excel(report_path, tmp_path / "out.xlsx", excel_mode="standard")
 
-        wb = load_workbook(output)
+        wb = load_workbook_allowing_native_sparklines(output)
         catalog_ws = wb["Portfolio Catalog"]
         assert catalog_ws["A1"].value == "Portfolio Catalog"
         assert "No portfolio catalog contract is recorded yet." in str(catalog_ws["A3"].value)

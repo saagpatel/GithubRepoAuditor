@@ -7,10 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-from openpyxl import load_workbook
-
 from src.excel_export import CORE_VISIBLE_SHEETS, export_excel
-from src.excel_template import DEFAULT_TEMPLATE_PATH
+from src.excel_template import DEFAULT_TEMPLATE_PATH, load_workbook_allowing_native_sparklines
 
 DEFAULT_GATE_DIR = Path("output") / "workbook-gate"
 RESULT_FILENAME = "workbook-gate-result.json"
@@ -888,7 +886,7 @@ def _validate_workbook_artifact(
     expected_visible: set[str],
 ) -> dict:
     checks: list[dict] = []
-    wb = load_workbook(workbook_path)
+    wb = load_workbook_allowing_native_sparklines(workbook_path)
     visible_sheets = {ws.title for ws in wb.worksheets if ws.sheet_state == "visible"}
     if visible_sheets != expected_visible:
         checks.append(
@@ -972,8 +970,8 @@ def _validate_workbook_artifact(
 
 def _validate_parity(standard_path: Path, template_path: Path) -> dict:
     checks: list[dict] = []
-    standard_wb = load_workbook(standard_path)
-    template_wb = load_workbook(template_path)
+    standard_wb = load_workbook_allowing_native_sparklines(standard_path)
+    template_wb = load_workbook_allowing_native_sparklines(template_path)
     parity_checks = [
         ("Dashboard", "A1"),
         ("Dashboard", "N8"),

@@ -10,7 +10,7 @@ import json
 from collections import Counter
 from pathlib import Path
 
-from openpyxl import Workbook, load_workbook
+from openpyxl import Workbook
 from openpyxl.chart import BarChart, BubbleChart, PieChart, RadarChart, Reference, ScatterChart
 from openpyxl.chart.label import DataLabelList
 from openpyxl.chart.series import DataPoint
@@ -60,6 +60,7 @@ from src.excel_template import (
     SparklineSpec,
     copy_template_to_output,
     inject_native_sparklines,
+    load_workbook_allowing_native_sparklines,
     resolve_template_path,
 )
 from src.report_enrichment import (
@@ -7735,7 +7736,7 @@ def export_excel(
     if excel_mode == "template":
         template = resolve_template_path(template_path or DEFAULT_TEMPLATE_PATH)
         copy_template_to_output(output_path, template)
-        wb = load_workbook(output_path)
+        wb = load_workbook_allowing_native_sparklines(output_path)
     else:
         wb = Workbook()
 
