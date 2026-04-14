@@ -393,6 +393,8 @@ def render_control_center_markdown(snapshot: dict, username: str, generated_at: 
             lines.append(f"  Action: {item['recommended_action']}")
             if item.get("catalog_line"):
                 lines.append(f"  Catalog: {item['catalog_line']}")
+            if item.get("operating_path_line"):
+                lines.append(f"  {item['operating_path_line']}")
             if item.get("intent_alignment"):
                 lines.append(
                     f"  Intent Alignment: {item.get('intent_alignment')} — "

@@ -164,6 +164,18 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
     assert summary["primary_target_confidence_label"] == "high"
     assert summary["primary_target_confidence_score"] >= 0.75
     assert summary["next_action_confidence_label"] == "high"
+    assert summary["decision_quality_v1"]["contract_version"] == "decision_quality_v1"
+    assert summary["decision_quality_v1"]["authority_cap"] == "advisory-only"
+    assert summary["decision_quality_v1"]["recommendation_quality_summary"] == summary[
+        "recommendation_quality_summary"
+    ]
+    assert summary["decision_quality_v1"]["confidence_validation_status"] == summary[
+        "confidence_validation_status"
+    ]
+    assert summary["decision_quality_v1"]["primary_target_trust_policy"] == summary[
+        "primary_target_trust_policy"
+    ]
+    assert summary["decision_quality_authority_cap"] == "advisory-only"
 
     assert summary["primary_target_trust_policy"] == "act-now"
     assert "blocked" in summary["primary_target_trust_policy_reason"].lower()

@@ -8,6 +8,7 @@ from src.portfolio_catalog import (
     build_portfolio_catalog_summary,
     catalog_entry_for_repo,
     evaluate_intent_alignment,
+    group_entry_for_path,
     load_portfolio_catalog,
 )
 
@@ -29,12 +30,20 @@ repos:
     team: operator-loop
     purpose: flagship surface
     intended_disposition: maintain
+    category: commercial
+    tool_provenance: claude-code
     maturity_program: maintain
     target_maturity: strong
   RepoB:
     purpose: finishing push
     lifecycle_state: active
     intended_disposition: finish
+groups:
+  it:
+    path_prefixes:
+      - ITPRJsViaClaude
+    section_marker: ITPRJsViaClaude/
+    category: it-work
 """
     )
 
@@ -46,6 +55,8 @@ repos:
     assert catalog["repos"]["repob"]["review_cadence"] == "monthly"
     assert catalog["repos"]["user/repoa"]["maturity_program"] == "maintain"
     assert catalog["repos"]["repob"]["target_maturity"] == "operating"
+    assert catalog["groups"]["it"]["category"] == "it-work"
+    assert catalog["groups"]["it"]["section_marker"] == "ITPRJsViaClaude/"
 
 
 def test_catalog_entry_matches_full_name_then_bare_name():
@@ -59,6 +70,8 @@ def test_catalog_entry_matches_full_name_then_bare_name():
                 "criticality": "high",
                 "review_cadence": "weekly",
                 "intended_disposition": "maintain",
+                "category": "commercial",
+                "tool_provenance": "claude-code",
                 "maturity_program": "maintain",
                 "target_maturity": "strong",
                 "notes": "",
@@ -74,6 +87,8 @@ def test_catalog_entry_matches_full_name_then_bare_name():
                 "criticality": "medium",
                 "review_cadence": "monthly",
                 "intended_disposition": "finish",
+                "category": "vanity",
+                "tool_provenance": "codex",
                 "maturity_program": "finish",
                 "target_maturity": "operating",
                 "notes": "",
@@ -89,6 +104,28 @@ def test_catalog_entry_matches_full_name_then_bare_name():
 
     assert repo_a["matched_by"] == "full-name"
     assert repo_b["matched_by"] == "bare-name"
+
+
+def test_group_entry_matches_path_prefix():
+    catalog = {
+        "groups": {
+            "it": {
+                "group_key": "it",
+                "label": "IT Tools",
+                "section_marker": "ITPRJsViaClaude/",
+                "section_label": "IT Tools",
+                "path_prefixes": ["ITPRJsViaClaude"],
+                "category": "it-work",
+                "tool_provenance": "claude-code",
+                "has_explicit_entry": True,
+                "order": 0,
+            }
+        }
+    }
+
+    group = group_entry_for_path("ITPRJsViaClaude/IncidentWorkbench", catalog)
+    assert group["group_key"] == "it"
+    assert group["category"] == "it-work"
 
 
 def test_evaluate_intent_alignment_uses_disposition_and_focus():

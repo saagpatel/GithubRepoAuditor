@@ -223,12 +223,19 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
         "criticality": "high",
         "review_cadence": "weekly",
         "intended_disposition": "maintain",
+        "maturity_program": "maintain",
+        "target_maturity": "strong",
+        "operating_path": "maintain",
+        "path_override": "",
+        "path_confidence": "high",
+        "path_rationale": "Stable path is Maintain from intended disposition.",
         "notes": "",
         "intent_alignment": "aligned",
         "intent_alignment_reason": "The repo is holding a maintain posture without urgent or revalidation pressure.",
         "catalog_line": "operator-loop | warehouse verification | lifecycle active | criticality high | cadence weekly | disposition maintain",
     }
     report.portfolio_catalog_summary = {"summary": "1/1 repos have an explicit catalog contract."}
+    report.operating_paths_summary = {"summary": "Maintain 1", "path_counts": {"maintain": 1}, "confidence_counts": {"high": 1}, "override_counts": {}}
     report.intent_alignment_summary = {"summary": "1 aligned, 0 needing review, and 0 missing a contract."}
     audit.scorecard = {
         "program": "maintain",
@@ -263,6 +270,49 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
         {
             "portfolio_outcomes_summary": report.portfolio_outcomes_summary,
             "operator_effectiveness_summary": report.operator_effectiveness_summary,
+            "decision_quality_v1": {
+                "contract_version": "decision_quality_v1",
+                "authority_cap": "advisory-only",
+                "evidence_window_runs": 6,
+                "validation_window_runs": 2,
+                "judged_recommendation_count": 4,
+                "validated_recommendation_count": 3,
+                "partially_validated_recommendation_count": 1,
+                "reopened_recommendation_count": 0,
+                "unresolved_recommendation_count": 0,
+                "high_confidence_hit_rate": 0.75,
+                "medium_confidence_hit_rate": 0.67,
+                "low_confidence_caution_rate": 1.0,
+                "confidence_validation_status": "healthy",
+                "decision_quality_status": "trusted",
+                "human_skepticism_required": False,
+                "downgrade_reasons": [],
+                "recommendation_quality_summary": "Strong recommendation because the next step is tied directly to the current top target.",
+                "confidence_calibration_summary": "Recent high-confidence recommendations are validating well.",
+                "recent_validation_outcomes": [],
+                "primary_target_trust_policy": "act-with-review",
+                "primary_target_trust_policy_reason": "Healthy calibration supports a confident next step, with light operator judgment.",
+                "next_action_trust_policy": "act-with-review",
+                "next_action_trust_policy_reason": "Healthy calibration supports a confident next step, with light operator judgment.",
+                "adaptive_confidence_summary": "Calibration is validating well, so the recommendation can be acted on with light operator review.",
+            },
+            "recommendation_quality_summary": "Strong recommendation because the next step is tied directly to the current top target.",
+            "confidence_validation_status": "healthy",
+            "decision_quality_status": "trusted",
+            "decision_quality_authority_cap": "advisory-only",
+            "human_skepticism_required": False,
+            "downgrade_reasons": [],
+            "confidence_window_runs": 6,
+            "validation_window_runs": 2,
+            "judged_recommendation_count": 4,
+            "validated_recommendation_count": 3,
+            "partially_validated_recommendation_count": 1,
+            "unresolved_recommendation_count": 0,
+            "reopened_recommendation_count": 0,
+            "high_confidence_hit_rate": 0.75,
+            "medium_confidence_hit_rate": 0.67,
+            "low_confidence_caution_rate": 1.0,
+            "confidence_calibration_summary": "Recent high-confidence recommendations are validating well.",
             "high_pressure_queue_history": report.high_pressure_queue_history,
             "high_pressure_queue_trend_status": "stable",
             "high_pressure_queue_trend_summary": "Blocked and urgent queue pressure is stable.",
@@ -405,6 +455,9 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
         action_sync_automation_rows = conn.execute("SELECT COUNT(*) FROM action_sync_automation").fetchone()[0]
         hotspot_history_rows = conn.execute("SELECT COUNT(*) FROM repo_implementation_hotspots").fetchone()[0]
         catalog_rows = conn.execute("SELECT COUNT(*) FROM portfolio_catalog_entries").fetchone()[0]
+        catalog_contract = conn.execute(
+            "SELECT operating_path, path_override, path_confidence, path_rationale FROM portfolio_catalog_entries"
+        ).fetchone()
         scorecard_rows = conn.execute("SELECT COUNT(*) FROM repo_scorecards").fetchone()[0]
     finally:
         conn.close()
@@ -425,6 +478,12 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     assert action_sync_automation_rows == 1
     assert hotspot_history_rows == 1
     assert catalog_rows == 1
+    assert catalog_contract == (
+        "maintain",
+        "",
+        "high",
+        "Stable path is Maintain from intended disposition.",
+    )
     assert scorecard_rows == 1
 
     campaign_outcomes = load_campaign_outcomes(tmp_path, "user", limit=5)
@@ -445,11 +504,14 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     assert latest_runs[0]["review_summary"]["review_id"] == "review-1"
     assert latest_runs[0]["governance_summary"]["status"] == "blocked"
     assert latest_runs[0]["portfolio_catalog_summary"]["summary"] == "1/1 repos have an explicit catalog contract."
+    assert latest_runs[0]["operating_paths_summary"]["summary"] == "Maintain 1"
     assert latest_runs[0]["intent_alignment_summary"]["summary"] == "1 aligned, 0 needing review, and 0 missing a contract."
     assert latest_runs[0]["scorecards_summary"]["summary"].startswith("0 repos are on track")
     assert latest_runs[0]["scorecard_programs"]["maintain"]["label"] == "Maintain"
     assert latest_runs[0]["portfolio_outcomes_summary"]["summary"].startswith("Managed action closure")
     assert latest_runs[0]["operator_effectiveness_summary"]["summary"].startswith("recommendation validation")
+    assert latest_runs[0]["decision_quality_summary"]["contract_version"] == "decision_quality_v1"
+    assert latest_runs[0]["decision_quality_summary"]["authority_cap"] == "advisory-only"
     assert latest_runs[0]["high_pressure_queue_history"][0]["high_pressure_count"] == 1
     assert latest_runs[0]["campaign_outcomes_summary"]["summary"].startswith("Promotion Push was applied recently")
     assert latest_runs[0]["automation_guidance_summary"]["summary"].startswith("Use a non-mutating follow-up")
@@ -472,10 +534,13 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     assert operator_state["operator_summary"]["headline"] == "Campaign work is ready for review."
     assert operator_state["governance_summary"]["needs_reapproval"] is True
     assert operator_state["portfolio_catalog_summary"]["summary"] == "1/1 repos have an explicit catalog contract."
+    assert operator_state["operating_paths_summary"]["summary"] == "Maintain 1"
     assert operator_state["scorecards_summary"]["summary"].startswith("0 repos are on track")
     assert operator_state["scorecard_programs"]["maintain"]["label"] == "Maintain"
     assert operator_state["portfolio_outcomes_summary"]["summary"].startswith("Managed action closure")
     assert operator_state["operator_effectiveness_summary"]["summary"].startswith("recommendation validation")
+    assert operator_state["decision_quality_summary"]["decision_quality_status"] == "trusted"
+    assert operator_state["decision_quality_summary"]["authority_cap"] == "advisory-only"
     assert operator_state["high_pressure_queue_history"][0]["high_pressure_count"] == 1
     assert operator_state["campaign_outcomes_summary"]["summary"].startswith("Promotion Push was applied recently")
     assert operator_state["campaign_tuning_summary"]["summary"].startswith("Promotion Push should win ties")
@@ -499,9 +564,14 @@ def test_write_warehouse_snapshot_defaults_empty_campaign_outcomes_for_older_sty
     assert latest_runs[0]["campaign_outcomes_summary"] == {}
     assert latest_runs[0]["campaign_tuning_summary"] == {}
     assert latest_runs[0]["intervention_ledger_summary"] == {}
+    assert latest_runs[0]["decision_quality_summary"]["decision_quality_status"] == "insufficient-data"
+    assert latest_runs[0]["decision_quality_summary"]["downgrade_reasons"] == [
+        "legacy-run-without-decision-quality-contract"
+    ]
     assert operator_state["campaign_outcomes_summary"] == {}
     assert operator_state["campaign_tuning_summary"] == {}
     assert operator_state["intervention_ledger_summary"] == {}
+    assert operator_state["decision_quality_summary"]["decision_quality_status"] == "insufficient-data"
 
 
 def test_approval_workflow_summary_and_records_round_trip(tmp_path):

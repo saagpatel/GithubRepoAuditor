@@ -87,6 +87,7 @@ from src.report_enrichment import (
     build_follow_through_relapse_churn_summary,
     build_last_movement_label,
     build_maturity_gap_summary,
+    build_operating_paths_summary,
     build_operator_focus,
     build_operator_focus_line,
     build_operator_focus_summary,
@@ -1179,6 +1180,7 @@ def _build_workbook_rollups(data: dict) -> tuple[list[list[object]], list[list[o
                 item.get("follow_through_reacquisition_revalidation_recovery_summary", ""),
                 item.get("follow_through_reacquisition_revalidation_recovery_reason", ""),
                 item.get("catalog_line", ""),
+                item.get("operating_path_line", ""),
                 item.get("intent_alignment", ""),
                 item.get("intent_alignment_reason", ""),
                 item.get("scorecard_line", ""),
@@ -1675,6 +1677,7 @@ def _build_dashboard(
         ("Focus Summary", operator_focus_summary),
         ("Focus Line", operator_focus_line),
         ("Portfolio Catalog", build_portfolio_catalog_summary(data)),
+        ("Operating Paths", build_operating_paths_summary(data)),
         ("Intent Alignment", build_portfolio_intent_alignment_summary(data)),
         ("Scorecards", build_scorecards_summary(data)),
         ("Next Action", next_action),
@@ -4006,6 +4009,7 @@ def _repo_detail_rows(data: dict, score_history: dict[str, list[float]] | None) 
             briefing.get("what_to_do_next", {}).get("revalidation_recovery_summary", "No post-revalidation recovery or confidence re-earning signal is currently surfaced."),
             briefing.get("what_to_do_next", {}).get("what_would_count_as_progress", "Use the next run or linked artifact to confirm whether the recommendation moved."),
             briefing.get("catalog_line", "No portfolio catalog contract is recorded yet."),
+            briefing.get("operating_path_line", "Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet."),
             briefing.get("intent_alignment_line", "missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists."),
             briefing.get("scorecard_line", "Scorecard: No maturity scorecard is recorded yet."),
             briefing.get("maturity_gap_summary", "No maturity gap summary is recorded yet."),
@@ -4297,6 +4301,9 @@ def _build_hidden_data_sheets(
             catalog.get("intended_disposition", ""),
             catalog.get("maturity_program", ""),
             catalog.get("target_maturity", ""),
+            catalog.get("operating_path", ""),
+            catalog.get("path_override", ""),
+            catalog.get("path_confidence", ""),
             catalog.get("notes", ""),
             catalog.get("intent_alignment", "missing-contract"),
             catalog.get("intent_alignment_reason", ""),
@@ -4704,6 +4711,9 @@ def _build_hidden_data_sheets(
             "Disposition",
             "Maturity Program",
             "Target Maturity",
+            "Operating Path",
+            "Path Override",
+            "Path Confidence",
             "Notes",
             "Intent Alignment",
             "Intent Alignment Reason",
@@ -4965,6 +4975,7 @@ def _build_hidden_data_sheets(
             "Follow-Through Reacquisition Revalidation Recovery Summary",
             "Follow-Through Reacquisition Revalidation Recovery Reason",
             "Catalog Line",
+            "Operating Path",
             "Intent Alignment",
             "Intent Alignment Reason",
             "Scorecard Line",
@@ -5073,6 +5084,7 @@ def _build_hidden_data_sheets(
             "Revalidation Recovery Summary",
             "What Would Count As Progress",
             "Catalog",
+            "Operating Path",
             "Intent Alignment",
             "Scorecard",
             "Maturity Gap",
@@ -5578,13 +5590,13 @@ def _build_portfolio_explorer(
         "Use this sheet to rank the portfolio, sort by profile-aware score, and drill from summary into repo-level facts.",
         width=10,
     )
-    ws.merge_cells("A3:O3")
+    ws.merge_cells("A3:P3")
     ws["A3"] = "How to use this sheet: sort by Profile Score first, then use the catalog columns to separate intentional experiments from maintained assets before drilling in."
     ws["A3"].font = SUBTITLE_FONT
     ws["A3"].alignment = WRAP
     headers = [
         "Repo", "Profile Score", "Overall", "Interest", "Tier", "Collections",
-        "Lifecycle", "Criticality", "Disposition", "Maturity", "Scorecard Gap", "Security", "Hotspots", "Top Hotspot", "Primary Action",
+        "Lifecycle", "Criticality", "Disposition", "Operating Path", "Maturity", "Scorecard Gap", "Security", "Hotspots", "Top Hotspot", "Primary Action",
     ]
     start_row = 5
     for col, header in enumerate(headers, 1):
@@ -5605,6 +5617,7 @@ def _build_portfolio_explorer(
             audit.get("portfolio_catalog", {}).get("lifecycle_state", "") or "—",
             audit.get("portfolio_catalog", {}).get("criticality", "") or "—",
             audit.get("portfolio_catalog", {}).get("intended_disposition", "") or "—",
+            audit.get("portfolio_catalog", {}).get("operating_path", "") or "—",
             audit.get("scorecard", {}).get("maturity_level", "") or "—",
             build_maturity_gap_summary(audit),
             entry["security_label"],
@@ -5632,14 +5645,18 @@ def _build_portfolio_catalog_sheet(wb: Workbook, data: dict) -> None:
         "Use this sheet to see what each repo is supposed to be, who owns it, and whether its current state still matches that intent.",
         width=10,
     )
-    ws.merge_cells("A3:L3")
+    ws.merge_cells("A3:O3")
     ws["A3"] = build_portfolio_catalog_summary(data)
     ws["A3"].font = SUBTITLE_FONT
     ws["A3"].alignment = WRAP
-    ws.merge_cells("A4:L4")
+    ws.merge_cells("A4:O4")
     ws["A4"] = build_portfolio_intent_alignment_summary(data)
     ws["A4"].font = SUBTITLE_FONT
     ws["A4"].alignment = WRAP
+    ws.merge_cells("A5:O5")
+    ws["A5"] = build_operating_paths_summary(data)
+    ws["A5"].font = SUBTITLE_FONT
+    ws["A5"].alignment = WRAP
     headers = [
         "Repo",
         "Owner",
@@ -5651,14 +5668,17 @@ def _build_portfolio_catalog_sheet(wb: Workbook, data: dict) -> None:
         "Disposition",
         "Maturity Program",
         "Target Maturity",
+        "Operating Path",
+        "Path Override",
+        "Path Confidence",
         "Intent Alignment",
         "Notes",
     ]
-    start_row = 6
+    start_row = 7
     for col, header in enumerate(headers, 1):
         ws.cell(row=start_row, column=col, value=header)
     style_header_row(ws, start_row, len(headers))
-    ws.freeze_panes = "B7"
+    ws.freeze_panes = "B8"
 
     audits = sorted(data.get("audits", []), key=lambda item: item.get("metadata", {}).get("name", ""))
     for row, audit in enumerate(audits, start_row + 1):
@@ -5674,6 +5694,9 @@ def _build_portfolio_catalog_sheet(wb: Workbook, data: dict) -> None:
             catalog.get("intended_disposition", "") or "—",
             catalog.get("maturity_program", "") or "—",
             catalog.get("target_maturity", "") or "—",
+            catalog.get("operating_path", "") or "—",
+            catalog.get("path_override", "") or "—",
+            catalog.get("path_confidence", "") or "—",
             catalog.get("intent_alignment", "missing-contract"),
             catalog.get("notes", "") or "—",
         ]
@@ -6071,6 +6094,7 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
         ("Revalidation Recovery Summary", 60, "No post-revalidation recovery or confidence re-earning signal is currently surfaced."),
         ("Progress Checkpoint", 61, "Use the next run or linked artifact to confirm whether the recommendation moved."),
         ("Portfolio Catalog", 62, "No portfolio catalog contract is recorded yet."),
+        ("Operating Path", 66, "Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet."),
         ("Intent Alignment", 63, "missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists."),
         ("Scorecard", 64, "Scorecard: No maturity scorecard is recorded yet."),
         ("Maturity Gap", 65, "No maturity gap summary is recorded yet."),
@@ -6367,6 +6391,7 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
         "Why This Is Here",
         "What To Do Next",
         "Catalog",
+        "Operating Path",
         "Intent Alignment",
         "Maturity",
         "Scorecard Gap",
@@ -6423,6 +6448,7 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
             why_this_is_here,
             next_step,
             item.get("catalog_line", "No portfolio catalog contract is recorded yet."),
+            item.get("operating_path_line", "Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet."),
             (
                 f"{item.get('intent_alignment', 'missing-contract')} — "
                 f"{item.get('intent_alignment_reason', 'Intent alignment cannot be judged until a portfolio catalog contract exists.')}"
@@ -6460,7 +6486,7 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
             "yes" if safe_to_defer else "no",
         ]
         for col, value in enumerate(values, 1):
-            align = "center" if col in {3, 4, 5, 10, 15, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 43} else "left"
+            align = "center" if col in {3, 4, 5, 11, 16, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 44} else "left"
             style_data_cell(ws.cell(row=row, column=col, value=value), align)
         repo_cell = ws.cell(row=row, column=1)
         if item.get("repo_url"):
@@ -6936,6 +6962,7 @@ def _build_executive_summary(
         ("Why It Matters", why_it_matters),
         ("Top Recommendation", top_recommendation),
         ("Portfolio Catalog", build_portfolio_catalog_summary(data)),
+        ("Operating Paths", build_operating_paths_summary(data)),
         ("Intent Alignment", build_portfolio_intent_alignment_summary(data)),
         ("Scorecards", build_scorecards_summary(data)),
         ("Follow-Through", follow_through),

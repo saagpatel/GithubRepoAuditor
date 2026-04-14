@@ -7,6 +7,7 @@ Use this guide for the normal ongoing operator loop. If you need the broader pro
 1. Run `audit <github-username> --doctor` if setup, baseline, or workbook health is in doubt.
 2. Run `audit <github-username> --html` to refresh the workbook, Markdown, HTML, JSON, review-pack, and scheduled-handoff story.
 3. Run `audit <github-username> --control-center` for read-only operator triage from the latest state.
+   This also refreshes the report-only `weekly-command-center-<username>-<date>.json` and `.md` digest.
 4. Open the workbook and read it in this order:
    - `Dashboard`
    - `Run Changes`
@@ -42,6 +43,8 @@ That means the visible surfaces should agree on:
 
 The current release boundary still keeps one shared weekly story, but that story can now apply a bounded approval-aware overlay when local approval work is the best weekly move. That overlay stays inside `weekly_story_v1`: blocked or urgent portfolio pressure still wins, and the product still does not ship a second weekly recommendation engine.
 
+Phase 107 adds one more bounded artifact on top of that same contract: the weekly command-center digest. It is not a second authority and it is not an executor. It is a report-only summary that packages the shared weekly story together with current decision-quality posture and live portfolio-truth/path attention so a paused or future weekly loop can read one structured digest instead of stale hand-maintained notes.
+
 ## Workbook reading order
 
 - `Dashboard` tells you whether the portfolio is quiet, worsening, or moving in the right direction.
@@ -63,6 +66,16 @@ When you open the control-center artifact, read it in this order:
 6. `Queue lanes`
 
 That sequence tells you whether the portfolio is actually changing, why the top target is still the top target, and whether the next move belongs in normal weekly review or in Action Sync.
+
+If you open the weekly command-center digest, read it after the control-center headline, not instead of it:
+
+1. `Headline`
+2. `Decision`
+3. `Why This Week`
+4. `Path Attention`
+5. `Weekly Sections`
+
+The digest is there to compress the weekly read, not to replace the workbook or the control-center artifact.
 
 ## What a good weekly review looks like
 

@@ -2,7 +2,283 @@ defaults:
   lifecycle_state: maintenance
   criticality: medium
   review_cadence: monthly
+  category: vanity
+  tool_provenance: unknown
   maturity_program: maintain
   target_maturity: operating
-
-repos: {}
+groups:
+  itprjsviaclaude:
+    label: IT Tools
+    section_marker: ITPRJsViaClaude/
+    section_label: IT Tools
+    path_prefixes:
+    - ITPRJsViaClaude
+    category: it-work
+    tool_provenance: unknown
+    order: 10
+  vanityprjs:
+    label: Personal/Learning
+    section_marker: VanityPRJs/
+    section_label: Personal/Learning
+    path_prefixes:
+    - VanityPRJs
+    category: vanity
+    order: 20
+  fungameprjs:
+    label: Build-Ready Staging
+    section_marker: FunGamePrjs/
+    section_label: Build-Ready Staging
+    path_prefixes:
+    - FunGamePrjs
+    category: fun
+    order: 30
+  fungameprjs_legacy:
+    label: Games and Creative
+    section_marker: Fun:GamePrjs/
+    section_label: Games & Creative
+    path_prefixes:
+    - Fun:GamePrjs
+    category: fun
+    tool_provenance: codex
+    order: 40
+  grokprjs:
+    label: Grok Built
+    section_marker: GrokPRJs/
+    section_label: Grok-Built
+    path_prefixes:
+    - GrokPRJs
+    category: vanity
+    tool_provenance: grok
+    lifecycle_state: archived
+    intended_disposition: archive
+    order: 50
+  moneyprjsviagpt:
+    label: GPT Built
+    section_marker: MoneyPRJsViaGPT/
+    section_label: GPT-Built
+    path_prefixes:
+    - MoneyPRJsViaGPT
+    category: commercial
+    tool_provenance: gpt
+    lifecycle_state: archived
+    intended_disposition: archive
+    order: 60
+  iosprojects:
+    label: iOS Projects
+    section_marker: iOS Projects
+    section_label: iOS Projects
+    path_prefixes:
+    - claude-code/ios
+    - iOS
+    category: vanity
+    tool_provenance: claude-code
+    order: 70
+repos:
+  ApplyKit:
+    owner: d
+    purpose: deterministic local-first application packet generation
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: commercial
+    tool_provenance: codex
+    maturity_program: maintain
+    target_maturity: operating
+  BrowserHistoryVisualizer:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: vanity
+    tool_provenance: claude-code
+  DecisionStressTest:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: experiment
+    tool_provenance: codex
+  Devil's Advocate:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    tool_provenance: claude-code
+  evals:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: experiment
+  EvolutionSandbox:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: experiment
+  HowMoneyMoves:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: vanity
+    tool_provenance: claude-code
+  JobMarketHeatmap:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: vanity
+    tool_provenance: claude-code
+  JSMTicketAnalyticsExport:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: it-work
+    tool_provenance: claude-code
+  LifeCadenceLedger:
+    owner: d
+    purpose: recurring commitment ledger for personal cadence and obligations
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: experiment
+    category: vanity
+    tool_provenance: claude-code
+    maturity_program: experiment
+    target_maturity: functional
+  MCPAudit:
+    owner: d
+    purpose: local MCP security and drift audit tool
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: infrastructure
+    tool_provenance: codex
+    maturity_program: maintain
+    target_maturity: operating
+  knowledgecore:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: infrastructure
+    tool_provenance: codex
+  OrbitMechanic:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    tool_provenance: claude-code
+  PageDiffBookmark:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: vanity
+    tool_provenance: claude-code
+  Recall:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    tool_provenance: claude-code
+  ResumeEvolver:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    tool_provenance: codex
+  ScreenshottoDataSelect:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: vanity
+    tool_provenance: claude-code
+  TabTriage:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    tool_provenance: claude-code
+  Terroir:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    tool_provenance: claude-code
+  Cartograph:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    tool_provenance: claude-code
+  GithubRepoAuditor:
+    owner: d
+    purpose: workbook-first portfolio operating system for repo truth and weekly review
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: infrastructure
+    tool_provenance: codex
+    maturity_program: maintain
+    target_maturity: operating
+  JobCommandCenter:
+    owner: d
+    purpose: desktop command-center shell for portfolio and operator workflows
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: commercial
+    tool_provenance: codex
+    maturity_program: maintain
+    target_maturity: operating
+  Chromafield:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    tool_provenance: claude-code
+  Seismoscope:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    tool_provenance: claude-code
+  AIWorkFlow:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: commercial
+    tool_provenance: claude-code
+  job-search-2026:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: vanity
+  Phantom Frequencies:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+    tool_provenance: claude-code
+  RedditSentimentAnalyzer:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: vanity
+    tool_provenance: claude-code
+  SignalDecay:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+    tool_provenance: claude-code
+  desktop_terrarium:
+    owner: d
+    lifecycle_state: maintenance
+    review_cadence: monthly
+    intended_disposition: experiment
+    category: fun
+    tool_provenance: codex

@@ -60,6 +60,7 @@ def _make_report(**overrides) -> dict:
         "implementation_hotspots_summary": {
             "summary": "1 repos have concrete implementation pressure. Start with RepoC in file src/core.py.",
         },
+        "operating_paths_summary": {"summary": "Maintain 1, Finish 1, Archive 1"},
         "security_posture": {
             "average_score": 0.61,
             "critical_repos": ["RepoC"],
@@ -830,6 +831,7 @@ class TestRenderHtml:
                         "summary": "Operator pressure is active.",
                         "recommended_action": "Inspect the managed issue before closing the campaign.",
                         "catalog_line": "operator-loop | flagship repo | lifecycle active | criticality high | cadence weekly | disposition maintain",
+                        "operating_path_line": "Operating Path: Maintain (high confidence) — Stable path is Maintain from intended disposition.",
                         "intent_alignment": "aligned",
                         "intent_alignment_reason": "The repo is holding a maintain posture without urgent or revalidation pressure.",
                     }
@@ -837,8 +839,10 @@ class TestRenderHtml:
             )
         )
         assert "Portfolio Catalog:" in html
+        assert "Operating Paths:" in html
         assert "Intent Alignment:" in html
         assert "operator-loop | flagship repo" in html
+        assert "Operating Path: Maintain (high confidence)" in html
         assert "aligned: The repo is holding a maintain posture" in html
         assert "What To Do Next" in html
         assert "Follow-Through" in html

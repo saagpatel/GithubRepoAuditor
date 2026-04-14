@@ -8,7 +8,7 @@ from pathlib import Path
 from src.models import AuditReport
 
 WAREHOUSE_FILENAME = "portfolio-warehouse.db"
-WAREHOUSE_SCHEMA_VERSION = 16
+WAREHOUSE_SCHEMA_VERSION = 17
 
 
 def write_warehouse_snapshot(
@@ -58,11 +58,13 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             security_governance_preview_json TEXT NOT NULL,
             collections_json TEXT NOT NULL,
             portfolio_catalog_summary_json TEXT NOT NULL DEFAULT '{}',
+            operating_paths_summary_json TEXT NOT NULL DEFAULT '{}',
             intent_alignment_summary_json TEXT NOT NULL DEFAULT '{}',
             scorecards_summary_json TEXT NOT NULL DEFAULT '{}',
             scorecard_programs_json TEXT NOT NULL DEFAULT '{}',
             portfolio_outcomes_summary_json TEXT NOT NULL DEFAULT '{}',
             operator_effectiveness_summary_json TEXT NOT NULL DEFAULT '{}',
+            decision_quality_summary_json TEXT NOT NULL DEFAULT '{}',
             high_pressure_queue_history_json TEXT NOT NULL DEFAULT '[]',
             action_sync_outcomes_summary_json TEXT NOT NULL DEFAULT '{}',
             campaign_tuning_summary_json TEXT NOT NULL DEFAULT '{}',
@@ -545,6 +547,10 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             catalog_line TEXT NOT NULL,
             maturity_program TEXT NOT NULL,
             target_maturity TEXT NOT NULL,
+            operating_path TEXT NOT NULL,
+            path_override TEXT NOT NULL,
+            path_confidence TEXT NOT NULL,
+            path_rationale TEXT NOT NULL,
             PRIMARY KEY (run_id, repo_id)
         );
 
@@ -589,6 +595,7 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     _ensure_column(
         conn, "audit_runs", "portfolio_catalog_summary_json", "TEXT NOT NULL DEFAULT '{}'"
     )
+    _ensure_column(conn, "audit_runs", "operating_paths_summary_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(
         conn, "audit_runs", "intent_alignment_summary_json", "TEXT NOT NULL DEFAULT '{}'"
     )
@@ -596,6 +603,7 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     _ensure_column(conn, "audit_runs", "scorecard_programs_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(conn, "audit_runs", "portfolio_outcomes_summary_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(conn, "audit_runs", "operator_effectiveness_summary_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(conn, "audit_runs", "decision_quality_summary_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(conn, "audit_runs", "high_pressure_queue_history_json", "TEXT NOT NULL DEFAULT '[]'")
     _ensure_column(conn, "audit_runs", "action_sync_outcomes_summary_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(conn, "audit_runs", "campaign_tuning_summary_json", "TEXT NOT NULL DEFAULT '{}'")
@@ -607,6 +615,10 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
         conn, "portfolio_catalog_entries", "maturity_program", "TEXT NOT NULL DEFAULT ''"
     )
     _ensure_column(conn, "portfolio_catalog_entries", "target_maturity", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(conn, "portfolio_catalog_entries", "operating_path", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(conn, "portfolio_catalog_entries", "path_override", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(conn, "portfolio_catalog_entries", "path_confidence", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(conn, "portfolio_catalog_entries", "path_rationale", "TEXT NOT NULL DEFAULT ''")
     _ensure_column(conn, "audit_runs", "review_summary_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(conn, "audit_runs", "review_alerts_json", "TEXT NOT NULL DEFAULT '[]'")
     _ensure_column(conn, "audit_runs", "material_changes_json", "TEXT NOT NULL DEFAULT '[]'")
@@ -651,8 +663,8 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             total_repos, repos_audited, average_score, portfolio_baseline_size, baseline_signature, baseline_context_json,
             tier_distribution_json, language_distribution_json, lens_summary_json,
             security_summary_json, security_governance_preview_json, collections_json, scenario_summary_json,
-            portfolio_catalog_summary_json, intent_alignment_summary_json, scorecards_summary_json, scorecard_programs_json,
-            portfolio_outcomes_summary_json, operator_effectiveness_summary_json, high_pressure_queue_history_json,
+            portfolio_catalog_summary_json, operating_paths_summary_json, intent_alignment_summary_json, scorecards_summary_json, scorecard_programs_json,
+            portfolio_outcomes_summary_json, operator_effectiveness_summary_json, decision_quality_summary_json, high_pressure_queue_history_json,
             action_sync_outcomes_summary_json,
             campaign_tuning_summary_json,
             historical_portfolio_intelligence_json, automation_guidance_summary_json, approval_workflow_summary_json, implementation_hotspots_summary_json,
@@ -662,7 +674,7 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             governance_history_json, governance_drift_json, governance_summary_json, review_summary_json, review_alerts_json,
             preflight_summary_json, material_changes_json, review_targets_json, review_history_json, watch_state_json,
             operator_summary_json, operator_queue_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             run_id,
@@ -686,11 +698,13 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             json.dumps(report.collections),
             json.dumps(report.scenario_summary),
             json.dumps(report.portfolio_catalog_summary),
+            json.dumps(report.operating_paths_summary),
             json.dumps(report.intent_alignment_summary),
             json.dumps(report.scorecards_summary),
             json.dumps(report.scorecard_programs),
             json.dumps(report.portfolio_outcomes_summary),
             json.dumps(report.operator_effectiveness_summary),
+            json.dumps((report.operator_summary or {}).get("decision_quality_v1", {})),
             json.dumps(report.high_pressure_queue_history),
             json.dumps(report.campaign_outcomes_summary),
             json.dumps(report.campaign_tuning_summary),
@@ -1048,8 +1062,9 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
                 INSERT OR REPLACE INTO portfolio_catalog_entries (
                     run_id, repo_id, owner, team, purpose, lifecycle_state, criticality,
                     review_cadence, intended_disposition, notes, intent_alignment,
-                    intent_alignment_reason, catalog_line, maturity_program, target_maturity
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    intent_alignment_reason, catalog_line, maturity_program, target_maturity,
+                    operating_path, path_override, path_confidence, path_rationale
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     run_id,
@@ -1067,6 +1082,10 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
                     portfolio_catalog.get("catalog_line", ""),
                     portfolio_catalog.get("maturity_program", ""),
                     portfolio_catalog.get("target_maturity", ""),
+                    portfolio_catalog.get("operating_path", ""),
+                    portfolio_catalog.get("path_override", ""),
+                    portfolio_catalog.get("path_confidence", ""),
+                    portfolio_catalog.get("path_rationale", ""),
                 ),
             )
 
@@ -2029,9 +2048,9 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
             """
             SELECT run_id, username, generated_at, run_mode, scoring_profile,
                    portfolio_baseline_size, baseline_signature, baseline_context_json, report_path, preflight_summary_json,
-                   governance_summary_json, portfolio_catalog_summary_json, intent_alignment_summary_json,
+                   governance_summary_json, portfolio_catalog_summary_json, operating_paths_summary_json, intent_alignment_summary_json,
                    scorecards_summary_json, scorecard_programs_json,
-                   portfolio_outcomes_summary_json, operator_effectiveness_summary_json, high_pressure_queue_history_json,
+                   portfolio_outcomes_summary_json, operator_effectiveness_summary_json, decision_quality_summary_json, high_pressure_queue_history_json,
                    action_sync_outcomes_summary_json, campaign_tuning_summary_json,
                    automation_guidance_summary_json, approval_workflow_summary_json,
                    historical_portfolio_intelligence_json, implementation_hotspots_summary_json,
@@ -2050,6 +2069,13 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
     results: list[dict] = []
     for row in rows:
         operator_summary = json.loads(row["operator_summary_json"] or "{}")
+        decision_quality_summary = json.loads(row["decision_quality_summary_json"] or "{}")
+        if not decision_quality_summary:
+            from src import operator_decision_quality as _operator_decision_quality
+
+            decision_quality_summary = _operator_decision_quality.historical_decision_quality_from_summary(
+                operator_summary
+            )
         results.append(
             {
                 "run_id": row["run_id"],
@@ -2066,6 +2092,7 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
                 "portfolio_catalog_summary": json.loads(
                     row["portfolio_catalog_summary_json"] or "{}"
                 ),
+                "operating_paths_summary": json.loads(row["operating_paths_summary_json"] or "{}"),
                 "intent_alignment_summary": json.loads(
                     row["intent_alignment_summary_json"] or "{}"
                 ),
@@ -2073,6 +2100,7 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
                 "scorecard_programs": json.loads(row["scorecard_programs_json"] or "{}"),
                 "portfolio_outcomes_summary": json.loads(row["portfolio_outcomes_summary_json"] or "{}"),
                 "operator_effectiveness_summary": json.loads(row["operator_effectiveness_summary_json"] or "{}"),
+                "decision_quality_summary": decision_quality_summary,
                 "high_pressure_queue_history": json.loads(row["high_pressure_queue_history_json"] or "[]"),
                 "campaign_outcomes_summary": json.loads(row["action_sync_outcomes_summary_json"] or "{}"),
                 "campaign_tuning_summary": json.loads(row["campaign_tuning_summary_json"] or "{}"),
@@ -2601,9 +2629,9 @@ def load_latest_operator_state(output_dir: Path, username: str) -> dict | None:
             """
             SELECT run_id, generated_at, report_path, preflight_summary_json,
                    baseline_signature, baseline_context_json,
-                   governance_summary_json, portfolio_catalog_summary_json, intent_alignment_summary_json,
+                   governance_summary_json, portfolio_catalog_summary_json, operating_paths_summary_json, intent_alignment_summary_json,
                    scorecards_summary_json, scorecard_programs_json,
-                   portfolio_outcomes_summary_json, operator_effectiveness_summary_json, high_pressure_queue_history_json,
+                   portfolio_outcomes_summary_json, operator_effectiveness_summary_json, decision_quality_summary_json, high_pressure_queue_history_json,
                    action_sync_outcomes_summary_json,
                    campaign_tuning_summary_json,
                    automation_guidance_summary_json,
@@ -2624,6 +2652,13 @@ def load_latest_operator_state(output_dir: Path, username: str) -> dict | None:
     if not row:
         return None
     operator_summary = json.loads(row["operator_summary_json"] or "{}")
+    decision_quality_summary = json.loads(row["decision_quality_summary_json"] or "{}")
+    if not decision_quality_summary:
+        from src import operator_decision_quality as _operator_decision_quality
+
+        decision_quality_summary = _operator_decision_quality.historical_decision_quality_from_summary(
+            operator_summary
+        )
     return {
         "run_id": row["run_id"],
         "generated_at": row["generated_at"],
@@ -2633,11 +2668,13 @@ def load_latest_operator_state(output_dir: Path, username: str) -> dict | None:
         "preflight_summary": json.loads(row["preflight_summary_json"] or "{}"),
         "governance_summary": json.loads(row["governance_summary_json"] or "{}"),
         "portfolio_catalog_summary": json.loads(row["portfolio_catalog_summary_json"] or "{}"),
+        "operating_paths_summary": json.loads(row["operating_paths_summary_json"] or "{}"),
         "intent_alignment_summary": json.loads(row["intent_alignment_summary_json"] or "{}"),
         "scorecards_summary": json.loads(row["scorecards_summary_json"] or "{}"),
         "scorecard_programs": json.loads(row["scorecard_programs_json"] or "{}"),
         "portfolio_outcomes_summary": json.loads(row["portfolio_outcomes_summary_json"] or "{}"),
         "operator_effectiveness_summary": json.loads(row["operator_effectiveness_summary_json"] or "{}"),
+        "decision_quality_summary": decision_quality_summary,
         "high_pressure_queue_history": json.loads(row["high_pressure_queue_history_json"] or "[]"),
         "campaign_outcomes_summary": json.loads(row["action_sync_outcomes_summary_json"] or "{}"),
         "campaign_tuning_summary": json.loads(row["campaign_tuning_summary_json"] or "{}"),

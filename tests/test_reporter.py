@@ -1062,6 +1062,7 @@ class TestPortfolioCatalogMarkdown:
         report.portfolio_catalog_summary = {
             "summary": "1/1 repos have an explicit catalog contract.",
         }
+        report.operating_paths_summary = {"summary": "Maintain 1"}
         report.intent_alignment_summary = {
             "summary": "1 aligned, 0 needing review, and 0 missing a contract.",
         }
@@ -1074,6 +1075,12 @@ class TestPortfolioCatalogMarkdown:
             "criticality": "high",
             "review_cadence": "weekly",
             "intended_disposition": "maintain",
+            "maturity_program": "maintain",
+            "target_maturity": "strong",
+            "operating_path": "maintain",
+            "path_override": "",
+            "path_confidence": "high",
+            "path_rationale": "Stable path is Maintain from intended disposition.",
             "catalog_line": "operator-loop | flagship workbook | lifecycle active | criticality high | cadence weekly | disposition maintain",
             "intent_alignment": "aligned",
             "intent_alignment_reason": "The repo is holding a maintain posture without urgent or revalidation pressure.",
@@ -1086,6 +1093,7 @@ class TestPortfolioCatalogMarkdown:
                 "lane_reason": "Portfolio-critical repo needs a quick review.",
                 "recommended_action": "Review the latest state.",
                 "catalog_line": report.audits[0].portfolio_catalog["catalog_line"],
+                "operating_path_line": "Operating Path: Maintain (high confidence) — Stable path is Maintain from intended disposition.",
                 "intent_alignment": "aligned",
                 "intent_alignment_reason": report.audits[0].portfolio_catalog["intent_alignment_reason"],
             }
@@ -1095,8 +1103,10 @@ class TestPortfolioCatalogMarkdown:
         content = path.read_text()
 
         assert "Portfolio Catalog: 1/1 repos have an explicit catalog contract." in content
+        assert "Operating Paths: Maintain 1" in content
         assert "Intent Alignment: 1 aligned, 0 needing review, and 0 missing a contract." in content
         assert "Catalog: operator-loop | flagship workbook" in content
+        assert "Operating Path: Maintain (high confidence)" in content
         assert "Intent Alignment: aligned: The repo is holding a maintain posture" in content
 
 
