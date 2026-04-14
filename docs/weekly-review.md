@@ -27,6 +27,21 @@ The primary workbook, HTML, Markdown, and review-pack surfaces all tell the same
 
 Read those buckets in exactly that order. The hidden workbook sheets and raw JSON still keep the richer lifecycle detail underneath.
 
+Phase 96 adds one stronger packaging rule on top of that guidance:
+
+- the visible weekly surfaces share one `weekly_story_v1` contract
+- each section now carries a compact summary, a next step, and a short evidence strip
+- scheduled handoff is part of that same weekly contract instead of inventing a separate weekly story
+
+That means the visible surfaces should agree on:
+- the weekly headline
+- the weekly decision
+- the next workflow step
+- the section order
+- the short evidence for why a repo, campaign, or approval path is being surfaced
+
+The current release boundary intentionally stops at that shared weekly-story contract. Approval-aware weekly scheduling remains deferred and is not a second weekly recommendation engine in the shipped weekly surfaces.
+
 ## Workbook reading order
 
 - `Dashboard` tells you whether the portfolio is quiet, worsening, or moving in the right direction.
@@ -137,6 +152,25 @@ If the next question becomes “does this need approval, re-approval, or explici
 - `blocked` means approval alone cannot help yet because drift, access, or other blockers still exist
 
 Use `audit <github-username> --approval-center` when you want the read-only approval view. Use `--approve-governance` or `--approve-packet` only to capture local approval records; those actions regenerate artifacts, but they do not perform external mutation.
+
+## Weekly section order
+
+When the workbook, Markdown, HTML, review-pack, or scheduled handoff shows the compact weekly story, read the sections in this order:
+
+1. `Weekly Priority`
+2. `Action Sync Readiness`
+3. `Apply Packet`
+4. `Post-Apply Monitoring`
+5. `Campaign Tuning`
+6. `Historical Portfolio Intelligence`
+7. `Automation Guidance`
+8. `Approval Workflow`
+9. `Operator Focus`
+
+The goal is progressive disclosure:
+- the top of the weekly story tells you what deserves attention this week
+- each later section tells you the next safe step inside its own layer
+- the evidence strips let you validate the recommendation without rereading the full raw artifact first
 
 ## Workbook gate reminder
 

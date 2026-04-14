@@ -7,6 +7,27 @@ from src.report_enrichment import build_weekly_review_pack
 from src.terminology import ACTION_SYNC_CANONICAL_LABELS
 
 
+def _render_weekly_story_sections(_w, weekly_pack: dict) -> None:
+    story = weekly_pack.get("weekly_story_v1") or {}
+    for section in story.get("sections") or []:
+        if section.get("id") == "weekly-priority":
+            continue
+        _w(f"### {section.get('label', 'Weekly Story')}")
+        _w("")
+        _w(f"- Summary: {section.get('headline', 'No section summary is recorded yet.')}")
+        _w(f"- {section.get('next_label', 'Next Step')}: {section.get('next_step', 'No next step is recorded yet.')}")
+        _w(f"- State: {section.get('state', 'idle')}")
+        evidence_items = list(section.get("evidence_items") or [])
+        if evidence_items:
+            _w("- Evidence:")
+            for item in evidence_items[:5]:
+                command = f" [{item.get('command_hint')}]" if item.get("command_hint") else ""
+                _w(f"  - {item.get('label', 'Item')} — {item.get('summary', 'No evidence summary is recorded yet.')}{command}")
+        else:
+            _w("- Evidence: No supporting evidence is currently surfaced.")
+        _w("")
+
+
 def export_review_pack(
     report_data: dict,
     output_dir: Path,
@@ -71,139 +92,23 @@ def export_review_pack(
     _w(f"- {ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}: {weekly_pack.get('approval_workflow_summary', 'No current approval needs review yet, so the approval workflow can stay local for now.')}")
     _w(f"- {ACTION_SYNC_CANONICAL_LABELS['next_approval_review']}: {weekly_pack.get('next_approval_review', 'Stay local for now; no current approval needs review.')}")
     _w("")
-    _w(f"### {ACTION_SYNC_CANONICAL_LABELS['readiness']}")
-    _w("")
-    readiness_sections = [
-        ("Apply Ready", weekly_pack.get("top_apply_ready_campaigns", []), "No campaigns are currently apply-ready."),
-        ("Preview Ready", weekly_pack.get("top_preview_ready_campaigns", []), "No campaigns are currently preview-ready."),
-        ("Drift Review", weekly_pack.get("top_drift_review_campaigns", []), "No campaigns are currently waiting on drift review."),
-        ("Blocked", weekly_pack.get("top_blocked_campaigns", []), "No campaigns are currently blocked."),
-    ]
-    for label, items, empty_message in readiness_sections:
-        _w(f"- {label}:")
-        if items:
-            for item in items[:3]:
-                _w(
-                    f"  - {item.get('label', item.get('campaign_type', 'Campaign'))} — {item.get('reason', 'No readiness reason is recorded yet.')} "
-                    f"(target {item.get('recommended_target', 'none')})"
-                )
-        else:
-            _w(f"  - {empty_message}")
-    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['apply_packet']}:")
-    _w(f"  Summary: {weekly_pack.get('apply_readiness_summary', 'No current campaign has a safe execution handoff yet, so the local story should stay local for now.')}")
-    _w(f"  Next Candidate: {weekly_pack.get('next_apply_candidate', 'Stay local for now; no current campaign has a safe execution handoff.')}")
-    _w(f"  Command Hint: {weekly_pack.get('action_sync_command_hint', 'No Action Sync command is recommended yet.')}")
-    packet_sections = [
-        ("Ready To Apply", weekly_pack.get("top_ready_to_apply_packets", []), "No campaigns are currently ready to apply."),
-        ("Needs Approval", weekly_pack.get("top_needs_approval_packets", []), "No campaigns currently need approval-only review."),
-        ("Review Drift", weekly_pack.get("top_review_drift_packets", []), "No campaigns currently need drift review before apply."),
-    ]
-    for label, items, empty_message in packet_sections:
-        _w(f"- {label}:")
-        if items:
-            for item in items[:3]:
-                command = item.get("apply_command") or item.get("preview_command") or "No command"
-                _w(f"  - {item.get('label', item.get('campaign_type', 'Campaign'))} — {item.get('summary', 'No packet summary is recorded yet.')} [{command}]")
-        else:
-            _w(f"  - {empty_message}")
-    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['post_apply_monitoring']}:")
-    _w(f"  Summary: {weekly_pack.get('campaign_outcomes_summary', 'No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.')}")
-    _w(f"  Next Step: {weekly_pack.get('next_monitoring_step', 'Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.')}")
-    monitoring_sections = [
-        ("Drift Returned", weekly_pack.get("top_drift_returned_campaigns", []), "No campaigns currently show post-apply drift return."),
-        ("Reopened", weekly_pack.get("top_reopened_campaigns", []), "No campaigns currently show reopened action flow after apply."),
-        ("Monitor Now", weekly_pack.get("top_monitor_now_campaigns", []), "No campaigns are currently in the short monitoring window."),
-        ("Holding Clean", weekly_pack.get("top_holding_clean_campaigns", []), "No campaigns have enough follow-up evidence to be called clean yet."),
-    ]
-    for label, items, empty_message in monitoring_sections:
-        _w(f"- {label}:")
-        if items:
-            for item in items[:3]:
-                _w(f"  - {item.get('label', item.get('campaign_type', 'Campaign'))} — {item.get('summary', 'No post-apply monitoring summary is recorded yet.')}")
-        else:
-            _w(f"  - {empty_message}")
-    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['campaign_tuning']}:")
-    _w(f"  Summary: {weekly_pack.get('campaign_tuning_summary', 'Campaign tuning stays neutral until there is enough outcome history to bias tied recommendations.')}")
-    _w(f"  {ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}: {weekly_pack.get('next_tie_break_candidate', weekly_pack.get('next_tuned_campaign', 'No current campaign needs a tie-break candidate yet.'))}")
-    tuning_sections = [
-        ("Proven", weekly_pack.get("top_proven_campaigns", []), "No campaigns have enough clean evidence to be called proven yet."),
-        ("Caution", weekly_pack.get("top_caution_campaigns", []), "No campaigns currently show caution-level outcome risk."),
-        ("Thin Evidence", weekly_pack.get("top_thin_evidence_campaigns", []), "No campaigns are currently limited mainly by thin evidence."),
-    ]
-    for label, items, empty_message in tuning_sections:
-        _w(f"- {label}:")
-        if items:
-            for item in items[:3]:
-                _w(f"  - {item.get('label', item.get('campaign_type', 'Campaign'))} — {item.get('summary', 'No campaign tuning summary is recorded yet.')}")
-        else:
-            _w(f"  - {empty_message}")
-    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}:")
-    _w(f"  Summary: {weekly_pack.get('automation_guidance_summary', 'Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture.')}")
-    _w(f"  Next Step: {weekly_pack.get('next_safe_automation_step', 'Stay local for now; no current campaign has a stronger safe automation posture than manual review.')}")
-    for label, items, empty_message in (
-        ("Preview Safe", weekly_pack.get("top_preview_safe_campaigns", []), "No campaigns are currently safe to automate as preview-only."),
-        ("Apply Manual", weekly_pack.get("top_apply_manual_campaigns", []), "No campaigns are currently in a manual-apply posture."),
-        ("Approval First", weekly_pack.get("top_approval_first_campaigns", []), "No campaigns are currently waiting on approval-first review."),
-        ("Follow-Up Safe", weekly_pack.get("top_follow_up_safe_campaigns", []), "No campaigns are currently in a non-mutating follow-up posture."),
-        ("Manual Only", weekly_pack.get("top_manual_only_campaigns", []), "No campaigns are currently constrained to manual-only review."),
-    ):
-        _w(f"- {label}:")
-        if items:
-            for item in items[:3]:
-                command = item.get("recommended_command") or "No command"
-                _w(f"  - {item.get('label', item.get('campaign_type', 'Campaign'))} — {item.get('summary', 'No automation guidance summary is recorded yet.')} [{command}]")
-        else:
-            _w(f"  - {empty_message}")
-    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}:")
-    _w(f"  Summary: {weekly_pack.get('approval_workflow_summary', 'No current approval needs review yet, so the approval workflow can stay local for now.')}")
-    _w(f"  {ACTION_SYNC_CANONICAL_LABELS['next_approval_review']}: {weekly_pack.get('next_approval_review', 'Stay local for now; no current approval needs review.')}")
-    for label, items, empty_message in (
-        ("Needs Re-Approval", weekly_pack.get("top_needs_reapproval_approvals", []), "No approvals currently need re-approval."),
-        ("Ready For Review", weekly_pack.get("top_ready_for_review_approvals", []), "No approvals are currently ready for review."),
-        ("Approved But Manual", weekly_pack.get("top_approved_manual_approvals", []), "No approvals are currently waiting on explicit manual apply."),
-        ("Blocked", weekly_pack.get("top_blocked_approvals", []), "No approvals are currently blocked."),
-    ):
-        _w(f"- {label}:")
-        if items:
-            for item in items[:3]:
-                command = item.get("approval_command") or item.get("manual_apply_command") or "No command"
-                _w(f"  - {item.get('label', item.get('subject_key', 'Approval'))} — {item.get('summary', 'No approval summary is recorded yet.')} [{command}]")
-        else:
-            _w(f"  - {empty_message}")
-    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['historical_portfolio_intelligence']}:")
-    _w(f"  Summary: {weekly_pack.get('historical_portfolio_intelligence', 'Historical portfolio intelligence is still thin, so the weekly story should stay grounded in the current run and recent operator queue.')}")
-    _w(f"  Next Focus: {weekly_pack.get('next_historical_focus', 'Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet.')}")
-    for label, items, empty_message in (
-        ("Relapsing", weekly_pack.get("top_relapsing_repos", []), "No repos currently show a relapsing intervention story."),
-        ("Persistent Pressure", weekly_pack.get("top_persistent_pressure_repos", []), "No repos currently show persistent pressure."),
-        ("Improving After Intervention", weekly_pack.get("top_improving_repos", []), "No repos currently show a clear improving-after-intervention story."),
-        ("Holding Steady", weekly_pack.get("top_holding_repos", []), "No repos currently show a holding-steady story."),
-    ):
-        _w(f"- {label}:")
-        if items:
-            for item in items[:3]:
-                _w(f"  - {item.get('repo', 'Repo')} — {item.get('summary', 'No historical intelligence summary is recorded yet.')}")
-        else:
-            _w(f"  - {empty_message}")
-    _w("")
+    _render_weekly_story_sections(_w, weekly_pack)
     _w("### Top Attention")
     _w("")
     for item in weekly_pack.get("top_attention", [])[:5]:
         _w(f"- [{item.get('lane', 'ready')}] {item.get('repo', 'Portfolio')}: {item.get('title', 'Operator attention item')}")
-        _w(f"  Why: {item.get('why', 'Operator pressure is active.')}")
-        _w(f"  Action: {item.get('next_step', 'Review the latest state.')}")
+        _w(f"  What Changed: {item.get('last_movement', 'Current run')}")
+        _w(f"  Why It Matters: {item.get('why_it_won', item.get('why', 'Operator pressure is active.'))}")
+        _w(f"  What To Do Next: {item.get('next_step', 'Review the latest state.')}")
         _w(f"  Operator Focus: {item.get('operator_focus_line', 'Watch Closely: No operator focus bucket is currently surfaced.')}")
         _w(f"  Catalog: {item.get('catalog_line', 'No portfolio catalog contract is recorded yet.')}")
         _w(f"  Intent Alignment: {item.get('intent_alignment', 'missing-contract')} — {item.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.')}")
         _w(f"  {item.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.')}")
         _w(f"  Maturity Gap: {item.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.')}")
-        _w(f"  {item.get('action_sync_line', 'Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.')}")
-        _w(f"  {item.get('apply_packet_line', 'Apply Packet: no current execution handoff is surfaced.')}")
-        _w(f"  {item.get('post_apply_line', 'Post-Apply Monitoring: no recent Action Sync apply needs follow-up yet.')}")
-        _w(f"  {item.get('campaign_tuning_line', 'Campaign Tuning: recommendations stay neutral until more outcome history is available.')}")
-        _w(f"  {item.get('historical_intelligence_line', 'Historical Portfolio Intelligence: keep the weekly story anchored in the current run until more cross-run evidence accumulates.')}")
-        _w(f"  {item.get('automation_line', 'Automation Guidance: keep the next step human-led until a bounded safe posture is surfaced.')}")
-        _w(f"  {item.get('approval_line', 'Approval Workflow: no current approval needs review yet.')}")
+        _w("  Evidence:")
+        for evidence in item.get("evidence_strip", [])[:5]:
+            command = f" [{evidence.get('command_hint')}]" if evidence.get("command_hint") else ""
+            _w(f"    - {evidence.get('label', 'Item')} — {evidence.get('summary', 'No evidence summary is recorded yet.')}{command}")
         _w(f"  Checkpoint Timing: {item.get('follow_through_checkpoint_timing', 'Unknown')}")
         _w(f"  Next Checkpoint: {item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
     if not weekly_pack.get("top_attention"):
@@ -239,21 +144,18 @@ def export_review_pack(
         _w(f"- {briefing.get('headline', briefing.get('repo', 'Repo briefing'))}")
         _w(f"  Current State: {briefing.get('current_state_line', 'No current-state summary is recorded yet.')}")
         _w(f"  What Changed: {briefing.get('what_changed_line', 'No change summary is recorded yet.')}")
-        _w(f"  Why It Matters: {briefing.get('why_it_matters_line', 'No explanation summary is recorded yet.')}")
+        _w(f"  Why It Matters: {briefing.get('why_it_won', briefing.get('why_it_matters_line', 'No explanation summary is recorded yet.'))}")
         _w(f"  Where To Start: {briefing.get('where_to_start_summary', 'No meaningful implementation hotspot is currently surfaced.')}")
-        _w(f"  What To Do Next: {briefing.get('what_to_do_next_line', 'No next action is recorded yet.')}")
+        _w(f"  What To Do Next: {briefing.get('next_step', briefing.get('what_to_do_next_line', 'No next action is recorded yet.'))}")
         _w(f"  Operator Focus: {briefing.get('operator_focus_line', 'Watch Closely: No operator focus bucket is currently surfaced.')}")
         _w(f"  Catalog: {briefing.get('catalog_line', 'No portfolio catalog contract is recorded yet.')}")
         _w(f"  Intent Alignment: {briefing.get('intent_alignment_line', 'missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.')}")
         _w(f"  {briefing.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.')}")
         _w(f"  Maturity Gap: {briefing.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.')}")
-        _w(f"  {briefing.get('action_sync_line', 'Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.')}")
-        _w(f"  {briefing.get('apply_packet_line', 'Apply Packet: no current execution handoff is surfaced.')}")
-        _w(f"  {briefing.get('post_apply_line', 'Post-Apply Monitoring: no recent Action Sync apply needs follow-up yet.')}")
-        _w(f"  {briefing.get('campaign_tuning_line', 'Campaign Tuning: recommendations stay neutral until more outcome history is available.')}")
-        _w(f"  {briefing.get('historical_intelligence_line', 'Historical Portfolio Intelligence: keep the weekly story anchored in the current run until more cross-run evidence accumulates.')}")
-        _w(f"  {briefing.get('automation_line', 'Automation Guidance: keep the next step human-led until a bounded safe posture is surfaced.')}")
-        _w(f"  {briefing.get('approval_line', 'Approval Workflow: no current approval needs review yet.')}")
+        _w("  Evidence:")
+        for evidence in briefing.get("evidence_strip", [])[:5]:
+            command = f" [{evidence.get('command_hint')}]" if evidence.get("command_hint") else ""
+            _w(f"    - {evidence.get('label', 'Item')} — {evidence.get('summary', 'No evidence summary is recorded yet.')}{command}")
         _w(f"  Checkpoint Timing: {briefing.get('checkpoint_timing_line', 'Unknown')}")
         _w(f"  What Would Count As Progress: {briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
     _w("")

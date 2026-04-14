@@ -3,6 +3,7 @@ output/*.md
 output/*.xlsx
 output/*.html
 output/*.db
+output/workbook-gate/
 output/~$*
 output/.cache/
 output/history/
