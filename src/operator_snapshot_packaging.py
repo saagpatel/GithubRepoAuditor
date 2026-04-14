@@ -1381,6 +1381,8 @@ def build_operator_summary(
         "next_approval_review": approval_ledger["next_approval_review"],
         "top_ready_for_review_approvals": approval_ledger["top_ready_for_review_approvals"],
         "top_needs_reapproval_approvals": approval_ledger["top_needs_reapproval_approvals"],
+        "top_overdue_approval_followups": approval_ledger["top_overdue_approval_followups"],
+        "top_due_soon_approval_followups": approval_ledger["top_due_soon_approval_followups"],
         "top_approved_manual_approvals": approval_ledger["top_approved_manual_approvals"],
         "top_blocked_approvals": approval_ledger["top_blocked_approvals"],
     }

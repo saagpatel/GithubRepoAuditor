@@ -294,25 +294,28 @@ Historical compatibility remains a design constraint. Older rows and older repor
 
 ## Approval Workflow
 
-Phase 93 adds one local, artifact-first approval layer: `Approval Workflow`.
+Phase 93 and Phase 101 together add one local, artifact-first approval layer: `Approval Workflow`.
 
 That layer does not widen write authority. It exists to answer:
 
 - what needs review now
 - what needs re-approval because the fingerprint changed
 - what is approved but still waits on an explicit manual apply
+- what is still approved but now needs a local recurring follow-up review soon
 - what is blocked for reasons approval alone cannot solve
 
 Architecturally:
 
 - `src/approval_ledger.py` owns approval synthesis and fingerprinting
+- `src/approval_ledger.py` now also derives approval freshness from the latest tracked follow-up review event or the original approval timestamp fallback
 - `src/operator_control_center.py` carries approval state into the operator summary and queue items
-- `src/report_enrichment.py` packages the same approval story across workbook, Markdown, HTML, review-pack, scheduled handoff, and approval-center artifacts
-- `src/warehouse.py` persists approval ledger snapshots and approval records while keeping legacy governance approvals readable
+- `src/report_enrichment.py` passes the approval story through the shared weekly/report contracts, and `src/weekly_packaging.py` now carries the final weekly approval packaging across workbook, Markdown, HTML, review-pack, and scheduled handoff artifacts
+- `src/warehouse.py` persists approval ledger snapshots, initial approval records, and append-only approval follow-up events while keeping legacy governance approvals readable
 
 Approval stays local-authoritative:
 
 - approval capture writes a local attestation
+- recurring follow-up review writes a separate local review event
 - it may regenerate shared artifacts
 - it never auto-runs `--writeback-apply`
 - explicit apply remains a separate human action

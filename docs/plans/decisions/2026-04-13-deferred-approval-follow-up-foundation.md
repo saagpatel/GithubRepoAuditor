@@ -2,7 +2,7 @@
 
 ## Status
 
-`deferred`
+`implemented in Phase 101`
 
 ## Context
 
@@ -24,4 +24,4 @@ Do not implement approval follow-up foundation work until the roadmap reaches Ph
 
 ## Superseded By
 
-None yet.
+- [Phase 101 closeout](/Users/d/Projects/GithubRepoAuditor/docs/plans/2026-04-14-phase-101-closeout.md)

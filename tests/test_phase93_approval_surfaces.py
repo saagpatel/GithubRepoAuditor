@@ -37,6 +37,18 @@ def _report() -> dict:
                 }
             ],
             "top_needs_reapproval_approvals": [],
+            "top_overdue_approval_followups": [
+                {
+                    "label": "Governance: all",
+                    "subject_key": "all",
+                    "summary": "Governance: all is still approved, but its local follow-up review is overdue.",
+                    "follow_up_state": "overdue-follow-up",
+                    "follow_up_command": "audit testuser --review-governance --governance-scope all",
+                    "last_reviewed_by": "owner",
+                    "next_follow_up_due_at": "2026-04-12T12:00:00+00:00",
+                }
+            ],
+            "top_due_soon_approval_followups": [],
             "top_approved_manual_approvals": [],
             "top_blocked_approvals": [],
         },
@@ -67,7 +79,28 @@ def _report() -> dict:
                 "approval_command": "audit testuser --approve-governance --governance-scope all",
                 "manual_apply_command": "",
                 "summary": "Governance scope all is ready for review.",
-            }
+            },
+            {
+                "approval_id": "governance:followup",
+                "approval_subject_type": "governance",
+                "subject_key": "all",
+                "label": "Governance: all",
+                "approval_state": "approved-manual",
+                "follow_up_state": "overdue-follow-up",
+                "source_run_id": "testuser:2026-04-13T12:00:00+00:00",
+                "fingerprint": "fingerprint-1",
+                "approved_at": "2026-04-01T12:00:00+00:00",
+                "approved_by": "owner",
+                "last_reviewed_at": "2026-04-06T12:00:00+00:00",
+                "last_reviewed_by": "owner",
+                "next_follow_up_due_at": "2026-04-12T12:00:00+00:00",
+                "approval_ready": False,
+                "apply_ready_after_approval": True,
+                "approval_command": "audit testuser --approve-governance --governance-scope all",
+                "follow_up_command": "audit testuser --review-governance --governance-scope all",
+                "manual_apply_command": "audit testuser --writeback-apply --governance-scope all",
+                "summary": "Governance: all is still approved, but its local follow-up review is overdue.",
+            },
         ],
         "approval_workflow_summary": {
             "summary": "Governance: all is the strongest approval review candidate right now.",
@@ -114,6 +147,8 @@ def test_review_pack_web_and_scheduled_handoff_include_approval_workflow(tmp_pat
     assert "Next Approval Review" in handoff
     assert "Approval Workflow" in approval_center
     assert "Ready For Review" in approval_center
+    assert "Overdue Follow-Up" in approval_center
+    assert "--review-governance --governance-scope all" in approval_center
 
 
 def test_excel_approval_ledger_sheet_and_hidden_data_exist() -> None:
@@ -129,3 +164,5 @@ def test_excel_approval_ledger_sheet_and_hidden_data_exist() -> None:
     sheet = workbook["Approval Ledger"]
     assert sheet["A1"].value == "Approval Ledger"
     assert "strongest approval review candidate" in str(sheet["A2"].value)
+    assert sheet["C5"].value == "Follow-Up"
+    assert sheet["G5"].value == "Next Follow-Up Due"
