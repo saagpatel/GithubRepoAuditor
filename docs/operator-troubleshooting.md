@@ -170,5 +170,12 @@ If the product surfaces `Approval Workflow`, read it as local approval memory, n
 - `ready-for-review` means approval can be reviewed now, but nothing will be applied automatically
 - `approved-manual` means approval is current and the next move is still a human-run apply command
 - `blocked` means approval alone cannot solve the current path
+- `overdue-follow-up` and `due-soon-follow-up` mean the subject is still approved, but its local review freshness is now visible and tracked separately from approval validity
 
 If approval wording ever suggests that approval capture will also execute writeback, treat that as a bug and fall back to the workbook plus control-center review path.
+
+Use the command surface intentionally:
+
+- `--approve-governance` and `--approve-packet` capture initial local approval only
+- `--review-governance` and `--review-packet` capture recurring local follow-up review only
+- neither command path performs `--writeback-apply`

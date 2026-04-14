@@ -62,6 +62,8 @@ def _safe_posture_for_command(command_hint: str | None, *, default: str = "read-
         return "manual-mutation"
     if "--approve-" in command_hint:
         return "local-approval-capture"
+    if "--review-governance" in command_hint or "--review-packet" in command_hint:
+        return "local-follow-up-review"
     return "bounded-command"
 
 
@@ -200,7 +202,11 @@ def _approval_evidence_items(items: list[dict[str, Any]], *, label_prefix: str |
         if label_prefix:
             label = f"{label_prefix}: {label}"
         summary = str(item.get("summary") or "No approval summary is recorded yet.")
-        command_hint = _first_command_hint(item.get("approval_command"), item.get("manual_apply_command"))
+        command_hint = _first_command_hint(
+            item.get("follow_up_command"),
+            item.get("approval_command"),
+            item.get("manual_apply_command"),
+        )
         evidence_items.append(
             _build_story_evidence_item(
                 label,
@@ -514,7 +520,9 @@ def _build_weekly_story_v1(weekly_pack: dict[str, Any]) -> dict[str, Any]:
                 weekly_pack,
                 [
                     ("top_needs_reapproval_approvals", "needs-reapproval"),
+                    ("top_overdue_approval_followups", "overdue-follow-up"),
                     ("top_ready_for_review_approvals", "ready-for-review"),
+                    ("top_due_soon_approval_followups", "due-soon-follow-up"),
                     ("top_approved_manual_approvals", "approved-manual"),
                     ("top_blocked_approvals", "blocked"),
                 ],
@@ -529,8 +537,16 @@ def _build_weekly_story_v1(weekly_pack: dict[str, Any]) -> dict[str, Any]:
                     label_prefix="Needs Re-Approval",
                 )
                 + _approval_evidence_items(
+                    list(weekly_pack.get("top_overdue_approval_followups") or []),
+                    label_prefix="Overdue Follow-Up",
+                )
+                + _approval_evidence_items(
                     list(weekly_pack.get("top_ready_for_review_approvals") or []),
                     label_prefix="Ready For Review",
+                )
+                + _approval_evidence_items(
+                    list(weekly_pack.get("top_due_soon_approval_followups") or []),
+                    label_prefix="Due Soon Follow-Up",
                 )
                 + _approval_evidence_items(
                     list(weekly_pack.get("top_approved_manual_approvals") or []),

@@ -8,6 +8,7 @@ from src.models import AnalyzerResult, RepoMetadata
 from src.scorer import WEIGHTS, score_repo
 from src.warehouse import (
     load_action_sync_automation,
+    load_approval_followup_events,
     load_approval_records,
     load_campaign_history,
     load_campaign_outcomes,
@@ -21,6 +22,7 @@ from src.warehouse import (
     load_recent_repo_scorecards,
     load_review_history,
     load_watch_checkpoint,
+    save_approval_followup_event,
     save_approval_record,
     write_warehouse_snapshot,
 )
@@ -552,3 +554,33 @@ def test_approval_workflow_summary_and_records_round_trip(tmp_path):
     )
     loaded = load_approval_records(tmp_path, "user")
     assert loaded[0]["approval_note"] == "Reviewed locally"
+
+
+def test_approval_followup_events_round_trip(tmp_path):
+    audit = score_repo(_make_metadata(), _make_results())
+
+    from src.models import AuditReport
+
+    report = AuditReport.from_audits("user", [audit], [], 1)
+    write_warehouse_snapshot(report, tmp_path)
+
+    save_approval_followup_event(
+        tmp_path,
+        {
+            "event_id": "followup-1",
+            "approval_id": "governance:all",
+            "fingerprint": "fingerprint-1",
+            "approval_subject_type": "governance",
+            "subject_key": "all",
+            "source_run_id": f"{report.username}:{report.generated_at.isoformat()}",
+            "reviewed_at": report.generated_at.isoformat(),
+            "reviewed_by": "sam",
+            "review_note": "Still valid",
+            "cadence_days": 7,
+            "details_json": {"summary": "Still valid"},
+        },
+    )
+
+    loaded = load_approval_followup_events(tmp_path, "user")
+    assert loaded[0]["review_note"] == "Still valid"
+    assert loaded[0]["cadence_days"] == 7

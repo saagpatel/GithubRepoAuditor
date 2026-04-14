@@ -62,6 +62,8 @@ def _make_args(**overrides) -> Namespace:
         "approval_view": "all",
         "approve_governance": False,
         "approve_packet": False,
+        "review_governance": False,
+        "review_packet": False,
         "governance_scope": "all",
         "approval_reviewer": None,
         "approval_note": "",
@@ -299,6 +301,32 @@ def test_main_rejects_approve_packet_with_writeback_apply(monkeypatch):
 
     assert exc.value.code == 2
     assert "Remove --writeback-apply" in parser.error_message
+
+
+def test_main_rejects_review_packet_without_campaign(monkeypatch):
+    args = _make_args(review_packet=True)
+    parser = FakeParser(args)
+
+    monkeypatch.setattr(cli, "build_parser", lambda: parser)
+
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+
+    assert exc.value.code == 2
+    assert "--review-packet requires --campaign" in parser.error_message
+
+
+def test_main_rejects_review_packet_with_writeback_apply(monkeypatch):
+    args = _make_args(review_packet=True, campaign="security-review", writeback_apply=True, writeback_target="all")
+    parser = FakeParser(args)
+
+    monkeypatch.setattr(cli, "build_parser", lambda: parser)
+
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+
+    assert exc.value.code == 2
+    assert "local follow-up review only" in parser.error_message
 
 
 def test_main_forwards_scoring_profile_to_incremental_audit(monkeypatch, sample_metadata):

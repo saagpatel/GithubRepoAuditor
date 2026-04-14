@@ -3337,7 +3337,7 @@ def _build_changes(wb: Workbook, data: dict, diff_data: dict | None) -> None:
                 ws.cell(row=row, column=4, value=item.get("title", ""))
                 row += 1
 
-    auto_width(ws, 6, row)
+    auto_width(ws, 8, row)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -3712,17 +3712,17 @@ def _build_approval_ledger(wb: Workbook, data: dict) -> None:
         "Stay local for now; no current approval needs review.",
     )
 
-    ws.merge_cells("A1:F1")
+    ws.merge_cells("A1:H1")
     ws["A1"].value = ACTION_SYNC_CANONICAL_LABELS["approval_ledger"]
     ws["A1"].font = SECTION_FONT
-    ws.merge_cells("A2:F2")
+    ws.merge_cells("A2:H2")
     ws["A2"].value = summary
     ws["A2"].alignment = WRAP
-    ws.merge_cells("A3:F3")
+    ws.merge_cells("A3:H3")
     ws["A3"].value = next_review
     ws["A3"].alignment = WRAP
 
-    headers = ["Label", "State", "Subject", "Reviewer", "Approved At", "Summary"]
+    headers = ["Label", "State", "Follow-Up", "Subject", "Reviewer", "Approved At", "Next Follow-Up Due", "Summary"]
     for col, header in enumerate(headers, 1):
         ws.cell(row=5, column=col, value=header)
     style_header_row(ws, 5, len(headers))
@@ -3731,7 +3731,9 @@ def _build_approval_ledger(wb: Workbook, data: dict) -> None:
     row = 6
     for label, items in (
         ("Needs Re-Approval", data.get("top_needs_reapproval_approvals", []) or []),
+        ("Overdue Follow-Up", data.get("top_overdue_approval_followups", []) or []),
         ("Ready For Review", data.get("top_ready_for_review_approvals", []) or []),
+        ("Due Soon Follow-Up", data.get("top_due_soon_approval_followups", []) or []),
         (ACTION_SYNC_CANONICAL_LABELS["approved_but_manual"], data.get("top_approved_manual_approvals", []) or []),
         ("Blocked", data.get("top_blocked_approvals", []) or []),
     ):
@@ -3746,14 +3748,16 @@ def _build_approval_ledger(wb: Workbook, data: dict) -> None:
             values = [
                 item.get("label", item.get("subject_key", "Approval")),
                 item.get("approval_state", "not-applicable"),
+                item.get("follow_up_state", "not-applicable"),
                 item.get("approval_subject_type", ""),
-                item.get("approved_by", ""),
+                item.get("last_reviewed_by", item.get("approved_by", "")),
                 item.get("approved_at", ""),
+                item.get("next_follow_up_due_at", ""),
                 item.get("summary", ""),
             ]
             for col, value in enumerate(values, 1):
                 cell = ws.cell(row=row, column=col, value=value)
-                style_data_cell(cell, "center" if col in {2, 3, 4, 5} else "left")
+                style_data_cell(cell, "center" if col in {2, 3, 4, 5, 6, 7} else "left")
             row += 1
 
     auto_width(ws, 6, row)
@@ -4228,13 +4232,20 @@ def _build_hidden_data_sheets(
             item.get("subject_key", ""),
             item.get("label", ""),
             item.get("approval_state", "not-applicable"),
+            item.get("follow_up_state", "not-applicable"),
             item.get("source_run_id", ""),
             item.get("fingerprint", ""),
             item.get("approved_at", ""),
             item.get("approved_by", ""),
+            item.get("last_reviewed_at", ""),
+            item.get("last_reviewed_by", ""),
+            item.get("follow_up_cadence_days", 0),
+            item.get("next_follow_up_due_at", ""),
+            "yes" if item.get("stale_approval") else "no",
             "yes" if item.get("approval_ready") else "no",
             "yes" if item.get("apply_ready_after_approval") else "no",
             item.get("approval_command", ""),
+            item.get("follow_up_command", ""),
             item.get("manual_apply_command", ""),
             item.get("summary", ""),
         ])
@@ -4823,13 +4834,20 @@ def _build_hidden_data_sheets(
             "Subject Key",
             "Label",
             "Approval State",
+            "Follow-Up State",
             "Source Run ID",
             "Fingerprint",
             "Approved At",
             "Approved By",
+            "Last Reviewed At",
+            "Last Reviewed By",
+            "Follow-Up Cadence Days",
+            "Next Follow-Up Due At",
+            "Stale Approval",
             "Approval Ready",
             "Apply Ready After Approval",
             "Approval Command",
+            "Follow-Up Command",
             "Manual Apply Command",
             "Summary",
         ],

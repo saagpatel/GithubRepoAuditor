@@ -170,9 +170,10 @@ Phase 93 adds one local approval read after that posture layer: `Approval Workfl
 - `ready-for-review` means the approval can be reviewed now, but it still does not apply anything
 - `approved-manual` means approval is current and the next step is still an explicit human apply
 - `blocked` means non-approval blockers still exist, so approval alone cannot clear the path
+- `overdue-follow-up` and `due-soon-follow-up` are freshness cues carried through `follow_up_state`, not new approval states
 
 Use that layer as workflow memory, not as execution:
-- it records local approval history and receipts
+- it records local approval history, recurring follow-up review history, and receipts
 - it is surfaced through `--approval-center` plus the `Next Approval Review` line
 - it never widens write authority
 - it never makes `--writeback-apply` automatic

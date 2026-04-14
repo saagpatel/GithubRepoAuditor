@@ -8,7 +8,7 @@ from pathlib import Path
 from src.models import AuditReport
 
 WAREHOUSE_FILENAME = "portfolio-warehouse.db"
-WAREHOUSE_SCHEMA_VERSION = 15
+WAREHOUSE_SCHEMA_VERSION = 16
 
 
 def write_warehouse_snapshot(
@@ -403,6 +403,20 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             approval_note TEXT NOT NULL DEFAULT '',
             details_json TEXT NOT NULL DEFAULT '{}',
             PRIMARY KEY (approval_id, fingerprint)
+        );
+
+        CREATE TABLE IF NOT EXISTS approval_followup_events (
+            event_id TEXT PRIMARY KEY,
+            approval_id TEXT NOT NULL,
+            fingerprint TEXT NOT NULL,
+            approval_subject_type TEXT NOT NULL,
+            subject_key TEXT NOT NULL,
+            source_run_id TEXT NOT NULL,
+            reviewed_at TEXT NOT NULL,
+            reviewed_by TEXT NOT NULL DEFAULT '',
+            review_note TEXT NOT NULL DEFAULT '',
+            cadence_days INTEGER NOT NULL,
+            details_json TEXT NOT NULL DEFAULT '{}'
         );
 
         CREATE TABLE IF NOT EXISTS repo_implementation_hotspots (
@@ -1695,6 +1709,38 @@ def save_approval_record(output_dir: Path, record: dict) -> None:
         conn.close()
 
 
+def save_approval_followup_event(output_dir: Path, event: dict) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(output_dir / WAREHOUSE_FILENAME)
+    conn.row_factory = sqlite3.Row
+    try:
+        _ensure_schema(conn)
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO approval_followup_events (
+                event_id, approval_id, fingerprint, approval_subject_type, subject_key,
+                source_run_id, reviewed_at, reviewed_by, review_note, cadence_days, details_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                event.get("event_id", ""),
+                event.get("approval_id", ""),
+                event.get("fingerprint", ""),
+                event.get("approval_subject_type", ""),
+                event.get("subject_key", ""),
+                event.get("source_run_id", ""),
+                event.get("reviewed_at", ""),
+                event.get("reviewed_by", ""),
+                event.get("review_note", ""),
+                int(event.get("cadence_days", 0) or 0),
+                json.dumps(event),
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def load_approval_records(output_dir: Path, username: str, limit: int = 200) -> list[dict]:
     conn = _connect(output_dir)
     if conn is None:
@@ -1760,6 +1806,52 @@ def load_approval_records(output_dir: Path, username: str, limit: int = 200) -> 
         payload.setdefault("approved_at", row["approved_at"])
         records.append(payload)
     return records[:limit]
+
+
+def load_approval_followup_events(output_dir: Path, username: str, limit: int = 400) -> list[dict]:
+    conn = _connect(output_dir)
+    if conn is None:
+        return []
+    try:
+        rows = conn.execute(
+            """
+            SELECT approval_followup_events.event_id,
+                   approval_followup_events.approval_id,
+                   approval_followup_events.fingerprint,
+                   approval_followup_events.approval_subject_type,
+                   approval_followup_events.subject_key,
+                   approval_followup_events.source_run_id,
+                   approval_followup_events.reviewed_at,
+                   approval_followup_events.reviewed_by,
+                   approval_followup_events.review_note,
+                   approval_followup_events.cadence_days,
+                   approval_followup_events.details_json,
+                   audit_runs.generated_at
+            FROM approval_followup_events
+            LEFT JOIN audit_runs ON audit_runs.run_id = approval_followup_events.source_run_id
+            WHERE audit_runs.username = ? OR audit_runs.username IS NULL
+            ORDER BY approval_followup_events.reviewed_at DESC
+            LIMIT ?
+            """,
+            (username, limit),
+        ).fetchall()
+    finally:
+        conn.close()
+    events: list[dict] = []
+    for row in rows:
+        payload = json.loads(row["details_json"] or "{}")
+        payload.setdefault("event_id", row["event_id"])
+        payload.setdefault("approval_id", row["approval_id"])
+        payload.setdefault("fingerprint", row["fingerprint"])
+        payload.setdefault("approval_subject_type", row["approval_subject_type"])
+        payload.setdefault("subject_key", row["subject_key"])
+        payload.setdefault("source_run_id", row["source_run_id"])
+        payload.setdefault("reviewed_at", row["reviewed_at"])
+        payload.setdefault("reviewed_by", row["reviewed_by"])
+        payload.setdefault("review_note", row["review_note"])
+        payload.setdefault("cadence_days", row["cadence_days"])
+        events.append(payload)
+    return events[:limit]
 
 
 def load_governance_history(output_dir: Path, *, source_run_id: str, limit: int = 10) -> list[dict]:

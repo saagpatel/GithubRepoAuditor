@@ -150,10 +150,17 @@ Approval states are intentionally narrow:
 This layer does not widen authority:
 
 - approval capture records a local attestation only
+- recurring follow-up review records a separate local review event only
 - it may regenerate workbook, Markdown, HTML, review-pack, control-center, and approval-center artifacts
 - it never performs external mutation
 - it never auto-runs `--writeback-apply`
 - campaign approvals are limited to approval-eligible packets; access/config blockers remain blocked rather than approvable
+
+Follow-up freshness is additive:
+
+- `approval_state` still describes validity and apply posture
+- `follow_up_state` describes whether the latest approved subject is overdue for local review, due soon, or still fresh enough to stay quiet
+- recurring follow-up review uses `--review-governance` or `--review-packet`; it does not replace the initial `--approve-*` capture commands
 
 ## Audit Trail
 
