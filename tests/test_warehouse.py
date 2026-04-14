@@ -7,6 +7,7 @@ from src.baseline_context import build_baseline_context
 from src.models import AnalyzerResult, RepoMetadata
 from src.scorer import WEIGHTS, score_repo
 from src.warehouse import (
+    load_action_sync_automation,
     load_campaign_history,
     load_campaign_outcomes,
     load_campaign_tuning,
@@ -341,6 +342,29 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
         "historical_intelligence_status": "improving-after-intervention",
         "summary": "Read warehouse-repo next: it is the clearest current example of improvement after intervention.",
     }
+    report.action_sync_automation = [
+        {
+            "campaign_type": "promotion-push",
+            "label": "Promotion Push",
+            "automation_posture": "follow-up-safe",
+            "automation_reason": "Only non-mutating follow-up is appropriate right now.",
+            "review_required": False,
+            "recommended_command": "audit user --control-center",
+            "recommended_follow_up": "Use a non-mutating follow-up for Promotion Push, then review the refreshed workbook or control center.",
+            "requires_approval": False,
+            "summary": "Promotion Push is follow-up-safe: use a non-mutating refresh or control-center pass next. Safe follow-up command: audit user --control-center.",
+        }
+    ]
+    report.automation_guidance_summary = {
+        "summary": "Use a non-mutating follow-up for Promotion Push next.",
+        "counts": {"follow-up-safe": 1},
+    }
+    report.next_safe_automation_step = {
+        "campaign_type": "promotion-push",
+        "automation_posture": "follow-up-safe",
+        "summary": "Use a non-mutating follow-up for Promotion Push next.",
+        "recommended_command": "audit user --control-center",
+    }
     report.operator_summary.update(
         {
             "action_sync_outcomes": report.action_sync_outcomes,
@@ -352,6 +376,9 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
             "historical_portfolio_intelligence": report.historical_portfolio_intelligence,
             "intervention_ledger_summary": report.intervention_ledger_summary,
             "next_historical_focus": report.next_historical_focus,
+            "action_sync_automation": report.action_sync_automation,
+            "automation_guidance_summary": report.automation_guidance_summary,
+            "next_safe_automation_step": report.next_safe_automation_step,
         }
     )
     db_path = write_warehouse_snapshot(report, tmp_path)
@@ -371,6 +398,7 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
         campaign_outcome_rows = conn.execute("SELECT COUNT(*) FROM campaign_outcomes").fetchone()[0]
         campaign_tuning_rows = conn.execute("SELECT COUNT(*) FROM campaign_tuning").fetchone()[0]
         intervention_ledger_rows = conn.execute("SELECT COUNT(*) FROM intervention_ledger").fetchone()[0]
+        action_sync_automation_rows = conn.execute("SELECT COUNT(*) FROM action_sync_automation").fetchone()[0]
         hotspot_history_rows = conn.execute("SELECT COUNT(*) FROM repo_implementation_hotspots").fetchone()[0]
         catalog_rows = conn.execute("SELECT COUNT(*) FROM portfolio_catalog_entries").fetchone()[0]
         scorecard_rows = conn.execute("SELECT COUNT(*) FROM repo_scorecards").fetchone()[0]
@@ -390,12 +418,14 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     assert campaign_outcome_rows == 1
     assert campaign_tuning_rows == 1
     assert intervention_ledger_rows == 1
+    assert action_sync_automation_rows == 1
     assert hotspot_history_rows == 1
     assert catalog_rows == 1
     assert scorecard_rows == 1
 
     campaign_outcomes = load_campaign_outcomes(tmp_path, "user", limit=5)
     campaign_tuning = load_campaign_tuning(tmp_path, "user", limit=5)
+    action_sync_automation = load_action_sync_automation(tmp_path, "user", limit=5)
     intervention_ledger = load_intervention_ledger(tmp_path, "user", limit=5)
     history = load_campaign_history(tmp_path, "promotion-push")
     recent_campaign_history = load_recent_campaign_history(tmp_path, "user", limit=5)
@@ -418,6 +448,10 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     assert latest_runs[0]["operator_effectiveness_summary"]["summary"].startswith("recommendation validation")
     assert latest_runs[0]["high_pressure_queue_history"][0]["high_pressure_count"] == 1
     assert latest_runs[0]["campaign_outcomes_summary"]["summary"].startswith("Promotion Push was applied recently")
+    assert latest_runs[0]["automation_guidance_summary"]["summary"].startswith("Use a non-mutating follow-up")
+    assert action_sync_automation[0]["automation_posture"] == "follow-up-safe"
+    assert operator_state["automation_guidance_summary"]["summary"].startswith("Use a non-mutating follow-up")
+    assert operator_state["next_safe_automation_step"]["recommended_command"] == "audit user --control-center"
     assert latest_runs[0]["campaign_tuning_summary"]["summary"].startswith("Promotion Push should win ties")
     assert latest_runs[0]["baseline_signature"] == report.baseline_signature
     assert latest_runs[0]["baseline_context"]["portfolio_baseline_size"] == 1

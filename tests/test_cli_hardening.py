@@ -729,7 +729,7 @@ def test_report_from_dict_keeps_legacy_reports_readable(sample_metadata):
     assert report.baseline_signature == ""
 
 
-def test_report_from_dict_preserves_action_sync_packet_outcome_and_tuning_layers(sample_metadata):
+def test_report_from_dict_preserves_action_sync_packet_outcome_tuning_and_automation_layers(sample_metadata):
     report_data = _make_report_dict(sample_metadata)
     report_data["action_sync_packets"] = [
         {
@@ -770,6 +770,21 @@ def test_report_from_dict_preserves_action_sync_packet_outcome_and_tuning_layers
     report_data["next_tuned_campaign"] = {
         "summary": "Security Review should win ties inside the preview-ready group because recent outcome history is proven."
     }
+    report_data["action_sync_automation"] = [
+        {
+            "campaign_type": "security-review",
+            "summary": "Security Review is preview-safe: use a preview-only step first.",
+            "automation_posture": "preview-safe",
+            "recommended_command": "audit testuser --campaign security-review --writeback-target all",
+        }
+    ]
+    report_data["automation_guidance_summary"] = {
+        "summary": "Preview Security Review next; that is the strongest safe automation step right now."
+    }
+    report_data["next_safe_automation_step"] = {
+        "summary": "Preview Security Review next; that is the strongest safe automation step right now.",
+        "recommended_command": "audit testuser --campaign security-review --writeback-target all",
+    }
 
     report = cli._report_from_dict(report_data)
 
@@ -782,6 +797,9 @@ def test_report_from_dict_preserves_action_sync_packet_outcome_and_tuning_layers
     assert report.action_sync_tuning[0]["tuning_status"] == "proven"
     assert report.campaign_tuning_summary["summary"].startswith("Security Review should win ties")
     assert report.next_tuned_campaign["summary"].startswith("Security Review should win ties")
+    assert report.action_sync_automation[0]["automation_posture"] == "preview-safe"
+    assert report.automation_guidance_summary["summary"].startswith("Preview Security Review next")
+    assert report.next_safe_automation_step["recommended_command"].endswith("--writeback-target all")
 
 
 def test_regenerate_outputs_from_latest_report_uses_existing_json(monkeypatch, tmp_path, sample_metadata):

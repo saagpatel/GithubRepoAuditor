@@ -540,6 +540,13 @@ def test_build_scheduled_handoff_includes_github_projects_campaign_status(tmp_pa
     payload["operator_summary"]["next_historical_focus"] = {
         "summary": "Read RepoC next: it is the clearest current example of improvement after intervention.",
     }
+    payload["operator_summary"]["automation_guidance_summary"] = {
+        "summary": "Preview Security Review next; that is the strongest safe automation step right now.",
+    }
+    payload["operator_summary"]["next_safe_automation_step"] = {
+        "summary": "Preview Security Review next; that is the strongest safe automation step right now.",
+        "recommended_command": "audit testuser --campaign security-review --writeback-target all",
+    }
     payload["campaign_summary"] = {
         "campaign_type": "security-review",
         "label": "Security Review",
@@ -581,6 +588,9 @@ def test_build_scheduled_handoff_includes_github_projects_campaign_status(tmp_pa
     assert "Next Tie-Break Candidate: Security Review should win ties inside the preview-ready group" in markdown
     assert "Historical portfolio intelligence: RepoC is improving after intervention while RepoD still looks relapsing." in markdown
     assert "Next historical focus: Read RepoC next: it is the clearest current example of improvement after intervention." in markdown
+    assert "Automation Guidance: Preview Security Review next; that is the strongest safe automation step right now." in markdown
+    assert "Next safe automation step: Preview Security Review next; that is the strongest safe automation step right now." in markdown
+    assert "Safe automation command: audit testuser --campaign security-review --writeback-target all" in markdown
 
 
 def test_build_scheduled_handoff_stays_quiet_for_quiet_runs(tmp_path):

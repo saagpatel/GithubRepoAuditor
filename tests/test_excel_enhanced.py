@@ -884,6 +884,7 @@ class TestHotspotsAndDataSheets:
         assert "Data_ActionSyncOutcomes" in wb.sheetnames
         assert "Data_CampaignTuning" in wb.sheetnames
         assert "Data_InterventionLedger" in wb.sheetnames
+        assert "Data_ActionSyncAutomation" in wb.sheetnames
         assert "Data_OperatorRepoRollups" in wb.sheetnames
         assert "Data_MaterialChangeRollups" in wb.sheetnames
         assert "Data_RepoDetail" in wb.sheetnames
@@ -1519,6 +1520,13 @@ class TestAnalystWorkbookSheets:
         report["next_historical_focus"] = {
             "summary": "Read RepoC next: it is the clearest current example of improvement after intervention.",
         }
+        report["automation_guidance_summary"] = {
+            "summary": "Preview Security Review next; that is the strongest safe automation step right now.",
+        }
+        report["next_safe_automation_step"] = {
+            "summary": "Preview Security Review next; that is the strongest safe automation step right now.",
+            "recommended_command": "audit user --campaign security-review --writeback-target all",
+        }
         report["writeback_preview"] = {
             "sync_mode": "reconcile",
             "github_projects": {
@@ -1553,6 +1561,9 @@ class TestAnalystWorkbookSheets:
         assert "win ties" in str(ws["K11"].value).lower()
         assert ws["J13"].value == "Historical Portfolio Intelligence"
         assert "improving after intervention" in str(ws["K13"].value).lower()
+        assert ws["J15"].value == "Automation Guidance"
+        assert "strongest safe automation step" in str(ws["K15"].value).lower()
+        assert ws["J16"].value == "Next Safe Automation Step"
         assert ws["D15"].value == "Projects"
         assert ws["D16"].value == 3
 
@@ -1591,6 +1602,13 @@ class TestAnalystWorkbookSheets:
             "next_historical_focus": {
                 "summary": "Read RepoC next: it is the clearest current example of improvement after intervention.",
             },
+            "automation_guidance_summary": {
+                "summary": "Preview Security Review next; that is the strongest safe automation step right now.",
+            },
+            "next_safe_automation_step": {
+                "summary": "Preview Security Review next; that is the strongest safe automation step right now.",
+                "recommended_command": "audit user --campaign security-review --writeback-target all",
+            },
         }
         _build_print_pack(wb, report, None)
         ws = wb["Print Pack"]
@@ -1610,6 +1628,9 @@ class TestAnalystWorkbookSheets:
         assert ws["D17"].value == "Historical Portfolio Intelligence"
         assert "improving after intervention" in str(ws["E17"].value).lower()
         assert ws["D18"].value == "Next Historical Focus"
+        assert ws["D19"].value == "Automation Guidance"
+        assert "strongest safe automation step" in str(ws["E19"].value).lower()
+        assert ws["D20"].value == "Next Safe Automation Step"
 
     def test_writeback_audit_shows_empty_state_when_no_results(self):
         wb = Workbook()

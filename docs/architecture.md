@@ -261,6 +261,7 @@ src/
   action_sync_packets.py
   action_sync_outcomes.py
   action_sync_tuning.py
+  action_sync_automation.py
   intervention_ledger.py
   warehouse.py
 
@@ -280,6 +281,28 @@ output/
 
 ## Design Intent
 
+## Automation Guidance
+
+Phase 92 adds one bounded execution-guidance layer on top of the existing Action Sync and historical stack: `Automation Guidance`.
+
+Its job is narrow:
+
+- classify whether the strongest next move is `preview-safe`, `apply-manual`, `approval-first`, `follow-up-safe`, `manual-only`, or `quiet-safe`
+- surface command hints only when those hints stay inside existing authority boundaries
+- keep scheduled handoff and issue automation artifact-first rather than mutation-first
+
+Architecturally:
+
+- `src/action_sync_automation.py` owns the posture classification and safe-command packaging
+- `src/operator_control_center.py` carries the posture into `operator_summary` and queue items
+- `src/report_enrichment.py` packages the same wording across workbook, Markdown, HTML, review-pack, and scheduled handoff
+
+This layer does not widen write authority:
+
+- it does not auto-run `--writeback-apply`
+- it does not create a second executor
+- it does not change readiness, execution, monitoring, tuning, or historical-intelligence precedence
+
 The current architecture is optimized for one outcome: make the weekly portfolio loop clear enough that operators can trust the workbook, understand the control-center, and only move into managed execution when the local story is already coherent.
 
-That is the baseline the next historical-intelligence and automation phases should build on.
+That is the baseline the next roadmap arc should reassess after the bounded automation phase is complete.

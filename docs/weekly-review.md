@@ -115,6 +115,20 @@ That historical layer is powered by the `Intervention Ledger`. It is descriptive
 - it does not change Action Sync precedence
 - it helps you decide whether to keep investing attention in the same repo or treat the improvement as real
 
+Read `Automation Guidance` last, after readiness, apply packet, post-apply monitoring, campaign tuning, and historical intelligence:
+
+- `approval-first` means approval review must happen before any execution step should be treated as safe
+- `manual-only` means relapse, reopen, drift, or persistent pressure still needs human judgment first
+- `preview-safe` means the suggested preview command is the strongest safe next automation step
+- `apply-manual` means the apply command can be shown, but it stays human-only
+- `follow-up-safe` means only a non-mutating rerun, workbook refresh, control-center pass, or monitoring step is appropriate
+- `quiet-safe` means the portfolio is quiet enough that only housekeeping or quiet-run behavior should be automated
+
+That layer is intentionally bounded:
+- it never auto-runs `--writeback-apply`
+- it does not create a new executor
+- it helps the product decide whether a command hint is safe to surface, not whether a mutation should happen automatically
+
 ## Workbook gate reminder
 
 Use `make workbook-gate` only when you changed workbook-facing code or layout. Normal portfolio use does not require the workbook gate.

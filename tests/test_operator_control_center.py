@@ -7407,6 +7407,8 @@ def test_operator_snapshot_includes_action_sync_readiness_and_queue_handoff(tmp_
     assert "next_tuned_campaign" in summary
     assert "intervention_ledger_summary" in summary
     assert "next_historical_focus" in summary
+    assert "automation_guidance_summary" in summary
+    assert "next_safe_automation_step" in summary
     repo_item = next(item for item in snapshot["operator_queue"] if item.get("repo") == "RepoSecure")
     assert repo_item["suggested_campaign"] == "security-review"
     assert repo_item["action_sync_stage"] == "preview-ready"
@@ -7420,3 +7422,5 @@ def test_operator_snapshot_includes_action_sync_readiness_and_queue_handoff(tmp_
     assert "Campaign Tuning:" in repo_item["campaign_tuning_line"]
     assert repo_item["historical_intelligence_status"] == "insufficient-evidence"
     assert "Historical Portfolio Intelligence:" in repo_item["historical_intelligence_line"]
+    assert repo_item["automation_posture"] in {"preview-safe", "manual-only", "quiet-safe", "follow-up-safe", "approval-first", "apply-manual"}
+    assert "Automation Guidance:" in repo_item["automation_line"]

@@ -657,6 +657,9 @@ def _report_from_dict(data: dict) -> AuditReport:
         historical_portfolio_intelligence=data.get("historical_portfolio_intelligence", []),
         intervention_ledger_summary=data.get("intervention_ledger_summary", {}),
         next_historical_focus=data.get("next_historical_focus", {}),
+        action_sync_automation=data.get("action_sync_automation", []),
+        automation_guidance_summary=data.get("automation_guidance_summary", {}),
+        next_safe_automation_step=data.get("next_safe_automation_step", {}),
         security_posture=data.get("security_posture", {}),
         security_governance_preview=data.get("security_governance_preview", []),
         collections=data.get("collections", {}),
@@ -1959,6 +1962,9 @@ def _enrich_report_with_operator_state(
     report.historical_portfolio_intelligence = snapshot.get("historical_portfolio_intelligence", [])
     report.intervention_ledger_summary = snapshot.get("intervention_ledger_summary", {})
     report.next_historical_focus = snapshot.get("next_historical_focus", {})
+    report.action_sync_automation = snapshot.get("action_sync_automation", [])
+    report.automation_guidance_summary = snapshot.get("automation_guidance_summary", {})
+    report.next_safe_automation_step = snapshot.get("next_safe_automation_step", {})
     return report
 
 
@@ -2269,6 +2275,10 @@ def _print_output_summary(
         print_info(f"Historical portfolio intelligence: {report.intervention_ledger_summary.get('summary')}")
     if report.next_historical_focus.get("summary"):
         print_info(f"Next historical focus: {report.next_historical_focus.get('summary')}")
+    if report.automation_guidance_summary.get("summary"):
+        print_info(f"Automation guidance: {report.automation_guidance_summary.get('summary')}")
+    if report.next_safe_automation_step.get("summary"):
+        print_info(f"Next safe automation step: {report.next_safe_automation_step.get('summary')}")
     print_info(_normal_audit_next_step_hint(report.username))
 
 
