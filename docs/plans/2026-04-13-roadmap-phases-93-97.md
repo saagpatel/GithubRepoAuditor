@@ -1,13 +1,13 @@
 # Roadmap: Phases 93-97
 
 ## Current Status Snapshot
-- Shipped through **Phase 92**
-- Current baseline is `main`
-- No open PRs
-- Workbook automated gate passes; manual desktop Excel signoff remains a separate release step
-- Only intentional local residue is untracked `.serena/`
+- Release branch carries **Phase 96: Weekly Story Consolidation + Explainability Baseline**
+- **Phase 97** is the active closeout phase on this branch
+- Phase 95 scheduling remains explicitly deferred and quarantined from the tracked release boundary
+- Workbook automated gate still matters; manual desktop Excel signoff remains the final release step for workbook-facing changes
+- Git closeout is in progress on the Phase 97 release branch
 - The `88-92` roadmap arc is complete and now historical context only
-- **Phase 93** is the active target
+- Current dirty `main` work has been moved onto a feature branch for reconciliation and closeout
 
 ## Phase Closeout Standard
 Every phase from this roadmap is only complete when all of the following are true:
@@ -28,7 +28,7 @@ Every phase from this roadmap is only complete when all of the following are tru
 7. Planning restarts before implementation begins for the next phase.
 
 ## Phase 93: Unified Approval Workflow + Approval Ledger
-Status: Active
+Status: Complete
 
 Goal:
 - Create one local, artifact-first approval workflow that unifies governance approvals and approval-eligible campaign packets without widening write authority.
@@ -41,25 +41,25 @@ Key targets:
 - add workbook, Markdown, HTML, review-pack, scheduled-handoff, and approval-center parity
 
 ## Phase 94: Recurring Review + Follow-Up Handoff
-Status: Planned
+Status: Deferred on tracked baseline
 
 Goal:
 - Use the approval ledger plus the existing review and monitoring layers to manage approved-but-not-applied work, stale approvals, and recurring follow-up reminders without adding auto-apply behavior.
 
 ## Phase 95: Approval-Aware Portfolio Scheduling
-Status: Planned
+Status: Deferred and quarantined
 
 Goal:
 - Blend approval backlog, follow-up timing, and portfolio pressure into clearer weekly scheduling guidance while keeping execution human-led.
 
-## Phase 96: Evidence Pack Compression + Operator Explainability
-Status: Planned
+## Phase 96: Weekly Story Consolidation + Explainability Baseline
+Status: Complete on release branch
 
 Goal:
-- Make the operator story easier to skim by tightening summary wording, reducing repeated framing, and surfacing compact evidence packs for why a repo or campaign is being recommended.
+- Consolidate the weekly story into one shared `weekly_story_v1` contract, route the weekly-facing artifacts through that contract, and then compress repeated wording into compact evidence packs without rewriting raw operator targeting.
 
 ## Phase 97: Stability, Docs, and Release Hardening
-Status: Planned
+Status: Active on release branch
 
 Goal:
-- Consolidate the post-Phase-93 system into a calmer long-term baseline with stronger regression coverage, docs refresh, and release-readiness cleanup.
+- Reconcile the deferred Phase 94/95 residue, close the current local work end to end, and harden the post-Phase-96 system with stronger regression coverage, docs truthfulness, and release-readiness cleanup.

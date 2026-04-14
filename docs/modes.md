@@ -35,6 +35,17 @@ Goal:
 - read the workbook in order
 - decide what needs attention now versus what can safely wait
 
+Visible weekly surfaces now share one compact weekly-story contract:
+- one headline
+- one weekly decision
+- one next workflow step
+- the same ordered section set across workbook, Markdown, HTML, review-pack, and scheduled handoff
+
+Treat that as a reading aid, not a new queue:
+- it does not rewrite `primary_target`
+- it does not rewrite `what_to_do_next`
+- it keeps the visible weekly story aligned across surfaces
+
 Primary reading order:
 - `Dashboard`
 - `Run Changes`
@@ -165,6 +176,22 @@ Use that layer as workflow memory, not as execution:
 - it is surfaced through `--approval-center` plus the `Next Approval Review` line
 - it never widens write authority
 - it never makes `--writeback-apply` automatic
+
+The visible weekly sections should now read in a stable order:
+- `Weekly Priority`
+- `Action Sync Readiness`
+- `Apply Packet`
+- `Post-Apply Monitoring`
+- `Campaign Tuning`
+- `Historical Portfolio Intelligence`
+- `Automation Guidance`
+- `Approval Workflow`
+- `Operator Focus`
+
+Each section should answer the same three questions quickly:
+- what is the current state
+- what is the next safe step
+- what evidence is driving the call
 
 ## Default guidance
 

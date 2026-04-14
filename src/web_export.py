@@ -543,36 +543,39 @@ def _top_attention_section(data: dict) -> str:
     </div>"""
 
 
-def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> str:
-    weekly_pack = build_weekly_review_pack(report_data, diff_data)
-    attention_rows = []
-    for item in weekly_pack.get("top_attention", [])[:5]:
-        intent_alignment = (
-            f"{item.get('intent_alignment', 'missing-contract')}: "
-            f"{item.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.')}"
+def _weekly_story_evidence_list(items: list[dict]) -> str:
+    if not items:
+        return "<li>No supporting evidence is currently surfaced.</li>"
+    rows = []
+    for item in items[:5]:
+        command = f" [{escape(item.get('command_hint'))}]" if item.get("command_hint") else ""
+        rows.append(
+            f"<li><strong>{escape(item.get('label', 'Item'))}</strong> — {escape(item.get('summary', 'No evidence summary is recorded yet.'))}{command}</li>"
         )
-        attention_rows.append(
-            "<li>"
-            f"<strong>{escape(item.get('repo', 'Portfolio'))}:</strong> {escape(item.get('title', 'Operator attention item'))}"
-            f"<br><span class='muted'><strong>What Changed:</strong> {escape(item.get('last_movement', 'Current run'))}</span>"
-            f"<br><span class='muted'><strong>Why It Matters:</strong> {escape(item.get('why', 'Operator pressure is active.'))}</span>"
-            f"<br><span class='muted'><strong>What To Do Next:</strong> {escape(item.get('next_step', 'Review the latest state.'))}</span>"
-            f"<br><span class='muted'><strong>Operator Focus:</strong> {escape(item.get('operator_focus_line', 'Watch Closely: No operator focus bucket is currently surfaced.'))}</span>"
-            f"<br><span class='muted'><strong>Catalog:</strong> {escape(item.get('catalog_line', 'No portfolio catalog contract is recorded yet.'))}</span>"
-            f"<br><span class='muted'><strong>Intent Alignment:</strong> {escape(intent_alignment)}</span>"
-            f"<br><span class='muted'><strong>{escape(item.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.'))}</strong></span>"
-            f"<br><span class='muted'><strong>Maturity Gap:</strong> {escape(item.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.'))}</span>"
-            f"<br><span class='muted'><strong>Action Sync:</strong> {escape(item.get('action_sync_line', 'Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.'))}</span>"
-            f"<br><span class='muted'><strong>Apply Packet:</strong> {escape(item.get('apply_packet_line', 'Apply Packet: no current execution handoff is surfaced.'))}</span>"
-            f"<br><span class='muted'><strong>Post-Apply Monitoring:</strong> {escape(item.get('post_apply_line', 'Post-Apply Monitoring: no recent Action Sync apply needs follow-up yet.'))}</span>"
-            f"<br><span class='muted'><strong>Campaign Tuning:</strong> {escape(item.get('campaign_tuning_line', 'Campaign Tuning: recommendations stay neutral until more outcome history is available.'))}</span>"
-            f"<br><span class='muted'><strong>{ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}:</strong> {escape(item.get('automation_line', 'Automation Guidance: keep the next step human-led until a bounded safe posture is surfaced.'))}</span>"
-            f"<br><span class='muted'><strong>{ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}:</strong> {escape(item.get('approval_line', 'Approval Workflow: no current approval needs review yet.'))}</span>"
-            f"<br><span class='muted'><strong>Checkpoint Timing:</strong> {escape(item.get('follow_through_checkpoint_timing', 'Unknown'))}</span>"
-            f"<br><span class='muted'><strong>Next Checkpoint:</strong> {escape(item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</span>"
-            "</li>"
-        )
+    return "".join(rows)
 
+
+def _weekly_story_blocks(weekly_pack: dict) -> str:
+    story = weekly_pack.get("weekly_story_v1") or {}
+    blocks = []
+    for section in story.get("sections") or []:
+        if section.get("id") == "weekly-priority":
+            continue
+        blocks.append(
+            f"""
+            <div class="panel">
+              <h3>{escape(section.get('label', 'Weekly Story'))}</h3>
+              <div class="meta-line"><strong>Summary:</strong> {escape(section.get('headline', 'No section summary is recorded yet.'))}</div>
+              <div class="meta-line"><strong>{escape(section.get('next_label', 'Next Step'))}:</strong> {escape(section.get('next_step', 'No next step is recorded yet.'))}</div>
+              <div class="meta-line"><strong>State:</strong> {escape(section.get('state', 'idle'))}</div>
+              <ul class="bullet-list">{_weekly_story_evidence_list(list(section.get('evidence_items') or []))}</ul>
+            </div>
+            """
+        )
+    return "".join(blocks)
+
+
+def _operator_focus_blocks(weekly_pack: dict) -> str:
     focus_sections = [
         ("Act Now", weekly_pack.get("top_act_now_items", []), "No immediate-action hotspots are currently surfaced."),
         ("Watch Closely", weekly_pack.get("top_watch_closely_items", []), "No watch-closely hotspots are currently surfaced."),
@@ -580,35 +583,55 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
         ("Fragile", weekly_pack.get("top_fragile_items", []), "No fragile hotspots are currently surfaced."),
         ("Revalidate", weekly_pack.get("top_revalidate_items", []), "No revalidation hotspots are currently surfaced."),
     ]
-    focus_blocks = []
+    blocks = []
     for label, items, empty_message in focus_sections:
-        rows = []
-        for item in items[:3]:
-            item_label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
-            rows.append(
-                f"<li><strong>{escape(item_label)}</strong> — {escape(item.get('operator_focus_summary', 'No operator focus bucket is currently surfaced.'))}</li>"
-            )
-        focus_blocks.append(
-            f"<h3>{escape(label)}</h3><ul class='bullet-list'>{''.join(rows) or f'<li>{escape(empty_message)}</li>'}</ul>"
+        if items:
+            row_parts = []
+            for item in items[:3]:
+                item_label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+                row_parts.append(
+                    f"<li><strong>{escape(item_label)}</strong>"
+                    f" — {escape(item.get('operator_focus_summary', 'No operator focus bucket is currently surfaced.'))}</li>"
+                )
+            rows = "".join(row_parts)
+        else:
+            rows = f"<li>{escape(empty_message)}</li>"
+        blocks.append(
+            f"<div class='meta-line'><strong>{escape(label)}:</strong></div>"
+            f"<ul class='bullet-list'>{rows}</ul>"
         )
+    return "".join(blocks)
 
-    readiness_sections = [
-        ("Apply Ready", weekly_pack.get("top_apply_ready_campaigns", []), "No campaigns are currently apply-ready."),
-        ("Preview Ready", weekly_pack.get("top_preview_ready_campaigns", []), "No campaigns are currently preview-ready."),
-        ("Drift Review", weekly_pack.get("top_drift_review_campaigns", []), "No campaigns are currently waiting on drift review."),
-        ("Blocked", weekly_pack.get("top_blocked_campaigns", []), "No campaigns are currently blocked."),
-    ]
-    readiness_blocks = []
-    for label, items, empty_message in readiness_sections:
-        rows = []
-        for item in items[:3]:
-            rows.append(
-                f"<li><strong>{escape(item.get('label', item.get('campaign_type', 'Campaign')))}</strong> — "
-                f"{escape(item.get('reason', 'No readiness reason is recorded yet.'))} "
-                f"<span class='muted'>(target {escape(item.get('recommended_target', 'none'))})</span></li>"
-            )
-        readiness_blocks.append(
-            f"<h3>{escape(label)}</h3><ul class='bullet-list'>{''.join(rows) or f'<li>{escape(empty_message)}</li>'}</ul>"
+
+def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> str:
+    weekly_pack = build_weekly_review_pack(report_data, diff_data)
+    story_blocks = _weekly_story_blocks(weekly_pack)
+    operator_focus_blocks = _operator_focus_blocks(weekly_pack)
+    attention_rows = []
+    for item in weekly_pack.get("top_attention", [])[:5]:
+        intent_alignment = (
+            f"{item.get('intent_alignment', 'missing-contract')}: "
+            f"{item.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.')}"
+        )
+        attention_evidence = "; ".join(
+            f"{e.get('label', 'Item')}: {e.get('summary', 'No evidence summary is recorded yet.')}"
+            for e in (item.get("evidence_strip") or [])[:4]
+        ) or "No supporting evidence is currently surfaced."
+        attention_rows.append(
+            "<li>"
+            f"<strong>{escape(item.get('repo', 'Portfolio'))}:</strong> {escape(item.get('title', 'Operator attention item'))}"
+            f"<br><span class='muted'><strong>What Changed:</strong> {escape(item.get('last_movement', 'Current run'))}</span>"
+            f"<br><span class='muted'><strong>Why It Matters:</strong> {escape(item.get('why_it_won', item.get('why', 'Operator pressure is active.')))}</span>"
+            f"<br><span class='muted'><strong>What To Do Next:</strong> {escape(item.get('next_step', 'Review the latest state.'))}</span>"
+            f"<br><span class='muted'><strong>Operator Focus:</strong> {escape(item.get('operator_focus_line', 'Watch Closely: No operator focus bucket is currently surfaced.'))}</span>"
+            f"<br><span class='muted'><strong>Catalog:</strong> {escape(item.get('catalog_line', 'No portfolio catalog contract is recorded yet.'))}</span>"
+            f"<br><span class='muted'><strong>Intent Alignment:</strong> {escape(intent_alignment)}</span>"
+            f"<br><span class='muted'><strong>{escape(item.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.'))}</strong></span>"
+            f"<br><span class='muted'><strong>Maturity Gap:</strong> {escape(item.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.'))}</span>"
+            f"<br><span class='muted'><strong>Evidence:</strong> {escape(attention_evidence)}</span>"
+            f"<br><span class='muted'><strong>Checkpoint Timing:</strong> {escape(item.get('follow_through_checkpoint_timing', 'Unknown'))}</span>"
+            f"<br><span class='muted'><strong>Next Checkpoint:</strong> {escape(item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</span>"
+            "</li>"
         )
 
     repo_cards = []
@@ -619,21 +642,15 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
               <h3><a href="#{escape(briefing.get('anchor', 'repo'), quote=True)}">{escape(briefing.get('headline', briefing.get('repo', 'Repo briefing')))}</a></h3>
               <div class="meta-line"><strong>Current State:</strong> {escape(briefing.get('current_state_line', 'No current-state summary is recorded yet.'))}</div>
               <div class="meta-line"><strong>What Changed:</strong> {escape(briefing.get('what_changed_line', 'No change summary is recorded yet.'))}</div>
-              <div class="meta-line"><strong>Why It Matters:</strong> {escape(briefing.get('why_it_matters_line', 'No explanation summary is recorded yet.'))}</div>
+              <div class="meta-line"><strong>Why It Matters:</strong> {escape(briefing.get('why_it_won', briefing.get('why_it_matters_line', 'No explanation summary is recorded yet.')))}</div>
               <div class="meta-line"><strong>Where To Start:</strong> {escape(briefing.get('where_to_start_summary', 'No meaningful implementation hotspot is currently surfaced.'))}</div>
-              <div class="meta-line"><strong>What To Do Next:</strong> {escape(briefing.get('what_to_do_next_line', 'No next action is recorded yet.'))}</div>
+              <div class="meta-line"><strong>What To Do Next:</strong> {escape(briefing.get('next_step', briefing.get('what_to_do_next_line', 'No next action is recorded yet.')))}</div>
               <div class="meta-line"><strong>Operator Focus:</strong> {escape(briefing.get('operator_focus_line', 'Watch Closely: No operator focus bucket is currently surfaced.'))}</div>
               <div class="meta-line"><strong>Catalog:</strong> {escape(briefing.get('catalog_line', 'No portfolio catalog contract is recorded yet.'))}</div>
               <div class="meta-line"><strong>Intent Alignment:</strong> {escape(briefing.get('intent_alignment_line', 'missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.'))}</div>
               <div class="meta-line"><strong>{escape(briefing.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.'))}</strong></div>
               <div class="meta-line"><strong>Maturity Gap:</strong> {escape(briefing.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.'))}</div>
-              <div class="meta-line"><strong>Action Sync:</strong> {escape(briefing.get('action_sync_line', 'Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.'))}</div>
-              <div class="meta-line"><strong>Apply Packet:</strong> {escape(briefing.get('apply_packet_line', 'Apply Packet: no current execution handoff is surfaced.'))}</div>
-              <div class="meta-line"><strong>Post-Apply Monitoring:</strong> {escape(briefing.get('post_apply_line', 'Post-Apply Monitoring: no recent Action Sync apply needs follow-up yet.'))}</div>
-              <div class="meta-line"><strong>Campaign Tuning:</strong> {escape(briefing.get('campaign_tuning_line', 'Campaign Tuning: recommendations stay neutral until more outcome history is available.'))}</div>
-              <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['historical_portfolio_intelligence']}:</strong> {escape(briefing.get('historical_intelligence_line', 'Historical Portfolio Intelligence: keep the weekly story anchored in the current run until more cross-run evidence accumulates.'))}</div>
-              <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}:</strong> {escape(briefing.get('automation_line', 'Automation Guidance: keep the next step human-led until a bounded safe posture is surfaced.'))}</div>
-              <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}:</strong> {escape(briefing.get('approval_line', 'Approval Workflow: no current approval needs review yet.'))}</div>
+              <div class="meta-line"><strong>Evidence:</strong> {escape('; '.join(f"{e.get('label', 'Item')}: {e.get('summary', 'No evidence summary is recorded yet.')}" for e in (briefing.get('evidence_strip') or [])[:4]) or 'No supporting evidence is currently surfaced.')}</div>
               <div class="meta-line"><strong>Checkpoint Timing:</strong> {escape(briefing.get('checkpoint_timing_line', 'Unknown'))}</div>
               <div class="meta-line"><strong>What Would Count As Progress:</strong> {escape(briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</div>
             </div>
@@ -675,49 +692,10 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
           <div class="meta-line"><strong>Next Safe Automation Step:</strong> {escape(weekly_pack.get('next_safe_automation_step', 'Stay local for now; no current campaign has a stronger safe automation posture than manual review.'))}</div>
           <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}:</strong> {escape(weekly_pack.get('approval_workflow_summary', 'No current approval needs review yet, so the approval workflow can stay local for now.'))}</div>
           <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['next_approval_review']}:</strong> {escape(weekly_pack.get('next_approval_review', 'Stay local for now; no current approval needs review.'))}</div>
-          <h3>{ACTION_SYNC_CANONICAL_LABELS['readiness']}</h3>
-          {''.join(readiness_blocks)}
-          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['apply_packet']}:</strong> {escape(weekly_pack.get('apply_readiness_summary', 'No current campaign has a safe execution handoff yet, so the local story should stay local for now.'))}</div>
-          <div class="meta-line"><strong>Next Apply Candidate:</strong> {escape(weekly_pack.get('next_apply_candidate', 'Stay local for now; no current campaign has a safe execution handoff.'))}</div>
-          <div class="meta-line"><strong>Action Sync Command Hint:</strong> {escape(weekly_pack.get('action_sync_command_hint', 'No Action Sync command is recommended yet.'))}</div>
-          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['post_apply_monitoring']}:</strong> {escape(weekly_pack.get('campaign_outcomes_summary', 'No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.'))}</div>
-          <div class="meta-line"><strong>Next Monitoring Step:</strong> {escape(weekly_pack.get('next_monitoring_step', 'Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.'))}</div>
-          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['campaign_tuning']}:</strong> {escape(weekly_pack.get('campaign_tuning_summary', 'Campaign tuning stays neutral until there is enough outcome history to bias tied recommendations.'))}</div>
-          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}:</strong> {escape(weekly_pack.get('next_tie_break_candidate', weekly_pack.get('next_tuned_campaign', 'No current campaign needs a tie-break candidate yet.')))}</div>
-          {''.join(f"<div class='meta-line'><strong>Ready To Apply:</strong> {escape(item.get('label', item.get('campaign_type', 'Campaign')))} — {escape(item.get('summary', 'No packet summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_ready_to_apply_packets', [])[:3])}
-          {''.join(f"<div class='meta-line'><strong>Needs Approval:</strong> {escape(item.get('label', item.get('campaign_type', 'Campaign')))} — {escape(item.get('summary', 'No packet summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_needs_approval_packets', [])[:3])}
-          {''.join(f"<div class='meta-line'><strong>Review Drift:</strong> {escape(item.get('label', item.get('campaign_type', 'Campaign')))} — {escape(item.get('summary', 'No packet summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_review_drift_packets', [])[:3])}
-          {''.join(f"<div class='meta-line'><strong>Drift Returned:</strong> {escape(item.get('label', item.get('campaign_type', 'Campaign')))} — {escape(item.get('summary', 'No post-apply monitoring summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_drift_returned_campaigns', [])[:3])}
-          {''.join(f"<div class='meta-line'><strong>Reopened:</strong> {escape(item.get('label', item.get('campaign_type', 'Campaign')))} — {escape(item.get('summary', 'No post-apply monitoring summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_reopened_campaigns', [])[:3])}
-          {''.join(f"<div class='meta-line'><strong>Monitor Now:</strong> {escape(item.get('label', item.get('campaign_type', 'Campaign')))} — {escape(item.get('summary', 'No post-apply monitoring summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_monitor_now_campaigns', [])[:3])}
-          {''.join(f"<div class='meta-line'><strong>Holding Clean:</strong> {escape(item.get('label', item.get('campaign_type', 'Campaign')))} — {escape(item.get('summary', 'No post-apply monitoring summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_holding_clean_campaigns', [])[:3])}
-          {''.join(f"<div class='meta-line'><strong>Proven:</strong> {escape(item.get('label', item.get('campaign_type', 'Campaign')))} — {escape(item.get('summary', 'No campaign tuning summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_proven_campaigns', [])[:3])}
-          {''.join(f"<div class='meta-line'><strong>Caution:</strong> {escape(item.get('label', item.get('campaign_type', 'Campaign')))} — {escape(item.get('summary', 'No campaign tuning summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_caution_campaigns', [])[:3])}
-          {''.join(f"<div class='meta-line'><strong>Thin Evidence:</strong> {escape(item.get('label', item.get('campaign_type', 'Campaign')))} — {escape(item.get('summary', 'No campaign tuning summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_thin_evidence_campaigns', [])[:3])}
-          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['historical_portfolio_intelligence']}:</strong> {escape(weekly_pack.get('historical_portfolio_intelligence', 'Historical portfolio intelligence is still thin, so the weekly story should stay grounded in the current run and recent operator queue.'))}</div>
-          <div class="meta-line"><strong>Next Historical Focus:</strong> {escape(weekly_pack.get('next_historical_focus', 'Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet.'))}</div>
-          {''.join(f"<div class='meta-line'><strong>Relapsing:</strong> {escape(item.get('repo', 'Repo'))} — {escape(item.get('summary', 'No historical intelligence summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_relapsing_repos', [])[:3])}
-          {''.join(f"<div class='meta-line'><strong>Persistent Pressure:</strong> {escape(item.get('repo', 'Repo'))} — {escape(item.get('summary', 'No historical intelligence summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_persistent_pressure_repos', [])[:3])}
-          {''.join(f"<div class='meta-line'><strong>Improving After Intervention:</strong> {escape(item.get('repo', 'Repo'))} — {escape(item.get('summary', 'No historical intelligence summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_improving_repos', [])[:3])}
-          {''.join(f"<div class='meta-line'><strong>Holding Steady:</strong> {escape(item.get('repo', 'Repo'))} — {escape(item.get('summary', 'No historical intelligence summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_holding_repos', [])[:3])}
-          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}:</strong> {escape(weekly_pack.get('automation_guidance_summary', 'Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture.'))}</div>
-          <div class="meta-line"><strong>Next Safe Automation Step:</strong> {escape(weekly_pack.get('next_safe_automation_step', 'Stay local for now; no current campaign has a stronger safe automation posture than manual review.'))}</div>
-          {''.join(f"<div class='meta-line'><strong>Preview Safe:</strong> {escape(item.get('label', item.get('campaign_type', 'Campaign')))} — {escape(item.get('summary', 'No automation guidance summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_preview_safe_campaigns', [])[:3])}
-          {''.join(f"<div class='meta-line'><strong>Apply Manual:</strong> {escape(item.get('label', item.get('campaign_type', 'Campaign')))} — {escape(item.get('summary', 'No automation guidance summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_apply_manual_campaigns', [])[:3])}
-          {''.join(f"<div class='meta-line'><strong>Approval First:</strong> {escape(item.get('label', item.get('campaign_type', 'Campaign')))} — {escape(item.get('summary', 'No automation guidance summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_approval_first_campaigns', [])[:3])}
-          {''.join(f"<div class='meta-line'><strong>Follow-Up Safe:</strong> {escape(item.get('label', item.get('campaign_type', 'Campaign')))} — {escape(item.get('summary', 'No automation guidance summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_follow_up_safe_campaigns', [])[:3])}
-          {''.join(f"<div class='meta-line'><strong>Manual Only:</strong> {escape(item.get('label', item.get('campaign_type', 'Campaign')))} — {escape(item.get('summary', 'No automation guidance summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_manual_only_campaigns', [])[:3])}
-          {''.join(f"<div class='meta-line'><strong>Needs Re-Approval:</strong> {escape(item.get('label', item.get('subject_key', 'Approval')))} — {escape(item.get('summary', 'No approval summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_needs_reapproval_approvals', [])[:3])}
-          {''.join(f"<div class='meta-line'><strong>Ready For Review:</strong> {escape(item.get('label', item.get('subject_key', 'Approval')))} — {escape(item.get('summary', 'No approval summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_ready_for_review_approvals', [])[:3])}
-          {''.join(f"<div class='meta-line'><strong>{ACTION_SYNC_CANONICAL_LABELS['approved_but_manual']}:</strong> {escape(item.get('label', item.get('subject_key', 'Approval')))} — {escape(item.get('summary', 'No approval summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_approved_manual_approvals', [])[:3])}
-          {''.join(f"<div class='meta-line'><strong>Blocked Approval:</strong> {escape(item.get('label', item.get('subject_key', 'Approval')))} — {escape(item.get('summary', 'No approval summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_blocked_approvals', [])[:3])}
+          {story_blocks}
           <div class="meta-line"><strong>Operator Focus:</strong> {escape(weekly_pack.get('operator_focus_summary', 'No operator focus bucket is currently surfaced.'))}</div>
           <div class="meta-line"><strong>Next Checkpoint:</strong> {escape(weekly_pack.get('follow_through_checkpoint_summary', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</div>
-          <h3>Operator Focus</h3>
-          <div class="meta-line"><strong>Summary:</strong> {escape(weekly_pack.get('operator_focus_summary', 'No operator focus bucket is currently surfaced.'))}</div>
-          {''.join(f"<div class='meta-line'><strong>Scorecard Gap:</strong> {escape(item.get('repo', 'Repo'))} — {escape(item.get('summary', 'Below target.'))}</div>" for item in weekly_pack.get('top_below_target_scorecard_items', [])[:5])}
-          <div class="meta-line"><strong>Next Checkpoint:</strong> {escape(weekly_pack.get('follow_through_checkpoint_summary', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</div>
-          {''.join(focus_blocks)}
+          {operator_focus_blocks}
           <h3>Top Attention</h3>
           <ul class="bullet-list">{''.join(attention_rows) or '<li>No urgent attention items are currently surfaced.</li>'}</ul>
         </div>
@@ -842,7 +820,7 @@ def _repo_table(analyst_context: dict, score_history: dict[str, list[float]] | N
     for entry in analyst_context["ranked_audits"]:
         a = entry["audit"]
         m = a.get("metadata", {})
-        explanation = a.get("score_explanation") or build_score_explanation(a)
+        explanation = a.get("score_explanation") or build_score_explanation(a) or {}
         name = m.get("name", "")
         grade = a.get("grade", "F")
         score = a.get("overall_score", 0)

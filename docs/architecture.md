@@ -10,6 +10,8 @@ GitHub Repo Auditor is now a workbook-first portfolio operating system, not just
 
 The same weekly story is rendered across workbook, Markdown, HTML, review-pack, and scheduled handoff. The workbook remains the flagship surface, while the other artifacts mirror the same compressed interpretation so operators do not have to relearn the product by surface.
 
+The weekly packaging seam now has an explicit structured contract, `weekly_story_v1`, inside `build_weekly_review_pack(...)`. That contract gives the visible weekly surfaces one shared summary, next-step, section order, and evidence-strip model instead of letting each renderer invent its own condensed story.
+
 ## Product Shape
 
 The shipped system now has five major layers:
@@ -50,7 +52,7 @@ The current module boundaries are intentionally explicit:
 - `src/operator_control_center.py`
   Raw operator state assembly, queue shaping, priority logic, and follow-through families.
 - `src/report_enrichment.py`
-  Compressed wording and parity layer for workbook, Markdown, HTML, review-pack, and scheduled handoff.
+  Shared weekly packaging, compact explainability, and parity layer for workbook, Markdown, HTML, review-pack, and scheduled handoff.
 - `src/action_sync_readiness.py`
   Readiness-stage logic for deciding whether a campaign should stay local, preview next, apply next, or stop for drift/blockers.
 - `src/action_sync_packets.py`
@@ -87,6 +89,12 @@ The generated artifact set is intentionally parallel:
 
 Those surfaces should not invent different meanings. They all consume the same enriched weekly summary layer so headings, summary lines, and next-step guidance stay aligned.
 
+Phase 96 tightens that rule:
+
+- workbook, Markdown, HTML, review-pack, and scheduled handoff should all read from the same `weekly_story_v1` structure
+- renderer-specific formatting is still allowed
+- renderer-specific section selection, local winner selection, and ad hoc summary invention are not
+
 ## Operator Model
 
 The operator system has two architectural layers:
@@ -110,6 +118,7 @@ The compressed layer exposes the primary workbook-friendly story:
 - operator focus buckets
 - follow-through checkpoints
 - operator outcomes and effectiveness
+- structured weekly sections with compact evidence items
 
 That split keeps the workbook fast to read without losing the historical or machine-facing detail underneath.
 
@@ -216,6 +225,31 @@ Architecturally, this keeps the split clean:
 - `src/intervention_ledger.py` owns cross-run historical synthesis
 - `src/operator_control_center.py` carries those results into `operator_summary` and queue items
 - `src/report_enrichment.py` packages the same historical story across workbook, Markdown, HTML, review-pack, and scheduled handoff
+
+## Weekly Story Contract
+
+The visible weekly surfaces now share one section-based contract:
+
+- `headline`
+- `decision`
+- `why_this_week`
+- `next_step`
+- `section_order`
+- `sections[]`
+
+Each section is intentionally compact:
+
+- `id`
+- `label`
+- `state`
+- `headline`
+- `next_step`
+- `reason_codes[]`
+- `evidence_items[]`
+
+That contract is not a new source of truth for raw portfolio priority. It is the shared explanation layer that sits on top of the raw operator, Action Sync, and enrichment state so the visible weekly artifacts stay aligned while remaining easier to scan.
+
+The tracked release boundary currently stops there. Approval-aware weekly scheduling remains a deferred design thread and is not a second weekly authority in the shipped architecture.
 
 ## Warehouse And Regeneration
 

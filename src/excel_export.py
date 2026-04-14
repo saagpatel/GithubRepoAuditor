@@ -7266,6 +7266,8 @@ def _build_print_pack(
     ) = _operator_transition_closure_values(data)
     calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
     weekly_pack = build_weekly_review_pack(data, diff_data)
+    weekly_story = weekly_pack.get("weekly_story_v1") or {}
+    weekly_sections = {section.get("id"): section for section in weekly_story.get("sections") or []}
     operator_focus, operator_focus_summary, operator_focus_line = _operator_focus_snapshot(weekly_pack)
     ws["D4"] = "Workflow Guidance"
     ws["D4"].font = SECTION_FONT
@@ -7288,16 +7290,19 @@ def _build_print_pack(
         "action_sync_summary",
         "No current campaign needs Action Sync yet, so the safest next move is to keep the story local.",
     )
+    ws["E9"] = (weekly_sections.get("action-sync-readiness") or {}).get("headline", ws["E9"].value)
     ws["D10"] = "Next Action Sync Step"
     ws["E10"] = weekly_pack.get(
         "next_action_sync_step",
         "Stay local for now; no current campaign needs preview or apply.",
     )
+    ws["E10"] = (weekly_sections.get("action-sync-readiness") or {}).get("next_step", ws["E10"].value)
     ws["D11"] = "Apply Packet"
     ws["E11"] = weekly_pack.get(
         "apply_readiness_summary",
         "No current campaign has a safe execution handoff yet, so the local story should stay local for now.",
     )
+    ws["E11"] = (weekly_sections.get("apply-packet") or {}).get("headline", ws["E11"].value)
     ws["D12"] = "Command Hint"
     ws["E12"] = weekly_pack.get(
         "action_sync_command_hint",
@@ -7313,46 +7318,55 @@ def _build_print_pack(
         "next_monitoring_step",
         "Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.",
     )
+    ws["E14"] = (weekly_sections.get("post-apply-monitoring") or {}).get("next_step", ws["E14"].value)
     ws["D15"] = ACTION_SYNC_CANONICAL_LABELS["campaign_tuning"]
     ws["E15"] = weekly_pack.get(
         "campaign_tuning_summary",
         "Campaign tuning is neutral because there is not enough outcome history yet to bias tied recommendations.",
     )
+    ws["E15"] = (weekly_sections.get("campaign-tuning") or {}).get("headline", ws["E15"].value)
     ws["D16"] = ACTION_SYNC_CANONICAL_LABELS["next_tie_break_candidate"]
     ws["E16"] = weekly_pack.get(
         "next_tuned_campaign",
         "No current campaign needs a tuning tie-break yet.",
     )
+    ws["E16"] = (weekly_sections.get("campaign-tuning") or {}).get("next_step", ws["E16"].value)
     ws["D17"] = ACTION_SYNC_CANONICAL_LABELS["historical_portfolio_intelligence"]
     ws["E17"] = weekly_pack.get(
         "historical_portfolio_intelligence",
         "Historical portfolio intelligence is still thin, so the weekly story should stay grounded in the current run and recent operator queue.",
     )
+    ws["E17"] = (weekly_sections.get("historical-portfolio-intelligence") or {}).get("headline", ws["E17"].value)
     ws["D18"] = "Next Historical Focus"
     ws["E18"] = weekly_pack.get(
         "next_historical_focus",
         "Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet.",
     )
+    ws["E18"] = (weekly_sections.get("historical-portfolio-intelligence") or {}).get("next_step", ws["E18"].value)
     ws["D19"] = ACTION_SYNC_CANONICAL_LABELS["automation_guidance"]
     ws["E19"] = weekly_pack.get(
         "automation_guidance_summary",
         "Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture.",
     )
+    ws["E19"] = (weekly_sections.get("automation-guidance") or {}).get("headline", ws["E19"].value)
     ws["D20"] = "Next Safe Automation Step"
     ws["E20"] = weekly_pack.get(
         "next_safe_automation_step",
         "Stay local for now; no current campaign has a stronger safe automation posture than manual review.",
     )
+    ws["E20"] = (weekly_sections.get("automation-guidance") or {}).get("next_step", ws["E20"].value)
     ws["D21"] = ACTION_SYNC_CANONICAL_LABELS["approval_workflow"]
     ws["E21"] = weekly_pack.get(
         "approval_workflow_summary",
         "No current approval needs review yet, so the approval workflow can stay local for now.",
     )
+    ws["E21"] = (weekly_sections.get("approval-workflow") or {}).get("headline", ws["E21"].value)
     ws["D22"] = ACTION_SYNC_CANONICAL_LABELS["next_approval_review"]
     ws["E22"] = weekly_pack.get(
         "next_approval_review",
         "Stay local for now; no current approval needs review.",
     )
+    ws["E22"] = (weekly_sections.get("approval-workflow") or {}).get("next_step", ws["E22"].value)
     ws["A7"] = "Portfolio Headline"
     ws["B7"] = weekly_pack.get("portfolio_headline", operator_summary.get("headline", "Review the latest workbook surfaces for change and drift."))
     ws["A8"] = "Queue Pressure"
@@ -7366,7 +7380,7 @@ def _build_print_pack(
     ws["A9"] = "Run Changes"
     ws["B9"] = weekly_pack.get("run_change_summary", build_run_change_summary(diff_data))
     ws["A10"] = "What To Do This Week"
-    ws["B10"] = weekly_pack.get("what_to_do_this_week", next_action)
+    ws["B10"] = weekly_story.get("decision", weekly_pack.get("what_to_do_this_week", next_action))
     ws["A11"] = "Trust / Actionability"
     ws["B11"] = weekly_pack.get("trust_actionability_summary", build_trust_actionability_summary(data))
     ws["A12"] = "Top Attention Items"
@@ -7374,9 +7388,9 @@ def _build_print_pack(
     ws["A13"] = "What Changed"
     ws["B13"] = what_changed or weekly_pack.get("run_change_summary", build_run_change_summary(diff_data))
     ws["A14"] = "Why It Matters"
-    ws["B14"] = why_it_matters or weekly_pack.get("queue_pressure_summary", build_queue_pressure_summary(data, diff_data))
+    ws["B14"] = why_it_matters or weekly_story.get("why_this_week", weekly_pack.get("queue_pressure_summary", build_queue_pressure_summary(data, diff_data)))
     ws["A15"] = "Decision This Week"
-    ws["B15"] = next_action or weekly_pack.get("what_to_do_this_week", build_top_recommendation_summary(data))
+    ws["B15"] = next_action or weekly_story.get("decision", weekly_pack.get("what_to_do_this_week", build_top_recommendation_summary(data)))
     ws["A16"] = "Follow-Through"
     ws["B16"] = f"{operator_focus_line} Next checkpoint: {follow_through_checkpoint}".strip()
     if excel_mode == "standard":
@@ -7501,14 +7515,14 @@ def _build_print_pack(
     for offset, item in enumerate(top_attention_rows, 1):
         ws.cell(row=risk_start_row + offset, column=1, value=item.get("repo", "Portfolio"))
         ws.cell(row=risk_start_row + offset, column=2, value=item.get("operator_focus", item.get("lane", "ready")))
-        ws.cell(row=risk_start_row + offset, column=3, value=item.get("why", "Operator pressure is active."))
+        ws.cell(row=risk_start_row + offset, column=3, value=item.get("why_it_won", item.get("why", "Operator pressure is active.")))
         ws.cell(row=risk_start_row + offset, column=4, value=item.get("next_step", "Review the latest state."))
     ws[f"E{opportunity_header_row}"] = "Top Repo Drilldowns"
     ws[f"E{opportunity_header_row}"].font = SECTION_FONT
     top_repo_briefings = weekly_pack.get("repo_briefings", [])[:3]
     for offset, briefing in enumerate(top_repo_briefings, 1):
         ws.cell(row=opportunity_header_row + offset, column=5, value=briefing.get("repo", ""))
-        ws.cell(row=opportunity_header_row + offset, column=6, value=briefing.get("operator_focus_line", "Watch Closely: No operator focus bucket is currently surfaced."))
+        ws.cell(row=opportunity_header_row + offset, column=6, value=briefing.get("next_step", briefing.get("operator_focus_line", "Watch Closely: No operator focus bucket is currently surfaced.")))
     ws.cell(row=page2_row, column=1, value="Page 2: Changes and Governance").font = SECTION_FONT
     ws.cell(row=page2_row + 1, column=1, value="Top Material Change Families").font = SUBHEADER_FONT
     change_rows = [[label, count] for label, count in _summarize_top_issue_families(data.get("material_changes", []) or [], limit=6)]
