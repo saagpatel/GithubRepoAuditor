@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import src.operator_control_center as operator_control_center
+import src.operator_follow_through as operator_follow_through
+import src.operator_resolution_trend as operator_resolution_trend
 from src.operator_control_center import (
     build_operator_snapshot,
     normalize_review_state,
@@ -950,7 +952,7 @@ def test_project_queue_follow_through_marks_overdue_untouched_items_for_escalati
         }
     }
 
-    enriched = operator_control_center._project_queue_follow_through(
+    enriched = operator_follow_through._project_queue_follow_through(
         queue,
         recent_runs=recent_runs,
         resolution_trend=resolution_trend,
@@ -996,7 +998,7 @@ def test_project_queue_follow_through_keeps_recent_waiting_items_on_watch():
         }
     }
 
-    enriched = operator_control_center._project_queue_follow_through(
+    enriched = operator_follow_through._project_queue_follow_through(
         queue,
         recent_runs=recent_runs,
         resolution_trend=resolution_trend,
@@ -1055,7 +1057,7 @@ def test_project_queue_follow_through_marks_calmer_post_escalation_items_as_reco
         }
     }
 
-    enriched = operator_control_center._project_queue_follow_through(
+    enriched = operator_follow_through._project_queue_follow_through(
         queue,
         recent_runs=recent_runs,
         resolution_trend=resolution_trend,
@@ -1115,7 +1117,7 @@ def test_project_queue_follow_through_marks_one_quiet_run_as_retiring_watch():
         }
     }
 
-    enriched = operator_control_center._project_queue_follow_through(
+    enriched = operator_follow_through._project_queue_follow_through(
         queue,
         recent_runs=recent_runs,
         resolution_trend=resolution_trend,
@@ -1187,7 +1189,7 @@ def test_project_queue_follow_through_marks_two_quiet_runs_as_retired():
         }
     }
 
-    enriched = operator_control_center._project_queue_follow_through(
+    enriched = operator_follow_through._project_queue_follow_through(
         queue,
         recent_runs=recent_runs,
         resolution_trend=resolution_trend,
@@ -1253,7 +1255,7 @@ def test_project_queue_follow_through_marks_relapses_after_quiet_runs():
         }
     }
 
-    enriched = operator_control_center._project_queue_follow_through(
+    enriched = operator_follow_through._project_queue_follow_through(
         queue,
         recent_runs=recent_runs,
         resolution_trend=resolution_trend,
@@ -1338,7 +1340,7 @@ def test_project_queue_follow_through_marks_multi_run_retired_states_as_sustaine
         }
     }
 
-    enriched = operator_control_center._project_queue_follow_through(
+    enriched = operator_follow_through._project_queue_follow_through(
         queue,
         recent_runs=recent_runs,
         resolution_trend=resolution_trend,
@@ -1435,7 +1437,7 @@ def test_project_queue_follow_through_marks_repeated_recovery_flips_as_churn():
         }
     }
 
-    enriched = operator_control_center._project_queue_follow_through(
+    enriched = operator_follow_through._project_queue_follow_through(
         queue,
         recent_runs=recent_runs,
         resolution_trend=resolution_trend,
@@ -1451,7 +1453,7 @@ def test_project_queue_follow_through_marks_repeated_recovery_flips_as_churn():
 def test_follow_through_reacquisition_durability_progresses_from_new_to_durable():
     item = {"repo": "RepoD", "title": "RepoD drift needs review"}
 
-    age_runs, status, reason, summary = operator_control_center._follow_through_reacquisition_durability_projection(
+    age_runs, status, reason, summary = operator_follow_through._follow_through_reacquisition_durability_projection(
         item,
         [],
         follow_through_recovery_reacquisition_status="just-reacquired",
@@ -1465,7 +1467,7 @@ def test_follow_through_reacquisition_durability_progresses_from_new_to_durable(
     assert "too new to treat as durable" in reason
     assert "still needs more confirmation" in summary
 
-    age_runs, status, reason, summary = operator_control_center._follow_through_reacquisition_durability_projection(
+    age_runs, status, reason, summary = operator_follow_through._follow_through_reacquisition_durability_projection(
         item,
         [{"follow_through_recovery_reacquisition_status": "just-reacquired"}],
         follow_through_recovery_reacquisition_status="holding-reacquired",
@@ -1479,7 +1481,7 @@ def test_follow_through_reacquisition_durability_progresses_from_new_to_durable(
     assert "still consolidating rather than stable" in reason
     assert "now consolidating it" in summary
 
-    age_runs, status, reason, summary = operator_control_center._follow_through_reacquisition_durability_projection(
+    age_runs, status, reason, summary = operator_follow_through._follow_through_reacquisition_durability_projection(
         item,
         [
             {"follow_through_recovery_reacquisition_durability_status": "holding-reacquired"},
@@ -1500,7 +1502,7 @@ def test_follow_through_reacquisition_durability_progresses_from_new_to_durable(
 def test_follow_through_reacquisition_durability_softens_when_reacquisition_wobbles():
     item = {"repo": "RepoD", "title": "RepoD drift needs review"}
 
-    age_runs, status, reason, summary = operator_control_center._follow_through_reacquisition_durability_projection(
+    age_runs, status, reason, summary = operator_follow_through._follow_through_reacquisition_durability_projection(
         item,
         [{"follow_through_recovery_reacquisition_status": "holding-reacquired"}],
         follow_through_recovery_reacquisition_status="fragile-reacquisition",
@@ -1518,7 +1520,7 @@ def test_follow_through_reacquisition_durability_softens_when_reacquisition_wobb
 def test_follow_through_reacquisition_consolidation_tracks_holding_durable_and_reversing_states():
     item = {"repo": "RepoD", "title": "RepoD drift needs review"}
 
-    status, reason, summary = operator_control_center._follow_through_reacquisition_consolidation_projection(
+    status, reason, summary = operator_follow_through._follow_through_reacquisition_consolidation_projection(
         item,
         [{"follow_through_recovery_reacquisition_durability_status": "holding-reacquired"}],
         follow_through_recovery_reacquisition_status="holding-reacquired",
@@ -1531,7 +1533,7 @@ def test_follow_through_reacquisition_consolidation_tracks_holding_durable_and_r
     assert "restored confidence is now consolidating cleanly" in reason
     assert "restored calmer confidence is now holding" in summary
 
-    status, reason, summary = operator_control_center._follow_through_reacquisition_consolidation_projection(
+    status, reason, summary = operator_follow_through._follow_through_reacquisition_consolidation_projection(
         item,
         [],
         follow_through_recovery_reacquisition_status="reacquired",
@@ -1544,7 +1546,7 @@ def test_follow_through_reacquisition_consolidation_tracks_holding_durable_and_r
     assert "safely consolidated" in reason
     assert "now looks durable" in summary
 
-    status, reason, summary = operator_control_center._follow_through_reacquisition_consolidation_projection(
+    status, reason, summary = operator_follow_through._follow_through_reacquisition_consolidation_projection(
         item,
         [{"follow_through_recovery_reacquisition_consolidation_status": "holding-confidence"}],
         follow_through_recovery_reacquisition_status="holding-reacquired",
@@ -1559,7 +1561,7 @@ def test_follow_through_reacquisition_consolidation_tracks_holding_durable_and_r
 
 
 def test_follow_through_revalidation_recovery_stays_under_revalidation_while_revalidation_is_active():
-    age_runs, status, reason, summary = operator_control_center._follow_through_reacquisition_revalidation_recovery_projection(
+    age_runs, status, reason, summary = operator_follow_through._follow_through_reacquisition_revalidation_recovery_projection(
         {"repo": "RepoD", "title": "RepoD drift needs review"},
         [],
         follow_through_recovery_reacquisition_status="reacquiring",
@@ -1578,7 +1580,7 @@ def test_follow_through_revalidation_recovery_stays_under_revalidation_while_rev
 
 
 def test_follow_through_revalidation_recovery_marks_rebuilding_when_revalidation_clears_but_confidence_is_not_back():
-    age_runs, status, reason, summary = operator_control_center._follow_through_reacquisition_revalidation_recovery_projection(
+    age_runs, status, reason, summary = operator_follow_through._follow_through_reacquisition_revalidation_recovery_projection(
         {"repo": "RepoD", "title": "RepoD drift needs review"},
         [{"follow_through_reacquisition_confidence_retirement_status": "revalidation-needed"}],
         follow_through_recovery_reacquisition_status="reacquiring",
@@ -1597,7 +1599,7 @@ def test_follow_through_revalidation_recovery_marks_rebuilding_when_revalidation
 
 
 def test_follow_through_revalidation_recovery_marks_reearning_when_confidence_is_building_again():
-    age_runs, status, reason, summary = operator_control_center._follow_through_reacquisition_revalidation_recovery_projection(
+    age_runs, status, reason, summary = operator_follow_through._follow_through_reacquisition_revalidation_recovery_projection(
         {"repo": "RepoD", "title": "RepoD drift needs review"},
         [{"follow_through_reacquisition_confidence_retirement_status": "revalidation-needed"}],
         follow_through_recovery_reacquisition_status="reacquired",
@@ -1616,7 +1618,7 @@ def test_follow_through_revalidation_recovery_marks_reearning_when_confidence_is
 
 
 def test_follow_through_revalidation_recovery_marks_just_reearned_on_first_restored_confidence_run():
-    age_runs, status, reason, summary = operator_control_center._follow_through_reacquisition_revalidation_recovery_projection(
+    age_runs, status, reason, summary = operator_follow_through._follow_through_reacquisition_revalidation_recovery_projection(
         {"repo": "RepoD", "title": "RepoD drift needs review"},
         [{"follow_through_reacquisition_confidence_retirement_status": "revalidation-needed"}],
         follow_through_recovery_reacquisition_status="reacquired",
@@ -1635,7 +1637,7 @@ def test_follow_through_revalidation_recovery_marks_just_reearned_on_first_resto
 
 
 def test_follow_through_revalidation_recovery_marks_holding_reearned_after_confirming_run():
-    age_runs, status, reason, summary = operator_control_center._follow_through_reacquisition_revalidation_recovery_projection(
+    age_runs, status, reason, summary = operator_follow_through._follow_through_reacquisition_revalidation_recovery_projection(
         {"repo": "RepoD", "title": "RepoD drift needs review"},
         [
             {"follow_through_reacquisition_revalidation_recovery_status": "just-reearned-confidence"},
@@ -1657,7 +1659,7 @@ def test_follow_through_revalidation_recovery_marks_holding_reearned_after_confi
 
 
 def test_follow_through_revalidation_recovery_falls_back_to_insufficient_evidence_when_history_is_thin():
-    age_runs, status, reason, summary = operator_control_center._follow_through_reacquisition_revalidation_recovery_projection(
+    age_runs, status, reason, summary = operator_follow_through._follow_through_reacquisition_revalidation_recovery_projection(
         {"repo": "RepoD", "title": "RepoD drift needs review"},
         [{"follow_through_reacquisition_softening_decay_status": "revalidation-needed"}],
         follow_through_recovery_reacquisition_status="reacquired",
@@ -1676,7 +1678,7 @@ def test_follow_through_revalidation_recovery_falls_back_to_insufficient_evidenc
 
 
 def test_follow_through_revalidation_recovery_summary_prioritizes_under_revalidation_hotspots():
-    summary = operator_control_center._follow_through_reacquisition_revalidation_recovery_summary(
+    summary = operator_follow_through._follow_through_reacquisition_revalidation_recovery_summary(
         {
             "under-revalidation": 2,
             "rebuilding-restored-confidence": 1,
@@ -2292,7 +2294,7 @@ def test_operator_snapshot_healthy_calibration_boosts_urgent_confidence(tmp_path
     monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: [])
 
     monkeypatch.setattr(
-        "src.operator_control_center._build_confidence_calibration",
+        "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
             "confidence_validation_status": "healthy",
             "confidence_window_runs": 8,
@@ -2311,7 +2313,7 @@ def test_operator_snapshot_healthy_calibration_boosts_urgent_confidence(tmp_path
     healthy_snapshot = build_operator_snapshot(report, output_dir=tmp_path)
 
     monkeypatch.setattr(
-        "src.operator_control_center._build_confidence_calibration",
+        "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
             "confidence_validation_status": "mixed",
             "confidence_window_runs": 8,
@@ -2375,7 +2377,7 @@ def test_operator_snapshot_uses_verify_first_for_noisy_reopened_targets(tmp_path
         ],
     )
     monkeypatch.setattr(
-        "src.operator_control_center._build_confidence_calibration",
+        "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
             "confidence_validation_status": "noisy",
             "confidence_window_runs": 8,
@@ -2391,7 +2393,7 @@ def test_operator_snapshot_uses_verify_first_for_noisy_reopened_targets(tmp_path
             "confidence_calibration_summary": "Recent high-confidence guidance has missed often enough that operators should verify before overcommitting.",
         },
     )
-    monkeypatch.setattr("src.operator_control_center._was_resolved_then_reopened", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr("src.operator_resolution_trend._was_resolved_then_reopened", lambda *_args, **_kwargs: True)
 
     snapshot = build_operator_snapshot(report, output_dir=tmp_path)
     summary = snapshot["operator_summary"]
@@ -2512,7 +2514,7 @@ def test_operator_snapshot_softens_for_policy_flip_churn(tmp_path: Path, monkeyp
         ],
     )
     monkeypatch.setattr(
-        "src.operator_control_center._build_confidence_calibration",
+        "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
             "confidence_validation_status": "healthy",
             "confidence_window_runs": 8,
@@ -2529,7 +2531,7 @@ def test_operator_snapshot_softens_for_policy_flip_churn(tmp_path: Path, monkeyp
         },
     )
     monkeypatch.setattr(
-        "src.operator_control_center._trust_policy_exception_for_target",
+        "src.operator_resolution_trend._trust_policy_exception_for_target",
         lambda target, *_args, **_kwargs: (
             "softened-for-flip-churn",
             "Recent trust-policy flips have been bouncing enough that this recommendation should not be treated as fully stable yet.",
@@ -2538,7 +2540,7 @@ def test_operator_snapshot_softens_for_policy_flip_churn(tmp_path: Path, monkeyp
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._trust_recovery_for_target",
+        "src.operator_resolution_trend._trust_recovery_for_target",
         lambda target, *_args, **_kwargs: (
             "candidate",
             "This target is stabilizing under healthy calibration, but it has not held steady long enough to earn stronger trust yet.",
@@ -2647,7 +2649,7 @@ def test_operator_snapshot_never_softens_blocked_setup_below_act_with_review(tmp
         ],
     )
     monkeypatch.setattr(
-        "src.operator_control_center._build_confidence_calibration",
+        "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
             "confidence_validation_status": "noisy",
             "confidence_window_runs": 8,
@@ -2663,7 +2665,7 @@ def test_operator_snapshot_never_softens_blocked_setup_below_act_with_review(tmp
             "confidence_calibration_summary": "Recent high-confidence guidance has missed often enough that operators should verify before overcommitting.",
         },
     )
-    monkeypatch.setattr("src.operator_control_center._was_resolved_then_reopened", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr("src.operator_resolution_trend._was_resolved_then_reopened", lambda *_args, **_kwargs: True)
 
     snapshot = build_operator_snapshot(report, output_dir=tmp_path)
     summary = snapshot["operator_summary"]
@@ -2749,7 +2751,7 @@ def test_operator_snapshot_recovers_stable_verify_first_target(tmp_path: Path, m
         ],
     )
     monkeypatch.setattr(
-        "src.operator_control_center._build_confidence_calibration",
+        "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
             "confidence_validation_status": "healthy",
             "confidence_window_runs": 8,
@@ -2766,7 +2768,7 @@ def test_operator_snapshot_recovers_stable_verify_first_target(tmp_path: Path, m
         },
     )
     monkeypatch.setattr(
-        "src.operator_control_center._trust_policy_exception_for_target",
+        "src.operator_resolution_trend._trust_policy_exception_for_target",
         lambda target, *_args, **_kwargs: (
             "softened-for-flip-churn",
             "Recent trust-policy flips have been bouncing enough that this recommendation should not be treated as fully stable yet.",
@@ -2863,7 +2865,7 @@ def test_operator_snapshot_retires_exception_after_stable_window(tmp_path: Path,
         ],
     )
     monkeypatch.setattr(
-        "src.operator_control_center._build_confidence_calibration",
+        "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
             "confidence_validation_status": "healthy",
             "confidence_window_runs": 8,
@@ -2880,7 +2882,7 @@ def test_operator_snapshot_retires_exception_after_stable_window(tmp_path: Path,
         },
     )
     monkeypatch.setattr(
-        "src.operator_control_center._trust_policy_exception_for_target",
+        "src.operator_resolution_trend._trust_policy_exception_for_target",
         lambda target, *_args, **_kwargs: (
             "softened-for-flip-churn",
             "Recent trust-policy flips have been bouncing enough that this recommendation should not be treated as fully stable yet.",
@@ -2987,7 +2989,7 @@ def test_operator_snapshot_applies_class_level_normalization_for_healthy_class(t
         ],
     )
     monkeypatch.setattr(
-        "src.operator_control_center._build_confidence_calibration",
+        "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
             "confidence_validation_status": "healthy",
             "confidence_window_runs": 8,
@@ -3004,7 +3006,7 @@ def test_operator_snapshot_applies_class_level_normalization_for_healthy_class(t
         },
     )
     monkeypatch.setattr(
-        "src.operator_control_center._trust_policy_exception_for_target",
+        "src.operator_resolution_trend._trust_policy_exception_for_target",
         lambda target, *_args, **_kwargs: (
             "softened-for-flip-churn",
             "Recent trust-policy flips have been bouncing enough that this recommendation should not be treated as fully stable yet.",
@@ -3111,7 +3113,7 @@ def test_operator_snapshot_keeps_one_off_noise_from_class_normalization(tmp_path
         ],
     )
     monkeypatch.setattr(
-        "src.operator_control_center._build_confidence_calibration",
+        "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
             "confidence_validation_status": "healthy",
             "confidence_window_runs": 8,
@@ -3128,7 +3130,7 @@ def test_operator_snapshot_keeps_one_off_noise_from_class_normalization(tmp_path
         },
     )
     monkeypatch.setattr(
-        "src.operator_control_center._trust_policy_exception_for_target",
+        "src.operator_resolution_trend._trust_policy_exception_for_target",
         lambda target, *_args, **_kwargs: (
             "softened-for-reopen-risk",
             "Recent reopen or unresolved behavior softened the recommendation, so confirm closure evidence before overcommitting.",
@@ -3137,7 +3139,7 @@ def test_operator_snapshot_keeps_one_off_noise_from_class_normalization(tmp_path
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._trust_recovery_for_target",
+        "src.operator_resolution_trend._trust_recovery_for_target",
         lambda target, *_args, **_kwargs: (
             "blocked",
             "Trust recovery is blocked because this target reopened again inside the recent recovery window.",
@@ -3224,7 +3226,7 @@ def test_operator_snapshot_decays_stale_class_normalization(tmp_path: Path, monk
         )
     monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
     monkeypatch.setattr(
-        "src.operator_control_center._build_confidence_calibration",
+        "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
             "confidence_validation_status": "healthy",
             "confidence_window_runs": 8,
@@ -3241,7 +3243,7 @@ def test_operator_snapshot_decays_stale_class_normalization(tmp_path: Path, monk
         },
     )
     monkeypatch.setattr(
-        "src.operator_control_center._trust_policy_exception_for_target",
+        "src.operator_resolution_trend._trust_policy_exception_for_target",
         lambda target, *_args, **_kwargs: (
             "softened-for-flip-churn",
             "Recent trust-policy flips have been bouncing enough that this recommendation should not be treated as fully stable yet.",
@@ -3250,7 +3252,7 @@ def test_operator_snapshot_decays_stale_class_normalization(tmp_path: Path, monk
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._trust_recovery_for_target",
+        "src.operator_resolution_trend._trust_recovery_for_target",
         lambda target, *_args, **_kwargs: (
             "candidate",
             "This target is stabilizing under healthy calibration, but it has not held steady long enough to earn stronger trust yet.",
@@ -3322,7 +3324,7 @@ def test_operator_snapshot_softens_class_debt_when_fresh_sticky_signal_ages_out(
         )
     monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
     monkeypatch.setattr(
-        "src.operator_control_center._build_confidence_calibration",
+        "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
             "confidence_validation_status": "healthy",
             "confidence_window_runs": 8,
@@ -3339,7 +3341,7 @@ def test_operator_snapshot_softens_class_debt_when_fresh_sticky_signal_ages_out(
         },
     )
     monkeypatch.setattr(
-        "src.operator_control_center._trust_policy_exception_for_target",
+        "src.operator_resolution_trend._trust_policy_exception_for_target",
         lambda target, *_args, **_kwargs: (
             "softened-for-flip-churn",
             "Recent trust-policy flips have been bouncing enough that this recommendation should not be treated as fully stable yet.",
@@ -3408,7 +3410,7 @@ def test_operator_snapshot_boosts_candidate_normalization_when_fresh_support_cro
         )
     monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
     monkeypatch.setattr(
-        "src.operator_control_center._build_confidence_calibration",
+        "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
             "confidence_validation_status": "healthy",
             "confidence_window_runs": 8,
@@ -3425,7 +3427,7 @@ def test_operator_snapshot_boosts_candidate_normalization_when_fresh_support_cro
         },
     )
     monkeypatch.setattr(
-        "src.operator_control_center._trust_policy_exception_for_target",
+        "src.operator_resolution_trend._trust_policy_exception_for_target",
         lambda target, *_args, **_kwargs: (
             "softened-for-flip-churn",
             "Recent trust-policy flips have been bouncing enough that this recommendation should not be treated as fully stable yet.",
@@ -3434,7 +3436,7 @@ def test_operator_snapshot_boosts_candidate_normalization_when_fresh_support_cro
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._trust_recovery_for_target",
+        "src.operator_resolution_trend._trust_recovery_for_target",
         lambda target, *_args, **_kwargs: (
             "candidate",
             "This target is stabilizing under healthy calibration, but it has not held steady long enough to earn stronger trust yet.",
@@ -3443,7 +3445,7 @@ def test_operator_snapshot_boosts_candidate_normalization_when_fresh_support_cro
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._class_normalization_for_target",
+        "src.operator_resolution_trend._class_normalization_for_target",
         lambda target, *_args, **_kwargs: (
             "candidate",
             "This class is trending healthier, but the current target has not earned class-level normalization yet.",
@@ -3452,7 +3454,7 @@ def test_operator_snapshot_boosts_candidate_normalization_when_fresh_support_cro
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._class_memory_decay_for_target",
+        "src.operator_resolution_trend._class_memory_decay_for_target",
         lambda target, _history_meta, _calibration, **kwargs: (
             "none",
             "",
@@ -3529,7 +3531,7 @@ def test_operator_snapshot_strengthens_watch_into_class_debt_when_fresh_caution_
         )
     monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
     monkeypatch.setattr(
-        "src.operator_control_center._build_confidence_calibration",
+        "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
             "confidence_validation_status": "healthy",
             "confidence_window_runs": 8,
@@ -3546,7 +3548,7 @@ def test_operator_snapshot_strengthens_watch_into_class_debt_when_fresh_caution_
         },
     )
     monkeypatch.setattr(
-        "src.operator_control_center._trust_policy_exception_for_target",
+        "src.operator_resolution_trend._trust_policy_exception_for_target",
         lambda target, *_args, **_kwargs: (
             "softened-for-reopen-risk",
             "Recent reopen or unresolved behavior softened the recommendation, so confirm closure evidence before overcommitting.",
@@ -3555,7 +3557,7 @@ def test_operator_snapshot_strengthens_watch_into_class_debt_when_fresh_caution_
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._trust_recovery_for_target",
+        "src.operator_resolution_trend._trust_recovery_for_target",
         lambda target, *_args, **_kwargs: (
             "blocked",
             "Trust recovery is blocked because this target reopened again inside the recent recovery window.",
@@ -3564,14 +3566,14 @@ def test_operator_snapshot_strengthens_watch_into_class_debt_when_fresh_caution_
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._policy_debt_for_target",
+        "src.operator_resolution_trend._policy_debt_for_target",
         lambda target, _history_meta: (
             "watch",
             "This class has enough recent exception activity to watch for lingering caution, but it is not yet clearly sticky or clearly normalization-friendly.",
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._class_memory_decay_for_target",
+        "src.operator_resolution_trend._class_memory_decay_for_target",
         lambda target, _history_meta, _calibration, **kwargs: (
             "none",
             "",
@@ -3619,7 +3621,7 @@ def test_operator_snapshot_holds_class_normalization_pending_until_support_persi
     history = []
     monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
     monkeypatch.setattr(
-        "src.operator_control_center._build_confidence_calibration",
+        "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
             "confidence_validation_status": "healthy",
             "confidence_window_runs": 8,
@@ -3636,7 +3638,7 @@ def test_operator_snapshot_holds_class_normalization_pending_until_support_persi
         },
     )
     monkeypatch.setattr(
-        "src.operator_control_center._trust_policy_exception_for_target",
+        "src.operator_resolution_trend._trust_policy_exception_for_target",
         lambda target, *_args, **_kwargs: (
             "softened-for-flip-churn",
             "Recent trust-policy flips have been bouncing enough that this recommendation should not be treated as fully stable yet.",
@@ -3645,7 +3647,7 @@ def test_operator_snapshot_holds_class_normalization_pending_until_support_persi
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._trust_recovery_for_target",
+        "src.operator_resolution_trend._trust_recovery_for_target",
         lambda target, *_args, **_kwargs: (
             "candidate",
             "This target is stabilizing under healthy calibration, but it has not held steady long enough to earn stronger trust yet.",
@@ -3654,7 +3656,7 @@ def test_operator_snapshot_holds_class_normalization_pending_until_support_persi
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._class_memory_decay_for_target",
+        "src.operator_resolution_trend._class_memory_decay_for_target",
         lambda target, _history_meta, _calibration, **kwargs: (
             "none",
             "",
@@ -3667,7 +3669,7 @@ def test_operator_snapshot_holds_class_normalization_pending_until_support_persi
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._class_trust_reweight_for_target",
+        "src.operator_resolution_trend._class_trust_reweight_for_target",
         lambda target, _history_meta, _calibration, **kwargs: (
             "normalization-boosted",
             "Fresh class support crossed the reweight threshold, so this target inherits a stronger act-with-review posture.",
@@ -3735,7 +3737,7 @@ def test_operator_snapshot_marks_flat_pending_support_as_holding_then_stalled(tm
     ]
     monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
     monkeypatch.setattr(
-        "src.operator_control_center._build_confidence_calibration",
+        "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
             "confidence_validation_status": "healthy",
             "confidence_window_runs": 8,
@@ -3752,7 +3754,7 @@ def test_operator_snapshot_marks_flat_pending_support_as_holding_then_stalled(tm
         },
     )
     monkeypatch.setattr(
-        "src.operator_control_center._trust_policy_exception_for_target",
+        "src.operator_resolution_trend._trust_policy_exception_for_target",
         lambda target, *_args, **_kwargs: (
             "softened-for-flip-churn",
             "Recent trust-policy flips have been bouncing enough that this recommendation should not be treated as fully stable yet.",
@@ -3761,7 +3763,7 @@ def test_operator_snapshot_marks_flat_pending_support_as_holding_then_stalled(tm
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._trust_recovery_for_target",
+        "src.operator_resolution_trend._trust_recovery_for_target",
         lambda target, *_args, **_kwargs: (
             "candidate",
             "This target is stabilizing under healthy calibration, but it has not held steady long enough to earn stronger trust yet.",
@@ -3770,7 +3772,7 @@ def test_operator_snapshot_marks_flat_pending_support_as_holding_then_stalled(tm
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._class_memory_decay_for_target",
+        "src.operator_resolution_trend._class_memory_decay_for_target",
         lambda target, _history_meta, _calibration, **kwargs: (
             "none",
             "",
@@ -3783,7 +3785,7 @@ def test_operator_snapshot_marks_flat_pending_support_as_holding_then_stalled(tm
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._class_trust_reweight_for_target",
+        "src.operator_resolution_trend._class_trust_reweight_for_target",
         lambda target, _history_meta, _calibration, **kwargs: (
             "normalization-boosted",
             "Fresh class support crossed the reweight threshold, so this target inherits a stronger act-with-review posture.",
@@ -3796,11 +3798,11 @@ def test_operator_snapshot_marks_flat_pending_support_as_holding_then_stalled(tm
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._class_trust_reweight_scores_for_target",
+        "src.operator_resolution_trend._class_trust_reweight_scores_for_target",
         lambda target, _history_meta: (0.48, 0.24, 0.24, "supporting-normalization", []),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._class_trust_momentum_for_target",
+        "src.operator_resolution_trend._class_trust_momentum_for_target",
         lambda target, _history_meta, _calibration, **kwargs: (
             "pending-support",
             "The class signal is visible, but it has not stayed strong long enough to confirm broader normalization yet.",
@@ -3893,7 +3895,7 @@ def test_operator_snapshot_expires_old_pending_support_when_signal_fades(tmp_pat
         )
     monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
     monkeypatch.setattr(
-        "src.operator_control_center._build_confidence_calibration",
+        "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
             "confidence_validation_status": "healthy",
             "confidence_window_runs": 8,
@@ -3910,7 +3912,7 @@ def test_operator_snapshot_expires_old_pending_support_when_signal_fades(tmp_pat
         },
     )
     monkeypatch.setattr(
-        "src.operator_control_center._trust_policy_exception_for_target",
+        "src.operator_resolution_trend._trust_policy_exception_for_target",
         lambda target, *_args, **_kwargs: (
             "softened-for-flip-churn",
             "Recent trust-policy flips have been bouncing enough that this recommendation should not be treated as fully stable yet.",
@@ -3919,7 +3921,7 @@ def test_operator_snapshot_expires_old_pending_support_when_signal_fades(tmp_pat
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._trust_recovery_for_target",
+        "src.operator_resolution_trend._trust_recovery_for_target",
         lambda target, *_args, **_kwargs: (
             "candidate",
             "This target is stabilizing under healthy calibration, but it has not held steady long enough to earn stronger trust yet.",
@@ -3928,7 +3930,7 @@ def test_operator_snapshot_expires_old_pending_support_when_signal_fades(tmp_pat
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._class_memory_decay_for_target",
+        "src.operator_resolution_trend._class_memory_decay_for_target",
         lambda target, _history_meta, _calibration, **kwargs: (
             "none",
             "",
@@ -3941,11 +3943,11 @@ def test_operator_snapshot_expires_old_pending_support_when_signal_fades(tmp_pat
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._class_trust_reweight_scores_for_target",
+        "src.operator_resolution_trend._class_trust_reweight_scores_for_target",
         lambda target, _history_meta: (0.05, 0.02, 0.03, "neutral", []),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._class_trust_reweight_for_target",
+        "src.operator_resolution_trend._class_trust_reweight_for_target",
         lambda target, _history_meta, _calibration, **kwargs: (
             "none",
             "",
@@ -3958,7 +3960,7 @@ def test_operator_snapshot_expires_old_pending_support_when_signal_fades(tmp_pat
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._class_trust_momentum_for_target",
+        "src.operator_resolution_trend._class_trust_momentum_for_target",
         lambda target, _history_meta, _calibration, **kwargs: (
             "none",
             "",
@@ -4001,7 +4003,7 @@ def test_operator_snapshot_marks_blocked_pending_support_when_local_noise_overri
     )
     monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: [])
     monkeypatch.setattr(
-        "src.operator_control_center._build_confidence_calibration",
+        "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
             "confidence_validation_status": "healthy",
             "confidence_window_runs": 8,
@@ -4018,7 +4020,7 @@ def test_operator_snapshot_marks_blocked_pending_support_when_local_noise_overri
         },
     )
     monkeypatch.setattr(
-        "src.operator_control_center._trust_policy_exception_for_target",
+        "src.operator_resolution_trend._trust_policy_exception_for_target",
         lambda target, *_args, **_kwargs: (
             "softened-for-reopen-risk",
             "Recent reopen or unresolved behavior softened the recommendation, so confirm closure evidence before overcommitting.",
@@ -4027,7 +4029,7 @@ def test_operator_snapshot_marks_blocked_pending_support_when_local_noise_overri
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._trust_recovery_for_target",
+        "src.operator_resolution_trend._trust_recovery_for_target",
         lambda target, *_args, **_kwargs: (
             "blocked",
             "Trust recovery is blocked because this target reopened again inside the recent recovery window.",
@@ -4036,7 +4038,7 @@ def test_operator_snapshot_marks_blocked_pending_support_when_local_noise_overri
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._class_memory_decay_for_target",
+        "src.operator_resolution_trend._class_memory_decay_for_target",
         lambda target, _history_meta, _calibration, **kwargs: (
             "none",
             "",
@@ -4049,7 +4051,7 @@ def test_operator_snapshot_marks_blocked_pending_support_when_local_noise_overri
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._class_trust_reweight_for_target",
+        "src.operator_resolution_trend._class_trust_reweight_for_target",
         lambda target, _history_meta, _calibration, **kwargs: (
             "normalization-boosted",
             "Fresh class support crossed the reweight threshold, so this target inherits a stronger act-with-review posture.",
@@ -4062,7 +4064,7 @@ def test_operator_snapshot_marks_blocked_pending_support_when_local_noise_overri
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._class_trust_momentum_for_target",
+        "src.operator_resolution_trend._class_trust_momentum_for_target",
         lambda target, _history_meta, _calibration, **kwargs: (
             "blocked",
             "Positive class strengthening is blocked because local reopen, flip, or blocked-recovery noise still overrides the class signal.",
@@ -4131,7 +4133,7 @@ def test_operator_snapshot_scores_pending_support_as_confirm_soon_without_auto_c
     ]
     monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
     monkeypatch.setattr(
-        "src.operator_control_center._build_confidence_calibration",
+        "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
             "confidence_validation_status": "healthy",
             "confidence_window_runs": 8,
@@ -4148,7 +4150,7 @@ def test_operator_snapshot_scores_pending_support_as_confirm_soon_without_auto_c
         },
     )
     monkeypatch.setattr(
-        "src.operator_control_center._trust_policy_exception_for_target",
+        "src.operator_resolution_trend._trust_policy_exception_for_target",
         lambda target, *_args, **_kwargs: (
             "softened-for-flip-churn",
             "Recent trust-policy flips have been bouncing enough that this recommendation should not be treated as fully stable yet.",
@@ -4157,7 +4159,7 @@ def test_operator_snapshot_scores_pending_support_as_confirm_soon_without_auto_c
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._trust_recovery_for_target",
+        "src.operator_resolution_trend._trust_recovery_for_target",
         lambda target, *_args, **_kwargs: (
             "candidate",
             "This target is stabilizing under healthy calibration, but it has not held steady long enough to earn stronger trust yet.",
@@ -4166,7 +4168,7 @@ def test_operator_snapshot_scores_pending_support_as_confirm_soon_without_auto_c
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._class_memory_decay_for_target",
+        "src.operator_resolution_trend._class_memory_decay_for_target",
         lambda target, _history_meta, _calibration, **kwargs: (
             "none",
             "",
@@ -4179,11 +4181,11 @@ def test_operator_snapshot_scores_pending_support_as_confirm_soon_without_auto_c
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._class_trust_reweight_scores_for_target",
+        "src.operator_resolution_trend._class_trust_reweight_scores_for_target",
         lambda target, _history_meta: (0.55, 0.20, 0.35, "supporting-normalization", []),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._class_trust_reweight_for_target",
+        "src.operator_resolution_trend._class_trust_reweight_for_target",
         lambda target, _history_meta, _calibration, **kwargs: (
             "normalization-boosted",
             "Fresh class support crossed the reweight threshold, so this target inherits a stronger act-with-review posture.",
@@ -4196,7 +4198,7 @@ def test_operator_snapshot_scores_pending_support_as_confirm_soon_without_auto_c
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._class_trust_momentum_for_target",
+        "src.operator_resolution_trend._class_trust_momentum_for_target",
         lambda target, _history_meta, _calibration, **kwargs: (
             "pending-support",
             "The class signal is visible, but it has not stayed strong long enough to confirm broader normalization yet.",
@@ -4329,7 +4331,7 @@ def test_operator_snapshot_clears_low_confidence_pending_support_with_active_pen
     ]
     monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
     monkeypatch.setattr(
-        "src.operator_control_center._build_confidence_calibration",
+        "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
             "confidence_validation_status": "healthy",
             "confidence_window_runs": 8,
@@ -4346,7 +4348,7 @@ def test_operator_snapshot_clears_low_confidence_pending_support_with_active_pen
         },
     )
     monkeypatch.setattr(
-        "src.operator_control_center._trust_policy_exception_for_target",
+        "src.operator_resolution_trend._trust_policy_exception_for_target",
         lambda target, *_args, **_kwargs: (
             "softened-for-flip-churn",
             "Recent trust-policy flips have been bouncing enough that this recommendation should not be treated as fully stable yet.",
@@ -4355,7 +4357,7 @@ def test_operator_snapshot_clears_low_confidence_pending_support_with_active_pen
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._trust_recovery_for_target",
+        "src.operator_resolution_trend._trust_recovery_for_target",
         lambda target, *_args, **_kwargs: (
             "candidate",
             "This target is stabilizing under healthy calibration, but it has not held steady long enough to earn stronger trust yet.",
@@ -4364,7 +4366,7 @@ def test_operator_snapshot_clears_low_confidence_pending_support_with_active_pen
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._class_memory_decay_for_target",
+        "src.operator_resolution_trend._class_memory_decay_for_target",
         lambda target, _history_meta, _calibration, **kwargs: (
             "none",
             "",
@@ -4377,11 +4379,11 @@ def test_operator_snapshot_clears_low_confidence_pending_support_with_active_pen
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._class_trust_reweight_scores_for_target",
+        "src.operator_resolution_trend._class_trust_reweight_scores_for_target",
         lambda target, _history_meta: (0.08, 0.03, 0.05, "neutral", []),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._class_trust_reweight_for_target",
+        "src.operator_resolution_trend._class_trust_reweight_for_target",
         lambda target, _history_meta, _calibration, **kwargs: (
             "none",
             "",
@@ -4394,7 +4396,7 @@ def test_operator_snapshot_clears_low_confidence_pending_support_with_active_pen
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._class_trust_momentum_for_target",
+        "src.operator_resolution_trend._class_trust_momentum_for_target",
         lambda target, _history_meta, _calibration, **kwargs: (
             "pending-support",
             "The class signal is visible, but it has not stayed strong long enough to confirm broader normalization yet.",
@@ -4618,11 +4620,11 @@ def test_operator_snapshot_reacquires_confirmation_forecast_after_decay(tmp_path
         }
 
     monkeypatch.setattr(
-        "src.operator_control_center._apply_closure_forecast_freshness_and_decay",
+        "src.operator_resolution_trend._apply_closure_forecast_freshness_and_decay",
         _phase43_seed,
     )
     monkeypatch.setattr(
-        "src.operator_control_center._target_specific_normalization_noise",
+        "src.operator_resolution_trend._target_specific_normalization_noise",
         lambda *_args, **_kwargs: False,
     )
 
@@ -4773,7 +4775,7 @@ def test_operator_snapshot_reenables_early_clear_when_clearance_is_reacquired(tm
         }
 
     monkeypatch.setattr(
-        "src.operator_control_center._apply_closure_forecast_freshness_and_decay",
+        "src.operator_resolution_trend._apply_closure_forecast_freshness_and_decay",
         _phase43_seed,
     )
 
@@ -4852,11 +4854,11 @@ def test_operator_snapshot_marks_new_confirmation_reacquisition_as_fragile(tmp_p
         }
 
     monkeypatch.setattr(
-        "src.operator_control_center._apply_closure_forecast_refresh_recovery_and_reacquisition",
+        "src.operator_resolution_trend._apply_closure_forecast_refresh_recovery_and_reacquisition",
         _phase44_seed,
     )
     monkeypatch.setattr(
-        "src.operator_control_center._target_specific_normalization_noise",
+        "src.operator_resolution_trend._target_specific_normalization_noise",
         lambda *_args, **_kwargs: False,
     )
 
@@ -4979,11 +4981,11 @@ def test_operator_snapshot_keeps_confirmation_reacquisition_when_it_is_holding(t
         }
 
     monkeypatch.setattr(
-        "src.operator_control_center._apply_closure_forecast_refresh_recovery_and_reacquisition",
+        "src.operator_resolution_trend._apply_closure_forecast_refresh_recovery_and_reacquisition",
         _phase44_seed,
     )
     monkeypatch.setattr(
-        "src.operator_control_center._target_specific_normalization_noise",
+        "src.operator_resolution_trend._target_specific_normalization_noise",
         lambda *_args, **_kwargs: False,
     )
 
@@ -5110,11 +5112,11 @@ def test_operator_snapshot_softens_reacquired_clearance_when_recovery_churns(tmp
         }
 
     monkeypatch.setattr(
-        "src.operator_control_center._apply_closure_forecast_refresh_recovery_and_reacquisition",
+        "src.operator_resolution_trend._apply_closure_forecast_refresh_recovery_and_reacquisition",
         _phase44_seed,
     )
     monkeypatch.setattr(
-        "src.operator_control_center._target_specific_normalization_noise",
+        "src.operator_resolution_trend._target_specific_normalization_noise",
         lambda *_args, **_kwargs: False,
     )
 
@@ -5230,11 +5232,11 @@ def test_operator_snapshot_softens_sustained_reacquisition_when_freshness_turns_
         }
 
     monkeypatch.setattr(
-        "src.operator_control_center._apply_closure_forecast_refresh_recovery_and_reacquisition",
+        "src.operator_resolution_trend._apply_closure_forecast_refresh_recovery_and_reacquisition",
         _phase44_seed,
     )
     monkeypatch.setattr(
-        "src.operator_control_center._target_specific_normalization_noise",
+        "src.operator_resolution_trend._target_specific_normalization_noise",
         lambda *_args, **_kwargs: False,
     )
 
@@ -5352,11 +5354,11 @@ def test_operator_snapshot_resets_stale_reacquired_clearance_and_restores_pendin
         }
 
     monkeypatch.setattr(
-        "src.operator_control_center._apply_closure_forecast_refresh_recovery_and_reacquisition",
+        "src.operator_resolution_trend._apply_closure_forecast_refresh_recovery_and_reacquisition",
         _phase44_seed,
     )
     monkeypatch.setattr(
-        "src.operator_control_center._target_specific_normalization_noise",
+        "src.operator_resolution_trend._target_specific_normalization_noise",
         lambda *_args, **_kwargs: False,
     )
 
@@ -5465,11 +5467,11 @@ def test_operator_snapshot_sets_pending_confirmation_reentry_after_confirmation_
         }
 
     monkeypatch.setattr(
-        "src.operator_control_center._apply_reacquisition_freshness_and_persistence_reset",
+        "src.operator_resolution_trend._apply_reacquisition_freshness_and_persistence_reset",
         _phase46_seed,
     )
     monkeypatch.setattr(
-        "src.operator_control_center._target_specific_normalization_noise",
+        "src.operator_resolution_trend._target_specific_normalization_noise",
         lambda *_args, **_kwargs: False,
     )
 
@@ -5596,11 +5598,11 @@ def test_operator_snapshot_reenters_confirmation_after_fresh_follow_through(
         }
 
     monkeypatch.setattr(
-        "src.operator_control_center._apply_reacquisition_freshness_and_persistence_reset",
+        "src.operator_resolution_trend._apply_reacquisition_freshness_and_persistence_reset",
         _phase46_seed,
     )
     monkeypatch.setattr(
-        "src.operator_control_center._target_specific_normalization_noise",
+        "src.operator_resolution_trend._target_specific_normalization_noise",
         lambda *_args, **_kwargs: False,
     )
 
@@ -5734,11 +5736,11 @@ def test_operator_snapshot_reenters_clearance_after_fresh_follow_through(
         }
 
     monkeypatch.setattr(
-        "src.operator_control_center._apply_reacquisition_freshness_and_persistence_reset",
+        "src.operator_resolution_trend._apply_reacquisition_freshness_and_persistence_reset",
         _phase46_seed,
     )
     monkeypatch.setattr(
-        "src.operator_control_center._target_specific_normalization_noise",
+        "src.operator_resolution_trend._target_specific_normalization_noise",
         lambda *_args, **_kwargs: False,
     )
 
@@ -5846,11 +5848,11 @@ def test_operator_snapshot_holds_reset_reentry_when_follow_through_stays_aligned
         }
 
     monkeypatch.setattr(
-        "src.operator_control_center._apply_reacquisition_reset_refresh_recovery_and_reentry",
+        "src.operator_resolution_trend._apply_reacquisition_reset_refresh_recovery_and_reentry",
         _phase47_seed,
     )
     monkeypatch.setattr(
-        "src.operator_control_center._target_specific_normalization_noise",
+        "src.operator_resolution_trend._target_specific_normalization_noise",
         lambda *_args, **_kwargs: False,
     )
 
@@ -5995,11 +5997,11 @@ def test_operator_snapshot_softens_reset_reentry_when_reentry_starts_churning(
         }
 
     monkeypatch.setattr(
-        "src.operator_control_center._apply_reacquisition_reset_refresh_recovery_and_reentry",
+        "src.operator_resolution_trend._apply_reacquisition_reset_refresh_recovery_and_reentry",
         _phase47_seed,
     )
     monkeypatch.setattr(
-        "src.operator_control_center._target_specific_normalization_noise",
+        "src.operator_resolution_trend._target_specific_normalization_noise",
         lambda *_args, **_kwargs: False,
     )
 
@@ -6106,11 +6108,11 @@ def test_operator_snapshot_starts_pending_confirmation_rebuild_after_reset_reent
         }
 
     monkeypatch.setattr(
-        "src.operator_control_center._apply_reset_reentry_freshness_and_reset",
+        "src.operator_resolution_trend._apply_reset_reentry_freshness_and_reset",
         _phase49_seed,
     )
     monkeypatch.setattr(
-        "src.operator_control_center._target_specific_normalization_noise",
+        "src.operator_resolution_trend._target_specific_normalization_noise",
         lambda *_args, **_kwargs: False,
     )
 
@@ -6238,11 +6240,11 @@ def test_operator_snapshot_rebuilds_confirmation_reentry_after_fresh_follow_thro
         }
 
     monkeypatch.setattr(
-        "src.operator_control_center._apply_reset_reentry_freshness_and_reset",
+        "src.operator_resolution_trend._apply_reset_reentry_freshness_and_reset",
         _phase49_seed,
     )
     monkeypatch.setattr(
-        "src.operator_control_center._target_specific_normalization_noise",
+        "src.operator_resolution_trend._target_specific_normalization_noise",
         lambda *_args, **_kwargs: False,
     )
 
@@ -6370,11 +6372,11 @@ def test_operator_snapshot_rebuilds_clearance_reentry_after_fresh_follow_through
         }
 
     monkeypatch.setattr(
-        "src.operator_control_center._apply_reset_reentry_freshness_and_reset",
+        "src.operator_resolution_trend._apply_reset_reentry_freshness_and_reset",
         _phase49_seed,
     )
     monkeypatch.setattr(
-        "src.operator_control_center._target_specific_normalization_noise",
+        "src.operator_resolution_trend._target_specific_normalization_noise",
         lambda *_args, **_kwargs: False,
     )
 
@@ -6413,7 +6415,7 @@ def test_operator_snapshot_marks_rebuilt_confirmation_as_just_rebuilt(
     )
 
     monkeypatch.setattr(
-        "src.operator_control_center._apply_reset_reentry_refresh_recovery_and_rebuild",
+        "src.operator_resolution_trend._apply_reset_reentry_refresh_recovery_and_rebuild",
         lambda resolution_targets, _history, **_kwargs: (
             resolution_targets.__setitem__(
                 slice(None),
@@ -6447,7 +6449,7 @@ def test_operator_snapshot_marks_rebuilt_confirmation_as_just_rebuilt(
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._closure_forecast_reset_reentry_rebuild_persistence_for_target",
+        "src.operator_resolution_trend._closure_forecast_reset_reentry_rebuild_persistence_for_target",
         lambda *_args, **_kwargs: {
             "closure_forecast_reset_reentry_rebuild_age_runs": 1,
             "closure_forecast_reset_reentry_rebuild_persistence_score": 0.29,
@@ -6457,7 +6459,7 @@ def test_operator_snapshot_marks_rebuilt_confirmation_as_just_rebuilt(
         },
     )
     monkeypatch.setattr(
-        "src.operator_control_center._closure_forecast_reset_reentry_rebuild_churn_for_target",
+        "src.operator_resolution_trend._closure_forecast_reset_reentry_rebuild_churn_for_target",
         lambda *_args, **_kwargs: {
             "closure_forecast_reset_reentry_rebuild_churn_score": 0.10,
             "closure_forecast_reset_reentry_rebuild_churn_status": "none",
@@ -6499,7 +6501,7 @@ def test_operator_snapshot_softens_rebuilt_clearance_when_rebuild_churn_is_high(
     )
 
     monkeypatch.setattr(
-        "src.operator_control_center._apply_reset_reentry_refresh_recovery_and_rebuild",
+        "src.operator_resolution_trend._apply_reset_reentry_refresh_recovery_and_rebuild",
         lambda resolution_targets, _history, **_kwargs: (
             resolution_targets.__setitem__(
                 slice(None),
@@ -6533,7 +6535,7 @@ def test_operator_snapshot_softens_rebuilt_clearance_when_rebuild_churn_is_high(
         ),
     )
     monkeypatch.setattr(
-        "src.operator_control_center._closure_forecast_reset_reentry_rebuild_persistence_for_target",
+        "src.operator_resolution_trend._closure_forecast_reset_reentry_rebuild_persistence_for_target",
         lambda *_args, **_kwargs: {
             "closure_forecast_reset_reentry_rebuild_age_runs": 2,
             "closure_forecast_reset_reentry_rebuild_persistence_score": -0.11,
@@ -6543,7 +6545,7 @@ def test_operator_snapshot_softens_rebuilt_clearance_when_rebuild_churn_is_high(
         },
     )
     monkeypatch.setattr(
-        "src.operator_control_center._closure_forecast_reset_reentry_rebuild_churn_for_target",
+        "src.operator_resolution_trend._closure_forecast_reset_reentry_rebuild_churn_for_target",
         lambda *_args, **_kwargs: {
             "closure_forecast_reset_reentry_rebuild_churn_score": 0.52,
             "closure_forecast_reset_reentry_rebuild_churn_status": "churn",
@@ -6561,7 +6563,7 @@ def test_operator_snapshot_softens_rebuilt_clearance_when_rebuild_churn_is_high(
 
 
 def test_rebuild_freshness_softens_mixed_age_sustained_confirmation_rebuild():
-    updates = operator_control_center._apply_reset_reentry_rebuild_freshness_reset_control(
+    updates = operator_resolution_trend._apply_reset_reentry_rebuild_freshness_reset_control(
         {
             "closure_forecast_reset_reentry_rebuild_churn_status": "none",
         },
@@ -6592,7 +6594,7 @@ def test_rebuild_freshness_softens_mixed_age_sustained_confirmation_rebuild():
 
 
 def test_rebuild_freshness_resets_stale_clearance_and_restores_pending_posture():
-    updates = operator_control_center._apply_reset_reentry_rebuild_freshness_reset_control(
+    updates = operator_resolution_trend._apply_reset_reentry_rebuild_freshness_reset_control(
         {
             "closure_forecast_reset_reentry_rebuild_churn_status": "none",
         },
@@ -6627,7 +6629,7 @@ def test_rebuild_freshness_resets_stale_clearance_and_restores_pending_posture()
 
 
 def test_rebuild_refresh_sets_pending_confirmation_reentry_until_fully_reearned():
-    updates = operator_control_center._apply_reset_reentry_rebuild_refresh_reentry_control(
+    updates = operator_resolution_trend._apply_reset_reentry_rebuild_refresh_reentry_control(
         {
             "closure_forecast_reset_reentry_rebuild_freshness_status": "mixed-age",
             "decayed_rebuilt_clearance_reentry_rate": 0.10,
@@ -6661,7 +6663,7 @@ def test_rebuild_refresh_sets_pending_confirmation_reentry_until_fully_reearned(
 
 
 def test_rebuild_refresh_reenters_clearance_and_restores_earlier_clear_when_fully_earned():
-    updates = operator_control_center._apply_reset_reentry_rebuild_refresh_reentry_control(
+    updates = operator_resolution_trend._apply_reset_reentry_rebuild_refresh_reentry_control(
         {
             "closure_forecast_reset_reentry_rebuild_freshness_status": "fresh",
             "closure_forecast_stability_status": "stable",
@@ -6696,7 +6698,7 @@ def test_rebuild_refresh_reenters_clearance_and_restores_earlier_clear_when_full
 
 
 def test_rebuild_reentry_persistence_keeps_confirm_soon_while_holding():
-    updates = operator_control_center._apply_reset_reentry_rebuild_reentry_persistence_and_churn_control(
+    updates = operator_resolution_trend._apply_reset_reentry_rebuild_reentry_persistence_and_churn_control(
         {
             "closure_forecast_reset_reentry_rebuild_reentry_status": "reentered-confirmation-rebuild",
             "closure_forecast_reset_reentry_rebuild_refresh_recovery_status": "reentering-confirmation-rebuild",
@@ -6726,7 +6728,7 @@ def test_rebuild_reentry_persistence_keeps_confirm_soon_while_holding():
 
 
 def test_rebuild_reentry_churn_softens_clearance_back_toward_hold():
-    updates = operator_control_center._apply_reset_reentry_rebuild_reentry_persistence_and_churn_control(
+    updates = operator_resolution_trend._apply_reset_reentry_rebuild_reentry_persistence_and_churn_control(
         {
             "closure_forecast_reset_reentry_rebuild_reentry_status": "reentered-clearance-rebuild",
             "closure_forecast_reset_reentry_rebuild_refresh_recovery_status": "reentering-clearance-rebuild",
@@ -6758,7 +6760,7 @@ def test_rebuild_reentry_churn_softens_clearance_back_toward_hold():
 
 
 def test_rebuild_reentry_refresh_sets_pending_confirmation_restore_until_fully_restored():
-    updates = operator_control_center._apply_reset_reentry_rebuild_reentry_refresh_restore_control(
+    updates = operator_resolution_trend._apply_reset_reentry_rebuild_reentry_refresh_restore_control(
         {
             "closure_forecast_reset_reentry_rebuild_reentry_freshness_status": "mixed-age",
             "decayed_reentered_rebuild_clearance_rate": 0.12,
@@ -6792,7 +6794,7 @@ def test_rebuild_reentry_refresh_sets_pending_confirmation_restore_until_fully_r
 
 
 def test_rebuild_reentry_refresh_restores_clearance_and_earlier_clear_when_fully_earned():
-    updates = operator_control_center._apply_reset_reentry_rebuild_reentry_refresh_restore_control(
+    updates = operator_resolution_trend._apply_reset_reentry_rebuild_reentry_refresh_restore_control(
         {
             "closure_forecast_reset_reentry_rebuild_reentry_freshness_status": "fresh",
             "closure_forecast_stability_status": "stable",
@@ -6828,7 +6830,7 @@ def test_rebuild_reentry_refresh_restores_clearance_and_earlier_clear_when_fully
 
 
 def test_rebuild_reentry_restore_persistence_keeps_confirm_soon_while_holding():
-    updates = operator_control_center._apply_reset_reentry_rebuild_reentry_restore_persistence_and_churn_control(
+    updates = operator_resolution_trend._apply_reset_reentry_rebuild_reentry_restore_persistence_and_churn_control(
         {
             "closure_forecast_reset_reentry_rebuild_reentry_status": "reentered-confirmation-rebuild",
             "closure_forecast_reset_reentry_rebuild_reentry_restore_status": "restored-confirmation-rebuild-reentry",
@@ -6859,7 +6861,7 @@ def test_rebuild_reentry_restore_persistence_keeps_confirm_soon_while_holding():
 
 
 def test_rebuild_reentry_restore_churn_softens_clearance_back_toward_hold():
-    updates = operator_control_center._apply_reset_reentry_rebuild_reentry_restore_persistence_and_churn_control(
+    updates = operator_resolution_trend._apply_reset_reentry_rebuild_reentry_restore_persistence_and_churn_control(
         {
             "closure_forecast_reset_reentry_rebuild_reentry_status": "reentered-clearance-rebuild",
             "closure_forecast_reset_reentry_rebuild_reentry_restore_status": "restored-clearance-rebuild-reentry",
@@ -6893,7 +6895,7 @@ def test_rebuild_reentry_restore_churn_softens_clearance_back_toward_hold():
 
 
 def test_rebuild_reentry_restore_freshness_mixed_age_softens_confirmation_restore():
-    updates = operator_control_center._apply_reset_reentry_rebuild_reentry_restore_freshness_reset_control(
+    updates = operator_resolution_trend._apply_reset_reentry_rebuild_reentry_restore_freshness_reset_control(
         {
             "closure_forecast_reset_reentry_rebuild_reentry_restore_churn_status": "none",
         },
@@ -6926,7 +6928,7 @@ def test_rebuild_reentry_restore_freshness_mixed_age_softens_confirmation_restor
 
 
 def test_rebuild_reentry_restore_freshness_stale_resets_clearance_restore():
-    updates = operator_control_center._apply_reset_reentry_rebuild_reentry_restore_freshness_reset_control(
+    updates = operator_resolution_trend._apply_reset_reentry_rebuild_reentry_restore_freshness_reset_control(
         {
             "closure_forecast_reset_reentry_rebuild_reentry_restore_churn_status": "none",
         },
@@ -6962,7 +6964,7 @@ def test_rebuild_reentry_restore_freshness_stale_resets_clearance_restore():
 
 
 def test_rebuild_reentry_restore_refresh_pending_confirmation_rerestore_holds_weaker_posture():
-    updates = operator_control_center._apply_reset_reentry_rebuild_reentry_restore_refresh_rerestore_control(
+    updates = operator_resolution_trend._apply_reset_reentry_rebuild_reentry_restore_refresh_rerestore_control(
         {
             "closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_status": "mixed-age",
             "decayed_restored_rebuild_reentry_clearance_rate": 0.22,
@@ -7003,7 +7005,7 @@ def test_rebuild_reentry_restore_refresh_pending_confirmation_rerestore_holds_we
 
 
 def test_rebuild_reentry_restore_refresh_rerestored_clearance_reenables_clear_posture():
-    updates = operator_control_center._apply_reset_reentry_rebuild_reentry_restore_refresh_rerestore_control(
+    updates = operator_resolution_trend._apply_reset_reentry_rebuild_reentry_restore_refresh_rerestore_control(
         {
             "closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_status": "fresh",
             "decayed_restored_rebuild_reentry_clearance_rate": 0.63,
@@ -7046,7 +7048,7 @@ def test_rebuild_reentry_restore_refresh_rerestored_clearance_reenables_clear_po
 
 
 def test_rererestore_refresh_pending_confirmation_rerererestore_holds_weaker_posture():
-    updates = operator_control_center._apply_reset_reentry_rebuild_reentry_restore_rererestore_refresh_rerererestore_control(
+    updates = operator_resolution_trend._apply_reset_reentry_rebuild_reentry_restore_rererestore_refresh_rerererestore_control(
         {
             "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status": "mixed-age",
             "decayed_rererestored_rebuild_reentry_clearance_rate": 0.18,
@@ -7091,7 +7093,7 @@ def test_rererestore_refresh_pending_confirmation_rerererestore_holds_weaker_pos
 
 
 def test_rererestore_refresh_rerererestored_clearance_reenables_clear_posture():
-    updates = operator_control_center._apply_reset_reentry_rebuild_reentry_restore_rererestore_refresh_rerererestore_control(
+    updates = operator_resolution_trend._apply_reset_reentry_rebuild_reentry_restore_rererestore_refresh_rerererestore_control(
         {
             "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status": "fresh",
             "decayed_rererestored_rebuild_reentry_clearance_rate": 0.61,
@@ -7139,7 +7141,7 @@ def test_rererestore_refresh_rerererestored_clearance_reenables_clear_posture():
 
 
 def test_rerererestore_persistence_holding_confirmation_keeps_stronger_posture():
-    updates = operator_control_center._apply_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_and_churn_control(
+    updates = operator_resolution_trend._apply_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_and_churn_control(
         {
             "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status": "fresh",
         },
@@ -7175,7 +7177,7 @@ def test_rerererestore_persistence_holding_confirmation_keeps_stronger_posture()
 
 
 def test_rerererestore_churn_softens_clearance_posture():
-    updates = operator_control_center._apply_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_and_churn_control(
+    updates = operator_resolution_trend._apply_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_and_churn_control(
         {
             "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status": "mixed-age",
         },
@@ -7304,7 +7306,7 @@ def test_operator_snapshot_learns_when_soft_exception_was_overcautious(tmp_path:
         ],
     )
     monkeypatch.setattr(
-        "src.operator_control_center._build_confidence_calibration",
+        "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
             "confidence_validation_status": "noisy",
             "confidence_window_runs": 8,
@@ -7320,7 +7322,7 @@ def test_operator_snapshot_learns_when_soft_exception_was_overcautious(tmp_path:
             "confidence_calibration_summary": "Recent high-confidence guidance has missed often enough that operators should verify before overcommitting.",
         },
     )
-    monkeypatch.setattr("src.operator_control_center._was_resolved_then_reopened", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr("src.operator_resolution_trend._was_resolved_then_reopened", lambda *_args, **_kwargs: True)
 
     snapshot = build_operator_snapshot(report, output_dir=tmp_path)
     summary = snapshot["operator_summary"]
