@@ -21,6 +21,29 @@ def _load_json(path: Path | None) -> dict:
     return json.loads(path.read_text())
 
 
+def _first_present(*values):
+    for value in values:
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            return text
+    return ""
+
+
+def _weekly_story_value(weekly_story: dict, key: str, *fallbacks: object) -> str:
+    return _first_present(weekly_story.get(key), *fallbacks)
+
+
+def _weekly_section_value(
+    weekly_sections: dict[str, dict],
+    section_id: str,
+    field: str,
+    *fallbacks: object,
+) -> str:
+    return _first_present((weekly_sections.get(section_id) or {}).get(field), *fallbacks)
+
+
 def _queue_counts(summary: dict) -> str:
     counts = summary.get("counts", {})
     return (
@@ -125,29 +148,29 @@ def render_scheduled_handoff_markdown(payload: dict) -> str:
         f"<!-- {issue_candidate.get('marker', '')} -->",
         "",
         f"- Generated: `{payload.get('generated_at', '')}`",
-        f"- Headline: {weekly_story.get('headline', summary.get('headline', 'No operator triage items are currently surfaced.'))}",
-        f"- Weekly decision: {weekly_story.get('decision', weekly_pack.get('what_to_do_this_week', summary.get('what_to_do_next', 'Continue the normal operator loop.')))}",
-        f"- Why this week: {weekly_story.get('why_this_week', summary.get('why_it_matters', 'No additional operator impact is recorded.'))}",
-        f"- Next workflow step: {weekly_story.get('next_step', 'Open the standard workbook first, then use --control-center for read-only triage.')}",
+        f"- Headline: {_weekly_story_value(weekly_story, 'headline', weekly_pack.get('portfolio_headline'), summary.get('headline'), 'No operator triage items are currently surfaced.')}",
+        f"- Weekly decision: {_weekly_story_value(weekly_story, 'decision', weekly_pack.get('what_to_do_this_week'), summary.get('what_to_do_next'), 'Continue the normal operator loop.')}",
+        f"- Why this week: {_weekly_story_value(weekly_story, 'why_this_week', weekly_pack.get('queue_pressure_summary'), summary.get('why_it_matters'), 'No additional operator impact is recorded.')}",
+        f"- Next workflow step: {_weekly_story_value(weekly_story, 'next_step', weekly_pack.get('next_best_workflow_step'), 'Open the standard workbook first, then use --control-center for read-only triage.')}",
         f"- What changed: {summary.get('what_changed', 'No operator change summary is recorded.')}",
         f"- Why it matters: {summary.get('why_it_matters', 'No additional operator impact is recorded.')}",
         f"- What to do next: {summary.get('what_to_do_next', 'Continue the normal operator loop.')}",
-        f"- Action Sync readiness: {(weekly_sections.get('action-sync-readiness') or {}).get('headline', (summary.get('action_sync_summary') or {}).get('summary', 'No current campaign needs Action Sync yet, so the safest next move is to keep the story local.'))}",
-        f"- Next Action Sync step: {(weekly_sections.get('action-sync-readiness') or {}).get('next_step', summary.get('next_action_sync_step', 'Stay local for now; no current campaign needs preview or apply.'))}",
-        f"- Apply packet: {(weekly_sections.get('apply-packet') or {}).get('headline', (summary.get('apply_readiness_summary') or {}).get('summary', 'No current campaign has a safe execution handoff yet, so the local story should stay local for now.'))}",
-        f"- Next apply candidate: {(weekly_sections.get('apply-packet') or {}).get('next_step', (summary.get('next_apply_candidate') or {}).get('summary', 'Stay local for now; no current campaign has a safe execution handoff.'))}",
+        f"- Action Sync readiness: {_weekly_section_value(weekly_sections, 'action-sync-readiness', 'headline', weekly_pack.get('action_sync_summary'), (summary.get('action_sync_summary') or {}).get('summary'), 'No current campaign needs Action Sync yet, so the safest next move is to keep the story local.')}",
+        f"- Next Action Sync step: {_weekly_section_value(weekly_sections, 'action-sync-readiness', 'next_step', weekly_pack.get('next_action_sync_step'), summary.get('next_action_sync_step'), 'Stay local for now; no current campaign needs preview or apply.')}",
+        f"- Apply packet: {_weekly_section_value(weekly_sections, 'apply-packet', 'headline', weekly_pack.get('apply_readiness_summary'), (summary.get('apply_readiness_summary') or {}).get('summary'), 'No current campaign has a safe execution handoff yet, so the local story should stay local for now.')}",
+        f"- Next apply candidate: {_weekly_section_value(weekly_sections, 'apply-packet', 'next_step', weekly_pack.get('next_apply_candidate'), (summary.get('next_apply_candidate') or {}).get('summary'), 'Stay local for now; no current campaign has a safe execution handoff.')}",
         f"- Action Sync command hint: {(summary.get('next_apply_candidate') or {}).get('apply_command') or (summary.get('next_apply_candidate') or {}).get('preview_command') or 'No Action Sync command is recommended yet.'}",
-        f"- Post-apply monitoring: {(weekly_sections.get('post-apply-monitoring') or {}).get('headline', (summary.get('campaign_outcomes_summary') or {}).get('summary', 'No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.'))}",
-        f"- Next monitoring step: {(weekly_sections.get('post-apply-monitoring') or {}).get('next_step', (summary.get('next_monitoring_step') or {}).get('summary', 'Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.'))}",
-        f"- Campaign tuning: {(weekly_sections.get('campaign-tuning') or {}).get('headline', (summary.get('campaign_tuning_summary') or {}).get('summary', 'Campaign tuning is neutral because there is not enough outcome history yet to bias tied recommendations.'))}",
-        f"- {ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}: {(weekly_sections.get('campaign-tuning') or {}).get('next_step', (summary.get('next_tuned_campaign') or {}).get('summary', 'No current campaign needs a tuning tie-break yet.'))}",
-        f"- Historical portfolio intelligence: {(weekly_sections.get('historical-portfolio-intelligence') or {}).get('headline', (summary.get('intervention_ledger_summary') or {}).get('summary', 'Historical portfolio intelligence is still thin, so the weekly story should stay grounded in the current run and recent operator queue.'))}",
-        f"- Next historical focus: {(weekly_sections.get('historical-portfolio-intelligence') or {}).get('next_step', (summary.get('next_historical_focus') or {}).get('summary', 'Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet.'))}",
-        f"- {ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}: {(weekly_sections.get('automation-guidance') or {}).get('headline', (summary.get('automation_guidance_summary') or {}).get('summary', 'Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture.'))}",
-        f"- Next safe automation step: {(weekly_sections.get('automation-guidance') or {}).get('next_step', (summary.get('next_safe_automation_step') or {}).get('summary', 'Stay local for now; no current campaign has a stronger safe automation posture than manual review.'))}",
+        f"- Post-apply monitoring: {_weekly_section_value(weekly_sections, 'post-apply-monitoring', 'headline', weekly_pack.get('campaign_outcomes_summary'), (summary.get('campaign_outcomes_summary') or {}).get('summary'), 'No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.')}",
+        f"- Next monitoring step: {_weekly_section_value(weekly_sections, 'post-apply-monitoring', 'next_step', weekly_pack.get('next_monitoring_step'), (summary.get('next_monitoring_step') or {}).get('summary'), 'Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.')}",
+        f"- Campaign tuning: {_weekly_section_value(weekly_sections, 'campaign-tuning', 'headline', weekly_pack.get('campaign_tuning_summary'), (summary.get('campaign_tuning_summary') or {}).get('summary'), 'Campaign tuning is neutral because there is not enough outcome history yet to bias tied recommendations.')}",
+        f"- {ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}: {_weekly_section_value(weekly_sections, 'campaign-tuning', 'next_step', weekly_pack.get('next_tie_break_candidate'), weekly_pack.get('next_tuned_campaign'), (summary.get('next_tuned_campaign') or {}).get('summary'), 'No current campaign needs a tuning tie-break yet.')}",
+        f"- Historical portfolio intelligence: {_weekly_section_value(weekly_sections, 'historical-portfolio-intelligence', 'headline', weekly_pack.get('historical_portfolio_intelligence'), (summary.get('intervention_ledger_summary') or {}).get('summary'), 'Historical portfolio intelligence is still thin, so the weekly story should stay grounded in the current run and recent operator queue.')}",
+        f"- Next historical focus: {_weekly_section_value(weekly_sections, 'historical-portfolio-intelligence', 'next_step', weekly_pack.get('next_historical_focus'), (summary.get('next_historical_focus') or {}).get('summary'), 'Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet.')}",
+        f"- {ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}: {_weekly_section_value(weekly_sections, 'automation-guidance', 'headline', weekly_pack.get('automation_guidance_summary'), (summary.get('automation_guidance_summary') or {}).get('summary'), 'Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture.')}",
+        f"- Next safe automation step: {_weekly_section_value(weekly_sections, 'automation-guidance', 'next_step', weekly_pack.get('next_safe_automation_step'), (summary.get('next_safe_automation_step') or {}).get('summary'), 'Stay local for now; no current campaign has a stronger safe automation posture than manual review.')}",
         f"- Safe automation command: {(summary.get('next_safe_automation_step') or {}).get('recommended_command', 'No safe automation command is recommended yet.')}",
-        f"- {ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}: {(weekly_sections.get('approval-workflow') or {}).get('headline', (summary.get('approval_workflow_summary') or {}).get('summary', 'No current approval needs review yet, so the approval workflow can stay local for now.'))}",
-        f"- {ACTION_SYNC_CANONICAL_LABELS['next_approval_review']}: {(weekly_sections.get('approval-workflow') or {}).get('next_step', (summary.get('next_approval_review') or {}).get('summary', 'Stay local for now; no current approval needs review.'))}",
+        f"- {ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}: {_weekly_section_value(weekly_sections, 'approval-workflow', 'headline', weekly_pack.get('approval_workflow_summary'), (summary.get('approval_workflow_summary') or {}).get('summary'), 'No current approval needs review yet, so the approval workflow can stay local for now.')}",
+        f"- {ACTION_SYNC_CANONICAL_LABELS['next_approval_review']}: {_weekly_section_value(weekly_sections, 'approval-workflow', 'next_step', weekly_pack.get('next_approval_review'), (summary.get('next_approval_review') or {}).get('summary'), 'Stay local for now; no current approval needs review.')}",
         f"- Trend: `{summary.get('trend_status', 'stable')}` — {summary.get('trend_summary', 'No trend summary is recorded yet.')}",
         f"- Aging status: `{summary.get('aging_status', 'fresh')}`",
         f"- Attention counts: new={summary.get('new_attention_count', 0)}, resolved={resolved_count}, persisting={persisting_count}, reopened={summary.get('reopened_attention_count', 0)}",
