@@ -180,6 +180,9 @@ class AuditReport:
     action_sync_automation: list[dict] = field(default_factory=list)
     automation_guidance_summary: dict = field(default_factory=dict)
     next_safe_automation_step: dict = field(default_factory=dict)
+    approval_ledger: list[dict] = field(default_factory=list)
+    approval_workflow_summary: dict = field(default_factory=dict)
+    next_approval_review: dict = field(default_factory=dict)
     security_posture: dict = field(default_factory=dict)
     security_governance_preview: list[dict] = field(default_factory=list)
     collections: dict[str, dict] = field(default_factory=dict)
@@ -368,6 +371,12 @@ class AuditReport:
             historical_portfolio_intelligence=[],
             intervention_ledger_summary={},
             next_historical_focus={},
+            action_sync_automation=[],
+            automation_guidance_summary={},
+            next_safe_automation_step={},
+            approval_ledger=[],
+            approval_workflow_summary={},
+            next_approval_review={},
             security_posture=portfolio_security,
             security_governance_preview=security_governance_preview,
             collections=collections,
@@ -443,6 +452,12 @@ class AuditReport:
             "historical_portfolio_intelligence": self.historical_portfolio_intelligence,
             "intervention_ledger_summary": self.intervention_ledger_summary,
             "next_historical_focus": self.next_historical_focus,
+            "action_sync_automation": self.action_sync_automation,
+            "automation_guidance_summary": self.automation_guidance_summary,
+            "next_safe_automation_step": self.next_safe_automation_step,
+            "approval_ledger": self.approval_ledger,
+            "approval_workflow_summary": self.approval_workflow_summary,
+            "next_approval_review": self.next_approval_review,
             "security_posture": self.security_posture,
             "security_governance_preview": self.security_governance_preview,
             "collections": self.collections,

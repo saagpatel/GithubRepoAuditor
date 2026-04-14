@@ -529,6 +529,7 @@ def _top_attention_section(data: dict) -> str:
             f"<br><span class='muted'><strong>Apply Packet:</strong> {escape(item.get('apply_packet_line', 'Apply Packet: no current execution handoff is surfaced.'))}</span>"
             f"<br><span class='muted'><strong>Post-Apply Monitoring:</strong> {escape(item.get('post_apply_line', 'Post-Apply Monitoring: no recent Action Sync apply needs follow-up yet.'))}</span>"
             f"<br><span class='muted'><strong>Campaign Tuning:</strong> {escape(item.get('campaign_tuning_line', 'Campaign Tuning: recommendations stay neutral until more outcome history is available.'))}</span>"
+            f"<br><span class='muted'><strong>{ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}:</strong> {escape(item.get('approval_line', 'Approval Workflow: no current approval needs review yet.'))}</span>"
             f"<br><span class='muted'><strong>Checkpoint timing:</strong> {escape(build_follow_through_checkpoint_status_label(item))}</span>"
             "</li>"
         )
@@ -566,6 +567,7 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
             f"<br><span class='muted'><strong>Post-Apply Monitoring:</strong> {escape(item.get('post_apply_line', 'Post-Apply Monitoring: no recent Action Sync apply needs follow-up yet.'))}</span>"
             f"<br><span class='muted'><strong>Campaign Tuning:</strong> {escape(item.get('campaign_tuning_line', 'Campaign Tuning: recommendations stay neutral until more outcome history is available.'))}</span>"
             f"<br><span class='muted'><strong>{ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}:</strong> {escape(item.get('automation_line', 'Automation Guidance: keep the next step human-led until a bounded safe posture is surfaced.'))}</span>"
+            f"<br><span class='muted'><strong>{ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}:</strong> {escape(item.get('approval_line', 'Approval Workflow: no current approval needs review yet.'))}</span>"
             f"<br><span class='muted'><strong>Checkpoint Timing:</strong> {escape(item.get('follow_through_checkpoint_timing', 'Unknown'))}</span>"
             f"<br><span class='muted'><strong>Next Checkpoint:</strong> {escape(item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</span>"
             "</li>"
@@ -631,6 +633,7 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
               <div class="meta-line"><strong>Campaign Tuning:</strong> {escape(briefing.get('campaign_tuning_line', 'Campaign Tuning: recommendations stay neutral until more outcome history is available.'))}</div>
               <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['historical_portfolio_intelligence']}:</strong> {escape(briefing.get('historical_intelligence_line', 'Historical Portfolio Intelligence: keep the weekly story anchored in the current run until more cross-run evidence accumulates.'))}</div>
               <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}:</strong> {escape(briefing.get('automation_line', 'Automation Guidance: keep the next step human-led until a bounded safe posture is surfaced.'))}</div>
+              <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}:</strong> {escape(briefing.get('approval_line', 'Approval Workflow: no current approval needs review yet.'))}</div>
               <div class="meta-line"><strong>Checkpoint Timing:</strong> {escape(briefing.get('checkpoint_timing_line', 'Unknown'))}</div>
               <div class="meta-line"><strong>What Would Count As Progress:</strong> {escape(briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</div>
             </div>
@@ -670,6 +673,8 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
           <div class="meta-line"><strong>Next Historical Focus:</strong> {escape(weekly_pack.get('next_historical_focus', 'Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet.'))}</div>
           <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}:</strong> {escape(weekly_pack.get('automation_guidance_summary', 'Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture.'))}</div>
           <div class="meta-line"><strong>Next Safe Automation Step:</strong> {escape(weekly_pack.get('next_safe_automation_step', 'Stay local for now; no current campaign has a stronger safe automation posture than manual review.'))}</div>
+          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}:</strong> {escape(weekly_pack.get('approval_workflow_summary', 'No current approval needs review yet, so the approval workflow can stay local for now.'))}</div>
+          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['next_approval_review']}:</strong> {escape(weekly_pack.get('next_approval_review', 'Stay local for now; no current approval needs review.'))}</div>
           <h3>{ACTION_SYNC_CANONICAL_LABELS['readiness']}</h3>
           {''.join(readiness_blocks)}
           <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['apply_packet']}:</strong> {escape(weekly_pack.get('apply_readiness_summary', 'No current campaign has a safe execution handoff yet, so the local story should stay local for now.'))}</div>
@@ -702,6 +707,10 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
           {''.join(f"<div class='meta-line'><strong>Approval First:</strong> {escape(item.get('label', item.get('campaign_type', 'Campaign')))} — {escape(item.get('summary', 'No automation guidance summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_approval_first_campaigns', [])[:3])}
           {''.join(f"<div class='meta-line'><strong>Follow-Up Safe:</strong> {escape(item.get('label', item.get('campaign_type', 'Campaign')))} — {escape(item.get('summary', 'No automation guidance summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_follow_up_safe_campaigns', [])[:3])}
           {''.join(f"<div class='meta-line'><strong>Manual Only:</strong> {escape(item.get('label', item.get('campaign_type', 'Campaign')))} — {escape(item.get('summary', 'No automation guidance summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_manual_only_campaigns', [])[:3])}
+          {''.join(f"<div class='meta-line'><strong>Needs Re-Approval:</strong> {escape(item.get('label', item.get('subject_key', 'Approval')))} — {escape(item.get('summary', 'No approval summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_needs_reapproval_approvals', [])[:3])}
+          {''.join(f"<div class='meta-line'><strong>Ready For Review:</strong> {escape(item.get('label', item.get('subject_key', 'Approval')))} — {escape(item.get('summary', 'No approval summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_ready_for_review_approvals', [])[:3])}
+          {''.join(f"<div class='meta-line'><strong>{ACTION_SYNC_CANONICAL_LABELS['approved_but_manual']}:</strong> {escape(item.get('label', item.get('subject_key', 'Approval')))} — {escape(item.get('summary', 'No approval summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_approved_manual_approvals', [])[:3])}
+          {''.join(f"<div class='meta-line'><strong>Blocked Approval:</strong> {escape(item.get('label', item.get('subject_key', 'Approval')))} — {escape(item.get('summary', 'No approval summary is recorded yet.'))}</div>" for item in weekly_pack.get('top_blocked_approvals', [])[:3])}
           <div class="meta-line"><strong>Operator Focus:</strong> {escape(weekly_pack.get('operator_focus_summary', 'No operator focus bucket is currently surfaced.'))}</div>
           <div class="meta-line"><strong>Next Checkpoint:</strong> {escape(weekly_pack.get('follow_through_checkpoint_summary', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</div>
           <h3>Operator Focus</h3>
@@ -1073,6 +1082,8 @@ def _campaign_section(report_data: dict) -> str:
           <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}:</strong> {escape((report_data.get('next_tuned_campaign') or {}).get('summary', (report_data.get('operator_summary', {}).get('next_tuned_campaign', {}) or {}).get('summary', 'No current campaign needs a tie-break candidate yet.')))}</div>
           <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}:</strong> {escape((report_data.get('automation_guidance_summary') or {}).get('summary', (report_data.get('operator_summary', {}).get('automation_guidance_summary', {}) or {}).get('summary', 'Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture.')))}</div>
           <div class="meta-line"><strong>Next Safe Automation Step:</strong> {escape((report_data.get('next_safe_automation_step') or {}).get('summary', (report_data.get('operator_summary', {}).get('next_safe_automation_step', {}) or {}).get('summary', 'Stay local for now; no current campaign has a stronger safe automation posture than manual review.')))}</div>
+          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}:</strong> {escape((report_data.get('approval_workflow_summary') or {}).get('summary', (report_data.get('operator_summary', {}).get('approval_workflow_summary', {}) or {}).get('summary', 'No current approval needs review yet, so the approval workflow can stay local for now.')))}</div>
+          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['next_approval_review']}:</strong> {escape((report_data.get('next_approval_review') or {}).get('summary', (report_data.get('operator_summary', {}).get('next_approval_review', {}) or {}).get('summary', 'Stay local for now; no current approval needs review.')))}</div>
           <div class="meta-line"><strong>GitHub Projects:</strong> {escape(github_projects.get('status', 'disabled'))}
             ({escape(github_projects.get('project_owner', '—'))} #{github_projects.get('project_number', 0)}, {github_projects.get('item_count', 0)} items)</div>
         </div>

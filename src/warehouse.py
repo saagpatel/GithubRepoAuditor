@@ -8,7 +8,7 @@ from pathlib import Path
 from src.models import AuditReport
 
 WAREHOUSE_FILENAME = "portfolio-warehouse.db"
-WAREHOUSE_SCHEMA_VERSION = 14
+WAREHOUSE_SCHEMA_VERSION = 15
 
 
 def write_warehouse_snapshot(
@@ -68,6 +68,7 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             campaign_tuning_summary_json TEXT NOT NULL DEFAULT '{}',
             historical_portfolio_intelligence_json TEXT NOT NULL DEFAULT '{}',
             automation_guidance_summary_json TEXT NOT NULL DEFAULT '{}',
+            approval_workflow_summary_json TEXT NOT NULL DEFAULT '{}',
             implementation_hotspots_summary_json TEXT NOT NULL DEFAULT '{}',
             scenario_summary_json TEXT NOT NULL,
             campaign_summary_json TEXT NOT NULL DEFAULT '{}',
@@ -376,6 +377,34 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             PRIMARY KEY (run_id, campaign_type)
         );
 
+        CREATE TABLE IF NOT EXISTS approval_ledger (
+            run_id TEXT NOT NULL,
+            approval_id TEXT NOT NULL,
+            approval_subject_type TEXT NOT NULL,
+            subject_key TEXT NOT NULL,
+            approval_state TEXT NOT NULL,
+            source_run_id TEXT NOT NULL,
+            fingerprint TEXT NOT NULL,
+            approved_at TEXT,
+            approved_by TEXT NOT NULL DEFAULT '',
+            apply_ready_after_approval INTEGER NOT NULL DEFAULT 0,
+            details_json TEXT NOT NULL DEFAULT '{}',
+            PRIMARY KEY (run_id, approval_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS approval_records (
+            approval_id TEXT NOT NULL,
+            fingerprint TEXT NOT NULL,
+            approval_subject_type TEXT NOT NULL,
+            subject_key TEXT NOT NULL,
+            source_run_id TEXT NOT NULL,
+            approved_at TEXT NOT NULL,
+            approved_by TEXT NOT NULL DEFAULT '',
+            approval_note TEXT NOT NULL DEFAULT '',
+            details_json TEXT NOT NULL DEFAULT '{}',
+            PRIMARY KEY (approval_id, fingerprint)
+        );
+
         CREATE TABLE IF NOT EXISTS repo_implementation_hotspots (
             run_id TEXT NOT NULL,
             repo TEXT NOT NULL,
@@ -558,6 +587,7 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     _ensure_column(conn, "audit_runs", "campaign_tuning_summary_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(conn, "audit_runs", "historical_portfolio_intelligence_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(conn, "audit_runs", "automation_guidance_summary_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(conn, "audit_runs", "approval_workflow_summary_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(conn, "audit_runs", "implementation_hotspots_summary_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(
         conn, "portfolio_catalog_entries", "maturity_program", "TEXT NOT NULL DEFAULT ''"
@@ -611,14 +641,14 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             portfolio_outcomes_summary_json, operator_effectiveness_summary_json, high_pressure_queue_history_json,
             action_sync_outcomes_summary_json,
             campaign_tuning_summary_json,
-            historical_portfolio_intelligence_json, automation_guidance_summary_json, implementation_hotspots_summary_json,
+            historical_portfolio_intelligence_json, automation_guidance_summary_json, approval_workflow_summary_json, implementation_hotspots_summary_json,
             campaign_summary_json, writeback_preview_json, writeback_results_json,
             managed_state_drift_json, rollback_preview_json, campaign_history_json,
             governance_preview_json, governance_approval_json, governance_results_json,
             governance_history_json, governance_drift_json, governance_summary_json, review_summary_json, review_alerts_json,
             preflight_summary_json, material_changes_json, review_targets_json, review_history_json, watch_state_json,
             operator_summary_json, operator_queue_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             run_id,
@@ -652,6 +682,7 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             json.dumps(report.campaign_tuning_summary),
             json.dumps(report.intervention_ledger_summary),
             json.dumps(report.automation_guidance_summary),
+            json.dumps(report.approval_workflow_summary),
             json.dumps(report.implementation_hotspots_summary),
             json.dumps(report.campaign_summary),
             json.dumps(report.writeback_preview),
@@ -1310,6 +1341,30 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             ),
         )
 
+    for row in report.approval_ledger:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO approval_ledger (
+                run_id, approval_id, approval_subject_type, subject_key, approval_state,
+                source_run_id, fingerprint, approved_at, approved_by,
+                apply_ready_after_approval, details_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                run_id,
+                row.get("approval_id", ""),
+                row.get("approval_subject_type", ""),
+                row.get("subject_key", ""),
+                row.get("approval_state", "not-applicable"),
+                row.get("source_run_id", ""),
+                row.get("fingerprint", ""),
+                row.get("approved_at"),
+                row.get("approved_by", ""),
+                int(bool(row.get("apply_ready_after_approval", False))),
+                json.dumps(row),
+            ),
+        )
+
     for result in (
         report.writeback_results.get("results", [])
         if isinstance(report.writeback_results, dict)
@@ -1579,6 +1634,134 @@ def load_governance_approval(output_dir: Path, source_run_id: str) -> dict | Non
     return json.loads(row["details_json"] or "{}")
 
 
+def save_approval_record(output_dir: Path, record: dict) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(output_dir / WAREHOUSE_FILENAME)
+    conn.row_factory = sqlite3.Row
+    try:
+        _ensure_schema(conn)
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO approval_records (
+                approval_id, fingerprint, approval_subject_type, subject_key,
+                source_run_id, approved_at, approved_by, approval_note, details_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                record.get("approval_id", ""),
+                record.get("fingerprint", ""),
+                record.get("approval_subject_type", ""),
+                record.get("subject_key", ""),
+                record.get("source_run_id", ""),
+                record.get("approved_at", ""),
+                record.get("approved_by", ""),
+                record.get("approval_note", ""),
+                json.dumps(record),
+            ),
+        )
+        if record.get("approval_subject_type") == "governance" and record.get("subject_key") == "all":
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO governance_approvals (
+                    source_run_id, approved_at, scope, fingerprint, action_count,
+                    applyable_count, status, details_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record.get("source_run_id", ""),
+                    record.get("approved_at", ""),
+                    record.get("subject_key", "all"),
+                    record.get("fingerprint", ""),
+                    int((record.get("details_json") or {}).get("action_count", 0) or 0),
+                    int((record.get("details_json") or {}).get("applyable_count", 0) or 0),
+                    "approved",
+                    json.dumps(
+                        {
+                            "source_run_id": record.get("source_run_id", ""),
+                            "approved_at": record.get("approved_at", ""),
+                            "scope": record.get("subject_key", "all"),
+                            "fingerprint": record.get("fingerprint", ""),
+                            "action_count": int((record.get("details_json") or {}).get("action_count", 0) or 0),
+                            "applyable_count": int((record.get("details_json") or {}).get("applyable_count", 0) or 0),
+                            "status": "approved",
+                            "approved_by": record.get("approved_by", ""),
+                            "approval_note": record.get("approval_note", ""),
+                        }
+                    ),
+                ),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def load_approval_records(output_dir: Path, username: str, limit: int = 200) -> list[dict]:
+    conn = _connect(output_dir)
+    if conn is None:
+        return []
+    try:
+        rows = conn.execute(
+            """
+            SELECT approval_records.approval_id,
+                   approval_records.fingerprint,
+                   approval_records.approval_subject_type,
+                   approval_records.subject_key,
+                   approval_records.source_run_id,
+                   approval_records.approved_at,
+                   approval_records.approved_by,
+                   approval_records.approval_note,
+                   approval_records.details_json,
+                   audit_runs.generated_at
+            FROM approval_records
+            LEFT JOIN audit_runs ON audit_runs.run_id = approval_records.source_run_id
+            WHERE audit_runs.username = ? OR audit_runs.username IS NULL
+            ORDER BY approval_records.approved_at DESC
+            LIMIT ?
+            """,
+            (username, limit),
+        ).fetchall()
+        legacy_rows = conn.execute(
+            """
+            SELECT source_run_id, approved_at, scope, fingerprint, details_json
+            FROM governance_approvals
+            ORDER BY approved_at DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+    finally:
+        conn.close()
+    records: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for row in rows:
+        payload = json.loads(row["details_json"] or "{}")
+        payload.setdefault("approval_id", row["approval_id"])
+        payload.setdefault("fingerprint", row["fingerprint"])
+        payload.setdefault("approval_subject_type", row["approval_subject_type"])
+        payload.setdefault("subject_key", row["subject_key"])
+        payload.setdefault("source_run_id", row["source_run_id"])
+        payload.setdefault("approved_at", row["approved_at"])
+        payload.setdefault("approved_by", row["approved_by"])
+        payload.setdefault("approval_note", row["approval_note"])
+        key = (payload.get("approval_id", ""), payload.get("fingerprint", ""))
+        seen.add(key)
+        records.append(payload)
+    for row in legacy_rows:
+        approval_id = f"governance:{row['scope']}"
+        key = (approval_id, row["fingerprint"])
+        if key in seen:
+            continue
+        payload = json.loads(row["details_json"] or "{}")
+        payload.setdefault("approval_id", approval_id)
+        payload.setdefault("approval_subject_type", "governance")
+        payload.setdefault("subject_key", row["scope"])
+        payload.setdefault("source_run_id", row["source_run_id"])
+        payload.setdefault("fingerprint", row["fingerprint"])
+        payload.setdefault("approved_at", row["approved_at"])
+        records.append(payload)
+    return records[:limit]
+
+
 def load_governance_history(output_dir: Path, *, source_run_id: str, limit: int = 10) -> list[dict]:
     conn = _connect(output_dir)
     if conn is None:
@@ -1758,7 +1941,7 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
                    scorecards_summary_json, scorecard_programs_json,
                    portfolio_outcomes_summary_json, operator_effectiveness_summary_json, high_pressure_queue_history_json,
                    action_sync_outcomes_summary_json, campaign_tuning_summary_json,
-                   automation_guidance_summary_json,
+                   automation_guidance_summary_json, approval_workflow_summary_json,
                    historical_portfolio_intelligence_json, implementation_hotspots_summary_json,
                    campaign_summary_json, writeback_preview_json, writeback_results_json,
                    managed_state_drift_json, rollback_preview_json, campaign_history_json,
@@ -1802,6 +1985,7 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
                 "campaign_outcomes_summary": json.loads(row["action_sync_outcomes_summary_json"] or "{}"),
                 "campaign_tuning_summary": json.loads(row["campaign_tuning_summary_json"] or "{}"),
                 "automation_guidance_summary": json.loads(row["automation_guidance_summary_json"] or "{}"),
+                "approval_workflow_summary": json.loads(row["approval_workflow_summary_json"] or "{}"),
                 "intervention_ledger_summary": json.loads(row["historical_portfolio_intelligence_json"] or "{}"),
                 "implementation_hotspots_summary": json.loads(row["implementation_hotspots_summary_json"] or "{}"),
                 "campaign_summary": json.loads(row["campaign_summary_json"] or "{}"),
@@ -1847,6 +2031,12 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
                 ),
                 "next_safe_automation_step": _coerce_action_sync_snapshot_field(
                     operator_summary, "next_safe_automation_step", {}
+                ),
+                "approval_ledger": _coerce_action_sync_snapshot_field(
+                    operator_summary, "approval_ledger", []
+                ),
+                "next_approval_review": _coerce_action_sync_snapshot_field(
+                    operator_summary, "next_approval_review", {}
                 ),
                 "historical_portfolio_intelligence": _coerce_action_sync_snapshot_field(
                     operator_summary, "historical_portfolio_intelligence", []
@@ -2325,6 +2515,7 @@ def load_latest_operator_state(output_dir: Path, username: str) -> dict | None:
                    action_sync_outcomes_summary_json,
                    campaign_tuning_summary_json,
                    automation_guidance_summary_json,
+                   approval_workflow_summary_json,
                    historical_portfolio_intelligence_json, implementation_hotspots_summary_json,
                    review_summary_json, review_alerts_json, material_changes_json,
                    review_targets_json, review_history_json, watch_state_json,
@@ -2359,6 +2550,7 @@ def load_latest_operator_state(output_dir: Path, username: str) -> dict | None:
         "campaign_outcomes_summary": json.loads(row["action_sync_outcomes_summary_json"] or "{}"),
         "campaign_tuning_summary": json.loads(row["campaign_tuning_summary_json"] or "{}"),
         "automation_guidance_summary": json.loads(row["automation_guidance_summary_json"] or "{}"),
+        "approval_workflow_summary": json.loads(row["approval_workflow_summary_json"] or "{}"),
         "intervention_ledger_summary": json.loads(row["historical_portfolio_intelligence_json"] or "{}"),
         "implementation_hotspots_summary": json.loads(row["implementation_hotspots_summary_json"] or "{}"),
         "review_summary": json.loads(row["review_summary_json"] or "{}"),
@@ -2404,6 +2596,12 @@ def load_latest_operator_state(output_dir: Path, username: str) -> dict | None:
         ),
         "next_safe_automation_step": _coerce_action_sync_snapshot_field(
             operator_summary, "next_safe_automation_step", {}
+        ),
+        "approval_ledger": _coerce_action_sync_snapshot_field(
+            operator_summary, "approval_ledger", []
+        ),
+        "next_approval_review": _coerce_action_sync_snapshot_field(
+            operator_summary, "next_approval_review", {}
         ),
         "historical_portfolio_intelligence": _coerce_action_sync_snapshot_field(
             operator_summary, "historical_portfolio_intelligence", []

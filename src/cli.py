@@ -329,6 +329,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Filter governance surfaces to a specific operator state (default: all)",
     )
     parser.add_argument(
+        "--governance-scope",
+        choices=["all", "codeql", "secret-scanning", "push-protection", "code-security"],
+        default="all",
+        help="Select which governed control family a local approval should cover (default: all)",
+    )
+    parser.add_argument(
         "--auto-archive",
         action="store_true",
         help="Generate archive candidate report for consistently low-scoring repos",
@@ -354,10 +360,43 @@ def build_parser() -> argparse.ArgumentParser:
         help="Summarize the latest operator state without running a new audit",
     )
     parser.add_argument(
+        "--approval-center",
+        action="store_true",
+        help="Summarize the latest approval workflow state without running a new audit",
+    )
+    parser.add_argument(
         "--triage-view",
         choices=["all", "urgent", "ready", "blocked", "deferred"],
         default="all",
         help="Filter control-center triage output to one lane (default: all)",
+    )
+    parser.add_argument(
+        "--approval-view",
+        choices=["all", "ready", "approved", "needs-reapproval", "blocked", "applied"],
+        default="all",
+        help="Filter approval-center output to one approval state (default: all)",
+    )
+    parser.add_argument(
+        "--approve-governance",
+        action="store_true",
+        help="Capture a local governance approval from the latest governed preview",
+    )
+    parser.add_argument(
+        "--approve-packet",
+        action="store_true",
+        help="Capture a local campaign approval for the selected campaign packet",
+    )
+    parser.add_argument(
+        "--approval-reviewer",
+        type=str,
+        default=None,
+        help="Reviewer name recorded on local approvals (default: $USER, then git user.name, then local-operator)",
+    )
+    parser.add_argument(
+        "--approval-note",
+        type=str,
+        default="",
+        help="Optional free-text note stored with the local approval record",
     )
     parser.add_argument(
         "--preflight-mode",
@@ -660,6 +699,9 @@ def _report_from_dict(data: dict) -> AuditReport:
         action_sync_automation=data.get("action_sync_automation", []),
         automation_guidance_summary=data.get("automation_guidance_summary", {}),
         next_safe_automation_step=data.get("next_safe_automation_step", {}),
+        approval_ledger=data.get("approval_ledger", []),
+        approval_workflow_summary=data.get("approval_workflow_summary", {}),
+        next_approval_review=data.get("next_approval_review", {}),
         security_posture=data.get("security_posture", {}),
         security_governance_preview=data.get("security_governance_preview", []),
         collections=data.get("collections", {}),
@@ -807,6 +849,22 @@ def _latest_control_center_paths(output_dir: Path, username: str, generated_at: 
     )
 
 
+def _latest_approval_center_paths(output_dir: Path, username: str, generated_at: datetime) -> tuple[Path, Path]:
+    stamp = _date_str(generated_at)
+    return (
+        output_dir / f"approval-center-{username}-{stamp}.json",
+        output_dir / f"approval-center-{username}-{stamp}.md",
+    )
+
+
+def _latest_approval_receipt_paths(output_dir: Path, username: str, generated_at: datetime) -> tuple[Path, Path]:
+    stamp = _date_str(generated_at)
+    return (
+        output_dir / f"approval-receipt-{username}-{stamp}.json",
+        output_dir / f"approval-receipt-{username}-{stamp}.md",
+    )
+
+
 def _report_artifact_datetime(report_path: Path | None, fallback: datetime) -> datetime:
     if report_path:
         stem = report_path.stem
@@ -815,6 +873,195 @@ def _report_artifact_datetime(report_path: Path | None, fallback: datetime) -> d
             if parsed:
                 return parsed
     return fallback
+
+
+def _refresh_latest_report_state(
+    output_dir: Path,
+    args,
+) -> tuple[Path, dict, AuditReport]:
+    from src.diff import diff_reports
+    from src.governance_activation import build_governance_summary
+    from src.history import find_previous
+    from src.operator_control_center import normalize_review_state
+
+    report_path, report_data = _load_latest_report(output_dir)
+    if not report_path or not report_data:
+        raise FileNotFoundError("No existing audit report found in output directory")
+    diff_dict = None
+    previous_path = find_previous(report_path.name)
+    if previous_path:
+        diff_dict = diff_reports(
+            previous_path,
+            report_path,
+            portfolio_profile=args.portfolio_profile,
+            collection_name=args.collection,
+        ).to_dict()
+    report = _report_from_dict(report_data)
+    report_data = normalize_review_state(
+        report.to_dict(),
+        output_dir=output_dir,
+        diff_data=diff_dict,
+        portfolio_profile=args.portfolio_profile,
+        collection_name=args.collection,
+    )
+    report_data["latest_report_path"] = str(report_path)
+    report_data["governance_summary"] = build_governance_summary(report_data)
+    report = _report_from_dict(report_data)
+    report = _enrich_report_with_operator_state(
+        report,
+        output_dir=output_dir,
+        diff_dict=diff_dict,
+        triage_view=getattr(args, "triage_view", "all"),
+        portfolio_profile=args.portfolio_profile,
+        collection=args.collection,
+    )
+    return report_path, diff_dict or {}, report
+
+
+def _write_approval_center_artifacts(
+    report: AuditReport,
+    output_dir: Path,
+    *,
+    approval_view: str,
+) -> tuple[Path, Path, dict]:
+    from src.approval_ledger import load_approval_ledger_bundle, render_approval_center_markdown
+
+    report_data = report.to_dict()
+    bundle = load_approval_ledger_bundle(
+        output_dir,
+        report_data,
+        list(report.operator_queue or []),
+        approval_view=approval_view,
+    )
+    report.approval_ledger = bundle["approval_ledger"]
+    report.approval_workflow_summary = bundle["approval_workflow_summary"]
+    report.next_approval_review = bundle["next_approval_review"]
+    report.operator_queue = bundle.get("operator_queue", report.operator_queue)
+    report.operator_summary = {
+        **report.operator_summary,
+        "approval_ledger": bundle["approval_ledger"],
+        "approval_workflow_summary": bundle["approval_workflow_summary"],
+        "next_approval_review": bundle["next_approval_review"],
+        "top_ready_for_review_approvals": bundle["top_ready_for_review_approvals"],
+        "top_needs_reapproval_approvals": bundle["top_needs_reapproval_approvals"],
+        "top_approved_manual_approvals": bundle["top_approved_manual_approvals"],
+        "top_blocked_approvals": bundle["top_blocked_approvals"],
+    }
+    generated_at = report.generated_at
+    username = report.username
+    json_path, md_path = _latest_approval_center_paths(output_dir, username, generated_at)
+    payload = {
+        "username": username,
+        "generated_at": generated_at.isoformat(),
+        "approval_view": approval_view,
+        "approval_workflow_summary": bundle["approval_workflow_summary"],
+        "next_approval_review": bundle["next_approval_review"],
+        "approval_ledger": bundle["approval_ledger"],
+        "operator_summary": report.operator_summary,
+    }
+    json_path.write_text(json.dumps(payload, indent=2))
+    md_path.write_text(render_approval_center_markdown(payload))
+    return json_path, md_path, payload
+
+
+def _write_approval_receipt(
+    output_dir: Path,
+    username: str,
+    *,
+    generated_at: datetime,
+    receipt: dict,
+) -> tuple[Path, Path]:
+    json_path, md_path = _latest_approval_receipt_paths(output_dir, username, generated_at)
+    json_path.write_text(json.dumps(receipt, indent=2))
+    lines = [
+        f"# Approval Receipt: {username}",
+        "",
+        f"- Generated: `{generated_at.isoformat()}`",
+        f"- Subject: {receipt.get('label', 'Approval')}",
+        f"- State: {receipt.get('approval_state', 'approved')}",
+        f"- Reviewer: {receipt.get('approved_by', '') or 'local-operator'}",
+        f"- Approved At: `{receipt.get('approved_at', '')}`",
+        f"- Note: {receipt.get('approval_note', '') or '—'}",
+        f"- Summary: {receipt.get('summary', 'Local approval captured.')}",
+    ]
+    if receipt.get("approval_command"):
+        lines.append(f"- Approval Command: `{receipt.get('approval_command')}`")
+    if receipt.get("manual_apply_command"):
+        lines.append(f"- Manual Apply Command: `{receipt.get('manual_apply_command')}`")
+    md_path.write_text("\n".join(lines) + "\n")
+    return json_path, md_path
+
+
+def _refresh_shared_artifacts_from_report(
+    report: AuditReport,
+    output_dir: Path,
+    args,
+    *,
+    diff_dict: dict | None = None,
+) -> dict[str, Path]:
+    from src.excel_export import export_excel
+    from src.history import load_repo_score_history, load_trend_data
+    from src.operator_control_center import (
+        control_center_artifact_payload,
+        render_control_center_markdown,
+    )
+    from src.review_pack import export_review_pack
+    from src.warehouse import write_warehouse_snapshot
+    from src.web_export import export_html_dashboard
+
+    approval_json, approval_md, _payload = _write_approval_center_artifacts(
+        report,
+        output_dir,
+        approval_view=getattr(args, "approval_view", "all"),
+    )
+    json_path = write_json_report(report, output_dir)
+    write_markdown_report(report, output_dir, diff_data=diff_dict)
+    write_pcc_export(report, output_dir)
+    write_raw_metadata(report, output_dir)
+    trend_data = load_trend_data()
+    score_history = load_repo_score_history()
+    export_excel(
+        json_path,
+        output_dir / f"audit-dashboard-{report.username}-{_date_str(report.generated_at)}.xlsx",
+        trend_data=trend_data,
+        diff_data=diff_dict,
+        score_history=score_history,
+        portfolio_profile=args.portfolio_profile,
+        collection=args.collection,
+        excel_mode=args.excel_mode,
+    )
+    export_review_pack(
+        report.to_dict(),
+        output_dir,
+        diff_data=diff_dict,
+        portfolio_profile=args.portfolio_profile,
+        collection=args.collection,
+    )
+    export_html_dashboard(
+        report.to_dict(),
+        output_dir,
+        trend_data,
+        score_history,
+        diff_data=diff_dict,
+        portfolio_profile=args.portfolio_profile,
+        collection=args.collection,
+    )
+    artifact_generated_at = _report_artifact_datetime(json_path, report.generated_at)
+    control_json, control_md = _latest_control_center_paths(output_dir, report.username, artifact_generated_at)
+    report.operator_summary["control_center_reference"] = str(control_json)
+    snapshot = {"operator_summary": report.operator_summary, "operator_queue": report.operator_queue}
+    control_json.write_text(json.dumps(control_center_artifact_payload(report.to_dict(), snapshot), indent=2))
+    control_md.write_text(
+        render_control_center_markdown(snapshot, report.username, artifact_generated_at.isoformat())
+    )
+    write_warehouse_snapshot(report, output_dir, json_path)
+    return {
+        "json_path": json_path,
+        "control_center_json": control_json,
+        "control_center_md": control_md,
+        "approval_center_json": approval_json,
+        "approval_center_md": approval_md,
+    }
 
 
 def _doctor_next_step_hint(username: str) -> str:
@@ -1965,6 +2212,9 @@ def _enrich_report_with_operator_state(
     report.action_sync_automation = snapshot.get("action_sync_automation", [])
     report.automation_guidance_summary = snapshot.get("automation_guidance_summary", {})
     report.next_safe_automation_step = snapshot.get("next_safe_automation_step", {})
+    report.approval_ledger = snapshot.get("approval_ledger", [])
+    report.approval_workflow_summary = snapshot.get("approval_workflow_summary", {})
+    report.next_approval_review = snapshot.get("next_approval_review", {})
     return report
 
 
@@ -2597,6 +2847,7 @@ def _print_dry_run_summary(repos: list[RepoMetadata]) -> None:
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
+    from src.approval_ledger import default_approval_reviewer
 
     # Load config file and merge into args (CLI flags take precedence)
     from src.config import inspect_config, merge_config_with_args
@@ -2612,6 +2863,8 @@ def main() -> None:
     if config_inspection.data:
         merge_config_with_args(args, config_inspection.data)
     setattr(args, "_preflight_summary", {})
+    if not getattr(args, "approval_reviewer", None):
+        args.approval_reviewer = default_approval_reviewer()
 
     # Validate mutually exclusive registry flags
     if args.registry and args.notion_registry:
@@ -2636,10 +2889,107 @@ def main() -> None:
         parser.error(
             "--github-projects only runs inside Action Sync with --writeback-target github or all."
         )
+    if args.approve_packet and not args.campaign:
+        parser.error("--approve-packet requires --campaign")
+    if args.approve_packet and args.writeback_apply:
+        parser.error("--approve-packet captures local approval only. Remove --writeback-apply and run apply separately.")
+    if args.approve_governance and args.approval_center:
+        parser.error("--approve-governance captures a local approval. Remove --approval-center for read-only mode.")
+    if args.approval_center and args.control_center:
+        parser.error("--approval-center and --control-center are separate read-only views; run one at a time.")
+    if args.approval_center and (
+        args.campaign
+        or args.writeback_target
+        or args.writeback_apply
+        or args.github_projects
+        or args.approve_governance
+        or args.approve_packet
+    ):
+        parser.error(
+            "--approval-center is the read-only approval view. Remove campaign, writeback, or approval-capture flags."
+        )
     if args.control_center and (args.campaign or args.writeback_target or args.writeback_apply or args.github_projects):
         parser.error(
             "--control-center is the read-only Weekly Review entrypoint. Remove campaign/writeback flags or run a normal audit for Action Sync."
         )
+
+    if args.approval_center:
+        report_output_dir = Path(args.output_dir)
+        try:
+            _report_path, _diff_dict, report = _refresh_latest_report_state(report_output_dir, args)
+        except FileNotFoundError:
+            parser.error("No existing audit report found in output directory")
+        approval_json, approval_md, payload = _write_approval_center_artifacts(
+            report,
+            report_output_dir,
+            approval_view=args.approval_view,
+        )
+        print_info(payload.get("approval_workflow_summary", {}).get("summary", "No current approval needs review yet."))
+        print_info(payload.get("next_approval_review", {}).get("summary", "Stay local for now; no current approval needs review."))
+        print_info(f"Approval center JSON: {approval_json}")
+        print_info(f"Approval center Markdown: {approval_md}")
+        return
+
+    if args.approve_governance or args.approve_packet:
+        from src.approval_ledger import build_approval_record, load_approval_ledger_bundle
+        from src.warehouse import save_approval_record
+
+        report_output_dir = Path(args.output_dir)
+        try:
+            _report_path, diff_dict, report = _refresh_latest_report_state(report_output_dir, args)
+        except FileNotFoundError:
+            parser.error("No existing audit report found in output directory")
+        bundle = load_approval_ledger_bundle(
+            report_output_dir,
+            report.to_dict(),
+            list(report.operator_queue or []),
+            approval_view="all",
+        )
+        ledger = {str(item.get("approval_id") or ""): item for item in bundle.get("approval_ledger", [])}
+        approval_id = f"governance:{args.governance_scope}" if args.approve_governance else f"campaign:{args.campaign}"
+        ledger_record = ledger.get(approval_id)
+        if not ledger_record:
+            parser.error("No matching approval subject is surfaced in the latest report.")
+        if ledger_record.get("approval_state") == "blocked":
+            parser.error("That approval subject is blocked by non-approval prerequisites and cannot be approved yet.")
+        if ledger_record.get("approval_state") == "not-applicable":
+            parser.error("That approval subject is not part of the current approval workflow.")
+        approval_record = build_approval_record(
+            ledger_record,
+            reviewer=args.approval_reviewer,
+            note=args.approval_note or "",
+        )
+        save_approval_record(report_output_dir, approval_record)
+        _report_path, diff_dict, report = _refresh_latest_report_state(report_output_dir, args)
+        _refresh_shared_artifacts_from_report(report, report_output_dir, args, diff_dict=diff_dict)
+        approval_json, approval_md, payload = _write_approval_center_artifacts(
+            report,
+            report_output_dir,
+            approval_view="all",
+        )
+        updated_bundle = load_approval_ledger_bundle(
+            report_output_dir,
+            report.to_dict(),
+            list(report.operator_queue or []),
+            approval_view="all",
+        )
+        updated_record = next(
+            (item for item in updated_bundle.get("approval_ledger", []) if item.get("approval_id") == approval_id),
+            ledger_record,
+        )
+        receipt_payload = {**updated_record, **approval_record}
+        receipt_json, receipt_md = _write_approval_receipt(
+            report_output_dir,
+            report.username,
+            generated_at=datetime.now(timezone.utc),
+            receipt=receipt_payload,
+        )
+        print_info(receipt_payload.get("summary", "Local approval captured."))
+        print_info(f"Approval receipt JSON: {receipt_json}")
+        print_info(f"Approval receipt Markdown: {receipt_md}")
+        print_info(f"Approval center JSON: {approval_json}")
+        print_info(f"Approval center Markdown: {approval_md}")
+        return
 
     if args.doctor:
         result = run_diagnostics(args, config_inspection=config_inspection, full=True)

@@ -135,6 +135,26 @@ This layer does not widen authority:
 - it does not override stronger readiness, execution, monitoring, tuning, or historical-intelligence signals
 - it exists to keep surfaced execution guidance bounded and honest
 
+## Approval Workflow
+
+Phase 93 adds one local approval layer on top of the existing execution story.
+
+Approval states are intentionally narrow:
+
+- `needs-reapproval`: the earlier approval no longer matches the current fingerprint or blocker set
+- `ready-for-review`: approval can be reviewed now, but no mutation happens yet
+- `approved-manual`: approval matches the current fingerprint and the next move is still an explicit manual apply
+- `blocked`: approval alone cannot help yet because drift, access, or other blockers still exist
+- `applied`: a matching approved subject has already been manually applied
+
+This layer does not widen authority:
+
+- approval capture records a local attestation only
+- it may regenerate workbook, Markdown, HTML, review-pack, control-center, and approval-center artifacts
+- it never performs external mutation
+- it never auto-runs `--writeback-apply`
+- campaign approvals are limited to approval-eligible packets; access/config blockers remain blocked rather than approvable
+
 ## Audit Trail
 
 Every campaign run records:

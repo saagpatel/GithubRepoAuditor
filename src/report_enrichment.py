@@ -76,6 +76,9 @@ NO_HISTORICAL_INTELLIGENCE_LINE = "Historical Portfolio Intelligence: keep the w
 NO_AUTOMATION_GUIDANCE_SUMMARY = "Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture."
 NO_NEXT_SAFE_AUTOMATION_STEP = "Stay local for now; no current campaign has a stronger safe automation posture than manual review."
 NO_AUTOMATION_GUIDANCE_LINE = "Automation Guidance: keep the next step human-led until a bounded safe posture is surfaced."
+NO_APPROVAL_WORKFLOW_SUMMARY = "No current approval needs review yet, so the approval workflow can stay local for now."
+NO_NEXT_APPROVAL_REVIEW = "Stay local for now; no current approval needs review."
+NO_APPROVAL_WORKFLOW_LINE = "Approval Workflow: no current approval needs review yet."
 
 OPERATOR_FOCUS_LABELS = {
     "act-now": "Act Now",
@@ -799,12 +802,24 @@ def build_weekly_review_pack(
         "next_historical_focus": build_next_historical_focus_line(data),
         "automation_guidance_summary": build_automation_guidance_summary(data),
         "next_safe_automation_step": build_next_safe_automation_step_line(data),
+        "approval_workflow_summary": build_approval_workflow_summary(data),
+        "next_approval_review": build_next_approval_review_line(data),
+        "approval_workflow_line": (
+            f"{build_approval_workflow_summary(data)} Next review: {build_next_approval_review_line(data)}"
+            if build_approval_workflow_summary(data) != NO_APPROVAL_WORKFLOW_SUMMARY
+            or build_next_approval_review_line(data) != NO_NEXT_APPROVAL_REVIEW
+            else NO_APPROVAL_WORKFLOW_LINE
+        ),
         "automation_guidance_line": (
             f"{build_automation_guidance_summary(data)} Next step: {build_next_safe_automation_step_line(data)}"
             if build_automation_guidance_summary(data) != NO_AUTOMATION_GUIDANCE_SUMMARY
             or build_next_safe_automation_step_line(data) != NO_NEXT_SAFE_AUTOMATION_STEP
             else NO_AUTOMATION_GUIDANCE_LINE
         ),
+        "top_ready_for_review_approvals": list(operator_summary.get("top_ready_for_review_approvals") or []),
+        "top_needs_reapproval_approvals": list(operator_summary.get("top_needs_reapproval_approvals") or []),
+        "top_approved_manual_approvals": list(operator_summary.get("top_approved_manual_approvals") or []),
+        "top_blocked_approvals": list(operator_summary.get("top_blocked_approvals") or []),
         "top_apply_ready_campaigns": list(operator_summary.get("top_apply_ready_campaigns") or []),
         "top_preview_ready_campaigns": list(operator_summary.get("top_preview_ready_campaigns") or []),
         "top_drift_review_campaigns": list(operator_summary.get("top_drift_review_campaigns") or []),
@@ -1699,6 +1714,20 @@ def build_next_safe_automation_step_line(report_data: Any) -> str:
     return str(_mapping(step).get("summary") or NO_NEXT_SAFE_AUTOMATION_STEP)
 
 
+def build_approval_workflow_summary(report_data: Any) -> str:
+    summary = _mapping(_mapping(report_data).get("approval_workflow_summary"))
+    if not summary:
+        summary = _mapping(_mapping(report_data).get("operator_summary")).get("approval_workflow_summary") or {}
+    return str(_mapping(summary).get("summary") or NO_APPROVAL_WORKFLOW_SUMMARY)
+
+
+def build_next_approval_review_line(report_data: Any) -> str:
+    step = _mapping(_mapping(report_data).get("next_approval_review"))
+    if not step:
+        step = _mapping(_mapping(report_data).get("operator_summary")).get("next_approval_review") or {}
+    return str(_mapping(step).get("summary") or NO_NEXT_APPROVAL_REVIEW)
+
+
 def build_historical_intelligence_line(value: Any) -> str:
     mapped = _mapping(value)
     direct = str(mapped.get("historical_intelligence_line") or "").strip()
@@ -1711,6 +1740,18 @@ def build_historical_intelligence_line(value: Any) -> str:
     if status:
         return f"Historical Portfolio Intelligence: {status}."
     return NO_HISTORICAL_INTELLIGENCE_LINE
+
+
+def build_approval_workflow_line(value: Any) -> str:
+    mapped = _mapping(value)
+    direct = str(mapped.get("approval_line") or "").strip()
+    if direct:
+        return direct
+    summary = str(mapped.get("approval_summary") or "").strip()
+    state = str(mapped.get("approval_state") or "").strip()
+    if not summary and not state:
+        return NO_APPROVAL_WORKFLOW_LINE
+    return f"{ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}: {summary or state.replace('-', ' ').title()}"
 
 
 def build_automation_line(value: Any) -> str:
@@ -1846,6 +1887,9 @@ def _build_operator_focus_item(mapped: dict[str, Any], review_summary: dict[str,
         "campaign_tuning_status": str(mapped.get("campaign_tuning_status") or "insufficient-evidence"),
         "campaign_tuning_summary": str(mapped.get("campaign_tuning_summary") or "No campaign tuning evidence is surfaced for this item yet."),
         "campaign_tuning_line": build_campaign_tuning_line(mapped),
+        "approval_state": str(mapped.get("approval_state") or "not-applicable"),
+        "approval_summary": str(mapped.get("approval_summary") or "No approval workflow is surfaced for this item yet."),
+        "approval_line": build_approval_workflow_line(mapped),
         "automation_posture": str(mapped.get("automation_posture") or "manual-only"),
         "automation_summary": str(mapped.get("automation_summary") or "No automation guidance is surfaced for this item yet."),
         "automation_command": str(mapped.get("automation_command") or ""),

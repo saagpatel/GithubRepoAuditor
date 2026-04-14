@@ -1778,6 +1778,7 @@ class TestWorkbookModes:
             "Scorecards",
             "Implementation Hotspots",
             "Operator Outcomes",
+            "Approval Ledger",
             "Historical Intelligence",
             "Repo Detail",
             "Executive Summary",
