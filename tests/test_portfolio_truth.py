@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -576,3 +578,53 @@ def test_cli_context_recovery_dry_run_does_not_mutate_repo(
 
     assert list(output_dir.glob("context-recovery-plan-*.json"))
     assert not (target_repo / "AGENTS.md").exists()
+
+
+def test_allow_dirty_worktree_makes_dirty_repos_eligible(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    dirty_repo = portfolio_workspace / "DirtyRepo"
+    dirty_repo.mkdir()
+    _write(dirty_repo / "README.md", "# DirtyRepo\n\nA dirty repo.\n")
+    _write(dirty_repo / "package.json", '{"dependencies":{"react":"19.0.0"}}')
+    subprocess.run(["git", "init"], cwd=dirty_repo, capture_output=True, check=True)
+    subprocess.run(["git", "add", "."], cwd=dirty_repo, capture_output=True, check=True)
+    subprocess.run(
+        ["git", "commit", "-m", "init"],
+        cwd=dirty_repo,
+        capture_output=True,
+        check=True,
+        env={
+            **os.environ,
+            "GIT_AUTHOR_NAME": "test",
+            "GIT_AUTHOR_EMAIL": "t@t",
+            "GIT_COMMITTER_NAME": "test",
+            "GIT_COMMITTER_EMAIL": "t@t",
+        },
+    )
+    _write(dirty_repo / "dirty.txt", "uncommitted")
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=datetime.fromtimestamp(1_700_000_100, tz=timezone.utc),
+    )
+
+    # Without allow_dirty: should be skipped
+    plan_strict = build_context_recovery_plan(result.snapshot, workspace_root=portfolio_workspace)
+    strict_target = next((t for t in plan_strict.projects if t.project_key == "DirtyRepo"), None)
+    assert strict_target is not None
+    assert strict_target.status == "skipped"
+    assert strict_target.reason == "dirty-worktree"
+
+    # With allow_dirty: should be eligible
+    plan_dirty = build_context_recovery_plan(
+        result.snapshot, workspace_root=portfolio_workspace, allow_dirty=True
+    )
+    dirty_target = next((t for t in plan_dirty.projects if t.project_key == "DirtyRepo"), None)
+    assert dirty_target is not None
+    assert dirty_target.status == "eligible"
