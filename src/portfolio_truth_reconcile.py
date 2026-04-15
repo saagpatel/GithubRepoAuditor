@@ -214,6 +214,7 @@ def _build_truth_project(
             "notes", repo_entry, group_entry, legacy, raw_project, provenance
         ),
         "doctor_standard": _select_declared("doctor_standard", repo_entry, group_entry, provenance),
+        "automation_eligible": bool(repo_entry.get("automation_eligible", False)),
     }
 
     context_quality = raw_project["context_quality"]
@@ -290,6 +291,7 @@ def _build_truth_project(
         tool_provenance=declared_values["tool_provenance"],
         notes=declared_values["notes"],
         doctor_standard=declared_values["doctor_standard"],
+        automation_eligible=declared_values["automation_eligible"],
     )
     provenance["derived.last_meaningful_activity_at"] = {
         "source": "git" if raw_project["has_git"] and last_activity else "workspace",

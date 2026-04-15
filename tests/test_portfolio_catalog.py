@@ -88,6 +88,34 @@ repos:
     assert catalog["repos"]["repowithnostandard"]["doctor_standard"] == ""
 
 
+def test_load_portfolio_catalog_normalizes_automation_eligible(tmp_path: Path):
+    path = tmp_path / "portfolio-catalog.yaml"
+    path.write_text(
+        """
+repos:
+  RepoEnabled:
+    automation_eligible: "true"
+  RepoDisabled:
+    automation_eligible: "false"
+  RepoAbsent: {}
+"""
+    )
+
+    catalog = load_portfolio_catalog(path)
+
+    assert catalog["repos"]["repoenabled"]["automation_eligible"] is True
+    assert catalog["repos"]["repodisabled"]["automation_eligible"] is False
+    assert catalog["repos"]["repoabsent"]["automation_eligible"] is False
+
+
+def test_catalog_entry_for_repo_defaults_automation_eligible_false():
+    catalog = {"repos": {}, "defaults": {}}
+    entry = catalog_entry_for_repo(
+        {"name": "unknown-repo", "full_name": "user/unknown-repo"}, catalog
+    )
+    assert entry["automation_eligible"] is False
+
+
 def test_catalog_entry_matches_full_name_then_bare_name():
     catalog = {
         "repos": {

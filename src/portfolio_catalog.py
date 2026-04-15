@@ -11,6 +11,7 @@ VALID_INTENDED_DISPOSITIONS = {"maintain", "finish", "archive", "experiment"}
 VALID_CATEGORY_TAGS = {"commercial", "it-work", "vanity", "fun", "learning", "infrastructure"}
 VALID_TOOL_PROVENANCE = {"claude-code", "codex", "gpt", "grok", "claude-ai", "unknown"}
 VALID_DOCTOR_STANDARDS = {"full", "basic"}
+VALID_AUTOMATION_ELIGIBLE = {"true", "false"}
 DEFAULT_CATALOG_PATH = Path("config") / "portfolio-catalog.yaml"
 
 
@@ -286,6 +287,8 @@ def _normalize_repo_entries(
             "doctor_standard": _normalize_enum(
                 raw_value.get("doctor_standard"), VALID_DOCTOR_STANDARDS
             ),
+            "automation_eligible": _safe_text(raw_value.get("automation_eligible", "")).lower()
+            == "true",
             "catalog_key": key,
             "matched_by": "full-name" if "/" in key else "bare-name",
             "has_explicit_entry": True,
@@ -363,6 +366,7 @@ def catalog_entry_for_repo(
         "tool_provenance": "",
         "notes": "",
         "doctor_standard": "",
+        "automation_eligible": False,
         "maturity_program": "",
         "target_maturity": "",
         "catalog_default_maturity_program": default_program,
