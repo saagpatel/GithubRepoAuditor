@@ -15,14 +15,18 @@ def _render_weekly_story_sections(_w, weekly_pack: dict) -> None:
         _w(f"### {section.get('label', 'Weekly Story')}")
         _w("")
         _w(f"- Summary: {section.get('headline', 'No section summary is recorded yet.')}")
-        _w(f"- {section.get('next_label', 'Next Step')}: {section.get('next_step', 'No next step is recorded yet.')}")
+        _w(
+            f"- {section.get('next_label', 'Next Step')}: {section.get('next_step', 'No next step is recorded yet.')}"
+        )
         _w(f"- State: {section.get('state', 'idle')}")
         evidence_items = list(section.get("evidence_items") or [])
         if evidence_items:
             _w("- Evidence:")
             for item in evidence_items[:5]:
                 command = f" [{item.get('command_hint')}]" if item.get("command_hint") else ""
-                _w(f"  - {item.get('label', 'Item')} — {item.get('summary', 'No evidence summary is recorded yet.')}{command}")
+                _w(
+                    f"  - {item.get('label', 'Item')} — {item.get('summary', 'No evidence summary is recorded yet.')}{command}"
+                )
         else:
             _w("- Evidence: No supporting evidence is currently surfaced.")
         _w("")
@@ -49,7 +53,7 @@ def export_review_pack(
 
     lines: list[str] = []
     _w = lines.append
-    weekly_pack = build_weekly_review_pack(report_data, diff_data)
+    weekly_pack = build_weekly_review_pack(report_data, diff_data, output_dir=output_dir)
 
     _w(f"# Review Pack: {username}")
     _w("")
@@ -60,83 +64,195 @@ def export_review_pack(
 
     _w("## Weekly Review Pack")
     _w("")
-    _w(f"- Product Mode: {weekly_pack.get('product_mode_summary', 'Weekly Review: use this artifact for the normal workbook-first operator loop.')}")
-    _w(f"- Artifact Role: {weekly_pack.get('artifact_role_summary', 'This artifact is the shared weekly handoff across workbook, HTML, Markdown, and review-pack.')}")
-    _w(f"- Suggested Reading Order: {weekly_pack.get('suggested_reading_order', 'Read Dashboard, then Run Changes, then Review Queue.')}")
-    _w(f"- Next Best Workflow Step: {weekly_pack.get('next_best_workflow_step', 'Open the standard workbook first, then use --control-center for read-only triage.')}")
-    _w(f"- Portfolio Headline: {weekly_pack.get('portfolio_headline', 'No weekly headline is recorded yet.')}")
-    _w(f"- Run Changes: {weekly_pack.get('run_change_summary', 'No run-change summary is recorded yet.')}")
-    _w(f"- Queue Pressure: {weekly_pack.get('queue_pressure_summary', 'No queue-pressure summary is recorded yet.')}")
-    _w(f"- Trust / Actionability: {weekly_pack.get('trust_actionability_summary', 'No trust summary is recorded yet.')}")
-    _w(f"- What To Do This Week: {weekly_pack.get('what_to_do_this_week', 'Continue the normal operator review loop.')}")
-    _w(f"- Portfolio Catalog: {weekly_pack.get('portfolio_catalog_summary', 'No portfolio catalog contract is recorded yet.')}")
-    _w(f"- Operating Paths: {weekly_pack.get('operating_paths_summary', 'No normalized operating-path contract is recorded yet.')}")
-    _w(f"- Intent Alignment: {weekly_pack.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.')}")
-    _w(f"- Scorecards: {weekly_pack.get('scorecards_summary', 'No maturity scorecard is recorded yet.')}")
-    _w(f"- Implementation Hotspots: {weekly_pack.get('implementation_hotspots_summary', 'No meaningful implementation hotspots are currently surfaced.')}")
-    _w(f"- Operator Outcomes: {weekly_pack.get('operator_outcomes_summary', 'Not enough operator history is recorded yet to judge outcomes.')}")
-    _w(f"- Operator Effectiveness: {weekly_pack.get('operator_effectiveness_line', 'Not enough judged recommendation history is recorded yet to judge operator effectiveness.')}")
-    _w(f"- High-Pressure Queue Trend: {weekly_pack.get('high_pressure_queue_trend_line', 'High-pressure queue trend is not ready yet.')}")
-    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['readiness']}: {weekly_pack.get('action_sync_summary', 'No current campaign needs Action Sync yet, so the safest next move is to keep the story local.')}")
-    _w(f"- Next Action Sync Step: {weekly_pack.get('next_action_sync_step', 'Stay local for now; no current campaign needs preview or apply.')}")
-    _w(f"- Apply Packet: {weekly_pack.get('apply_readiness_summary', 'No current campaign has a safe execution handoff yet, so the local story should stay local for now.')}")
-    _w(f"- Next Apply Candidate: {weekly_pack.get('next_apply_candidate', 'Stay local for now; no current campaign has a safe execution handoff.')}")
-    _w(f"- Action Sync Command Hint: {weekly_pack.get('action_sync_command_hint', 'No Action Sync command is recommended yet.')}")
-    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['post_apply_monitoring']}: {weekly_pack.get('campaign_outcomes_summary', 'No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.')}")
-    _w(f"- Next Monitoring Step: {weekly_pack.get('next_monitoring_step', 'Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.')}")
-    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['campaign_tuning']}: {weekly_pack.get('campaign_tuning_summary', 'Campaign tuning stays neutral until there is enough outcome history to bias tied recommendations.')}")
-    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}: {weekly_pack.get('next_tie_break_candidate', weekly_pack.get('next_tuned_campaign', 'No current campaign needs a tie-break candidate yet.'))}")
-    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['historical_portfolio_intelligence']}: {weekly_pack.get('historical_portfolio_intelligence', 'Historical portfolio intelligence is still thin, so the weekly story should stay grounded in the current run and recent operator queue.')}")
-    _w(f"- Next Historical Focus: {weekly_pack.get('next_historical_focus', 'Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet.')}")
-    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}: {weekly_pack.get('automation_guidance_summary', 'Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture.')}")
-    _w(f"- Next Safe Automation Step: {weekly_pack.get('next_safe_automation_step', 'Stay local for now; no current campaign has a stronger safe automation posture than manual review.')}")
-    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}: {weekly_pack.get('approval_workflow_summary', 'No current approval needs review yet, so the approval workflow can stay local for now.')}")
-    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['next_approval_review']}: {weekly_pack.get('next_approval_review', 'Stay local for now; no current approval needs review.')}")
+    _w(
+        f"- Product Mode: {weekly_pack.get('product_mode_summary', 'Weekly Review: use this artifact for the normal workbook-first operator loop.')}"
+    )
+    _w(
+        f"- Artifact Role: {weekly_pack.get('artifact_role_summary', 'This artifact is the shared weekly handoff across workbook, HTML, Markdown, and review-pack.')}"
+    )
+    _w(
+        f"- Suggested Reading Order: {weekly_pack.get('suggested_reading_order', 'Read Dashboard, then Run Changes, then Review Queue.')}"
+    )
+    _w(
+        f"- Next Best Workflow Step: {weekly_pack.get('next_best_workflow_step', 'Open the standard workbook first, then use --control-center for read-only triage.')}"
+    )
+    _w(
+        f"- Portfolio Headline: {weekly_pack.get('portfolio_headline', 'No weekly headline is recorded yet.')}"
+    )
+    _w(
+        f"- Run Changes: {weekly_pack.get('run_change_summary', 'No run-change summary is recorded yet.')}"
+    )
+    _w(
+        f"- Queue Pressure: {weekly_pack.get('queue_pressure_summary', 'No queue-pressure summary is recorded yet.')}"
+    )
+    _w(
+        f"- Trust / Actionability: {weekly_pack.get('trust_actionability_summary', 'No trust summary is recorded yet.')}"
+    )
+    _w(
+        f"- What To Do This Week: {weekly_pack.get('what_to_do_this_week', 'Continue the normal operator review loop.')}"
+    )
+    _w(
+        f"- Portfolio Catalog: {weekly_pack.get('portfolio_catalog_summary', 'No portfolio catalog contract is recorded yet.')}"
+    )
+    _w(
+        f"- Operating Paths: {weekly_pack.get('operating_paths_summary', 'No normalized operating-path contract is recorded yet.')}"
+    )
+    _w(
+        f"- Intent Alignment: {weekly_pack.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.')}"
+    )
+    _w(
+        f"- Scorecards: {weekly_pack.get('scorecards_summary', 'No maturity scorecard is recorded yet.')}"
+    )
+    _w(
+        f"- Implementation Hotspots: {weekly_pack.get('implementation_hotspots_summary', 'No meaningful implementation hotspots are currently surfaced.')}"
+    )
+    _w(
+        f"- Operator Outcomes: {weekly_pack.get('operator_outcomes_summary', 'Not enough operator history is recorded yet to judge outcomes.')}"
+    )
+    _w(
+        f"- Operator Effectiveness: {weekly_pack.get('operator_effectiveness_line', 'Not enough judged recommendation history is recorded yet to judge operator effectiveness.')}"
+    )
+    _w(
+        f"- High-Pressure Queue Trend: {weekly_pack.get('high_pressure_queue_trend_line', 'High-pressure queue trend is not ready yet.')}"
+    )
+    _w(
+        f"- {ACTION_SYNC_CANONICAL_LABELS['readiness']}: {weekly_pack.get('action_sync_summary', 'No current campaign needs Action Sync yet, so the safest next move is to keep the story local.')}"
+    )
+    _w(
+        f"- Next Action Sync Step: {weekly_pack.get('next_action_sync_step', 'Stay local for now; no current campaign needs preview or apply.')}"
+    )
+    _w(
+        f"- Apply Packet: {weekly_pack.get('apply_readiness_summary', 'No current campaign has a safe execution handoff yet, so the local story should stay local for now.')}"
+    )
+    _w(
+        f"- Next Apply Candidate: {weekly_pack.get('next_apply_candidate', 'Stay local for now; no current campaign has a safe execution handoff.')}"
+    )
+    _w(
+        f"- Action Sync Command Hint: {weekly_pack.get('action_sync_command_hint', 'No Action Sync command is recommended yet.')}"
+    )
+    _w(
+        f"- {ACTION_SYNC_CANONICAL_LABELS['post_apply_monitoring']}: {weekly_pack.get('campaign_outcomes_summary', 'No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.')}"
+    )
+    _w(
+        f"- Next Monitoring Step: {weekly_pack.get('next_monitoring_step', 'Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.')}"
+    )
+    _w(
+        f"- {ACTION_SYNC_CANONICAL_LABELS['campaign_tuning']}: {weekly_pack.get('campaign_tuning_summary', 'Campaign tuning stays neutral until there is enough outcome history to bias tied recommendations.')}"
+    )
+    _w(
+        f"- {ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}: {weekly_pack.get('next_tie_break_candidate', weekly_pack.get('next_tuned_campaign', 'No current campaign needs a tie-break candidate yet.'))}"
+    )
+    _w(
+        f"- {ACTION_SYNC_CANONICAL_LABELS['historical_portfolio_intelligence']}: {weekly_pack.get('historical_portfolio_intelligence', 'Historical portfolio intelligence is still thin, so the weekly story should stay grounded in the current run and recent operator queue.')}"
+    )
+    _w(
+        f"- Next Historical Focus: {weekly_pack.get('next_historical_focus', 'Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet.')}"
+    )
+    _w(
+        f"- {ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}: {weekly_pack.get('automation_guidance_summary', 'Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture.')}"
+    )
+    _w(
+        f"- Next Safe Automation Step: {weekly_pack.get('next_safe_automation_step', 'Stay local for now; no current campaign has a stronger safe automation posture than manual review.')}"
+    )
+    _w(
+        f"- {ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}: {weekly_pack.get('approval_workflow_summary', 'No current approval needs review yet, so the approval workflow can stay local for now.')}"
+    )
+    _w(
+        f"- {ACTION_SYNC_CANONICAL_LABELS['next_approval_review']}: {weekly_pack.get('next_approval_review', 'Stay local for now; no current approval needs review.')}"
+    )
     _w("")
     _render_weekly_story_sections(_w, weekly_pack)
     _w("### Top Attention")
     _w("")
     for item in weekly_pack.get("top_attention", [])[:5]:
-        _w(f"- [{item.get('lane', 'ready')}] {item.get('repo', 'Portfolio')}: {item.get('title', 'Operator attention item')}")
+        _w(
+            f"- [{item.get('lane', 'ready')}] {item.get('repo', 'Portfolio')}: {item.get('title', 'Operator attention item')}"
+        )
         _w(f"  What Changed: {item.get('last_movement', 'Current run')}")
-        _w(f"  Why It Matters: {item.get('why_it_won', item.get('why', 'Operator pressure is active.'))}")
+        _w(
+            f"  Why It Matters: {item.get('why_it_won', item.get('why', 'Operator pressure is active.'))}"
+        )
         _w(f"  What To Do Next: {item.get('next_step', 'Review the latest state.')}")
-        _w(f"  Operator Focus: {item.get('operator_focus_line', 'Watch Closely: No operator focus bucket is currently surfaced.')}")
-        _w(f"  Catalog: {item.get('catalog_line', 'No portfolio catalog contract is recorded yet.')}")
-        _w(f"  {item.get('operating_path_line', 'Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet.')}")
-        _w(f"  Intent Alignment: {item.get('intent_alignment', 'missing-contract')} — {item.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.')}")
+        _w(
+            f"  Operator Focus: {item.get('operator_focus_line', 'Watch Closely: No operator focus bucket is currently surfaced.')}"
+        )
+        _w(
+            f"  Catalog: {item.get('catalog_line', 'No portfolio catalog contract is recorded yet.')}"
+        )
+        _w(
+            f"  {item.get('operating_path_line', 'Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet.')}"
+        )
+        _w(
+            f"  Intent Alignment: {item.get('intent_alignment', 'missing-contract')} — {item.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.')}"
+        )
         _w(f"  {item.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.')}")
-        _w(f"  Maturity Gap: {item.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.')}")
+        _w(
+            f"  Maturity Gap: {item.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.')}"
+        )
         _w("  Evidence:")
         for evidence in item.get("evidence_strip", [])[:5]:
             command = f" [{evidence.get('command_hint')}]" if evidence.get("command_hint") else ""
-            _w(f"    - {evidence.get('label', 'Item')} — {evidence.get('summary', 'No evidence summary is recorded yet.')}{command}")
+            _w(
+                f"    - {evidence.get('label', 'Item')} — {evidence.get('summary', 'No evidence summary is recorded yet.')}{command}"
+            )
         _w(f"  Checkpoint Timing: {item.get('follow_through_checkpoint_timing', 'Unknown')}")
-        _w(f"  Next Checkpoint: {item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
+        _w(
+            f"  Next Checkpoint: {item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}"
+        )
     if not weekly_pack.get("top_attention"):
         _w("- No urgent attention items are currently surfaced.")
     _w("")
     _w("### Operator Focus")
     _w("")
-    _w(f"- Summary: {weekly_pack.get('operator_focus_summary', 'No operator focus bucket is currently surfaced.')}")
+    _w(
+        f"- Summary: {weekly_pack.get('operator_focus_summary', 'No operator focus bucket is currently surfaced.')}"
+    )
     if weekly_pack.get("top_below_target_scorecard_items"):
         _w("- Scorecard Gaps:")
         for item in weekly_pack.get("top_below_target_scorecard_items", [])[:5]:
             _w(f"  - {item.get('repo', 'Repo')} — {item.get('summary', 'Below target.')}")
-    _w(f"- Next Checkpoint: {weekly_pack.get('follow_through_checkpoint_summary', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
+    _w(
+        f"- Next Checkpoint: {weekly_pack.get('follow_through_checkpoint_summary', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}"
+    )
     focus_sections = [
-        ("Act Now", weekly_pack.get("top_act_now_items", []), "No immediate-action hotspots are currently surfaced."),
-        ("Watch Closely", weekly_pack.get("top_watch_closely_items", []), "No watch-closely hotspots are currently surfaced."),
-        ("Improving", weekly_pack.get("top_improving_items", []), "No clearly improving hotspots are currently surfaced."),
-        ("Fragile", weekly_pack.get("top_fragile_items", []), "No fragile hotspots are currently surfaced."),
-        ("Revalidate", weekly_pack.get("top_revalidate_items", []), "No revalidation hotspots are currently surfaced."),
+        (
+            "Act Now",
+            weekly_pack.get("top_act_now_items", []),
+            "No immediate-action hotspots are currently surfaced.",
+        ),
+        (
+            "Watch Closely",
+            weekly_pack.get("top_watch_closely_items", []),
+            "No watch-closely hotspots are currently surfaced.",
+        ),
+        (
+            "Improving",
+            weekly_pack.get("top_improving_items", []),
+            "No clearly improving hotspots are currently surfaced.",
+        ),
+        (
+            "Fragile",
+            weekly_pack.get("top_fragile_items", []),
+            "No fragile hotspots are currently surfaced.",
+        ),
+        (
+            "Revalidate",
+            weekly_pack.get("top_revalidate_items", []),
+            "No revalidation hotspots are currently surfaced.",
+        ),
     ]
     for label, items, empty_message in focus_sections:
         _w(f"- {label}:")
         if items:
             for item in items[:3]:
-                item_label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
-                _w(f"  - {item_label} — {item.get('operator_focus_summary', 'No operator focus bucket is currently surfaced.')}")
+                item_label = (
+                    f"{item.get('repo')}: {item.get('title')}"
+                    if item.get("repo")
+                    else item.get("title", "Operator item")
+                )
+                _w(
+                    f"  - {item_label} — {item.get('operator_focus_summary', 'No operator focus bucket is currently surfaced.')}"
+                )
         else:
             _w(f"  - {empty_message}")
     _w("")
@@ -144,23 +260,49 @@ def export_review_pack(
     _w("")
     for briefing in weekly_pack.get("repo_briefings", [])[:3]:
         _w(f"- {briefing.get('headline', briefing.get('repo', 'Repo briefing'))}")
-        _w(f"  Current State: {briefing.get('current_state_line', 'No current-state summary is recorded yet.')}")
-        _w(f"  What Changed: {briefing.get('what_changed_line', 'No change summary is recorded yet.')}")
-        _w(f"  Why It Matters: {briefing.get('why_it_won', briefing.get('why_it_matters_line', 'No explanation summary is recorded yet.'))}")
-        _w(f"  Where To Start: {briefing.get('where_to_start_summary', 'No meaningful implementation hotspot is currently surfaced.')}")
-        _w(f"  What To Do Next: {briefing.get('next_step', briefing.get('what_to_do_next_line', 'No next action is recorded yet.'))}")
-        _w(f"  Operator Focus: {briefing.get('operator_focus_line', 'Watch Closely: No operator focus bucket is currently surfaced.')}")
-        _w(f"  Catalog: {briefing.get('catalog_line', 'No portfolio catalog contract is recorded yet.')}")
-        _w(f"  {briefing.get('operating_path_line', 'Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet.')}")
-        _w(f"  Intent Alignment: {briefing.get('intent_alignment_line', 'missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.')}")
-        _w(f"  {briefing.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.')}")
-        _w(f"  Maturity Gap: {briefing.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.')}")
+        _w(
+            f"  Current State: {briefing.get('current_state_line', 'No current-state summary is recorded yet.')}"
+        )
+        _w(
+            f"  What Changed: {briefing.get('what_changed_line', 'No change summary is recorded yet.')}"
+        )
+        _w(
+            f"  Why It Matters: {briefing.get('why_it_won', briefing.get('why_it_matters_line', 'No explanation summary is recorded yet.'))}"
+        )
+        _w(
+            f"  Where To Start: {briefing.get('where_to_start_summary', 'No meaningful implementation hotspot is currently surfaced.')}"
+        )
+        _w(
+            f"  What To Do Next: {briefing.get('next_step', briefing.get('what_to_do_next_line', 'No next action is recorded yet.'))}"
+        )
+        _w(
+            f"  Operator Focus: {briefing.get('operator_focus_line', 'Watch Closely: No operator focus bucket is currently surfaced.')}"
+        )
+        _w(
+            f"  Catalog: {briefing.get('catalog_line', 'No portfolio catalog contract is recorded yet.')}"
+        )
+        _w(
+            f"  {briefing.get('operating_path_line', 'Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet.')}"
+        )
+        _w(
+            f"  Intent Alignment: {briefing.get('intent_alignment_line', 'missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.')}"
+        )
+        _w(
+            f"  {briefing.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.')}"
+        )
+        _w(
+            f"  Maturity Gap: {briefing.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.')}"
+        )
         _w("  Evidence:")
         for evidence in briefing.get("evidence_strip", [])[:5]:
             command = f" [{evidence.get('command_hint')}]" if evidence.get("command_hint") else ""
-            _w(f"    - {evidence.get('label', 'Item')} — {evidence.get('summary', 'No evidence summary is recorded yet.')}{command}")
+            _w(
+                f"    - {evidence.get('label', 'Item')} — {evidence.get('summary', 'No evidence summary is recorded yet.')}{command}"
+            )
         _w(f"  Checkpoint Timing: {briefing.get('checkpoint_timing_line', 'Unknown')}")
-        _w(f"  What Would Count As Progress: {briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
+        _w(
+            f"  What Would Count As Progress: {briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}"
+        )
     _w("")
 
     operator_summary = report_data.get("operator_summary", {})
@@ -168,7 +310,9 @@ def export_review_pack(
     if operator_summary or operator_queue:
         _w("## Operator Control Center")
         _w("")
-        _w(f"- Headline: {operator_summary.get('headline', 'No operator triage items are currently surfaced.')}")
+        _w(
+            f"- Headline: {operator_summary.get('headline', 'No operator triage items are currently surfaced.')}"
+        )
         if operator_summary.get("source_run_id"):
             _w(f"- Source Run: `{operator_summary.get('source_run_id')}`")
         counts = operator_summary.get("counts", {})
@@ -177,51 +321,100 @@ def export_review_pack(
             f"Ready: {counts.get('ready', 0)} | Deferred: {counts.get('deferred', 0)}"
         )
         if (operator_summary.get("action_sync_summary") or {}).get("summary"):
-            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['readiness']}: {(operator_summary.get('action_sync_summary') or {}).get('summary')}")
+            _w(
+                f"- {ACTION_SYNC_CANONICAL_LABELS['readiness']}: {(operator_summary.get('action_sync_summary') or {}).get('summary')}"
+            )
         if operator_summary.get("next_action_sync_step"):
             _w(f"- Next Action Sync Step: {operator_summary.get('next_action_sync_step')}")
         if (operator_summary.get("apply_readiness_summary") or {}).get("summary"):
-            _w(f"- Apply Packet: {(operator_summary.get('apply_readiness_summary') or {}).get('summary')}")
+            _w(
+                f"- Apply Packet: {(operator_summary.get('apply_readiness_summary') or {}).get('summary')}"
+            )
         if (operator_summary.get("next_apply_candidate") or {}).get("summary"):
-            _w(f"- Next Apply Candidate: {(operator_summary.get('next_apply_candidate') or {}).get('summary')}")
-        command_hint = (operator_summary.get("next_apply_candidate") or {}).get("apply_command") or (operator_summary.get("next_apply_candidate") or {}).get("preview_command")
+            _w(
+                f"- Next Apply Candidate: {(operator_summary.get('next_apply_candidate') or {}).get('summary')}"
+            )
+        command_hint = (operator_summary.get("next_apply_candidate") or {}).get(
+            "apply_command"
+        ) or (operator_summary.get("next_apply_candidate") or {}).get("preview_command")
         if command_hint:
             _w(f"- Action Sync Command Hint: `{command_hint}`")
         if (operator_summary.get("campaign_outcomes_summary") or {}).get("summary"):
-            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['post_apply_monitoring']}: {(operator_summary.get('campaign_outcomes_summary') or {}).get('summary')}")
+            _w(
+                f"- {ACTION_SYNC_CANONICAL_LABELS['post_apply_monitoring']}: {(operator_summary.get('campaign_outcomes_summary') or {}).get('summary')}"
+            )
         if (operator_summary.get("next_monitoring_step") or {}).get("summary"):
-            _w(f"- Next Monitoring Step: {(operator_summary.get('next_monitoring_step') or {}).get('summary')}")
+            _w(
+                f"- Next Monitoring Step: {(operator_summary.get('next_monitoring_step') or {}).get('summary')}"
+            )
         if (operator_summary.get("campaign_tuning_summary") or {}).get("summary"):
-            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['campaign_tuning']}: {(operator_summary.get('campaign_tuning_summary') or {}).get('summary')}")
+            _w(
+                f"- {ACTION_SYNC_CANONICAL_LABELS['campaign_tuning']}: {(operator_summary.get('campaign_tuning_summary') or {}).get('summary')}"
+            )
         if (operator_summary.get("next_tuned_campaign") or {}).get("summary"):
-            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}: {(operator_summary.get('next_tuned_campaign') or {}).get('summary')}")
+            _w(
+                f"- {ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}: {(operator_summary.get('next_tuned_campaign') or {}).get('summary')}"
+            )
         if (operator_summary.get("intervention_ledger_summary") or {}).get("summary"):
-            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['historical_portfolio_intelligence']}: {(operator_summary.get('intervention_ledger_summary') or {}).get('summary')}")
+            _w(
+                f"- {ACTION_SYNC_CANONICAL_LABELS['historical_portfolio_intelligence']}: {(operator_summary.get('intervention_ledger_summary') or {}).get('summary')}"
+            )
         if (operator_summary.get("next_historical_focus") or {}).get("summary"):
-            _w(f"- Next Historical Focus: {(operator_summary.get('next_historical_focus') or {}).get('summary')}")
+            _w(
+                f"- Next Historical Focus: {(operator_summary.get('next_historical_focus') or {}).get('summary')}"
+            )
         if (operator_summary.get("automation_guidance_summary") or {}).get("summary"):
-            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}: {(operator_summary.get('automation_guidance_summary') or {}).get('summary')}")
+            _w(
+                f"- {ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}: {(operator_summary.get('automation_guidance_summary') or {}).get('summary')}"
+            )
         if (operator_summary.get("next_safe_automation_step") or {}).get("summary"):
-            _w(f"- Next Safe Automation Step: {(operator_summary.get('next_safe_automation_step') or {}).get('summary')}")
+            _w(
+                f"- Next Safe Automation Step: {(operator_summary.get('next_safe_automation_step') or {}).get('summary')}"
+            )
         if (operator_summary.get("approval_workflow_summary") or {}).get("summary"):
-            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}: {(operator_summary.get('approval_workflow_summary') or {}).get('summary')}")
+            _w(
+                f"- {ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}: {(operator_summary.get('approval_workflow_summary') or {}).get('summary')}"
+            )
         if (operator_summary.get("next_approval_review") or {}).get("summary"):
-            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['next_approval_review']}: {(operator_summary.get('next_approval_review') or {}).get('summary')}")
+            _w(
+                f"- {ACTION_SYNC_CANONICAL_LABELS['next_approval_review']}: {(operator_summary.get('next_approval_review') or {}).get('summary')}"
+            )
         for item in operator_queue[:8]:
             repo = f"{item.get('repo', '')}: " if item.get("repo") else ""
-            _w(f"- [{item.get('lane_label', item.get('lane', 'ready'))}] {repo}{item.get('title', 'Triage item')}")
+            _w(
+                f"- [{item.get('lane_label', item.get('lane', 'ready'))}] {repo}{item.get('title', 'Triage item')}"
+            )
             _w(f"  Why: {item.get('lane_reason', item.get('summary', 'Operator triage item.'))}")
-            _w(f"  {item.get('post_apply_line', 'Post-Apply Monitoring: no recent Action Sync apply needs follow-up yet.')}")
+            _w(
+                f"  {item.get('post_apply_line', 'Post-Apply Monitoring: no recent Action Sync apply needs follow-up yet.')}"
+            )
             _w(f"  Action: {item.get('recommended_action', 'Review the latest state.')}")
-            _w(f"  {item.get('action_sync_line', 'Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.')}")
-            _w(f"  {item.get('apply_packet_line', 'Apply Packet: no current execution handoff is surfaced.')}")
-            _w(f"  {item.get('historical_intelligence_line', 'Historical Portfolio Intelligence: keep the weekly story anchored in the current run until more cross-run evidence accumulates.')}")
-            _w(f"  {item.get('automation_line', 'Automation Guidance: keep the next step human-led until a bounded safe posture is surfaced.')}")
-            _w(f"  {item.get('approval_line', 'Approval Workflow: no current approval needs review yet.')}")
+            _w(
+                f"  {item.get('action_sync_line', 'Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.')}"
+            )
+            _w(
+                f"  {item.get('apply_packet_line', 'Apply Packet: no current execution handoff is surfaced.')}"
+            )
+            _w(
+                f"  {item.get('historical_intelligence_line', 'Historical Portfolio Intelligence: keep the weekly story anchored in the current run until more cross-run evidence accumulates.')}"
+            )
+            _w(
+                f"  {item.get('automation_line', 'Automation Guidance: keep the next step human-led until a bounded safe posture is surfaced.')}"
+            )
+            _w(
+                f"  {item.get('approval_line', 'Approval Workflow: no current approval needs review yet.')}"
+            )
         recent_changes = operator_summary.get("operator_recent_changes", [])
         for change in recent_changes[:3]:
-            subject = change.get("repo") or change.get("repo_full_name") or change.get("item_id") or "portfolio"
-            _w(f"- Recent: {change.get('generated_at', '')[:10]} {subject} — {change.get('summary', change.get('kind', 'change'))}")
+            subject = (
+                change.get("repo")
+                or change.get("repo_full_name")
+                or change.get("item_id")
+                or "portfolio"
+            )
+            _w(
+                f"- Recent: {change.get('generated_at', '')[:10]} {subject} — {change.get('summary', change.get('kind', 'change'))}"
+            )
         _w("")
 
     _w("## Snapshot")
@@ -288,7 +481,9 @@ def export_review_pack(
     if projection:
         _w("")
         _w(f"- Selected repos: {projection.get('selected_repo_count', 0)}")
-        _w(f"- Projected average score delta: {projection.get('projected_average_score_delta', 0):+.3f}")
+        _w(
+            f"- Projected average score delta: {projection.get('projected_average_score_delta', 0):+.3f}"
+        )
         _w(f"- Projected tier promotions: {projection.get('projected_tier_promotions', 0)}")
     _w("")
 
@@ -308,15 +503,27 @@ def export_review_pack(
         github_projects = report_data.get("writeback_preview", {}).get("github_projects", {}) or {}
         _w("## Next Actions")
         _w("")
-        _w(f"- Campaign: {campaign_summary.get('label', campaign_summary.get('campaign_type', '—'))}")
+        _w(
+            f"- Campaign: {campaign_summary.get('label', campaign_summary.get('campaign_type', '—'))}"
+        )
         _w(f"- Actions: {campaign_summary.get('action_count', 0)}")
         _w(f"- Repos: {campaign_summary.get('repo_count', 0)}")
         _w(f"- Sync Mode: {report_data.get('writeback_preview', {}).get('sync_mode', 'reconcile')}")
-        _w(f"- Apply Packet: {(report_data.get('apply_readiness_summary') or {}).get('summary', (report_data.get('operator_summary', {}).get('apply_readiness_summary', {}) or {}).get('summary', 'No current campaign has a safe execution handoff yet, so the local story should stay local for now.'))}")
-        _w(f"- Next Apply Candidate: {(report_data.get('next_apply_candidate') or {}).get('summary', (report_data.get('operator_summary', {}).get('next_apply_candidate', {}) or {}).get('summary', 'Stay local for now; no current campaign has a safe execution handoff.'))}")
-        _w(f"- Action Sync Command Hint: {(report_data.get('next_apply_candidate') or {}).get('apply_command') or (report_data.get('next_apply_candidate') or {}).get('preview_command') or ((report_data.get('operator_summary', {}).get('next_apply_candidate', {}) or {}).get('apply_command') or ((report_data.get('operator_summary', {}).get('next_apply_candidate', {}) or {}).get('preview_command') or 'No Action Sync command is recommended yet.'))}")
-        _w(f"- Post-Apply Monitoring: {(report_data.get('campaign_outcomes_summary') or {}).get('summary', (report_data.get('operator_summary', {}).get('campaign_outcomes_summary', {}) or {}).get('summary', 'No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.'))}")
-        _w(f"- Next Monitoring Step: {(report_data.get('next_monitoring_step') or {}).get('summary', (report_data.get('operator_summary', {}).get('next_monitoring_step', {}) or {}).get('summary', 'Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.'))}")
+        _w(
+            f"- Apply Packet: {(report_data.get('apply_readiness_summary') or {}).get('summary', (report_data.get('operator_summary', {}).get('apply_readiness_summary', {}) or {}).get('summary', 'No current campaign has a safe execution handoff yet, so the local story should stay local for now.'))}"
+        )
+        _w(
+            f"- Next Apply Candidate: {(report_data.get('next_apply_candidate') or {}).get('summary', (report_data.get('operator_summary', {}).get('next_apply_candidate', {}) or {}).get('summary', 'Stay local for now; no current campaign has a safe execution handoff.'))}"
+        )
+        _w(
+            f"- Action Sync Command Hint: {(report_data.get('next_apply_candidate') or {}).get('apply_command') or (report_data.get('next_apply_candidate') or {}).get('preview_command') or ((report_data.get('operator_summary', {}).get('next_apply_candidate', {}) or {}).get('apply_command') or ((report_data.get('operator_summary', {}).get('next_apply_candidate', {}) or {}).get('preview_command') or 'No Action Sync command is recommended yet.'))}"
+        )
+        _w(
+            f"- Post-Apply Monitoring: {(report_data.get('campaign_outcomes_summary') or {}).get('summary', (report_data.get('operator_summary', {}).get('campaign_outcomes_summary', {}) or {}).get('summary', 'No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.'))}"
+        )
+        _w(
+            f"- Next Monitoring Step: {(report_data.get('next_monitoring_step') or {}).get('summary', (report_data.get('operator_summary', {}).get('next_monitoring_step', {}) or {}).get('summary', 'Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.'))}"
+        )
         if github_projects.get("enabled"):
             _w(
                 f"- GitHub Projects: {github_projects.get('status', 'disabled')} "
@@ -359,19 +566,43 @@ def export_review_pack(
             )
         _w("")
 
-    if report_data.get("governance_results", {}).get("results") or report_data.get("governance_drift"):
+    if report_data.get("governance_results", {}).get("results") or report_data.get(
+        "governance_drift"
+    ):
         _w("## Governance Operator State")
         _w("")
         governance_summary = report_data.get("governance_summary", {})
-        _w(f"- Headline: {governance_summary.get('headline', 'Governance state is being tracked.')}")
+        _w(
+            f"- Headline: {governance_summary.get('headline', 'Governance state is being tracked.')}"
+        )
         _w(f"- Status: {governance_summary.get('status', 'preview')}")
         _w(f"- Approved: {'yes' if report_data.get('governance_approval') else 'no'}")
         _w(f"- Needs Re-Approval: {'yes' if governance_summary.get('needs_reapproval') else 'no'}")
-        _w(f"- Drift Count: {governance_summary.get('drift_count', len(report_data.get('governance_drift', []) or []))}")
-        _w(f"- Applied Count: {governance_summary.get('applied_count', len(report_data.get('governance_results', {}).get('results', []) or []))}")
+        _w(
+            f"- Drift Count: {governance_summary.get('drift_count', len(report_data.get('governance_drift', []) or []))}"
+        )
+        _w(
+            f"- Applied Count: {governance_summary.get('applied_count', len(report_data.get('governance_results', {}).get('results', []) or []))}"
+        )
         for item in governance_summary.get("top_actions", [])[:4]:
-            _w(f"- {item.get('repo', '—')}: {item.get('title', 'Governed control')} [{item.get('operator_state', 'preview')}]")
+            _w(
+                f"- {item.get('repo', '—')}: {item.get('title', 'Governed control')} [{item.get('operator_state', 'preview')}]"
+            )
         _w("")
+
+    risk_posture = weekly_pack.get("risk_posture") or {}
+    if risk_posture:
+        _w("")
+        _w("## Risk Posture")
+        _w("")
+        _w(
+            f"- Elevated: {risk_posture.get('elevated_count', 0)}"
+            f"  Moderate: {risk_posture.get('moderate_count', 0)}"
+            f"  Baseline: {risk_posture.get('baseline_count', 0)}"
+            f"  Deferred: {risk_posture.get('deferred_count', 0)}"
+        )
+        for item in (risk_posture.get("top_elevated") or [])[:3]:
+            _w(f"- **{item['repo']}**: {item['risk_summary']}")
 
     review_pack_path.write_text("\n".join(lines))
     return {"review_pack_path": review_pack_path}

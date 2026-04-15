@@ -4,6 +4,7 @@ Produces a 10-sheet workbook that serves as the primary way to understand
 the portfolio: KPI dashboard, master table, heatmap, quick wins, badges,
 tech stack, trends, tier breakdown, activity, and registry reconciliation.
 """
+
 from __future__ import annotations
 
 import json
@@ -294,7 +295,9 @@ def _review_status_counts(data: dict) -> dict[str, int]:
             counts[status] += 1
     review_summary = data.get("review_summary", {})
     review_id = review_summary.get("review_id")
-    if review_id and not any(item.get("review_id") == review_id for item in data.get("review_history", [])):
+    if review_id and not any(
+        item.get("review_id") == review_id for item in data.get("review_history", [])
+    ):
         status = review_summary.get("status")
         if status in counts:
             counts[status] += 1
@@ -312,7 +315,9 @@ def _operator_watch_values(data: dict) -> tuple[str, str, str]:
 def _operator_handoff_values(data: dict) -> tuple[str, str, str]:
     summary = data.get("operator_summary") or {}
     what_changed = summary.get("what_changed", "") or "No operator change summary is recorded."
-    why_it_matters = summary.get("why_it_matters", "") or "No additional operator impact is recorded."
+    why_it_matters = (
+        summary.get("why_it_matters", "") or "No additional operator impact is recorded."
+    )
     next_action = summary.get("what_to_do_next", "") or "Continue the normal operator loop."
     return what_changed, why_it_matters, next_action
 
@@ -324,32 +329,69 @@ def _operator_follow_through_value(data: dict) -> str:
 
 def _operator_follow_through_details(data: dict) -> tuple[str, str, str, str, str]:
     summary = data.get("operator_summary") or {}
-    follow_through = summary.get("follow_through_summary", "") or "No follow-through signal is recorded yet."
-    checkpoint = summary.get("follow_through_checkpoint_summary", "") or "Use the next run or linked artifact to confirm whether the recommendation moved."
-    escalation = summary.get("follow_through_escalation_summary", "") or "No stronger follow-through escalation is currently surfaced."
+    follow_through = (
+        summary.get("follow_through_summary", "") or "No follow-through signal is recorded yet."
+    )
+    checkpoint = (
+        summary.get("follow_through_checkpoint_summary", "")
+        or "Use the next run or linked artifact to confirm whether the recommendation moved."
+    )
+    escalation = (
+        summary.get("follow_through_escalation_summary", "")
+        or "No stronger follow-through escalation is currently surfaced."
+    )
     top_stale = list(summary.get("top_stale_follow_through_items") or [])
     top_unattempted = list(summary.get("top_unattempted_items") or [])
     top_overdue = list(summary.get("top_overdue_follow_through_items") or [])
     top_escalation = list(summary.get("top_escalation_items") or [])
-    top_item = top_overdue[0] if top_overdue else (top_escalation[0] if top_escalation else (top_stale[0] if top_stale else (top_unattempted[0] if top_unattempted else {})))
+    top_item = (
+        top_overdue[0]
+        if top_overdue
+        else (
+            top_escalation[0]
+            if top_escalation
+            else (top_stale[0] if top_stale else (top_unattempted[0] if top_unattempted else {}))
+        )
+    )
     top_label = (
         f"{top_item.get('repo')}: {top_item.get('title')}"
         if top_item.get("repo")
         else top_item.get("title", "")
     ) or "No outstanding follow-through hotspot"
-    return follow_through, checkpoint, escalation, top_label, top_item.get("follow_through_escalation_summary", "") or top_item.get("follow_through_summary", "") or "No outstanding follow-through hotspot"
+    return (
+        follow_through,
+        checkpoint,
+        escalation,
+        top_label,
+        top_item.get("follow_through_escalation_summary", "")
+        or top_item.get("follow_through_summary", "")
+        or "No outstanding follow-through hotspot",
+    )
 
 
 def _operator_follow_through_recovery_details(data: dict) -> tuple[str, str, str, str, str, str]:
     summary = data.get("operator_summary") or {}
-    recovery = summary.get("follow_through_recovery_summary", "") or "No follow-through recovery or escalation-retirement signal is currently surfaced."
-    persistence = summary.get("follow_through_recovery_persistence_summary", "") or "No follow-through recovery persistence signal is currently surfaced."
-    churn = summary.get("follow_through_relapse_churn_summary", "") or "No relapse churn is currently surfaced."
+    recovery = (
+        summary.get("follow_through_recovery_summary", "")
+        or "No follow-through recovery or escalation-retirement signal is currently surfaced."
+    )
+    persistence = (
+        summary.get("follow_through_recovery_persistence_summary", "")
+        or "No follow-through recovery persistence signal is currently surfaced."
+    )
+    churn = (
+        summary.get("follow_through_relapse_churn_summary", "")
+        or "No relapse churn is currently surfaced."
+    )
     top_relapsing = list(summary.get("top_relapsing_follow_through_items") or [])
     top_retiring = list(summary.get("top_retiring_follow_through_items") or [])
     top_fragile = list(summary.get("top_fragile_recovery_items") or [])
     top_churn = list(summary.get("top_churn_follow_through_items") or [])
-    top_item = top_relapsing[0] if top_relapsing else (top_retiring[0] if top_retiring else (top_fragile[0] if top_fragile else {}))
+    top_item = (
+        top_relapsing[0]
+        if top_relapsing
+        else (top_retiring[0] if top_retiring else (top_fragile[0] if top_fragile else {}))
+    )
     top_label = (
         f"{top_item.get('repo')}: {top_item.get('title')}"
         if top_item.get("repo")
@@ -372,8 +414,14 @@ def _operator_follow_through_recovery_details(data: dict) -> tuple[str, str, str
 
 def _operator_follow_through_freshness_details(data: dict) -> tuple[str, str, str, str, str]:
     summary = data.get("operator_summary") or {}
-    freshness = summary.get("follow_through_recovery_freshness_summary", "") or "No follow-through recovery freshness signal is currently surfaced."
-    memory_reset = summary.get("follow_through_recovery_memory_reset_summary", "") or "No follow-through recovery memory reset signal is currently surfaced."
+    freshness = (
+        summary.get("follow_through_recovery_freshness_summary", "")
+        or "No follow-through recovery freshness signal is currently surfaced."
+    )
+    memory_reset = (
+        summary.get("follow_through_recovery_memory_reset_summary", "")
+        or "No follow-through recovery memory reset signal is currently surfaced."
+    )
     top_stale = list(summary.get("top_stale_recovery_items") or [])
     top_reset = list(summary.get("top_reset_recovery_items") or [])
     top_rebuilding = list(summary.get("top_rebuilding_recovery_items") or [])
@@ -397,12 +445,26 @@ def _operator_follow_through_freshness_details(data: dict) -> tuple[str, str, st
     return freshness, memory_reset, top_label, top_summary, rebuild_label
 
 
-def _operator_follow_through_rebuild_details(data: dict) -> tuple[str, str, str, str, str, str, str, str, str, str, str, str, str]:
+def _operator_follow_through_rebuild_details(
+    data: dict,
+) -> tuple[str, str, str, str, str, str, str, str, str, str, str, str, str]:
     summary = data.get("operator_summary") or {}
-    rebuild_strength = summary.get("follow_through_recovery_rebuild_strength_summary", "") or "No follow-through recovery rebuild-strength signal is currently surfaced."
-    reacquisition = summary.get("follow_through_recovery_reacquisition_summary", "") or "No follow-through recovery reacquisition signal is currently surfaced."
-    durability = summary.get("follow_through_recovery_reacquisition_durability_summary", "") or "No follow-through reacquisition durability signal is currently surfaced."
-    confidence = summary.get("follow_through_recovery_reacquisition_consolidation_summary", "") or "No follow-through reacquisition confidence-consolidation signal is currently surfaced."
+    rebuild_strength = (
+        summary.get("follow_through_recovery_rebuild_strength_summary", "")
+        or "No follow-through recovery rebuild-strength signal is currently surfaced."
+    )
+    reacquisition = (
+        summary.get("follow_through_recovery_reacquisition_summary", "")
+        or "No follow-through recovery reacquisition signal is currently surfaced."
+    )
+    durability = (
+        summary.get("follow_through_recovery_reacquisition_durability_summary", "")
+        or "No follow-through reacquisition durability signal is currently surfaced."
+    )
+    confidence = (
+        summary.get("follow_through_recovery_reacquisition_consolidation_summary", "")
+        or "No follow-through reacquisition confidence-consolidation signal is currently surfaced."
+    )
     top_rebuilding = list(summary.get("top_rebuilding_recovery_strength_items") or [])
     top_reacquiring = list(summary.get("top_reacquiring_recovery_items") or [])
     top_reacquired = list(summary.get("top_reacquired_recovery_items") or [])
@@ -483,10 +545,18 @@ def _operator_follow_through_rebuild_details(data: dict) -> tuple[str, str, str,
     )
 
 
-def _operator_follow_through_reacquisition_retirement_details(data: dict) -> tuple[str, str, str, str, str]:
+def _operator_follow_through_reacquisition_retirement_details(
+    data: dict,
+) -> tuple[str, str, str, str, str]:
     summary = data.get("operator_summary") or {}
-    softening_decay = summary.get("follow_through_reacquisition_softening_decay_summary", "") or "No reacquisition softening-decay signal is currently surfaced."
-    confidence_retirement = summary.get("follow_through_reacquisition_confidence_retirement_summary", "") or "No reacquisition confidence-retirement signal is currently surfaced."
+    softening_decay = (
+        summary.get("follow_through_reacquisition_softening_decay_summary", "")
+        or "No reacquisition softening-decay signal is currently surfaced."
+    )
+    confidence_retirement = (
+        summary.get("follow_through_reacquisition_confidence_retirement_summary", "")
+        or "No reacquisition confidence-retirement signal is currently surfaced."
+    )
     top_softening = list(summary.get("top_softening_reacquisition_items") or [])
     top_revalidation = list(summary.get("top_revalidation_needed_reacquisition_items") or [])
     top_retired = list(summary.get("top_retired_reacquisition_confidence_items") or [])
@@ -517,11 +587,13 @@ def _operator_follow_through_reacquisition_retirement_details(data: dict) -> tup
     )
 
 
-def _operator_follow_through_revalidation_recovery_details(data: dict) -> tuple[str, str, str, str, str, str]:
+def _operator_follow_through_revalidation_recovery_details(
+    data: dict,
+) -> tuple[str, str, str, str, str, str]:
     summary = data.get("operator_summary") or {}
-    revalidation_recovery = summary.get("follow_through_reacquisition_revalidation_recovery_summary", "") or (
-        "No post-revalidation recovery or confidence re-earning signal is currently surfaced."
-    )
+    revalidation_recovery = summary.get(
+        "follow_through_reacquisition_revalidation_recovery_summary", ""
+    ) or ("No post-revalidation recovery or confidence re-earning signal is currently surfaced.")
     top_under_revalidation = list(summary.get("top_under_revalidation_recovery_items") or [])
     top_rebuilding = list(summary.get("top_rebuilding_restored_confidence_items") or [])
     top_reearning = list(summary.get("top_reearning_confidence_items") or [])
@@ -537,11 +609,22 @@ def _operator_follow_through_revalidation_recovery_details(data: dict) -> tuple[
 
     return (
         revalidation_recovery,
-        _label(top_under_revalidation[0] if top_under_revalidation else {}, "No under-revalidation recovery hotspot"),
-        _label(top_rebuilding[0] if top_rebuilding else {}, "No rebuilding restored-confidence hotspot"),
+        _label(
+            top_under_revalidation[0] if top_under_revalidation else {},
+            "No under-revalidation recovery hotspot",
+        ),
+        _label(
+            top_rebuilding[0] if top_rebuilding else {}, "No rebuilding restored-confidence hotspot"
+        ),
         _label(top_reearning[0] if top_reearning else {}, "No confidence re-earning hotspot"),
-        _label(top_just_reearned[0] if top_just_reearned else {}, "No just re-earned confidence hotspot"),
-        _label(top_holding_reearned[0] if top_holding_reearned else {}, "No holding re-earned confidence hotspot"),
+        _label(
+            top_just_reearned[0] if top_just_reearned else {},
+            "No just re-earned confidence hotspot",
+        ),
+        _label(
+            top_holding_reearned[0] if top_holding_reearned else {},
+            "No holding re-earned confidence hotspot",
+        ),
     )
 
 
@@ -562,12 +645,19 @@ def _operator_trend_values(data: dict) -> tuple[str, str, str, str]:
     )
     if summary.get("quiet_streak_runs", 0):
         counts_summary += f" | Quiet streak {summary.get('quiet_streak_runs', 0)}"
-    return trend_status.replace("_", " ").title(), trend_summary, primary_target_label, counts_summary
+    return (
+        trend_status.replace("_", " ").title(),
+        trend_summary,
+        primary_target_label,
+        counts_summary,
+    )
 
 
 def _operator_accountability_values(data: dict) -> tuple[str, str, str]:
     summary = data.get("operator_summary") or {}
-    primary_target_reason = summary.get("primary_target_reason", "") or "No top-target rationale is recorded yet."
+    primary_target_reason = (
+        summary.get("primary_target_reason", "") or "No top-target rationale is recorded yet."
+    )
     closure_guidance = summary.get("closure_guidance", "") or "No closure guidance is recorded yet."
     longest_item = summary.get("longest_persisting_item") or {}
     longest_label = (
@@ -587,7 +677,9 @@ def _operator_decision_memory_values(data: dict) -> tuple[str, str, str, str]:
     summary = data.get("operator_summary") or {}
     last_intervention = summary.get("primary_target_last_intervention") or {}
     last_outcome = summary.get("primary_target_last_outcome", "") or "no-change"
-    resolution_evidence = summary.get("resolution_evidence_summary", "") or "No resolution evidence is recorded yet."
+    resolution_evidence = (
+        summary.get("resolution_evidence_summary", "") or "No resolution evidence is recorded yet."
+    )
     if last_intervention:
         when = (last_intervention.get("recorded_at") or "")[:10]
         event_type = last_intervention.get("event_type", "recorded")
@@ -599,7 +691,12 @@ def _operator_decision_memory_values(data: dict) -> tuple[str, str, str, str]:
         f"Confirmed resolved {summary.get('confirmed_resolved_count', 0)} | "
         f"Reopened {summary.get('reopened_after_resolution_count', 0)}"
     )
-    return last_intervention_label, last_outcome.replace("-", " ").title(), resolution_evidence, recovery_counts
+    return (
+        last_intervention_label,
+        last_outcome.replace("-", " ").title(),
+        resolution_evidence,
+        recovery_counts,
+    )
 
 
 def _operator_confidence_values(data: dict) -> tuple[str, str, str, str]:
@@ -623,7 +720,9 @@ def _operator_confidence_values(data: dict) -> tuple[str, str, str, str]:
 
 def _operator_trust_values(data: dict) -> tuple[str, str, str]:
     summary = data.get("operator_summary") or {}
-    trust_policy = (summary.get("primary_target_trust_policy", "") or "monitor").replace("-", " ").title()
+    trust_policy = (
+        (summary.get("primary_target_trust_policy", "") or "monitor").replace("-", " ").title()
+    )
     trust_reason = (
         summary.get("primary_target_trust_policy_reason")
         or "No trust-policy reason is recorded yet."
@@ -638,15 +737,15 @@ def _operator_trust_values(data: dict) -> tuple[str, str, str]:
 def _operator_exception_values(data: dict) -> tuple[str, str, str, str]:
     summary = data.get("operator_summary") or {}
     exception_status = (
-        summary.get("primary_target_exception_status", "") or "none"
-    ).replace("-", " ").title()
+        (summary.get("primary_target_exception_status", "") or "none").replace("-", " ").title()
+    )
     exception_reason = (
         summary.get("primary_target_exception_reason")
         or "No trust-policy exception reason is recorded yet."
     )
     drift_status = (
-        summary.get("recommendation_drift_status", "") or "stable"
-    ).replace("-", " ").title()
+        (summary.get("recommendation_drift_status", "") or "stable").replace("-", " ").title()
+    )
     drift_summary = (
         summary.get("recommendation_drift_summary")
         or "No recommendation-drift summary is recorded yet."
@@ -657,18 +756,21 @@ def _operator_exception_values(data: dict) -> tuple[str, str, str, str]:
 def _operator_learning_values(data: dict) -> tuple[str, str, str, str]:
     summary = data.get("operator_summary") or {}
     recovery_status = (
-        summary.get("primary_target_trust_recovery_status", "") or "none"
-    ).replace("-", " ").title()
+        (summary.get("primary_target_trust_recovery_status", "") or "none")
+        .replace("-", " ")
+        .title()
+    )
     recovery_reason = (
         summary.get("primary_target_trust_recovery_reason")
         or "No trust-recovery reason is recorded yet."
     )
     pattern_status = (
-        summary.get("primary_target_exception_pattern_status", "") or "none"
-    ).replace("-", " ").title()
+        (summary.get("primary_target_exception_pattern_status", "") or "none")
+        .replace("-", " ")
+        .title()
+    )
     pattern_summary = (
-        summary.get("exception_pattern_summary")
-        or "No exception-pattern summary is recorded yet."
+        summary.get("exception_pattern_summary") or "No exception-pattern summary is recorded yet."
     )
     return recovery_status, recovery_reason, pattern_status, pattern_summary
 
@@ -680,8 +782,10 @@ def _operator_retirement_values(data: dict) -> tuple[str, str, str, str]:
         f"({summary.get('primary_target_recovery_confidence_score', 0.0):.2f})"
     )
     retirement_status = (
-        summary.get("primary_target_exception_retirement_status", "") or "none"
-    ).replace("-", " ").title()
+        (summary.get("primary_target_exception_retirement_status", "") or "none")
+        .replace("-", " ")
+        .title()
+    )
     retirement_reason = (
         summary.get("primary_target_exception_retirement_reason")
         or "No exception-retirement reason is recorded yet."
@@ -696,14 +800,15 @@ def _operator_retirement_values(data: dict) -> tuple[str, str, str, str]:
 def _operator_class_normalization_values(data: dict) -> tuple[str, str, str, str]:
     summary = data.get("operator_summary") or {}
     policy_debt = (
-        summary.get("primary_target_policy_debt_status", "") or "none"
-    ).replace("-", " ").title()
+        (summary.get("primary_target_policy_debt_status", "") or "none").replace("-", " ").title()
+    )
     class_normalization = (
-        summary.get("primary_target_class_normalization_status", "") or "none"
-    ).replace("-", " ").title()
+        (summary.get("primary_target_class_normalization_status", "") or "none")
+        .replace("-", " ")
+        .title()
+    )
     debt_reason = (
-        summary.get("primary_target_policy_debt_reason")
-        or "No policy-debt reason is recorded yet."
+        summary.get("primary_target_policy_debt_reason") or "No policy-debt reason is recorded yet."
     )
     normalization_summary = (
         summary.get("trust_normalization_summary")
@@ -716,15 +821,17 @@ def _operator_class_normalization_values(data: dict) -> tuple[str, str, str, str
 def _operator_class_memory_values(data: dict) -> tuple[str, str, str, str]:
     summary = data.get("operator_summary") or {}
     freshness_status = (
-        summary.get("primary_target_class_memory_freshness_status", "") or "insufficient-data"
-    ).replace("-", " ").title()
+        (summary.get("primary_target_class_memory_freshness_status", "") or "insufficient-data")
+        .replace("-", " ")
+        .title()
+    )
     freshness_reason = (
         summary.get("primary_target_class_memory_freshness_reason")
         or "No class-memory freshness reason is recorded yet."
     )
     class_decay_status = (
-        summary.get("primary_target_class_decay_status", "") or "none"
-    ).replace("-", " ").title()
+        (summary.get("primary_target_class_decay_status", "") or "none").replace("-", " ").title()
+    )
     class_decay_summary = (
         summary.get("class_decay_summary")
         or summary.get("class_memory_summary")
@@ -736,15 +843,16 @@ def _operator_class_memory_values(data: dict) -> tuple[str, str, str, str]:
 def _operator_class_reweight_values(data: dict) -> tuple[str, str, str, str]:
     summary = data.get("operator_summary") or {}
     direction = (
-        summary.get("primary_target_class_trust_reweight_direction", "") or "neutral"
-    ).replace("-", " ").title()
+        (summary.get("primary_target_class_trust_reweight_direction", "") or "neutral")
+        .replace("-", " ")
+        .title()
+    )
     reweight_score = f"{summary.get('primary_target_class_trust_reweight_score', 0.0):.2f}"
     reasons = ", ".join(summary.get("primary_target_class_trust_reweight_reasons") or [])
     if not reasons:
         reasons = "No class reweighting rationale is recorded yet."
     reweight_summary = (
-        summary.get("class_reweighting_summary")
-        or "No class reweighting summary is recorded yet."
+        summary.get("class_reweighting_summary") or "No class reweighting summary is recorded yet."
     )
     return direction, reweight_score, reasons, reweight_summary
 
@@ -752,14 +860,20 @@ def _operator_class_reweight_values(data: dict) -> tuple[str, str, str, str]:
 def _operator_class_momentum_values(data: dict) -> tuple[str, str, str]:
     summary = data.get("operator_summary") or {}
     momentum_status = (
-        summary.get("primary_target_class_trust_momentum_status", "") or "insufficient-data"
-    ).replace("-", " ").title()
+        (summary.get("primary_target_class_trust_momentum_status", "") or "insufficient-data")
+        .replace("-", " ")
+        .title()
+    )
     stability_status = (
-        summary.get("primary_target_class_reweight_stability_status", "") or "watch"
-    ).replace("-", " ").title()
+        (summary.get("primary_target_class_reweight_stability_status", "") or "watch")
+        .replace("-", " ")
+        .title()
+    )
     transition_status = (
-        summary.get("primary_target_class_reweight_transition_status", "") or "none"
-    ).replace("-", " ").title()
+        (summary.get("primary_target_class_reweight_transition_status", "") or "none")
+        .replace("-", " ")
+        .title()
+    )
     transition_reason = (
         summary.get("primary_target_class_reweight_transition_reason")
         or "No class transition reason is recorded yet."
@@ -776,11 +890,15 @@ def _operator_class_momentum_values(data: dict) -> tuple[str, str, str]:
 def _operator_class_transition_values(data: dict) -> tuple[str, str, str]:
     summary = data.get("operator_summary") or {}
     health_status = (
-        summary.get("primary_target_class_transition_health_status", "") or "none"
-    ).replace("-", " ").title()
+        (summary.get("primary_target_class_transition_health_status", "") or "none")
+        .replace("-", " ")
+        .title()
+    )
     resolution_status = (
-        summary.get("primary_target_class_transition_resolution_status", "") or "none"
-    ).replace("-", " ").title()
+        (summary.get("primary_target_class_transition_resolution_status", "") or "none")
+        .replace("-", " ")
+        .title()
+    )
     transition_summary = (
         summary.get("class_transition_resolution_summary")
         or summary.get("class_transition_health_summary")
@@ -794,61 +912,113 @@ def _operator_transition_closure_values(
 ) -> tuple[str, str, str, str, str, str, str, str, str]:
     summary = data.get("operator_summary") or {}
     closure_label = (
-        summary.get("primary_target_transition_closure_confidence_label", "") or "low"
-    ).replace("-", " ").title()
+        (summary.get("primary_target_transition_closure_confidence_label", "") or "low")
+        .replace("-", " ")
+        .title()
+    )
     likely_outcome = (
-        summary.get("primary_target_transition_closure_likely_outcome", "") or "none"
-    ).replace("-", " ").title()
+        (summary.get("primary_target_transition_closure_likely_outcome", "") or "none")
+        .replace("-", " ")
+        .title()
+    )
     pending_debt_freshness = (
-        summary.get("primary_target_pending_debt_freshness_status", "") or "insufficient-data"
-    ).replace("-", " ").title()
+        (summary.get("primary_target_pending_debt_freshness_status", "") or "insufficient-data")
+        .replace("-", " ")
+        .title()
+    )
     closure_forecast_direction = (
-        summary.get("primary_target_closure_forecast_reweight_direction", "") or "neutral"
-    ).replace("-", " ").title()
+        (summary.get("primary_target_closure_forecast_reweight_direction", "") or "neutral")
+        .replace("-", " ")
+        .title()
+    )
     reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery = (
-        summary.get(
-            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status",
-            "",
+        (
+            summary.get(
+                "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status",
+                "",
+            )
+            or "none"
         )
-        or "none"
-    ).replace("-", " ").title()
+        .replace("-", " ")
+        .title()
+    )
     reset_reentry_rebuild_reentry_restore_rerererestore = (
-        summary.get(
-            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status",
-            "",
+        (
+            summary.get(
+                "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status",
+                "",
+            )
+            or "none"
         )
-        or "none"
-    ).replace("-", " ").title()
+        .replace("-", " ")
+        .title()
+    )
     reset_reentry_rebuild_reentry_restore_rerererestore_persistence = (
-        summary.get(
-            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status",
-            "",
+        (
+            summary.get(
+                "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status",
+                "",
+            )
+            or "none"
         )
-        or "none"
-    ).replace("-", " ").title()
+        .replace("-", " ")
+        .title()
+    )
     reset_reentry_rebuild_reentry_restore_rerererestore_churn = (
-        summary.get(
-            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status",
-            "",
+        (
+            summary.get(
+                "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status",
+                "",
+            )
+            or "none"
         )
-        or "none"
-    ).replace("-", " ").title()
+        .replace("-", " ")
+        .title()
+    )
     closure_summary = (
-        summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_summary")
-        or summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_summary")
-        or summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_summary")
-        or summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_summary")
-        or summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_summary")
-        or summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_summary")
-        or summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_summary")
-        or summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_summary")
-        or summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_summary")
+        summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_summary"
+        )
+        or summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_summary"
+        )
+        or summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_summary"
+        )
+        or summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_summary"
+        )
+        or summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_summary"
+        )
+        or summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_summary"
+        )
+        or summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_summary"
+        )
+        or summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_summary"
+        )
+        or summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_summary"
+        )
         or summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_summary")
-        or summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_summary")
-        or summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_summary")
-        or summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_summary")
-        or summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_summary")
-        or summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_summary")
+        or summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_summary"
+        )
+        or summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_summary"
+        )
+        or summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_summary"
+        )
+        or summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_summary"
+        )
+        or summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_summary"
+        )
         or summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_summary")
         or summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_summary")
         or summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_reset_summary")
@@ -910,7 +1080,12 @@ def _operator_calibration_values(data: dict) -> tuple[str, str, str, str]:
     )
     high_hit_rate = f"{summary.get('high_confidence_hit_rate', 0.0):.0%}"
     reopened_count = f"{summary.get('reopened_recommendation_count', 0)} reopened"
-    return validation_status.replace("-", " ").title(), calibration_summary, high_hit_rate, reopened_count
+    return (
+        validation_status.replace("-", " ").title(),
+        calibration_summary,
+        high_hit_rate,
+        reopened_count,
+    )
 
 
 def _apply_workbook_named_ranges(
@@ -936,10 +1111,16 @@ def _apply_workbook_named_ranges(
     _set_defined_name(wb, "nrSelectedCollectionLabel", f"'{TEMPLATE_INFO_SHEET}'!$B$13")
 
     dashboard = wb["Dashboard"]
-    dashboard["A2"] = f"Generated: {data['generated_at'][:10]} | {data['repos_audited']} repos audited"
+    dashboard["A2"] = (
+        f"Generated: {data['generated_at'][:10]} | {data['repos_audited']} repos audited"
+    )
 
     counts = _review_status_counts(data)
-    info = wb[TEMPLATE_INFO_SHEET] if TEMPLATE_INFO_SHEET in wb.sheetnames else wb.create_sheet(TEMPLATE_INFO_SHEET)
+    info = (
+        wb[TEMPLATE_INFO_SHEET]
+        if TEMPLATE_INFO_SHEET in wb.sheetnames
+        else wb.create_sheet(TEMPLATE_INFO_SHEET)
+    )
     info.sheet_state = "hidden"
     values = [
         ("Workbook Mode", excel_mode),
@@ -950,7 +1131,9 @@ def _apply_workbook_named_ranges(
         ("Campaign Repo Count", data.get("campaign_summary", {}).get("repo_count", 0)),
         (
             "Governance Ready Count",
-            data.get("governance_preview", {}).get("applyable_count", len(data.get("security_governance_preview", []) or [])),
+            data.get("governance_preview", {}).get(
+                "applyable_count", len(data.get("security_governance_preview", []) or [])
+            ),
         ),
         ("Governance Drift Count", len(data.get("governance_drift", []) or [])),
         ("Latest Portfolio Grade", data.get("portfolio_grade", "F")),
@@ -1034,7 +1217,9 @@ def _summarize_top_actions(queue: list[dict], *, limit: int = 5) -> list[tuple[s
     return action_counts.most_common(limit)
 
 
-def _summarize_top_issue_families(material_changes: list[dict], *, limit: int = 5) -> list[tuple[str, int]]:
+def _summarize_top_issue_families(
+    material_changes: list[dict], *, limit: int = 5
+) -> list[tuple[str, int]]:
     issue_counts = Counter()
     for item in material_changes:
         change_type = item.get("change_type") or "other"
@@ -1049,10 +1234,14 @@ def _primary_lane_label(blocked: object, urgent: object, ready: object, deferred
         "Ready for Manual Action": int(ready or 0),
         "Safe to Defer": int(deferred or 0),
     }
-    return max(lane_counts.items(), key=lambda item: (item[1], -list(lane_counts.keys()).index(item[0])))[0]
+    return max(
+        lane_counts.items(), key=lambda item: (item[1], -list(lane_counts.keys()).index(item[0]))
+    )[0]
 
 
-def _format_repo_rollup_counts(blocked: object, urgent: object, ready: object, deferred: object) -> str:
+def _format_repo_rollup_counts(
+    blocked: object, urgent: object, ready: object, deferred: object
+) -> str:
     return f"{int(blocked or 0)} blocked, {int(urgent or 0)} urgent, {int(ready or 0)} ready, {int(deferred or 0)} deferred"
 
 
@@ -1066,7 +1255,11 @@ def _ordered_queue_items(queue: list[dict]) -> list[dict]:
             str(item.get(key, "") or "")
             for key in ("title", "summary", "recommended_action", "next_step", "decision_hint")
         ).lower()
-        strategic_signal = 1 if any(token in text for token in ("drift", "security", "rollback", "approval")) else 0
+        strategic_signal = (
+            1
+            if any(token in text for token in ("drift", "security", "rollback", "approval"))
+            else 0
+        )
         return (
             lane_order.get(lane, 4),
             -strategic_signal,
@@ -1095,7 +1288,9 @@ def _primary_operator_focus_item(weekly_pack: dict) -> dict:
 
 def _operator_focus_snapshot(weekly_pack: dict) -> tuple[str, str, str]:
     focus_item = _primary_operator_focus_item(weekly_pack)
-    focus_summary = weekly_pack.get("operator_focus_summary", "No operator focus bucket is currently surfaced.")
+    focus_summary = weekly_pack.get(
+        "operator_focus_summary", "No operator focus bucket is currently surfaced."
+    )
     focus = str(focus_item.get("operator_focus") or build_operator_focus(focus_item))
     focus_line = str(focus_item.get("operator_focus_line") or build_operator_focus_line(focus_item))
     if not focus_item:
@@ -1104,7 +1299,9 @@ def _operator_focus_snapshot(weekly_pack: dict) -> tuple[str, str, str]:
     return focus, focus_summary, focus_line
 
 
-def _build_workbook_rollups(data: dict) -> tuple[list[list[object]], list[list[object]], list[list[object]]]:
+def _build_workbook_rollups(
+    data: dict,
+) -> tuple[list[list[object]], list[list[object]], list[list[object]]]:
     queue = data.get("operator_queue", []) or []
     material_changes = data.get("material_changes", []) or []
 
@@ -1247,7 +1444,9 @@ def _build_workbook_rollups(data: dict) -> tuple[list[list[object]], list[list[o
             item[0],
         ),
     ):
-        primary_kind = record["kind_counts"].most_common(1)[0][0] if record["kind_counts"] else "review"
+        primary_kind = (
+            record["kind_counts"].most_common(1)[0][0] if record["kind_counts"] else "review"
+        )
         repo_rows.append(
             [
                 repo,
@@ -1281,7 +1480,12 @@ def _build_workbook_rollups(data: dict) -> tuple[list[list[object]], list[list[o
     material_rows: list[list[object]] = []
     for (repo, change_type), record in sorted(
         material_rollups.items(),
-        key=lambda item: (-int(item[1]["count"]), -float(item[1]["max_severity"]), item[0][0], item[0][1]),
+        key=lambda item: (
+            -int(item[1]["count"]),
+            -float(item[1]["max_severity"]),
+            item[0][0],
+            item[0][1],
+        ),
     ):
         material_rows.append(
             [
@@ -1315,7 +1519,9 @@ def _write_instruction_banner(ws, row: int, end_col: int, message: str) -> None:
     cell.fill = PatternFill(fill_type="solid", fgColor="E0F2FE")
 
 
-def _write_key_value_block(ws, start_row: int, start_col: int, rows: list[tuple[str, object]], *, title: str | None = None) -> int:
+def _write_key_value_block(
+    ws, start_row: int, start_col: int, rows: list[tuple[str, object]], *, title: str | None = None
+) -> int:
     row = start_row
     if title:
         ws.cell(row=row, column=start_col, value=title).font = SECTION_FONT
@@ -1347,9 +1553,13 @@ def _write_ranked_list(
     for row_index, values in enumerate(rows, header_row + 1):
         for col_offset, value in enumerate(values):
             align = "center" if isinstance(value, (int, float)) else "left"
-            style_data_cell(ws.cell(row=row_index, column=start_col + col_offset, value=value), align)
+            style_data_cell(
+                ws.cell(row=row_index, column=start_col + col_offset, value=value), align
+            )
     if rows:
-        apply_zebra_stripes(ws, header_row + 1, header_row + len(rows), start_col + len(headers) - 1)
+        apply_zebra_stripes(
+            ws, header_row + 1, header_row + len(rows), start_col + len(headers) - 1
+        )
     return header_row + len(rows)
 
 
@@ -1491,9 +1701,27 @@ def _build_dashboard(
     write_kpi_card(ws, 5, 1, "Portfolio Grade", grade, grade_color)
     write_kpi_card(ws, 5, 3, "Avg Score", f"{data['average_score']:.2f}")
     tiers = data.get("tier_distribution", {})
-    write_kpi_card(ws, 5, 5, "Shipped", tiers.get("shipped", 0), "166534", f"#{_sheet_location('Tier Breakdown')}")
-    write_kpi_card(ws, 5, 7, "Functional", tiers.get("functional", 0), "1565C0", f"#{_sheet_location('Tier Breakdown')}")
-    write_kpi_card(ws, 5, 9, "WIP", tiers.get("wip", 0), "D97706", f"#{_sheet_location('Quick Wins')}")
+    write_kpi_card(
+        ws,
+        5,
+        5,
+        "Shipped",
+        tiers.get("shipped", 0),
+        "166534",
+        f"#{_sheet_location('Tier Breakdown')}",
+    )
+    write_kpi_card(
+        ws,
+        5,
+        7,
+        "Functional",
+        tiers.get("functional", 0),
+        "1565C0",
+        f"#{_sheet_location('Tier Breakdown')}",
+    )
+    write_kpi_card(
+        ws, 5, 9, "WIP", tiers.get("wip", 0), "D97706", f"#{_sheet_location('Quick Wins')}"
+    )
     skel_aband = tiers.get("skeleton", 0) + tiers.get("abandoned", 0)
     write_kpi_card(ws, 5, 11, "Needs Work", skel_aband, "C2410C")
 
@@ -1504,6 +1732,7 @@ def _build_dashboard(
     # Portfolio score sparkline (row 7, next to KPI cards)
     if score_history:
         from src.history import load_trend_data as _load_trends
+
         avg_scores = [t.get("average_score", 0) for t in (_load_trends() or [])]
         spark = render_sparkline(avg_scores)
         if spark:
@@ -1524,7 +1753,9 @@ def _build_dashboard(
         weekly_pack.get("what_to_do_this_week"),
         build_top_recommendation_summary(data),
     )
-    operator_focus, operator_focus_summary, operator_focus_line = _operator_focus_snapshot(weekly_pack)
+    operator_focus, operator_focus_summary, operator_focus_line = _operator_focus_snapshot(
+        weekly_pack
+    )
     ws["M8"] = "Run Summary"
     ws["M8"].font = SUBHEADER_FONT
     ws["N8"] = run_change_summary
@@ -1610,17 +1841,46 @@ def _build_dashboard(
     ) = _operator_follow_through_revalidation_recovery_details(data)
     trend_status, trend_summary, primary_target, resolution_counts = _operator_trend_values(data)
     primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
-    last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
-    primary_confidence, confidence_reason, next_action_confidence, recommendation_quality = _operator_confidence_values(data)
+    last_intervention, last_outcome, resolution_evidence, recovery_counts = (
+        _operator_decision_memory_values(data)
+    )
+    primary_confidence, confidence_reason, next_action_confidence, recommendation_quality = (
+        _operator_confidence_values(data)
+    )
     trust_policy, trust_policy_reason, adaptive_confidence_summary = _operator_trust_values(data)
-    exception_status, exception_reason, drift_status, drift_summary = _operator_exception_values(data)
-    trust_recovery_status, trust_recovery_reason, exception_pattern_status, exception_pattern_summary = _operator_learning_values(data)
-    recovery_confidence, retirement_status, retirement_reason, retirement_summary = _operator_retirement_values(data)
-    policy_debt_status, policy_debt_reason, class_normalization_status, trust_normalization_summary = _operator_class_normalization_values(data)
-    class_memory_status, class_memory_reason, class_decay_status, class_decay_summary = _operator_class_memory_values(data)
-    class_reweight_direction, class_reweight_score, class_reweight_reason, class_reweight_summary = _operator_class_reweight_values(data)
-    class_momentum_status, class_reweight_stability, class_momentum_summary = _operator_class_momentum_values(data)
-    class_transition_health, class_transition_resolution, class_transition_summary = _operator_class_transition_values(data)
+    exception_status, exception_reason, drift_status, drift_summary = _operator_exception_values(
+        data
+    )
+    (
+        trust_recovery_status,
+        trust_recovery_reason,
+        exception_pattern_status,
+        exception_pattern_summary,
+    ) = _operator_learning_values(data)
+    recovery_confidence, retirement_status, retirement_reason, retirement_summary = (
+        _operator_retirement_values(data)
+    )
+    (
+        policy_debt_status,
+        policy_debt_reason,
+        class_normalization_status,
+        trust_normalization_summary,
+    ) = _operator_class_normalization_values(data)
+    class_memory_status, class_memory_reason, class_decay_status, class_decay_summary = (
+        _operator_class_memory_values(data)
+    )
+    (
+        class_reweight_direction,
+        class_reweight_score,
+        class_reweight_reason,
+        class_reweight_summary,
+    ) = _operator_class_reweight_values(data)
+    class_momentum_status, class_reweight_stability, class_momentum_summary = (
+        _operator_class_momentum_values(data)
+    )
+    class_transition_health, class_transition_resolution, class_transition_summary = (
+        _operator_class_transition_values(data)
+    )
     (
         transition_closure_confidence,
         transition_likely_outcome,
@@ -1632,7 +1892,9 @@ def _build_dashboard(
         reset_reentry_rebuild_reentry_restore_rerererestore_churn,
         transition_closure_summary,
     ) = _operator_transition_closure_values(data)
-    calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
+    calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = (
+        _operator_calibration_values(data)
+    )
     ws["M10"] = "Trust Summary"
     ws["M10"].font = SUBHEADER_FONT
     ws["N10"] = trust_actionability_summary
@@ -1641,13 +1903,20 @@ def _build_dashboard(
     ws["N11"] = top_recommendation_summary
     ws["M12"] = "Use This Page"
     ws["M12"].font = SUBHEADER_FONT
-    ws["N12"] = "Read the left side for portfolio shape, the right side for operator pressure, then jump into Review Queue or Repo Detail."
+    ws["N12"] = (
+        "Read the left side for portfolio shape, the right side for operator pressure, then jump into Review Queue or Repo Detail."
+    )
 
     operator_rows = [
         ("Setup Health", _display_operator_state(setup_health.get("status", "ok"))),
         ("Operator Headline", operator_summary.get("headline", "Portfolio health is stable.")),
         ("Queue Counts", _format_lane_counts(lane_counts)),
-        ("Governance", governance_summary.get("headline", "Governance preview is aligned with the latest report.")),
+        (
+            "Governance",
+            governance_summary.get(
+                "headline", "Governance preview is aligned with the latest report."
+            ),
+        ),
         (
             "Campaign State",
             campaign_summary.get("label")
@@ -1703,15 +1972,30 @@ def _build_dashboard(
                 ("Holding Reacquired Hotspot", follow_through_holding_reacquired_hotspot),
                 ("Durable Reacquired Hotspot", follow_through_durable_reacquired_hotspot),
                 ("Softening Reacquired Hotspot", follow_through_softening_reacquired_hotspot),
-                ("Fragile Reacquisition Confidence Hotspot", follow_through_fragile_reacquisition_confidence_hotspot),
+                (
+                    "Fragile Reacquisition Confidence Hotspot",
+                    follow_through_fragile_reacquisition_confidence_hotspot,
+                ),
                 ("Reacquisition Softening Hotspot", follow_through_reacquisition_softening_hotspot),
                 ("Revalidation Needed Hotspot", follow_through_reacquisition_revalidation_hotspot),
-                ("Retired Confidence Hotspot", follow_through_reacquisition_retired_confidence_hotspot),
+                (
+                    "Retired Confidence Hotspot",
+                    follow_through_reacquisition_retired_confidence_hotspot,
+                ),
                 ("Under Revalidation Hotspot", follow_through_under_revalidation_hotspot),
-                ("Rebuilding Restored Confidence Hotspot", follow_through_rebuilding_restored_confidence_hotspot),
+                (
+                    "Rebuilding Restored Confidence Hotspot",
+                    follow_through_rebuilding_restored_confidence_hotspot,
+                ),
                 ("Re-Earning Confidence Hotspot", follow_through_reearning_confidence_hotspot),
-                ("Just Re-Earned Confidence Hotspot", follow_through_just_reearned_confidence_hotspot),
-                ("Holding Re-Earned Confidence Hotspot", follow_through_holding_reearned_confidence_hotspot),
+                (
+                    "Just Re-Earned Confidence Hotspot",
+                    follow_through_just_reearned_confidence_hotspot,
+                ),
+                (
+                    "Holding Re-Earned Confidence Hotspot",
+                    follow_through_holding_reearned_confidence_hotspot,
+                ),
             ]
         )
     operator_rows.extend(
@@ -1747,10 +2031,16 @@ def _build_dashboard(
                 ("Exception Retirement", f"{retirement_status} — {retirement_reason}"),
                 ("Retirement Summary", retirement_summary),
                 ("Policy Debt", f"{policy_debt_status} — {policy_debt_reason}"),
-                ("Class Normalization", f"{class_normalization_status} — {trust_normalization_summary}"),
+                (
+                    "Class Normalization",
+                    f"{class_normalization_status} — {trust_normalization_summary}",
+                ),
                 ("Class Memory", f"{class_memory_status} — {class_memory_reason}"),
                 ("Trust Decay", f"{class_decay_status} — {class_decay_summary}"),
-                ("Class Reweighting", f"{class_reweight_direction} ({class_reweight_score}) — {class_reweight_summary}"),
+                (
+                    "Class Reweighting",
+                    f"{class_reweight_direction} ({class_reweight_score}) — {class_reweight_summary}",
+                ),
                 ("Class Reweighting Why", class_reweight_reason),
                 ("Class Momentum", class_momentum_status),
                 ("Reweight Stability", class_reweight_stability),
@@ -1761,8 +2051,14 @@ def _build_dashboard(
                 ("Transition Likely Outcome", transition_likely_outcome),
                 ("Pending Debt Freshness", pending_debt_freshness),
                 ("Closure Forecast", closure_forecast_direction),
-                ("Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence", reset_reentry_rebuild_reentry_restore_rerererestore_persistence),
-                ("Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls", reset_reentry_rebuild_reentry_restore_rerererestore_churn),
+                (
+                    "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence",
+                    reset_reentry_rebuild_reentry_restore_rerererestore_persistence,
+                ),
+                (
+                    "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls",
+                    reset_reentry_rebuild_reentry_restore_rerererestore_churn,
+                ),
                 ("Closure Forecast Summary", transition_closure_summary),
                 ("Momentum Summary", class_momentum_summary),
                 ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}"),
@@ -1778,7 +2074,18 @@ def _build_dashboard(
 
     repo_rollups = _build_workbook_rollups(data)[1]
     top_attention_rows = []
-    for repo, total, blocked, urgent, ready, deferred, _kind, _priority, title, action in repo_rollups[:5]:
+    for (
+        repo,
+        total,
+        blocked,
+        urgent,
+        ready,
+        deferred,
+        _kind,
+        _priority,
+        title,
+        action,
+    ) in repo_rollups[:5]:
         top_attention_rows.append(
             [
                 repo,
@@ -1788,7 +2095,9 @@ def _build_dashboard(
             ]
         )
     if not top_attention_rows:
-        top_attention_rows.append(["Portfolio", "No open items", "Nothing is currently queued.", "Monitor future audits"])
+        top_attention_rows.append(
+            ["Portfolio", "No open items", "Nothing is currently queued.", "Monitor future audits"]
+        )
     top_attention_start = max(19, operator_block_end + 2)
     _write_ranked_list(
         ws,
@@ -1799,7 +2108,9 @@ def _build_dashboard(
         top_attention_rows,
     )
 
-    audits_sorted = sorted(data.get("audits", []), key=lambda audit: audit.get("overall_score", 0), reverse=True)
+    audits_sorted = sorted(
+        data.get("audits", []), key=lambda audit: audit.get("overall_score", 0), reverse=True
+    )
     top_opportunities: list[list[object]] = []
     for audit in audits_sorted:
         action = (audit.get("action_candidates") or [{}])[0]
@@ -1826,7 +2137,9 @@ def _build_dashboard(
         top_opportunities,
     )
 
-    bottom_repos = sorted(data.get("audits", []), key=lambda audit: audit.get("overall_score", 0))[:5]
+    bottom_repos = sorted(data.get("audits", []), key=lambda audit: audit.get("overall_score", 0))[
+        :5
+    ]
     laggard_rows = [
         [
             audit.get("metadata", {}).get("name", ""),
@@ -1848,7 +2161,9 @@ def _build_dashboard(
     # Portfolio DNA row (row 8) — one colored cell per repo
     dna_row = 8
     ws.cell(row=dna_row, column=1, value="Portfolio DNA").font = SUBHEADER_FONT
-    audits_sorted = sorted(data.get("audits", []), key=lambda a: a.get("overall_score", 0), reverse=True)
+    audits_sorted = sorted(
+        data.get("audits", []), key=lambda a: a.get("overall_score", 0), reverse=True
+    )
     for i, audit in enumerate(audits_sorted[:24]):
         cell = ws.cell(row=dna_row, column=2 + i, value="")
         tier = audit.get("completeness_tier", "abandoned")
@@ -1963,8 +2278,18 @@ def _build_dashboard(
         lang_bar.type = "bar"
         lang_bar.title = "Top Languages"
         lang_bar.style = 10
-        lang_data = Reference(ws, min_col=lang_value_col, min_row=lang_row, max_row=lang_row + min(7, len(lang_dist) - 1))
-        lang_cats = Reference(ws, min_col=lang_label_col, min_row=lang_row, max_row=lang_row + min(7, len(lang_dist) - 1))
+        lang_data = Reference(
+            ws,
+            min_col=lang_value_col,
+            min_row=lang_row,
+            max_row=lang_row + min(7, len(lang_dist) - 1),
+        )
+        lang_cats = Reference(
+            ws,
+            min_col=lang_label_col,
+            min_row=lang_row,
+            max_row=lang_row + min(7, len(lang_dist) - 1),
+        )
         lang_bar.add_data(lang_data, titles_from_data=False)
         lang_bar.set_categories(lang_cats)
         lang_bar.width = 8.0
@@ -1984,8 +2309,8 @@ def _build_scatter_on_dashboard(ws, data: dict) -> None:
     # Write scatter data to hidden support columns starting at AG.
     data_start_row = 10
     col_name = 33  # AG: repo name (reference)
-    col_x = 34     # AH: completeness
-    col_y = 35     # AI: interest
+    col_x = 34  # AH: completeness
+    col_y = 35  # AI: interest
 
     for i, audit in enumerate(audits):
         row = data_start_row + i
@@ -2020,24 +2345,34 @@ def _build_scatter_on_dashboard(ws, data: dict) -> None:
     ws.cell(row=data_start_row + 1, column=line_col, value=0.55)
     ws.cell(row=data_start_row + 1, column=line_col + 1, value=1.0)
 
-    vline_y = Reference(ws, min_col=line_col + 1, min_row=data_start_row, max_row=data_start_row + 1)
+    vline_y = Reference(
+        ws, min_col=line_col + 1, min_row=data_start_row, max_row=data_start_row + 1
+    )
     vline_x = Reference(ws, min_col=line_col, min_row=data_start_row, max_row=data_start_row + 1)
     chart.add_data(vline_y, titles_from_data=False)
     chart.set_categories(vline_x)
     if len(chart.series) > 1:
-        chart.series[-1].graphicalProperties.line = LineProperties(w=12700, prstDash="dash", solidFill="808080")
+        chart.series[-1].graphicalProperties.line = LineProperties(
+            w=12700, prstDash="dash", solidFill="808080"
+        )
 
     ws.cell(row=data_start_row, column=line_col + 2, value=0.0)
     ws.cell(row=data_start_row, column=line_col + 3, value=0.45)
     ws.cell(row=data_start_row + 1, column=line_col + 2, value=1.0)
     ws.cell(row=data_start_row + 1, column=line_col + 3, value=0.45)
 
-    hline_y = Reference(ws, min_col=line_col + 3, min_row=data_start_row, max_row=data_start_row + 1)
-    hline_x = Reference(ws, min_col=line_col + 2, min_row=data_start_row, max_row=data_start_row + 1)
+    hline_y = Reference(
+        ws, min_col=line_col + 3, min_row=data_start_row, max_row=data_start_row + 1
+    )
+    hline_x = Reference(
+        ws, min_col=line_col + 2, min_row=data_start_row, max_row=data_start_row + 1
+    )
     chart.add_data(hline_y, titles_from_data=False)
     chart.set_categories(hline_x)
     if len(chart.series) > 2:
-        chart.series[-1].graphicalProperties.line = LineProperties(w=12700, prstDash="dash", solidFill="808080")
+        chart.series[-1].graphicalProperties.line = LineProperties(
+            w=12700, prstDash="dash", solidFill="808080"
+        )
 
     chart.width = 10.5
     chart.height = 8
@@ -2090,19 +2425,56 @@ def _write_quadrant_table(ws, audits: list[dict], legend_row: int) -> None:
 # ═══════════════════════════════════════════════════════════════════════
 
 
-def _build_all_repos(wb: Workbook, data: dict, score_history: dict[str, list[float]] | None = None) -> None:
+def _build_all_repos(
+    wb: Workbook,
+    data: dict,
+    score_history: dict[str, list[float]] | None = None,
+    *,
+    risk_lookup: dict[str, str] | None = None,
+) -> None:
     ws = _get_or_create_sheet(wb, "All Repos")
     ws.sheet_properties.tabColor = "1565C0"
     _configure_sheet_view(ws, zoom=105, show_grid_lines=True)
 
     headers = [
-        "Repo", "Grade", "Score", "Interest", "Interest Grade", "Interest Tier", "Tier", "Badges",
-        "Next Badge", "Language", "Topics", "Commit Pattern", "Bus Factor",
-        "Days Since Push", "Commits", "Releases", "Test Files", "Test Framework",
-        "LOC", "TODO Density", "PR Merge %", "Comment Ratio",
-        "Dep Count", "Libyears", "Stars", "Private", "Flags", "Description",
-        "Biggest Drag", "Why This Grade", "Tech Novelty", "Burst", "Ambition", "Storytelling",
-        "Created", "Size (KB)", "Trend",
+        "Repo",
+        "Grade",
+        "Score",
+        "Interest",
+        "Interest Grade",
+        "Interest Tier",
+        "Tier",
+        "Badges",
+        "Next Badge",
+        "Language",
+        "Topics",
+        "Commit Pattern",
+        "Bus Factor",
+        "Days Since Push",
+        "Commits",
+        "Releases",
+        "Test Files",
+        "Test Framework",
+        "LOC",
+        "TODO Density",
+        "PR Merge %",
+        "Comment Ratio",
+        "Dep Count",
+        "Libyears",
+        "Stars",
+        "Private",
+        "Flags",
+        "Description",
+        "Biggest Drag",
+        "Why This Grade",
+        "Tech Novelty",
+        "Burst",
+        "Ambition",
+        "Storytelling",
+        "Created",
+        "Size (KB)",
+        "Trend",
+        "Risk Tier",
     ]
     for col, h in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=h)
@@ -2173,7 +2545,9 @@ def _build_all_repos(wb: Workbook, data: dict, score_history: dict[str, list[flo
             sorted_dims = sorted(dim_scores.items(), key=lambda x: x[1])[:2]
             g = audit.get("grade", "F")
             if len(sorted_dims) >= 2:
-                values.append(f"{g}: {sorted_dims[0][0]}={sorted_dims[0][1]:.1f}, {sorted_dims[1][0]}={sorted_dims[1][1]:.1f}")
+                values.append(
+                    f"{g}: {sorted_dims[0][0]}={sorted_dims[0][1]:.1f}, {sorted_dims[1][0]}={sorted_dims[1][1]:.1f}"
+                )
             else:
                 values.append(g)
         else:
@@ -2181,12 +2555,14 @@ def _build_all_repos(wb: Workbook, data: dict, score_history: dict[str, list[flo
 
         # Interest breakdown
         interest_d = details.get("interest", {})
-        values.extend([
-            round(interest_d.get("tech_novelty", 0), 2),
-            round(interest_d.get("burst_coefficient", 0), 2),
-            round(interest_d.get("ambition_score") or 0, 2),
-            round(interest_d.get("readme_storytelling", 0), 2),
-        ])
+        values.extend(
+            [
+                round(interest_d.get("tech_novelty", 0), 2),
+                round(interest_d.get("burst_coefficient", 0), 2),
+                round(interest_d.get("ambition_score") or 0, 2),
+                round(interest_d.get("readme_storytelling", 0), 2),
+            ]
+        )
 
         # Created date and repo size
         created = m.get("created_at", "")
@@ -2214,46 +2590,68 @@ def _build_all_repos(wb: Workbook, data: dict, score_history: dict[str, list[flo
         if pattern and pattern != "—":
             color_pattern_cell(ws.cell(row=row, column=12), pattern)
 
-        # Sparkline trend (last column)
+        # Sparkline trend (second-to-last column; last is Risk Tier)
         if score_history:
             repo_name = m.get("name", "")
             scores = score_history.get(repo_name, [])
             spark = render_sparkline(scores)
             if spark:
-                cell = ws.cell(row=row, column=len(headers), value=spark)
+                cell = ws.cell(row=row, column=len(headers) - 1, value=spark)
                 cell.font = SPARKLINE_FONT
+
+        # Risk Tier (last column)
+        if risk_lookup is not None:
+            repo_name = m.get("name", "")
+            tier_value = risk_lookup.get(str(repo_name), "")
+            ws.cell(row=row, column=len(headers), value=tier_value)
 
     max_row = len(audits) + 1
     apply_zebra_stripes(ws, 2, max_row, len(headers), skip_cols={2, 7})
 
     # Consistent number formatting
     for row in range(2, max_row + 1):
-        ws.cell(row=row, column=3).number_format = '0.000'  # Score
-        ws.cell(row=row, column=4).number_format = '0.000'  # Interest
+        ws.cell(row=row, column=3).number_format = "0.000"  # Score
+        ws.cell(row=row, column=4).number_format = "0.000"  # Interest
 
     # DataBar on Score and Interest columns
     if max_row > 1:
         ws.conditional_formatting.add(
             f"C2:C{max_row}",
-            DataBarRule(start_type='num', start_value=0, end_type='num', end_value=1, color='166534'),
+            DataBarRule(
+                start_type="num", start_value=0, end_type="num", end_value=1, color="166534"
+            ),
         )
         ws.conditional_formatting.add(
             f"D2:D{max_row}",
-            DataBarRule(start_type='num', start_value=0, end_type='num', end_value=1, color='0EA5E9'),
+            DataBarRule(
+                start_type="num", start_value=0, end_type="num", end_value=1, color="0EA5E9"
+            ),
         )
         ws.conditional_formatting.add(
             f"C2:C{max_row}",
-            IconSetRule('3TrafficLights1', 'num', [0, 0.55, 0.7]),
+            IconSetRule("3TrafficLights1", "num", [0, 0.55, 0.7]),
         )
 
     # Tooltips on key columns
-    score_dv = DataValidation(allow_blank=True, prompt="Weighted average of 10 dimensions. See Score Explainer sheet.", promptTitle="Overall Score")
+    score_dv = DataValidation(
+        allow_blank=True,
+        prompt="Weighted average of 10 dimensions. See Score Explainer sheet.",
+        promptTitle="Overall Score",
+    )
     score_dv.sqref = f"C2:C{max_row}"
     ws.add_data_validation(score_dv)
-    interest_dv = DataValidation(allow_blank=True, prompt="How interesting/ambitious (separate from completeness). Based on tech novelty, commit patterns, scope.", promptTitle="Interest Score")
+    interest_dv = DataValidation(
+        allow_blank=True,
+        prompt="How interesting/ambitious (separate from completeness). Based on tech novelty, commit patterns, scope.",
+        promptTitle="Interest Score",
+    )
     interest_dv.sqref = f"D2:D{max_row}"
     ws.add_data_validation(interest_dv)
-    grade_dv = DataValidation(allow_blank=True, prompt="A (>=85%) B (>=70%) C (>=55%) D (>=35%) F (<35%)", promptTitle="Letter Grade")
+    grade_dv = DataValidation(
+        allow_blank=True,
+        prompt="A (>=85%) B (>=70%) C (>=55%) D (>=35%) F (<35%)",
+        promptTitle="Letter Grade",
+    )
     grade_dv.sqref = f"B2:B{max_row}"
     ws.add_data_validation(grade_dv)
 
@@ -2272,13 +2670,14 @@ def _build_all_repos(wb: Workbook, data: dict, score_history: dict[str, list[flo
 
     # Wrap text on long-content columns and set appropriate widths
     from openpyxl.styles import Alignment
+
     desc_col_idx = headers.index("Description") + 1
     topics_col_idx = headers.index("Topics") + 1
     badges_col_idx = headers.index("Badges") + 1
     for col_idx in (desc_col_idx, topics_col_idx, badges_col_idx):
         ws.column_dimensions[get_column_letter(col_idx)].width = 60
         for row in range(2, max_row + 1):
-            ws.cell(row=row, column=col_idx).alignment = Alignment(wrap_text=True, vertical='top')
+            ws.cell(row=row, column=col_idx).alignment = Alignment(wrap_text=True, vertical="top")
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -2292,9 +2691,17 @@ def _build_heatmap(wb: Workbook, data: dict) -> None:
     _configure_sheet_view(ws, zoom=105, show_grid_lines=True)
 
     dimensions = [
-        "readme", "structure", "code_quality", "testing", "cicd",
-        "dependencies", "activity", "documentation", "build_readiness",
-        "community_profile", "interest",
+        "readme",
+        "structure",
+        "code_quality",
+        "testing",
+        "cicd",
+        "dependencies",
+        "activity",
+        "documentation",
+        "build_readiness",
+        "community_profile",
+        "interest",
     ]
     dim_labels = [d.replace("_", " ").title() for d in dimensions]
     headers = ["Repo", "Grade", "Overall"] + dim_labels
@@ -2333,9 +2740,15 @@ def _build_heatmap(wb: Workbook, data: dict) -> None:
             ws.conditional_formatting.add(
                 f"{col_letter}2:{col_letter}{max_row}",
                 ColorScaleRule(
-                    start_type='num', start_value=0, start_color=HEATMAP_RED,
-                    mid_type='num', mid_value=0.5, mid_color=HEATMAP_AMBER,
-                    end_type='num', end_value=1, end_color=HEATMAP_GREEN,
+                    start_type="num",
+                    start_value=0,
+                    start_color=HEATMAP_RED,
+                    mid_type="num",
+                    mid_value=0.5,
+                    mid_color=HEATMAP_AMBER,
+                    end_type="num",
+                    end_value=1,
+                    end_color=HEATMAP_GREEN,
                 ),
             )
 
@@ -2373,16 +2786,18 @@ def _build_quick_wins(wb: Workbook, data: dict) -> None:
         sorted_dims = sorted(dim_scores.items(), key=lambda x: x[1])
         actions = [f"Improve {d} ({s:.1f})" for d, s in sorted_dims[:3]]
 
-        wins.append({
-            "name": audit["metadata"]["name"],
-            "grade": audit.get("grade", "F"),
-            "tier": current_tier,
-            "score": audit.get("overall_score", 0),
-            "next_tier": next_name,
-            "gap": gap,
-            "actions": actions,
-            "badges": len(audit.get("badges", [])),
-        })
+        wins.append(
+            {
+                "name": audit["metadata"]["name"],
+                "grade": audit.get("grade", "F"),
+                "tier": current_tier,
+                "score": audit.get("overall_score", 0),
+                "next_tier": next_name,
+                "gap": gap,
+                "actions": actions,
+                "badges": len(audit.get("badges", [])),
+            }
+        )
 
     wins.sort(key=lambda w: w["gap"])
 
@@ -2420,7 +2835,9 @@ def _build_quick_wins(wb: Workbook, data: dict) -> None:
     if max_row > 4:
         ws.conditional_formatting.add(
             f"F4:F{max_row}",
-            DataBarRule(start_type='num', start_value=0, end_type='num', end_value=0.20, color='0EA5E9'),
+            DataBarRule(
+                start_type="num", start_value=0, end_type="num", end_value=0.20, color="0EA5E9"
+            ),
         )
 
     apply_zebra_stripes(ws, 4, max_row, len(headers))
@@ -2455,7 +2872,9 @@ def _build_badges(wb: Workbook, data: dict) -> None:
     ws["A1"].font = SECTION_FONT
 
     total_badges = sum(badge_counts.values())
-    ws.cell(row=2, column=1, value=f"Total badges earned: {total_badges} across {total_repos} repos")
+    ws.cell(
+        row=2, column=1, value=f"Total badges earned: {total_badges} across {total_repos} repos"
+    )
     ws.cell(row=2, column=1).font = SUBTITLE_FONT
 
     # Badge distribution table
@@ -2468,7 +2887,7 @@ def _build_badges(wb: Workbook, data: dict) -> None:
     for row, (badge, count) in enumerate(badge_counts.most_common(), 5):
         ws.cell(row=row, column=1, value=badge)
         ws.cell(row=row, column=2, value=count)
-        ws.cell(row=row, column=3, value=f"{count/total_repos*100:.0f}%")
+        ws.cell(row=row, column=3, value=f"{count / total_repos * 100:.0f}%")
         for col in range(1, 4):
             style_data_cell(ws.cell(row=row, column=col))
 
@@ -2596,7 +3015,9 @@ def _build_trends(wb: Workbook, data: dict, trend_data: list[dict] | None = None
     for i, tier in enumerate(TIER_ORDER):
         ws.cell(row=row + 1 + i, column=1, value=tier.capitalize())
         for col, run in enumerate(trend_data, 2):
-            ws.cell(row=row + 1 + i, column=col, value=run.get("tier_distribution", {}).get(tier, 0))
+            ws.cell(
+                row=row + 1 + i, column=col, value=run.get("tier_distribution", {}).get(tier, 0)
+            )
 
     auto_width(ws, len(trend_data) + 1, 15)
 
@@ -2626,6 +3047,7 @@ def _build_tier_breakdown(wb: Workbook, data: dict) -> None:
         tier_audits.sort(key=lambda a: a.get("overall_score", 0), reverse=True)
 
         from src.excel_styles import TIER_FILLS
+
         ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=6)
         h = ws.cell(row=current_row, column=1, value=f"{tier.upper()} ({len(tier_audits)} repos)")
         h.font = XFont(bold=True, size=13, color=WHITE)
@@ -2668,8 +3090,15 @@ def _build_activity(wb: Workbook, data: dict) -> None:
     _configure_sheet_view(ws, zoom=105, show_grid_lines=True)
 
     headers = [
-        "Repo", "Commit Pattern", "Days Since Push", "Total Commits",
-        "Recent 3mo", "Bus Factor", "Release Count", "Activity Score", "Tier",
+        "Repo",
+        "Commit Pattern",
+        "Days Since Push",
+        "Total Commits",
+        "Recent 3mo",
+        "Bus Factor",
+        "Release Count",
+        "Activity Score",
+        "Tier",
     ]
     for col, h in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=h)
@@ -2679,8 +3108,11 @@ def _build_activity(wb: Workbook, data: dict) -> None:
     audits = sorted(
         data.get("audits", []),
         key=lambda a: next(
-            (r.get("details", {}).get("days_since_push", 9999)
-             for r in a.get("analyzer_results", []) if r["dimension"] == "activity"),
+            (
+                r.get("details", {}).get("days_since_push", 9999)
+                for r in a.get("analyzer_results", [])
+                if r["dimension"] == "activity"
+            ),
             9999,
         ),
     )
@@ -2757,7 +3189,9 @@ def _build_reconciliation(wb: Workbook, data: dict) -> None:
     unmatched_gh = recon.get("on_github_not_registry", [])
     if unmatched_gh:
         row += 2
-        ws.cell(row=row, column=1, value=f"On GitHub, NOT in Registry ({len(unmatched_gh)})").font = SUBHEADER_FONT
+        ws.cell(
+            row=row, column=1, value=f"On GitHub, NOT in Registry ({len(unmatched_gh)})"
+        ).font = SUBHEADER_FONT
         row += 1
         for name in unmatched_gh:
             ws.cell(row=row, column=1, value=name).border = THIN_BORDER
@@ -2766,7 +3200,9 @@ def _build_reconciliation(wb: Workbook, data: dict) -> None:
     unmatched_reg = recon.get("in_registry_not_github", [])
     if unmatched_reg:
         row += 1
-        ws.cell(row=row, column=1, value=f"In Registry, NOT on GitHub ({len(unmatched_reg)})").font = SUBHEADER_FONT
+        ws.cell(
+            row=row, column=1, value=f"In Registry, NOT on GitHub ({len(unmatched_reg)})"
+        ).font = SUBHEADER_FONT
         row += 1
         for name in unmatched_reg:
             ws.cell(row=row, column=1, value=name).border = THIN_BORDER
@@ -2792,16 +3228,40 @@ def _build_score_explainer(wb: Workbook) -> None:
     ws["A1"].font = TITLE_FONT
 
     DIMENSION_INFO = {
-        "testing": ("Test directories, framework, test file count", "Add test/ with pytest/jest/vitest configured"),
-        "code_quality": ("Entry points, TODO density, types, commit quality", "Add main entry point, reduce TODOs"),
-        "activity": ("Push recency, commit count, releases, bus factor", "Push regularly, tag releases"),
-        "readme": ("Exists, description, install instructions, examples", "Add usage section with code blocks"),
-        "structure": (".gitignore, source dirs, config files, LICENSE", "Add .gitignore + LICENSE + package manifest"),
+        "testing": (
+            "Test directories, framework, test file count",
+            "Add test/ with pytest/jest/vitest configured",
+        ),
+        "code_quality": (
+            "Entry points, TODO density, types, commit quality",
+            "Add main entry point, reduce TODOs",
+        ),
+        "activity": (
+            "Push recency, commit count, releases, bus factor",
+            "Push regularly, tag releases",
+        ),
+        "readme": (
+            "Exists, description, install instructions, examples",
+            "Add usage section with code blocks",
+        ),
+        "structure": (
+            ".gitignore, source dirs, config files, LICENSE",
+            "Add .gitignore + LICENSE + package manifest",
+        ),
         "cicd": ("GitHub Actions, CI configs, build scripts", "Add .github/workflows/ci.yml"),
-        "dependencies": ("Manifest + lockfile, dep count, libyears", "Add lockfile alongside manifest"),
-        "build_readiness": ("Docker, Makefile, .env.example, deploy configs", "Add Dockerfile or Makefile"),
+        "dependencies": (
+            "Manifest + lockfile, dep count, libyears",
+            "Add lockfile alongside manifest",
+        ),
+        "build_readiness": (
+            "Docker, Makefile, .env.example, deploy configs",
+            "Add Dockerfile or Makefile",
+        ),
         "community_profile": ("LICENSE, CONTRIBUTING, CODE_OF_CONDUCT", "Add CONTRIBUTING.md"),
-        "documentation": ("docs/ dir, CHANGELOG, comment density", "Add docs/ folder or CHANGELOG.md"),
+        "documentation": (
+            "docs/ dir, CHANGELOG, comment density",
+            "Add docs/ folder or CHANGELOG.md",
+        ),
     }
 
     ws.cell(row=3, column=1, value="Dimension Weights").font = SECTION_FONT
@@ -2844,10 +3304,16 @@ def _build_score_explainer(wb: Workbook) -> None:
 
 # ── Effort map for action items
 EFFORT_MAP = {
-    "readme": "Low", "structure": "Low", "cicd": "Low",
-    "documentation": "Low", "community_profile": "Low",
-    "dependencies": "Low", "build_readiness": "Med",
-    "testing": "Med", "code_quality": "Med", "activity": "High",
+    "readme": "Low",
+    "structure": "Low",
+    "cicd": "Low",
+    "documentation": "Low",
+    "community_profile": "Low",
+    "dependencies": "Low",
+    "build_readiness": "Med",
+    "testing": "Med",
+    "code_quality": "Med",
+    "activity": "High",
 }
 
 TIER_NEXT = {
@@ -2876,24 +3342,28 @@ def _collect_all_actions(data: dict) -> list[dict]:
             if r["dimension"] != "interest"
         }
         for dim, score in sorted(dim_scores.items(), key=lambda x: x[1])[:2]:
-            actions.append({
-                "repo": audit["metadata"]["name"],
-                "action": f"Improve {dim} (currently {score:.1f})",
-                "impact": f"Close {gap:.3f} gap to {next_tier}",
-                "effort": EFFORT_MAP.get(dim, "Med"),
-                "dimension": dim,
-                "gap": gap,
-            })
+            actions.append(
+                {
+                    "repo": audit["metadata"]["name"],
+                    "action": f"Improve {dim} (currently {score:.1f})",
+                    "impact": f"Close {gap:.3f} gap to {next_tier}",
+                    "effort": EFFORT_MAP.get(dim, "Med"),
+                    "dimension": dim,
+                    "gap": gap,
+                }
+            )
 
         for badge_s in audit.get("next_badges", [])[:1]:
-            actions.append({
-                "repo": audit["metadata"]["name"],
-                "action": badge_s.get("action", ""),
-                "impact": f"Earn '{badge_s.get('badge', '')}' badge",
-                "effort": "Low" if badge_s.get("gap", 1) < 0.3 else "Med",
-                "dimension": "badges",
-                "gap": badge_s.get("gap", 1.0),
-            })
+            actions.append(
+                {
+                    "repo": audit["metadata"]["name"],
+                    "action": badge_s.get("action", ""),
+                    "impact": f"Earn '{badge_s.get('badge', '')}' badge",
+                    "effort": "Low" if badge_s.get("gap", 1) < 0.3 else "Med",
+                    "dimension": "badges",
+                    "gap": badge_s.get("gap", 1.0),
+                }
+            )
 
     effort_order = {"Low": 0, "Med": 1, "High": 2}
     actions.sort(key=lambda a: (effort_order.get(a["effort"], 1), a["gap"]))
@@ -2930,7 +3400,17 @@ def _build_action_items(wb: Workbook, data: dict) -> None:
             ws.cell(row=4, column=col, value=h)
         style_header_row(ws, 4, len(headers))
         for i, item in enumerate(sprint, 5):
-            for col, val in enumerate([i - 4, item["repo"], item["action"], item["impact"], item["effort"], item["dimension"]], 1):
+            for col, val in enumerate(
+                [
+                    i - 4,
+                    item["repo"],
+                    item["action"],
+                    item["impact"],
+                    item["effort"],
+                    item["dimension"],
+                ],
+                1,
+            ):
                 cell = ws.cell(row=i, column=col, value=val)
                 style_data_cell(cell)
 
@@ -2942,7 +3422,17 @@ def _build_action_items(wb: Workbook, data: dict) -> None:
     style_header_row(ws, full_start, len(headers))
 
     for i, item in enumerate(actions[:100], full_start + 1):
-        for col, val in enumerate([i - full_start, item["repo"], item["action"], item["impact"], item["effort"], item["dimension"]], 1):
+        for col, val in enumerate(
+            [
+                i - full_start,
+                item["repo"],
+                item["action"],
+                item["impact"],
+                item["effort"],
+                item["dimension"],
+            ],
+            1,
+        ):
             cell = ws.cell(row=i, column=col, value=val)
             style_data_cell(cell)
 
@@ -2974,7 +3464,9 @@ def _build_navigation(
     ws["A1"].alignment = CENTER
 
     ws.merge_cells("A2:G2")
-    ws["A2"].value = f"Last updated: {data['generated_at'][:10]} | {data['repos_audited']} repos | Grade: {data.get('portfolio_grade', '?')}"
+    ws[
+        "A2"
+    ].value = f"Last updated: {data['generated_at'][:10]} | {data['repos_audited']} repos | Grade: {data.get('portfolio_grade', '?')}"
     ws["A2"].font = SUBTITLE_FONT
     ws["A2"].alignment = CENTER
     _write_instruction_banner(
@@ -3035,11 +3527,15 @@ def _build_navigation(
     ws["A14"].font = SUBTITLE_FONT
     ws["A14"].alignment = WRAP
     ws.merge_cells("A15:G15")
-    ws["A15"] = "Start with Dashboard for the portfolio brief, move to Review Queue for action, then drill into Portfolio Explorer and Executive Summary for detail."
+    ws["A15"] = (
+        "Start with Dashboard for the portfolio brief, move to Review Queue for action, then drill into Portfolio Explorer and Executive Summary for detail."
+    )
     ws["A15"].font = SUBTITLE_FONT
     ws["A15"].alignment = WRAP
     ws.merge_cells("A16:G16")
-    ws["A16"] = "Operating rules: standard mode is the default path, visible sheets stay filter-based, and hidden Data_* sheets remain the workbook contract. Advanced sheets are hidden by default; use Excel Unhide when you need deeper diagnostics."
+    ws["A16"] = (
+        "Operating rules: standard mode is the default path, visible sheets stay filter-based, and hidden Data_* sheets remain the workbook contract. Advanced sheets are hidden by default; use Excel Unhide when you need deeper diagnostics."
+    )
     ws["A16"].font = SUBTITLE_FONT
     ws["A16"].alignment = WRAP
 
@@ -3049,11 +3545,23 @@ def _build_navigation(
             18,
             1,
             [
-                ("Dashboard", "Start here for the big-picture health view and top attention items."),
-                ("Review Queue", "Use this for blocked, urgent, ready, and safe-to-defer review work."),
-                ("Run Changes", "See what changed since the last run before you decide where to spend attention."),
+                (
+                    "Dashboard",
+                    "Start here for the big-picture health view and top attention items.",
+                ),
+                (
+                    "Review Queue",
+                    "Use this for blocked, urgent, ready, and safe-to-defer review work.",
+                ),
+                (
+                    "Run Changes",
+                    "See what changed since the last run before you decide where to spend attention.",
+                ),
                 ("Campaigns", "Check managed campaign state, reopen/closure context, and drift."),
-                ("Governance Controls", "Review governed controls, approval posture, and rollback visibility."),
+                (
+                    "Governance Controls",
+                    "Review governed controls, approval posture, and rollback visibility.",
+                ),
                 ("Writeback Audit", "See what writeback changed and what is reversible."),
             ],
         ),
@@ -3062,12 +3570,24 @@ def _build_navigation(
             17,
             5,
             [
-                ("Portfolio Explorer", "Rank repos, compare score quality, and drill from summary into raw facts."),
-                ("Repo Detail", "Select one repo and get a single-page briefing on score, risks, trend, and next action."),
-                ("By Lens", "Compare the portfolio by ship readiness, momentum, security, and fit."),
+                (
+                    "Portfolio Explorer",
+                    "Rank repos, compare score quality, and drill from summary into raw facts.",
+                ),
+                (
+                    "Repo Detail",
+                    "Select one repo and get a single-page briefing on score, risks, trend, and next action.",
+                ),
+                (
+                    "By Lens",
+                    "Compare the portfolio by ship readiness, momentum, security, and fit.",
+                ),
                 ("By Collection", "Understand collection-level leaders and concentration."),
                 ("Trend Summary", "See portfolio-wide movement and repo trendlines over time."),
-                ("All Repos", "Scan the full inventory with grades, tiers, and supporting evidence."),
+                (
+                    "All Repos",
+                    "Scan the full inventory with grades, tiers, and supporting evidence.",
+                ),
             ],
         ),
         (
@@ -3075,8 +3595,14 @@ def _build_navigation(
             27,
             1,
             [
-                ("Executive Summary", "Readable leadership summary with what changed and what matters this week."),
-                ("Print Pack", "Print-friendly handoff with risks, opportunities, and operator counts in plain language."),
+                (
+                    "Executive Summary",
+                    "Readable leadership summary with what changed and what matters this week.",
+                ),
+                (
+                    "Print Pack",
+                    "Print-friendly handoff with risks, opportunities, and operator counts in plain language.",
+                ),
             ],
         ),
         (
@@ -3139,10 +3665,30 @@ def _build_navigation(
 # ═══════════════════════════════════════════════════════════════════════
 
 
-RADAR_DIMS = ["readme", "structure", "code_quality", "testing", "cicd",
-              "dependencies", "activity", "documentation", "build_readiness", "community_profile"]
-RADAR_LABELS = ["README", "Structure", "Code Quality", "Testing", "CI/CD",
-                "Deps", "Activity", "Docs", "Build Ready", "Community"]
+RADAR_DIMS = [
+    "readme",
+    "structure",
+    "code_quality",
+    "testing",
+    "cicd",
+    "dependencies",
+    "activity",
+    "documentation",
+    "build_readiness",
+    "community_profile",
+]
+RADAR_LABELS = [
+    "README",
+    "Structure",
+    "Code Quality",
+    "Testing",
+    "CI/CD",
+    "Deps",
+    "Activity",
+    "Docs",
+    "Build Ready",
+    "Community",
+]
 
 
 def _build_repo_profiles(wb: Workbook, data: dict) -> None:
@@ -3151,7 +3697,9 @@ def _build_repo_profiles(wb: Workbook, data: dict) -> None:
     _configure_sheet_view(ws, zoom=105, show_grid_lines=True)
     ws.freeze_panes = "B2"
 
-    audits = sorted(data.get("audits", []), key=lambda a: a.get("overall_score", 0), reverse=True)[:20]
+    audits = sorted(data.get("audits", []), key=lambda a: a.get("overall_score", 0), reverse=True)[
+        :20
+    ]
     if len(audits) < 2:
         return
 
@@ -3178,8 +3726,13 @@ def _build_repo_profiles(wb: Workbook, data: dict) -> None:
         chart.title = f"Repos {batch_start + 1}-{batch_end}"
         chart.y_axis.delete = True
 
-        chart_data = Reference(ws, min_col=batch_start + 2, max_col=batch_end + 1,
-                               min_row=1, max_row=len(RADAR_DIMS) + 1)
+        chart_data = Reference(
+            ws,
+            min_col=batch_start + 2,
+            max_col=batch_end + 1,
+            min_row=1,
+            max_row=len(RADAR_DIMS) + 1,
+        )
         chart.add_data(chart_data, titles_from_data=True)
         chart.set_categories(labels)
         chart.width = 18
@@ -3201,13 +3754,24 @@ def _build_security(wb: Workbook, data: dict) -> None:
     ws.sheet_properties.tabColor = "991B1B"
     _configure_sheet_view(ws, zoom=105, show_grid_lines=True)
 
-    headers = ["Repo", "Score", "Secrets", "Dangerous Files", "SECURITY.md", "Dependabot", "GitHub", "Findings"]
+    headers = [
+        "Repo",
+        "Score",
+        "Secrets",
+        "Dangerous Files",
+        "SECURITY.md",
+        "Dependabot",
+        "GitHub",
+        "Findings",
+    ]
     for col, h in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=h)
     style_header_row(ws, 1, len(headers))
     ws.freeze_panes = "B2"
 
-    audits = sorted(data.get("audits", []), key=lambda a: a.get("security_posture", {}).get("score", 1.0))
+    audits = sorted(
+        data.get("audits", []), key=lambda a: a.get("security_posture", {}).get("score", 1.0)
+    )
 
     for row, audit in enumerate(audits, 2):
         posture = audit.get("security_posture", {})
@@ -3219,7 +3783,9 @@ def _build_security(wb: Workbook, data: dict) -> None:
             m.get("name", ""),
             round(posture.get("score", 0), 2),
             local.get("secrets_found", posture.get("secrets_found", 0)),
-            ", ".join(str(f) for f in local.get("dangerous_files", posture.get("dangerous_files", []))[:3]),
+            ", ".join(
+                str(f) for f in local.get("dangerous_files", posture.get("dangerous_files", []))[:3]
+            ),
             "Yes" if posture.get("has_security_md") else "No",
             "Yes" if posture.get("has_dependabot") else "No",
             "Yes" if github.get("provider_available") else "No",
@@ -3233,13 +3799,21 @@ def _build_security(wb: Workbook, data: dict) -> None:
     if max_row > 1:
         ws.conditional_formatting.add(
             f"B2:B{max_row}",
-            ColorScaleRule(start_type='num', start_value=0, start_color=HEATMAP_RED,
-                           mid_type='num', mid_value=0.5, mid_color=HEATMAP_AMBER,
-                           end_type='num', end_value=1, end_color=HEATMAP_GREEN),
+            ColorScaleRule(
+                start_type="num",
+                start_value=0,
+                start_color=HEATMAP_RED,
+                mid_type="num",
+                mid_value=0.5,
+                mid_color=HEATMAP_AMBER,
+                end_type="num",
+                end_value=1,
+                end_color=HEATMAP_GREEN,
+            ),
         )
         ws.conditional_formatting.add(
             f"B2:B{max_row}",
-            IconSetRule('3TrafficLights1', 'num', [0, 0.4, 0.7]),
+            IconSetRule("3TrafficLights1", "num", [0, 0.4, 0.7]),
         )
 
     apply_zebra_stripes(ws, 2, max_row, len(headers))
@@ -3282,7 +3856,9 @@ def _build_changes(wb: Workbook, data: dict, diff_data: dict | None) -> None:
     if tier_changes:
         ws.cell(row=row, column=1, value="Tier Changes").font = SECTION_FONT
         row += 1
-        for col, h in enumerate(["Repo", "Old Tier", "New Tier", "Old Score", "New Score", "Direction"], 1):
+        for col, h in enumerate(
+            ["Repo", "Old Tier", "New Tier", "Old Score", "New Score", "Direction"], 1
+        ):
             ws.cell(row=row, column=col, value=h)
         style_header_row(ws, row, 6)
         row += 1
@@ -3371,7 +3947,14 @@ def _build_bubble_on_dashboard(ws, data: dict) -> None:
 
     for i, audit in enumerate(audits):
         row = data_start + i
-        cq = next((r.get("details", {}) for r in audit.get("analyzer_results", []) if r["dimension"] == "code_quality"), {})
+        cq = next(
+            (
+                r.get("details", {})
+                for r in audit.get("analyzer_results", [])
+                if r["dimension"] == "code_quality"
+            ),
+            {},
+        )
         loc = cq.get("total_loc", 100)
         ws.cell(row=row, column=bcol_x, value=round(audit.get("overall_score", 0), 3))
         ws.cell(row=row, column=bcol_y, value=round(audit.get("interest_score", 0), 3))
@@ -3437,8 +4020,10 @@ def _build_dependency_graph(wb: Workbook, data: dict) -> None:
         ws.conditional_formatting.add(
             f"B3:B{max_row}",
             ColorScaleRule(
-                start_type="min", start_color=HEATMAP_AMBER,
-                end_type="max", end_color=HEATMAP_GREEN,
+                start_type="min",
+                start_color=HEATMAP_AMBER,
+                end_type="max",
+                end_color=HEATMAP_GREEN,
             ),
         )
 
@@ -3476,7 +4061,9 @@ def _build_hotspots(wb: Workbook, data: dict) -> None:
     if max_row > 1:
         ws.conditional_formatting.add(
             f"C2:C{max_row}",
-            DataBarRule(start_type="num", start_value=0, end_type="num", end_value=1, color="DC2626"),
+            DataBarRule(
+                start_type="num", start_value=0, end_type="num", end_value=1, color="DC2626"
+            ),
         )
         apply_zebra_stripes(ws, 2, max_row, len(headers))
         _add_table(ws, "tblHotspots", len(headers), max_row)
@@ -3536,7 +4123,9 @@ def _build_implementation_hotspots(wb: Workbook, data: dict) -> None:
     if max_row > 4:
         ws.conditional_formatting.add(
             f"F5:F{max_row}",
-            DataBarRule(start_type="num", start_value=0, end_type="num", end_value=1, color="B45309"),
+            DataBarRule(
+                start_type="num", start_value=0, end_type="num", end_value=1, color="B45309"
+            ),
         )
         apply_zebra_stripes(ws, 5, max_row, len(headers))
         _add_table(ws, "tblImplementationHotspots", len(headers), max_row, start_row=4)
@@ -3636,11 +4225,30 @@ def _build_operator_outcomes(wb: Workbook, data: dict) -> None:
     ws.freeze_panes = "A15"
 
     metrics = [
-        ("Review To Action Closure Rate", data.get("portfolio_outcomes_summary", {}).get("review_to_action_closure_rate", {})),
-        ("Median Runs To Quiet After Escalation", data.get("portfolio_outcomes_summary", {}).get("median_runs_to_quiet_after_escalation", {})),
-        ("Repeated Regression Rate", data.get("portfolio_outcomes_summary", {}).get("repeated_regression_rate", {})),
-        ("Recommendation Validation Rate", data.get("operator_effectiveness_summary", {}).get("recommendation_validation_rate", {})),
-        ("Noisy Guidance Rate", data.get("operator_effectiveness_summary", {}).get("noisy_guidance_rate", {})),
+        (
+            "Review To Action Closure Rate",
+            data.get("portfolio_outcomes_summary", {}).get("review_to_action_closure_rate", {}),
+        ),
+        (
+            "Median Runs To Quiet After Escalation",
+            data.get("portfolio_outcomes_summary", {}).get(
+                "median_runs_to_quiet_after_escalation", {}
+            ),
+        ),
+        (
+            "Repeated Regression Rate",
+            data.get("portfolio_outcomes_summary", {}).get("repeated_regression_rate", {}),
+        ),
+        (
+            "Recommendation Validation Rate",
+            data.get("operator_effectiveness_summary", {}).get(
+                "recommendation_validation_rate", {}
+            ),
+        ),
+        (
+            "Noisy Guidance Rate",
+            data.get("operator_effectiveness_summary", {}).get("noisy_guidance_rate", {}),
+        ),
     ]
     for row, (label, metric) in enumerate(metrics, 15):
         value = metric.get("value")
@@ -3684,11 +4292,29 @@ def _build_operator_outcomes(wb: Workbook, data: dict) -> None:
     ws.cell(row=example_row, column=1, value="Recent Examples")
     style_header_row(ws, example_row, 3)
     ws.cell(row=example_row + 1, column=1, value="Closed Actions")
-    ws.cell(row=example_row + 1, column=2, value=_join_outcome_examples(data.get("operator_summary", {}).get("recent_closed_actions", [])))
+    ws.cell(
+        row=example_row + 1,
+        column=2,
+        value=_join_outcome_examples(
+            data.get("operator_summary", {}).get("recent_closed_actions", [])
+        ),
+    )
     ws.cell(row=example_row + 2, column=1, value="Reopened Recommendations")
-    ws.cell(row=example_row + 2, column=2, value=_join_outcome_examples(data.get("operator_summary", {}).get("recent_reopened_recommendations", [])))
+    ws.cell(
+        row=example_row + 2,
+        column=2,
+        value=_join_outcome_examples(
+            data.get("operator_summary", {}).get("recent_reopened_recommendations", [])
+        ),
+    )
     ws.cell(row=example_row + 3, column=1, value="Regression Examples")
-    ws.cell(row=example_row + 3, column=2, value=_join_outcome_examples(data.get("operator_summary", {}).get("recent_regression_examples", [])))
+    ws.cell(
+        row=example_row + 3,
+        column=2,
+        value=_join_outcome_examples(
+            data.get("operator_summary", {}).get("recent_regression_examples", [])
+        ),
+    )
 
     history_row = example_row + 6
     history_headers = ["Run", "Generated", "Blocked", "Urgent", "High Pressure"]
@@ -3736,7 +4362,16 @@ def _build_approval_ledger(wb: Workbook, data: dict) -> None:
     ws["A3"].value = next_review
     ws["A3"].alignment = WRAP
 
-    headers = ["Label", "State", "Follow-Up", "Subject", "Reviewer", "Approved At", "Next Follow-Up Due", "Summary"]
+    headers = [
+        "Label",
+        "State",
+        "Follow-Up",
+        "Subject",
+        "Reviewer",
+        "Approved At",
+        "Next Follow-Up Due",
+        "Summary",
+    ]
     for col, header in enumerate(headers, 1):
         ws.cell(row=5, column=col, value=header)
     style_header_row(ws, 5, len(headers))
@@ -3748,7 +4383,10 @@ def _build_approval_ledger(wb: Workbook, data: dict) -> None:
         ("Overdue Follow-Up", data.get("top_overdue_approval_followups", []) or []),
         ("Ready For Review", data.get("top_ready_for_review_approvals", []) or []),
         ("Due Soon Follow-Up", data.get("top_due_soon_approval_followups", []) or []),
-        (ACTION_SYNC_CANONICAL_LABELS["approved_but_manual"], data.get("top_approved_manual_approvals", []) or []),
+        (
+            ACTION_SYNC_CANONICAL_LABELS["approved_but_manual"],
+            data.get("top_approved_manual_approvals", []) or [],
+        ),
         ("Blocked", data.get("top_blocked_approvals", []) or []),
     ):
         ws.cell(row=row, column=1, value=label)
@@ -3801,7 +4439,14 @@ def _build_historical_intelligence(wb: Workbook, data: dict) -> None:
     ws["A3"].value = next_focus
     ws["A3"].alignment = WRAP
 
-    headers = ["Repo", "Status", "Pressure Trend", "Hotspot Persistence", "Scorecard Trend", "Summary"]
+    headers = [
+        "Repo",
+        "Status",
+        "Pressure Trend",
+        "Hotspot Persistence",
+        "Scorecard Trend",
+        "Summary",
+    ]
     for col, header in enumerate(headers, 1):
         ws.cell(row=5, column=col, value=header)
     style_header_row(ws, 5, len(headers))
@@ -3877,7 +4522,9 @@ def _write_hidden_table_sheet(
     auto_width(ws, len(headers), max_row)
 
 
-def _set_internal_hyperlink(cell, sheet_name: str, *, target_cell: str = "A1", display: str | None = None) -> None:
+def _set_internal_hyperlink(
+    cell, sheet_name: str, *, target_cell: str = "A1", display: str | None = None
+) -> None:
     cell.hyperlink = Hyperlink(
         ref=cell.coordinate,
         location=_sheet_location(sheet_name, target_cell),
@@ -3886,7 +4533,9 @@ def _set_internal_hyperlink(cell, sheet_name: str, *, target_cell: str = "A1", d
     cell.font = Font("Calibri", 10, bold=True, color=TEAL, underline="single")
 
 
-def _repo_detail_lookup_formula(column_index: int, fallback: str, *, allow_blank: bool = False) -> str:
+def _repo_detail_lookup_formula(
+    column_index: int, fallback: str, *, allow_blank: bool = False
+) -> str:
     escaped_fallback = fallback.replace('"', '""')
     lookup = f"VLOOKUP($B$4,Data_RepoDetail!$A:$BZ,{column_index},FALSE)"
     if allow_blank:
@@ -3926,14 +4575,18 @@ def _score_explanation_for_audit(audit: dict) -> dict:
     return build_score_explanation(audit)
 
 
-def _repo_detail_rows(data: dict, score_history: dict[str, list[float]] | None) -> tuple[list[list[object]], list[list[object]], list[list[object]]]:
+def _repo_detail_rows(
+    data: dict, score_history: dict[str, list[float]] | None
+) -> tuple[list[list[object]], list[list[object]], list[list[object]]]:
     memberships = _collection_memberships(data)
     history = _extend_score_history_with_current(data, score_history)
     detail_rows: list[list[object]] = []
     dimension_rows: list[list[object]] = []
     history_rows: list[list[object]] = []
 
-    for audit in sorted(data.get("audits", []), key=lambda item: item.get("metadata", {}).get("name", "")):
+    for audit in sorted(
+        data.get("audits", []), key=lambda item: item.get("metadata", {}).get("name", "")
+    ):
         metadata = audit.get("metadata", {})
         repo_name = metadata.get("name", "")
         explanation = _score_explanation_for_audit(audit)
@@ -3943,81 +4596,189 @@ def _repo_detail_rows(data: dict, score_history: dict[str, list[float]] | None) 
             f"{item.get('path', 'repo root')}: {item.get('signal_summary', 'No signal summary recorded yet.')}"
             for item in (briefing.get("implementation_hotspots") or [])[:3]
         ]
-        action_titles = [item.get("title", "") for item in (audit.get("action_candidates") or [])[:3]]
+        action_titles = [
+            item.get("title", "") for item in (audit.get("action_candidates") or [])[:3]
+        ]
         lenses = audit.get("lenses", {})
         scores = history.get(repo_name, [])
-        detail_rows.append([
-            repo_name,
-            metadata.get("html_url", ""),
-            metadata.get("language") or "Unknown",
-            metadata.get("description") or "No description recorded yet.",
-            round(audit.get("overall_score", 0.0), 3),
-            round(audit.get("interest_score", 0.0), 3),
-            audit.get("grade", ""),
-            audit.get("completeness_tier", ""),
-            ", ".join(audit.get("badges", [])[:6]) or "None",
-            ", ".join(audit.get("flags", [])[:6]) or "None",
-            ", ".join(memberships.get(repo_name, [])) or "—",
-            audit.get("security_posture", {}).get("label", "unknown"),
-            round(audit.get("security_posture", {}).get("score", 0.0), 3),
-            lenses.get("ship_readiness", {}).get("summary", "") or "No ship-readiness summary recorded yet.",
-            lenses.get("momentum", {}).get("summary", "") or "No momentum summary recorded yet.",
-            lenses.get("security_posture", {}).get("summary", "") or "No security summary recorded yet.",
-            lenses.get("portfolio_fit", {}).get("summary", "") or "No portfolio-fit summary recorded yet.",
-            render_sparkline(scores) if scores else briefing.get("current_state", {}).get("trend", "No trend history yet."),
-            briefing.get("why_this_repo_looks_this_way", {}).get("strongest_drivers", ", ".join(explanation.get("top_positive_drivers", [])[:3]) or "No strong positive drivers recorded yet."),
-            briefing.get("why_this_repo_looks_this_way", {}).get("biggest_drags", ", ".join(explanation.get("top_negative_drivers", [])[:3]) or "No major drag factors recorded yet."),
-            briefing.get("why_this_repo_looks_this_way", {}).get("next_tier_gap", explanation.get("next_tier_gap_summary", "") or "No next-tier gap is recorded yet."),
-            briefing.get("what_to_do_next", {}).get("next_best_action", explanation.get("next_best_action", "") or "No clear next action is recorded yet."),
-            briefing.get("what_to_do_next", {}).get("rationale", explanation.get("next_best_action_rationale", "") or "No action rationale is recorded yet."),
-            briefing.get("what_changed", {}).get("top_hotspot_context", hotspot_titles[0] if len(hotspot_titles) > 0 else "No hotspot recorded yet."),
-            hotspot_titles[1] if len(hotspot_titles) > 1 else "No secondary hotspot recorded yet.",
-            hotspot_titles[2] if len(hotspot_titles) > 2 else "No third hotspot recorded yet.",
-            briefing.get("what_to_do_next", {}).get("next_best_action", action_titles[0] if len(action_titles) > 0 else "No action candidate recorded yet."),
-            action_titles[1] if len(action_titles) > 1 else "No second action candidate recorded yet.",
-            action_titles[2] if len(action_titles) > 2 else "No third action candidate recorded yet.",
-            briefing.get("what_changed", {}).get("last_movement", _repo_detail_last_movement(scores)),
-            briefing.get("what_changed", {}).get("recent_change_summary", "No recent change summary is recorded yet."),
-            briefing.get("what_to_do_next", {}).get("follow_through_status", "Unknown"),
-            briefing.get("what_to_do_next", {}).get("follow_through_summary", "No follow-through evidence is recorded yet."),
-            briefing.get("what_to_do_next", {}).get("checkpoint_timing", "Unknown"),
-            briefing.get("what_to_do_next", {}).get("escalation", "Unknown"),
-            briefing.get("what_to_do_next", {}).get("escalation_summary", "No stronger follow-through escalation is currently surfaced."),
-            briefing.get("what_to_do_next", {}).get("recovery_retirement", "None"),
-            briefing.get("what_to_do_next", {}).get("recovery_retirement_summary", "No follow-through recovery or escalation-retirement signal is currently surfaced."),
-            briefing.get("what_to_do_next", {}).get("recovery_persistence", "None"),
-            briefing.get("what_to_do_next", {}).get("recovery_persistence_summary", "No follow-through recovery persistence signal is currently surfaced."),
-            briefing.get("what_to_do_next", {}).get("relapse_churn", "None"),
-            briefing.get("what_to_do_next", {}).get("relapse_churn_summary", "No relapse churn is currently surfaced."),
-            briefing.get("what_to_do_next", {}).get("recovery_freshness", "None"),
-            briefing.get("what_to_do_next", {}).get("recovery_freshness_summary", "No follow-through recovery freshness signal is currently surfaced."),
-            briefing.get("what_to_do_next", {}).get("recovery_memory_reset", "None"),
-            briefing.get("what_to_do_next", {}).get("recovery_memory_reset_summary", "No follow-through recovery memory reset signal is currently surfaced."),
-            briefing.get("what_to_do_next", {}).get("recovery_rebuild_strength", "None"),
-            briefing.get("what_to_do_next", {}).get("recovery_rebuild_strength_summary", "No follow-through recovery rebuild-strength signal is currently surfaced."),
-            briefing.get("what_to_do_next", {}).get("recovery_reacquisition", "None"),
-            briefing.get("what_to_do_next", {}).get("recovery_reacquisition_summary", "No follow-through recovery reacquisition signal is currently surfaced."),
-            briefing.get("what_to_do_next", {}).get("reacquisition_durability", "None"),
-            briefing.get("what_to_do_next", {}).get("reacquisition_durability_summary", "No follow-through reacquisition durability signal is currently surfaced."),
-            briefing.get("what_to_do_next", {}).get("reacquisition_confidence", "None"),
-            briefing.get("what_to_do_next", {}).get("reacquisition_confidence_summary", "No follow-through reacquisition confidence-consolidation signal is currently surfaced."),
-            briefing.get("what_to_do_next", {}).get("reacquisition_softening_decay", "None"),
-            briefing.get("what_to_do_next", {}).get("reacquisition_softening_decay_summary", "No reacquisition softening-decay signal is currently surfaced."),
-            briefing.get("what_to_do_next", {}).get("reacquisition_confidence_retirement", "None"),
-            briefing.get("what_to_do_next", {}).get("reacquisition_confidence_retirement_summary", "No reacquisition confidence-retirement signal is currently surfaced."),
-            briefing.get("what_to_do_next", {}).get("revalidation_recovery", "None"),
-            briefing.get("what_to_do_next", {}).get("revalidation_recovery_summary", "No post-revalidation recovery or confidence re-earning signal is currently surfaced."),
-            briefing.get("what_to_do_next", {}).get("what_would_count_as_progress", "Use the next run or linked artifact to confirm whether the recommendation moved."),
-            briefing.get("catalog_line", "No portfolio catalog contract is recorded yet."),
-            briefing.get("operating_path_line", "Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet."),
-            briefing.get("intent_alignment_line", "missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists."),
-            briefing.get("scorecard_line", "Scorecard: No maturity scorecard is recorded yet."),
-            briefing.get("maturity_gap_summary", "No maturity gap summary is recorded yet."),
-            briefing.get("where_to_start_summary", "No meaningful implementation hotspot is currently surfaced."),
-            implementation_hotspot_lines[0] if len(implementation_hotspot_lines) > 0 else "No implementation hotspot is currently surfaced.",
-            implementation_hotspot_lines[1] if len(implementation_hotspot_lines) > 1 else "No second implementation hotspot is currently surfaced.",
-            implementation_hotspot_lines[2] if len(implementation_hotspot_lines) > 2 else "No third implementation hotspot is currently surfaced.",
-        ])
+        detail_rows.append(
+            [
+                repo_name,
+                metadata.get("html_url", ""),
+                metadata.get("language") or "Unknown",
+                metadata.get("description") or "No description recorded yet.",
+                round(audit.get("overall_score", 0.0), 3),
+                round(audit.get("interest_score", 0.0), 3),
+                audit.get("grade", ""),
+                audit.get("completeness_tier", ""),
+                ", ".join(audit.get("badges", [])[:6]) or "None",
+                ", ".join(audit.get("flags", [])[:6]) or "None",
+                ", ".join(memberships.get(repo_name, [])) or "—",
+                audit.get("security_posture", {}).get("label", "unknown"),
+                round(audit.get("security_posture", {}).get("score", 0.0), 3),
+                lenses.get("ship_readiness", {}).get("summary", "")
+                or "No ship-readiness summary recorded yet.",
+                lenses.get("momentum", {}).get("summary", "")
+                or "No momentum summary recorded yet.",
+                lenses.get("security_posture", {}).get("summary", "")
+                or "No security summary recorded yet.",
+                lenses.get("portfolio_fit", {}).get("summary", "")
+                or "No portfolio-fit summary recorded yet.",
+                render_sparkline(scores)
+                if scores
+                else briefing.get("current_state", {}).get("trend", "No trend history yet."),
+                briefing.get("why_this_repo_looks_this_way", {}).get(
+                    "strongest_drivers",
+                    ", ".join(explanation.get("top_positive_drivers", [])[:3])
+                    or "No strong positive drivers recorded yet.",
+                ),
+                briefing.get("why_this_repo_looks_this_way", {}).get(
+                    "biggest_drags",
+                    ", ".join(explanation.get("top_negative_drivers", [])[:3])
+                    or "No major drag factors recorded yet.",
+                ),
+                briefing.get("why_this_repo_looks_this_way", {}).get(
+                    "next_tier_gap",
+                    explanation.get("next_tier_gap_summary", "")
+                    or "No next-tier gap is recorded yet.",
+                ),
+                briefing.get("what_to_do_next", {}).get(
+                    "next_best_action",
+                    explanation.get("next_best_action", "")
+                    or "No clear next action is recorded yet.",
+                ),
+                briefing.get("what_to_do_next", {}).get(
+                    "rationale",
+                    explanation.get("next_best_action_rationale", "")
+                    or "No action rationale is recorded yet.",
+                ),
+                briefing.get("what_changed", {}).get(
+                    "top_hotspot_context",
+                    hotspot_titles[0] if len(hotspot_titles) > 0 else "No hotspot recorded yet.",
+                ),
+                hotspot_titles[1]
+                if len(hotspot_titles) > 1
+                else "No secondary hotspot recorded yet.",
+                hotspot_titles[2] if len(hotspot_titles) > 2 else "No third hotspot recorded yet.",
+                briefing.get("what_to_do_next", {}).get(
+                    "next_best_action",
+                    action_titles[0]
+                    if len(action_titles) > 0
+                    else "No action candidate recorded yet.",
+                ),
+                action_titles[1]
+                if len(action_titles) > 1
+                else "No second action candidate recorded yet.",
+                action_titles[2]
+                if len(action_titles) > 2
+                else "No third action candidate recorded yet.",
+                briefing.get("what_changed", {}).get(
+                    "last_movement", _repo_detail_last_movement(scores)
+                ),
+                briefing.get("what_changed", {}).get(
+                    "recent_change_summary", "No recent change summary is recorded yet."
+                ),
+                briefing.get("what_to_do_next", {}).get("follow_through_status", "Unknown"),
+                briefing.get("what_to_do_next", {}).get(
+                    "follow_through_summary", "No follow-through evidence is recorded yet."
+                ),
+                briefing.get("what_to_do_next", {}).get("checkpoint_timing", "Unknown"),
+                briefing.get("what_to_do_next", {}).get("escalation", "Unknown"),
+                briefing.get("what_to_do_next", {}).get(
+                    "escalation_summary",
+                    "No stronger follow-through escalation is currently surfaced.",
+                ),
+                briefing.get("what_to_do_next", {}).get("recovery_retirement", "None"),
+                briefing.get("what_to_do_next", {}).get(
+                    "recovery_retirement_summary",
+                    "No follow-through recovery or escalation-retirement signal is currently surfaced.",
+                ),
+                briefing.get("what_to_do_next", {}).get("recovery_persistence", "None"),
+                briefing.get("what_to_do_next", {}).get(
+                    "recovery_persistence_summary",
+                    "No follow-through recovery persistence signal is currently surfaced.",
+                ),
+                briefing.get("what_to_do_next", {}).get("relapse_churn", "None"),
+                briefing.get("what_to_do_next", {}).get(
+                    "relapse_churn_summary", "No relapse churn is currently surfaced."
+                ),
+                briefing.get("what_to_do_next", {}).get("recovery_freshness", "None"),
+                briefing.get("what_to_do_next", {}).get(
+                    "recovery_freshness_summary",
+                    "No follow-through recovery freshness signal is currently surfaced.",
+                ),
+                briefing.get("what_to_do_next", {}).get("recovery_memory_reset", "None"),
+                briefing.get("what_to_do_next", {}).get(
+                    "recovery_memory_reset_summary",
+                    "No follow-through recovery memory reset signal is currently surfaced.",
+                ),
+                briefing.get("what_to_do_next", {}).get("recovery_rebuild_strength", "None"),
+                briefing.get("what_to_do_next", {}).get(
+                    "recovery_rebuild_strength_summary",
+                    "No follow-through recovery rebuild-strength signal is currently surfaced.",
+                ),
+                briefing.get("what_to_do_next", {}).get("recovery_reacquisition", "None"),
+                briefing.get("what_to_do_next", {}).get(
+                    "recovery_reacquisition_summary",
+                    "No follow-through recovery reacquisition signal is currently surfaced.",
+                ),
+                briefing.get("what_to_do_next", {}).get("reacquisition_durability", "None"),
+                briefing.get("what_to_do_next", {}).get(
+                    "reacquisition_durability_summary",
+                    "No follow-through reacquisition durability signal is currently surfaced.",
+                ),
+                briefing.get("what_to_do_next", {}).get("reacquisition_confidence", "None"),
+                briefing.get("what_to_do_next", {}).get(
+                    "reacquisition_confidence_summary",
+                    "No follow-through reacquisition confidence-consolidation signal is currently surfaced.",
+                ),
+                briefing.get("what_to_do_next", {}).get("reacquisition_softening_decay", "None"),
+                briefing.get("what_to_do_next", {}).get(
+                    "reacquisition_softening_decay_summary",
+                    "No reacquisition softening-decay signal is currently surfaced.",
+                ),
+                briefing.get("what_to_do_next", {}).get(
+                    "reacquisition_confidence_retirement", "None"
+                ),
+                briefing.get("what_to_do_next", {}).get(
+                    "reacquisition_confidence_retirement_summary",
+                    "No reacquisition confidence-retirement signal is currently surfaced.",
+                ),
+                briefing.get("what_to_do_next", {}).get("revalidation_recovery", "None"),
+                briefing.get("what_to_do_next", {}).get(
+                    "revalidation_recovery_summary",
+                    "No post-revalidation recovery or confidence re-earning signal is currently surfaced.",
+                ),
+                briefing.get("what_to_do_next", {}).get(
+                    "what_would_count_as_progress",
+                    "Use the next run or linked artifact to confirm whether the recommendation moved.",
+                ),
+                briefing.get("catalog_line", "No portfolio catalog contract is recorded yet."),
+                briefing.get(
+                    "operating_path_line",
+                    "Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet.",
+                ),
+                briefing.get(
+                    "intent_alignment_line",
+                    "missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.",
+                ),
+                briefing.get("scorecard_line", "Scorecard: No maturity scorecard is recorded yet."),
+                briefing.get("maturity_gap_summary", "No maturity gap summary is recorded yet."),
+                briefing.get(
+                    "where_to_start_summary",
+                    "No meaningful implementation hotspot is currently surfaced.",
+                ),
+                implementation_hotspot_lines[0]
+                if len(implementation_hotspot_lines) > 0
+                else "No implementation hotspot is currently surfaced.",
+                implementation_hotspot_lines[1]
+                if len(implementation_hotspot_lines) > 1
+                else "No second implementation hotspot is currently surfaced.",
+                implementation_hotspot_lines[2]
+                if len(implementation_hotspot_lines) > 2
+                else "No third implementation hotspot is currently surfaced.",
+            ]
+        )
 
         ranked_dimensions = sorted(
             [
@@ -4041,58 +4802,90 @@ def _repo_detail_rows(data: dict, score_history: dict[str, list[float]] | None) 
     return detail_rows, dimension_rows, history_rows
 
 
-def _run_change_rows(data: dict, diff_data: dict | None) -> tuple[list[list[object]], list[list[object]]]:
+def _run_change_rows(
+    data: dict, diff_data: dict | None
+) -> tuple[list[list[object]], list[list[object]]]:
     counts = build_run_change_counts(diff_data)
     summary_rows = [
         ["Summary", build_run_change_summary(diff_data), ""],
-        ["Score Improvements", counts.get("score_improvements", 0), "Repos that improved since the last run."],
-        ["Score Regressions", counts.get("score_regressions", 0), "Repos that regressed since the last run."],
+        [
+            "Score Improvements",
+            counts.get("score_improvements", 0),
+            "Repos that improved since the last run.",
+        ],
+        [
+            "Score Regressions",
+            counts.get("score_regressions", 0),
+            "Repos that regressed since the last run.",
+        ],
         ["Tier Promotions", counts.get("tier_promotions", 0), "Repos that moved up a tier."],
         ["Tier Demotions", counts.get("tier_demotions", 0), "Repos that moved down a tier."],
         ["New Repos", counts.get("new_repos", 0), "Repos that are new in this run."],
-        ["Removed Repos", counts.get("removed_repos", 0), "Repos missing compared with the prior run."],
-        ["Security Changes", counts.get("security_changes", 0), "Repos with security posture movement."],
-        ["Governance Changes", counts.get("collection_changes", 0), "Repos with collection or governance drift."],
-        ["Notable Repo Changes", counts.get("notable_repo_changes", 0), "Repos with notable diff rows."],
+        [
+            "Removed Repos",
+            counts.get("removed_repos", 0),
+            "Repos missing compared with the prior run.",
+        ],
+        [
+            "Security Changes",
+            counts.get("security_changes", 0),
+            "Repos with security posture movement.",
+        ],
+        [
+            "Governance Changes",
+            counts.get("collection_changes", 0),
+            "Repos with collection or governance drift.",
+        ],
+        [
+            "Notable Repo Changes",
+            counts.get("notable_repo_changes", 0),
+            "Repos with notable diff rows.",
+        ],
     ]
 
     repo_rows: list[list[object]] = []
     for change in diff_data.get("repo_changes", []) if diff_data else []:
-        repo_rows.append([
-            "repo-change",
-            change.get("name", ""),
-            round(change.get("delta", 0.0), 3),
-            change.get("old_tier", ""),
-            change.get("new_tier", ""),
-            change.get("security_change", {}).get("new_label", ""),
-            change.get("hotspot_change", {}).get("new_count", 0),
-            ", ".join(change.get("collection_change", {}).get("new", []) or []),
-            "General repo movement since the previous run.",
-        ])
+        repo_rows.append(
+            [
+                "repo-change",
+                change.get("name", ""),
+                round(change.get("delta", 0.0), 3),
+                change.get("old_tier", ""),
+                change.get("new_tier", ""),
+                change.get("security_change", {}).get("new_label", ""),
+                change.get("hotspot_change", {}).get("new_count", 0),
+                ", ".join(change.get("collection_change", {}).get("new", []) or []),
+                "General repo movement since the previous run.",
+            ]
+        )
     for change in diff_data.get("tier_changes", []) if diff_data else []:
-        repo_rows.append([
-            f"tier-{change.get('direction', 'change')}",
-            change.get("name", ""),
-            round(change.get("new_score", 0.0) - change.get("old_score", 0.0), 3),
-            change.get("old_tier", ""),
-            change.get("new_tier", ""),
-            "",
-            "",
-            "",
-            f"Tier {change.get('direction', 'change')} detected in the comparison window.",
-        ])
+        repo_rows.append(
+            [
+                f"tier-{change.get('direction', 'change')}",
+                change.get("name", ""),
+                round(change.get("new_score", 0.0) - change.get("old_score", 0.0), 3),
+                change.get("old_tier", ""),
+                change.get("new_tier", ""),
+                "",
+                "",
+                "",
+                f"Tier {change.get('direction', 'change')} detected in the comparison window.",
+            ]
+        )
     for item in data.get("material_changes", []) or []:
-        repo_rows.append([
-            f"material-{item.get('change_type', 'other')}",
-            item.get("repo", ""),
-            _severity_rank(item.get("severity")),
-            "",
-            "",
-            "",
-            "",
-            "",
-            item.get("title", ""),
-        ])
+        repo_rows.append(
+            [
+                f"material-{item.get('change_type', 'other')}",
+                item.get("repo", ""),
+                _severity_rank(item.get("severity")),
+                "",
+                "",
+                "",
+                "",
+                "",
+                item.get("title", ""),
+            ]
+        )
     return summary_rows, repo_rows
 
 
@@ -4139,290 +4932,384 @@ def _build_hidden_data_sheets(
     action_sync_automation_rows: list[list[object]] = []
     approval_ledger_rows: list[list[object]] = []
     lookup_rows: list[list[object]] = []
-    repo_detail_rows, repo_dimension_rollup_rows, repo_history_rollup_rows = _repo_detail_rows(data, score_history)
+    repo_detail_rows, repo_dimension_rollup_rows, repo_history_rollup_rows = _repo_detail_rows(
+        data, score_history
+    )
     run_change_rollup_rows, run_change_repo_rows = _run_change_rows(data, diff_data)
     operator_queue_rows, operator_repo_rollups, material_rollups = _build_workbook_rollups(data)
     portfolio_outcomes = data.get("portfolio_outcomes_summary", {}) or {}
     operator_effectiveness = data.get("operator_effectiveness_summary", {}) or {}
     operator_summary = data.get("operator_summary", {}) or {}
     for label, metric in (
-        ("review_to_action_closure_rate", portfolio_outcomes.get("review_to_action_closure_rate", {})),
-        ("median_runs_to_quiet_after_escalation", portfolio_outcomes.get("median_runs_to_quiet_after_escalation", {})),
+        (
+            "review_to_action_closure_rate",
+            portfolio_outcomes.get("review_to_action_closure_rate", {}),
+        ),
+        (
+            "median_runs_to_quiet_after_escalation",
+            portfolio_outcomes.get("median_runs_to_quiet_after_escalation", {}),
+        ),
         ("repeated_regression_rate", portfolio_outcomes.get("repeated_regression_rate", {})),
-        ("recommendation_validation_rate", operator_effectiveness.get("recommendation_validation_rate", {})),
+        (
+            "recommendation_validation_rate",
+            operator_effectiveness.get("recommendation_validation_rate", {}),
+        ),
         ("noisy_guidance_rate", operator_effectiveness.get("noisy_guidance_rate", {})),
     ):
-        operator_outcome_rows.append([
-            label,
-            metric.get("status", "insufficient-evidence"),
-            metric.get("value", ""),
-            metric.get("numerator", metric.get("episodes", "")),
-            metric.get("denominator", ""),
-            metric.get("summary", ""),
-        ])
+        operator_outcome_rows.append(
+            [
+                label,
+                metric.get("status", "insufficient-evidence"),
+                metric.get("value", ""),
+                metric.get("numerator", metric.get("episodes", "")),
+                metric.get("denominator", ""),
+                metric.get("summary", ""),
+            ]
+        )
     for item in data.get("high_pressure_queue_history", []) or []:
-        operator_outcome_rows.append([
-            "high_pressure_queue_history",
-            operator_summary.get("high_pressure_queue_trend_status", ""),
-            item.get("high_pressure_count", 0),
-            item.get("blocked_count", 0),
-            item.get("urgent_count", 0),
-            item.get("generated_at", ""),
-        ])
+        operator_outcome_rows.append(
+            [
+                "high_pressure_queue_history",
+                operator_summary.get("high_pressure_queue_trend_status", ""),
+                item.get("high_pressure_count", 0),
+                item.get("blocked_count", 0),
+                item.get("urgent_count", 0),
+                item.get("generated_at", ""),
+            ]
+        )
     for label, items in (
         ("recent_closed_actions", operator_summary.get("recent_closed_actions", [])),
-        ("recent_reopened_recommendations", operator_summary.get("recent_reopened_recommendations", [])),
+        (
+            "recent_reopened_recommendations",
+            operator_summary.get("recent_reopened_recommendations", []),
+        ),
         ("recent_regression_examples", operator_summary.get("recent_regression_examples", [])),
     ):
         for item in items[:3]:
-            operator_outcome_rows.append([
-                label,
-                "example",
-                item.get("repo", ""),
-                item.get("title", ""),
-                item.get("action_id", ""),
-                item.get("summary", ""),
-            ])
+            operator_outcome_rows.append(
+                [
+                    label,
+                    "example",
+                    item.get("repo", ""),
+                    item.get("title", ""),
+                    item.get("action_id", ""),
+                    item.get("summary", ""),
+                ]
+            )
     for item in data.get("action_sync_outcomes", []) or []:
-        action_sync_outcome_rows.append([
-            item.get("campaign_type", ""),
-            item.get("label", ""),
-            item.get("latest_target", ""),
-            item.get("latest_run_mode", ""),
-            item.get("recent_apply_count", 0),
-            item.get("monitored_repo_count", 0),
-            item.get("monitoring_state", "no-recent-apply"),
-            item.get("pressure_effect", "insufficient-evidence"),
-            item.get("drift_state", "insufficient-evidence"),
-            item.get("reopen_state", "insufficient-evidence"),
-            item.get("rollback_state", "not-applicable"),
-            item.get("follow_up_recommendation", ""),
-            ", ".join(item.get("top_repos", []) or []),
-            item.get("summary", ""),
-        ])
+        action_sync_outcome_rows.append(
+            [
+                item.get("campaign_type", ""),
+                item.get("label", ""),
+                item.get("latest_target", ""),
+                item.get("latest_run_mode", ""),
+                item.get("recent_apply_count", 0),
+                item.get("monitored_repo_count", 0),
+                item.get("monitoring_state", "no-recent-apply"),
+                item.get("pressure_effect", "insufficient-evidence"),
+                item.get("drift_state", "insufficient-evidence"),
+                item.get("reopen_state", "insufficient-evidence"),
+                item.get("rollback_state", "not-applicable"),
+                item.get("follow_up_recommendation", ""),
+                ", ".join(item.get("top_repos", []) or []),
+                item.get("summary", ""),
+            ]
+        )
     for item in data.get("action_sync_tuning", []) or []:
-        campaign_tuning_rows.append([
-            item.get("campaign_type", ""),
-            item.get("label", ""),
-            item.get("tuning_status", "insufficient-evidence"),
-            item.get("recommendation_bias", "neutral"),
-            item.get("judged_count", 0),
-            item.get("monitor_now_count", 0),
-            item.get("holding_clean_rate", 0.0),
-            item.get("drift_return_rate", 0.0),
-            item.get("reopen_rate", 0.0),
-            item.get("rollback_watch_rate", 0.0),
-            item.get("pressure_reduction_rate", 0.0),
-            item.get("summary", ""),
-        ])
+        campaign_tuning_rows.append(
+            [
+                item.get("campaign_type", ""),
+                item.get("label", ""),
+                item.get("tuning_status", "insufficient-evidence"),
+                item.get("recommendation_bias", "neutral"),
+                item.get("judged_count", 0),
+                item.get("monitor_now_count", 0),
+                item.get("holding_clean_rate", 0.0),
+                item.get("drift_return_rate", 0.0),
+                item.get("reopen_rate", 0.0),
+                item.get("rollback_watch_rate", 0.0),
+                item.get("pressure_reduction_rate", 0.0),
+                item.get("summary", ""),
+            ]
+        )
     for item in data.get("historical_portfolio_intelligence", []) or []:
-        intervention_ledger_rows.append([
-            item.get("repo", ""),
-            item.get("latest_tier", ""),
-            item.get("latest_score", 0.0),
-            item.get("recent_intervention_count", 0),
-            item.get("last_intervention", ""),
-            item.get("pressure_trend", "insufficient-evidence"),
-            item.get("hotspot_persistence", "insufficient-evidence"),
-            item.get("scorecard_trend", "insufficient-evidence"),
-            item.get("campaign_follow_through", "insufficient-evidence"),
-            item.get("historical_intelligence_status", "insufficient-evidence"),
-            item.get("summary", ""),
-        ])
+        intervention_ledger_rows.append(
+            [
+                item.get("repo", ""),
+                item.get("latest_tier", ""),
+                item.get("latest_score", 0.0),
+                item.get("recent_intervention_count", 0),
+                item.get("last_intervention", ""),
+                item.get("pressure_trend", "insufficient-evidence"),
+                item.get("hotspot_persistence", "insufficient-evidence"),
+                item.get("scorecard_trend", "insufficient-evidence"),
+                item.get("campaign_follow_through", "insufficient-evidence"),
+                item.get("historical_intelligence_status", "insufficient-evidence"),
+                item.get("summary", ""),
+            ]
+        )
     for item in data.get("action_sync_automation", []) or []:
-        action_sync_automation_rows.append([
-            item.get("campaign_type", ""),
-            item.get("label", ""),
-            item.get("automation_posture", "manual-only"),
-            "yes" if item.get("review_required") else "no",
-            "yes" if item.get("requires_approval") else "no",
-            item.get("recommended_command", ""),
-            item.get("recommended_follow_up", ""),
-            item.get("summary", ""),
-        ])
+        action_sync_automation_rows.append(
+            [
+                item.get("campaign_type", ""),
+                item.get("label", ""),
+                item.get("automation_posture", "manual-only"),
+                "yes" if item.get("review_required") else "no",
+                "yes" if item.get("requires_approval") else "no",
+                item.get("recommended_command", ""),
+                item.get("recommended_follow_up", ""),
+                item.get("summary", ""),
+            ]
+        )
     for item in data.get("approval_ledger", []) or []:
-        approval_ledger_rows.append([
-            item.get("approval_id", ""),
-            item.get("approval_subject_type", ""),
-            item.get("subject_key", ""),
-            item.get("label", ""),
-            item.get("approval_state", "not-applicable"),
-            item.get("follow_up_state", "not-applicable"),
-            item.get("source_run_id", ""),
-            item.get("fingerprint", ""),
-            item.get("approved_at", ""),
-            item.get("approved_by", ""),
-            item.get("last_reviewed_at", ""),
-            item.get("last_reviewed_by", ""),
-            item.get("follow_up_cadence_days", 0),
-            item.get("next_follow_up_due_at", ""),
-            "yes" if item.get("stale_approval") else "no",
-            "yes" if item.get("approval_ready") else "no",
-            "yes" if item.get("apply_ready_after_approval") else "no",
-            item.get("approval_command", ""),
-            item.get("follow_up_command", ""),
-            item.get("manual_apply_command", ""),
-            item.get("summary", ""),
-        ])
+        approval_ledger_rows.append(
+            [
+                item.get("approval_id", ""),
+                item.get("approval_subject_type", ""),
+                item.get("subject_key", ""),
+                item.get("label", ""),
+                item.get("approval_state", "not-applicable"),
+                item.get("follow_up_state", "not-applicable"),
+                item.get("source_run_id", ""),
+                item.get("fingerprint", ""),
+                item.get("approved_at", ""),
+                item.get("approved_by", ""),
+                item.get("last_reviewed_at", ""),
+                item.get("last_reviewed_by", ""),
+                item.get("follow_up_cadence_days", 0),
+                item.get("next_follow_up_due_at", ""),
+                "yes" if item.get("stale_approval") else "no",
+                "yes" if item.get("approval_ready") else "no",
+                "yes" if item.get("apply_ready_after_approval") else "no",
+                item.get("approval_command", ""),
+                item.get("follow_up_command", ""),
+                item.get("manual_apply_command", ""),
+                item.get("summary", ""),
+            ]
+        )
 
     for audit in audits:
         metadata = audit.get("metadata", {})
         repo_name = metadata.get("name", "")
         lenses = audit.get("lenses", {})
-        repo_rows.append([
-            repo_name,
-            metadata.get("full_name", ""),
-            metadata.get("language") or "Unknown",
-            "Yes" if metadata.get("private") else "No",
-            "Yes" if metadata.get("archived") else "No",
-            round(audit.get("overall_score", 0), 3),
-            round(audit.get("interest_score", 0), 3),
-            audit.get("grade", ""),
-            audit.get("completeness_tier", ""),
-            audit.get("security_posture", {}).get("label", "unknown"),
-            ", ".join(memberships.get(repo_name, [])),
-            lenses.get("ship_readiness", {}).get("score", 0.0),
-            lenses.get("maintenance_risk", {}).get("score", 0.0),
-            lenses.get("showcase_value", {}).get("score", 0.0),
-            lenses.get("security_posture", {}).get("score", 0.0),
-            lenses.get("momentum", {}).get("score", 0.0),
-            lenses.get("portfolio_fit", {}).get("score", 0.0),
-        ])
-        catalog = audit.get("portfolio_catalog", {})
-        portfolio_catalog_rows.append([
-            repo_name,
-            metadata.get("full_name", ""),
-            catalog.get("owner", ""),
-            catalog.get("team", ""),
-            catalog.get("purpose", ""),
-            catalog.get("lifecycle_state", ""),
-            catalog.get("criticality", ""),
-            catalog.get("review_cadence", ""),
-            catalog.get("intended_disposition", ""),
-            catalog.get("maturity_program", ""),
-            catalog.get("target_maturity", ""),
-            catalog.get("operating_path", ""),
-            catalog.get("path_override", ""),
-            catalog.get("path_confidence", ""),
-            catalog.get("notes", ""),
-            catalog.get("intent_alignment", "missing-contract"),
-            catalog.get("intent_alignment_reason", ""),
-            catalog.get("catalog_line", ""),
-        ])
-        scorecard = audit.get("scorecard", {})
-        scorecard_rows.append([
-            repo_name,
-            metadata.get("full_name", ""),
-            scorecard.get("program", ""),
-            scorecard.get("program_label", ""),
-            scorecard.get("score", 0.0),
-            scorecard.get("maturity_level", ""),
-            scorecard.get("target_maturity", ""),
-            scorecard.get("status", ""),
-            scorecard.get("passed_rules", 0),
-            scorecard.get("applicable_rules", 0),
-            ", ".join(scorecard.get("failed_rule_keys", [])),
-            ", ".join(scorecard.get("top_gaps", [])),
-            scorecard.get("summary", ""),
-        ])
-        for hotspot in audit.get("implementation_hotspots", []):
-            implementation_hotspot_rows.append([
+        repo_rows.append(
+            [
                 repo_name,
                 metadata.get("full_name", ""),
-                hotspot.get("scope", ""),
-                hotspot.get("path", ""),
-                hotspot.get("module", ""),
-                hotspot.get("category", ""),
-                hotspot.get("pressure_score", 0.0),
-                hotspot.get("suggestion_type", ""),
-                hotspot.get("why_it_matters", ""),
-                hotspot.get("suggested_first_move", ""),
-                hotspot.get("signal_summary", ""),
-            ])
+                metadata.get("language") or "Unknown",
+                "Yes" if metadata.get("private") else "No",
+                "Yes" if metadata.get("archived") else "No",
+                round(audit.get("overall_score", 0), 3),
+                round(audit.get("interest_score", 0), 3),
+                audit.get("grade", ""),
+                audit.get("completeness_tier", ""),
+                audit.get("security_posture", {}).get("label", "unknown"),
+                ", ".join(memberships.get(repo_name, [])),
+                lenses.get("ship_readiness", {}).get("score", 0.0),
+                lenses.get("maintenance_risk", {}).get("score", 0.0),
+                lenses.get("showcase_value", {}).get("score", 0.0),
+                lenses.get("security_posture", {}).get("score", 0.0),
+                lenses.get("momentum", {}).get("score", 0.0),
+                lenses.get("portfolio_fit", {}).get("score", 0.0),
+            ]
+        )
+        catalog = audit.get("portfolio_catalog", {})
+        portfolio_catalog_rows.append(
+            [
+                repo_name,
+                metadata.get("full_name", ""),
+                catalog.get("owner", ""),
+                catalog.get("team", ""),
+                catalog.get("purpose", ""),
+                catalog.get("lifecycle_state", ""),
+                catalog.get("criticality", ""),
+                catalog.get("review_cadence", ""),
+                catalog.get("intended_disposition", ""),
+                catalog.get("maturity_program", ""),
+                catalog.get("target_maturity", ""),
+                catalog.get("operating_path", ""),
+                catalog.get("path_override", ""),
+                catalog.get("path_confidence", ""),
+                catalog.get("notes", ""),
+                catalog.get("intent_alignment", "missing-contract"),
+                catalog.get("intent_alignment_reason", ""),
+                catalog.get("catalog_line", ""),
+            ]
+        )
+        scorecard = audit.get("scorecard", {})
+        scorecard_rows.append(
+            [
+                repo_name,
+                metadata.get("full_name", ""),
+                scorecard.get("program", ""),
+                scorecard.get("program_label", ""),
+                scorecard.get("score", 0.0),
+                scorecard.get("maturity_level", ""),
+                scorecard.get("target_maturity", ""),
+                scorecard.get("status", ""),
+                scorecard.get("passed_rules", 0),
+                scorecard.get("applicable_rules", 0),
+                ", ".join(scorecard.get("failed_rule_keys", [])),
+                ", ".join(scorecard.get("top_gaps", [])),
+                scorecard.get("summary", ""),
+            ]
+        )
+        for hotspot in audit.get("implementation_hotspots", []):
+            implementation_hotspot_rows.append(
+                [
+                    repo_name,
+                    metadata.get("full_name", ""),
+                    hotspot.get("scope", ""),
+                    hotspot.get("path", ""),
+                    hotspot.get("module", ""),
+                    hotspot.get("category", ""),
+                    hotspot.get("pressure_score", 0.0),
+                    hotspot.get("suggestion_type", ""),
+                    hotspot.get("why_it_matters", ""),
+                    hotspot.get("suggested_first_move", ""),
+                    hotspot.get("signal_summary", ""),
+                ]
+            )
 
         for result in audit.get("analyzer_results", []):
-            dimension_rows.append([
-                repo_name,
-                result.get("dimension", ""),
-                result.get("score", 0.0),
-                result.get("max_score", 1.0),
-                "; ".join(result.get("findings", [])[:3]),
-            ])
+            dimension_rows.append(
+                [
+                    repo_name,
+                    result.get("dimension", ""),
+                    result.get("score", 0.0),
+                    result.get("max_score", 1.0),
+                    "; ".join(result.get("findings", [])[:3]),
+                ]
+            )
 
         for lens_name, lens_data in lenses.items():
-            lens_rows.append([
-                repo_name,
-                lens_name,
-                lens_data.get("score", 0.0),
-                lens_data.get("orientation", ""),
-                lens_data.get("summary", ""),
-                ", ".join(lens_data.get("drivers", [])),
-            ])
+            lens_rows.append(
+                [
+                    repo_name,
+                    lens_name,
+                    lens_data.get("score", 0.0),
+                    lens_data.get("orientation", ""),
+                    lens_data.get("summary", ""),
+                    ", ".join(lens_data.get("drivers", [])),
+                ]
+            )
 
         posture = audit.get("security_posture", {})
-        security_rows.append([
-            repo_name,
-            posture.get("label", "unknown"),
-            posture.get("score", 0.0),
-            posture.get("secrets_found", 0),
-            len(posture.get("dangerous_files", [])),
-            "Yes" if posture.get("has_security_md") else "No",
-            "Yes" if posture.get("has_dependabot") else "No",
-            "; ".join(posture.get("evidence", [])),
-        ])
+        security_rows.append(
+            [
+                repo_name,
+                posture.get("label", "unknown"),
+                posture.get("score", 0.0),
+                posture.get("secrets_found", 0),
+                len(posture.get("dangerous_files", [])),
+                "Yes" if posture.get("has_security_md") else "No",
+                "Yes" if posture.get("has_dependabot") else "No",
+                "; ".join(posture.get("evidence", [])),
+            ]
+        )
         github = posture.get("github", {})
-        security_control_rows.extend([
-            [repo_name, "security_md", "enabled" if posture.get("has_security_md") else "missing", "local", ""],
-            [repo_name, "dependabot_config", "enabled" if posture.get("has_dependabot") else "missing", "local", ""],
-            [repo_name, "dependency_graph", github.get("dependency_graph_status", "unavailable"), "github", str(github.get("dependency_graph_enabled"))],
-            [repo_name, "sbom_export", github.get("sbom_status", "unavailable"), "github", str(github.get("sbom_exportable"))],
-            [repo_name, "code_scanning", github.get("code_scanning_status", "unavailable"), "github", str(github.get("code_scanning_alerts"))],
-            [repo_name, "secret_scanning", github.get("secret_scanning_status", "unavailable"), "github", str(github.get("secret_scanning_alerts"))],
-        ])
+        security_control_rows.extend(
+            [
+                [
+                    repo_name,
+                    "security_md",
+                    "enabled" if posture.get("has_security_md") else "missing",
+                    "local",
+                    "",
+                ],
+                [
+                    repo_name,
+                    "dependabot_config",
+                    "enabled" if posture.get("has_dependabot") else "missing",
+                    "local",
+                    "",
+                ],
+                [
+                    repo_name,
+                    "dependency_graph",
+                    github.get("dependency_graph_status", "unavailable"),
+                    "github",
+                    str(github.get("dependency_graph_enabled")),
+                ],
+                [
+                    repo_name,
+                    "sbom_export",
+                    github.get("sbom_status", "unavailable"),
+                    "github",
+                    str(github.get("sbom_exportable")),
+                ],
+                [
+                    repo_name,
+                    "code_scanning",
+                    github.get("code_scanning_status", "unavailable"),
+                    "github",
+                    str(github.get("code_scanning_alerts")),
+                ],
+                [
+                    repo_name,
+                    "secret_scanning",
+                    github.get("secret_scanning_status", "unavailable"),
+                    "github",
+                    str(github.get("secret_scanning_alerts")),
+                ],
+            ]
+        )
         for provider_name, provider_data in (posture.get("providers") or {}).items():
-            security_provider_rows.append([
+            security_provider_rows.append(
+                [
+                    repo_name,
+                    provider_name,
+                    "Yes" if provider_data.get("available") else "No",
+                    provider_data.get("score", ""),
+                    posture.get(provider_name, {}).get("reason", "")
+                    if provider_name != "local"
+                    else "",
+                ]
+            )
+        security_alert_rows.append(
+            [
                 repo_name,
-                provider_name,
-                "Yes" if provider_data.get("available") else "No",
-                provider_data.get("score", ""),
-                posture.get(provider_name, {}).get("reason", "") if provider_name != "local" else "",
-            ])
-        security_alert_rows.append([
-            repo_name,
-            "code_scanning",
-            github.get("code_scanning_alerts") or 0,
-            github.get("code_scanning_status", "unavailable"),
-        ])
-        security_alert_rows.append([
-            repo_name,
-            "secret_scanning",
-            github.get("secret_scanning_alerts") or 0,
-            github.get("secret_scanning_status", "unavailable"),
-        ])
+                "code_scanning",
+                github.get("code_scanning_alerts") or 0,
+                github.get("code_scanning_status", "unavailable"),
+            ]
+        )
+        security_alert_rows.append(
+            [
+                repo_name,
+                "secret_scanning",
+                github.get("secret_scanning_alerts") or 0,
+                github.get("secret_scanning_status", "unavailable"),
+            ]
+        )
         for recommendation in posture.get("recommendations", []):
-            governance_rows.append([
-                repo_name,
-                recommendation.get("key", ""),
-                recommendation.get("priority", "medium"),
-                recommendation.get("title", ""),
-                recommendation.get("expected_posture_lift", 0.0),
-                recommendation.get("effort", ""),
-                recommendation.get("source", ""),
-                recommendation.get("why", ""),
-            ])
+            governance_rows.append(
+                [
+                    repo_name,
+                    recommendation.get("key", ""),
+                    recommendation.get("priority", "medium"),
+                    recommendation.get("title", ""),
+                    recommendation.get("expected_posture_lift", 0.0),
+                    recommendation.get("effort", ""),
+                    recommendation.get("source", ""),
+                    recommendation.get("why", ""),
+                ]
+            )
 
         for action in audit.get("action_candidates", []):
-            action_rows.append([
-                repo_name,
-                action.get("key", ""),
-                action.get("title", ""),
-                action.get("lens", ""),
-                action.get("effort", ""),
-                action.get("confidence", 0.0),
-                action.get("expected_lens_delta", 0.0),
-                action.get("expected_tier_movement", ""),
-                action.get("rationale", ""),
-            ])
+            action_rows.append(
+                [
+                    repo_name,
+                    action.get("key", ""),
+                    action.get("title", ""),
+                    action.get("lens", ""),
+                    action.get("effort", ""),
+                    action.get("confidence", 0.0),
+                    action.get("expected_lens_delta", 0.0),
+                    action.get("expected_tier_movement", ""),
+                    action.get("rationale", ""),
+                ]
+            )
 
     if extended_score_history:
         for repo_name, scores in extended_score_history.items():
@@ -4433,56 +5320,69 @@ def _build_hidden_data_sheets(
 
     if extended_trends:
         for run_index, trend in enumerate(extended_trends, 1):
-            history_rows.append([
-                "__portfolio__",
-                run_index,
-                trend.get("average_score", 0.0),
-            ])
-            portfolio_history_rows.append([
-                run_index,
-                trend.get("date", ""),
-                trend.get("average_score", 0.0),
-                trend.get("repos_audited", 0),
-                trend.get("tier_distribution", {}).get("shipped", 0),
-                trend.get("tier_distribution", {}).get("functional", 0),
-                trend.get("security_average_score", data.get("security_posture", {}).get("average_score", 0.0)),
-                "yes" if trend.get("review_emitted") else "no",
-                trend.get("campaign_drift_count", 0),
-                trend.get("governance_drift_count", 0),
-            ])
+            history_rows.append(
+                [
+                    "__portfolio__",
+                    run_index,
+                    trend.get("average_score", 0.0),
+                ]
+            )
+            portfolio_history_rows.append(
+                [
+                    run_index,
+                    trend.get("date", ""),
+                    trend.get("average_score", 0.0),
+                    trend.get("repos_audited", 0),
+                    trend.get("tier_distribution", {}).get("shipped", 0),
+                    trend.get("tier_distribution", {}).get("functional", 0),
+                    trend.get(
+                        "security_average_score",
+                        data.get("security_posture", {}).get("average_score", 0.0),
+                    ),
+                    "yes" if trend.get("review_emitted") else "no",
+                    trend.get("campaign_drift_count", 0),
+                    trend.get("governance_drift_count", 0),
+                ]
+            )
 
     for collection_name, collection_data in data.get("collections", {}).items():
         for rank_index, repo_data in enumerate(collection_data.get("repos", []), 1):
             repo_name = repo_data["name"] if isinstance(repo_data, dict) else str(repo_data)
             reason = repo_data.get("reason", "") if isinstance(repo_data, dict) else ""
-            collection_rows.append([
-                collection_name,
-                repo_name,
-                rank_index,
-                reason,
-                collection_data.get("description", ""),
-            ])
+            collection_rows.append(
+                [
+                    collection_name,
+                    repo_name,
+                    rank_index,
+                    reason,
+                    collection_data.get("description", ""),
+                ]
+            )
 
     scenario_summary = data.get("scenario_summary", {})
     for lever in scenario_summary.get("top_levers", []):
-        scenario_rows.append([
-            lever.get("key", ""),
-            lever.get("title", ""),
-            lever.get("lens", ""),
-            lever.get("repo_count", 0),
-            lever.get("average_expected_lens_delta", 0.0),
-            lever.get("projected_tier_promotions", 0),
-        ])
+        scenario_rows.append(
+            [
+                lever.get("key", ""),
+                lever.get("title", ""),
+                lever.get("lens", ""),
+                lever.get("repo_count", 0),
+                lever.get("average_expected_lens_delta", 0.0),
+                lever.get("projected_tier_promotions", 0),
+            ]
+        )
     projection = scenario_summary.get("portfolio_projection", {})
     if projection:
-        scenario_rows.append([
-            "portfolio_projection",
-            "Portfolio projection",
-            "portfolio_fit",
-            projection.get("projected_shipped", 0),
-            projection.get("projected_average_score_delta", 0.0),
-            projection.get("current_shipped", 0),
-        ])
+        scenario_rows.append(
+            [
+                "portfolio_projection",
+                "Portfolio projection",
+                "portfolio_fit",
+                projection.get("projected_shipped", 0),
+                projection.get("projected_average_score_delta", 0.0),
+                projection.get("current_shipped", 0),
+            ]
+        )
 
     contexts: list[tuple[str, str | None, dict]] = []
     profile_names = list(data.get("profiles", {}).keys()) or ["default"]
@@ -4510,79 +5410,106 @@ def _build_hidden_data_sheets(
                 item.get("audit", {}).get("lenses", {}).get(lens_name, {}).get("score", 0.0)
                 for item in selected
             ]
-            rollup_rows.append([
-                profile_name,
-                collection_name or "all",
-                lens_name,
-                len(selected),
-                round(sum(scores) / len(scores), 3) if scores else 0.0,
-                top_repo,
-                leaders[0]["profile_score"] if leaders else 0.0,
-            ])
+            rollup_rows.append(
+                [
+                    profile_name,
+                    collection_name or "all",
+                    lens_name,
+                    len(selected),
+                    round(sum(scores) / len(scores), 3) if scores else 0.0,
+                    top_repo,
+                    leaders[0]["profile_score"] if leaders else 0.0,
+                ]
+            )
 
     for item in data.get("review_targets", []):
-        review_target_rows.append([
-            item.get("repo", ""),
-            item.get("title", ""),
-            item.get("severity", 0.0),
-            item.get("next_step", ""),
-            item.get("decision_hint", ""),
-            "yes" if item.get("safe_to_defer") else "no",
-        ])
+        review_target_rows.append(
+            [
+                item.get("repo", ""),
+                item.get("title", ""),
+                item.get("severity", 0.0),
+                item.get("next_step", ""),
+                item.get("decision_hint", ""),
+                "yes" if item.get("safe_to_defer") else "no",
+            ]
+        )
 
     for item in data.get("review_history", []):
-        review_history_rows.append([
-            item.get("review_id", ""),
-            item.get("source_run_id", ""),
-            item.get("generated_at", ""),
-            item.get("materiality", ""),
-            item.get("material_change_count", 0),
-            item.get("status", ""),
-            item.get("decision_state", ""),
-            item.get("sync_state", ""),
-            "yes" if item.get("safe_to_defer") else "no",
-            "yes" if item.get("emitted") else "no",
-        ])
+        review_history_rows.append(
+            [
+                item.get("review_id", ""),
+                item.get("source_run_id", ""),
+                item.get("generated_at", ""),
+                item.get("materiality", ""),
+                item.get("material_change_count", 0),
+                item.get("status", ""),
+                item.get("decision_state", ""),
+                item.get("sync_state", ""),
+                "yes" if item.get("safe_to_defer") else "no",
+                "yes" if item.get("emitted") else "no",
+            ]
+        )
 
     for lens_name, lens_data in data.get("lenses", {}).items():
         lookup_rows.append(["lens", lens_name, lens_data.get("description", "")])
     for profile_name, profile_data in data.get("profiles", {}).items():
         lookup_rows.append(["profile", profile_name, profile_data.get("description", "")])
     for tier_name in TIER_ORDER:
-        lookup_rows.append(["tier", tier_name, str(data.get("tier_distribution", {}).get(tier_name, 0))])
-    for audit in sorted(data.get("audits", []), key=lambda item: item.get("metadata", {}).get("name", "")):
+        lookup_rows.append(
+            ["tier", tier_name, str(data.get("tier_distribution", {}).get(tier_name, 0))]
+        )
+    for audit in sorted(
+        data.get("audits", []), key=lambda item: item.get("metadata", {}).get("name", "")
+    ):
         repo_name = audit.get("metadata", {}).get("name", "")
         if repo_name:
             lookup_rows.append(["repo-selector", repo_name, repo_name])
     campaign_summary = data.get("campaign_summary", {})
     if campaign_summary:
-        campaign_rows.append([
-            campaign_summary.get("campaign_type", ""),
-            campaign_summary.get("label", ""),
-            campaign_summary.get("portfolio_profile", "default"),
-            campaign_summary.get("collection_name", ""),
-            campaign_summary.get("action_count", 0),
-            campaign_summary.get("repo_count", 0),
-        ])
+        campaign_rows.append(
+            [
+                campaign_summary.get("campaign_type", ""),
+                campaign_summary.get("label", ""),
+                campaign_summary.get("portfolio_profile", "default"),
+                campaign_summary.get("collection_name", ""),
+                campaign_summary.get("action_count", 0),
+                campaign_summary.get("repo_count", 0),
+            ]
+        )
     for result in data.get("writeback_results", {}).get("results", []):
-        writeback_rows.append([
-            result.get("repo_full_name", ""),
-            result.get("target", ""),
-            result.get("status", ""),
-            result.get("url", ""),
-            json.dumps(result.get("before", {})),
-            json.dumps(result.get("after", {})),
-        ])
+        writeback_rows.append(
+            [
+                result.get("repo_full_name", ""),
+                result.get("target", ""),
+                result.get("status", ""),
+                result.get("url", ""),
+                json.dumps(result.get("before", {})),
+                json.dumps(result.get("after", {})),
+            ]
+        )
 
     _write_hidden_table_sheet(
         wb,
         "Data_Repos",
         "tblRepos",
         [
-            "Repo", "Full Name", "Language", "Private", "Archived", "Overall Score",
-            "Interest Score", "Grade", "Tier", "Security Label", "Collections",
-            "Ship Readiness", "Maintenance Risk", "Showcase Value",
-            "Security Posture", "Momentum", "Portfolio Fit",
+            "Repo",
+            "Full Name",
+            "Language",
+            "Private",
+            "Archived",
+            "Overall Score",
+            "Interest Score",
+            "Grade",
+            "Tier",
+            "Security Label",
+            "Collections",
+            "Ship Readiness",
+            "Maintenance Risk",
+            "Showcase Value",
+            "Security Posture",
+            "Momentum",
+            "Portfolio Fit",
         ],
         repo_rows,
     )
@@ -4636,7 +5563,15 @@ def _build_hidden_data_sheets(
         wb,
         "Data_Rollups",
         "tblRollups",
-        ["Profile", "Collection", "Lens", "Repo Count", "Average Lens Score", "Top Repo", "Top Profile Score"],
+        [
+            "Profile",
+            "Collection",
+            "Lens",
+            "Repo Count",
+            "Average Lens Score",
+            "Top Repo",
+            "Top Profile Score",
+        ],
         rollup_rows,
     )
     _write_hidden_table_sheet(
@@ -4650,14 +5585,34 @@ def _build_hidden_data_sheets(
         wb,
         "Data_ReviewHistory",
         "tblReviewHistoryData",
-        ["Review ID", "Source Run", "Generated", "Materiality", "Changes", "Status", "Decision State", "Sync State", "Safe To Defer", "Emitted"],
+        [
+            "Review ID",
+            "Source Run",
+            "Generated",
+            "Materiality",
+            "Changes",
+            "Status",
+            "Decision State",
+            "Sync State",
+            "Safe To Defer",
+            "Emitted",
+        ],
         review_history_rows,
     )
     _write_hidden_table_sheet(
         wb,
         "Data_Security",
         "tblSecurityData",
-        ["Repo", "Label", "Score", "Secrets", "Dangerous Files", "SECURITY.md", "Dependabot", "Evidence"],
+        [
+            "Repo",
+            "Label",
+            "Score",
+            "Secrets",
+            "Dangerous Files",
+            "SECURITY.md",
+            "Dependabot",
+            "Evidence",
+        ],
         security_rows,
     )
     _write_hidden_table_sheet(
@@ -4685,7 +5640,17 @@ def _build_hidden_data_sheets(
         wb,
         "Data_Actions",
         "tblActions",
-        ["Repo", "Key", "Title", "Lens", "Effort", "Confidence", "Expected Lens Delta", "Expected Tier Movement", "Rationale"],
+        [
+            "Repo",
+            "Key",
+            "Title",
+            "Lens",
+            "Effort",
+            "Confidence",
+            "Expected Lens Delta",
+            "Expected Tier Movement",
+            "Rationale",
+        ],
         action_rows,
     )
     _write_hidden_table_sheet(
@@ -4878,7 +5843,14 @@ def _build_hidden_data_sheets(
         wb,
         "Data_Scenarios",
         "tblScenarios",
-        ["Key", "Title", "Lens", "Repo Count", "Average Expected Lens Delta", "Projected Tier Promotions"],
+        [
+            "Key",
+            "Title",
+            "Lens",
+            "Repo Count",
+            "Average Expected Lens Delta",
+            "Projected Tier Promotions",
+        ],
         scenario_rows,
     )
     _write_hidden_table_sheet(
@@ -5007,7 +5979,18 @@ def _build_hidden_data_sheets(
         wb,
         "Data_OperatorRepoRollups",
         "tblOperatorRepoRollups",
-        ["Repo", "Total Items", "Blocked", "Urgent", "Ready", "Deferred", "Primary Kind", "Top Priority", "Top Title", "Recommended Action"],
+        [
+            "Repo",
+            "Total Items",
+            "Blocked",
+            "Urgent",
+            "Ready",
+            "Deferred",
+            "Primary Kind",
+            "Top Priority",
+            "Top Title",
+            "Recommended Action",
+        ],
         operator_repo_rollups,
     )
     _write_hidden_table_sheet(
@@ -5120,7 +6103,17 @@ def _build_hidden_data_sheets(
         wb,
         "Data_RunChangeRepoData",
         "tblRunChangeRepoData",
-        ["Section", "Repo", "Delta", "Old Tier", "New Tier", "Security", "Hotspots", "Collections", "Summary"],
+        [
+            "Section",
+            "Repo",
+            "Delta",
+            "Old Tier",
+            "New Tier",
+            "Security",
+            "Hotspots",
+            "Collections",
+            "Summary",
+        ],
         run_change_repo_rows,
     )
     _write_hidden_table_sheet(
@@ -5136,13 +6129,24 @@ def _build_security_controls(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Security Controls")
     ws.sheet_properties.tabColor = "0F766E"
     _configure_sheet_view(ws, zoom=105, show_grid_lines=True)
-    headers = ["Repo", "SECURITY.md", "Dependabot", "Dependency Graph", "SBOM", "Code Scanning", "Secret Scanning"]
+    headers = [
+        "Repo",
+        "SECURITY.md",
+        "Dependabot",
+        "Dependency Graph",
+        "SBOM",
+        "Code Scanning",
+        "Secret Scanning",
+    ]
     for col, header in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=header)
     style_header_row(ws, 1, len(headers))
     ws.freeze_panes = "B2"
 
-    audits = sorted(data.get("audits", []), key=lambda audit: audit.get("security_posture", {}).get("score", 0.0))
+    audits = sorted(
+        data.get("audits", []),
+        key=lambda audit: audit.get("security_posture", {}).get("score", 0.0),
+    )
     for row, audit in enumerate(audits, 2):
         posture = audit.get("security_posture", {})
         github = posture.get("github", {})
@@ -5156,7 +6160,9 @@ def _build_security_controls(wb: Workbook, data: dict) -> None:
             github.get("secret_scanning_status", "unavailable"),
         ]
         for col, value in enumerate(values, 1):
-            style_data_cell(ws.cell(row=row, column=col, value=value), "left" if col == 1 else "center")
+            style_data_cell(
+                ws.cell(row=row, column=col, value=value), "left" if col == 1 else "center"
+            )
 
     max_row = len(audits) + 1
     if max_row > 1:
@@ -5169,13 +6175,23 @@ def _build_supply_chain(wb: Workbook, data: dict) -> None:
     ws = _get_or_create_sheet(wb, "Supply Chain")
     ws.sheet_properties.tabColor = "7C3AED"
     _configure_sheet_view(ws, zoom=105, show_grid_lines=True)
-    headers = ["Repo", "Security Score", "Dependency Graph", "SBOM", "Scorecard", "Top Recommendation"]
+    headers = [
+        "Repo",
+        "Security Score",
+        "Dependency Graph",
+        "SBOM",
+        "Scorecard",
+        "Top Recommendation",
+    ]
     for col, header in enumerate(headers, 1):
         ws.cell(row=1, column=col, value=header)
     style_header_row(ws, 1, len(headers))
     ws.freeze_panes = "B2"
 
-    audits = sorted(data.get("audits", []), key=lambda audit: audit.get("security_posture", {}).get("score", 0.0))
+    audits = sorted(
+        data.get("audits", []),
+        key=lambda audit: audit.get("security_posture", {}).get("score", 0.0),
+    )
     for row, audit in enumerate(audits, 2):
         posture = audit.get("security_posture", {})
         github = posture.get("github", {})
@@ -5190,7 +6206,10 @@ def _build_supply_chain(wb: Workbook, data: dict) -> None:
             recommendation.get("title", ""),
         ]
         for col, value in enumerate(values, 1):
-            style_data_cell(ws.cell(row=row, column=col, value=value), "center" if col != 1 and col != 6 else "left")
+            style_data_cell(
+                ws.cell(row=row, column=col, value=value),
+                "center" if col != 1 and col != 6 else "left",
+            )
 
     max_row = len(audits) + 1
     if max_row > 1:
@@ -5220,7 +6239,10 @@ def _build_security_debt(wb: Workbook, data: dict) -> None:
             item.get("source", ""),
         ]
         for col, value in enumerate(values, 1):
-            style_data_cell(ws.cell(row=row, column=col, value=value), "center" if col in {2, 4, 5, 6} else "left")
+            style_data_cell(
+                ws.cell(row=row, column=col, value=value),
+                "center" if col in {2, 4, 5, 6} else "left",
+            )
 
     max_row = len(preview) + 1
     if max_row > 1:
@@ -5248,7 +6270,11 @@ def _build_campaigns(wb: Workbook, data: dict) -> None:
     else:
         request_state = "Campaign requested from the current report facts."
     if not preview_rows:
-        row_state = "Campaign requested but no current rows matched." if campaign_requested else "No current rows because no managed campaign was requested."
+        row_state = (
+            "Campaign requested but no current rows matched."
+            if campaign_requested
+            else "No current rows because no managed campaign was requested."
+        )
     else:
         row_state = "Campaign rows are present. External mutation stays manual until writeback apply is explicitly requested."
     summary_end_row = _write_key_value_block(
@@ -5290,7 +6316,10 @@ def _build_campaigns(wb: Workbook, data: dict) -> None:
             ),
             (
                 "Next Action Sync Step",
-                data.get("next_action_sync_step", "Stay local for now; no current campaign needs preview or apply."),
+                data.get(
+                    "next_action_sync_step",
+                    "Stay local for now; no current campaign needs preview or apply.",
+                ),
             ),
             (
                 "Apply Packet",
@@ -5378,7 +6407,16 @@ def _build_campaigns(wb: Workbook, data: dict) -> None:
         ],
         title=ACTION_SYNC_CANONICAL_LABELS["readiness"],
     )
-    headers = ["Repo", "Issue", "Topics", "Projects", "Notion Actions", "Action IDs", "Drift", "Sync Mode"]
+    headers = [
+        "Repo",
+        "Issue",
+        "Topics",
+        "Projects",
+        "Notion Actions",
+        "Action IDs",
+        "Drift",
+        "Sync Mode",
+    ]
     start_row = summary_end_row + 2
     for col, header in enumerate(headers, 1):
         ws.cell(row=start_row, column=col, value=header)
@@ -5398,7 +6436,9 @@ def _build_campaigns(wb: Workbook, data: dict) -> None:
         ws.cell(row=row, column=5, value=item.get("notion_action_count", 0))
         ws.cell(row=row, column=6, value=", ".join(item.get("action_ids", [])))
         ws.cell(row=row, column=7, value="yes" if repo_key in drift_repo_keys else "no")
-        ws.cell(row=row, column=8, value=data.get("writeback_preview", {}).get("sync_mode", "reconcile"))
+        ws.cell(
+            row=row, column=8, value=data.get("writeback_preview", {}).get("sync_mode", "reconcile")
+        )
 
     max_row = start_row + len(preview_rows)
     if preview_rows:
@@ -5435,7 +6475,10 @@ def _build_writeback_audit(wb: Workbook, data: dict) -> None:
         [
             ("Writeback Rows", len(results)),
             ("Rollback Ready", rollback_count),
-            ("Created / Updated / Closed", f"{status_counts.get('created', 0)} / {status_counts.get('updated', 0)} / {status_counts.get('closed', 0)}"),
+            (
+                "Created / Updated / Closed",
+                f"{status_counts.get('created', 0)} / {status_counts.get('updated', 0)} / {status_counts.get('closed', 0)}",
+            ),
         ],
         title="Current Writeback State",
     )
@@ -5453,7 +6496,10 @@ def _build_writeback_audit(wb: Workbook, data: dict) -> None:
             ),
             (
                 "Next Action Sync Step",
-                data.get("next_action_sync_step", "Stay local for now; no current campaign needs preview or apply."),
+                data.get(
+                    "next_action_sync_step",
+                    "Stay local for now; no current campaign needs preview or apply.",
+                ),
             ),
             (
                 "Apply Packet",
@@ -5552,7 +6598,11 @@ def _build_writeback_audit(wb: Workbook, data: dict) -> None:
         ws.cell(row=row, column=1, value=result.get("repo_full_name", ""))
         ws.cell(row=row, column=2, value=result.get("target", ""))
         ws.cell(row=row, column=3, value=result.get("status", ""))
-        ws.cell(row=row, column=4, value="yes" if result.get("before") not in ({}, None, []) else "partial")
+        ws.cell(
+            row=row,
+            column=4,
+            value="yes" if result.get("before") not in ({}, None, []) else "partial",
+        )
         ws.cell(row=row, column=5, value=result.get("url", ""))
         ws.cell(row=row, column=6, value=json.dumps(result))
 
@@ -5580,7 +6630,9 @@ def _build_portfolio_explorer(
 ) -> None:
     from src.analyst_views import build_analyst_context
 
-    context = build_analyst_context(data, profile_name=portfolio_profile, collection_name=collection)
+    context = build_analyst_context(
+        data, profile_name=portfolio_profile, collection_name=collection
+    )
     ws = _get_or_create_sheet(wb, "Portfolio Explorer")
     ws.sheet_properties.tabColor = "1D4ED8"
     _configure_sheet_view(ws, zoom=110, show_grid_lines=True)
@@ -5591,12 +6643,28 @@ def _build_portfolio_explorer(
         width=10,
     )
     ws.merge_cells("A3:P3")
-    ws["A3"] = "How to use this sheet: sort by Profile Score first, then use the catalog columns to separate intentional experiments from maintained assets before drilling in."
+    ws["A3"] = (
+        "How to use this sheet: sort by Profile Score first, then use the catalog columns to separate intentional experiments from maintained assets before drilling in."
+    )
     ws["A3"].font = SUBTITLE_FONT
     ws["A3"].alignment = WRAP
     headers = [
-        "Repo", "Profile Score", "Overall", "Interest", "Tier", "Collections",
-        "Lifecycle", "Criticality", "Disposition", "Operating Path", "Maturity", "Scorecard Gap", "Security", "Hotspots", "Top Hotspot", "Primary Action",
+        "Repo",
+        "Profile Score",
+        "Overall",
+        "Interest",
+        "Tier",
+        "Collections",
+        "Lifecycle",
+        "Criticality",
+        "Disposition",
+        "Operating Path",
+        "Maturity",
+        "Scorecard Gap",
+        "Security",
+        "Hotspots",
+        "Top Hotspot",
+        "Primary Action",
     ]
     start_row = 5
     for col, header in enumerate(headers, 1):
@@ -5606,7 +6674,11 @@ def _build_portfolio_explorer(
 
     for row, entry in enumerate(context["ranked_audits"], start_row + 1):
         audit = entry["audit"]
-        top_action = audit.get("action_candidates", [{}])[0].get("title", "") if audit.get("action_candidates") else ""
+        top_action = (
+            audit.get("action_candidates", [{}])[0].get("title", "")
+            if audit.get("action_candidates")
+            else ""
+        )
         values = [
             entry["name"],
             entry["profile_score"],
@@ -5626,7 +6698,10 @@ def _build_portfolio_explorer(
             top_action,
         ]
         for col, value in enumerate(values, 1):
-            style_data_cell(ws.cell(row=row, column=col, value=value), "center" if col in {2, 3, 4, 8} else "left")
+            style_data_cell(
+                ws.cell(row=row, column=col, value=value),
+                "center" if col in {2, 3, 4, 8} else "left",
+            )
 
     max_row = len(context["ranked_audits"]) + start_row
     if max_row > start_row:
@@ -5680,7 +6755,9 @@ def _build_portfolio_catalog_sheet(wb: Workbook, data: dict) -> None:
     style_header_row(ws, start_row, len(headers))
     ws.freeze_panes = "B8"
 
-    audits = sorted(data.get("audits", []), key=lambda item: item.get("metadata", {}).get("name", ""))
+    audits = sorted(
+        data.get("audits", []), key=lambda item: item.get("metadata", {}).get("name", "")
+    )
     for row, audit in enumerate(audits, start_row + 1):
         catalog = audit.get("portfolio_catalog", {})
         values = [
@@ -5740,7 +6817,9 @@ def _build_scorecards_sheet(wb: Workbook, data: dict) -> None:
     style_header_row(ws, start_row, len(headers))
     ws.freeze_panes = "B6"
 
-    audits = sorted(data.get("audits", []), key=lambda item: item.get("metadata", {}).get("name", ""))
+    audits = sorted(
+        data.get("audits", []), key=lambda item: item.get("metadata", {}).get("name", "")
+    )
     for row, audit in enumerate(audits, start_row + 1):
         scorecard = audit.get("scorecard", {})
         values = [
@@ -5754,7 +6833,10 @@ def _build_scorecards_sheet(wb: Workbook, data: dict) -> None:
             scorecard.get("summary", "") or "—",
         ]
         for col, value in enumerate(values, 1):
-            style_data_cell(ws.cell(row=row, column=col, value=value), "center" if col in {3, 4, 5, 6} else "left")
+            style_data_cell(
+                ws.cell(row=row, column=col, value=value),
+                "center" if col in {3, 4, 5, 6} else "left",
+            )
 
     max_row = start_row + len(audits)
     if audits:
@@ -5772,7 +6854,9 @@ def _build_by_lens(
 ) -> None:
     from src.analyst_views import build_analyst_context
 
-    context = build_analyst_context(data, profile_name=portfolio_profile, collection_name=collection)
+    context = build_analyst_context(
+        data, profile_name=portfolio_profile, collection_name=collection
+    )
     ws = _get_or_create_sheet(wb, "By Lens")
     ws.sheet_properties.tabColor = "0F766E"
     _configure_sheet_view(ws, zoom=110, show_grid_lines=True)
@@ -5783,10 +6867,19 @@ def _build_by_lens(
         width=9,
     )
     ws.merge_cells("A3:I3")
-    ws["A3"] = f"Current view: profile {portfolio_profile} | collection {collection or 'all'} | use this sheet to compare the same repo through multiple decision lenses."
+    ws["A3"] = (
+        f"Current view: profile {portfolio_profile} | collection {collection or 'all'} | use this sheet to compare the same repo through multiple decision lenses."
+    )
     ws["A3"].font = SUBTITLE_FONT
     ws["A3"].alignment = WRAP
-    lens_headers = ["Ship Readiness", "Maintenance Risk", "Showcase", "Security", "Momentum", "Portfolio Fit"]
+    lens_headers = [
+        "Ship Readiness",
+        "Maintenance Risk",
+        "Showcase",
+        "Security",
+        "Momentum",
+        "Portfolio Fit",
+    ]
     headers = ["Repo", "Profile Score", "Tier"] + lens_headers
     start_row = 5
     for col, header in enumerate(headers, 1):
@@ -5808,7 +6901,9 @@ def _build_by_lens(
             lenses.get("portfolio_fit", {}).get("score", 0.0),
         ]
         for col, value in enumerate(values, 1):
-            style_data_cell(ws.cell(row=row, column=col, value=value), "center" if col >= 2 else "left")
+            style_data_cell(
+                ws.cell(row=row, column=col, value=value), "center" if col >= 2 else "left"
+            )
 
     max_row = len(context["ranked_audits"]) + start_row
     if max_row > start_row:
@@ -5835,7 +6930,9 @@ def _build_by_collection(
         width=5,
     )
     ws.merge_cells("A3:E3")
-    ws["A3"] = f"Current profile: {portfolio_profile}. Use this sheet to see how each collection groups related repos and where its best work sits."
+    ws["A3"] = (
+        f"Current profile: {portfolio_profile}. Use this sheet to see how each collection groups related repos and where its best work sits."
+    )
     ws["A3"].font = SUBTITLE_FONT
     ws["A3"].alignment = WRAP
     headers = ["Collection", "Repos", "Description", "Top Repo", "Top Score"]
@@ -5846,7 +6943,9 @@ def _build_by_collection(
     ws.freeze_panes = "B6"
 
     for row, collection_name in enumerate(data.get("collections", {}).keys(), start_row + 1):
-        context = build_analyst_context(data, profile_name=portfolio_profile, collection_name=collection_name)
+        context = build_analyst_context(
+            data, profile_name=portfolio_profile, collection_name=collection_name
+        )
         leaders = context.get("profile_leaderboard", {}).get("leaders", [])
         collection_data = data.get("collections", {}).get(collection_name, {})
         values = [
@@ -5857,7 +6956,9 @@ def _build_by_collection(
             leaders[0]["profile_score"] if leaders else 0.0,
         ]
         for col, value in enumerate(values, 1):
-            style_data_cell(ws.cell(row=row, column=col, value=value), "center" if col in {2, 5} else "left")
+            style_data_cell(
+                ws.cell(row=row, column=col, value=value), "center" if col in {2, 5} else "left"
+            )
 
     max_row = len(data.get("collections", {})) + start_row
     if max_row > start_row:
@@ -5884,11 +6985,22 @@ def _build_trend_summary(
         width=8,
     )
     ws.merge_cells("A3:H3")
-    ws["A3"] = "Use this sheet when you want portfolio-wide movement first, then repo-level trendlines second."
+    ws["A3"] = (
+        "Use this sheet when you want portfolio-wide movement first, then repo-level trendlines second."
+    )
     ws["A3"].font = SUBTITLE_FONT
     ws["A3"].alignment = WRAP
 
-    headers = ["Date", "Average Score", "Repos", "Shipped", "Functional", "Review Emitted", "Campaign Drift", "Governance Drift"]
+    headers = [
+        "Date",
+        "Average Score",
+        "Repos",
+        "Shipped",
+        "Functional",
+        "Review Emitted",
+        "Campaign Drift",
+        "Governance Drift",
+    ]
     start_row = 5
     for col, header in enumerate(headers, 1):
         ws.cell(row=start_row, column=col, value=header)
@@ -5907,7 +7019,10 @@ def _build_trend_summary(
             trend.get("governance_drift_count", 0),
         ]
         for col, value in enumerate(values, 1):
-            style_data_cell(ws.cell(row=start_row + offset, column=col, value=value), "center" if col != 1 else "left")
+            style_data_cell(
+                ws.cell(row=start_row + offset, column=col, value=value),
+                "center" if col != 1 else "left",
+            )
 
     summary_row = start_row + len(extended_trends) + 3
     ws.cell(row=summary_row, column=1, value="Top Repo Trendlines").font = SECTION_FONT
@@ -5918,7 +7033,13 @@ def _build_trend_summary(
 
     max_row = summary_row + min(len(extended_score_history), 10)
     if extended_trends:
-        _add_table(ws, "tblTrendSummary", len(headers), start_row + len(extended_trends), start_row=start_row)
+        _add_table(
+            ws,
+            "tblTrendSummary",
+            len(headers),
+            start_row + len(extended_trends),
+            start_row=start_row,
+        )
     auto_width(ws, max(8, len(headers)), max_row)
 
 
@@ -5948,7 +7069,11 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
         for audit in data.get("audits", [])
         if audit.get("metadata", {}).get("name")
     )
-    default_repo = existing_selection if existing_selection in repo_names else (repo_names[0] if repo_names else "")
+    default_repo = (
+        existing_selection
+        if existing_selection in repo_names
+        else (repo_names[0] if repo_names else "")
+    )
     ws["A4"] = "Select Repo"
     ws["A4"].font = SUBHEADER_FONT
     ws["B4"] = default_repo
@@ -5964,7 +7089,9 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
         ws.add_data_validation(dv)
     ws["D4"] = "GitHub"
     ws["D4"].font = SUBHEADER_FONT
-    ws["E4"] = '=IFERROR(IF(VLOOKUP($B$4,Data_RepoDetail!$A:$BZ,2,FALSE)="","Repo URL unavailable",HYPERLINK(VLOOKUP($B$4,Data_RepoDetail!$A:$BZ,2,FALSE),"Open Repo")),"Repo URL unavailable")'
+    ws["E4"] = (
+        '=IFERROR(IF(VLOOKUP($B$4,Data_RepoDetail!$A:$BZ,2,FALSE)="","Repo URL unavailable",HYPERLINK(VLOOKUP($B$4,Data_RepoDetail!$A:$BZ,2,FALSE),"Open Repo")),"Repo URL unavailable")'
+    )
     ws["E4"].font = Font("Calibri", 10, bold=True, color=TEAL, underline="single")
 
     summary_fields = [
@@ -5985,7 +7112,9 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
         row = row_base + 5
         col = col_base
         ws.cell(row=row, column=col, value=label).font = SUBHEADER_FONT
-        formula = _repo_detail_lookup_formula(column_index, fallback, allow_blank=column_index in {5, 6, 13})
+        formula = _repo_detail_lookup_formula(
+            column_index, fallback, allow_blank=column_index in {5, 6, 13}
+        )
         style_data_cell(ws.cell(row=row, column=col + 1, value=formula), "left")
 
     ws["A11"] = "Description"
@@ -6005,7 +7134,14 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
     for offset, (label, column_index) in enumerate(lens_rows, 1):
         row = 13 + offset
         ws.cell(row=row, column=1, value=label).font = SUBHEADER_FONT
-        style_data_cell(ws.cell(row=row, column=2, value=_repo_detail_lookup_formula(column_index, "No summary recorded yet.")), "left")
+        style_data_cell(
+            ws.cell(
+                row=row,
+                column=2,
+                value=_repo_detail_lookup_formula(column_index, "No summary recorded yet."),
+            ),
+            "left",
+        )
 
     ws["E13"] = "Why This Repo Looks This Way"
     ws["E13"].font = SECTION_FONT
@@ -6020,7 +7156,14 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
     for offset, (label, column_index) in enumerate(explanation_rows, 1):
         row = 13 + offset
         ws.cell(row=row, column=5, value=label).font = SUBHEADER_FONT
-        style_data_cell(ws.cell(row=row, column=6, value=_repo_detail_lookup_formula(column_index, "No briefing detail recorded yet.")), "left")
+        style_data_cell(
+            ws.cell(
+                row=row,
+                column=6,
+                value=_repo_detail_lookup_formula(column_index, "No briefing detail recorded yet."),
+            ),
+            "left",
+        )
 
     ws["A20"] = "Dimension Breakdown"
     ws["A20"].font = SECTION_FONT
@@ -6032,9 +7175,21 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
         row = 21 + rank
         ws.cell(row=row, column=1, value=rank)
         lookup_expr = f'$B$4&"::{rank}"'
-        ws.cell(row=row, column=2, value=f'=IFERROR(VLOOKUP({lookup_expr},Data_RepoDimensionRollups!$A:$F,4,FALSE),"")')
-        ws.cell(row=row, column=3, value=f'=IFERROR(VLOOKUP({lookup_expr},Data_RepoDimensionRollups!$A:$F,5,FALSE),"")')
-        ws.cell(row=row, column=4, value=f'=IFERROR(VLOOKUP({lookup_expr},Data_RepoDimensionRollups!$A:$F,6,FALSE),"")')
+        ws.cell(
+            row=row,
+            column=2,
+            value=f'=IFERROR(VLOOKUP({lookup_expr},Data_RepoDimensionRollups!$A:$F,4,FALSE),"")',
+        )
+        ws.cell(
+            row=row,
+            column=3,
+            value=f'=IFERROR(VLOOKUP({lookup_expr},Data_RepoDimensionRollups!$A:$F,5,FALSE),"")',
+        )
+        ws.cell(
+            row=row,
+            column=4,
+            value=f'=IFERROR(VLOOKUP({lookup_expr},Data_RepoDimensionRollups!$A:$F,6,FALSE),"")',
+        )
         for col in range(1, 5):
             style_data_cell(ws.cell(row=row, column=col), "center" if col in {1, 3} else "left")
 
@@ -6043,7 +7198,14 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
     for idx in range(1, 4):
         row = 20 + idx
         ws.cell(row=row, column=6, value=f"Hotspot {idx}").font = SUBHEADER_FONT
-        style_data_cell(ws.cell(row=row, column=7, value=_repo_detail_lookup_formula(23 + idx, "No hotspot recorded yet.")), "left")
+        style_data_cell(
+            ws.cell(
+                row=row,
+                column=7,
+                value=_repo_detail_lookup_formula(23 + idx, "No hotspot recorded yet."),
+            ),
+            "left",
+        )
 
     ws["A28"] = "Where To Start"
     ws["A28"].font = SECTION_FONT
@@ -6056,7 +7218,10 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
     for offset, (label, column_index, fallback) in enumerate(implementation_rows, 1):
         row = 28 + offset
         ws.cell(row=row, column=1, value=label).font = SUBHEADER_FONT
-        style_data_cell(ws.cell(row=row, column=2, value=_repo_detail_lookup_formula(column_index, fallback)), "left")
+        style_data_cell(
+            ws.cell(row=row, column=2, value=_repo_detail_lookup_formula(column_index, fallback)),
+            "left",
+        )
 
     ws["F25"] = "What To Do Next"
     ws["F25"].font = SECTION_FONT
@@ -6069,33 +7234,89 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
         ("Escalation", 35, "Unknown"),
         ("Escalation Summary", 36, "No stronger follow-through escalation is currently surfaced."),
         ("Recovery / Retirement", 37, "None"),
-        ("Recovery Summary", 38, "No follow-through recovery or escalation-retirement signal is currently surfaced."),
+        (
+            "Recovery Summary",
+            38,
+            "No follow-through recovery or escalation-retirement signal is currently surfaced.",
+        ),
         ("Recovery Persistence", 39, "None"),
-        ("Recovery Persistence Summary", 40, "No follow-through recovery persistence signal is currently surfaced."),
+        (
+            "Recovery Persistence Summary",
+            40,
+            "No follow-through recovery persistence signal is currently surfaced.",
+        ),
         ("Relapse Churn", 41, "None"),
         ("Relapse Churn Summary", 42, "No relapse churn is currently surfaced."),
         ("Recovery Freshness", 43, "None"),
-        ("Recovery Freshness Summary", 44, "No follow-through recovery freshness signal is currently surfaced."),
+        (
+            "Recovery Freshness Summary",
+            44,
+            "No follow-through recovery freshness signal is currently surfaced.",
+        ),
         ("Recovery Memory Reset", 45, "None"),
-        ("Recovery Memory Reset Summary", 46, "No follow-through recovery memory reset signal is currently surfaced."),
+        (
+            "Recovery Memory Reset Summary",
+            46,
+            "No follow-through recovery memory reset signal is currently surfaced.",
+        ),
         ("Recovery Rebuild Strength", 47, "None"),
-        ("Recovery Rebuild Strength Summary", 48, "No follow-through recovery rebuild-strength signal is currently surfaced."),
+        (
+            "Recovery Rebuild Strength Summary",
+            48,
+            "No follow-through recovery rebuild-strength signal is currently surfaced.",
+        ),
         ("Recovery Reacquisition", 49, "None"),
-        ("Recovery Reacquisition Summary", 50, "No follow-through recovery reacquisition signal is currently surfaced."),
+        (
+            "Recovery Reacquisition Summary",
+            50,
+            "No follow-through recovery reacquisition signal is currently surfaced.",
+        ),
         ("Reacquisition Durability", 51, "None"),
-        ("Reacquisition Durability Summary", 52, "No follow-through reacquisition durability signal is currently surfaced."),
+        (
+            "Reacquisition Durability Summary",
+            52,
+            "No follow-through reacquisition durability signal is currently surfaced.",
+        ),
         ("Reacquisition Confidence", 53, "None"),
-        ("Reacquisition Confidence Summary", 54, "No follow-through reacquisition confidence-consolidation signal is currently surfaced."),
+        (
+            "Reacquisition Confidence Summary",
+            54,
+            "No follow-through reacquisition confidence-consolidation signal is currently surfaced.",
+        ),
         ("Reacquisition Softening Decay", 55, "None"),
-        ("Reacquisition Softening Decay Summary", 56, "No reacquisition softening-decay signal is currently surfaced."),
+        (
+            "Reacquisition Softening Decay Summary",
+            56,
+            "No reacquisition softening-decay signal is currently surfaced.",
+        ),
         ("Reacquisition Confidence Retirement", 57, "None"),
-        ("Reacquisition Confidence Retirement Summary", 58, "No reacquisition confidence-retirement signal is currently surfaced."),
+        (
+            "Reacquisition Confidence Retirement Summary",
+            58,
+            "No reacquisition confidence-retirement signal is currently surfaced.",
+        ),
         ("Revalidation Recovery", 59, "None"),
-        ("Revalidation Recovery Summary", 60, "No post-revalidation recovery or confidence re-earning signal is currently surfaced."),
-        ("Progress Checkpoint", 61, "Use the next run or linked artifact to confirm whether the recommendation moved."),
+        (
+            "Revalidation Recovery Summary",
+            60,
+            "No post-revalidation recovery or confidence re-earning signal is currently surfaced.",
+        ),
+        (
+            "Progress Checkpoint",
+            61,
+            "Use the next run or linked artifact to confirm whether the recommendation moved.",
+        ),
         ("Portfolio Catalog", 62, "No portfolio catalog contract is recorded yet."),
-        ("Operating Path", 66, "Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet."),
-        ("Intent Alignment", 63, "missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists."),
+        (
+            "Operating Path",
+            66,
+            "Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet.",
+        ),
+        (
+            "Intent Alignment",
+            63,
+            "missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.",
+        ),
         ("Scorecard", 64, "Scorecard: No maturity scorecard is recorded yet."),
         ("Maturity Gap", 65, "No maturity gap summary is recorded yet."),
         ("Action Candidate 2", 28, "No second action candidate recorded yet."),
@@ -6104,15 +7325,24 @@ def _build_repo_detail(wb: Workbook, data: dict) -> None:
     for offset, (label, column_index, fallback) in enumerate(handoff_rows, 1):
         row = 25 + offset
         ws.cell(row=row, column=6, value=label).font = SUBHEADER_FONT
-        style_data_cell(ws.cell(row=row, column=7, value=_repo_detail_lookup_formula(column_index, fallback)), "left")
+        style_data_cell(
+            ws.cell(row=row, column=7, value=_repo_detail_lookup_formula(column_index, fallback)),
+            "left",
+        )
 
     nav_row = 26 + len(handoff_rows)
     ws.cell(row=nav_row, column=1, value="Use Score Explainer")
-    _set_internal_hyperlink(ws.cell(row=nav_row, column=2), "Score Explainer", display="Open Score Explainer")
+    _set_internal_hyperlink(
+        ws.cell(row=nav_row, column=2), "Score Explainer", display="Open Score Explainer"
+    )
     ws.cell(row=nav_row, column=4, value="Go To Explorer")
-    _set_internal_hyperlink(ws.cell(row=nav_row, column=5), "Portfolio Explorer", display="Open Explorer")
+    _set_internal_hyperlink(
+        ws.cell(row=nav_row, column=5), "Portfolio Explorer", display="Open Explorer"
+    )
     ws.cell(row=nav_row, column=6, value="Go To Queue")
-    _set_internal_hyperlink(ws.cell(row=nav_row, column=7), "Review Queue", display="Open Review Queue")
+    _set_internal_hyperlink(
+        ws.cell(row=nav_row, column=7), "Review Queue", display="Open Review Queue"
+    )
     auto_width(ws, 8, nav_row)
 
 
@@ -6135,7 +7365,7 @@ def _build_run_changes(wb: Workbook, data: dict, diff_data: dict | None) -> None
     ws.freeze_panes = "A9"
 
     counts = build_run_change_counts(diff_data)
-    summary = (data.get("run_change_summary") or build_run_change_summary(diff_data))
+    summary = data.get("run_change_summary") or build_run_change_summary(diff_data)
     ws.merge_cells("A3:I3")
     ws["A3"] = summary
     ws["A3"].font = SUBTITLE_FONT
@@ -6162,48 +7392,106 @@ def _build_run_changes(wb: Workbook, data: dict, diff_data: dict | None) -> None
 
     row = 9
     sections: list[tuple[str, list[list[object]], list[str]]] = []
-    improvements = sorted((diff_data or {}).get("score_changes", []), key=lambda item: item.get("delta", 0.0), reverse=True)
-    regressions = sorted((diff_data or {}).get("score_changes", []), key=lambda item: item.get("delta", 0.0))[:5]
-    sections.append((
-        "Biggest Score Gains",
-        [[item.get("name", ""), round(item.get("delta", 0.0), 3), round(item.get("new_score", 0.0), 3)] for item in improvements[:5]],
-        ["Repo", "Delta", "New Score"],
-    ))
-    sections.append((
-        "Biggest Regressions",
-        [[item.get("name", ""), round(item.get("delta", 0.0), 3), round(item.get("new_score", 0.0), 3)] for item in regressions[:5]],
-        ["Repo", "Delta", "New Score"],
-    ))
+    improvements = sorted(
+        (diff_data or {}).get("score_changes", []),
+        key=lambda item: item.get("delta", 0.0),
+        reverse=True,
+    )
+    regressions = sorted(
+        (diff_data or {}).get("score_changes", []), key=lambda item: item.get("delta", 0.0)
+    )[:5]
+    sections.append(
+        (
+            "Biggest Score Gains",
+            [
+                [
+                    item.get("name", ""),
+                    round(item.get("delta", 0.0), 3),
+                    round(item.get("new_score", 0.0), 3),
+                ]
+                for item in improvements[:5]
+            ],
+            ["Repo", "Delta", "New Score"],
+        )
+    )
+    sections.append(
+        (
+            "Biggest Regressions",
+            [
+                [
+                    item.get("name", ""),
+                    round(item.get("delta", 0.0), 3),
+                    round(item.get("new_score", 0.0), 3),
+                ]
+                for item in regressions[:5]
+            ],
+            ["Repo", "Delta", "New Score"],
+        )
+    )
     tier_changes = (diff_data or {}).get("tier_changes", [])
     promotions = [item for item in tier_changes if item.get("direction") == "promotion"][:5]
     demotions = [item for item in tier_changes if item.get("direction") == "demotion"][:5]
-    sections.append((
-        "Tier Promotions / Demotions",
-        [[item.get("name", ""), item.get("old_tier", ""), item.get("new_tier", ""), item.get("direction", "")] for item in promotions + demotions],
-        ["Repo", "Old Tier", "New Tier", "Movement"],
-    ))
-    blocked_items = [item for item in (data.get("operator_queue") or []) if item.get("lane") == "blocked"][:5]
-    sections.append((
-        "Newly Blocked Items",
-        [[item.get("repo", ""), item.get("title", ""), item.get("lane_reason", "") or item.get("summary", "")] for item in blocked_items],
-        ["Repo", "Item", "Why"],
-    ))
-    reopened = [item for item in (data.get("material_changes") or []) if "reopen" in str(item.get("change_type", "")).lower()][:5]
-    sections.append((
-        "Reopened Items",
-        [[item.get("repo", ""), item.get("title", ""), item.get("change_type", "")] for item in reopened],
-        ["Repo", "Title", "Type"],
-    ))
+    sections.append(
+        (
+            "Tier Promotions / Demotions",
+            [
+                [
+                    item.get("name", ""),
+                    item.get("old_tier", ""),
+                    item.get("new_tier", ""),
+                    item.get("direction", ""),
+                ]
+                for item in promotions + demotions
+            ],
+            ["Repo", "Old Tier", "New Tier", "Movement"],
+        )
+    )
+    blocked_items = [
+        item for item in (data.get("operator_queue") or []) if item.get("lane") == "blocked"
+    ][:5]
+    sections.append(
+        (
+            "Newly Blocked Items",
+            [
+                [
+                    item.get("repo", ""),
+                    item.get("title", ""),
+                    item.get("lane_reason", "") or item.get("summary", ""),
+                ]
+                for item in blocked_items
+            ],
+            ["Repo", "Item", "Why"],
+        )
+    )
+    reopened = [
+        item
+        for item in (data.get("material_changes") or [])
+        if "reopen" in str(item.get("change_type", "")).lower()
+    ][:5]
+    sections.append(
+        (
+            "Reopened Items",
+            [
+                [item.get("repo", ""), item.get("title", ""), item.get("change_type", "")]
+                for item in reopened
+            ],
+            ["Repo", "Title", "Type"],
+        )
+    )
     pressure_rows = []
     for item in (data.get("governance_drift") or [])[:5]:
-        pressure_rows.append([item.get("repo_full_name", ""), item.get("drift_type", ""), "governance"])
+        pressure_rows.append(
+            [item.get("repo_full_name", ""), item.get("drift_type", ""), "governance"]
+        )
     for item in (diff_data or {}).get("security_changes", [])[:5]:
         pressure_rows.append([item.get("name", ""), item.get("new_label", ""), "security"])
-    sections.append((
-        "New Security / Governance Pressure",
-        pressure_rows[:5],
-        ["Repo", "Signal", "Area"],
-    ))
+    sections.append(
+        (
+            "New Security / Governance Pressure",
+            pressure_rows[:5],
+            ["Repo", "Signal", "Area"],
+        )
+    )
 
     for title, rows, headers in sections:
         ws.cell(row=row, column=1, value=title).font = SECTION_FONT
@@ -6215,7 +7503,10 @@ def _build_run_changes(wb: Workbook, data: dict, diff_data: dict | None) -> None
             rows = [["No movement to call out yet.", "", ""][: len(headers)]]
         for offset, values in enumerate(rows, 1):
             for col, value in enumerate(values, 1):
-                style_data_cell(ws.cell(row=header_row + offset, column=col, value=value), "center" if isinstance(value, (int, float)) else "left")
+                style_data_cell(
+                    ws.cell(row=header_row + offset, column=col, value=value),
+                    "center" if isinstance(value, (int, float)) else "left",
+                )
         if rows:
             apply_zebra_stripes(ws, header_row + 1, header_row + len(rows), len(headers))
         row = header_row + len(rows) + 2
@@ -6249,17 +7540,46 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
     top_issue_families = _summarize_top_issue_families(material_changes)
     trend_status, trend_summary, primary_target, resolution_counts = _operator_trend_values(data)
     primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
-    last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
-    primary_confidence, confidence_reason, next_action_confidence, recommendation_quality = _operator_confidence_values(data)
+    last_intervention, last_outcome, resolution_evidence, recovery_counts = (
+        _operator_decision_memory_values(data)
+    )
+    primary_confidence, confidence_reason, next_action_confidence, recommendation_quality = (
+        _operator_confidence_values(data)
+    )
     trust_policy, trust_policy_reason, adaptive_confidence_summary = _operator_trust_values(data)
-    exception_status, exception_reason, drift_status, drift_summary = _operator_exception_values(data)
-    trust_recovery_status, trust_recovery_reason, exception_pattern_status, exception_pattern_summary = _operator_learning_values(data)
-    recovery_confidence, retirement_status, retirement_reason, retirement_summary = _operator_retirement_values(data)
-    policy_debt_status, policy_debt_reason, class_normalization_status, trust_normalization_summary = _operator_class_normalization_values(data)
-    class_memory_status, class_memory_reason, class_decay_status, class_decay_summary = _operator_class_memory_values(data)
-    class_reweight_direction, class_reweight_score, class_reweight_reason, class_reweight_summary = _operator_class_reweight_values(data)
-    class_momentum_status, class_reweight_stability, class_momentum_summary = _operator_class_momentum_values(data)
-    class_transition_health, class_transition_resolution, class_transition_summary = _operator_class_transition_values(data)
+    exception_status, exception_reason, drift_status, drift_summary = _operator_exception_values(
+        data
+    )
+    (
+        trust_recovery_status,
+        trust_recovery_reason,
+        exception_pattern_status,
+        exception_pattern_summary,
+    ) = _operator_learning_values(data)
+    recovery_confidence, retirement_status, retirement_reason, retirement_summary = (
+        _operator_retirement_values(data)
+    )
+    (
+        policy_debt_status,
+        policy_debt_reason,
+        class_normalization_status,
+        trust_normalization_summary,
+    ) = _operator_class_normalization_values(data)
+    class_memory_status, class_memory_reason, class_decay_status, class_decay_summary = (
+        _operator_class_memory_values(data)
+    )
+    (
+        class_reweight_direction,
+        class_reweight_score,
+        class_reweight_reason,
+        class_reweight_summary,
+    ) = _operator_class_reweight_values(data)
+    class_momentum_status, class_reweight_stability, class_momentum_summary = (
+        _operator_class_momentum_values(data)
+    )
+    class_transition_health, class_transition_resolution, class_transition_summary = (
+        _operator_class_transition_values(data)
+    )
     (
         transition_closure_confidence,
         transition_likely_outcome,
@@ -6271,18 +7591,32 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
         reset_reentry_rebuild_reentry_restore_rerererestore_churn,
         transition_closure_summary,
     ) = _operator_transition_closure_values(data)
-    calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
+    calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = (
+        _operator_calibration_values(data)
+    )
     summary_rows = [
-        ("Headline", (data.get("operator_summary") or {}).get("headline", "Review activity is available below.")),
+        (
+            "Headline",
+            (data.get("operator_summary") or {}).get(
+                "headline", "Review activity is available below."
+            ),
+        ),
         ("Queue Counts", _format_lane_counts(counts)),
         ("Queue Pressure", queue_pressure_summary),
         ("Total Queue Items", len(queue)),
         (
             "Immediate Focus",
-            (ordered_queue[0].get("recommended_action") or ordered_queue[0].get("title", "")) if ordered_queue else "No immediate queue item is open.",
+            (ordered_queue[0].get("recommended_action") or ordered_queue[0].get("title", ""))
+            if ordered_queue
+            else "No immediate queue item is open.",
         ),
         ("Top Recommendation", top_recommendation_summary),
-        ("Top Issue Family", f"{top_issue_families[0][0]} ({top_issue_families[0][1]})" if top_issue_families else "No material change families"),
+        (
+            "Top Issue Family",
+            f"{top_issue_families[0][0]} ({top_issue_families[0][1]})"
+            if top_issue_families
+            else "No material change families",
+        ),
     ]
     if excel_mode == "standard":
         summary_rows.extend(
@@ -6308,10 +7642,16 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
                 ("Exception Retirement", f"{retirement_status} — {retirement_reason}"),
                 ("Retirement Summary", retirement_summary),
                 ("Policy Debt", f"{policy_debt_status} — {policy_debt_reason}"),
-                ("Class Normalization", f"{class_normalization_status} — {trust_normalization_summary}"),
+                (
+                    "Class Normalization",
+                    f"{class_normalization_status} — {trust_normalization_summary}",
+                ),
                 ("Class Memory", f"{class_memory_status} — {class_memory_reason}"),
                 ("Trust Decay", f"{class_decay_status} — {class_decay_summary}"),
-                ("Class Reweighting", f"{class_reweight_direction} ({class_reweight_score}) — {class_reweight_summary}"),
+                (
+                    "Class Reweighting",
+                    f"{class_reweight_direction} ({class_reweight_score}) — {class_reweight_summary}",
+                ),
                 ("Class Reweighting Why", class_reweight_reason),
                 ("Class Momentum", class_momentum_status),
                 ("Reweight Stability", class_reweight_stability),
@@ -6322,8 +7662,14 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
                 ("Transition Likely Outcome", transition_likely_outcome),
                 ("Pending Debt Freshness", pending_debt_freshness),
                 ("Closure Forecast", closure_forecast_direction),
-                ("Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence", reset_reentry_rebuild_reentry_restore_rerererestore_persistence),
-                ("Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls", reset_reentry_rebuild_reentry_restore_rerererestore_churn),
+                (
+                    "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence",
+                    reset_reentry_rebuild_reentry_restore_rerererestore_persistence,
+                ),
+                (
+                    "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls",
+                    reset_reentry_rebuild_reentry_restore_rerererestore_churn,
+                ),
                 ("Closure Forecast Summary", transition_closure_summary),
                 ("Momentum Summary", class_momentum_summary),
                 ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}"),
@@ -6335,7 +7681,9 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
                 ("Reopened Recommendations", reopened_recommendations),
             ]
         )
-    summary_rows.append(("Source Run", (data.get("operator_summary") or {}).get("source_run_id", "")))
+    summary_rows.append(
+        ("Source Run", (data.get("operator_summary") or {}).get("source_run_id", ""))
+    )
     summary_end = _write_key_value_block(ws, 4, 1, summary_rows, title="Summary")
     top_repo_rows = [
         [
@@ -6345,8 +7693,18 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
             title or "See detailed queue rows below.",
             action or "Open the repo queue details.",
         ]
-        for repo, _total, blocked, urgent, ready, deferred, _kind, _priority, title, action in repo_rollups[:10]
-    ] or [["Portfolio", "Clear", "0 blocked, 0 urgent, 0 ready, 0 deferred", "No open review items.", "Monitor future audits."]]
+        for repo, _total, blocked, urgent, ready, deferred, _kind, _priority, title, action in repo_rollups[
+            :10
+        ]
+    ] or [
+        [
+            "Portfolio",
+            "Clear",
+            "0 blocked, 0 urgent, 0 ready, 0 deferred",
+            "No open review items.",
+            "Monitor future audits.",
+        ]
+    ]
     top_repo_end = _write_ranked_list(
         ws,
         4,
@@ -6380,7 +7738,11 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
     )
     guidance_row = max(issue_family_end, action_end) + 2
     ws.merge_cells(start_row=guidance_row, start_column=1, end_row=guidance_row, end_column=8)
-    ws.cell(row=guidance_row, column=1, value="Read this table top-down: urgent items first, ready items second, and safe-to-defer rows last.").font = SUBTITLE_FONT
+    ws.cell(
+        row=guidance_row,
+        column=1,
+        value="Read this table top-down: urgent items first, ready items second, and safe-to-defer rows last.",
+    ).font = SUBTITLE_FONT
     ws.cell(row=guidance_row, column=1).alignment = WRAP
     headers = [
         "Repo",
@@ -6433,12 +7795,21 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
 
     targets = ordered_queue or data.get("review_targets", [])
     for row, item in enumerate(targets, start_row + 1):
-        next_step = item.get("recommended_action") or item.get("next_step") or "Open Repo Detail and choose the next concrete follow-through step."
+        next_step = (
+            item.get("recommended_action")
+            or item.get("next_step")
+            or "Open Repo Detail and choose the next concrete follow-through step."
+        )
         safe_to_defer = item.get("lane") == "deferred" or item.get("safe_to_defer")
         links = item.get("links") or []
         primary_link = links[0].get("url", "") if links else ""
         last_movement = build_last_movement_label(item, data.get("review_summary") or {})
-        why_this_is_here = item.get("lane_reason", "") or item.get("summary", "") or item.get("decision_hint", "") or "This item is still open and needs operator follow-through."
+        why_this_is_here = (
+            item.get("lane_reason", "")
+            or item.get("summary", "")
+            or item.get("decision_hint", "")
+            or "This item is still open and needs operator follow-through."
+        )
         values = [
             item.get("repo", item.get("repo_name", "")),
             item.get("title", ""),
@@ -6448,7 +7819,10 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
             why_this_is_here,
             next_step,
             item.get("catalog_line", "No portfolio catalog contract is recorded yet."),
-            item.get("operating_path_line", "Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet."),
+            item.get(
+                "operating_path_line",
+                "Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet.",
+            ),
             (
                 f"{item.get('intent_alignment', 'missing-contract')} — "
                 f"{item.get('intent_alignment_reason', 'Intent alignment cannot be judged until a portfolio catalog contract exists.')}"
@@ -6457,7 +7831,10 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
             item.get("maturity_gap_summary", "No maturity gap summary is recorded yet."),
             last_movement,
             item.get("follow_through_summary", "No follow-through evidence is recorded yet."),
-            item.get("follow_through_next_checkpoint", "Use the next run or linked artifact to confirm whether the recommendation moved."),
+            item.get(
+                "follow_through_next_checkpoint",
+                "Use the next run or linked artifact to confirm whether the recommendation moved.",
+            ),
             build_follow_through_checkpoint_status_label(item),
             build_follow_through_escalation_status_label(item),
             build_follow_through_escalation_summary(item),
@@ -6486,7 +7863,11 @@ def _build_review_queue(wb: Workbook, data: dict, *, excel_mode: str = "standard
             "yes" if safe_to_defer else "no",
         ]
         for col, value in enumerate(values, 1):
-            align = "center" if col in {3, 4, 5, 11, 16, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 44} else "left"
+            align = (
+                "center"
+                if col in {3, 4, 5, 11, 16, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 44}
+                else "left"
+            )
             style_data_cell(ws.cell(row=row, column=col, value=value), align)
         repo_cell = ws.cell(row=row, column=1)
         if item.get("repo_url"):
@@ -6526,11 +7907,22 @@ def _build_review_history_sheet(wb: Workbook, data: dict) -> None:
             ("Current Review", active_review.get("review_id", "—")),
             ("Current Status", active_review.get("status", "unknown")),
             ("History Rows", len(data.get("review_history", []) or [])),
-            ("How To Read This", "The active review is summarized above; the ledger below is the historical trail."),
+            (
+                "How To Read This",
+                "The active review is summarized above; the ledger below is the historical trail.",
+            ),
         ],
         title="Current State",
     )
-    headers = ["Review ID", "Generated", "Changes", "Status", "Decision State", "Sync State", "Emitted"]
+    headers = [
+        "Review ID",
+        "Generated",
+        "Changes",
+        "Status",
+        "Decision State",
+        "Sync State",
+        "Emitted",
+    ]
     start_row = 9
     for col, header in enumerate(headers, 1):
         ws.cell(row=start_row, column=col, value=header)
@@ -6549,7 +7941,10 @@ def _build_review_history_sheet(wb: Workbook, data: dict) -> None:
             "yes" if item.get("emitted") else "no",
         ]
         for col, value in enumerate(values, 1):
-            style_data_cell(ws.cell(row=row, column=col, value=value), "center" if col not in {1, 2, 4, 5, 6} else "left")
+            style_data_cell(
+                ws.cell(row=row, column=col, value=value),
+                "center" if col not in {1, 2, 4, 5, 6} else "left",
+            )
 
     max_row = len(history) + start_row
     if history:
@@ -6575,11 +7970,22 @@ def _build_governance_controls(wb: Workbook, data: dict) -> None:
         1,
         [
             ("Status", _display_operator_state(governance_summary.get("status", "preview"))),
-            ("Selected View", governance_summary.get("selected_view", data.get("governance_preview", {}).get("selected_view", "all"))),
-            ("Approval", _display_operator_state(governance_summary.get("approval_status", "preview-only"))),
+            (
+                "Selected View",
+                governance_summary.get(
+                    "selected_view", data.get("governance_preview", {}).get("selected_view", "all")
+                ),
+            ),
+            (
+                "Approval",
+                _display_operator_state(governance_summary.get("approval_status", "preview-only")),
+            ),
             ("Needs Re-Approval", "yes" if governance_summary.get("needs_reapproval") else "no"),
             ("Rollback Available", governance_summary.get("rollback_available_count", 0)),
-            ("Headline", governance_summary.get("headline", "Governed controls are being tracked locally.")),
+            (
+                "Headline",
+                governance_summary.get("headline", "Governed controls are being tracked locally."),
+            ),
             (
                 ACTION_SYNC_CANONICAL_LABELS["approval_workflow"],
                 (data.get("approval_workflow_summary") or {}).get(
@@ -6626,7 +8032,9 @@ def _build_governance_controls(wb: Workbook, data: dict) -> None:
             item.get("why", ""),
         ]
         for col, value in enumerate(values, 1):
-            style_data_cell(ws.cell(row=row, column=col, value=value), "center" if col in {3, 4} else "left")
+            style_data_cell(
+                ws.cell(row=row, column=col, value=value), "center" if col in {3, 4} else "left"
+            )
 
     max_row = len(preview) + start_row
     if preview:
@@ -6667,19 +8075,33 @@ def _build_governance_audit(wb: Workbook, data: dict) -> None:
     rows = [
         ["Status", _display_operator_state(governance_summary.get("status", "preview"))],
         ["Headline", governance_summary.get("headline", "Governance state is being tracked.")],
-        ["Approval Status", _display_operator_state(governance_summary.get("approval_status", "preview-only"))],
+        [
+            "Approval Status",
+            _display_operator_state(governance_summary.get("approval_status", "preview-only")),
+        ],
         ["Needs Re-Approval", "yes" if governance_summary.get("needs_reapproval") else "no"],
         ["Approval Age (days)", governance_summary.get("approval_age_days", "—")],
         ["Fingerprint Mismatch", "yes" if governance_summary.get("fingerprint_mismatch") else "no"],
         ["Applyable Count", preview_count],
-        ["Drift Count", governance_summary.get("drift_count", len(data.get("governance_drift", []) or []))],
-        ["Applied Count", governance_summary.get("applied_count", len(data.get("governance_results", {}).get("results", []) or []))],
+        [
+            "Drift Count",
+            governance_summary.get("drift_count", len(data.get("governance_drift", []) or [])),
+        ],
+        [
+            "Applied Count",
+            governance_summary.get(
+                "applied_count", len(data.get("governance_results", {}).get("results", []) or [])
+            ),
+        ],
         ["Rollback Available", governance_summary.get("rollback_available_count", 0)],
         ["Selected View", data.get("governance_preview", {}).get("selected_view", "all")],
     ]
     for row_index, row in enumerate(rows, start_row + 1):
         for col_index, value in enumerate(row, 1):
-            style_data_cell(ws.cell(row=row_index, column=col_index, value=value), "center" if col_index == 2 else "left")
+            style_data_cell(
+                ws.cell(row=row_index, column=col_index, value=value),
+                "center" if col_index == 2 else "left",
+            )
 
     apply_zebra_stripes(ws, start_row + 1, len(rows) + start_row, len(headers))
     _add_table(ws, "tblGovernanceAudit", len(headers), len(rows) + start_row, start_row=start_row)
@@ -6729,7 +8151,9 @@ def _build_compare_sheet(
             f"{', '.join(change.get('collection_change', {}).get('old', [])) or '—'} → {', '.join(change.get('collection_change', {}).get('new', [])) or '—'}",
         ]
         for col, value in enumerate(values, 1):
-            style_data_cell(ws.cell(row=row + offset, column=col, value=value), "center" if col == 2 else "left")
+            style_data_cell(
+                ws.cell(row=row + offset, column=col, value=value), "center" if col == 2 else "left"
+            )
     max_row = row + min(len(repo_changes), 15)
     if max_row > row:
         _add_table(ws, "tblCompare", len(headers), max_row, start_row=row)
@@ -6745,7 +8169,9 @@ def _build_scenario_planner(
 ) -> None:
     from src.analyst_views import build_analyst_context
 
-    context = build_analyst_context(data, profile_name=portfolio_profile, collection_name=collection)
+    context = build_analyst_context(
+        data, profile_name=portfolio_profile, collection_name=collection
+    )
     preview = context["scenario_preview"]
     ws = _get_or_create_sheet(wb, "Scenario Planner")
     ws.sheet_properties.tabColor = "CA8A04"
@@ -6772,14 +8198,18 @@ def _build_scenario_planner(
             lever.get("projected_tier_promotions", 0),
         ]
         for col, value in enumerate(values, 1):
-            style_data_cell(ws.cell(row=row, column=col, value=value), "center" if col >= 3 else "left")
+            style_data_cell(
+                ws.cell(row=row, column=col, value=value), "center" if col >= 3 else "left"
+            )
 
     projection = preview.get("portfolio_projection", {})
     summary_row = max(7, len(preview.get("top_levers", [])) + 7)
     ws.cell(row=summary_row, column=1, value="Selected Repos").font = SUBHEADER_FONT
     ws.cell(row=summary_row, column=2, value=projection.get("selected_repo_count", 0))
     ws.cell(row=summary_row + 1, column=1, value="Projected Avg Score Delta").font = SUBHEADER_FONT
-    ws.cell(row=summary_row + 1, column=2, value=projection.get("projected_average_score_delta", 0.0))
+    ws.cell(
+        row=summary_row + 1, column=2, value=projection.get("projected_average_score_delta", 0.0)
+    )
     ws.cell(row=summary_row + 2, column=1, value="Projected Promotions").font = SUBHEADER_FONT
     ws.cell(row=summary_row + 2, column=2, value=projection.get("projected_tier_promotions", 0))
 
@@ -6806,7 +8236,9 @@ def _build_executive_summary(
 ) -> None:
     from src.analyst_views import build_analyst_context
 
-    context = build_analyst_context(data, profile_name=portfolio_profile, collection_name=collection)
+    context = build_analyst_context(
+        data, profile_name=portfolio_profile, collection_name=collection
+    )
     ws = _get_or_create_sheet(wb, "Executive Summary")
     ws.sheet_properties.tabColor = NAVY
     _configure_sheet_view(ws, zoom=120, show_grid_lines=False)
@@ -6828,7 +8260,9 @@ def _build_executive_summary(
     critical_repos = data.get("security_posture", {}).get("critical_repos", []) or []
     operator_summary = data.get("operator_summary") or {}
     weekly_pack = build_weekly_review_pack(data, diff_data)
-    operator_focus, operator_focus_summary, operator_focus_line = _operator_focus_snapshot(weekly_pack)
+    operator_focus, operator_focus_summary, operator_focus_line = _operator_focus_snapshot(
+        weekly_pack
+    )
     preview = context["scenario_preview"].get("portfolio_projection", {})
     next_mode, watch_strategy, watch_decision = _operator_watch_values(data)
     what_changed, why_it_matters, next_action = _operator_handoff_values(data)
@@ -6886,17 +8320,46 @@ def _build_executive_summary(
     ) = _operator_follow_through_revalidation_recovery_details(data)
     trend_status, trend_summary, primary_target, resolution_counts = _operator_trend_values(data)
     primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
-    last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
-    primary_confidence, confidence_reason, next_action_confidence, recommendation_quality = _operator_confidence_values(data)
+    last_intervention, last_outcome, resolution_evidence, recovery_counts = (
+        _operator_decision_memory_values(data)
+    )
+    primary_confidence, confidence_reason, next_action_confidence, recommendation_quality = (
+        _operator_confidence_values(data)
+    )
     trust_policy, trust_policy_reason, adaptive_confidence_summary = _operator_trust_values(data)
-    exception_status, exception_reason, drift_status, drift_summary = _operator_exception_values(data)
-    trust_recovery_status, trust_recovery_reason, exception_pattern_status, exception_pattern_summary = _operator_learning_values(data)
-    recovery_confidence, retirement_status, retirement_reason, retirement_summary = _operator_retirement_values(data)
-    policy_debt_status, policy_debt_reason, class_normalization_status, trust_normalization_summary = _operator_class_normalization_values(data)
-    class_memory_status, class_memory_reason, class_decay_status, class_decay_summary = _operator_class_memory_values(data)
-    class_reweight_direction, class_reweight_score, class_reweight_reason, class_reweight_summary = _operator_class_reweight_values(data)
-    class_momentum_status, class_reweight_stability, class_momentum_summary = _operator_class_momentum_values(data)
-    class_transition_health, class_transition_resolution, class_transition_summary = _operator_class_transition_values(data)
+    exception_status, exception_reason, drift_status, drift_summary = _operator_exception_values(
+        data
+    )
+    (
+        trust_recovery_status,
+        trust_recovery_reason,
+        exception_pattern_status,
+        exception_pattern_summary,
+    ) = _operator_learning_values(data)
+    recovery_confidence, retirement_status, retirement_reason, retirement_summary = (
+        _operator_retirement_values(data)
+    )
+    (
+        policy_debt_status,
+        policy_debt_reason,
+        class_normalization_status,
+        trust_normalization_summary,
+    ) = _operator_class_normalization_values(data)
+    class_memory_status, class_memory_reason, class_decay_status, class_decay_summary = (
+        _operator_class_memory_values(data)
+    )
+    (
+        class_reweight_direction,
+        class_reweight_score,
+        class_reweight_reason,
+        class_reweight_summary,
+    ) = _operator_class_reweight_values(data)
+    class_momentum_status, class_reweight_stability, class_momentum_summary = (
+        _operator_class_momentum_values(data)
+    )
+    class_transition_health, class_transition_resolution, class_transition_summary = (
+        _operator_class_transition_values(data)
+    )
     (
         transition_closure_confidence,
         transition_likely_outcome,
@@ -6908,7 +8371,9 @@ def _build_executive_summary(
         reset_reentry_rebuild_reentry_restore_rerererestore_churn,
         transition_closure_summary,
     ) = _operator_transition_closure_values(data)
-    calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
+    calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = (
+        _operator_calibration_values(data)
+    )
     recommended_focus = ""
     if data.get("operator_queue"):
         recommended_focus = data["operator_queue"][0].get("recommended_action", "")
@@ -6951,7 +8416,11 @@ def _build_executive_summary(
         (
             "Top Attention",
             operator_summary.get("headline", "No urgent operator headline is present.")
-            + (f" Critical security pressure is concentrated in {len(critical_repos)} repos." if critical_repos else ""),
+            + (
+                f" Critical security pressure is concentrated in {len(critical_repos)} repos."
+                if critical_repos
+                else ""
+            ),
         ),
         ("Run Changes", run_change_summary or change_summary),
         (
@@ -6982,7 +8451,12 @@ def _build_executive_summary(
         ("Focus Line", operator_focus_line),
         ("Trust Summary", trust_actionability_summary),
         ("Biggest Opportunity", biggest_opportunity),
-        ("Focus This Week", next_action or recommended_focus or "Review the top queue items first, then protect the highest-value repos from drift."),
+        (
+            "Focus This Week",
+            next_action
+            or recommended_focus
+            or "Review the top queue items first, then protect the highest-value repos from drift.",
+        ),
     ]
     if excel_mode == "standard":
         narrative_rows.insert(5, ("Trend", f"{trend_status} — {trend_summary}"))
@@ -6993,25 +8467,71 @@ def _build_executive_summary(
         narrative_rows.insert(10, ("Retiring Watch Hotspot", follow_through_retiring_hotspot))
         narrative_rows.insert(11, ("Churn Hotspot", follow_through_churn_hotspot))
         narrative_rows.insert(12, ("Freshness Hotspot", follow_through_recovery_freshness_hotspot))
-        narrative_rows.insert(13, ("Freshness Detail", follow_through_recovery_freshness_hotspot_summary))
+        narrative_rows.insert(
+            13, ("Freshness Detail", follow_through_recovery_freshness_hotspot_summary)
+        )
         narrative_rows.insert(14, ("Rebuild Hotspot", follow_through_recovery_rebuild_hotspot))
-        narrative_rows.insert(15, ("Rebuild Strength Hotspot", follow_through_rebuild_strength_hotspot))
+        narrative_rows.insert(
+            15, ("Rebuild Strength Hotspot", follow_through_rebuild_strength_hotspot)
+        )
         narrative_rows.insert(16, ("Reacquiring Hotspot", follow_through_reacquiring_hotspot))
         narrative_rows.insert(17, ("Reacquired Hotspot", follow_through_reacquired_hotspot))
-        narrative_rows.insert(18, ("Fragile Reacquisition Hotspot", follow_through_fragile_reacquisition_hotspot))
-        narrative_rows.insert(19, ("Just Reacquired Hotspot", follow_through_just_reacquired_hotspot))
-        narrative_rows.insert(20, ("Holding Reacquired Hotspot", follow_through_holding_reacquired_hotspot))
-        narrative_rows.insert(21, ("Durable Reacquired Hotspot", follow_through_durable_reacquired_hotspot))
-        narrative_rows.insert(22, ("Softening Reacquired Hotspot", follow_through_softening_reacquired_hotspot))
-        narrative_rows.insert(23, ("Fragile Reacquisition Confidence Hotspot", follow_through_fragile_reacquisition_confidence_hotspot))
-        narrative_rows.insert(24, ("Reacquisition Softening Hotspot", follow_through_reacquisition_softening_hotspot))
-        narrative_rows.insert(25, ("Revalidation Needed Hotspot", follow_through_reacquisition_revalidation_hotspot))
-        narrative_rows.insert(26, ("Retired Confidence Hotspot", follow_through_reacquisition_retired_confidence_hotspot))
-        narrative_rows.insert(27, ("Under Revalidation Hotspot", follow_through_under_revalidation_hotspot))
-        narrative_rows.insert(28, ("Rebuilding Restored Confidence Hotspot", follow_through_rebuilding_restored_confidence_hotspot))
-        narrative_rows.insert(29, ("Re-Earning Confidence Hotspot", follow_through_reearning_confidence_hotspot))
-        narrative_rows.insert(30, ("Just Re-Earned Confidence Hotspot", follow_through_just_reearned_confidence_hotspot))
-        narrative_rows.insert(31, ("Holding Re-Earned Confidence Hotspot", follow_through_holding_reearned_confidence_hotspot))
+        narrative_rows.insert(
+            18, ("Fragile Reacquisition Hotspot", follow_through_fragile_reacquisition_hotspot)
+        )
+        narrative_rows.insert(
+            19, ("Just Reacquired Hotspot", follow_through_just_reacquired_hotspot)
+        )
+        narrative_rows.insert(
+            20, ("Holding Reacquired Hotspot", follow_through_holding_reacquired_hotspot)
+        )
+        narrative_rows.insert(
+            21, ("Durable Reacquired Hotspot", follow_through_durable_reacquired_hotspot)
+        )
+        narrative_rows.insert(
+            22, ("Softening Reacquired Hotspot", follow_through_softening_reacquired_hotspot)
+        )
+        narrative_rows.insert(
+            23,
+            (
+                "Fragile Reacquisition Confidence Hotspot",
+                follow_through_fragile_reacquisition_confidence_hotspot,
+            ),
+        )
+        narrative_rows.insert(
+            24, ("Reacquisition Softening Hotspot", follow_through_reacquisition_softening_hotspot)
+        )
+        narrative_rows.insert(
+            25, ("Revalidation Needed Hotspot", follow_through_reacquisition_revalidation_hotspot)
+        )
+        narrative_rows.insert(
+            26,
+            ("Retired Confidence Hotspot", follow_through_reacquisition_retired_confidence_hotspot),
+        )
+        narrative_rows.insert(
+            27, ("Under Revalidation Hotspot", follow_through_under_revalidation_hotspot)
+        )
+        narrative_rows.insert(
+            28,
+            (
+                "Rebuilding Restored Confidence Hotspot",
+                follow_through_rebuilding_restored_confidence_hotspot,
+            ),
+        )
+        narrative_rows.insert(
+            29, ("Re-Earning Confidence Hotspot", follow_through_reearning_confidence_hotspot)
+        )
+        narrative_rows.insert(
+            30,
+            ("Just Re-Earned Confidence Hotspot", follow_through_just_reearned_confidence_hotspot),
+        )
+        narrative_rows.insert(
+            31,
+            (
+                "Holding Re-Earned Confidence Hotspot",
+                follow_through_holding_reearned_confidence_hotspot,
+            ),
+        )
         narrative_rows.insert(32, ("Closure Guidance", closure_guidance))
         narrative_rows.insert(33, ("What We Tried", last_intervention))
         narrative_rows.insert(34, ("Recommendation Confidence", primary_confidence))
@@ -7020,15 +8540,33 @@ def _build_executive_summary(
         narrative_rows.insert(37, ("Trust Policy", trust_policy))
         narrative_rows.insert(38, ("Trust Rationale", trust_policy_reason))
         narrative_rows.insert(39, ("Trust Exception", f"{exception_status} — {exception_reason}"))
-        narrative_rows.insert(40, ("Trust Recovery", f"{trust_recovery_status} — {trust_recovery_reason}"))
+        narrative_rows.insert(
+            40, ("Trust Recovery", f"{trust_recovery_status} — {trust_recovery_reason}")
+        )
         narrative_rows.insert(41, ("Recovery Confidence", recovery_confidence))
-        narrative_rows.insert(42, ("Exception Retirement", f"{retirement_status} — {retirement_reason}"))
+        narrative_rows.insert(
+            42, ("Exception Retirement", f"{retirement_status} — {retirement_reason}")
+        )
         narrative_rows.insert(43, ("Retirement Summary", retirement_summary))
         narrative_rows.insert(44, ("Policy Debt", f"{policy_debt_status} — {policy_debt_reason}"))
-        narrative_rows.insert(45, ("Class Normalization", f"{class_normalization_status} — {trust_normalization_summary}"))
-        narrative_rows.insert(46, ("Class Memory", f"{class_memory_status} — {class_memory_reason}"))
+        narrative_rows.insert(
+            45,
+            (
+                "Class Normalization",
+                f"{class_normalization_status} — {trust_normalization_summary}",
+            ),
+        )
+        narrative_rows.insert(
+            46, ("Class Memory", f"{class_memory_status} — {class_memory_reason}")
+        )
         narrative_rows.insert(47, ("Trust Decay", f"{class_decay_status} — {class_decay_summary}"))
-        narrative_rows.insert(48, ("Class Reweighting", f"{class_reweight_direction} ({class_reweight_score}) — {class_reweight_summary}"))
+        narrative_rows.insert(
+            48,
+            (
+                "Class Reweighting",
+                f"{class_reweight_direction} ({class_reweight_score}) — {class_reweight_summary}",
+            ),
+        )
         narrative_rows.insert(49, ("Class Reweighting Why", class_reweight_reason))
         narrative_rows.insert(50, ("Class Momentum", class_momentum_status))
         narrative_rows.insert(51, ("Reweight Stability", class_reweight_stability))
@@ -7039,14 +8577,30 @@ def _build_executive_summary(
         narrative_rows.insert(51, ("Transition Likely Outcome", transition_likely_outcome))
         narrative_rows.insert(52, ("Pending Debt Freshness", pending_debt_freshness))
         narrative_rows.insert(50, ("Closure Forecast", closure_forecast_direction))
-        narrative_rows.insert(51, ("Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence", reset_reentry_rebuild_reentry_restore_rerererestore_persistence))
-        narrative_rows.insert(52, ("Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls", reset_reentry_rebuild_reentry_restore_rerererestore_churn))
+        narrative_rows.insert(
+            51,
+            (
+                "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence",
+                reset_reentry_rebuild_reentry_restore_rerererestore_persistence,
+            ),
+        )
+        narrative_rows.insert(
+            52,
+            (
+                "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls",
+                reset_reentry_rebuild_reentry_restore_rerererestore_churn,
+            ),
+        )
         narrative_rows.insert(53, ("Closure Forecast Summary", transition_closure_summary))
         narrative_rows.insert(54, ("Momentum Summary", class_momentum_summary))
-        narrative_rows.insert(55, ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}"))
+        narrative_rows.insert(
+            55, ("Exception Learning", f"{exception_pattern_status} — {exception_pattern_summary}")
+        )
         narrative_rows.insert(56, ("Recommendation Drift", f"{drift_status} — {drift_summary}"))
         narrative_rows.insert(57, ("Adaptive Confidence", adaptive_confidence_summary))
-        narrative_rows.insert(58, ("Confidence Validation", f"{calibration_status} — {calibration_summary}"))
+        narrative_rows.insert(
+            58, ("Confidence Validation", f"{calibration_status} — {calibration_summary}")
+        )
     _write_key_value_block(ws, 4, 1, narrative_rows, title="Leadership Brief")
 
     write_kpi_card(ws, 10, 1, "Portfolio Grade", data.get("portfolio_grade", "F"))
@@ -7055,18 +8609,38 @@ def _build_executive_summary(
     write_kpi_card(ws, 10, 7, "Improving", run_change_counts.get("score_improvements", 0))
     write_kpi_card(ws, 10, 9, "Regressing", run_change_counts.get("score_regressions", 0), "C2410C")
 
-    leader_rows = [[entry["name"], entry["profile_score"], entry["tier"]] for entry in leaders] or [["No leader", 0, "—"]]
-    _write_ranked_list(ws, 14, 1, "Top Profile Leaders", ["Repo", "Profile Score", "Tier"], leader_rows)
+    leader_rows = [[entry["name"], entry["profile_score"], entry["tier"]] for entry in leaders] or [
+        ["No leader", 0, "—"]
+    ]
+    _write_ranked_list(
+        ws, 14, 1, "Top Profile Leaders", ["Repo", "Profile Score", "Tier"], leader_rows
+    )
 
     attention_rows = [
-        [repo, f"B{blocked}/U{urgent}/R{ready}", title or "Queue pressure", action or "Review the repo detail page."]
+        [
+            repo,
+            f"B{blocked}/U{urgent}/R{ready}",
+            title or "Queue pressure",
+            action or "Review the repo detail page.",
+        ]
         for repo, _total, blocked, urgent, ready, _deferred, _kind, _priority, title, action in top_attention
     ] or [["Portfolio", "No open items", "Queue is clear", "Monitor future runs."]]
-    _write_ranked_list(ws, 14, 9, "Top 5 Attention Items", ["Repo", "Counts", "Why Now", "Next Step"], attention_rows)
+    _write_ranked_list(
+        ws,
+        14,
+        9,
+        "Top 5 Attention Items",
+        ["Repo", "Counts", "Why Now", "Next Step"],
+        attention_rows,
+    )
 
     if diff_data:
         mover_rows = [
-            [change.get("name", ""), round(change.get("delta", 0.0), 3), f"{change.get('old_tier', '—')} -> {change.get('new_tier', '—')}"]
+            [
+                change.get("name", ""),
+                round(change.get("delta", 0.0), 3),
+                f"{change.get('old_tier', '—')} -> {change.get('new_tier', '—')}",
+            ]
             for change in (diff_data.get("repo_changes", []) or [])[:5]
         ] or [["No movers", 0.0, "—"]]
         _write_ranked_list(ws, 14, 5, "Top Movers", ["Repo", "Delta", "Tier Change"], mover_rows)
@@ -7094,7 +8668,11 @@ def _build_executive_summary(
             row=28,
             column=5,
             value=next_action
-            or (data.get("operator_queue", [{}])[0].get("recommended_action") if data.get("operator_queue") else "")
+            or (
+                data.get("operator_queue", [{}])[0].get("recommended_action")
+                if data.get("operator_queue")
+                else ""
+            )
             or "Start with the top review queue item, then protect the current profile leaders.",
         )
         if excel_mode == "standard":
@@ -7171,13 +8749,21 @@ def _build_executive_summary(
             ws.cell(row=64, column=4, value="Policy Debt").font = SUBHEADER_FONT
             ws.cell(row=64, column=5, value=f"{policy_debt_status} — {policy_debt_reason}")
             ws.cell(row=65, column=4, value="Class Normalization").font = SUBHEADER_FONT
-            ws.cell(row=65, column=5, value=f"{class_normalization_status} — {trust_normalization_summary}")
+            ws.cell(
+                row=65,
+                column=5,
+                value=f"{class_normalization_status} — {trust_normalization_summary}",
+            )
             ws.cell(row=66, column=4, value="Class Memory").font = SUBHEADER_FONT
             ws.cell(row=66, column=5, value=f"{class_memory_status} — {class_memory_reason}")
             ws.cell(row=67, column=4, value="Trust Decay").font = SUBHEADER_FONT
             ws.cell(row=67, column=5, value=f"{class_decay_status} — {class_decay_summary}")
             ws.cell(row=68, column=4, value="Class Reweighting").font = SUBHEADER_FONT
-            ws.cell(row=68, column=5, value=f"{class_reweight_direction} ({class_reweight_score}) — {class_reweight_summary}")
+            ws.cell(
+                row=68,
+                column=5,
+                value=f"{class_reweight_direction} ({class_reweight_score}) — {class_reweight_summary}",
+            )
             ws.cell(row=69, column=4, value="Class Reweighting Why").font = SUBHEADER_FONT
             ws.cell(row=69, column=5, value=class_reweight_reason)
             ws.cell(row=70, column=4, value="Class Momentum").font = SUBHEADER_FONT
@@ -7198,16 +8784,32 @@ def _build_executive_summary(
             ws.cell(row=77, column=5, value=pending_debt_freshness)
             ws.cell(row=78, column=4, value="Closure Forecast").font = SUBHEADER_FONT
             ws.cell(row=78, column=5, value=closure_forecast_direction)
-            ws.cell(row=79, column=4, value="Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence").font = SUBHEADER_FONT
-            ws.cell(row=79, column=5, value=reset_reentry_rebuild_reentry_restore_rerererestore_persistence)
-            ws.cell(row=80, column=4, value="Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls").font = SUBHEADER_FONT
-            ws.cell(row=80, column=5, value=reset_reentry_rebuild_reentry_restore_rerererestore_churn)
+            ws.cell(
+                row=79,
+                column=4,
+                value="Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence",
+            ).font = SUBHEADER_FONT
+            ws.cell(
+                row=79,
+                column=5,
+                value=reset_reentry_rebuild_reentry_restore_rerererestore_persistence,
+            )
+            ws.cell(
+                row=80,
+                column=4,
+                value="Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls",
+            ).font = SUBHEADER_FONT
+            ws.cell(
+                row=80, column=5, value=reset_reentry_rebuild_reentry_restore_rerererestore_churn
+            )
             ws.cell(row=81, column=4, value="Closure Forecast Summary").font = SUBHEADER_FONT
             ws.cell(row=81, column=5, value=transition_closure_summary)
             ws.cell(row=82, column=4, value="Momentum Summary").font = SUBHEADER_FONT
             ws.cell(row=82, column=5, value=class_momentum_summary)
             ws.cell(row=83, column=4, value="Exception Learning").font = SUBHEADER_FONT
-            ws.cell(row=83, column=5, value=f"{exception_pattern_status} — {exception_pattern_summary}")
+            ws.cell(
+                row=83, column=5, value=f"{exception_pattern_status} — {exception_pattern_summary}"
+            )
             ws.cell(row=84, column=4, value="Recommendation Drift").font = SUBHEADER_FONT
             ws.cell(row=84, column=5, value=f"{drift_status} — {drift_summary}")
             ws.cell(row=85, column=4, value="Adaptive Confidence").font = SUBHEADER_FONT
@@ -7217,7 +8819,11 @@ def _build_executive_summary(
             ws.cell(row=87, column=4, value="Confidence Validation").font = SUBHEADER_FONT
             ws.cell(row=87, column=5, value=f"{calibration_status} — {calibration_summary}")
             ws.cell(row=88, column=4, value="Calibration Snapshot").font = SUBHEADER_FONT
-            ws.cell(row=88, column=5, value=f"High-confidence hit rate {high_hit_rate} | {reopened_recommendations}")
+            ws.cell(
+                row=88,
+                column=5,
+                value=f"High-confidence hit rate {high_hit_rate} | {reopened_recommendations}",
+            )
     preflight = data.get("preflight_summary") or {}
     if preflight and (preflight.get("blocking_errors", 0) or preflight.get("warnings", 0)):
         row_base = 59 if excel_mode == "standard" else 33
@@ -7311,17 +8917,46 @@ def _build_print_pack(
     ) = _operator_follow_through_reacquisition_retirement_details(data)
     trend_status, trend_summary, primary_target, resolution_counts = _operator_trend_values(data)
     primary_target_reason, closure_guidance, aging_pressure = _operator_accountability_values(data)
-    last_intervention, last_outcome, resolution_evidence, recovery_counts = _operator_decision_memory_values(data)
-    primary_confidence, confidence_reason, next_action_confidence, recommendation_quality = _operator_confidence_values(data)
+    last_intervention, last_outcome, resolution_evidence, recovery_counts = (
+        _operator_decision_memory_values(data)
+    )
+    primary_confidence, confidence_reason, next_action_confidence, recommendation_quality = (
+        _operator_confidence_values(data)
+    )
     trust_policy, trust_policy_reason, adaptive_confidence_summary = _operator_trust_values(data)
-    exception_status, exception_reason, drift_status, drift_summary = _operator_exception_values(data)
-    trust_recovery_status, trust_recovery_reason, exception_pattern_status, exception_pattern_summary = _operator_learning_values(data)
-    recovery_confidence, retirement_status, retirement_reason, retirement_summary = _operator_retirement_values(data)
-    policy_debt_status, policy_debt_reason, class_normalization_status, trust_normalization_summary = _operator_class_normalization_values(data)
-    class_memory_status, class_memory_reason, class_decay_status, class_decay_summary = _operator_class_memory_values(data)
-    class_reweight_direction, class_reweight_score, class_reweight_reason, class_reweight_summary = _operator_class_reweight_values(data)
-    class_momentum_status, class_reweight_stability, class_momentum_summary = _operator_class_momentum_values(data)
-    class_transition_health, class_transition_resolution, class_transition_summary = _operator_class_transition_values(data)
+    exception_status, exception_reason, drift_status, drift_summary = _operator_exception_values(
+        data
+    )
+    (
+        trust_recovery_status,
+        trust_recovery_reason,
+        exception_pattern_status,
+        exception_pattern_summary,
+    ) = _operator_learning_values(data)
+    recovery_confidence, retirement_status, retirement_reason, retirement_summary = (
+        _operator_retirement_values(data)
+    )
+    (
+        policy_debt_status,
+        policy_debt_reason,
+        class_normalization_status,
+        trust_normalization_summary,
+    ) = _operator_class_normalization_values(data)
+    class_memory_status, class_memory_reason, class_decay_status, class_decay_summary = (
+        _operator_class_memory_values(data)
+    )
+    (
+        class_reweight_direction,
+        class_reweight_score,
+        class_reweight_reason,
+        class_reweight_summary,
+    ) = _operator_class_reweight_values(data)
+    class_momentum_status, class_reweight_stability, class_momentum_summary = (
+        _operator_class_momentum_values(data)
+    )
+    class_transition_health, class_transition_resolution, class_transition_summary = (
+        _operator_class_transition_values(data)
+    )
     (
         transition_closure_confidence,
         transition_likely_outcome,
@@ -7333,22 +8968,31 @@ def _build_print_pack(
         reset_reentry_rebuild_reentry_restore_rerererestore_churn,
         transition_closure_summary,
     ) = _operator_transition_closure_values(data)
-    calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = _operator_calibration_values(data)
+    calibration_status, calibration_summary, high_hit_rate, reopened_recommendations = (
+        _operator_calibration_values(data)
+    )
     weekly_pack = build_weekly_review_pack(data, diff_data)
     weekly_story = weekly_pack.get("weekly_story_v1") or {}
     weekly_sections = {section.get("id"): section for section in weekly_story.get("sections") or []}
-    operator_focus, operator_focus_summary, operator_focus_line = _operator_focus_snapshot(weekly_pack)
+    operator_focus, operator_focus_summary, operator_focus_line = _operator_focus_snapshot(
+        weekly_pack
+    )
     ws["D4"] = "Workflow Guidance"
     ws["D4"].font = SECTION_FONT
     ws["D5"] = "Product Mode"
-    ws["E5"] = weekly_pack.get("product_mode_summary", "Weekly Review: use this artifact for the normal workbook-first operator loop.")
+    ws["E5"] = weekly_pack.get(
+        "product_mode_summary",
+        "Weekly Review: use this artifact for the normal workbook-first operator loop.",
+    )
     ws["D6"] = "Artifact Role"
     ws["E6"] = weekly_pack.get(
         "artifact_role_summary",
         "This artifact is the shared weekly handoff across workbook, HTML, Markdown, and review-pack.",
     )
     ws["D7"] = "Reading Order"
-    ws["E7"] = weekly_pack.get("suggested_reading_order", "Read Dashboard, then Run Changes, then Review Queue.")
+    ws["E7"] = weekly_pack.get(
+        "suggested_reading_order", "Read Dashboard, then Run Changes, then Review Queue."
+    )
     ws["D8"] = "Next Best Step"
     ws["E8"] = weekly_pack.get(
         "next_best_workflow_step",
@@ -7365,7 +9009,9 @@ def _build_print_pack(
         "next_action_sync_step",
         "Stay local for now; no current campaign needs preview or apply.",
     )
-    ws["E10"] = (weekly_sections.get("action-sync-readiness") or {}).get("next_step", ws["E10"].value)
+    ws["E10"] = (weekly_sections.get("action-sync-readiness") or {}).get(
+        "next_step", ws["E10"].value
+    )
     ws["D11"] = "Apply Packet"
     ws["E11"] = weekly_pack.get(
         "apply_readiness_summary",
@@ -7387,7 +9033,9 @@ def _build_print_pack(
         "next_monitoring_step",
         "Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.",
     )
-    ws["E14"] = (weekly_sections.get("post-apply-monitoring") or {}).get("next_step", ws["E14"].value)
+    ws["E14"] = (weekly_sections.get("post-apply-monitoring") or {}).get(
+        "next_step", ws["E14"].value
+    )
     ws["D15"] = ACTION_SYNC_CANONICAL_LABELS["campaign_tuning"]
     ws["E15"] = weekly_pack.get(
         "campaign_tuning_summary",
@@ -7405,13 +9053,17 @@ def _build_print_pack(
         "historical_portfolio_intelligence",
         "Historical portfolio intelligence is still thin, so the weekly story should stay grounded in the current run and recent operator queue.",
     )
-    ws["E17"] = (weekly_sections.get("historical-portfolio-intelligence") or {}).get("headline", ws["E17"].value)
+    ws["E17"] = (weekly_sections.get("historical-portfolio-intelligence") or {}).get(
+        "headline", ws["E17"].value
+    )
     ws["D18"] = "Next Historical Focus"
     ws["E18"] = weekly_pack.get(
         "next_historical_focus",
         "Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet.",
     )
-    ws["E18"] = (weekly_sections.get("historical-portfolio-intelligence") or {}).get("next_step", ws["E18"].value)
+    ws["E18"] = (weekly_sections.get("historical-portfolio-intelligence") or {}).get(
+        "next_step", ws["E18"].value
+    )
     ws["D19"] = ACTION_SYNC_CANONICAL_LABELS["automation_guidance"]
     ws["E19"] = weekly_pack.get(
         "automation_guidance_summary",
@@ -7437,29 +9089,45 @@ def _build_print_pack(
     )
     ws["E22"] = (weekly_sections.get("approval-workflow") or {}).get("next_step", ws["E22"].value)
     ws["A7"] = "Portfolio Headline"
-    ws["B7"] = weekly_pack.get("portfolio_headline", operator_summary.get("headline", "Review the latest workbook surfaces for change and drift."))
+    ws["B7"] = weekly_pack.get(
+        "portfolio_headline",
+        operator_summary.get(
+            "headline", "Review the latest workbook surfaces for change and drift."
+        ),
+    )
     ws["A8"] = "Queue Pressure"
     ws["B8"] = weekly_pack.get(
         "queue_pressure_summary",
         (
             f"{counts.get('blocked', 0)} blocked, {counts.get('urgent', 0)} need attention now, "
             f"and {counts.get('ready', 0)} are ready for manual action."
-        ) if operator_summary else "",
+        )
+        if operator_summary
+        else "",
     )
     ws["A9"] = "Run Changes"
     ws["B9"] = weekly_pack.get("run_change_summary", build_run_change_summary(diff_data))
     ws["A10"] = "What To Do This Week"
     ws["B10"] = weekly_story.get("decision", weekly_pack.get("what_to_do_this_week", next_action))
     ws["A11"] = "Trust / Actionability"
-    ws["B11"] = weekly_pack.get("trust_actionability_summary", build_trust_actionability_summary(data))
+    ws["B11"] = weekly_pack.get(
+        "trust_actionability_summary", build_trust_actionability_summary(data)
+    )
     ws["A12"] = "Top Attention Items"
     ws["B12"] = len(weekly_pack.get("top_attention", []))
     ws["A13"] = "What Changed"
-    ws["B13"] = what_changed or weekly_pack.get("run_change_summary", build_run_change_summary(diff_data))
+    ws["B13"] = what_changed or weekly_pack.get(
+        "run_change_summary", build_run_change_summary(diff_data)
+    )
     ws["A14"] = "Why It Matters"
-    ws["B14"] = why_it_matters or weekly_story.get("why_this_week", weekly_pack.get("queue_pressure_summary", build_queue_pressure_summary(data, diff_data)))
+    ws["B14"] = why_it_matters or weekly_story.get(
+        "why_this_week",
+        weekly_pack.get("queue_pressure_summary", build_queue_pressure_summary(data, diff_data)),
+    )
     ws["A15"] = "Decision This Week"
-    ws["B15"] = next_action or weekly_story.get("decision", weekly_pack.get("what_to_do_this_week", build_top_recommendation_summary(data)))
+    ws["B15"] = next_action or weekly_story.get(
+        "decision", weekly_pack.get("what_to_do_this_week", build_top_recommendation_summary(data))
+    )
     ws["A16"] = "Follow-Through"
     ws["B16"] = f"{operator_focus_line} Next checkpoint: {follow_through_checkpoint}".strip()
     if excel_mode == "standard":
@@ -7528,7 +9196,9 @@ def _build_print_pack(
         ws["A48"] = "Trust Decay"
         ws["B48"] = f"{class_decay_status} — {class_decay_summary}"
         ws["A49"] = "Class Reweighting"
-        ws["B49"] = f"{class_reweight_direction} ({class_reweight_score}) — {class_reweight_summary}"
+        ws["B49"] = (
+            f"{class_reweight_direction} ({class_reweight_score}) — {class_reweight_summary}"
+        )
         ws["A50"] = "Class Reweighting Why"
         ws["B50"] = class_reweight_reason
         ws["A51"] = "Class Momentum"
@@ -7583,18 +9253,45 @@ def _build_print_pack(
     top_attention_rows = weekly_pack.get("top_attention", [])[:5]
     for offset, item in enumerate(top_attention_rows, 1):
         ws.cell(row=risk_start_row + offset, column=1, value=item.get("repo", "Portfolio"))
-        ws.cell(row=risk_start_row + offset, column=2, value=item.get("operator_focus", item.get("lane", "ready")))
-        ws.cell(row=risk_start_row + offset, column=3, value=item.get("why_it_won", item.get("why", "Operator pressure is active.")))
-        ws.cell(row=risk_start_row + offset, column=4, value=item.get("next_step", "Review the latest state."))
+        ws.cell(
+            row=risk_start_row + offset,
+            column=2,
+            value=item.get("operator_focus", item.get("lane", "ready")),
+        )
+        ws.cell(
+            row=risk_start_row + offset,
+            column=3,
+            value=item.get("why_it_won", item.get("why", "Operator pressure is active.")),
+        )
+        ws.cell(
+            row=risk_start_row + offset,
+            column=4,
+            value=item.get("next_step", "Review the latest state."),
+        )
     ws[f"E{opportunity_header_row}"] = "Top Repo Drilldowns"
     ws[f"E{opportunity_header_row}"].font = SECTION_FONT
     top_repo_briefings = weekly_pack.get("repo_briefings", [])[:3]
     for offset, briefing in enumerate(top_repo_briefings, 1):
         ws.cell(row=opportunity_header_row + offset, column=5, value=briefing.get("repo", ""))
-        ws.cell(row=opportunity_header_row + offset, column=6, value=briefing.get("next_step", briefing.get("operator_focus_line", "Watch Closely: No operator focus bucket is currently surfaced.")))
+        ws.cell(
+            row=opportunity_header_row + offset,
+            column=6,
+            value=briefing.get(
+                "next_step",
+                briefing.get(
+                    "operator_focus_line",
+                    "Watch Closely: No operator focus bucket is currently surfaced.",
+                ),
+            ),
+        )
     ws.cell(row=page2_row, column=1, value="Page 2: Changes and Governance").font = SECTION_FONT
     ws.cell(row=page2_row + 1, column=1, value="Top Material Change Families").font = SUBHEADER_FONT
-    change_rows = [[label, count] for label, count in _summarize_top_issue_families(data.get("material_changes", []) or [], limit=6)]
+    change_rows = [
+        [label, count]
+        for label, count in _summarize_top_issue_families(
+            data.get("material_changes", []) or [], limit=6
+        )
+    ]
     for offset, (label, count) in enumerate(change_rows, 1):
         ws.cell(row=page2_row + 1 + offset, column=1, value=label)
         ws.cell(row=page2_row + 1 + offset, column=2, value=count)
@@ -7603,7 +9300,10 @@ def _build_print_pack(
     governance_rows = [
         ("Status", _display_operator_state(governance_summary.get("status", "preview"))),
         ("Needs Re-Approval", "yes" if governance_summary.get("needs_reapproval") else "no"),
-        ("Drift Count", governance_summary.get("drift_count", len(data.get("governance_drift", []) or []))),
+        (
+            "Drift Count",
+            governance_summary.get("drift_count", len(data.get("governance_drift", []) or [])),
+        ),
         ("Rollback Available", governance_summary.get("rollback_available_count", 0)),
     ]
     for offset, (label, value) in enumerate(governance_rows, 1):
@@ -7645,8 +9345,12 @@ def _build_template_sparkline_specs(
 ) -> list[SparklineSpec]:
     specs: list[SparklineSpec] = []
     extended_score_history = _extend_score_history_with_current(data, score_history)
-    row_map = {repo_name: index + 2 for index, repo_name in enumerate(extended_score_history.keys())}
-    audits_sorted = sorted(data.get("audits", []), key=lambda audit: audit.get("overall_score", 0), reverse=True)
+    row_map = {
+        repo_name: index + 2 for index, repo_name in enumerate(extended_score_history.keys())
+    }
+    audits_sorted = sorted(
+        data.get("audits", []), key=lambda audit: audit.get("overall_score", 0), reverse=True
+    )
 
     for offset, audit in enumerate(audits_sorted, 2):
         repo_name = audit.get("metadata", {}).get("name", "")
@@ -7685,9 +9389,10 @@ def _build_excel_workbook(
     portfolio_profile: str = "default",
     collection: str | None = None,
     excel_mode: str = "standard",
+    risk_lookup: dict[str, str] | None = None,
 ) -> None:
     _build_dashboard(wb, data, diff_data, score_history, excel_mode=excel_mode)
-    _build_all_repos(wb, data, score_history)
+    _build_all_repos(wb, data, score_history, risk_lookup=risk_lookup)
     _build_portfolio_explorer(
         wb,
         data,
@@ -7784,6 +9489,37 @@ def _build_excel_workbook(
     wb.calculation.forceFullCalc = True
 
 
+def _build_risk_summary_sheet(wb: Workbook, risk_posture: dict) -> None:
+    ws = _get_or_create_sheet(wb, "Risk Summary")
+    ws.sheet_properties.tabColor = "DC2626"
+    _configure_sheet_view(ws, zoom=115, show_grid_lines=False)
+    _set_sheet_header(
+        ws,
+        "Risk Summary",
+        "Portfolio risk tier distribution sourced from portfolio-truth-latest.json.",
+        width=4,
+    )
+    headers = ["Risk Tier", "Count"]
+    start_row = 3
+    for col, h in enumerate(headers, 1):
+        ws.cell(row=start_row, column=col, value=h)
+    style_header_row(ws, start_row, len(headers))
+
+    rows = [
+        ("elevated", risk_posture.get("elevated", 0)),
+        ("moderate", risk_posture.get("moderate", 0)),
+        ("baseline", risk_posture.get("baseline", 0)),
+        ("deferred", risk_posture.get("deferred", 0)),
+    ]
+    for offset, (tier, count) in enumerate(rows, 1):
+        ws.cell(row=start_row + offset, column=1, value=tier)
+        ws.cell(row=start_row + offset, column=2, value=count)
+
+    max_row = start_row + len(rows)
+    _add_table(ws, "tblRiskSummary", len(headers), max_row, start_row=start_row)
+    auto_width(ws, len(headers), max_row)
+
+
 def export_excel(
     report_path: Path,
     output_path: Path,
@@ -7794,9 +9530,34 @@ def export_excel(
     collection: str | None = None,
     excel_mode: str = "standard",
     template_path: Path | None = None,
+    truth_dir: Path | None = None,
 ) -> Path:
     """Generate the flagship Excel dashboard."""
     data = json.loads(report_path.read_text())
+
+    risk_lookup: dict[str, str] = {}
+    risk_posture: dict[str, int] = {}
+    if truth_dir:
+        _truth_path = truth_dir / "portfolio-truth-latest.json"
+        if _truth_path.is_file():
+            try:
+                _truth = json.loads(_truth_path.read_text())
+            except Exception:
+                _truth = {}
+            tier_counts: dict[str, int] = {}
+            for _proj in _truth.get("projects") or []:
+                _name = str((_proj.get("identity") or {}).get("display_name") or "")
+                _tier = str((_proj.get("risk") or {}).get("risk_tier") or "")
+                if _name:
+                    risk_lookup[_name] = _tier
+                if _tier:
+                    tier_counts[_tier] = tier_counts.get(_tier, 0) + 1
+            risk_posture = {
+                "elevated": tier_counts.get("elevated", 0),
+                "moderate": tier_counts.get("moderate", 0),
+                "baseline": tier_counts.get("baseline", 0),
+                "deferred": tier_counts.get("deferred", 0),
+            }
 
     if excel_mode not in {"template", "standard"}:
         raise ValueError(f"Unsupported excel mode: {excel_mode}")
@@ -7817,7 +9578,11 @@ def export_excel(
         portfolio_profile=portfolio_profile,
         collection=collection,
         excel_mode=excel_mode,
+        risk_lookup=risk_lookup,
     )
+
+    if risk_posture:
+        _build_risk_summary_sheet(wb, risk_posture)
 
     wb.save(str(output_path))
     if excel_mode == "template":

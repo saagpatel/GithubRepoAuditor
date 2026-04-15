@@ -324,7 +324,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--campaign",
-        choices=["security-review", "promotion-push", "archive-sweep", "showcase-publish", "maintenance-cleanup"],
+        choices=[
+            "security-review",
+            "promotion-push",
+            "archive-sweep",
+            "showcase-publish",
+            "maintenance-cleanup",
+        ],
         default=None,
         help="Build a managed campaign view from the current report facts",
     )
@@ -895,7 +901,9 @@ def _apply_operating_paths(report: AuditReport) -> AuditReport:
             intent_alignment=catalog_entry.get("intent_alignment", ""),
             archived=audit.metadata.archived,
             completeness_tier=audit.completeness_tier,
-            decision_quality_status=(report.operator_summary or {}).get("decision_quality_v1", {}).get(
+            decision_quality_status=(report.operator_summary or {})
+            .get("decision_quality_v1", {})
+            .get(
                 "decision_quality_status",
                 "",
             ),
@@ -938,7 +946,9 @@ def _load_latest_report(output_dir: Path) -> tuple[Path | None, dict | None]:
     return latest, json.loads(latest.read_text())
 
 
-def _latest_control_center_paths(output_dir: Path, username: str, generated_at: datetime) -> tuple[Path, Path]:
+def _latest_control_center_paths(
+    output_dir: Path, username: str, generated_at: datetime
+) -> tuple[Path, Path]:
     stamp = _date_str(generated_at)
     return (
         output_dir / f"operator-control-center-{username}-{stamp}.json",
@@ -946,7 +956,9 @@ def _latest_control_center_paths(output_dir: Path, username: str, generated_at: 
     )
 
 
-def _latest_weekly_command_center_paths(output_dir: Path, username: str, generated_at: datetime) -> tuple[Path, Path]:
+def _latest_weekly_command_center_paths(
+    output_dir: Path, username: str, generated_at: datetime
+) -> tuple[Path, Path]:
     stamp = _date_str(generated_at)
     return (
         output_dir / f"weekly-command-center-{username}-{stamp}.json",
@@ -954,7 +966,9 @@ def _latest_weekly_command_center_paths(output_dir: Path, username: str, generat
     )
 
 
-def _latest_approval_center_paths(output_dir: Path, username: str, generated_at: datetime) -> tuple[Path, Path]:
+def _latest_approval_center_paths(
+    output_dir: Path, username: str, generated_at: datetime
+) -> tuple[Path, Path]:
     stamp = _date_str(generated_at)
     return (
         output_dir / f"approval-center-{username}-{stamp}.json",
@@ -962,7 +976,9 @@ def _latest_approval_center_paths(output_dir: Path, username: str, generated_at:
     )
 
 
-def _latest_approval_receipt_paths(output_dir: Path, username: str, generated_at: datetime) -> tuple[Path, Path]:
+def _latest_approval_receipt_paths(
+    output_dir: Path, username: str, generated_at: datetime
+) -> tuple[Path, Path]:
     stamp = _date_str(generated_at)
     return (
         output_dir / f"approval-receipt-{username}-{stamp}.json",
@@ -970,7 +986,9 @@ def _latest_approval_receipt_paths(output_dir: Path, username: str, generated_at
     )
 
 
-def _latest_followup_review_receipt_paths(output_dir: Path, username: str, generated_at: datetime) -> tuple[Path, Path]:
+def _latest_followup_review_receipt_paths(
+    output_dir: Path, username: str, generated_at: datetime
+) -> tuple[Path, Path]:
     stamp = _date_str(generated_at)
     return (
         output_dir / f"approval-followup-receipt-{username}-{stamp}.json",
@@ -1184,6 +1202,7 @@ def _refresh_shared_artifacts_from_report(
         portfolio_profile=args.portfolio_profile,
         collection=args.collection,
         excel_mode=args.excel_mode,
+        truth_dir=output_dir,
     )
     export_review_pack(
         report.to_dict(),
@@ -1202,9 +1221,14 @@ def _refresh_shared_artifacts_from_report(
         collection=args.collection,
     )
     artifact_generated_at = _report_artifact_datetime(json_path, report.generated_at)
-    control_json, control_md = _latest_control_center_paths(output_dir, report.username, artifact_generated_at)
+    control_json, control_md = _latest_control_center_paths(
+        output_dir, report.username, artifact_generated_at
+    )
     report.operator_summary["control_center_reference"] = str(control_json)
-    snapshot = {"operator_summary": report.operator_summary, "operator_queue": report.operator_queue}
+    snapshot = {
+        "operator_summary": report.operator_summary,
+        "operator_queue": report.operator_queue,
+    }
     portfolio_truth_path, portfolio_truth = load_latest_portfolio_truth(output_dir)
     weekly_digest = build_weekly_command_center_digest(
         report.to_dict(),
@@ -1269,7 +1293,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
     summary = snapshot.get("operator_summary", {})
     queue = snapshot.get("operator_queue", [])
     recent_changes = snapshot.get("operator_recent_changes", [])
-    print(f"\nOperator Control Center\n  {summary.get('headline', 'No operator triage items are currently surfaced.')}")
+    print(
+        f"\nOperator Control Center\n  {summary.get('headline', 'No operator triage items are currently surfaced.')}"
+    )
     if summary.get("report_reference"):
         print(f"  Latest report: {summary['report_reference']}")
     if summary.get("source_run_id"):
@@ -1427,7 +1453,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
             f"({summary.get('primary_target_closure_forecast_reweight_score', 0.0):.2f})"
         )
     if summary.get("closure_forecast_reweighting_summary"):
-        print(f"  Closure forecast reweighting summary: {summary['closure_forecast_reweighting_summary']}")
+        print(
+            f"  Closure forecast reweighting summary: {summary['closure_forecast_reweighting_summary']}"
+        )
     if summary.get("primary_target_closure_forecast_momentum_status"):
         print(
             "  Closure forecast momentum: "
@@ -1435,7 +1463,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
             f"({summary.get('primary_target_closure_forecast_momentum_score', 0.0):.2f})"
         )
     if summary.get("closure_forecast_momentum_summary"):
-        print(f"  Closure forecast momentum summary: {summary['closure_forecast_momentum_summary']}")
+        print(
+            f"  Closure forecast momentum summary: {summary['closure_forecast_momentum_summary']}"
+        )
     if summary.get("primary_target_closure_forecast_freshness_status"):
         print(
             "  Closure forecast freshness: "
@@ -1443,7 +1473,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
             f"({summary.get('primary_target_closure_forecast_freshness_reason', 'No closure-forecast freshness reason is recorded yet.')})"
         )
     if summary.get("closure_forecast_freshness_summary"):
-        print(f"  Closure forecast freshness summary: {summary['closure_forecast_freshness_summary']}")
+        print(
+            f"  Closure forecast freshness summary: {summary['closure_forecast_freshness_summary']}"
+        )
     if summary.get("primary_target_closure_forecast_stability_status"):
         print(
             "  Closure forecast hysteresis: "
@@ -1452,7 +1484,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
             f"{summary.get('primary_target_closure_forecast_hysteresis_reason', 'No closure-forecast hysteresis reason is recorded yet.')})"
         )
     if summary.get("closure_forecast_hysteresis_summary"):
-        print(f"  Closure forecast hysteresis summary: {summary['closure_forecast_hysteresis_summary']}")
+        print(
+            f"  Closure forecast hysteresis summary: {summary['closure_forecast_hysteresis_summary']}"
+        )
     if summary.get("primary_target_closure_forecast_decay_status") not in {None, "", "none"}:
         print(
             "  Hysteresis decay controls: "
@@ -1461,23 +1495,39 @@ def _print_control_center_summary(snapshot: dict) -> None:
         )
     if summary.get("closure_forecast_decay_summary"):
         print(f"  Closure forecast decay summary: {summary['closure_forecast_decay_summary']}")
-    if summary.get("primary_target_closure_forecast_refresh_recovery_status") not in {None, "", "none"}:
+    if summary.get("primary_target_closure_forecast_refresh_recovery_status") not in {
+        None,
+        "",
+        "none",
+    }:
         print(
             "  Closure forecast refresh recovery: "
             f"{summary.get('primary_target_closure_forecast_refresh_recovery_status', 'none')} "
             f"({summary.get('primary_target_closure_forecast_refresh_recovery_score', 0.0):.2f})"
         )
     if summary.get("closure_forecast_refresh_recovery_summary"):
-        print(f"  Closure forecast refresh recovery summary: {summary['closure_forecast_refresh_recovery_summary']}")
-    if summary.get("primary_target_closure_forecast_reacquisition_status") not in {None, "", "none"}:
+        print(
+            f"  Closure forecast refresh recovery summary: {summary['closure_forecast_refresh_recovery_summary']}"
+        )
+    if summary.get("primary_target_closure_forecast_reacquisition_status") not in {
+        None,
+        "",
+        "none",
+    }:
         print(
             "  Reacquisition controls: "
             f"{summary.get('primary_target_closure_forecast_reacquisition_status', 'none')} "
             f"({summary.get('primary_target_closure_forecast_reacquisition_reason', 'No closure-forecast reacquisition reason is recorded yet.')})"
         )
     if summary.get("closure_forecast_reacquisition_summary"):
-        print(f"  Closure forecast reacquisition summary: {summary['closure_forecast_reacquisition_summary']}")
-    if summary.get("primary_target_closure_forecast_reacquisition_persistence_status") not in {None, "", "none"}:
+        print(
+            f"  Closure forecast reacquisition summary: {summary['closure_forecast_reacquisition_summary']}"
+        )
+    if summary.get("primary_target_closure_forecast_reacquisition_persistence_status") not in {
+        None,
+        "",
+        "none",
+    }:
         print(
             "  Reacquisition persistence: "
             f"{summary.get('primary_target_closure_forecast_reacquisition_persistence_status', 'none')} "
@@ -1485,8 +1535,14 @@ def _print_control_center_summary(snapshot: dict) -> None:
             f"{summary.get('primary_target_closure_forecast_reacquisition_age_runs', 0)} run(s))"
         )
     if summary.get("closure_forecast_reacquisition_persistence_summary"):
-        print(f"  Reacquisition persistence summary: {summary['closure_forecast_reacquisition_persistence_summary']}")
-    if summary.get("primary_target_closure_forecast_recovery_churn_status") not in {None, "", "none"}:
+        print(
+            f"  Reacquisition persistence summary: {summary['closure_forecast_reacquisition_persistence_summary']}"
+        )
+    if summary.get("primary_target_closure_forecast_recovery_churn_status") not in {
+        None,
+        "",
+        "none",
+    }:
         print(
             "  Recovery churn controls: "
             f"{summary.get('primary_target_closure_forecast_recovery_churn_status', 'none')} "
@@ -1494,31 +1550,53 @@ def _print_control_center_summary(snapshot: dict) -> None:
         )
     if summary.get("closure_forecast_recovery_churn_summary"):
         print(f"  Recovery churn summary: {summary['closure_forecast_recovery_churn_summary']}")
-    if summary.get("primary_target_closure_forecast_reacquisition_freshness_status") not in {None, "", "insufficient-data"}:
+    if summary.get("primary_target_closure_forecast_reacquisition_freshness_status") not in {
+        None,
+        "",
+        "insufficient-data",
+    }:
         print(
             "  Reacquisition freshness: "
             f"{summary.get('primary_target_closure_forecast_reacquisition_freshness_status', 'insufficient-data')} "
             f"({summary.get('primary_target_closure_forecast_reacquisition_freshness_reason', 'No reacquisition-freshness reason is recorded yet.')})"
         )
     if summary.get("closure_forecast_reacquisition_freshness_summary"):
-        print(f"  Reacquisition freshness summary: {summary['closure_forecast_reacquisition_freshness_summary']}")
-    if summary.get("primary_target_closure_forecast_persistence_reset_status") not in {None, "", "none"}:
+        print(
+            f"  Reacquisition freshness summary: {summary['closure_forecast_reacquisition_freshness_summary']}"
+        )
+    if summary.get("primary_target_closure_forecast_persistence_reset_status") not in {
+        None,
+        "",
+        "none",
+    }:
         print(
             "  Persistence reset controls: "
             f"{summary.get('primary_target_closure_forecast_persistence_reset_status', 'none')} "
             f"({summary.get('primary_target_closure_forecast_persistence_reset_reason', 'No persistence-reset reason is recorded yet.')})"
         )
     if summary.get("closure_forecast_persistence_reset_summary"):
-        print(f"  Persistence reset summary: {summary['closure_forecast_persistence_reset_summary']}")
-    if summary.get("primary_target_closure_forecast_reset_refresh_recovery_status") not in {None, "", "none"}:
+        print(
+            f"  Persistence reset summary: {summary['closure_forecast_persistence_reset_summary']}"
+        )
+    if summary.get("primary_target_closure_forecast_reset_refresh_recovery_status") not in {
+        None,
+        "",
+        "none",
+    }:
         print(
             "  Reset refresh recovery: "
             f"{summary.get('primary_target_closure_forecast_reset_refresh_recovery_status', 'none')} "
             f"({summary.get('primary_target_closure_forecast_reset_refresh_recovery_score', 0.0):.2f})"
         )
     if summary.get("closure_forecast_reset_refresh_recovery_summary"):
-        print(f"  Reset refresh recovery summary: {summary['closure_forecast_reset_refresh_recovery_summary']}")
-    if summary.get("primary_target_closure_forecast_reset_reentry_status") not in {None, "", "none"}:
+        print(
+            f"  Reset refresh recovery summary: {summary['closure_forecast_reset_refresh_recovery_summary']}"
+        )
+    if summary.get("primary_target_closure_forecast_reset_reentry_status") not in {
+        None,
+        "",
+        "none",
+    }:
         print(
             "  Reset re-entry controls: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_status', 'none')} "
@@ -1526,7 +1604,11 @@ def _print_control_center_summary(snapshot: dict) -> None:
         )
     if summary.get("closure_forecast_reset_reentry_summary"):
         print(f"  Reset re-entry summary: {summary['closure_forecast_reset_reentry_summary']}")
-    if summary.get("primary_target_closure_forecast_reset_reentry_persistence_status") not in {None, "", "none"}:
+    if summary.get("primary_target_closure_forecast_reset_reentry_persistence_status") not in {
+        None,
+        "",
+        "none",
+    }:
         print(
             "  Reset re-entry persistence: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_persistence_status', 'none')} "
@@ -1538,7 +1620,11 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry persistence summary: "
             f"{summary['closure_forecast_reset_reentry_persistence_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_churn_status") not in {None, "", "none"}:
+    if summary.get("primary_target_closure_forecast_reset_reentry_churn_status") not in {
+        None,
+        "",
+        "none",
+    }:
         print(
             "  Reset re-entry churn controls: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_churn_status', 'none')} "
@@ -1549,7 +1635,11 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry churn summary: "
             f"{summary['closure_forecast_reset_reentry_churn_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_freshness_status") not in {None, "", "none"}:
+    if summary.get("primary_target_closure_forecast_reset_reentry_freshness_status") not in {
+        None,
+        "",
+        "none",
+    }:
         print(
             "  Reset re-entry freshness: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_freshness_status', 'insufficient-data')} "
@@ -1560,7 +1650,11 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry freshness summary: "
             f"{summary['closure_forecast_reset_reentry_freshness_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_reset_status") not in {None, "", "none"}:
+    if summary.get("primary_target_closure_forecast_reset_reentry_reset_status") not in {
+        None,
+        "",
+        "none",
+    }:
         print(
             "  Reset re-entry reset controls: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_reset_status', 'none')} "
@@ -1571,7 +1665,11 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry reset summary: "
             f"{summary['closure_forecast_reset_reentry_reset_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_refresh_recovery_status") not in {None, "", "none"}:
+    if summary.get("primary_target_closure_forecast_reset_reentry_refresh_recovery_status") not in {
+        None,
+        "",
+        "none",
+    }:
         print(
             "  Reset re-entry refresh recovery: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_refresh_recovery_status', 'none')} "
@@ -1582,7 +1680,11 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry refresh recovery summary: "
             f"{summary['closure_forecast_reset_reentry_refresh_recovery_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_status") not in {None, "", "none"}:
+    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_status") not in {
+        None,
+        "",
+        "none",
+    }:
         print(
             "  Reset re-entry rebuild controls: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_status', 'none')} "
@@ -1593,7 +1695,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry rebuild summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_freshness_status") not in {None, "", "none"}:
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_freshness_status"
+    ) not in {None, "", "none"}:
         print(
             "  Reset re-entry rebuild freshness: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_freshness_status', 'insufficient-data')} "
@@ -1604,7 +1708,11 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry rebuild freshness summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_freshness_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reset_status") not in {None, "", "none"}:
+    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reset_status") not in {
+        None,
+        "",
+        "none",
+    }:
         print(
             "  Reset re-entry rebuild reset controls: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reset_status', 'none')} "
@@ -1615,7 +1723,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry rebuild reset summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reset_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_refresh_recovery_status") not in {None, "", "none"}:
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_refresh_recovery_status"
+    ) not in {None, "", "none"}:
         print(
             "  Reset re-entry rebuild refresh recovery: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_refresh_recovery_status', 'none')} "
@@ -1626,7 +1736,11 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry rebuild refresh recovery summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_refresh_recovery_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_status") not in {None, "", "none"}:
+    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_status") not in {
+        None,
+        "",
+        "none",
+    }:
         print(
             "  Reset re-entry rebuild re-entry controls: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_status', 'none')} "
@@ -1637,7 +1751,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry rebuild re-entry summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_persistence_status") not in {None, "", "none"}:
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_persistence_status"
+    ) not in {None, "", "none"}:
         print(
             "  Reset re-entry rebuild re-entry persistence: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_persistence_status', 'none')} "
@@ -1649,7 +1765,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry rebuild re-entry persistence summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_persistence_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_churn_status") not in {None, "", "none"}:
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_churn_status"
+    ) not in {None, "", "none"}:
         print(
             "  Reset re-entry rebuild re-entry churn controls: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_churn_status', 'none')} "
@@ -1660,7 +1778,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry rebuild re-entry churn summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_churn_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_freshness_status") not in {None, "", "none"}:
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_freshness_status"
+    ) not in {None, "", "none"}:
         print(
             "  Reset re-entry rebuild re-entry freshness: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_freshness_status', 'insufficient-data')} "
@@ -1671,7 +1791,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry rebuild re-entry freshness summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_freshness_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_reset_status") not in {None, "", "none"}:
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_reset_status"
+    ) not in {None, "", "none"}:
         print(
             "  Reset re-entry rebuild re-entry reset controls: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_reset_status', 'none')} "
@@ -1682,13 +1804,17 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry rebuild re-entry reset summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_reset_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_status") not in {None, "", "none"}:
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_status"
+    ) not in {None, "", "none"}:
         print(
             "  Reset re-entry rebuild re-entry refresh recovery: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_status', 'none')} "
             f"({summary.get('closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_summary', 'No reset re-entry rebuild re-entry refresh recovery summary is recorded yet.')})"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_status") not in {None, "", "none"}:
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_status"
+    ) not in {None, "", "none"}:
         print(
             "  Reset re-entry rebuild re-entry restore controls: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_status', 'none')} "
@@ -1699,7 +1825,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry rebuild re-entry restore summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_status") not in {None, "", "insufficient-data"}:
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_status"
+    ) not in {None, "", "insufficient-data"}:
         print(
             "  Reset re-entry rebuild re-entry restore freshness: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_status', 'insufficient-data')} "
@@ -1710,7 +1838,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry rebuild re-entry restore freshness summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reset_status") not in {None, "", "none"}:
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reset_status"
+    ) not in {None, "", "none"}:
         print(
             "  Reset re-entry rebuild re-entry restore reset controls: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reset_status', 'none')} "
@@ -1721,18 +1851,24 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry rebuild re-entry restore reset summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_reset_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_status") not in {None, "", "none"}:
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_status"
+    ) not in {None, "", "none"}:
         print(
             "  Reset re-entry rebuild re-entry restore refresh recovery: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_status', 'none')} "
             f"({summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_summary', 'No reset re-entry rebuild re-entry restore refresh recovery summary is recorded yet.')})"
         )
-    if summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_summary"):
+    if summary.get(
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_summary"
+    ):
         print(
             "  Reset re-entry rebuild re-entry restore refresh recovery summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_status") not in {None, "", "none"}:
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_status"
+    ) not in {None, "", "none"}:
         print(
             "  Reset re-entry rebuild re-entry restore re-restore controls: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_status', 'none')} "
@@ -1743,63 +1879,85 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry rebuild re-entry restore re-restore summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_status") not in {None, "", "none"}:
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_status"
+    ) not in {None, "", "none"}:
         print(
             "  Reset re-entry rebuild re-entry restore re-restore persistence: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_status', 'none')} "
             f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_score', 0.0):.2f}; "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_age_runs', 0)} run(s))"
         )
-    if summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_summary"):
+    if summary.get(
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_summary"
+    ):
         print(
             "  Reset re-entry rebuild re-entry restore re-restore persistence summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_status") not in {None, "", "none"}:
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_status"
+    ) not in {None, "", "none"}:
         print(
             "  Reset re-entry rebuild re-entry restore re-restore churn controls: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_status', 'none')} "
             f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_reason', 'No reset re-entry rebuild re-entry restore re-restore churn reason is recorded yet.')})"
         )
-    if summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_summary"):
+    if summary.get(
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_summary"
+    ):
         print(
             "  Reset re-entry rebuild re-entry restore re-restore churn summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_status") not in {None, "", "insufficient-data"}:
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_status"
+    ) not in {None, "", "insufficient-data"}:
         print(
             "  Reset re-entry rebuild re-entry restore re-restore freshness: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_status', 'insufficient-data')} "
             f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_reason', 'No reset re-entry rebuild re-entry restore re-restore freshness reason is recorded yet.')})"
         )
-    if summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_summary"):
+    if summary.get(
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_summary"
+    ):
         print(
             "  Reset re-entry rebuild re-entry restore re-restore freshness summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_status") not in {None, "", "none"}:
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_status"
+    ) not in {None, "", "none"}:
         print(
             "  Reset re-entry rebuild re-entry restore re-restore reset controls: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_status', 'none')} "
             f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_reason', 'No reset re-entry rebuild re-entry restore re-restore reset reason is recorded yet.')})"
         )
-    if summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_summary"):
+    if summary.get(
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_summary"
+    ):
         print(
             "  Reset re-entry rebuild re-entry restore re-restore reset summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_status") not in {None, "", "none"}:
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_status"
+    ) not in {None, "", "none"}:
         print(
             "  Reset re-entry rebuild re-entry restore re-restore refresh recovery: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_status', 'none')} "
             f"({summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_summary', 'No reset re-entry rebuild re-entry restore re-restore refresh recovery summary is recorded yet.')})"
         )
-    if summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_summary"):
+    if summary.get(
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_summary"
+    ):
         print(
             "  Reset re-entry rebuild re-entry restore re-restore refresh recovery summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status") not in {None, "", "none"}:
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status"
+    ) not in {None, "", "none"}:
         print(
             "  Reset re-entry rebuild re-entry restore re-re-restore controls: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status', 'none')} "
@@ -1810,41 +1968,55 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry rebuild re-entry restore re-re-restore summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status") not in {None, "", "none"}:
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status"
+    ) not in {None, "", "none"}:
         print(
             "  Reset re-entry rebuild re-entry restore re-re-restore persistence: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status', 'none')} "
             f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score', 0.0):.2f}; "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs', 0)} run(s))"
         )
-    if summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_summary"):
+    if summary.get(
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_summary"
+    ):
         print(
             "  Reset re-entry rebuild re-entry restore re-re-restore persistence summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status") not in {None, "", "none"}:
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status"
+    ) not in {None, "", "none"}:
         print(
             "  Reset re-entry rebuild re-entry restore re-re-restore churn controls: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status', 'none')} "
             f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_reason', 'No reset re-entry rebuild re-entry restore re-re-restore churn reason is recorded yet.')})"
         )
-    if summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_summary"):
+    if summary.get(
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_summary"
+    ):
         print(
             "  Reset re-entry rebuild re-entry restore re-re-restore churn summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status") not in {None, "", "none"}:
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status"
+    ) not in {None, "", "none"}:
         print(
             "  Reset re-entry rebuild re-entry restore re-re-restore refresh recovery: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status', 'none')} "
             f"({summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_summary', 'No reset re-entry rebuild re-entry restore re-re-restore refresh recovery summary is recorded yet.')})"
         )
-    if summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_summary"):
+    if summary.get(
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_summary"
+    ):
         print(
             "  Reset re-entry rebuild re-entry restore re-re-restore refresh recovery summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status") not in {None, "", "none"}:
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status"
+    ) not in {None, "", "none"}:
         print(
             "  Reset re-entry rebuild re-entry restore re-re-re-restore controls: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status', 'none')} "
@@ -1855,30 +2027,40 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry rebuild re-entry restore re-re-re-restore summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status") not in {None, "", "none"}:
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status"
+    ) not in {None, "", "none"}:
         print(
             "  Reset re-entry rebuild re-entry restore re-re-re-restore persistence: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status', 'none')} "
             f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score', 0.0):.2f}; "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs', 0)} run(s))"
         )
-    if summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_summary"):
+    if summary.get(
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_summary"
+    ):
         print(
             "  Reset re-entry rebuild re-entry restore re-re-re-restore persistence summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status") not in {None, "", "none"}:
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status"
+    ) not in {None, "", "none"}:
         print(
             "  Reset re-entry rebuild re-entry restore re-re-re-restore churn controls: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status', 'none')} "
             f"({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason', 'No reset re-entry rebuild re-entry restore re-re-re-restore churn reason is recorded yet.')})"
         )
-    if summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_summary"):
+    if summary.get(
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_summary"
+    ):
         print(
             "  Reset re-entry rebuild re-entry restore re-re-re-restore churn summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_persistence_status") not in {None, "", "none"}:
+    if summary.get(
+        "primary_target_closure_forecast_reset_reentry_rebuild_persistence_status"
+    ) not in {None, "", "none"}:
         print(
             "  Reset re-entry rebuild persistence: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_persistence_status', 'none')} "
@@ -1890,7 +2072,11 @@ def _print_control_center_summary(snapshot: dict) -> None:
             "  Reset re-entry rebuild persistence summary: "
             f"{summary['closure_forecast_reset_reentry_rebuild_persistence_summary']}"
         )
-    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_churn_status") not in {None, "", "none"}:
+    if summary.get("primary_target_closure_forecast_reset_reentry_rebuild_churn_status") not in {
+        None,
+        "",
+        "none",
+    }:
         print(
             "  Reset re-entry rebuild churn controls: "
             f"{summary.get('primary_target_closure_forecast_reset_reentry_rebuild_churn_status', 'none')} "
@@ -1964,8 +2150,12 @@ def _print_control_center_summary(snapshot: dict) -> None:
     if recent_changes:
         print("\nRecently Changed")
         for item in recent_changes[:5]:
-            subject = item.get("repo") or item.get("repo_full_name") or item.get("item_id") or "portfolio"
-            print(f"  - {item.get('generated_at', '')[:10]} {subject}: {item.get('summary', item.get('kind', 'change'))}")
+            subject = (
+                item.get("repo") or item.get("repo_full_name") or item.get("item_id") or "portfolio"
+            )
+            print(
+                f"  - {item.get('generated_at', '')[:10]} {subject}: {item.get('summary', item.get('kind', 'change'))}"
+            )
 
 
 def _fetch_repo_metadata(args, client: GitHubClient) -> tuple[list[RepoMetadata], list[dict]]:
@@ -2013,7 +2203,9 @@ def _portfolio_lang_freq_for_filtered_baseline(repos: list[RepoMetadata]) -> dic
     return _compute_portfolio_lang_freq(repos)
 
 
-def _select_target_repos(target_names: list[str], repos: list[RepoMetadata]) -> tuple[list[RepoMetadata], list[str]]:
+def _select_target_repos(
+    target_names: list[str], repos: list[RepoMetadata]
+) -> tuple[list[RepoMetadata], list[str]]:
     exact = {repo.name: repo for repo in repos}
     lower = {repo.name.lower(): repo for repo in repos}
     selected: list[RepoMetadata] = []
@@ -2049,13 +2241,17 @@ def _analyze_repos(
     if getattr(args, "analyzers_dir", None):
         extra_analyzers = load_custom_analyzers(Path(args.analyzers_dir))
         if extra_analyzers:
-            print_info(f"Loaded {len(extra_analyzers)} custom analyzer(s) from {args.analyzers_dir}")
+            print_info(
+                f"Loaded {len(extra_analyzers)} custom analyzer(s) from {args.analyzers_dir}"
+            )
 
     audits: list[RepoAudit] = []
 
     def _analyze_one(repo_meta: RepoMetadata, repo_path: Path) -> RepoAudit:
         worker_client = GitHubClient(token=client.token, cache=client.cache)
-        results = run_all_analyzers(repo_path, repo_meta, worker_client, extra_analyzers=extra_analyzers)
+        results = run_all_analyzers(
+            repo_path, repo_meta, worker_client, extra_analyzers=extra_analyzers
+        )
         return score_repo(
             repo_meta,
             results,
@@ -2079,8 +2275,12 @@ def _analyze_repos(
         if runtime_stats is not None:
             runtime_stats["clone_fetch_seconds"] = round(clone_seconds, 3)
         print_info(f"Cloned {len(cloned)}/{len(repos)} repos. Analyzing...")
-        analyzable = [(index, repo_meta, cloned.get(repo_meta.name)) for index, repo_meta in enumerate(repos)]
-        analyzable = [(index, repo_meta, repo_path) for index, repo_meta, repo_path in analyzable if repo_path]
+        analyzable = [
+            (index, repo_meta, cloned.get(repo_meta.name)) for index, repo_meta in enumerate(repos)
+        ]
+        analyzable = [
+            (index, repo_meta, repo_path) for index, repo_meta, repo_path in analyzable if repo_path
+        ]
         workers = min(ANALYSIS_WORKERS, max(1, len(analyzable)))
         analyze_start = perf_counter()
         if progress:
@@ -2100,7 +2300,10 @@ def _analyze_repos(
                 else:
                     with ThreadPoolExecutor(max_workers=workers) as executor:
                         futures = {
-                            executor.submit(_analyze_one, repo_meta, repo_path): (index, repo_meta.name)
+                            executor.submit(_analyze_one, repo_meta, repo_path): (
+                                index,
+                                repo_meta.name,
+                            )
                             for index, repo_meta, repo_path in analyzable
                         }
                         for future in as_completed(futures):
@@ -2115,7 +2318,10 @@ def _analyze_repos(
             completed: dict[int, RepoAudit] = {}
             if workers == 1:
                 for index, repo_meta, repo_path in analyzable:
-                    print(f"  [{index + 1}/{len(repos)}] Analyzing {repo_meta.name}...", file=sys.stderr)
+                    print(
+                        f"  [{index + 1}/{len(repos)}] Analyzing {repo_meta.name}...",
+                        file=sys.stderr,
+                    )
                     completed[index] = _analyze_one(repo_meta, repo_path)
                     if args.verbose:
                         _print_verbose(completed[index])
@@ -2129,7 +2335,10 @@ def _analyze_repos(
                     for future in as_completed(futures):
                         index, repo_name = futures[future]
                         finished += 1
-                        print(f"  [{finished}/{len(analyzable)}] Analyzing {repo_name}...", file=sys.stderr)
+                        print(
+                            f"  [{finished}/{len(analyzable)}] Analyzing {repo_name}...",
+                            file=sys.stderr,
+                        )
                         completed[index] = future.result()
                         if args.verbose:
                             _print_verbose(completed[index])
@@ -2182,7 +2391,11 @@ def _run_portfolio_truth_mode(args) -> None:
 
     output_dir = Path(args.output_dir)
     workspace_root = Path(args.workspace_root)
-    registry_output = Path(args.registry_output) if args.registry_output else workspace_root / "project-registry.md"
+    registry_output = (
+        Path(args.registry_output)
+        if args.registry_output
+        else workspace_root / "project-registry.md"
+    )
     portfolio_report_output = (
         Path(args.portfolio_report_output)
         if args.portfolio_report_output
@@ -2221,7 +2434,11 @@ def _run_portfolio_context_recovery_mode(args) -> None:
 
     output_dir = Path(args.output_dir)
     workspace_root = Path(args.workspace_root)
-    registry_output = Path(args.registry_output) if args.registry_output else workspace_root / "project-registry.md"
+    registry_output = (
+        Path(args.registry_output)
+        if args.registry_output
+        else workspace_root / "project-registry.md"
+    )
     portfolio_report_output = (
         Path(args.portfolio_report_output)
         if args.portfolio_report_output
@@ -2259,9 +2476,7 @@ def _run_portfolio_context_recovery_mode(args) -> None:
         limit=args.context_recovery_limit,
     )
     if apply_result.failed_projects:
-        raise SystemExit(
-            "Context recovery failed for: " + ", ".join(apply_result.failed_projects)
-        )
+        raise SystemExit("Context recovery failed for: " + ", ".join(apply_result.failed_projects))
 
     truth_result = publish_portfolio_truth(
         workspace_root=workspace_root,
@@ -2288,8 +2503,16 @@ def _apply_governance_view_filter(report: AuditReport, governance_view: str) -> 
     if governance_view == "all":
         return
 
-    preview_actions = report.governance_preview.get("actions", []) if isinstance(report.governance_preview, dict) else []
-    result_rows = report.governance_results.get("results", []) if isinstance(report.governance_results, dict) else []
+    preview_actions = (
+        report.governance_preview.get("actions", [])
+        if isinstance(report.governance_preview, dict)
+        else []
+    )
+    result_rows = (
+        report.governance_results.get("results", [])
+        if isinstance(report.governance_results, dict)
+        else []
+    )
     drift_rows = report.governance_drift if isinstance(report.governance_drift, list) else []
 
     if governance_view == "ready":
@@ -2323,7 +2546,9 @@ def _apply_governance_view_filter(report: AuditReport, governance_view: str) -> 
         }
 
 
-def _apply_ops_writeback(report: AuditReport, args, client: GitHubClient | None, output_dir: Path) -> None:
+def _apply_ops_writeback(
+    report: AuditReport, args, client: GitHubClient | None, output_dir: Path
+) -> None:
     if not args.campaign:
         return
 
@@ -2334,7 +2559,9 @@ def _apply_ops_writeback(report: AuditReport, args, client: GitHubClient | None,
         from src.operator_control_center import build_operator_snapshot, normalize_review_state
 
         github_projects_config = load_github_projects_config(
-            Path(args.github_projects_config) if getattr(args, "github_projects_config", None) else None
+            Path(args.github_projects_config)
+            if getattr(args, "github_projects_config", None)
+            else None
         )
         normalized = normalize_review_state(
             report.to_dict(),
@@ -2389,14 +2616,16 @@ def _apply_ops_writeback(report: AuditReport, args, client: GitHubClient | None,
     managed_state_drift: list[dict] = []
     if args.writeback_apply and args.writeback_target:
         if args.writeback_target in {"github", "all"} and client is not None:
-            github_results, github_refs, github_drift, _github_closure_events = apply_github_writeback(
-                client,
-                actions,
-                previous_state=previous_state,
-                sync_mode=args.campaign_sync_mode,
-                campaign_summary=campaign_summary,
-                github_projects_config=github_projects_config,
-                operator_context=operator_context,
+            github_results, github_refs, github_drift, _github_closure_events = (
+                apply_github_writeback(
+                    client,
+                    actions,
+                    previous_state=previous_state,
+                    sync_mode=args.campaign_sync_mode,
+                    campaign_summary=campaign_summary,
+                    github_projects_config=github_projects_config,
+                    operator_context=operator_context,
+                )
             )
             results.extend(github_results)
             external_refs.update(github_refs)
@@ -2547,9 +2776,13 @@ def _write_report_outputs(
             collection_name=args.collection,
         )
         diff_dict = diff.to_dict()
-        diff_md_path = output_dir / f"audit-diff-{report.username}-{_date_str(report.generated_at)}.md"
+        diff_md_path = (
+            output_dir / f"audit-diff-{report.username}-{_date_str(report.generated_at)}.md"
+        )
         diff_md_path.write_text(format_diff_markdown(diff))
-        diff_json_path = output_dir / f"audit-diff-{report.username}-{_date_str(report.generated_at)}.json"
+        diff_json_path = (
+            output_dir / f"audit-diff-{report.username}-{_date_str(report.generated_at)}.json"
+        )
         diff_json_path.write_text(json.dumps(diff_dict, indent=2))
         print_info(
             f"Diff: {len(diff.tier_changes)} tier changes, "
@@ -2585,6 +2818,7 @@ def _write_report_outputs(
         portfolio_profile=args.portfolio_profile,
         collection=args.collection,
         excel_mode=args.excel_mode,
+        truth_dir=output_dir,
     )
     report.runtime_breakdown["workbook_build_seconds"] = round(perf_counter() - workbook_start, 3)
     md_path = write_markdown_report(report, output_dir, diff_data=diff_dict)
@@ -2603,7 +2837,9 @@ def _write_report_outputs(
         from src.badge_export import _write_badges_markdown, export_badges, upload_badge_gist
 
         badge_result = export_badges(report_data, output_dir)
-        badge_info = f"\n    {badge_result['badges_md']} ({badge_result['files_written']} badge files)"
+        badge_info = (
+            f"\n    {badge_result['badges_md']} ({badge_result['files_written']} badge files)"
+        )
         if args.upload_badges:
             gist_urls = upload_badge_gist(output_dir / "badges", report.username)
             if gist_urls:
@@ -2640,12 +2876,18 @@ def _write_report_outputs(
                 project_map = _load_project_map(Path("config"))
                 create_recommendation_run(report_data, quick_wins, sync_token, sync_config)
                 create_audit_action_requests(
-                    report_data.get("audits", []), project_map, sync_token, sync_config,
+                    report_data.get("audits", []),
+                    project_map,
+                    sync_token,
+                    sync_config,
                 )
                 patch_weekly_review(report_data, diff_dict, quick_wins, sync_token, sync_config)
                 create_audit_history_entry(report_data, sync_token, sync_config)
                 patch_project_completeness_cards(
-                    report_data.get("audits", []), project_map, sync_token, sync_config,
+                    report_data.get("audits", []),
+                    project_map,
+                    sync_token,
+                    sync_config,
                 )
                 check_recommendation_followup(report_data, sync_token, sync_config)
                 create_notion_dashboard(report_data, sync_token, sync_config)
@@ -2706,7 +2948,9 @@ def _write_report_outputs(
         candidates = find_archive_candidates(score_history)
         if candidates:
             archive_result = export_archive_report(candidates, report.username, output_dir)
-            print_info(f"Archive candidates: {archive_result['count']} repos → {archive_result['report_path']}")
+            print_info(
+                f"Archive candidates: {archive_result['count']} repos → {archive_result['report_path']}"
+            )
 
     if getattr(args, "vuln_check", False):
         from src.vuln_check import check_vulnerabilities, format_vuln_summary
@@ -2714,7 +2958,9 @@ def _write_report_outputs(
         vulns = check_vulnerabilities(report_data.get("audits", []), cache=cache)
         print_info(format_vuln_summary(vulns))
         if vulns:
-            vuln_path = output_dir / f"vuln-report-{report.username}-{_date_str(report.generated_at)}.json"
+            vuln_path = (
+                output_dir / f"vuln-report-{report.username}-{_date_str(report.generated_at)}.json"
+            )
             vuln_path.write_text(json.dumps(vulns, indent=2, default=str))
             print_info(f"Vulnerability report: {vuln_path}")
 
@@ -2745,7 +2991,9 @@ def _write_report_outputs(
     }
 
 
-def _ensure_partial_run_baseline_compatible(existing_report_data: dict | None, current_context: dict) -> bool:
+def _ensure_partial_run_baseline_compatible(
+    existing_report_data: dict | None, current_context: dict
+) -> bool:
     if not existing_report_data:
         return True
 
@@ -2805,9 +3053,13 @@ def _print_output_summary(
     if report.campaign_tuning_summary.get("summary"):
         print_info(f"Campaign tuning: {report.campaign_tuning_summary.get('summary')}")
     if report.next_tuned_campaign.get("summary"):
-        print_info(f"{ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}: {report.next_tuned_campaign.get('summary')}")
+        print_info(
+            f"{ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}: {report.next_tuned_campaign.get('summary')}"
+        )
     if report.intervention_ledger_summary.get("summary"):
-        print_info(f"Historical portfolio intelligence: {report.intervention_ledger_summary.get('summary')}")
+        print_info(
+            f"Historical portfolio intelligence: {report.intervention_ledger_summary.get('summary')}"
+        )
     if report.next_historical_focus.get("summary"):
         print_info(f"Next historical focus: {report.next_historical_focus.get('summary')}")
     if report.automation_guidance_summary.get("summary"):
@@ -2847,7 +3099,9 @@ def _run_targeted_audit(
     targeted_repos, missing = _select_target_repos(target_names, filtered_repos)
     run_errors = list(errors)
     for name in missing:
-        run_errors.append({"repo": f"{args.username}/{name}", "error": "Repo not found in fetched metadata"})
+        run_errors.append(
+            {"repo": f"{args.username}/{name}", "error": "Repo not found in fetched metadata"}
+        )
         print_warning(f"Repo not found: {name}")
 
     if not targeted_repos:
@@ -2878,7 +3132,9 @@ def _run_targeted_audit(
     # Load existing audits from the latest report so we can merge into them
     existing_audits = existing_report_data.get("audits", []) if existing_report_data else []
     if existing_report_path:
-        print_info(f"Merging into {existing_report_path.name} ({len(existing_audits)} existing repos)")
+        print_info(
+            f"Merging into {existing_report_path.name} ({len(existing_audits)} existing repos)"
+        )
 
     # Replace any existing audit entries for the re-analyzed repos
     new_names = {audit.metadata.name for audit in new_audits}
@@ -2889,7 +3145,11 @@ def _run_targeted_audit(
     ]
     # new_audits first so they appear at the top of the report
     merged_audits = list(new_audits) + kept_audits
-    total_repos = existing_report_data.get("total_repos", len(filtered_repos)) if existing_report_data else len(filtered_repos)
+    total_repos = (
+        existing_report_data.get("total_repos", len(filtered_repos))
+        if existing_report_data
+        else len(filtered_repos)
+    )
 
     report = AuditReport.from_audits(
         args.username,
@@ -3164,7 +3424,9 @@ def main() -> None:
     context_recovery_limit = getattr(args, "context_recovery_limit", None)
 
     if portfolio_truth_mode and portfolio_context_recovery_mode:
-        parser.error("--portfolio-truth and --portfolio-context-recovery are separate standalone modes; run one at a time.")
+        parser.error(
+            "--portfolio-truth and --portfolio-context-recovery are separate standalone modes; run one at a time."
+        )
     standalone_portfolio_modes = portfolio_truth_mode or portfolio_context_recovery_mode
     if apply_context_recovery and not portfolio_context_recovery_mode:
         parser.error("--apply-context-recovery requires --portfolio-context-recovery.")
@@ -3207,19 +3469,33 @@ def main() -> None:
     if args.review_packet and not args.campaign:
         parser.error("--review-packet requires --campaign")
     if args.approve_packet and args.writeback_apply:
-        parser.error("--approve-packet captures local approval only. Remove --writeback-apply and run apply separately.")
+        parser.error(
+            "--approve-packet captures local approval only. Remove --writeback-apply and run apply separately."
+        )
     if args.review_packet and args.writeback_apply:
-        parser.error("--review-packet captures a local follow-up review only. Remove --writeback-apply and run apply separately.")
+        parser.error(
+            "--review-packet captures a local follow-up review only. Remove --writeback-apply and run apply separately."
+        )
     if args.approve_governance and args.approval_center:
-        parser.error("--approve-governance captures a local approval. Remove --approval-center for read-only mode.")
+        parser.error(
+            "--approve-governance captures a local approval. Remove --approval-center for read-only mode."
+        )
     if args.review_governance and args.approval_center:
-        parser.error("--review-governance captures a local follow-up review. Remove --approval-center for read-only mode.")
+        parser.error(
+            "--review-governance captures a local follow-up review. Remove --approval-center for read-only mode."
+        )
     if args.approval_center and args.control_center:
-        parser.error("--approval-center and --control-center are separate read-only views; run one at a time.")
+        parser.error(
+            "--approval-center and --control-center are separate read-only views; run one at a time."
+        )
     if args.approve_governance and args.review_governance:
-        parser.error("--approve-governance and --review-governance are separate local actions; run one at a time.")
+        parser.error(
+            "--approve-governance and --review-governance are separate local actions; run one at a time."
+        )
     if args.approve_packet and args.review_packet:
-        parser.error("--approve-packet and --review-packet are separate local actions; run one at a time.")
+        parser.error(
+            "--approve-packet and --review-packet are separate local actions; run one at a time."
+        )
     if args.approval_center and (
         args.campaign
         or args.writeback_target
@@ -3233,7 +3509,9 @@ def main() -> None:
         parser.error(
             "--approval-center is the read-only approval view. Remove campaign, writeback, or approval-capture flags."
         )
-    if args.control_center and (args.campaign or args.writeback_target or args.writeback_apply or args.github_projects):
+    if args.control_center and (
+        args.campaign or args.writeback_target or args.writeback_apply or args.github_projects
+    ):
         parser.error(
             "--control-center is the read-only Weekly Review entrypoint. Remove campaign/writeback flags or run a normal audit for Action Sync."
         )
@@ -3249,13 +3527,26 @@ def main() -> None:
             report_output_dir,
             approval_view=args.approval_view,
         )
-        print_info(payload.get("approval_workflow_summary", {}).get("summary", "No current approval needs review yet."))
-        print_info(payload.get("next_approval_review", {}).get("summary", "Stay local for now; no current approval needs review."))
+        print_info(
+            payload.get("approval_workflow_summary", {}).get(
+                "summary", "No current approval needs review yet."
+            )
+        )
+        print_info(
+            payload.get("next_approval_review", {}).get(
+                "summary", "Stay local for now; no current approval needs review."
+            )
+        )
         print_info(f"Approval center JSON: {approval_json}")
         print_info(f"Approval center Markdown: {approval_md}")
         return
 
-    if args.approve_governance or args.approve_packet or args.review_governance or args.review_packet:
+    if (
+        args.approve_governance
+        or args.approve_packet
+        or args.review_governance
+        or args.review_packet
+    ):
         from src.approval_ledger import (
             build_approval_followup_record,
             build_approval_record,
@@ -3274,7 +3565,9 @@ def main() -> None:
             list(report.operator_queue or []),
             approval_view="all",
         )
-        ledger = {str(item.get("approval_id") or ""): item for item in bundle.get("approval_ledger", [])}
+        ledger = {
+            str(item.get("approval_id") or ""): item for item in bundle.get("approval_ledger", [])
+        }
         if args.approve_governance or args.review_governance:
             approval_id = f"governance:{args.governance_scope}"
         else:
@@ -3284,7 +3577,9 @@ def main() -> None:
             parser.error("No matching approval subject is surfaced in the latest report.")
         if args.approve_governance or args.approve_packet:
             if ledger_record.get("approval_state") == "blocked":
-                parser.error("That approval subject is blocked by non-approval prerequisites and cannot be approved yet.")
+                parser.error(
+                    "That approval subject is blocked by non-approval prerequisites and cannot be approved yet."
+                )
             if ledger_record.get("approval_state") == "not-applicable":
                 parser.error("That approval subject is not part of the current approval workflow.")
             approval_record = build_approval_record(
@@ -3294,12 +3589,19 @@ def main() -> None:
             )
             save_approval_record(report_output_dir, approval_record)
         else:
-            if ledger_record.get("approval_state") in {"ready-for-review", "needs-reapproval", "blocked", "not-applicable"}:
+            if ledger_record.get("approval_state") in {
+                "ready-for-review",
+                "needs-reapproval",
+                "blocked",
+                "not-applicable",
+            }:
                 parser.error(
                     "That approval subject is not currently eligible for a recurring local follow-up review."
                 )
             if str(ledger_record.get("follow_up_command") or "").strip() == "":
-                parser.error("That approval subject does not currently expose a follow-up review command.")
+                parser.error(
+                    "That approval subject does not currently expose a follow-up review command."
+                )
             followup_event = build_approval_followup_record(
                 ledger_record,
                 reviewer=args.approval_reviewer,
@@ -3320,7 +3622,11 @@ def main() -> None:
             approval_view="all",
         )
         updated_record = next(
-            (item for item in updated_bundle.get("approval_ledger", []) if item.get("approval_id") == approval_id),
+            (
+                item
+                for item in updated_bundle.get("approval_ledger", [])
+                if item.get("approval_id") == approval_id
+            ),
             ledger_record,
         )
         if args.approve_governance or args.approve_packet:
@@ -3496,8 +3802,12 @@ def main() -> None:
         if getattr(args, "apply_metadata", False):
             results = apply_metadata_updates(client, args.username, updates, dry_run=dry_run)
             all_results.extend(results)
-            ok_count = sum(1 for r in results for a in r.get("actions", []) if a.get("ok") or a.get("dry_run"))
-            print_info(f"Metadata updates: {ok_count} actions {'previewed' if dry_run else 'applied'}")
+            ok_count = sum(
+                1 for r in results for a in r.get("actions", []) if a.get("ok") or a.get("dry_run")
+            )
+            print_info(
+                f"Metadata updates: {ok_count} actions {'previewed' if dry_run else 'applied'}"
+            )
 
         if getattr(args, "apply_readmes", False):
             results = apply_readme_updates(client, args.username, updates, dry_run=dry_run)
@@ -3638,7 +3948,9 @@ def main() -> None:
             report.runtime_breakdown = runtime_stats
             _apply_requested_reconciliation(report, args, audits)
             outputs = _write_report_outputs(report, args, output_dir, client=client, cache=cache)
-            _print_output_summary(f"Audited {report.repos_audited} repos for {report.username}", report, outputs)
+            _print_output_summary(
+                f"Audited {report.repos_audited} repos for {report.username}", report, outputs
+            )
 
             if getattr(args, "create_issues", False):
                 from src.issue_creator import create_audit_issues
@@ -3674,7 +3986,11 @@ def main() -> None:
 
         # Fallback: --skip-clone was used, write raw metadata only
         raw_path = _write_json(
-            args.username, repos, errors, total_fetched, output_dir,
+            args.username,
+            repos,
+            errors,
+            total_fetched,
+            output_dir,
         )
         print(
             f"\n✓ Fetched {total_fetched} repos for {args.username}\n"
@@ -3692,10 +4008,7 @@ def main() -> None:
                 args,
                 scoring_profile=normalize_scoring_profile(args.scoring_profile),
             )
-            print_info(
-                "Watch decision: "
-                f"{watch_plan.mode} ({watch_plan.reason})"
-            )
+            print_info(f"Watch decision: {watch_plan.mode} ({watch_plan.reason})")
             original_incremental = args.incremental
             original_repos = args.repos
             setattr(args, "_watch_plan", watch_plan)
