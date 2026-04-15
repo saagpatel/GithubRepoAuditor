@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 CONTRACT_VERSION = "decision_quality_v1"
-AUTHORITY_CAP = "advisory-only"
+AUTHORITY_CAP = "bounded-automation"
 DEFAULT_EVIDENCE_WINDOW_RUNS = 20
 DEFAULT_VALIDATION_WINDOW_RUNS = 2
 
@@ -176,9 +176,7 @@ def decision_quality_from_summary(summary: dict[str, Any]) -> dict[str, Any]:
             or DEFAULT_EVIDENCE_WINDOW_RUNS
         ),
         "validation_window_runs": DEFAULT_VALIDATION_WINDOW_RUNS,
-        "judged_recommendation_count": int(
-            summary.get("validated_recommendation_count", 0) or 0
-        )
+        "judged_recommendation_count": int(summary.get("validated_recommendation_count", 0) or 0)
         + int(summary.get("partially_validated_recommendation_count", 0) or 0)
         + int(summary.get("unresolved_recommendation_count", 0) or 0)
         + int(summary.get("reopened_recommendation_count", 0) or 0),
@@ -188,16 +186,12 @@ def decision_quality_from_summary(summary: dict[str, Any]) -> dict[str, Any]:
         "partially_validated_recommendation_count": int(
             summary.get("partially_validated_recommendation_count", 0) or 0
         ),
-        "reopened_recommendation_count": int(
-            summary.get("reopened_recommendation_count", 0) or 0
-        ),
+        "reopened_recommendation_count": int(summary.get("reopened_recommendation_count", 0) or 0),
         "unresolved_recommendation_count": int(
             summary.get("unresolved_recommendation_count", 0) or 0
         ),
         "high_confidence_hit_rate": float(summary.get("high_confidence_hit_rate", 0.0) or 0.0),
-        "medium_confidence_hit_rate": float(
-            summary.get("medium_confidence_hit_rate", 0.0) or 0.0
-        ),
+        "medium_confidence_hit_rate": float(summary.get("medium_confidence_hit_rate", 0.0) or 0.0),
         "low_confidence_caution_rate": float(
             summary.get("low_confidence_caution_rate", 0.0) or 0.0
         ),
@@ -342,10 +336,7 @@ def _downgrade_reasons(
         reasons.append("trust-exception-active")
     if str(resolution_trend.get("primary_target_trust_recovery_status", "none")) == "blocked":
         reasons.append("trust-recovery-blocked")
-    if (
-        str(resolution_trend.get("primary_target_exception_retirement_status", "none"))
-        == "blocked"
-    ):
+    if str(resolution_trend.get("primary_target_exception_retirement_status", "none")) == "blocked":
         reasons.append("exception-retirement-blocked")
     if str(resolution_trend.get("primary_target_policy_debt_status", "none")) == "class-debt":
         reasons.append("class-policy-debt")

@@ -8,7 +8,7 @@ from typing import Any
 from src.report_enrichment import build_weekly_review_pack
 
 CONTRACT_VERSION = "weekly_command_center_digest_v1"
-AUTHORITY_CAP = "report-only"
+AUTHORITY_CAP = "bounded-automation"
 MAX_PATH_ATTENTION_ITEMS = 5
 MAX_REPO_BRIEFINGS = 3
 MAX_RISK_ATTENTION_ITEMS = 5

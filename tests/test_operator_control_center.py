@@ -86,7 +86,12 @@ def _make_report(**overrides) -> dict:
                 "drift_type": "approval-invalidated",
             }
         ],
-        "campaign_summary": {"campaign_type": "security-review", "label": "Security Review", "action_count": 2, "repo_count": 2},
+        "campaign_summary": {
+            "campaign_type": "security-review",
+            "label": "Security Review",
+            "action_count": 2,
+            "repo_count": 2,
+        },
         "writeback_preview": {"sync_mode": "reconcile"},
         "governance_preview": {
             "actions": [
@@ -165,17 +170,20 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
     assert summary["primary_target_confidence_score"] >= 0.75
     assert summary["next_action_confidence_label"] == "high"
     assert summary["decision_quality_v1"]["contract_version"] == "decision_quality_v1"
-    assert summary["decision_quality_v1"]["authority_cap"] == "advisory-only"
-    assert summary["decision_quality_v1"]["recommendation_quality_summary"] == summary[
-        "recommendation_quality_summary"
-    ]
-    assert summary["decision_quality_v1"]["confidence_validation_status"] == summary[
-        "confidence_validation_status"
-    ]
-    assert summary["decision_quality_v1"]["primary_target_trust_policy"] == summary[
-        "primary_target_trust_policy"
-    ]
-    assert summary["decision_quality_authority_cap"] == "advisory-only"
+    assert summary["decision_quality_v1"]["authority_cap"] == "bounded-automation"
+    assert (
+        summary["decision_quality_v1"]["recommendation_quality_summary"]
+        == summary["recommendation_quality_summary"]
+    )
+    assert (
+        summary["decision_quality_v1"]["confidence_validation_status"]
+        == summary["confidence_validation_status"]
+    )
+    assert (
+        summary["decision_quality_v1"]["primary_target_trust_policy"]
+        == summary["primary_target_trust_policy"]
+    )
+    assert summary["decision_quality_authority_cap"] == "bounded-automation"
 
     assert summary["primary_target_trust_policy"] == "act-now"
     assert "blocked" in summary["primary_target_trust_policy_reason"].lower()
@@ -183,12 +191,41 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
     assert summary["recommendation_drift_status"] == "stable"
     assert summary["primary_target_recovery_confidence_label"] in {"low", "medium", "high"}
     assert "recovery confidence" in summary["recovery_confidence_summary"].lower()
-    assert summary["primary_target_exception_retirement_status"] in {"none", "candidate", "blocked", "retired"}
-    assert summary["primary_target_policy_debt_status"] in {"none", "watch", "class-debt", "one-off-noise"}
-    assert summary["primary_target_class_normalization_status"] in {"none", "candidate", "applied", "blocked"}
-    assert summary["primary_target_class_memory_freshness_status"] in {"fresh", "mixed-age", "stale", "insufficient-data"}
-    assert summary["primary_target_class_decay_status"] in {"none", "normalization-decayed", "policy-debt-decayed", "blocked"}
-    assert summary["primary_target_class_trust_reweight_direction"] in {"supporting-normalization", "neutral", "supporting-caution"}
+    assert summary["primary_target_exception_retirement_status"] in {
+        "none",
+        "candidate",
+        "blocked",
+        "retired",
+    }
+    assert summary["primary_target_policy_debt_status"] in {
+        "none",
+        "watch",
+        "class-debt",
+        "one-off-noise",
+    }
+    assert summary["primary_target_class_normalization_status"] in {
+        "none",
+        "candidate",
+        "applied",
+        "blocked",
+    }
+    assert summary["primary_target_class_memory_freshness_status"] in {
+        "fresh",
+        "mixed-age",
+        "stale",
+        "insufficient-data",
+    }
+    assert summary["primary_target_class_decay_status"] in {
+        "none",
+        "normalization-decayed",
+        "policy-debt-decayed",
+        "blocked",
+    }
+    assert summary["primary_target_class_trust_reweight_direction"] in {
+        "supporting-normalization",
+        "neutral",
+        "supporting-caution",
+    }
     assert -0.95 <= summary["primary_target_class_trust_reweight_score"] <= 0.95
     assert 0.0 <= summary["primary_target_weighted_class_support_score"] <= 0.95
     assert 0.0 <= summary["primary_target_weighted_class_caution_score"] <= 0.95
@@ -200,7 +237,11 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
         "unstable",
         "insufficient-data",
     }
-    assert summary["primary_target_class_reweight_stability_status"] in {"stable", "watch", "oscillating"}
+    assert summary["primary_target_class_reweight_stability_status"] in {
+        "stable",
+        "watch",
+        "oscillating",
+    }
     assert summary["primary_target_class_reweight_transition_status"] in {
         "none",
         "pending-support",
@@ -224,7 +265,11 @@ def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
         "expired",
         "blocked",
     }
-    assert summary["primary_target_transition_closure_confidence_label"] in {"high", "medium", "low"}
+    assert summary["primary_target_transition_closure_confidence_label"] in {
+        "high",
+        "medium",
+        "low",
+    }
     assert summary["primary_target_transition_closure_likely_outcome"] in {
         "none",
         "confirm-soon",
@@ -298,7 +343,9 @@ def test_operator_snapshot_includes_phase_84_outcomes(monkeypatch, tmp_path: Pat
     monkeypatch.setattr(
         operator_control_center,
         "load_review_history",
-        lambda *args, **kwargs: [{"repo": "RepoA", "title": "RepoA", "summary": "RepoA reopened after review."}],
+        lambda *args, **kwargs: [
+            {"repo": "RepoA", "title": "RepoA", "summary": "RepoA reopened after review."}
+        ],
     )
     monkeypatch.setattr(
         operator_control_center,
@@ -308,23 +355,48 @@ def test_operator_snapshot_includes_phase_84_outcomes(monkeypatch, tmp_path: Pat
                 {
                     "run_id": "run-1",
                     "generated_at": "2026-04-01T00:00:00+00:00",
-                    "operator_summary": {"blocked_count": 0, "urgent_count": 0, "resolved_attention_count": 1, "reopened_attention_count": 0},
+                    "operator_summary": {
+                        "blocked_count": 0,
+                        "urgent_count": 0,
+                        "resolved_attention_count": 1,
+                        "reopened_attention_count": 0,
+                    },
                     "operator_queue": [],
                 },
                 {
                     "run_id": "run-2",
                     "generated_at": "2026-04-02T00:00:00+00:00",
-                    "operator_summary": {"blocked_count": 0, "urgent_count": 1, "resolved_attention_count": 1, "reopened_attention_count": 1},
-                    "operator_queue": [{"item_id": "a", "repo": "RepoA", "title": "RepoA", "lane": "urgent"}],
+                    "operator_summary": {
+                        "blocked_count": 0,
+                        "urgent_count": 1,
+                        "resolved_attention_count": 1,
+                        "reopened_attention_count": 1,
+                    },
+                    "operator_queue": [
+                        {"item_id": "a", "repo": "RepoA", "title": "RepoA", "lane": "urgent"}
+                    ],
                 },
                 {
                     "run_id": "run-3",
                     "generated_at": "2026-04-03T00:00:00+00:00",
-                    "operator_summary": {"blocked_count": 0, "urgent_count": 0, "resolved_attention_count": 1, "reopened_attention_count": 0},
+                    "operator_summary": {
+                        "blocked_count": 0,
+                        "urgent_count": 0,
+                        "resolved_attention_count": 1,
+                        "reopened_attention_count": 0,
+                    },
                     "operator_queue": [],
                 },
             ],
-            "events": [{"repo": "RepoA", "action_id": "action-1", "outcome": "reopened", "event_type": "open", "summary": "RepoA reopened."}],
+            "events": [
+                {
+                    "repo": "RepoA",
+                    "action_id": "action-1",
+                    "outcome": "reopened",
+                    "event_type": "open",
+                    "summary": "RepoA reopened.",
+                }
+            ],
         },
     )
 
@@ -519,7 +591,9 @@ def test_operator_snapshot_includes_phase_84_outcomes(monkeypatch, tmp_path: Pat
         "clearance-reset",
         "blocked",
     }
-    assert summary["primary_target_closure_forecast_reset_reentry_rebuild_refresh_recovery_status"] in {
+    assert summary[
+        "primary_target_closure_forecast_reset_reentry_rebuild_refresh_recovery_status"
+    ] in {
         "none",
         "recovering-confirmation-rebuild-reset",
         "recovering-clearance-rebuild-reset",
@@ -536,7 +610,9 @@ def test_operator_snapshot_includes_phase_84_outcomes(monkeypatch, tmp_path: Pat
         "reentered-clearance-rebuild",
         "blocked",
     }
-    assert summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_persistence_status"] in {
+    assert summary[
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_persistence_status"
+    ] in {
         "none",
         "just-reentered",
         "holding-confirmation-rebuild-reentry",
@@ -546,19 +622,25 @@ def test_operator_snapshot_includes_phase_84_outcomes(monkeypatch, tmp_path: Pat
         "reversing",
         "insufficient-data",
     }
-    assert summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_churn_status"] in {
+    assert summary[
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_churn_status"
+    ] in {
         "none",
         "watch",
         "churn",
         "blocked",
     }
-    assert summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_freshness_status"] in {
+    assert summary[
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_freshness_status"
+    ] in {
         "fresh",
         "mixed-age",
         "stale",
         "insufficient-data",
     }
-    assert summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_reset_status"] in {
+    assert summary[
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_reset_status"
+    ] in {
         "none",
         "confirmation-softened",
         "clearance-softened",
@@ -566,7 +648,9 @@ def test_operator_snapshot_includes_phase_84_outcomes(monkeypatch, tmp_path: Pat
         "clearance-reset",
         "blocked",
     }
-    assert summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_status"] in {
+    assert summary[
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_status"
+    ] in {
         "none",
         "recovering-confirmation-rebuild-reentry-reset",
         "recovering-clearance-rebuild-reentry-reset",
@@ -575,7 +659,9 @@ def test_operator_snapshot_includes_phase_84_outcomes(monkeypatch, tmp_path: Pat
         "reversing",
         "blocked",
     }
-    assert summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_status"] in {
+    assert summary[
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_status"
+    ] in {
         "none",
         "pending-confirmation-rebuild-reentry-restore",
         "pending-clearance-rebuild-reentry-restore",
@@ -583,13 +669,17 @@ def test_operator_snapshot_includes_phase_84_outcomes(monkeypatch, tmp_path: Pat
         "restored-clearance-rebuild-reentry",
         "blocked",
     }
-    assert summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_status"] in {
+    assert summary[
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_status"
+    ] in {
         "fresh",
         "mixed-age",
         "stale",
         "insufficient-data",
     }
-    assert summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reset_status"] in {
+    assert summary[
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reset_status"
+    ] in {
         "none",
         "confirmation-softened",
         "clearance-softened",
@@ -756,7 +846,9 @@ def test_operator_snapshot_includes_phase_84_outcomes(monkeypatch, tmp_path: Pat
         "churn",
         "blocked",
     }
-    assert summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_persistence_status"] in {
+    assert summary[
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_persistence_status"
+    ] in {
         "none",
         "just-restored",
         "holding-confirmation-rebuild-reentry-restore",
@@ -766,7 +858,9 @@ def test_operator_snapshot_includes_phase_84_outcomes(monkeypatch, tmp_path: Pat
         "reversing",
         "insufficient-data",
     }
-    assert summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_churn_status"] in {
+    assert summary[
+        "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_churn_status"
+    ] in {
         "none",
         "watch",
         "churn",
@@ -775,42 +869,158 @@ def test_operator_snapshot_includes_phase_84_outcomes(monkeypatch, tmp_path: Pat
     assert -0.95 <= summary["primary_target_closure_forecast_reweight_score"] <= 0.95
     assert -0.95 <= summary["primary_target_closure_forecast_momentum_score"] <= 0.95
     assert -0.95 <= summary["primary_target_closure_forecast_refresh_recovery_score"] <= 0.95
-    assert -0.95 <= summary["primary_target_closure_forecast_reacquisition_persistence_score"] <= 0.95
+    assert (
+        -0.95 <= summary["primary_target_closure_forecast_reacquisition_persistence_score"] <= 0.95
+    )
     assert -0.95 <= summary["primary_target_closure_forecast_reset_refresh_recovery_score"] <= 0.95
-    assert -0.95 <= summary["primary_target_closure_forecast_reset_reentry_persistence_score"] <= 0.95
-    assert -0.95 <= summary["primary_target_closure_forecast_reset_reentry_refresh_recovery_score"] <= 0.95
-    assert -0.95 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_persistence_score"] <= 0.95
-    assert -0.95 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_refresh_recovery_score"] <= 0.95
-    assert -0.95 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_persistence_score"] <= 0.95
-    assert -0.95 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_score"] <= 0.95
-    assert -0.95 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_persistence_score"] <= 0.95
-    assert -0.95 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_score"] <= 0.95
-    assert -0.95 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_score"] <= 0.95
-    assert -0.95 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score"] <= 0.95
-    assert -0.95 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_score"] <= 0.95
-    assert -0.95 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score"] <= 0.95
+    assert (
+        -0.95 <= summary["primary_target_closure_forecast_reset_reentry_persistence_score"] <= 0.95
+    )
+    assert (
+        -0.95
+        <= summary["primary_target_closure_forecast_reset_reentry_refresh_recovery_score"]
+        <= 0.95
+    )
+    assert (
+        -0.95
+        <= summary["primary_target_closure_forecast_reset_reentry_rebuild_persistence_score"]
+        <= 0.95
+    )
+    assert (
+        -0.95
+        <= summary["primary_target_closure_forecast_reset_reentry_rebuild_refresh_recovery_score"]
+        <= 0.95
+    )
+    assert (
+        -0.95
+        <= summary[
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_persistence_score"
+        ]
+        <= 0.95
+    )
+    assert (
+        -0.95
+        <= summary[
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_score"
+        ]
+        <= 0.95
+    )
+    assert (
+        -0.95
+        <= summary[
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_persistence_score"
+        ]
+        <= 0.95
+    )
+    assert (
+        -0.95
+        <= summary[
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_score"
+        ]
+        <= 0.95
+    )
+    assert (
+        -0.95
+        <= summary[
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_score"
+        ]
+        <= 0.95
+    )
+    assert (
+        -0.95
+        <= summary[
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score"
+        ]
+        <= 0.95
+    )
+    assert (
+        -0.95
+        <= summary[
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_score"
+        ]
+        <= 0.95
+    )
+    assert (
+        -0.95
+        <= summary[
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score"
+        ]
+        <= 0.95
+    )
     assert 0.0 <= summary["primary_target_closure_forecast_recovery_churn_score"] <= 0.95
     assert 0.0 <= summary["primary_target_closure_forecast_reset_reentry_churn_score"] <= 0.95
-    assert 0.0 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_churn_score"] <= 0.95
-    assert 0.0 <= summary["primary_target"]["decayed_rerestored_rebuild_reentry_confirmation_rate"] <= 1.0
-    assert 0.0 <= summary["primary_target"]["decayed_rerestored_rebuild_reentry_clearance_rate"] <= 1.0
-    assert 0.0 <= summary["primary_target"]["decayed_rererestored_rebuild_reentry_confirmation_rate"] <= 1.0
-    assert 0.0 <= summary["primary_target"]["decayed_rererestored_rebuild_reentry_clearance_rate"] <= 1.0
     assert (
-        summary["closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_decay_window_runs"]
+        0.0 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_churn_score"] <= 0.95
+    )
+    assert (
+        0.0
+        <= summary["primary_target"]["decayed_rerestored_rebuild_reentry_confirmation_rate"]
+        <= 1.0
+    )
+    assert (
+        0.0 <= summary["primary_target"]["decayed_rerestored_rebuild_reentry_clearance_rate"] <= 1.0
+    )
+    assert (
+        0.0
+        <= summary["primary_target"]["decayed_rererestored_rebuild_reentry_confirmation_rate"]
+        <= 1.0
+    )
+    assert (
+        0.0
+        <= summary["primary_target"]["decayed_rererestored_rebuild_reentry_clearance_rate"]
+        <= 1.0
+    )
+    assert (
+        summary[
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_decay_window_runs"
+        ]
         == 4
     )
-    assert 0.0 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_churn_score"] <= 0.95
-    assert 0.0 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_churn_score"] <= 0.95
-    assert 0.0 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_score"] <= 0.95
-    assert 0.0 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_score"] <= 0.95
-    assert 0.0 <= summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_score"] <= 0.95
+    assert (
+        0.0
+        <= summary["primary_target_closure_forecast_reset_reentry_rebuild_reentry_churn_score"]
+        <= 0.95
+    )
+    assert (
+        0.0
+        <= summary[
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_churn_score"
+        ]
+        <= 0.95
+    )
+    assert (
+        0.0
+        <= summary[
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_score"
+        ]
+        <= 0.95
+    )
+    assert (
+        0.0
+        <= summary[
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_score"
+        ]
+        <= 0.95
+    )
+    assert (
+        0.0
+        <= summary[
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_score"
+        ]
+        <= 0.95
+    )
     assert 0.0 <= summary["primary_target"]["decayed_confirmation_forecast_rate"] <= 1.0
     assert 0.0 <= summary["primary_target"]["decayed_clearance_forecast_rate"] <= 1.0
     assert 0.0 <= summary["primary_target"]["decayed_rebuilt_confirmation_reentry_rate"] <= 1.0
     assert 0.0 <= summary["primary_target"]["decayed_rebuilt_clearance_reentry_rate"] <= 1.0
-    assert 0.0 <= summary["primary_target"]["decayed_restored_rebuild_reentry_confirmation_rate"] <= 1.0
-    assert 0.0 <= summary["primary_target"]["decayed_restored_rebuild_reentry_clearance_rate"] <= 1.0
+    assert (
+        0.0
+        <= summary["primary_target"]["decayed_restored_rebuild_reentry_confirmation_rate"]
+        <= 1.0
+    )
+    assert (
+        0.0 <= summary["primary_target"]["decayed_restored_rebuild_reentry_clearance_rate"] <= 1.0
+    )
     assert 0.0 <= summary["primary_target_weighted_pending_resolution_support_score"] <= 0.95
     assert 0.0 <= summary["primary_target_weighted_pending_debt_caution_score"] <= 0.95
     assert summary["class_decay_window_runs"] == 4
@@ -821,12 +1031,35 @@ def test_operator_snapshot_includes_phase_84_outcomes(monkeypatch, tmp_path: Pat
     assert summary["closure_forecast_reset_reentry_rebuild_reentry_refresh_window_runs"] == 4
     assert summary["closure_forecast_reset_reentry_rebuild_reentry_restore_window_runs"] == 4
     assert summary["closure_forecast_reset_reentry_rebuild_reentry_restore_decay_window_runs"] == 4
-    assert summary["closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_window_runs"] == 4
-    assert summary["closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_window_runs"] == 4
-    assert summary["closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_window_runs"] == 4
-    assert summary["closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_window_runs"] == 4
-    assert summary["closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_decay_window_runs"] == 4
-    assert summary["closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_window_runs"] == 4
+    assert (
+        summary["closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_window_runs"] == 4
+    )
+    assert (
+        summary["closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_window_runs"]
+        == 4
+    )
+    assert (
+        summary[
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_window_runs"
+        ]
+        == 4
+    )
+    assert (
+        summary["closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_window_runs"]
+        == 4
+    )
+    assert (
+        summary[
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_decay_window_runs"
+        ]
+        == 4
+    )
+    assert (
+        summary[
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_window_runs"
+        ]
+        == 4
+    )
     assert summary["class_normalization_window_runs"] == 4
     assert summary["class_reweighting_window_runs"] == 4
     assert summary["class_transition_window_runs"] == 4
@@ -843,7 +1076,10 @@ def test_operator_snapshot_includes_phase_84_outcomes(monkeypatch, tmp_path: Pat
     assert summary["closure_forecast_reset_reentry_decay_window_runs"] == 4
     assert summary["closure_forecast_reset_reentry_refresh_window_runs"] == 4
     assert summary["closure_forecast_reset_reentry_rebuild_window_runs"] == 4
-    assert "guidance" in summary["adaptive_confidence_summary"].lower() or "immediate action" in summary["adaptive_confidence_summary"].lower()
+    assert (
+        "guidance" in summary["adaptive_confidence_summary"].lower()
+        or "immediate action" in summary["adaptive_confidence_summary"].lower()
+    )
     assert summary["recommendation_quality_summary"].startswith("Strong recommendation because")
 
 
@@ -896,7 +1132,9 @@ def test_operator_snapshot_adds_follow_through_from_recent_history(tmp_path: Pat
         "src.operator_control_center.load_operator_state_history",
         lambda *_args, **_kwargs: [
             {
-                "operator_summary": {"counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}},
+                "operator_summary": {
+                    "counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}
+                },
                 "operator_queue": [
                     {
                         "item_id": "campaign-drift:campaign-1:github-issue",
@@ -908,7 +1146,9 @@ def test_operator_snapshot_adds_follow_through_from_recent_history(tmp_path: Pat
                 ],
             },
             {
-                "operator_summary": {"counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}},
+                "operator_summary": {
+                    "counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}
+                },
                 "operator_queue": [
                     {
                         "item_id": "campaign-drift:campaign-1:github-issue",
@@ -1042,12 +1282,12 @@ def test_project_queue_follow_through_marks_calmer_post_escalation_items_as_reco
         {"items": {key: queue[0]}, "has_attention": True},
         {
             "items": {
-                    key: {
-                        "lane": "urgent",
-                        "age_days": 6,
-                        "follow_through_status": "stale-follow-through",
-                        "follow_through_checkpoint_status": "overdue",
-                        "follow_through_escalation_status": "escalate-now",
+                key: {
+                    "lane": "urgent",
+                    "age_days": 6,
+                    "follow_through_status": "stale-follow-through",
+                    "follow_through_checkpoint_status": "overdue",
+                    "follow_through_escalation_status": "escalate-now",
                 }
             },
             "has_attention": True,
@@ -1459,51 +1699,60 @@ def test_project_queue_follow_through_marks_repeated_recovery_flips_as_churn():
     item = enriched[0]
     assert item["follow_through_recovery_status"] == "relapsing"
     assert item["follow_through_relapse_churn_status"] == "churn"
-    assert "churning between calmer and escalated states" in item["follow_through_relapse_churn_summary"]
+    assert (
+        "churning between calmer and escalated states"
+        in item["follow_through_relapse_churn_summary"]
+    )
 
 
 def test_follow_through_reacquisition_durability_progresses_from_new_to_durable():
     item = {"repo": "RepoD", "title": "RepoD drift needs review"}
 
-    age_runs, status, reason, summary = operator_follow_through._follow_through_reacquisition_durability_projection(
-        item,
-        [],
-        follow_through_recovery_reacquisition_status="just-reacquired",
-        follow_through_relapse_churn_status="none",
-        follow_through_recovery_freshness_status="fresh",
-        follow_through_recovery_decay_status="none",
-        follow_through_recovery_memory_reset_status="rebuilding",
+    age_runs, status, reason, summary = (
+        operator_follow_through._follow_through_reacquisition_durability_projection(
+            item,
+            [],
+            follow_through_recovery_reacquisition_status="just-reacquired",
+            follow_through_relapse_churn_status="none",
+            follow_through_recovery_freshness_status="fresh",
+            follow_through_recovery_decay_status="none",
+            follow_through_recovery_memory_reset_status="rebuilding",
+        )
     )
     assert age_runs == 1
     assert status == "just-reacquired"
     assert "too new to treat as durable" in reason
     assert "still needs more confirmation" in summary
 
-    age_runs, status, reason, summary = operator_follow_through._follow_through_reacquisition_durability_projection(
-        item,
-        [{"follow_through_recovery_reacquisition_status": "just-reacquired"}],
-        follow_through_recovery_reacquisition_status="holding-reacquired",
-        follow_through_relapse_churn_status="none",
-        follow_through_recovery_freshness_status="fresh",
-        follow_through_recovery_decay_status="none",
-        follow_through_recovery_memory_reset_status="rebuilding",
+    age_runs, status, reason, summary = (
+        operator_follow_through._follow_through_reacquisition_durability_projection(
+            item,
+            [{"follow_through_recovery_reacquisition_status": "just-reacquired"}],
+            follow_through_recovery_reacquisition_status="holding-reacquired",
+            follow_through_relapse_churn_status="none",
+            follow_through_recovery_freshness_status="fresh",
+            follow_through_recovery_decay_status="none",
+            follow_through_recovery_memory_reset_status="rebuilding",
+        )
     )
     assert age_runs == 2
     assert status == "consolidating"
     assert "still consolidating rather than stable" in reason
     assert "now consolidating it" in summary
 
-    age_runs, status, reason, summary = operator_follow_through._follow_through_reacquisition_durability_projection(
-        item,
-        [
-            {"follow_through_recovery_reacquisition_durability_status": "holding-reacquired"},
-            {"follow_through_recovery_reacquisition_durability_status": "holding-reacquired"},
-        ],
-        follow_through_recovery_reacquisition_status="reacquired",
-        follow_through_relapse_churn_status="none",
-        follow_through_recovery_freshness_status="holding-fresh",
-        follow_through_recovery_decay_status="none",
-        follow_through_recovery_memory_reset_status="rebuilding",
+    age_runs, status, reason, summary = (
+        operator_follow_through._follow_through_reacquisition_durability_projection(
+            item,
+            [
+                {"follow_through_recovery_reacquisition_durability_status": "holding-reacquired"},
+                {"follow_through_recovery_reacquisition_durability_status": "holding-reacquired"},
+            ],
+            follow_through_recovery_reacquisition_status="reacquired",
+            follow_through_relapse_churn_status="none",
+            follow_through_recovery_freshness_status="holding-fresh",
+            follow_through_recovery_decay_status="none",
+            follow_through_recovery_memory_reset_status="rebuilding",
+        )
     )
     assert age_runs == 3
     assert status == "durable-reacquired"
@@ -1514,14 +1763,16 @@ def test_follow_through_reacquisition_durability_progresses_from_new_to_durable(
 def test_follow_through_reacquisition_durability_softens_when_reacquisition_wobbles():
     item = {"repo": "RepoD", "title": "RepoD drift needs review"}
 
-    age_runs, status, reason, summary = operator_follow_through._follow_through_reacquisition_durability_projection(
-        item,
-        [{"follow_through_recovery_reacquisition_status": "holding-reacquired"}],
-        follow_through_recovery_reacquisition_status="fragile-reacquisition",
-        follow_through_relapse_churn_status="fragile",
-        follow_through_recovery_freshness_status="mixed-age",
-        follow_through_recovery_decay_status="softening",
-        follow_through_recovery_memory_reset_status="reset-watch",
+    age_runs, status, reason, summary = (
+        operator_follow_through._follow_through_reacquisition_durability_projection(
+            item,
+            [{"follow_through_recovery_reacquisition_status": "holding-reacquired"}],
+            follow_through_recovery_reacquisition_status="fragile-reacquisition",
+            follow_through_relapse_churn_status="fragile",
+            follow_through_recovery_freshness_status="mixed-age",
+            follow_through_recovery_decay_status="softening",
+            follow_through_recovery_memory_reset_status="reset-watch",
+        )
     )
     assert age_runs == 1
     assert status == "softening"
@@ -1532,40 +1783,46 @@ def test_follow_through_reacquisition_durability_softens_when_reacquisition_wobb
 def test_follow_through_reacquisition_consolidation_tracks_holding_durable_and_reversing_states():
     item = {"repo": "RepoD", "title": "RepoD drift needs review"}
 
-    status, reason, summary = operator_follow_through._follow_through_reacquisition_consolidation_projection(
-        item,
-        [{"follow_through_recovery_reacquisition_durability_status": "holding-reacquired"}],
-        follow_through_recovery_reacquisition_status="holding-reacquired",
-        follow_through_recovery_reacquisition_durability_status="holding-reacquired",
-        follow_through_relapse_churn_status="none",
-        follow_through_recovery_freshness_status="fresh",
-        follow_through_recovery_decay_status="none",
+    status, reason, summary = (
+        operator_follow_through._follow_through_reacquisition_consolidation_projection(
+            item,
+            [{"follow_through_recovery_reacquisition_durability_status": "holding-reacquired"}],
+            follow_through_recovery_reacquisition_status="holding-reacquired",
+            follow_through_recovery_reacquisition_durability_status="holding-reacquired",
+            follow_through_relapse_churn_status="none",
+            follow_through_recovery_freshness_status="fresh",
+            follow_through_recovery_decay_status="none",
+        )
     )
     assert status == "holding-confidence"
     assert "restored confidence is now consolidating cleanly" in reason
     assert "restored calmer confidence is now holding" in summary
 
-    status, reason, summary = operator_follow_through._follow_through_reacquisition_consolidation_projection(
-        item,
-        [],
-        follow_through_recovery_reacquisition_status="reacquired",
-        follow_through_recovery_reacquisition_durability_status="durable-reacquired",
-        follow_through_relapse_churn_status="none",
-        follow_through_recovery_freshness_status="fresh",
-        follow_through_recovery_decay_status="none",
+    status, reason, summary = (
+        operator_follow_through._follow_through_reacquisition_consolidation_projection(
+            item,
+            [],
+            follow_through_recovery_reacquisition_status="reacquired",
+            follow_through_recovery_reacquisition_durability_status="durable-reacquired",
+            follow_through_relapse_churn_status="none",
+            follow_through_recovery_freshness_status="fresh",
+            follow_through_recovery_decay_status="none",
+        )
     )
     assert status == "durable-confidence"
     assert "safely consolidated" in reason
     assert "now looks durable" in summary
 
-    status, reason, summary = operator_follow_through._follow_through_reacquisition_consolidation_projection(
-        item,
-        [{"follow_through_recovery_reacquisition_consolidation_status": "holding-confidence"}],
-        follow_through_recovery_reacquisition_status="holding-reacquired",
-        follow_through_recovery_reacquisition_durability_status="holding-reacquired",
-        follow_through_relapse_churn_status="fragile",
-        follow_through_recovery_freshness_status="mixed-age",
-        follow_through_recovery_decay_status="softening",
+    status, reason, summary = (
+        operator_follow_through._follow_through_reacquisition_consolidation_projection(
+            item,
+            [{"follow_through_recovery_reacquisition_consolidation_status": "holding-confidence"}],
+            follow_through_recovery_reacquisition_status="holding-reacquired",
+            follow_through_recovery_reacquisition_durability_status="holding-reacquired",
+            follow_through_relapse_churn_status="fragile",
+            follow_through_recovery_freshness_status="mixed-age",
+            follow_through_recovery_decay_status="softening",
+        )
     )
     assert status == "reversing"
     assert "already pushing that confidence back down" in reason
@@ -1573,16 +1830,18 @@ def test_follow_through_reacquisition_consolidation_tracks_holding_durable_and_r
 
 
 def test_follow_through_revalidation_recovery_stays_under_revalidation_while_revalidation_is_active():
-    age_runs, status, reason, summary = operator_follow_through._follow_through_reacquisition_revalidation_recovery_projection(
-        {"repo": "RepoD", "title": "RepoD drift needs review"},
-        [],
-        follow_through_recovery_reacquisition_status="reacquiring",
-        follow_through_recovery_reacquisition_durability_status="consolidating",
-        follow_through_recovery_reacquisition_consolidation_status="fragile-confidence",
-        follow_through_reacquisition_softening_decay_status="revalidation-needed",
-        follow_through_reacquisition_confidence_retirement_status="revalidation-needed",
-        follow_through_recovery_freshness_status="fresh",
-        follow_through_recovery_decay_status="none",
+    age_runs, status, reason, summary = (
+        operator_follow_through._follow_through_reacquisition_revalidation_recovery_projection(
+            {"repo": "RepoD", "title": "RepoD drift needs review"},
+            [],
+            follow_through_recovery_reacquisition_status="reacquiring",
+            follow_through_recovery_reacquisition_durability_status="consolidating",
+            follow_through_recovery_reacquisition_consolidation_status="fragile-confidence",
+            follow_through_reacquisition_softening_decay_status="revalidation-needed",
+            follow_through_reacquisition_confidence_retirement_status="revalidation-needed",
+            follow_through_recovery_freshness_status="fresh",
+            follow_through_recovery_decay_status="none",
+        )
     )
 
     assert age_runs == 0
@@ -1592,16 +1851,18 @@ def test_follow_through_revalidation_recovery_stays_under_revalidation_while_rev
 
 
 def test_follow_through_revalidation_recovery_marks_rebuilding_when_revalidation_clears_but_confidence_is_not_back():
-    age_runs, status, reason, summary = operator_follow_through._follow_through_reacquisition_revalidation_recovery_projection(
-        {"repo": "RepoD", "title": "RepoD drift needs review"},
-        [{"follow_through_reacquisition_confidence_retirement_status": "revalidation-needed"}],
-        follow_through_recovery_reacquisition_status="reacquiring",
-        follow_through_recovery_reacquisition_durability_status="consolidating",
-        follow_through_recovery_reacquisition_consolidation_status="fragile-confidence",
-        follow_through_reacquisition_softening_decay_status="none",
-        follow_through_reacquisition_confidence_retirement_status="none",
-        follow_through_recovery_freshness_status="fresh",
-        follow_through_recovery_decay_status="none",
+    age_runs, status, reason, summary = (
+        operator_follow_through._follow_through_reacquisition_revalidation_recovery_projection(
+            {"repo": "RepoD", "title": "RepoD drift needs review"},
+            [{"follow_through_reacquisition_confidence_retirement_status": "revalidation-needed"}],
+            follow_through_recovery_reacquisition_status="reacquiring",
+            follow_through_recovery_reacquisition_durability_status="consolidating",
+            follow_through_recovery_reacquisition_consolidation_status="fragile-confidence",
+            follow_through_reacquisition_softening_decay_status="none",
+            follow_through_reacquisition_confidence_retirement_status="none",
+            follow_through_recovery_freshness_status="fresh",
+            follow_through_recovery_decay_status="none",
+        )
     )
 
     assert age_runs == 0
@@ -1611,16 +1872,18 @@ def test_follow_through_revalidation_recovery_marks_rebuilding_when_revalidation
 
 
 def test_follow_through_revalidation_recovery_marks_reearning_when_confidence_is_building_again():
-    age_runs, status, reason, summary = operator_follow_through._follow_through_reacquisition_revalidation_recovery_projection(
-        {"repo": "RepoD", "title": "RepoD drift needs review"},
-        [{"follow_through_reacquisition_confidence_retirement_status": "revalidation-needed"}],
-        follow_through_recovery_reacquisition_status="reacquired",
-        follow_through_recovery_reacquisition_durability_status="holding-reacquired",
-        follow_through_recovery_reacquisition_consolidation_status="building-confidence",
-        follow_through_reacquisition_softening_decay_status="none",
-        follow_through_reacquisition_confidence_retirement_status="none",
-        follow_through_recovery_freshness_status="holding-fresh",
-        follow_through_recovery_decay_status="none",
+    age_runs, status, reason, summary = (
+        operator_follow_through._follow_through_reacquisition_revalidation_recovery_projection(
+            {"repo": "RepoD", "title": "RepoD drift needs review"},
+            [{"follow_through_reacquisition_confidence_retirement_status": "revalidation-needed"}],
+            follow_through_recovery_reacquisition_status="reacquired",
+            follow_through_recovery_reacquisition_durability_status="holding-reacquired",
+            follow_through_recovery_reacquisition_consolidation_status="building-confidence",
+            follow_through_reacquisition_softening_decay_status="none",
+            follow_through_reacquisition_confidence_retirement_status="none",
+            follow_through_recovery_freshness_status="holding-fresh",
+            follow_through_recovery_decay_status="none",
+        )
     )
 
     assert age_runs == 0
@@ -1630,16 +1893,18 @@ def test_follow_through_revalidation_recovery_marks_reearning_when_confidence_is
 
 
 def test_follow_through_revalidation_recovery_marks_just_reearned_on_first_restored_confidence_run():
-    age_runs, status, reason, summary = operator_follow_through._follow_through_reacquisition_revalidation_recovery_projection(
-        {"repo": "RepoD", "title": "RepoD drift needs review"},
-        [{"follow_through_reacquisition_confidence_retirement_status": "revalidation-needed"}],
-        follow_through_recovery_reacquisition_status="reacquired",
-        follow_through_recovery_reacquisition_durability_status="durable-reacquired",
-        follow_through_recovery_reacquisition_consolidation_status="holding-confidence",
-        follow_through_reacquisition_softening_decay_status="none",
-        follow_through_reacquisition_confidence_retirement_status="none",
-        follow_through_recovery_freshness_status="holding-fresh",
-        follow_through_recovery_decay_status="none",
+    age_runs, status, reason, summary = (
+        operator_follow_through._follow_through_reacquisition_revalidation_recovery_projection(
+            {"repo": "RepoD", "title": "RepoD drift needs review"},
+            [{"follow_through_reacquisition_confidence_retirement_status": "revalidation-needed"}],
+            follow_through_recovery_reacquisition_status="reacquired",
+            follow_through_recovery_reacquisition_durability_status="durable-reacquired",
+            follow_through_recovery_reacquisition_consolidation_status="holding-confidence",
+            follow_through_reacquisition_softening_decay_status="none",
+            follow_through_reacquisition_confidence_retirement_status="none",
+            follow_through_recovery_freshness_status="holding-fresh",
+            follow_through_recovery_decay_status="none",
+        )
     )
 
     assert age_runs == 1
@@ -1649,19 +1914,25 @@ def test_follow_through_revalidation_recovery_marks_just_reearned_on_first_resto
 
 
 def test_follow_through_revalidation_recovery_marks_holding_reearned_after_confirming_run():
-    age_runs, status, reason, summary = operator_follow_through._follow_through_reacquisition_revalidation_recovery_projection(
-        {"repo": "RepoD", "title": "RepoD drift needs review"},
-        [
-            {"follow_through_reacquisition_revalidation_recovery_status": "just-reearned-confidence"},
-            {"follow_through_reacquisition_confidence_retirement_status": "revalidation-needed"},
-        ],
-        follow_through_recovery_reacquisition_status="reacquired",
-        follow_through_recovery_reacquisition_durability_status="durable-reacquired",
-        follow_through_recovery_reacquisition_consolidation_status="durable-confidence",
-        follow_through_reacquisition_softening_decay_status="none",
-        follow_through_reacquisition_confidence_retirement_status="none",
-        follow_through_recovery_freshness_status="holding-fresh",
-        follow_through_recovery_decay_status="none",
+    age_runs, status, reason, summary = (
+        operator_follow_through._follow_through_reacquisition_revalidation_recovery_projection(
+            {"repo": "RepoD", "title": "RepoD drift needs review"},
+            [
+                {
+                    "follow_through_reacquisition_revalidation_recovery_status": "just-reearned-confidence"
+                },
+                {
+                    "follow_through_reacquisition_confidence_retirement_status": "revalidation-needed"
+                },
+            ],
+            follow_through_recovery_reacquisition_status="reacquired",
+            follow_through_recovery_reacquisition_durability_status="durable-reacquired",
+            follow_through_recovery_reacquisition_consolidation_status="durable-confidence",
+            follow_through_reacquisition_softening_decay_status="none",
+            follow_through_reacquisition_confidence_retirement_status="none",
+            follow_through_recovery_freshness_status="holding-fresh",
+            follow_through_recovery_decay_status="none",
+        )
     )
 
     assert age_runs == 2
@@ -1671,16 +1942,18 @@ def test_follow_through_revalidation_recovery_marks_holding_reearned_after_confi
 
 
 def test_follow_through_revalidation_recovery_falls_back_to_insufficient_evidence_when_history_is_thin():
-    age_runs, status, reason, summary = operator_follow_through._follow_through_reacquisition_revalidation_recovery_projection(
-        {"repo": "RepoD", "title": "RepoD drift needs review"},
-        [{"follow_through_reacquisition_softening_decay_status": "revalidation-needed"}],
-        follow_through_recovery_reacquisition_status="reacquired",
-        follow_through_recovery_reacquisition_durability_status="insufficient-evidence",
-        follow_through_recovery_reacquisition_consolidation_status="insufficient-evidence",
-        follow_through_reacquisition_softening_decay_status="none",
-        follow_through_reacquisition_confidence_retirement_status="none",
-        follow_through_recovery_freshness_status="mixed-age",
-        follow_through_recovery_decay_status="aging",
+    age_runs, status, reason, summary = (
+        operator_follow_through._follow_through_reacquisition_revalidation_recovery_projection(
+            {"repo": "RepoD", "title": "RepoD drift needs review"},
+            [{"follow_through_reacquisition_softening_decay_status": "revalidation-needed"}],
+            follow_through_recovery_reacquisition_status="reacquired",
+            follow_through_recovery_reacquisition_durability_status="insufficient-evidence",
+            follow_through_recovery_reacquisition_consolidation_status="insufficient-evidence",
+            follow_through_reacquisition_softening_decay_status="none",
+            follow_through_reacquisition_confidence_retirement_status="none",
+            follow_through_recovery_freshness_status="mixed-age",
+            follow_through_recovery_decay_status="aging",
+        )
     )
 
     assert age_runs == 0
@@ -1715,7 +1988,9 @@ def test_operator_snapshot_marks_quiet_recovery_as_improving(tmp_path: Path, mon
         "src.operator_control_center.load_operator_state_history",
         lambda *_args, **_kwargs: [
             {
-                "operator_summary": {"counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}},
+                "operator_summary": {
+                    "counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}
+                },
                 "operator_queue": [
                     {
                         "item_id": "campaign-drift:campaign-1:github-issue",
@@ -1760,11 +2035,15 @@ def test_operator_snapshot_tracks_reopened_attention_items(tmp_path: Path, monke
         "src.operator_control_center.load_operator_state_history",
         lambda *_args, **_kwargs: [
             {
-                "operator_summary": {"counts": {"blocked": 0, "urgent": 0, "ready": 0, "deferred": 0}},
+                "operator_summary": {
+                    "counts": {"blocked": 0, "urgent": 0, "ready": 0, "deferred": 0}
+                },
                 "operator_queue": [],
             },
             {
-                "operator_summary": {"counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}},
+                "operator_summary": {
+                    "counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}
+                },
                 "operator_queue": [
                     {
                         "item_id": "campaign-drift:campaign-1:github-issue",
@@ -1801,11 +2080,15 @@ def test_operator_snapshot_prefers_reopened_urgent_over_fresh_urgent(tmp_path: P
         "src.operator_control_center.load_operator_state_history",
         lambda *_args, **_kwargs: [
             {
-                "operator_summary": {"counts": {"blocked": 0, "urgent": 0, "ready": 0, "deferred": 0}},
+                "operator_summary": {
+                    "counts": {"blocked": 0, "urgent": 0, "ready": 0, "deferred": 0}
+                },
                 "operator_queue": [],
             },
             {
-                "operator_summary": {"counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}},
+                "operator_summary": {
+                    "counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}
+                },
                 "operator_queue": [
                     {
                         "item_id": "campaign-drift:campaign-1:github-issue",
@@ -1838,12 +2121,16 @@ def test_operator_snapshot_prefers_reopened_urgent_over_fresh_urgent(tmp_path: P
     assert summary["primary_target"]["item_id"] == resolution_targets[0]["item_id"]
 
 
-def test_operator_snapshot_marks_chronic_targets_and_longest_persisting_item(tmp_path: Path, monkeypatch):
+def test_operator_snapshot_marks_chronic_targets_and_longest_persisting_item(
+    tmp_path: Path, monkeypatch
+):
     monkeypatch.setattr(
         "src.operator_control_center.load_operator_state_history",
         lambda *_args, **_kwargs: [
             {
-                "operator_summary": {"counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}},
+                "operator_summary": {
+                    "counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}
+                },
                 "operator_queue": [
                     {
                         "item_id": "campaign-drift:campaign-1:github-issue",
@@ -1855,7 +2142,9 @@ def test_operator_snapshot_marks_chronic_targets_and_longest_persisting_item(tmp
                 ],
             },
             {
-                "operator_summary": {"counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}},
+                "operator_summary": {
+                    "counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}
+                },
                 "operator_queue": [
                     {
                         "item_id": "campaign-drift:campaign-1:github-issue",
@@ -1867,7 +2156,9 @@ def test_operator_snapshot_marks_chronic_targets_and_longest_persisting_item(tmp
                 ],
             },
             {
-                "operator_summary": {"counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}},
+                "operator_summary": {
+                    "counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}
+                },
                 "operator_queue": [
                     {
                         "item_id": "campaign-drift:campaign-1:github-issue",
@@ -1879,7 +2170,9 @@ def test_operator_snapshot_marks_chronic_targets_and_longest_persisting_item(tmp
                 ],
             },
             {
-                "operator_summary": {"counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}},
+                "operator_summary": {
+                    "counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}
+                },
                 "operator_queue": [
                     {
                         "item_id": "campaign-drift:campaign-1:github-issue",
@@ -1914,14 +2207,18 @@ def test_operator_snapshot_marks_chronic_targets_and_longest_persisting_item(tmp
     assert "aging pressure" in summary["accountability_summary"].lower()
 
 
-def test_operator_snapshot_marks_attempted_when_recent_intervention_exists(tmp_path: Path, monkeypatch):
+def test_operator_snapshot_marks_attempted_when_recent_intervention_exists(
+    tmp_path: Path, monkeypatch
+):
     monkeypatch.setattr(
         "src.operator_control_center.load_recent_operator_evidence",
         lambda *_args, **_kwargs: {
             "history": [
                 {
                     "generated_at": "2026-03-28T12:00:00+00:00",
-                    "operator_summary": {"counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}},
+                    "operator_summary": {
+                        "counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}
+                    },
                     "operator_queue": [
                         {
                             "item_id": "campaign-drift:campaign-1:github-issue",
@@ -1946,7 +2243,17 @@ def test_operator_snapshot_marks_attempted_when_recent_intervention_exists(tmp_p
         },
     )
 
-    snapshot = build_operator_snapshot(_make_report(preflight_summary={}, material_changes=[], governance_drift=[], governance_preview={}, rollback_preview={}, review_targets=[]), output_dir=tmp_path)
+    snapshot = build_operator_snapshot(
+        _make_report(
+            preflight_summary={},
+            material_changes=[],
+            governance_drift=[],
+            governance_preview={},
+            rollback_preview={},
+            review_targets=[],
+        ),
+        output_dir=tmp_path,
+    )
     summary = snapshot["operator_summary"]
 
     assert summary["decision_memory_status"] == "attempted"
@@ -1955,24 +2262,32 @@ def test_operator_snapshot_marks_attempted_when_recent_intervention_exists(tmp_p
     assert "still open" in summary["primary_target_resolution_evidence"].lower()
 
 
-def test_operator_snapshot_tracks_confirmed_resolution_and_reopen_evidence(tmp_path: Path, monkeypatch):
+def test_operator_snapshot_tracks_confirmed_resolution_and_reopen_evidence(
+    tmp_path: Path, monkeypatch
+):
     monkeypatch.setattr(
         "src.operator_control_center.load_recent_operator_evidence",
         lambda *_args, **_kwargs: {
             "history": [
                 {
                     "generated_at": "2026-04-06T12:00:00+00:00",
-                    "operator_summary": {"counts": {"blocked": 0, "urgent": 0, "ready": 0, "deferred": 0}},
+                    "operator_summary": {
+                        "counts": {"blocked": 0, "urgent": 0, "ready": 0, "deferred": 0}
+                    },
                     "operator_queue": [],
                 },
                 {
                     "generated_at": "2026-04-05T12:00:00+00:00",
-                    "operator_summary": {"counts": {"blocked": 0, "urgent": 0, "ready": 0, "deferred": 0}},
+                    "operator_summary": {
+                        "counts": {"blocked": 0, "urgent": 0, "ready": 0, "deferred": 0}
+                    },
                     "operator_queue": [],
                 },
                 {
                     "generated_at": "2026-04-04T12:00:00+00:00",
-                    "operator_summary": {"counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}},
+                    "operator_summary": {
+                        "counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}
+                    },
                     "operator_queue": [
                         {
                             "item_id": "campaign-drift:campaign-1:github-issue",
@@ -2013,17 +2328,23 @@ def test_operator_snapshot_tracks_confirmed_resolution_and_reopen_evidence(tmp_p
             "history": [
                 {
                     "generated_at": "2026-04-06T12:00:00+00:00",
-                    "operator_summary": {"counts": {"blocked": 0, "urgent": 0, "ready": 0, "deferred": 0}},
+                    "operator_summary": {
+                        "counts": {"blocked": 0, "urgent": 0, "ready": 0, "deferred": 0}
+                    },
                     "operator_queue": [],
                 },
                 {
                     "generated_at": "2026-04-05T12:00:00+00:00",
-                    "operator_summary": {"counts": {"blocked": 0, "urgent": 0, "ready": 0, "deferred": 0}},
+                    "operator_summary": {
+                        "counts": {"blocked": 0, "urgent": 0, "ready": 0, "deferred": 0}
+                    },
                     "operator_queue": [],
                 },
                 {
                     "generated_at": "2026-04-04T12:00:00+00:00",
-                    "operator_summary": {"counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}},
+                    "operator_summary": {
+                        "counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}
+                    },
                     "operator_queue": [
                         {
                             "item_id": "campaign-drift:campaign-1:github-issue",
@@ -2107,37 +2428,65 @@ def test_operator_snapshot_calibrates_healthy_confidence_history(tmp_path: Path,
                 "run_id": "run-4",
                 "generated_at": "2026-04-04T12:00:00+00:00",
                 "operator_summary": {
-                    "primary_target": {"item_id": "target-d", "repo": "RepoD", "title": "Drift D", "lane": "urgent"},
+                    "primary_target": {
+                        "item_id": "target-d",
+                        "repo": "RepoD",
+                        "title": "Drift D",
+                        "lane": "urgent",
+                    },
                     "primary_target_confidence_label": "high",
                 },
-                "operator_queue": [{"item_id": "target-d", "repo": "RepoD", "title": "Drift D", "lane": "urgent"}],
+                "operator_queue": [
+                    {"item_id": "target-d", "repo": "RepoD", "title": "Drift D", "lane": "urgent"}
+                ],
             },
             {
                 "run_id": "run-3",
                 "generated_at": "2026-04-03T12:00:00+00:00",
                 "operator_summary": {
-                    "primary_target": {"item_id": "target-c", "repo": "RepoC", "title": "Drift C", "lane": "urgent"},
+                    "primary_target": {
+                        "item_id": "target-c",
+                        "repo": "RepoC",
+                        "title": "Drift C",
+                        "lane": "urgent",
+                    },
                     "primary_target_confidence_label": "high",
                 },
-                "operator_queue": [{"item_id": "target-c", "repo": "RepoC", "title": "Drift C", "lane": "urgent"}],
+                "operator_queue": [
+                    {"item_id": "target-c", "repo": "RepoC", "title": "Drift C", "lane": "urgent"}
+                ],
             },
             {
                 "run_id": "run-2",
                 "generated_at": "2026-04-02T12:00:00+00:00",
                 "operator_summary": {
-                    "primary_target": {"item_id": "target-b", "repo": "RepoB", "title": "Drift B", "lane": "urgent"},
+                    "primary_target": {
+                        "item_id": "target-b",
+                        "repo": "RepoB",
+                        "title": "Drift B",
+                        "lane": "urgent",
+                    },
                     "primary_target_confidence_label": "high",
                 },
-                "operator_queue": [{"item_id": "target-b", "repo": "RepoB", "title": "Drift B", "lane": "urgent"}],
+                "operator_queue": [
+                    {"item_id": "target-b", "repo": "RepoB", "title": "Drift B", "lane": "urgent"}
+                ],
             },
             {
                 "run_id": "run-1",
                 "generated_at": "2026-04-01T12:00:00+00:00",
                 "operator_summary": {
-                    "primary_target": {"item_id": "target-a", "repo": "RepoA", "title": "Drift A", "lane": "urgent"},
+                    "primary_target": {
+                        "item_id": "target-a",
+                        "repo": "RepoA",
+                        "title": "Drift A",
+                        "lane": "urgent",
+                    },
                     "primary_target_confidence_label": "high",
                 },
-                "operator_queue": [{"item_id": "target-a", "repo": "RepoA", "title": "Drift A", "lane": "urgent"}],
+                "operator_queue": [
+                    {"item_id": "target-a", "repo": "RepoA", "title": "Drift A", "lane": "urgent"}
+                ],
             },
         ],
     )
@@ -2166,46 +2515,81 @@ def test_operator_snapshot_marks_noisy_calibration_when_reopens_repeat(tmp_path:
                 "run_id": "run-5",
                 "generated_at": "2026-04-05T12:00:00+00:00",
                 "operator_summary": {
-                    "primary_target": {"item_id": "target-c", "repo": "RepoC", "title": "Drift C", "lane": "urgent"},
+                    "primary_target": {
+                        "item_id": "target-c",
+                        "repo": "RepoC",
+                        "title": "Drift C",
+                        "lane": "urgent",
+                    },
                     "primary_target_confidence_label": "high",
                 },
-                "operator_queue": [{"item_id": "target-c", "repo": "RepoC", "title": "Drift C", "lane": "urgent"}],
+                "operator_queue": [
+                    {"item_id": "target-c", "repo": "RepoC", "title": "Drift C", "lane": "urgent"}
+                ],
             },
             {
                 "run_id": "run-4",
                 "generated_at": "2026-04-04T12:00:00+00:00",
                 "operator_summary": {
-                    "primary_target": {"item_id": "target-b", "repo": "RepoB", "title": "Drift B", "lane": "urgent"},
+                    "primary_target": {
+                        "item_id": "target-b",
+                        "repo": "RepoB",
+                        "title": "Drift B",
+                        "lane": "urgent",
+                    },
                     "primary_target_confidence_label": "high",
                 },
-                "operator_queue": [{"item_id": "target-b", "repo": "RepoB", "title": "Drift B", "lane": "urgent"}],
+                "operator_queue": [
+                    {"item_id": "target-b", "repo": "RepoB", "title": "Drift B", "lane": "urgent"}
+                ],
             },
             {
                 "run_id": "run-3",
                 "generated_at": "2026-04-03T12:00:00+00:00",
                 "operator_summary": {
-                    "primary_target": {"item_id": "target-a", "repo": "RepoA", "title": "Drift A", "lane": "urgent"},
+                    "primary_target": {
+                        "item_id": "target-a",
+                        "repo": "RepoA",
+                        "title": "Drift A",
+                        "lane": "urgent",
+                    },
                     "primary_target_confidence_label": "high",
                 },
-                "operator_queue": [{"item_id": "target-a", "repo": "RepoA", "title": "Drift A", "lane": "urgent"}],
+                "operator_queue": [
+                    {"item_id": "target-a", "repo": "RepoA", "title": "Drift A", "lane": "urgent"}
+                ],
             },
             {
                 "run_id": "run-2",
                 "generated_at": "2026-04-02T12:00:00+00:00",
                 "operator_summary": {
-                    "primary_target": {"item_id": "target-b", "repo": "RepoB", "title": "Drift B", "lane": "urgent"},
+                    "primary_target": {
+                        "item_id": "target-b",
+                        "repo": "RepoB",
+                        "title": "Drift B",
+                        "lane": "urgent",
+                    },
                     "primary_target_confidence_label": "high",
                 },
-                "operator_queue": [{"item_id": "target-b", "repo": "RepoB", "title": "Drift B", "lane": "urgent"}],
+                "operator_queue": [
+                    {"item_id": "target-b", "repo": "RepoB", "title": "Drift B", "lane": "urgent"}
+                ],
             },
             {
                 "run_id": "run-1",
                 "generated_at": "2026-04-01T12:00:00+00:00",
                 "operator_summary": {
-                    "primary_target": {"item_id": "target-a", "repo": "RepoA", "title": "Drift A", "lane": "urgent"},
+                    "primary_target": {
+                        "item_id": "target-a",
+                        "repo": "RepoA",
+                        "title": "Drift A",
+                        "lane": "urgent",
+                    },
                     "primary_target_confidence_label": "high",
                 },
-                "operator_queue": [{"item_id": "target-a", "repo": "RepoA", "title": "Drift A", "lane": "urgent"}],
+                "operator_queue": [
+                    {"item_id": "target-a", "repo": "RepoA", "title": "Drift A", "lane": "urgent"}
+                ],
             },
         ],
     )
@@ -2233,16 +2617,28 @@ def test_operator_snapshot_tracks_partially_validated_recommendations(tmp_path: 
                 "run_id": "run-4",
                 "generated_at": "2026-04-04T12:00:00+00:00",
                 "operator_summary": {
-                    "primary_target": {"item_id": "target-c", "repo": "RepoC", "title": "Drift C", "lane": "urgent"},
+                    "primary_target": {
+                        "item_id": "target-c",
+                        "repo": "RepoC",
+                        "title": "Drift C",
+                        "lane": "urgent",
+                    },
                     "primary_target_confidence_label": "high",
                 },
-                "operator_queue": [{"item_id": "target-c", "repo": "RepoC", "title": "Drift C", "lane": "urgent"}],
+                "operator_queue": [
+                    {"item_id": "target-c", "repo": "RepoC", "title": "Drift C", "lane": "urgent"}
+                ],
             },
             {
                 "run_id": "run-3",
                 "generated_at": "2026-04-03T12:00:00+00:00",
                 "operator_summary": {
-                    "primary_target": {"item_id": "target-b", "repo": "RepoB", "title": "Drift B", "lane": "urgent"},
+                    "primary_target": {
+                        "item_id": "target-b",
+                        "repo": "RepoB",
+                        "title": "Drift B",
+                        "lane": "urgent",
+                    },
                     "primary_target_confidence_label": "high",
                 },
                 "operator_queue": [
@@ -2254,7 +2650,12 @@ def test_operator_snapshot_tracks_partially_validated_recommendations(tmp_path: 
                 "run_id": "run-2",
                 "generated_at": "2026-04-02T12:00:00+00:00",
                 "operator_summary": {
-                    "primary_target": {"item_id": "target-b", "repo": "RepoB", "title": "Drift B", "lane": "urgent"},
+                    "primary_target": {
+                        "item_id": "target-b",
+                        "repo": "RepoB",
+                        "title": "Drift B",
+                        "lane": "urgent",
+                    },
                     "primary_target_confidence_label": "high",
                 },
                 "operator_queue": [
@@ -2266,10 +2667,17 @@ def test_operator_snapshot_tracks_partially_validated_recommendations(tmp_path: 
                 "run_id": "run-1",
                 "generated_at": "2026-04-01T12:00:00+00:00",
                 "operator_summary": {
-                    "primary_target": {"item_id": "target-a", "repo": "RepoA", "title": "Drift A", "lane": "blocked"},
+                    "primary_target": {
+                        "item_id": "target-a",
+                        "repo": "RepoA",
+                        "title": "Drift A",
+                        "lane": "blocked",
+                    },
                     "primary_target_confidence_label": "medium",
                 },
-                "operator_queue": [{"item_id": "target-a", "repo": "RepoA", "title": "Drift A", "lane": "blocked"}],
+                "operator_queue": [
+                    {"item_id": "target-a", "repo": "RepoA", "title": "Drift A", "lane": "blocked"}
+                ],
             },
         ],
     )
@@ -2279,12 +2687,13 @@ def test_operator_snapshot_tracks_partially_validated_recommendations(tmp_path: 
 
     assert summary["partially_validated_recommendation_count"] >= 1
     assert any(
-        item["outcome"] == "partially_validated"
-        for item in summary["recent_validation_outcomes"]
+        item["outcome"] == "partially_validated" for item in summary["recent_validation_outcomes"]
     )
 
 
-def test_operator_snapshot_healthy_calibration_boosts_urgent_confidence(tmp_path: Path, monkeypatch):
+def test_operator_snapshot_healthy_calibration_boosts_urgent_confidence(
+    tmp_path: Path, monkeypatch
+):
     report = _make_report(
         preflight_summary={},
         material_changes=[
@@ -2303,7 +2712,9 @@ def test_operator_snapshot_healthy_calibration_boosts_urgent_confidence(tmp_path
         governance_preview={},
         rollback_preview={},
     )
-    monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: []
+    )
 
     monkeypatch.setattr(
         "src.operator_resolution_trend._build_confidence_calibration",
@@ -2351,7 +2762,9 @@ def test_operator_snapshot_healthy_calibration_boosts_urgent_confidence(tmp_path
     )
 
 
-def test_operator_snapshot_uses_verify_first_for_noisy_reopened_targets(tmp_path: Path, monkeypatch):
+def test_operator_snapshot_uses_verify_first_for_noisy_reopened_targets(
+    tmp_path: Path, monkeypatch
+):
     report = _make_report(
         preflight_summary={},
         material_changes=[
@@ -2373,16 +2786,23 @@ def test_operator_snapshot_uses_verify_first_for_noisy_reopened_targets(tmp_path
     monkeypatch.setattr(
         "src.operator_control_center.load_operator_state_history",
         lambda *_args, **_kwargs: [
-            {"operator_summary": {"counts": {"blocked": 0, "urgent": 0, "ready": 0, "deferred": 0}}, "operator_queue": []},
             {
-                "operator_summary": {"counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}},
-                    "operator_queue": [
-                        {
-                            "lane": "urgent",
-                            "priority": 90,
-                            "repo": "RepoC",
-                            "title": "RepoC security posture changed",
-                            "age_days": 2,
+                "operator_summary": {
+                    "counts": {"blocked": 0, "urgent": 0, "ready": 0, "deferred": 0}
+                },
+                "operator_queue": [],
+            },
+            {
+                "operator_summary": {
+                    "counts": {"blocked": 0, "urgent": 1, "ready": 0, "deferred": 0}
+                },
+                "operator_queue": [
+                    {
+                        "lane": "urgent",
+                        "priority": 90,
+                        "repo": "RepoC",
+                        "title": "RepoC security posture changed",
+                        "age_days": 2,
                     }
                 ],
             },
@@ -2405,7 +2825,9 @@ def test_operator_snapshot_uses_verify_first_for_noisy_reopened_targets(tmp_path
             "confidence_calibration_summary": "Recent high-confidence guidance has missed often enough that operators should verify before overcommitting.",
         },
     )
-    monkeypatch.setattr("src.operator_resolution_trend._was_resolved_then_reopened", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(
+        "src.operator_resolution_trend._was_resolved_then_reopened", lambda *_args, **_kwargs: True
+    )
 
     snapshot = build_operator_snapshot(report, output_dir=tmp_path)
     summary = snapshot["operator_summary"]
@@ -2570,7 +2992,9 @@ def test_operator_snapshot_softens_for_policy_flip_churn(tmp_path: Path, monkeyp
     assert summary["primary_target"].get("policy_flip_count", 0) >= 2
 
 
-def test_operator_snapshot_never_softens_blocked_setup_below_act_with_review(tmp_path: Path, monkeypatch):
+def test_operator_snapshot_never_softens_blocked_setup_below_act_with_review(
+    tmp_path: Path, monkeypatch
+):
     report = _make_report()
     monkeypatch.setattr(
         "src.operator_control_center.load_operator_state_history",
@@ -2677,12 +3101,18 @@ def test_operator_snapshot_never_softens_blocked_setup_below_act_with_review(tmp
             "confidence_calibration_summary": "Recent high-confidence guidance has missed often enough that operators should verify before overcommitting.",
         },
     )
-    monkeypatch.setattr("src.operator_resolution_trend._was_resolved_then_reopened", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(
+        "src.operator_resolution_trend._was_resolved_then_reopened", lambda *_args, **_kwargs: True
+    )
 
     snapshot = build_operator_snapshot(report, output_dir=tmp_path)
     summary = snapshot["operator_summary"]
 
-    assert summary["primary_target_exception_status"] in {"softened-for-noise", "softened-for-flip-churn", "softened-for-reopen-risk"}
+    assert summary["primary_target_exception_status"] in {
+        "softened-for-noise",
+        "softened-for-flip-churn",
+        "softened-for-reopen-risk",
+    }
     assert summary["primary_target_trust_policy"] == "act-with-review"
 
 
@@ -2912,7 +3342,9 @@ def test_operator_snapshot_retires_exception_after_stable_window(tmp_path: Path,
     assert summary["primary_target_trust_policy"] == "act-with-review"
 
 
-def test_operator_snapshot_applies_class_level_normalization_for_healthy_class(tmp_path: Path, monkeypatch):
+def test_operator_snapshot_applies_class_level_normalization_for_healthy_class(
+    tmp_path: Path, monkeypatch
+):
     report = _make_report(
         preflight_summary={"status": "ok", "blocking_errors": 0, "warnings": 0, "checks": []},
         review_targets=[],
@@ -3036,7 +3468,9 @@ def test_operator_snapshot_applies_class_level_normalization_for_healthy_class(t
     assert "clean retirement" in summary["trust_normalization_summary"].lower()
 
 
-def test_operator_snapshot_keeps_one_off_noise_from_class_normalization(tmp_path: Path, monkeypatch):
+def test_operator_snapshot_keeps_one_off_noise_from_class_normalization(
+    tmp_path: Path, monkeypatch
+):
     report = _make_report(
         preflight_summary={"status": "ok", "blocking_errors": 0, "warnings": 0, "checks": []},
         review_targets=[],
@@ -3236,7 +3670,9 @@ def test_operator_snapshot_decays_stale_class_normalization(tmp_path: Path, monk
                 "operator_queue": [],
             }
         )
-    monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history
+    )
     monkeypatch.setattr(
         "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
@@ -3280,10 +3716,15 @@ def test_operator_snapshot_decays_stale_class_normalization(tmp_path: Path, monk
     assert summary["primary_target_class_memory_freshness_status"] == "insufficient-data"
     assert summary["primary_target_class_decay_status"] == "normalization-decayed"
     assert summary["primary_target_trust_policy"] == "verify-first"
-    assert "aging out" in summary["class_decay_summary"].lower() or "too old" in summary["class_decay_summary"].lower()
+    assert (
+        "aging out" in summary["class_decay_summary"].lower()
+        or "too old" in summary["class_decay_summary"].lower()
+    )
 
 
-def test_operator_snapshot_softens_class_debt_when_fresh_sticky_signal_ages_out(tmp_path: Path, monkeypatch):
+def test_operator_snapshot_softens_class_debt_when_fresh_sticky_signal_ages_out(
+    tmp_path: Path, monkeypatch
+):
     report = _make_report(
         preflight_summary={"status": "ok", "blocking_errors": 0, "warnings": 0, "checks": []},
         review_targets=[],
@@ -3334,7 +3775,9 @@ def test_operator_snapshot_softens_class_debt_when_fresh_sticky_signal_ages_out(
                 "operator_queue": [],
             }
         )
-    monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history
+    )
     monkeypatch.setattr(
         "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
@@ -3368,10 +3811,14 @@ def test_operator_snapshot_softens_class_debt_when_fresh_sticky_signal_ages_out(
     assert summary["primary_target_policy_debt_status"] == "watch"
     assert summary["primary_target_class_decay_status"] == "policy-debt-decayed"
     assert summary["primary_target_class_memory_freshness_status"] == "fresh"
-    assert "no longer has enough fresh sticky class evidence" in summary["class_decay_summary"].lower()
+    assert (
+        "no longer has enough fresh sticky class evidence" in summary["class_decay_summary"].lower()
+    )
 
 
-def test_operator_snapshot_boosts_candidate_normalization_when_fresh_support_crosses_threshold(tmp_path: Path, monkeypatch):
+def test_operator_snapshot_boosts_candidate_normalization_when_fresh_support_crosses_threshold(
+    tmp_path: Path, monkeypatch
+):
     report = _make_report(
         preflight_summary={"status": "ok", "blocking_errors": 0, "warnings": 0, "checks": []},
         review_targets=[],
@@ -3420,7 +3867,9 @@ def test_operator_snapshot_boosts_candidate_normalization_when_fresh_support_cro
                 "operator_queue": [],
             }
         )
-    monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history
+    )
     monkeypatch.setattr(
         "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
@@ -3483,7 +3932,10 @@ def test_operator_snapshot_boosts_candidate_normalization_when_fresh_support_cro
     summary = snapshot["operator_summary"]
 
     assert summary["primary_target_class_trust_reweight_direction"] == "supporting-normalization"
-    assert summary["primary_target_weighted_class_support_score"] > summary["primary_target_weighted_class_caution_score"]
+    assert (
+        summary["primary_target_weighted_class_support_score"]
+        > summary["primary_target_weighted_class_caution_score"]
+    )
     assert summary["primary_target_class_normalization_status"] == "applied"
     assert summary["primary_target_class_trust_momentum_status"] == "sustained-support"
     assert summary["primary_target_class_reweight_transition_status"] == "confirmed-support"
@@ -3492,7 +3944,9 @@ def test_operator_snapshot_boosts_candidate_normalization_when_fresh_support_cro
     assert "confirm broader normalization" in summary["class_momentum_summary"].lower()
 
 
-def test_operator_snapshot_strengthens_watch_into_class_debt_when_fresh_caution_stays_heavy(tmp_path: Path, monkeypatch):
+def test_operator_snapshot_strengthens_watch_into_class_debt_when_fresh_caution_stays_heavy(
+    tmp_path: Path, monkeypatch
+):
     report = _make_report(
         preflight_summary={"status": "ok", "blocking_errors": 0, "warnings": 0, "checks": []},
         review_targets=[],
@@ -3541,7 +3995,9 @@ def test_operator_snapshot_strengthens_watch_into_class_debt_when_fresh_caution_
                 "operator_queue": [],
             }
         )
-    monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history
+    )
     monkeypatch.setattr(
         "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
@@ -3601,7 +4057,10 @@ def test_operator_snapshot_strengthens_watch_into_class_debt_when_fresh_caution_
     summary = snapshot["operator_summary"]
 
     assert summary["primary_target_class_trust_reweight_direction"] == "supporting-caution"
-    assert summary["primary_target_weighted_class_caution_score"] > summary["primary_target_weighted_class_support_score"]
+    assert (
+        summary["primary_target_weighted_class_caution_score"]
+        > summary["primary_target_weighted_class_support_score"]
+    )
     assert summary["primary_target_policy_debt_status"] == "class-debt"
     assert summary["primary_target_class_trust_momentum_status"] == "sustained-caution"
     assert summary["primary_target_class_reweight_transition_status"] == "confirmed-caution"
@@ -3610,7 +4069,9 @@ def test_operator_snapshot_strengthens_watch_into_class_debt_when_fresh_caution_
     assert "confirm broader caution" in summary["class_momentum_summary"].lower()
 
 
-def test_operator_snapshot_holds_class_normalization_pending_until_support_persists(tmp_path: Path, monkeypatch):
+def test_operator_snapshot_holds_class_normalization_pending_until_support_persists(
+    tmp_path: Path, monkeypatch
+):
     report = _make_report(
         preflight_summary={"status": "ok", "blocking_errors": 0, "warnings": 0, "checks": []},
         review_targets=[],
@@ -3631,7 +4092,9 @@ def test_operator_snapshot_holds_class_normalization_pending_until_support_persi
         ],
     )
     history = []
-    monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history
+    )
     monkeypatch.setattr(
         "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
@@ -3706,7 +4169,9 @@ def test_operator_snapshot_holds_class_normalization_pending_until_support_persi
     assert "not stayed persistent enough" in summary["class_momentum_summary"].lower()
 
 
-def test_operator_snapshot_marks_flat_pending_support_as_holding_then_stalled(tmp_path: Path, monkeypatch):
+def test_operator_snapshot_marks_flat_pending_support_as_holding_then_stalled(
+    tmp_path: Path, monkeypatch
+):
     report = _make_report(
         preflight_summary={"status": "ok", "blocking_errors": 0, "warnings": 0, "checks": []},
         review_targets=[],
@@ -3747,7 +4212,9 @@ def test_operator_snapshot_marks_flat_pending_support_as_holding_then_stalled(tm
             "operator_queue": [],
         }
     ]
-    monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history
+    )
     monkeypatch.setattr(
         "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
@@ -3862,7 +4329,9 @@ def test_operator_snapshot_marks_flat_pending_support_as_holding_then_stalled(tm
     assert summary["primary_target_class_transition_resolution_status"] == "none"
 
 
-def test_operator_snapshot_expires_old_pending_support_when_signal_fades(tmp_path: Path, monkeypatch):
+def test_operator_snapshot_expires_old_pending_support_when_signal_fades(
+    tmp_path: Path, monkeypatch
+):
     report = _make_report(
         preflight_summary={"status": "ok", "blocking_errors": 0, "warnings": 0, "checks": []},
         review_targets=[],
@@ -3905,7 +4374,9 @@ def test_operator_snapshot_expires_old_pending_support_when_signal_fades(tmp_pat
                 "operator_queue": [],
             }
         )
-    monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history
+    )
     monkeypatch.setattr(
         "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
@@ -3993,7 +4464,9 @@ def test_operator_snapshot_expires_old_pending_support_when_signal_fades(tmp_pat
     assert summary["primary_target_trust_policy"] == "verify-first"
 
 
-def test_operator_snapshot_marks_blocked_pending_support_when_local_noise_overrides(tmp_path: Path, monkeypatch):
+def test_operator_snapshot_marks_blocked_pending_support_when_local_noise_overrides(
+    tmp_path: Path, monkeypatch
+):
     report = _make_report(
         preflight_summary={"status": "ok", "blocking_errors": 0, "warnings": 0, "checks": []},
         review_targets=[],
@@ -4013,7 +4486,9 @@ def test_operator_snapshot_marks_blocked_pending_support_when_local_noise_overri
             }
         ],
     )
-    monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: []
+    )
     monkeypatch.setattr(
         "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
@@ -4143,7 +4618,9 @@ def test_operator_snapshot_scores_pending_support_as_confirm_soon_without_auto_c
             "operator_queue": [],
         }
     ]
-    monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history
+    )
     monkeypatch.setattr(
         "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
@@ -4341,7 +4818,9 @@ def test_operator_snapshot_clears_low_confidence_pending_support_with_active_pen
             "operator_queue": [],
         },
     ]
-    monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history
+    )
     monkeypatch.setattr(
         "src.operator_resolution_trend._build_confidence_calibration",
         lambda _history: {
@@ -4426,7 +4905,10 @@ def test_operator_snapshot_clears_low_confidence_pending_support_with_active_pen
     assert summary["primary_target_class_pending_debt_status"] == "active-debt"
     assert summary["primary_target_pending_debt_freshness_status"] == "fresh"
     assert summary["primary_target_transition_closure_confidence_label"] == "low"
-    assert summary["primary_target_transition_closure_likely_outcome"] in {"clear-risk", "expire-risk"}
+    assert summary["primary_target_transition_closure_likely_outcome"] in {
+        "clear-risk",
+        "expire-risk",
+    }
     assert summary["primary_target_closure_forecast_reweight_direction"] in {
         "neutral",
         "supporting-clearance",
@@ -4488,16 +4970,23 @@ def test_operator_snapshot_marks_class_pending_debt_as_clearing(tmp_path: Path, 
             "operator_queue": [],
         },
     ]
-    monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history
+    )
 
     summary = build_operator_snapshot(report, output_dir=tmp_path)["operator_summary"]
 
     assert summary["primary_target_class_pending_debt_status"] == "clearing"
     assert summary["primary_target_pending_debt_freshness_status"] == "fresh"
-    assert "resolving pending transitions more cleanly" in summary["class_pending_debt_summary"].lower()
+    assert (
+        "resolving pending transitions more cleanly"
+        in summary["class_pending_debt_summary"].lower()
+    )
 
 
-def test_operator_snapshot_reacquires_confirmation_forecast_after_decay(tmp_path: Path, monkeypatch):
+def test_operator_snapshot_reacquires_confirmation_forecast_after_decay(
+    tmp_path: Path, monkeypatch
+):
     report = _make_report(
         preflight_summary={"status": "ok", "blocking_errors": 0, "warnings": 0, "checks": []},
         review_targets=[],
@@ -4588,7 +5077,9 @@ def test_operator_snapshot_reacquires_confirmation_forecast_after_decay(tmp_path
             "operator_queue": [],
         },
     ]
-    monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history
+    )
 
     def _phase43_seed(
         resolution_targets, _history, *, current_generated_at, confidence_calibration
@@ -4642,13 +5133,20 @@ def test_operator_snapshot_reacquires_confirmation_forecast_after_decay(tmp_path
 
     summary = build_operator_snapshot(report, output_dir=tmp_path)["operator_summary"]
 
-    assert summary["primary_target_closure_forecast_refresh_recovery_status"] == "reacquiring-confirmation"
-    assert summary["primary_target_closure_forecast_reacquisition_status"] == "reacquired-confirmation"
+    assert (
+        summary["primary_target_closure_forecast_refresh_recovery_status"]
+        == "reacquiring-confirmation"
+    )
+    assert (
+        summary["primary_target_closure_forecast_reacquisition_status"] == "reacquired-confirmation"
+    )
     assert summary["primary_target_transition_closure_likely_outcome"] == "confirm-soon"
     assert summary["primary_target_closure_forecast_hysteresis_status"] == "confirmed-confirmation"
 
 
-def test_operator_snapshot_reenables_early_clear_when_clearance_is_reacquired(tmp_path: Path, monkeypatch):
+def test_operator_snapshot_reenables_early_clear_when_clearance_is_reacquired(
+    tmp_path: Path, monkeypatch
+):
     report = _make_report(
         preflight_summary={"status": "ok", "blocking_errors": 0, "warnings": 0, "checks": []},
         review_targets=[],
@@ -4739,7 +5237,9 @@ def test_operator_snapshot_reenables_early_clear_when_clearance_is_reacquired(tm
             "operator_queue": [],
         },
     ]
-    monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history
+    )
 
     def _phase43_seed(
         resolution_targets, _history, *, current_generated_at, confidence_calibration
@@ -4793,14 +5293,22 @@ def test_operator_snapshot_reenables_early_clear_when_clearance_is_reacquired(tm
 
     summary = build_operator_snapshot(report, output_dir=tmp_path)["operator_summary"]
 
-    assert summary["primary_target_closure_forecast_refresh_recovery_status"] == "reacquiring-clearance"
+    assert (
+        summary["primary_target_closure_forecast_refresh_recovery_status"]
+        == "reacquiring-clearance"
+    )
     assert summary["primary_target_closure_forecast_reacquisition_status"] == "reacquired-clearance"
-    assert summary["primary_target_transition_closure_likely_outcome"] in {"clear-risk", "expire-risk"}
+    assert summary["primary_target_transition_closure_likely_outcome"] in {
+        "clear-risk",
+        "expire-risk",
+    }
     assert summary["primary_target_class_transition_resolution_status"] == "cleared"
     assert summary["primary_target_class_reweight_transition_status"] == "none"
 
 
-def test_operator_snapshot_marks_new_confirmation_reacquisition_as_fragile(tmp_path: Path, monkeypatch):
+def test_operator_snapshot_marks_new_confirmation_reacquisition_as_fragile(
+    tmp_path: Path, monkeypatch
+):
     report = _make_report(
         preflight_summary={"status": "ok", "blocking_errors": 0, "warnings": 0, "checks": []},
         review_targets=[],
@@ -4820,7 +5328,9 @@ def test_operator_snapshot_marks_new_confirmation_reacquisition_as_fragile(tmp_p
             }
         ],
     )
-    monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: []
+    )
 
     def _phase44_seed(
         resolution_targets, _history, *, current_generated_at, confidence_calibration
@@ -4876,12 +5386,17 @@ def test_operator_snapshot_marks_new_confirmation_reacquisition_as_fragile(tmp_p
 
     summary = build_operator_snapshot(report, output_dir=tmp_path)["operator_summary"]
 
-    assert summary["primary_target_closure_forecast_reacquisition_persistence_status"] == "just-reacquired"
+    assert (
+        summary["primary_target_closure_forecast_reacquisition_persistence_status"]
+        == "just-reacquired"
+    )
     assert summary["primary_target_closure_forecast_recovery_churn_status"] == "none"
     assert summary["primary_target_transition_closure_likely_outcome"] == "confirm-soon"
 
 
-def test_operator_snapshot_keeps_confirmation_reacquisition_when_it_is_holding(tmp_path: Path, monkeypatch):
+def test_operator_snapshot_keeps_confirmation_reacquisition_when_it_is_holding(
+    tmp_path: Path, monkeypatch
+):
     report = _make_report(
         preflight_summary={"status": "ok", "blocking_errors": 0, "warnings": 0, "checks": []},
         review_targets=[],
@@ -4947,7 +5462,9 @@ def test_operator_snapshot_keeps_confirmation_reacquisition_when_it_is_holding(t
             "operator_queue": [],
         },
     ]
-    monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history
+    )
 
     def _phase44_seed(
         resolution_targets, _history, *, current_generated_at, confidence_calibration
@@ -5003,12 +5520,17 @@ def test_operator_snapshot_keeps_confirmation_reacquisition_when_it_is_holding(t
 
     summary = build_operator_snapshot(report, output_dir=tmp_path)["operator_summary"]
 
-    assert summary["primary_target_closure_forecast_reacquisition_persistence_status"] == "sustained-confirmation"
+    assert (
+        summary["primary_target_closure_forecast_reacquisition_persistence_status"]
+        == "sustained-confirmation"
+    )
     assert summary["primary_target_closure_forecast_recovery_churn_status"] == "none"
     assert summary["primary_target_transition_closure_likely_outcome"] == "confirm-soon"
 
 
-def test_operator_snapshot_softens_reacquired_clearance_when_recovery_churns(tmp_path: Path, monkeypatch):
+def test_operator_snapshot_softens_reacquired_clearance_when_recovery_churns(
+    tmp_path: Path, monkeypatch
+):
     report = _make_report(
         preflight_summary={"status": "ok", "blocking_errors": 0, "warnings": 0, "checks": []},
         review_targets=[],
@@ -5078,7 +5600,9 @@ def test_operator_snapshot_softens_reacquired_clearance_when_recovery_churns(tmp
             "operator_queue": [],
         },
     ]
-    monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history
+    )
 
     def _phase44_seed(
         resolution_targets, _history, *, current_generated_at, confidence_calibration
@@ -5165,12 +5689,48 @@ def test_operator_snapshot_softens_sustained_reacquisition_when_freshness_turns_
     )
     history = []
     for day, direction, reacq_status, persistence_status, outcome in [
-        (6, "supporting-confirmation", "reacquired-confirmation", "sustained-confirmation", "confirm-soon"),
-        (5, "supporting-confirmation", "reacquired-confirmation", "holding-confirmation", "confirm-soon"),
-        (4, "supporting-clearance", "pending-clearance-reacquisition", "holding-clearance", "clear-risk"),
-        (3, "supporting-confirmation", "reacquired-confirmation", "holding-confirmation", "confirm-soon"),
-        (2, "supporting-confirmation", "reacquired-confirmation", "holding-confirmation", "confirm-soon"),
-        (1, "supporting-confirmation", "reacquired-confirmation", "holding-confirmation", "confirm-soon"),
+        (
+            6,
+            "supporting-confirmation",
+            "reacquired-confirmation",
+            "sustained-confirmation",
+            "confirm-soon",
+        ),
+        (
+            5,
+            "supporting-confirmation",
+            "reacquired-confirmation",
+            "holding-confirmation",
+            "confirm-soon",
+        ),
+        (
+            4,
+            "supporting-clearance",
+            "pending-clearance-reacquisition",
+            "holding-clearance",
+            "clear-risk",
+        ),
+        (
+            3,
+            "supporting-confirmation",
+            "reacquired-confirmation",
+            "holding-confirmation",
+            "confirm-soon",
+        ),
+        (
+            2,
+            "supporting-confirmation",
+            "reacquired-confirmation",
+            "holding-confirmation",
+            "confirm-soon",
+        ),
+        (
+            1,
+            "supporting-confirmation",
+            "reacquired-confirmation",
+            "holding-confirmation",
+            "confirm-soon",
+        ),
     ]:
         history.append(
             {
@@ -5184,12 +5744,18 @@ def test_operator_snapshot_softens_sustained_reacquisition_when_freshness_turns_
                         "kind": "review",
                     },
                     "primary_target_closure_forecast_reweight_direction": direction,
-                    "primary_target_closure_forecast_reweight_score": 0.44 if direction == "supporting-confirmation" else -0.28,
-                    "primary_target_closure_forecast_momentum_status": "sustained-confirmation" if direction == "supporting-confirmation" else "building",
+                    "primary_target_closure_forecast_reweight_score": 0.44
+                    if direction == "supporting-confirmation"
+                    else -0.28,
+                    "primary_target_closure_forecast_momentum_status": "sustained-confirmation"
+                    if direction == "supporting-confirmation"
+                    else "building",
                     "primary_target_closure_forecast_stability_status": "stable",
                     "primary_target_closure_forecast_freshness_status": "fresh",
                     "primary_target_closure_forecast_decay_status": "none",
-                    "primary_target_closure_forecast_refresh_recovery_status": "reacquiring-confirmation" if direction == "supporting-confirmation" else "recovering-clearance",
+                    "primary_target_closure_forecast_refresh_recovery_status": "reacquiring-confirmation"
+                    if direction == "supporting-confirmation"
+                    else "recovering-clearance",
                     "primary_target_closure_forecast_reacquisition_status": reacq_status,
                     "primary_target_closure_forecast_reacquisition_persistence_status": persistence_status,
                     "primary_target_closure_forecast_recovery_churn_status": "none",
@@ -5198,7 +5764,9 @@ def test_operator_snapshot_softens_sustained_reacquisition_when_freshness_turns_
                 "operator_queue": [],
             }
         )
-    monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history
+    )
 
     def _phase44_seed(
         resolution_targets, _history, *, current_generated_at, confidence_calibration
@@ -5255,8 +5823,14 @@ def test_operator_snapshot_softens_sustained_reacquisition_when_freshness_turns_
     summary = build_operator_snapshot(report, output_dir=tmp_path)["operator_summary"]
 
     assert summary["primary_target_closure_forecast_reacquisition_freshness_status"] == "mixed-age"
-    assert summary["primary_target_closure_forecast_reacquisition_persistence_status"] == "holding-confirmation"
-    assert summary["primary_target_closure_forecast_persistence_reset_status"] == "confirmation-softened"
+    assert (
+        summary["primary_target_closure_forecast_reacquisition_persistence_status"]
+        == "holding-confirmation"
+    )
+    assert (
+        summary["primary_target_closure_forecast_persistence_reset_status"]
+        == "confirmation-softened"
+    )
     assert summary["primary_target_transition_closure_likely_outcome"] == "confirm-soon"
 
 
@@ -5284,13 +5858,69 @@ def test_operator_snapshot_resets_stale_reacquired_clearance_and_restores_pendin
         ],
     )
     history = []
-    for day, direction, reacq_status, persistence_status, outcome, transition_status, resolution_status in [
-        (6, "supporting-clearance", "pending-clearance-reacquisition", "holding-clearance", "clear-risk", "pending-caution", "none"),
-        (5, "supporting-confirmation", "pending-confirmation-reacquisition", "holding-confirmation", "hold", "pending-caution", "none"),
-        (4, "supporting-confirmation", "pending-confirmation-reacquisition", "holding-confirmation", "hold", "pending-caution", "none"),
-        (3, "supporting-confirmation", "pending-confirmation-reacquisition", "holding-confirmation", "hold", "pending-caution", "none"),
-        (2, "supporting-clearance", "reacquired-clearance", "holding-clearance", "clear-risk", "none", "cleared"),
-        (1, "supporting-clearance", "reacquired-clearance", "holding-clearance", "clear-risk", "none", "cleared"),
+    for (
+        day,
+        direction,
+        reacq_status,
+        persistence_status,
+        outcome,
+        transition_status,
+        resolution_status,
+    ) in [
+        (
+            6,
+            "supporting-clearance",
+            "pending-clearance-reacquisition",
+            "holding-clearance",
+            "clear-risk",
+            "pending-caution",
+            "none",
+        ),
+        (
+            5,
+            "supporting-confirmation",
+            "pending-confirmation-reacquisition",
+            "holding-confirmation",
+            "hold",
+            "pending-caution",
+            "none",
+        ),
+        (
+            4,
+            "supporting-confirmation",
+            "pending-confirmation-reacquisition",
+            "holding-confirmation",
+            "hold",
+            "pending-caution",
+            "none",
+        ),
+        (
+            3,
+            "supporting-confirmation",
+            "pending-confirmation-reacquisition",
+            "holding-confirmation",
+            "hold",
+            "pending-caution",
+            "none",
+        ),
+        (
+            2,
+            "supporting-clearance",
+            "reacquired-clearance",
+            "holding-clearance",
+            "clear-risk",
+            "none",
+            "cleared",
+        ),
+        (
+            1,
+            "supporting-clearance",
+            "reacquired-clearance",
+            "holding-clearance",
+            "clear-risk",
+            "none",
+            "cleared",
+        ),
     ]:
         history.append(
             {
@@ -5304,12 +5934,18 @@ def test_operator_snapshot_resets_stale_reacquired_clearance_and_restores_pendin
                         "kind": "review",
                     },
                     "primary_target_closure_forecast_reweight_direction": direction,
-                    "primary_target_closure_forecast_reweight_score": -0.43 if direction == "supporting-clearance" else 0.18,
-                    "primary_target_closure_forecast_momentum_status": "sustained-clearance" if direction == "supporting-clearance" else "building",
+                    "primary_target_closure_forecast_reweight_score": -0.43
+                    if direction == "supporting-clearance"
+                    else 0.18,
+                    "primary_target_closure_forecast_momentum_status": "sustained-clearance"
+                    if direction == "supporting-clearance"
+                    else "building",
                     "primary_target_closure_forecast_stability_status": "stable",
                     "primary_target_closure_forecast_freshness_status": "fresh",
                     "primary_target_closure_forecast_decay_status": "none",
-                    "primary_target_closure_forecast_refresh_recovery_status": "reacquiring-clearance" if direction == "supporting-clearance" else "recovering-confirmation",
+                    "primary_target_closure_forecast_refresh_recovery_status": "reacquiring-clearance"
+                    if direction == "supporting-clearance"
+                    else "recovering-confirmation",
                     "primary_target_closure_forecast_reacquisition_status": reacq_status,
                     "primary_target_closure_forecast_reacquisition_persistence_status": persistence_status,
                     "primary_target_closure_forecast_recovery_churn_status": "none",
@@ -5320,7 +5956,9 @@ def test_operator_snapshot_resets_stale_reacquired_clearance_and_restores_pendin
                 "operator_queue": [],
             }
         )
-    monkeypatch.setattr("src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history)
+    monkeypatch.setattr(
+        "src.operator_control_center.load_operator_state_history", lambda *_args, **_kwargs: history
+    )
 
     def _phase44_seed(
         resolution_targets, _history, *, current_generated_at, confidence_calibration
@@ -5489,11 +6127,23 @@ def test_operator_snapshot_sets_pending_confirmation_reentry_after_confirmation_
 
     summary = build_operator_snapshot(report, output_dir=tmp_path)["operator_summary"]
 
-    assert summary["primary_target_closure_forecast_reset_refresh_recovery_status"] == "recovering-confirmation-reset"
-    assert summary["primary_target_closure_forecast_reset_reentry_status"] == "pending-confirmation-reentry"
-    assert summary["primary_target_closure_forecast_reset_reentry_persistence_status"] in {"none", "insufficient-data"}
+    assert (
+        summary["primary_target_closure_forecast_reset_refresh_recovery_status"]
+        == "recovering-confirmation-reset"
+    )
+    assert (
+        summary["primary_target_closure_forecast_reset_reentry_status"]
+        == "pending-confirmation-reentry"
+    )
+    assert summary["primary_target_closure_forecast_reset_reentry_persistence_status"] in {
+        "none",
+        "insufficient-data",
+    }
     assert summary["primary_target_closure_forecast_reset_reentry_churn_status"] == "none"
-    assert summary["primary_target_closure_forecast_reacquisition_status"] == "pending-confirmation-reacquisition"
+    assert (
+        summary["primary_target_closure_forecast_reacquisition_status"]
+        == "pending-confirmation-reacquisition"
+    )
     assert summary["primary_target_transition_closure_likely_outcome"] == "hold"
     assert summary["primary_target_closure_forecast_hysteresis_status"] == "pending-confirmation"
 
@@ -5620,11 +6270,21 @@ def test_operator_snapshot_reenters_confirmation_after_fresh_follow_through(
 
     summary = build_operator_snapshot(report, output_dir=tmp_path)["operator_summary"]
 
-    assert summary["primary_target_closure_forecast_reset_refresh_recovery_status"] == "reentering-confirmation"
-    assert summary["primary_target_closure_forecast_reset_reentry_status"] == "reentered-confirmation"
-    assert summary["primary_target_closure_forecast_reset_reentry_persistence_status"] == "just-reentered"
+    assert (
+        summary["primary_target_closure_forecast_reset_refresh_recovery_status"]
+        == "reentering-confirmation"
+    )
+    assert (
+        summary["primary_target_closure_forecast_reset_reentry_status"] == "reentered-confirmation"
+    )
+    assert (
+        summary["primary_target_closure_forecast_reset_reentry_persistence_status"]
+        == "just-reentered"
+    )
     assert summary["primary_target_closure_forecast_reset_reentry_churn_status"] == "none"
-    assert summary["primary_target_closure_forecast_reacquisition_status"] == "reacquired-confirmation"
+    assert (
+        summary["primary_target_closure_forecast_reacquisition_status"] == "reacquired-confirmation"
+    )
     assert summary["primary_target_transition_closure_likely_outcome"] == "confirm-soon"
     assert summary["primary_target_closure_forecast_hysteresis_status"] == "confirmed-confirmation"
 
@@ -5758,9 +6418,15 @@ def test_operator_snapshot_reenters_clearance_after_fresh_follow_through(
 
     summary = build_operator_snapshot(report, output_dir=tmp_path)["operator_summary"]
 
-    assert summary["primary_target_closure_forecast_reset_refresh_recovery_status"] == "reentering-clearance"
+    assert (
+        summary["primary_target_closure_forecast_reset_refresh_recovery_status"]
+        == "reentering-clearance"
+    )
     assert summary["primary_target_closure_forecast_reset_reentry_status"] == "reentered-clearance"
-    assert summary["primary_target_closure_forecast_reset_reentry_persistence_status"] == "holding-clearance-reentry"
+    assert (
+        summary["primary_target_closure_forecast_reset_reentry_persistence_status"]
+        == "holding-clearance-reentry"
+    )
     assert summary["primary_target_closure_forecast_reset_reentry_churn_status"] == "none"
     assert summary["primary_target_closure_forecast_reset_reentry_freshness_status"] == "fresh"
     assert summary["primary_target_closure_forecast_reset_reentry_reset_status"] == "none"
@@ -5870,7 +6536,10 @@ def test_operator_snapshot_holds_reset_reentry_when_follow_through_stays_aligned
 
     summary = build_operator_snapshot(report, output_dir=tmp_path)["operator_summary"]
 
-    assert summary["primary_target_closure_forecast_reset_reentry_persistence_status"] == "holding-confirmation-reentry"
+    assert (
+        summary["primary_target_closure_forecast_reset_reentry_persistence_status"]
+        == "holding-confirmation-reentry"
+    )
     assert summary["primary_target_closure_forecast_reset_reentry_churn_status"] == "none"
     assert summary["primary_target_transition_closure_likely_outcome"] == "confirm-soon"
     assert summary["primary_target_closure_forecast_hysteresis_status"] == "confirmed-confirmation"
@@ -6130,10 +6799,22 @@ def test_operator_snapshot_starts_pending_confirmation_rebuild_after_reset_reent
 
     summary = build_operator_snapshot(report, output_dir=tmp_path)["operator_summary"]
 
-    assert summary["primary_target_closure_forecast_reset_reentry_refresh_recovery_status"] == "rebuilding-confirmation-reentry"
-    assert summary["primary_target_closure_forecast_reset_reentry_rebuild_status"] == "pending-confirmation-rebuild"
-    assert summary["primary_target_closure_forecast_reset_reentry_status"] == "pending-confirmation-reentry"
-    assert summary["primary_target_closure_forecast_reacquisition_status"] == "pending-confirmation-reacquisition"
+    assert (
+        summary["primary_target_closure_forecast_reset_reentry_refresh_recovery_status"]
+        == "rebuilding-confirmation-reentry"
+    )
+    assert (
+        summary["primary_target_closure_forecast_reset_reentry_rebuild_status"]
+        == "pending-confirmation-rebuild"
+    )
+    assert (
+        summary["primary_target_closure_forecast_reset_reentry_status"]
+        == "pending-confirmation-reentry"
+    )
+    assert (
+        summary["primary_target_closure_forecast_reacquisition_status"]
+        == "pending-confirmation-reacquisition"
+    )
     assert summary["primary_target_transition_closure_likely_outcome"] == "hold"
     assert summary["primary_target_closure_forecast_hysteresis_status"] == "pending-confirmation"
 
@@ -6262,10 +6943,20 @@ def test_operator_snapshot_rebuilds_confirmation_reentry_after_fresh_follow_thro
 
     summary = build_operator_snapshot(report, output_dir=tmp_path)["operator_summary"]
 
-    assert summary["primary_target_closure_forecast_reset_reentry_refresh_recovery_status"] == "rebuilding-confirmation-reentry"
-    assert summary["primary_target_closure_forecast_reset_reentry_rebuild_status"] == "rebuilt-confirmation-reentry"
-    assert summary["primary_target_closure_forecast_reset_reentry_status"] == "reentered-confirmation"
-    assert summary["primary_target_closure_forecast_reacquisition_status"] == "reacquired-confirmation"
+    assert (
+        summary["primary_target_closure_forecast_reset_reentry_refresh_recovery_status"]
+        == "rebuilding-confirmation-reentry"
+    )
+    assert (
+        summary["primary_target_closure_forecast_reset_reentry_rebuild_status"]
+        == "rebuilt-confirmation-reentry"
+    )
+    assert (
+        summary["primary_target_closure_forecast_reset_reentry_status"] == "reentered-confirmation"
+    )
+    assert (
+        summary["primary_target_closure_forecast_reacquisition_status"] == "reacquired-confirmation"
+    )
     assert summary["primary_target_transition_closure_likely_outcome"] == "confirm-soon"
     assert summary["primary_target_closure_forecast_hysteresis_status"] == "confirmed-confirmation"
 
@@ -6394,8 +7085,14 @@ def test_operator_snapshot_rebuilds_clearance_reentry_after_fresh_follow_through
 
     summary = build_operator_snapshot(report, output_dir=tmp_path)["operator_summary"]
 
-    assert summary["primary_target_closure_forecast_reset_reentry_refresh_recovery_status"] == "rebuilding-clearance-reentry"
-    assert summary["primary_target_closure_forecast_reset_reentry_rebuild_status"] == "rebuilt-clearance-reentry"
+    assert (
+        summary["primary_target_closure_forecast_reset_reentry_refresh_recovery_status"]
+        == "rebuilding-clearance-reentry"
+    )
+    assert (
+        summary["primary_target_closure_forecast_reset_reentry_rebuild_status"]
+        == "rebuilt-clearance-reentry"
+    )
     assert summary["primary_target_closure_forecast_reset_reentry_status"] == "reentered-clearance"
     assert summary["primary_target_closure_forecast_reacquisition_status"] == "reacquired-clearance"
     assert summary["primary_target_transition_closure_likely_outcome"] == "clear-risk"
@@ -6482,7 +7179,10 @@ def test_operator_snapshot_marks_rebuilt_confirmation_as_just_rebuilt(
 
     summary = build_operator_snapshot(report, output_dir=tmp_path)["operator_summary"]
 
-    assert summary["primary_target_closure_forecast_reset_reentry_rebuild_persistence_status"] == "just-rebuilt"
+    assert (
+        summary["primary_target_closure_forecast_reset_reentry_rebuild_persistence_status"]
+        == "just-rebuilt"
+    )
     assert summary["primary_target_closure_forecast_reset_reentry_rebuild_churn_status"] == "none"
     assert summary["primary_target_transition_closure_likely_outcome"] == "confirm-soon"
     assert summary["primary_target_closure_forecast_hysteresis_status"] == "confirmed-confirmation"
@@ -6569,7 +7269,10 @@ def test_operator_snapshot_softens_rebuilt_clearance_when_rebuild_churn_is_high(
     summary = build_operator_snapshot(report, output_dir=tmp_path)["operator_summary"]
 
     assert summary["primary_target_closure_forecast_reset_reentry_rebuild_churn_status"] == "churn"
-    assert summary["primary_target_closure_forecast_reset_reentry_rebuild_persistence_status"] == "reversing"
+    assert (
+        summary["primary_target_closure_forecast_reset_reentry_rebuild_persistence_status"]
+        == "reversing"
+    )
     assert summary["primary_target_transition_closure_likely_outcome"] == "hold"
     assert summary["primary_target_closure_forecast_hysteresis_status"] == "pending-clearance"
 
@@ -6601,7 +7304,10 @@ def test_rebuild_freshness_softens_mixed_age_sustained_confirmation_rebuild():
     )
 
     assert updates["closure_forecast_reset_reentry_rebuild_reset_status"] == "confirmation-softened"
-    assert updates["closure_forecast_reset_reentry_rebuild_persistence_status"] == "holding-confirmation-rebuild"
+    assert (
+        updates["closure_forecast_reset_reentry_rebuild_persistence_status"]
+        == "holding-confirmation-rebuild"
+    )
     assert updates["transition_closure_likely_outcome"] == "confirm-soon"
 
 
@@ -6668,7 +7374,9 @@ def test_rebuild_refresh_sets_pending_confirmation_reentry_until_fully_reearned(
         persistence_reason="",
     )
 
-    assert updates["closure_forecast_reset_reentry_rebuild_status"] == "pending-confirmation-rebuild"
+    assert (
+        updates["closure_forecast_reset_reentry_rebuild_status"] == "pending-confirmation-rebuild"
+    )
     assert updates["closure_forecast_reset_reentry_rebuild_persistence_status"] == "none"
     assert updates["transition_closure_likely_outcome"] == "hold"
     assert updates["closure_forecast_hysteresis_status"] == "pending-confirmation"
@@ -6835,7 +7543,10 @@ def test_rebuild_reentry_refresh_restores_clearance_and_earlier_clear_when_fully
         persistence_reason="",
     )
 
-    assert updates["closure_forecast_reset_reentry_rebuild_reentry_status"] == "reentered-clearance-rebuild"
+    assert (
+        updates["closure_forecast_reset_reentry_rebuild_reentry_status"]
+        == "reentered-clearance-rebuild"
+    )
     assert updates["transition_closure_likely_outcome"] == "clear-risk"
     assert updates["closure_forecast_hysteresis_status"] == "confirmed-clearance"
     assert updates["class_transition_resolution_status"] == "cleared"
@@ -6901,7 +7612,10 @@ def test_rebuild_reentry_restore_churn_softens_clearance_back_toward_hold():
 
     assert updates["transition_closure_likely_outcome"] == "clear-risk"
     assert updates["closure_forecast_hysteresis_status"] == "pending-clearance"
-    assert updates["closure_forecast_reset_reentry_rebuild_reentry_status"] == "pending-clearance-rebuild-reentry"
+    assert (
+        updates["closure_forecast_reset_reentry_rebuild_reentry_status"]
+        == "pending-clearance-rebuild-reentry"
+    )
     assert updates["class_transition_resolution_status"] == "none"
     assert updates["class_reweight_transition_status"] == "pending-caution"
 
@@ -6934,8 +7648,14 @@ def test_rebuild_reentry_restore_freshness_mixed_age_softens_confirmation_restor
         persistence_reason="Confirmation-side rebuilt re-entry restore is now holding with enough follow-through to trust the restored forecast more.",
     )
 
-    assert updates["closure_forecast_reset_reentry_rebuild_reentry_restore_reset_status"] == "confirmation-softened"
-    assert updates["closure_forecast_reset_reentry_rebuild_reentry_restore_persistence_status"] == "holding-confirmation-rebuild-reentry-restore"
+    assert (
+        updates["closure_forecast_reset_reentry_rebuild_reentry_restore_reset_status"]
+        == "confirmation-softened"
+    )
+    assert (
+        updates["closure_forecast_reset_reentry_rebuild_reentry_restore_persistence_status"]
+        == "holding-confirmation-rebuild-reentry-restore"
+    )
     assert updates["transition_closure_likely_outcome"] == "confirm-soon"
 
 
@@ -6967,10 +7687,16 @@ def test_rebuild_reentry_restore_freshness_stale_resets_clearance_restore():
         persistence_reason="Clearance-side rebuilt re-entry restore has stayed aligned long enough to keep the restored forecast in place.",
     )
 
-    assert updates["closure_forecast_reset_reentry_rebuild_reentry_restore_reset_status"] == "clearance-reset"
+    assert (
+        updates["closure_forecast_reset_reentry_rebuild_reentry_restore_reset_status"]
+        == "clearance-reset"
+    )
     assert updates["transition_closure_likely_outcome"] == "clear-risk"
     assert updates["closure_forecast_hysteresis_status"] == "pending-clearance"
-    assert updates["closure_forecast_reset_reentry_rebuild_reentry_status"] == "pending-clearance-rebuild-reentry"
+    assert (
+        updates["closure_forecast_reset_reentry_rebuild_reentry_status"]
+        == "pending-clearance-rebuild-reentry"
+    )
     assert updates["closure_forecast_reset_reentry_rebuild_reentry_restore_status"] == "none"
     assert updates["class_transition_resolution_status"] == "none"
 
@@ -7011,9 +7737,18 @@ def test_rebuild_reentry_restore_refresh_pending_confirmation_rerestore_holds_we
 
     assert updates["transition_closure_likely_outcome"] == "hold"
     assert updates["closure_forecast_hysteresis_status"] == "pending-confirmation"
-    assert updates["closure_forecast_reset_reentry_rebuild_reentry_status"] == "pending-confirmation-rebuild-reentry"
-    assert updates["closure_forecast_reset_reentry_rebuild_reentry_restore_status"] == "pending-confirmation-rebuild-reentry-restore"
-    assert updates["closure_forecast_reset_reentry_rebuild_reentry_restore_persistence_status"] == "none"
+    assert (
+        updates["closure_forecast_reset_reentry_rebuild_reentry_status"]
+        == "pending-confirmation-rebuild-reentry"
+    )
+    assert (
+        updates["closure_forecast_reset_reentry_rebuild_reentry_restore_status"]
+        == "pending-confirmation-rebuild-reentry-restore"
+    )
+    assert (
+        updates["closure_forecast_reset_reentry_rebuild_reentry_restore_persistence_status"]
+        == "none"
+    )
 
 
 def test_rebuild_reentry_restore_refresh_rerestored_clearance_reenables_clear_posture():
@@ -7053,10 +7788,19 @@ def test_rebuild_reentry_restore_refresh_rerestored_clearance_reenables_clear_po
 
     assert updates["transition_closure_likely_outcome"] == "expire-risk"
     assert updates["closure_forecast_hysteresis_status"] == "confirmed-clearance"
-    assert updates["closure_forecast_reset_reentry_rebuild_reentry_status"] == "reentered-clearance-rebuild"
-    assert updates["closure_forecast_reset_reentry_rebuild_reentry_restore_status"] == "restored-clearance-rebuild-reentry"
+    assert (
+        updates["closure_forecast_reset_reentry_rebuild_reentry_status"]
+        == "reentered-clearance-rebuild"
+    )
+    assert (
+        updates["closure_forecast_reset_reentry_rebuild_reentry_restore_status"]
+        == "restored-clearance-rebuild-reentry"
+    )
     assert updates["class_transition_resolution_status"] == "cleared"
-    assert updates["closure_forecast_reset_reentry_rebuild_reentry_restore_persistence_status"] == "none"
+    assert (
+        updates["closure_forecast_reset_reentry_rebuild_reentry_restore_persistence_status"]
+        == "none"
+    )
 
 
 def test_rererestore_refresh_pending_confirmation_rerererestore_holds_weaker_posture():
@@ -7100,8 +7844,16 @@ def test_rererestore_refresh_pending_confirmation_rerererestore_holds_weaker_pos
 
     assert updates["transition_closure_likely_outcome"] == "hold"
     assert updates["closure_forecast_hysteresis_status"] == "pending-confirmation"
-    assert updates["closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status"] == "pending-confirmation-rebuild-reentry-rererestore"
-    assert updates["closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status"] == "none"
+    assert (
+        updates["closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status"]
+        == "pending-confirmation-rebuild-reentry-rererestore"
+    )
+    assert (
+        updates[
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status"
+        ]
+        == "none"
+    )
 
 
 def test_rererestore_refresh_rerererestored_clearance_reenables_clear_posture():
@@ -7145,10 +7897,22 @@ def test_rererestore_refresh_rerererestored_clearance_reenables_clear_posture():
 
     assert updates["transition_closure_likely_outcome"] == "expire-risk"
     assert updates["closure_forecast_hysteresis_status"] == "confirmed-clearance"
-    assert updates["closure_forecast_reset_reentry_rebuild_reentry_status"] == "reentered-clearance-rebuild"
-    assert updates["closure_forecast_reset_reentry_rebuild_reentry_restore_status"] == "restored-clearance-rebuild-reentry"
-    assert updates["closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_status"] == "rerestored-clearance-rebuild-reentry"
-    assert updates["closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status"] == "rererestored-clearance-rebuild-reentry"
+    assert (
+        updates["closure_forecast_reset_reentry_rebuild_reentry_status"]
+        == "reentered-clearance-rebuild"
+    )
+    assert (
+        updates["closure_forecast_reset_reentry_rebuild_reentry_restore_status"]
+        == "restored-clearance-rebuild-reentry"
+    )
+    assert (
+        updates["closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_status"]
+        == "rerestored-clearance-rebuild-reentry"
+    )
+    assert (
+        updates["closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status"]
+        == "rererestored-clearance-rebuild-reentry"
+    )
     assert updates["class_transition_resolution_status"] == "cleared"
 
 
@@ -7185,7 +7949,10 @@ def test_rerererestore_persistence_holding_confirmation_keeps_stronger_posture()
 
     assert updates["transition_closure_likely_outcome"] == "confirm-soon"
     assert updates["closure_forecast_hysteresis_status"] == "confirmed-confirmation"
-    assert updates["closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status"] == "rererestored-confirmation-rebuild-reentry"
+    assert (
+        updates["closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status"]
+        == "rererestored-confirmation-rebuild-reentry"
+    )
 
 
 def test_rerererestore_churn_softens_clearance_posture():
@@ -7221,7 +7988,10 @@ def test_rerererestore_churn_softens_clearance_posture():
 
     assert updates["transition_closure_likely_outcome"] == "clear-risk"
     assert updates["closure_forecast_hysteresis_status"] == "pending-clearance"
-    assert updates["closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status"] == "pending-clearance-rebuild-reentry-rererestore"
+    assert (
+        updates["closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status"]
+        == "pending-clearance-rebuild-reentry-rererestore"
+    )
 
 
 def test_operator_snapshot_learns_when_soft_exception_was_overcautious(tmp_path: Path, monkeypatch):
@@ -7334,13 +8104,18 @@ def test_operator_snapshot_learns_when_soft_exception_was_overcautious(tmp_path:
             "confidence_calibration_summary": "Recent high-confidence guidance has missed often enough that operators should verify before overcommitting.",
         },
     )
-    monkeypatch.setattr("src.operator_resolution_trend._was_resolved_then_reopened", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(
+        "src.operator_resolution_trend._was_resolved_then_reopened", lambda *_args, **_kwargs: True
+    )
 
     snapshot = build_operator_snapshot(report, output_dir=tmp_path)
     summary = snapshot["operator_summary"]
 
     assert summary["primary_target_exception_pattern_status"] == "overcautious"
-    assert summary["false_positive_exception_hotspots"][0]["label"] == "RepoC: RepoC security posture changed"
+    assert (
+        summary["false_positive_exception_hotspots"][0]["label"]
+        == "RepoC: RepoC security posture changed"
+    )
 
 
 def test_normalize_review_state_backfills_missing_fields(tmp_path: Path):
@@ -7423,7 +8198,9 @@ def test_operator_snapshot_includes_action_sync_readiness_and_queue_handoff(tmp_
     assert "next_historical_focus" in summary
     assert "automation_guidance_summary" in summary
     assert "next_safe_automation_step" in summary
-    repo_item = next(item for item in snapshot["operator_queue"] if item.get("repo") == "RepoSecure")
+    repo_item = next(
+        item for item in snapshot["operator_queue"] if item.get("repo") == "RepoSecure"
+    )
     assert repo_item["suggested_campaign"] == "security-review"
     assert repo_item["action_sync_stage"] == "preview-ready"
     assert "Action Sync:" in repo_item["action_sync_line"]
@@ -7436,5 +8213,13 @@ def test_operator_snapshot_includes_action_sync_readiness_and_queue_handoff(tmp_
     assert "Campaign Tuning:" in repo_item["campaign_tuning_line"]
     assert repo_item["historical_intelligence_status"] == "insufficient-evidence"
     assert "Historical Portfolio Intelligence:" in repo_item["historical_intelligence_line"]
-    assert repo_item["automation_posture"] in {"preview-safe", "manual-only", "quiet-safe", "follow-up-safe", "approval-first", "apply-manual"}
+    assert repo_item["automation_posture"] in {
+        "preview-safe",
+        "manual-only",
+        "quiet-safe",
+        "follow-up-safe",
+        "approval-first",
+        "apply-manual",
+        "auto-apply-safe",
+    }
     assert "Automation Guidance:" in repo_item["automation_line"]

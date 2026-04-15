@@ -40,7 +40,7 @@ def test_build_decision_quality_v1_marks_noisy_guidance_as_skeptical() -> None:
 
     assert decision_quality["decision_quality_status"] == "needs-skepticism"
     assert decision_quality["human_skepticism_required"] is True
-    assert decision_quality["authority_cap"] == "advisory-only"
+    assert decision_quality["authority_cap"] == "bounded-automation"
     assert "noisy-calibration" in decision_quality["downgrade_reasons"]
     assert "primary-target-needs-verification" in decision_quality["downgrade_reasons"]
     assert "trust-recovery-blocked" in decision_quality["downgrade_reasons"]
