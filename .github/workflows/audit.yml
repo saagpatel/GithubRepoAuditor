@@ -155,7 +155,7 @@ jobs:
           key: audit-history-${{ github.repository }}-${{ github.run_number }}
 
       - name: Upload reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: audit-reports-${{ github.run_number }}
           path: output/
