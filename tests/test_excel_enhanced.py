@@ -32,6 +32,7 @@ from src.excel_export import (
     _build_repo_profiles,
     _build_review_history_sheet,
     _build_review_queue,
+    _build_risk_summary_sheet,
     _build_run_changes,
     _build_scenario_planner,
     _build_score_explainer,
@@ -55,28 +56,92 @@ from src.report_enrichment import (
 )
 
 
-def _make_audit(name: str, score: float, grade: str = "C", tier: str = "functional", **kwargs) -> dict:
+def _make_audit(
+    name: str, score: float, grade: str = "C", tier: str = "functional", **kwargs
+) -> dict:
     dims = kwargs.get("dims", {})
     results = [
-        {"dimension": d, "score": dims.get(d, score), "max_score": 1.0, "findings": [], "details": {}}
+        {
+            "dimension": d,
+            "score": dims.get(d, score),
+            "max_score": 1.0,
+            "findings": [],
+            "details": {},
+        }
         for d in RADAR_DIMS
     ]
     # Add security dimension
-    sec_details = kwargs.get("security_details", {"secrets_found": 0, "dangerous_files": [], "has_security_md": False, "has_dependabot": False})
-    results.append({"dimension": "security", "score": kwargs.get("security_score", 0.8), "max_score": 1.0, "findings": [], "details": sec_details})
+    sec_details = kwargs.get(
+        "security_details",
+        {
+            "secrets_found": 0,
+            "dangerous_files": [],
+            "has_security_md": False,
+            "has_dependabot": False,
+        },
+    )
+    results.append(
+        {
+            "dimension": "security",
+            "score": kwargs.get("security_score", 0.8),
+            "max_score": 1.0,
+            "findings": [],
+            "details": sec_details,
+        }
+    )
     # Add interest
-    results.append({"dimension": "interest", "score": 0.3, "max_score": 1.0, "findings": [], "details": {}})
+    results.append(
+        {"dimension": "interest", "score": 0.3, "max_score": 1.0, "findings": [], "details": {}}
+    )
     return {
-        "metadata": {"name": name, "html_url": f"https://github.com/user/{name}", "language": "Python"},
-        "overall_score": score, "interest_score": 0.3, "grade": grade,
-        "completeness_tier": tier, "badges": [], "flags": [],
+        "metadata": {
+            "name": name,
+            "html_url": f"https://github.com/user/{name}",
+            "language": "Python",
+        },
+        "overall_score": score,
+        "interest_score": 0.3,
+        "grade": grade,
+        "completeness_tier": tier,
+        "badges": [],
+        "flags": [],
         "lenses": {
-            "ship_readiness": {"score": score, "orientation": "higher-is-better", "summary": "Ready", "drivers": []},
-            "maintenance_risk": {"score": round(1 - score, 3), "orientation": "higher-is-riskier", "summary": "Risk", "drivers": []},
-            "showcase_value": {"score": min(1.0, score + 0.1), "orientation": "higher-is-better", "summary": "Story", "drivers": []},
-            "security_posture": {"score": kwargs.get("security_score", 0.8), "orientation": "higher-is-better", "summary": "Security", "drivers": []},
-            "momentum": {"score": 0.5, "orientation": "higher-is-better", "summary": "Momentum", "drivers": []},
-            "portfolio_fit": {"score": score, "orientation": "higher-is-better", "summary": "Fit", "drivers": []},
+            "ship_readiness": {
+                "score": score,
+                "orientation": "higher-is-better",
+                "summary": "Ready",
+                "drivers": [],
+            },
+            "maintenance_risk": {
+                "score": round(1 - score, 3),
+                "orientation": "higher-is-riskier",
+                "summary": "Risk",
+                "drivers": [],
+            },
+            "showcase_value": {
+                "score": min(1.0, score + 0.1),
+                "orientation": "higher-is-better",
+                "summary": "Story",
+                "drivers": [],
+            },
+            "security_posture": {
+                "score": kwargs.get("security_score", 0.8),
+                "orientation": "higher-is-better",
+                "summary": "Security",
+                "drivers": [],
+            },
+            "momentum": {
+                "score": 0.5,
+                "orientation": "higher-is-better",
+                "summary": "Momentum",
+                "drivers": [],
+            },
+            "portfolio_fit": {
+                "score": score,
+                "orientation": "higher-is-better",
+                "summary": "Fit",
+                "drivers": [],
+            },
         },
         "security_posture": {
             "label": "healthy" if kwargs.get("security_score", 0.8) >= 0.65 else "critical",
@@ -130,7 +195,19 @@ def _make_report(audits=None) -> dict:
         audits = [
             _make_audit("RepoA", 0.85, "A", "shipped"),
             _make_audit("RepoB", 0.60, "C", "functional"),
-            _make_audit("RepoC", 0.40, "D", "wip", security_score=0.3, security_details={"secrets_found": 2, "dangerous_files": [".env"], "has_security_md": False, "has_dependabot": False}),
+            _make_audit(
+                "RepoC",
+                0.40,
+                "D",
+                "wip",
+                security_score=0.3,
+                security_details={
+                    "secrets_found": 2,
+                    "dangerous_files": [".env"],
+                    "has_security_md": False,
+                    "has_dependabot": False,
+                },
+            ),
         ]
     return {
         "username": "user",
@@ -173,9 +250,7 @@ def _make_report(audits=None) -> dict:
                 "repos": [{"name": "RepoA", "reason": "High value"}],
             }
         },
-        "profiles": {
-            "default": {"description": "Balanced"}
-        },
+        "profiles": {"default": {"description": "Balanced"}},
         "lenses": {
             "ship_readiness": {"description": "Ready", "average_score": 0.7},
         },
@@ -370,7 +445,9 @@ def _make_report(audits=None) -> dict:
             "top_rebuilding_recovery_items": [],
             "next_action_confidence_score": 0.75,
             "next_action_confidence_label": "high",
-            "next_action_confidence_reasons": ["The next step is tied directly to the current top target."],
+            "next_action_confidence_reasons": [
+                "The next step is tied directly to the current top target."
+            ],
             "primary_target_trust_policy": "act-with-review",
             "primary_target_trust_policy_reason": "Urgent work has enough tuned confidence to act, with a quick operator review.",
             "next_action_trust_policy": "act-with-review",
@@ -724,7 +801,7 @@ class TestRadarChart:
         wb = Workbook()
         _build_repo_profiles(wb, _make_report())
         ws = wb["Repo Profiles"]
-        labels = [ws.cell(row=i+2, column=1).value for i in range(len(RADAR_LABELS))]
+        labels = [ws.cell(row=i + 2, column=1).value for i in range(len(RADAR_LABELS))]
         assert labels == RADAR_LABELS
 
 
@@ -758,8 +835,19 @@ class TestChangesSheet:
     def test_creates_sheet_with_diff(self):
         wb = Workbook()
         diff = {
-            "tier_changes": [{"name": "RepoA", "old_tier": "functional", "new_tier": "shipped", "direction": "promotion", "old_score": 0.72, "new_score": 0.80}],
-            "score_changes": [{"name": "RepoA", "old_score": 0.72, "new_score": 0.80, "delta": 0.08}],
+            "tier_changes": [
+                {
+                    "name": "RepoA",
+                    "old_tier": "functional",
+                    "new_tier": "shipped",
+                    "direction": "promotion",
+                    "old_score": 0.72,
+                    "new_score": 0.80,
+                }
+            ],
+            "score_changes": [
+                {"name": "RepoA", "old_score": 0.72, "new_score": 0.80, "delta": 0.08}
+            ],
             "average_score_delta": 0.03,
         }
         _build_changes(wb, _make_report(), diff)
@@ -768,7 +856,16 @@ class TestChangesSheet:
     def test_shows_promotions(self):
         wb = Workbook()
         diff = {
-            "tier_changes": [{"name": "RepoA", "old_tier": "functional", "new_tier": "shipped", "direction": "promotion", "old_score": 0.72, "new_score": 0.80}],
+            "tier_changes": [
+                {
+                    "name": "RepoA",
+                    "old_tier": "functional",
+                    "new_tier": "shipped",
+                    "direction": "promotion",
+                    "old_score": 0.72,
+                    "new_score": 0.80,
+                }
+            ],
             "score_changes": [],
             "average_score_delta": 0.03,
         }
@@ -874,7 +971,12 @@ class TestHotspotsAndDataSheets:
 
     def test_hidden_data_sheets_are_created(self):
         wb = Workbook()
-        _build_hidden_data_sheets(wb, _make_report(), trend_data=[{"average_score": 0.6}], score_history={"RepoA": [0.5, 0.8]})
+        _build_hidden_data_sheets(
+            wb,
+            _make_report(),
+            trend_data=[{"average_score": 0.6}],
+            score_history={"RepoA": [0.5, 0.8]},
+        )
         assert "Data_Repos" in wb.sheetnames
         assert "Data_Lenses" in wb.sheetnames
         assert "Data_TrendMatrix" in wb.sheetnames
@@ -908,7 +1010,9 @@ class TestHotspotsAndDataSheets:
 class TestAnalystWorkbookSheets:
     def test_creates_portfolio_explorer_and_by_lens(self):
         wb = Workbook()
-        _build_portfolio_explorer(wb, _make_report(), portfolio_profile="default", collection="showcase")
+        _build_portfolio_explorer(
+            wb, _make_report(), portfolio_profile="default", collection="showcase"
+        )
         _build_by_lens(wb, _make_report(), portfolio_profile="default", collection="showcase")
         assert "Portfolio Explorer" in wb.sheetnames
         assert "By Lens" in wb.sheetnames
@@ -951,7 +1055,19 @@ class TestAnalystWorkbookSheets:
         wb = Workbook()
         report = _make_report()
         _build_by_collection(wb, report, portfolio_profile="default")
-        _build_trend_summary(wb, report, trend_data=[{"date": "2026-03-28", "average_score": 0.6, "repos_audited": 3, "tier_distribution": {"shipped": 1, "functional": 1}}], score_history={"RepoA": [0.5, 0.8]})
+        _build_trend_summary(
+            wb,
+            report,
+            trend_data=[
+                {
+                    "date": "2026-03-28",
+                    "average_score": 0.6,
+                    "repos_audited": 3,
+                    "tier_distribution": {"shipped": 1, "functional": 1},
+                }
+            ],
+            score_history={"RepoA": [0.5, 0.8]},
+        )
         _build_repo_detail(wb, report)
         _build_run_changes(wb, report, {"score_changes": []})
         _build_review_queue(wb, report)
@@ -1009,9 +1125,7 @@ class TestAnalystWorkbookSheets:
         assert wb["Repo Detail"]["B4"].value == "RepoC"
 
     def test_repo_detail_formulas_include_safe_placeholder_copy(self):
-        audits = [
-            _make_audit("RepoA", 0.85, "A", "shipped")
-        ]
+        audits = [_make_audit("RepoA", 0.85, "A", "shipped")]
         audits[0]["metadata"]["description"] = ""
         audits[0]["metadata"]["language"] = None
         audits[0]["action_candidates"] = []
@@ -1034,8 +1148,13 @@ class TestAnalystWorkbookSheets:
         assert "No briefing detail recorded yet." in str(ws["F18"].value)
         assert "Unknown" in str(ws["G28"].value)
         assert "Unknown" in str(ws["G30"].value)
-        assert "No follow-through recovery or escalation-retirement signal is currently surfaced." in str(ws["G34"].value)
-        assert "No follow-through recovery persistence signal is currently surfaced." in str(ws["G36"].value)
+        assert (
+            "No follow-through recovery or escalation-retirement signal is currently surfaced."
+            in str(ws["G34"].value)
+        )
+        assert "No follow-through recovery persistence signal is currently surfaced." in str(
+            ws["G36"].value
+        )
         assert "No relapse churn is currently surfaced." in str(ws["G38"].value)
         assert "No clear next action is recorded yet." in str(ws["G26"].value)
 
@@ -1066,7 +1185,9 @@ class TestAnalystWorkbookSheets:
         assert "Work this page in lane order" in str(ws["A3"].value)
         assert ws["A4"].value == "Summary"
         assert ws["E4"].value == "Top 10 To Act On"
-        header_row = next(row for row in range(20, 80) if ws.cell(row=row, column=1).value == "Repo")
+        header_row = next(
+            row for row in range(20, 80) if ws.cell(row=row, column=1).value == "Repo"
+        )
         assert header_row > 24
         assert ws.freeze_panes == f"A{header_row + 1}"
         assert ws.cell(row=header_row, column=8).value == "Catalog"
@@ -1103,88 +1224,74 @@ class TestAnalystWorkbookSheets:
         assert ws.cell(row=header_row, column=39).value == "Focus Line"
         assert ws.cell(row=header_row, column=40).value == "Open Artifact"
         assert no_linked_artifact_summary() in {
-            ws.cell(row=row, column=40).value
-            for row in range(header_row + 1, header_row + 10)
+            ws.cell(row=row, column=40).value for row in range(header_row + 1, header_row + 10)
         }
         assert "No portfolio catalog contract is recorded yet." in {
-            ws.cell(row=row, column=8).value
-            for row in range(header_row + 1, header_row + 10)
+            ws.cell(row=row, column=8).value for row in range(header_row + 1, header_row + 10)
         }
-        assert any("missing-contract" in value for value in {
-            str(ws.cell(row=row, column=10).value)
-            for row in range(header_row + 1, header_row + 10)
-        })
+        assert any(
+            "missing-contract" in value
+            for value in {
+                str(ws.cell(row=row, column=10).value)
+                for row in range(header_row + 1, header_row + 10)
+            }
+        )
         assert "—" in {
-            ws.cell(row=row, column=11).value
-            for row in range(header_row + 1, header_row + 10)
+            ws.cell(row=row, column=11).value for row in range(header_row + 1, header_row + 10)
         }
         assert "No maturity gap summary is recorded yet." in {
-            ws.cell(row=row, column=12).value
-            for row in range(header_row + 1, header_row + 10)
+            ws.cell(row=row, column=12).value for row in range(header_row + 1, header_row + 10)
         }
-        assert "RepoC has recent follow-up recorded and is now waiting for confirming evidence." in {
-            ws.cell(row=row, column=14).value
-            for row in range(header_row + 1, header_row + 10)
-        }
+        assert (
+            "RepoC has recent follow-up recorded and is now waiting for confirming evidence."
+            in {ws.cell(row=row, column=14).value for row in range(header_row + 1, header_row + 10)}
+        )
         assert "Due Soon" in {
-            ws.cell(row=row, column=16).value
-            for row in range(header_row + 1, header_row + 10)
+            ws.cell(row=row, column=16).value for row in range(header_row + 1, header_row + 10)
         }
         assert "Recovering" in {
-            ws.cell(row=row, column=19).value
-            for row in range(header_row + 1, header_row + 10)
+            ws.cell(row=row, column=19).value for row in range(header_row + 1, header_row + 10)
         }
         assert "Fragile Recovery" in {
-            ws.cell(row=row, column=21).value
-            for row in range(header_row + 1, header_row + 10)
+            ws.cell(row=row, column=21).value for row in range(header_row + 1, header_row + 10)
         }
         assert "Fragile" in {
-            ws.cell(row=row, column=23).value
-            for row in range(header_row + 1, header_row + 10)
+            ws.cell(row=row, column=23).value for row in range(header_row + 1, header_row + 10)
         }
         assert "Mixed Age" in {
-            ws.cell(row=row, column=25).value
-            for row in range(header_row + 1, header_row + 10)
+            ws.cell(row=row, column=25).value for row in range(header_row + 1, header_row + 10)
         }
         assert "Reset Watch" in {
-            ws.cell(row=row, column=27).value
-            for row in range(header_row + 1, header_row + 10)
+            ws.cell(row=row, column=27).value for row in range(header_row + 1, header_row + 10)
         }
         assert "None" in {
-            ws.cell(row=row, column=33).value
-            for row in range(header_row + 1, header_row + 10)
+            ws.cell(row=row, column=33).value for row in range(header_row + 1, header_row + 10)
         }
         assert "None" in {
-            ws.cell(row=row, column=35).value
-            for row in range(header_row + 1, header_row + 10)
+            ws.cell(row=row, column=35).value for row in range(header_row + 1, header_row + 10)
         }
         assert "Act Now" in {
-            ws.cell(row=row, column=37).value
-            for row in range(header_row + 1, header_row + 10)
+            ws.cell(row=row, column=37).value for row in range(header_row + 1, header_row + 10)
         }
         assert any(
             "Act Now:" in str(ws.cell(row=row, column=39).value)
             for row in range(header_row + 1, header_row + 10)
         )
         assert "no" in {
-            ws.cell(row=row, column=41).value
-            for row in range(header_row + 1, header_row + 10)
+            ws.cell(row=row, column=41).value for row in range(header_row + 1, header_row + 10)
         }
         assert any(
             "stay visible" in str(ws.cell(row=row, column=38).value).lower()
             for row in range(header_row + 1, header_row + 10)
         )
         assert "None" in {
-            ws.cell(row=row, column=29).value
-            for row in range(header_row + 1, header_row + 10)
+            ws.cell(row=row, column=29).value for row in range(header_row + 1, header_row + 10)
         }
         assert "None" in {
-            ws.cell(row=row, column=31).value
-            for row in range(header_row + 1, header_row + 10)
+            ws.cell(row=row, column=31).value for row in range(header_row + 1, header_row + 10)
         }
         assert "None" in {
-            ws.cell(row=row, column=35).value
-            for row in range(header_row + 1, header_row + 10)
+            ws.cell(row=row, column=35).value for row in range(header_row + 1, header_row + 10)
         }
 
     def test_core_sheets_expose_consistent_navigation_strip(self, tmp_path):
@@ -1194,7 +1301,13 @@ class TestAnalystWorkbookSheets:
         output = export_excel(report_path, tmp_path / "out.xlsx", excel_mode="standard")
         wb = load_workbook_allowing_native_sparklines(output)
 
-        for sheet_name in ["Dashboard", "Run Changes", "Review Queue", "Repo Detail", "Executive Summary"]:
+        for sheet_name in [
+            "Dashboard",
+            "Run Changes",
+            "Review Queue",
+            "Repo Detail",
+            "Executive Summary",
+        ]:
             ws = wb[sheet_name]
             quick_link_cells = [
                 cell
@@ -1204,10 +1317,7 @@ class TestAnalystWorkbookSheets:
             ]
             assert quick_link_cells, f"missing quick links header on {sheet_name}"
             start_col = quick_link_cells[0].column
-            labels = [
-                ws.cell(row=row, column=start_col).value
-                for row in range(2, 7)
-            ]
+            labels = [ws.cell(row=row, column=start_col).value for row in range(2, 7)]
             assert labels == [
                 "Dashboard",
                 "Review Queue",
@@ -1221,8 +1331,22 @@ class TestAnalystWorkbookSheets:
         report = _make_report()
         _build_review_queue(wb, report, excel_mode="standard")
         _build_dashboard(wb, report, excel_mode="standard")
-        _build_executive_summary(wb, report, None, portfolio_profile="default", collection="showcase", excel_mode="standard")
-        _build_print_pack(wb, report, None, portfolio_profile="default", collection="showcase", excel_mode="standard")
+        _build_executive_summary(
+            wb,
+            report,
+            None,
+            portfolio_profile="default",
+            collection="showcase",
+            excel_mode="standard",
+        )
+        _build_print_pack(
+            wb,
+            report,
+            None,
+            portfolio_profile="default",
+            collection="showcase",
+            excel_mode="standard",
+        )
 
         review_ws = wb["Review Queue"]
         executive_ws = wb["Executive Summary"]
@@ -1264,8 +1388,13 @@ class TestAnalystWorkbookSheets:
         assert "Transition Likely Outcome" in review_labels
         assert "Pending Debt Freshness" in review_labels
         assert "Closure Forecast" in review_labels
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence" in review_labels
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls" in review_labels
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence" in review_labels
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls"
+            in review_labels
+        )
         assert "Closure Forecast Summary" in review_labels
         assert "Momentum Summary" in review_labels
         assert "Exception Learning" in review_labels
@@ -1294,8 +1423,22 @@ class TestAnalystWorkbookSheets:
         wb = Workbook()
         report = _make_report()
         _build_dashboard(wb, report, excel_mode="standard")
-        _build_executive_summary(wb, report, None, portfolio_profile="default", collection="showcase", excel_mode="standard")
-        _build_print_pack(wb, report, None, portfolio_profile="default", collection="showcase", excel_mode="standard")
+        _build_executive_summary(
+            wb,
+            report,
+            None,
+            portfolio_profile="default",
+            collection="showcase",
+            excel_mode="standard",
+        )
+        _build_print_pack(
+            wb,
+            report,
+            None,
+            portfolio_profile="default",
+            collection="showcase",
+            excel_mode="standard",
+        )
 
         dashboard_ws = wb["Dashboard"]
         executive_ws = wb["Executive Summary"]
@@ -1303,13 +1446,17 @@ class TestAnalystWorkbookSheets:
 
         dashboard_values = {
             cell
-            for row in dashboard_ws.iter_rows(min_row=1, max_row=110, min_col=1, max_col=25, values_only=True)
+            for row in dashboard_ws.iter_rows(
+                min_row=1, max_row=110, min_col=1, max_col=25, values_only=True
+            )
             for cell in row
             if cell is not None
         }
         executive_values = {
             cell
-            for row in executive_ws.iter_rows(min_row=1, max_row=140, min_col=1, max_col=20, values_only=True)
+            for row in executive_ws.iter_rows(
+                min_row=1, max_row=140, min_col=1, max_col=20, values_only=True
+            )
             for cell in row
             if cell is not None
         }
@@ -1326,10 +1473,16 @@ class TestAnalystWorkbookSheets:
         assert top_recommendation in executive_values
         assert trust_summary in executive_values
         assert "No portfolio catalog contract is recorded yet." in executive_values
-        assert "Intent alignment cannot be judged until a portfolio catalog contract exists." in executive_values
+        assert (
+            "Intent alignment cannot be judged until a portfolio catalog contract exists."
+            in executive_values
+        )
         assert print_ws["D4"].value == "Workflow Guidance"
         assert print_ws["D5"].value == "Product Mode"
-        assert any(label in str(print_ws["E5"].value) for label in ("First Run:", "Weekly Review:", "Deep Dive:", "Action Sync:"))
+        assert any(
+            label in str(print_ws["E5"].value)
+            for label in ("First Run:", "Weekly Review:", "Deep Dive:", "Action Sync:")
+        )
         assert print_ws["D6"].value == "Artifact Role"
         assert print_ws["D7"].value == "Reading Order"
         assert print_ws["D8"].value == "Next Best Step"
@@ -1341,7 +1494,9 @@ class TestAnalystWorkbookSheets:
         assert print_ws["E70"].value == "Top Repo Drilldowns"
         executive_labels = {
             cell
-            for row in executive_ws.iter_rows(min_row=20, max_row=110, min_col=1, max_col=20, values_only=True)
+            for row in executive_ws.iter_rows(
+                min_row=20, max_row=110, min_col=1, max_col=20, values_only=True
+            )
             for cell in row
             if isinstance(cell, str)
         }
@@ -1444,8 +1599,14 @@ class TestAnalystWorkbookSheets:
         assert print_ws["A57"].value == "Transition Likely Outcome"
         assert print_ws["A58"].value == "Pending Debt Freshness"
         assert print_ws["A59"].value == "Closure Forecast"
-        assert print_ws["A60"].value == "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence"
-        assert print_ws["A61"].value == "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls"
+        assert (
+            print_ws["A60"].value
+            == "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence"
+        )
+        assert (
+            print_ws["A61"].value
+            == "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls"
+        )
         assert print_ws["A62"].value == "Closure Forecast Summary"
         assert print_ws["A63"].value == "Momentum Summary"
         assert print_ws["A64"].value == "Exception Learning"
@@ -1476,8 +1637,14 @@ class TestAnalystWorkbookSheets:
         assert "Transition Likely Outcome" in dashboard_values
         assert "Pending Debt Freshness" in dashboard_values
         assert "Closure Forecast" in dashboard_values
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence" in dashboard_values
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls" in dashboard_values
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence"
+            in dashboard_values
+        )
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls"
+            in dashboard_values
+        )
         assert "Exception Learning" in dashboard_values
         assert "Recommendation Drift" in dashboard_values
 
@@ -1489,7 +1656,9 @@ class TestAnalystWorkbookSheets:
         _build_campaigns(wb, report)
         ws = wb["Campaigns"]
         values = [ws.cell(row=row, column=1).value for row in range(1, 30)]
-        assert any(isinstance(value, str) and "No active campaign rows" in value for value in values)
+        assert any(
+            isinstance(value, str) and "No active campaign rows" in value for value in values
+        )
 
     def test_campaigns_show_github_projects_status_and_counts(self):
         wb = Workbook()
@@ -1497,7 +1666,9 @@ class TestAnalystWorkbookSheets:
         report["action_sync_summary"] = {
             "summary": "Action Sync is preview-ready: Security Review is the strongest next campaign to preview from the current local facts.",
         }
-        report["next_action_sync_step"] = "Preview Security Review next, then decide whether it is ready to sync to all."
+        report["next_action_sync_step"] = (
+            "Preview Security Review next, then decide whether it is ready to sync to all."
+        )
         report["apply_readiness_summary"] = {
             "summary": "Apply handoff says preview Security Review next before deciding on apply to all."
         }
@@ -1684,8 +1855,12 @@ class TestAnalystWorkbookSheets:
 
     def test_creates_scenario_and_executive_summary(self):
         wb = Workbook()
-        _build_scenario_planner(wb, _make_report(), portfolio_profile="default", collection="showcase")
-        _build_executive_summary(wb, _make_report(), None, portfolio_profile="default", collection="showcase")
+        _build_scenario_planner(
+            wb, _make_report(), portfolio_profile="default", collection="showcase"
+        )
+        _build_executive_summary(
+            wb, _make_report(), None, portfolio_profile="default", collection="showcase"
+        )
         assert "Scenario Planner" in wb.sheetnames
         assert "Executive Summary" in wb.sheetnames
 
@@ -1698,7 +1873,18 @@ class TestAnalystWorkbookSheets:
         _build_scenario_planner(wb, report, portfolio_profile="default", collection="showcase")
         _build_security_debt(wb, report)
         _build_score_explainer(wb)
-        _build_trends(wb, report, trend_data=[{"date": "2026-03-28", "average_score": 0.6, "repos_audited": 3, "tier_distribution": {"shipped": 1, "functional": 1}}])
+        _build_trends(
+            wb,
+            report,
+            trend_data=[
+                {
+                    "date": "2026-03-28",
+                    "average_score": 0.6,
+                    "repos_audited": 3,
+                    "tier_distribution": {"shipped": 1, "functional": 1},
+                }
+            ],
+        )
 
         assert wb["Action Items"].freeze_panes == "A5"
         assert wb["Hotspots"].freeze_panes == "A2"
@@ -1803,7 +1989,14 @@ class TestWorkbookModes:
         output = export_excel(
             report_path,
             tmp_path / "out.xlsx",
-            trend_data=[{"date": "2026-03-28", "average_score": 0.58, "repos_audited": 3, "tier_distribution": {"shipped": 1, "functional": 1}}],
+            trend_data=[
+                {
+                    "date": "2026-03-28",
+                    "average_score": 0.58,
+                    "repos_audited": 3,
+                    "tier_distribution": {"shipped": 1, "functional": 1},
+                }
+            ],
             score_history={"RepoA": [0.5, 0.7], "RepoB": [0.4, 0.6]},
             excel_mode="template",
             template_path=DEFAULT_TEMPLATE_PATH,
@@ -1815,7 +2008,9 @@ class TestWorkbookModes:
         assert "nrSelectedProfileLabel" in wb.defined_names
 
         with zipfile.ZipFile(output) as archive:
-            worksheet_names = [name for name in archive.namelist() if name.startswith("xl/worksheets/sheet")]
+            worksheet_names = [
+                name for name in archive.namelist() if name.startswith("xl/worksheets/sheet")
+            ]
             assert any(
                 "sparkline" in archive.read(name).decode("utf-8", "ignore").lower()
                 for name in worksheet_names
@@ -1825,7 +2020,9 @@ class TestWorkbookModes:
         report_path = tmp_path / "report.json"
         report_path.write_text(json.dumps(_make_report()))
 
-        standard_output = export_excel(report_path, tmp_path / "standard.xlsx", excel_mode="standard")
+        standard_output = export_excel(
+            report_path, tmp_path / "standard.xlsx", excel_mode="standard"
+        )
         template_output = export_excel(
             report_path,
             tmp_path / "template.xlsx",
@@ -1838,7 +2035,10 @@ class TestWorkbookModes:
 
         assert standard_wb["Dashboard"]["A1"].value == template_wb["Dashboard"]["A1"].value
         assert standard_wb["Review Queue"]["B6"].value == template_wb["Review Queue"]["B6"].value
-        assert standard_wb["Governance Controls"]["B5"].value == template_wb["Governance Controls"]["B5"].value
+        assert (
+            standard_wb["Governance Controls"]["B5"].value
+            == template_wb["Governance Controls"]["B5"].value
+        )
         assert standard_wb["Print Pack"]["B7"].value == template_wb["Print Pack"]["B7"].value
         assert standard_wb["Print Pack"]["B8"].value == template_wb["Print Pack"]["B8"].value
         assert standard_wb["Print Pack"]["B9"].value == template_wb["Print Pack"]["B9"].value
@@ -1846,7 +2046,9 @@ class TestWorkbookModes:
         assert standard_wb["Print Pack"]["B16"].value == template_wb["Print Pack"]["B16"].value
         assert template_wb["Review Queue"]["A4"].value == "Summary"
         template_header_row = next(
-            row for row in range(15, 45) if template_wb["Review Queue"].cell(row=row, column=1).value == "Repo"
+            row
+            for row in range(15, 45)
+            if template_wb["Review Queue"].cell(row=row, column=1).value == "Repo"
         )
         assert template_header_row >= 17
 
@@ -1870,7 +2072,9 @@ class TestWorkbookModes:
 
         wb = load_workbook_allowing_native_sparklines(output)
         ws = wb["Review Queue"]
-        header_row = next(row for row in range(20, 70) if ws.cell(row=row, column=1).value == "Repo")
+        header_row = next(
+            row for row in range(20, 70) if ws.cell(row=row, column=1).value == "Repo"
+        )
         assert ws.auto_filter.ref == f"A{header_row}:AO{header_row + 1}"
         assert not ws.tables
 
@@ -1885,7 +2089,9 @@ class TestWorkbookModes:
         assert catalog_ws["A1"].value == "Portfolio Catalog"
         assert "No portfolio catalog contract is recorded yet." in str(catalog_ws["A3"].value)
         assert "Intent alignment cannot be judged" in str(catalog_ws["A4"].value)
-        assert "No normalized operating-path contract is recorded yet." in str(catalog_ws["A5"].value)
+        assert "No normalized operating-path contract is recorded yet." in str(
+            catalog_ws["A5"].value
+        )
 
         hidden_ws = wb["Data_PortfolioCatalog"]
         headers = [hidden_ws.cell(row=1, column=col).value for col in range(1, 19)]
@@ -1915,7 +2121,9 @@ class TestWorkbookModes:
         assert "No maturity scorecard is recorded yet." in str(scorecards_ws["A3"].value)
 
         hidden_scorecards_ws = wb["Data_Scorecards"]
-        scorecard_headers = [hidden_scorecards_ws.cell(row=1, column=col).value for col in range(1, 14)]
+        scorecard_headers = [
+            hidden_scorecards_ws.cell(row=1, column=col).value for col in range(1, 14)
+        ]
         assert scorecard_headers == [
             "Repo",
             "Full Name",
@@ -1948,8 +2156,14 @@ class TestWorkbookModes:
             }
             visible_targets = []
             hidden_targets = []
-            for sheet in workbook_root.findall("{http://schemas.openxmlformats.org/spreadsheetml/2006/main}sheets/{http://schemas.openxmlformats.org/spreadsheetml/2006/main}sheet"):
-                target = rel_targets[sheet.attrib["{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"]]
+            for sheet in workbook_root.findall(
+                "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}sheets/{http://schemas.openxmlformats.org/spreadsheetml/2006/main}sheet"
+            ):
+                target = rel_targets[
+                    sheet.attrib[
+                        "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
+                    ]
+                ]
                 if sheet.attrib.get("state") == "hidden":
                     hidden_targets.append(target)
                 else:
@@ -1972,3 +2186,38 @@ class TestWorkbookModes:
 
             assert not visible_table_rels
             assert hidden_table_rels
+
+
+def test_all_repos_sheet_has_risk_tier_column() -> None:
+    wb = Workbook()
+    risk_lookup = {"RepoA": "elevated", "RepoB": "baseline"}
+    report = _make_report()
+    report["audits"] = [_make_audit("RepoA", 0.8), _make_audit("RepoB", 0.5)]
+    _build_all_repos(wb, report, risk_lookup=risk_lookup)
+    ws = wb["All Repos"]
+    headers = [ws.cell(row=1, column=c).value for c in range(1, ws.max_column + 1)]
+    assert "Risk Tier" in headers
+    risk_col = headers.index("Risk Tier") + 1
+    trend_col = headers.index("Trend") + 1
+    assert risk_col == trend_col + 1
+    repo_a_row = next(
+        r for r in range(2, ws.max_row + 1) if ws.cell(row=r, column=1).value == "RepoA"
+    )
+    assert ws.cell(row=repo_a_row, column=risk_col).value == "elevated"
+
+
+def test_risk_summary_sheet_created() -> None:
+    wb = Workbook()
+    risk_posture = {"elevated": 3, "moderate": 5, "baseline": 12, "deferred": 1}
+    _build_risk_summary_sheet(wb, risk_posture)
+    assert "Risk Summary" in wb.sheetnames
+    ws = wb["Risk Summary"]
+    values = {ws.cell(row=r, column=1).value for r in range(1, ws.max_row + 1)}
+    assert "elevated" in values
+    assert "baseline" in values
+    count_col_values = [
+        ws.cell(row=r, column=2).value
+        for r in range(1, ws.max_row + 1)
+        if ws.cell(row=r, column=1).value == "elevated"
+    ]
+    assert 3 in count_col_values

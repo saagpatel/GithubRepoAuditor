@@ -7,7 +7,7 @@ from src.report_enrichment import (
     no_baseline_summary,
     no_linked_artifact_summary,
 )
-from src.web_export import _render_html, export_html_dashboard
+from src.web_export import _render_html, _risk_posture_section, export_html_dashboard
 
 
 def _make_report(**overrides) -> dict:
@@ -81,9 +81,26 @@ def _make_report(**overrides) -> dict:
             }
         ],
         "writeback_preview": {"sync_mode": "reconcile"},
-        "campaign_summary": {"campaign_type": "security-review", "label": "Security Review", "action_count": 1, "repo_count": 1},
-        "writeback_results": {"mode": "apply", "target": "github", "results": [{"repo_full_name": "user/RepoC", "target": "github-issue", "status": "created"}]},
-        "managed_state_drift": [{"repo_full_name": "user/RepoC", "target": "github-issue", "drift_state": "managed-issue-edited"}],
+        "campaign_summary": {
+            "campaign_type": "security-review",
+            "label": "Security Review",
+            "action_count": 1,
+            "repo_count": 1,
+        },
+        "writeback_results": {
+            "mode": "apply",
+            "target": "github",
+            "results": [
+                {"repo_full_name": "user/RepoC", "target": "github-issue", "status": "created"}
+            ],
+        },
+        "managed_state_drift": [
+            {
+                "repo_full_name": "user/RepoC",
+                "target": "github-issue",
+                "drift_state": "managed-issue-edited",
+            }
+        ],
         "governance_results": {"results": [{"repo_full_name": "user/RepoC", "status": "applied"}]},
         "governance_approval": {"status": "approved"},
         "governance_drift": [{"repo_full_name": "user/RepoC", "drift_type": "already-enabled"}],
@@ -137,7 +154,9 @@ def _make_report(**overrides) -> dict:
             ],
             "next_action_confidence_score": 0.75,
             "next_action_confidence_label": "high",
-            "next_action_confidence_reasons": ["The next step is tied directly to the current top target."],
+            "next_action_confidence_reasons": [
+                "The next step is tied directly to the current top target."
+            ],
             "primary_target_trust_policy": "verify-first",
             "primary_target_trust_policy_reason": "Recent calibration is noisy enough that this recommendation should be verified before acting on it.",
             "next_action_trust_policy": "verify-first",
@@ -161,7 +180,12 @@ def _make_report(**overrides) -> dict:
             "exception_retirement_summary": "RepoC: RepoC drift needs review still has reopen, flip, or calibration noise blocking exception retirement.",
             "retired_exception_hotspots": [],
             "sticky_exception_hotspots": [
-                {"scope": "class", "label": "urgent:campaign", "sticky_count": 2, "exception_count": 2}
+                {
+                    "scope": "class",
+                    "label": "urgent:campaign",
+                    "sticky_count": 2,
+                    "exception_count": 2,
+                }
             ],
             "exception_retirement_window_runs": 4,
             "primary_target_policy_debt_status": "class-debt",
@@ -171,7 +195,12 @@ def _make_report(**overrides) -> dict:
             "policy_debt_summary": "RepoC: RepoC drift needs review belongs to a class that keeps carrying sticky caution, so class-level normalization should stay conservative for now.",
             "trust_normalization_summary": "RepoC: RepoC drift needs review is blocked from class-level normalization by local reopen, flip, or calibration noise.",
             "policy_debt_hotspots": [
-                {"scope": "class", "label": "urgent:campaign", "match_count": 3, "exception_count": 3}
+                {
+                    "scope": "class",
+                    "label": "urgent:campaign",
+                    "match_count": 3,
+                    "exception_count": 3,
+                }
             ],
             "normalized_class_hotspots": [],
             "class_normalization_window_runs": 4,
@@ -468,10 +497,18 @@ def _make_report(**overrides) -> dict:
         ],
         "audits": [
             {
-                "metadata": {"name": "RepoA", "html_url": "https://github.com/user/RepoA",
-                             "description": "A cool project", "language": "Python"},
-                "overall_score": 0.85, "interest_score": 0.60, "grade": "A",
-                "completeness_tier": "shipped", "badges": ["fresh"], "flags": [],
+                "metadata": {
+                    "name": "RepoA",
+                    "html_url": "https://github.com/user/RepoA",
+                    "description": "A cool project",
+                    "language": "Python",
+                },
+                "overall_score": 0.85,
+                "interest_score": 0.60,
+                "grade": "A",
+                "completeness_tier": "shipped",
+                "badges": ["fresh"],
+                "flags": [],
                 "lenses": {
                     "ship_readiness": {"score": 0.85, "summary": "Ready"},
                     "showcase_value": {"score": 0.9, "summary": "Strong story"},
@@ -495,9 +532,18 @@ def _make_report(**overrides) -> dict:
                 "analyzer_results": [],
             },
             {
-                "metadata": {"name": "RepoB", "html_url": "", "description": None, "language": "Rust"},
-                "overall_score": 0.55, "interest_score": 0.30, "grade": "C",
-                "completeness_tier": "functional", "badges": [], "flags": [],
+                "metadata": {
+                    "name": "RepoB",
+                    "html_url": "",
+                    "description": None,
+                    "language": "Rust",
+                },
+                "overall_score": 0.55,
+                "interest_score": 0.30,
+                "grade": "C",
+                "completeness_tier": "functional",
+                "badges": [],
+                "flags": [],
                 "lenses": {
                     "ship_readiness": {"score": 0.55, "summary": "Needs work"},
                     "showcase_value": {"score": 0.5, "summary": "Average"},
@@ -508,9 +554,18 @@ def _make_report(**overrides) -> dict:
                 "analyzer_results": [],
             },
             {
-                "metadata": {"name": "RepoC", "html_url": "", "description": "WIP", "language": "Python"},
-                "overall_score": 0.40, "interest_score": 0.10, "grade": "D",
-                "completeness_tier": "wip", "badges": [], "flags": ["no-tests"],
+                "metadata": {
+                    "name": "RepoC",
+                    "html_url": "",
+                    "description": "WIP",
+                    "language": "Python",
+                },
+                "overall_score": 0.40,
+                "interest_score": 0.10,
+                "grade": "D",
+                "completeness_tier": "wip",
+                "badges": [],
+                "flags": ["no-tests"],
                 "lenses": {
                     "ship_readiness": {"score": 0.4, "summary": "Thin"},
                     "showcase_value": {"score": 0.25, "summary": "Weak"},
@@ -580,7 +635,9 @@ class TestRenderHtml:
             report,
             diff_data={"repo_changes": [], "score_changes": []},
         )
-        weekly_pack = build_weekly_review_pack(report, diff_data={"repo_changes": [], "score_changes": []})
+        weekly_pack = build_weekly_review_pack(
+            report, diff_data={"repo_changes": [], "score_changes": []}
+        )
         assert "Run Changes" in html
         assert "One repo improved and one regressed." in html
         assert f"Why It Matters:</strong> {weekly_pack['weekly_story_v1']['why_this_week']}" in html
@@ -593,7 +650,10 @@ class TestRenderHtml:
     def test_operator_section_includes_trend_and_primary_target(self):
         html = _render_html(_make_report())
         assert f"Queue Pressure:</strong> {build_queue_pressure_summary(_make_report())}" in html
-        assert f"Top Recommendation:</strong> {build_top_recommendation_summary(_make_report())}" in html
+        assert (
+            f"Top Recommendation:</strong> {build_top_recommendation_summary(_make_report())}"
+            in html
+        )
         assert "Top Attention / Next Action" in html
         assert "Trend:" in html
         assert "Accountability:" in html
@@ -722,14 +782,21 @@ class TestRenderHtml:
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Churn Summary:" in html
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Freshness Summary:" in html
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Reset Summary:" in html
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Refresh Recovery Summary:" in html
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Refresh Recovery Summary:" in html
+        )
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Summary:" in html
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Persistence Summary:" in html
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Churn Summary:" in html
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness Summary:" in html
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery Summary:" in html
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery Summary:"
+            in html
+        )
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Summary:" in html
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence Summary:" in html
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence Summary:" in html
+        )
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Summary:" in html
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Summary:" in html
         assert "Reset Re-entry Rebuild Persistence Summary:" in html
@@ -788,7 +855,9 @@ class TestRenderHtml:
                     "status": "warning",
                     "blocking_errors": 0,
                     "warnings": 2,
-                    "checks": [{"category": "config", "summary": "No audit-config.yaml was found."}],
+                    "checks": [
+                        {"category": "config", "summary": "No audit-config.yaml was found."}
+                    ],
                 }
             )
         )
@@ -923,15 +992,27 @@ class TestRenderHtml:
 
     def test_html_includes_portfolio_trends(self):
         trend_data = [
-            {"date": "2026-01-01", "average_score": 0.50, "repos_audited": 5,
-             "tier_distribution": {"shipped": 1, "functional": 2, "wip": 1, "skeleton": 1},
-             "top_repos": {}},
-            {"date": "2026-02-01", "average_score": 0.55, "repos_audited": 6,
-             "tier_distribution": {"shipped": 2, "functional": 2, "wip": 1, "skeleton": 1},
-             "top_repos": {}},
-            {"date": "2026-03-01", "average_score": 0.62, "repos_audited": 7,
-             "tier_distribution": {"shipped": 3, "functional": 2, "wip": 1, "skeleton": 1},
-             "top_repos": {}},
+            {
+                "date": "2026-01-01",
+                "average_score": 0.50,
+                "repos_audited": 5,
+                "tier_distribution": {"shipped": 1, "functional": 2, "wip": 1, "skeleton": 1},
+                "top_repos": {},
+            },
+            {
+                "date": "2026-02-01",
+                "average_score": 0.55,
+                "repos_audited": 6,
+                "tier_distribution": {"shipped": 2, "functional": 2, "wip": 1, "skeleton": 1},
+                "top_repos": {},
+            },
+            {
+                "date": "2026-03-01",
+                "average_score": 0.62,
+                "repos_audited": 7,
+                "tier_distribution": {"shipped": 3, "functional": 2, "wip": 1, "skeleton": 1},
+                "top_repos": {},
+            },
         ]
         html = _render_html(_make_report(), trend_data=trend_data)
         assert "Portfolio Trends" in html
@@ -967,18 +1048,22 @@ class TestRenderHtml:
             ]
         )
         html = _render_html(report)
-        assert '&lt;/script&gt;&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;' in html
+        assert "&lt;/script&gt;&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;" in html
         assert '</script><script>alert("xss")</script>' not in html
         assert '<script id="dashboard-data" type="application/json">' in html
-        assert '<\\/script>' in html
+        assert "<\\/script>" in html
 
     def test_renders_analyst_sections(self):
         diff_data = {
             "average_score_delta": 0.04,
             "lens_deltas": {"ship_readiness": 0.1},
-            "repo_changes": [{"name": "RepoA", "delta": 0.1, "old_tier": "functional", "new_tier": "shipped"}],
+            "repo_changes": [
+                {"name": "RepoA", "delta": 0.1, "old_tier": "functional", "new_tier": "shipped"}
+            ],
         }
-        html = _render_html(_make_report(), diff_data=diff_data, portfolio_profile="default", collection="showcase")
+        html = _render_html(
+            _make_report(), diff_data=diff_data, portfolio_profile="default", collection="showcase"
+        )
         assert "Analyst View" in html
         assert "Decision Lenses" in html
         assert "Security Overview" in html
@@ -1116,4 +1201,55 @@ class TestRenderHtml:
         assert "Next Safe Automation Step:" in html
         assert "Security Review should win ties because recent outcomes are proven." in html
         assert "RepoC is improving after intervention" in html
-        assert "Preview Security Review next; that is the strongest safe automation step right now." in html
+        assert (
+            "Preview Security Review next; that is the strongest safe automation step right now."
+            in html
+        )
+
+
+def test_risk_posture_section_renders_tier_counts() -> None:
+    risk_posture = {
+        "elevated_count": 2,
+        "moderate_count": 4,
+        "baseline_count": 10,
+        "deferred_count": 1,
+        "top_elevated": [
+            {"repo": "DangerRepo", "risk_summary": "No auth layer."},
+        ],
+    }
+    html = _risk_posture_section(risk_posture)
+    assert "Risk Posture" in html
+    assert ">2<" in html  # elevated count
+    assert ">4<" in html  # moderate count
+    assert ">10<" in html  # baseline count
+    assert "DangerRepo" in html
+    assert "No auth layer." in html
+
+
+def test_risk_posture_section_empty_when_no_risk() -> None:
+    assert _risk_posture_section({}) == ""
+
+
+def test_render_html_includes_risk_posture_section() -> None:
+    risk_posture = {
+        "elevated_count": 1,
+        "moderate_count": 0,
+        "baseline_count": 5,
+        "deferred_count": 0,
+        "top_elevated": [{"repo": "RiskyRepo", "risk_summary": "Missing tests."}],
+    }
+    report = {
+        "username": "tester",
+        "generated_at": "2026-04-14T00:00:00Z",
+        "repos_audited": 5,
+        "portfolio_grade": "B",
+        "average_score": 0.7,
+        "tier_distribution": {},
+        "collections": {},
+        "profiles": {},
+        "scenario_summary": {"top_levers": [], "portfolio_projection": {}},
+        "audits": [],
+    }
+    html = _render_html(report, risk_posture=risk_posture)
+    assert "Risk Posture" in html
+    assert "RiskyRepo" in html

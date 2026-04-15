@@ -3,6 +3,7 @@
 Produces a single .html file with embedded CSS, JS, and data.
 No external dependencies — works offline, shareable as one file.
 """
+
 from __future__ import annotations
 
 import json
@@ -97,6 +98,34 @@ def export_html_dashboard(
     collection: str | None = None,
 ) -> dict:
     """Generate interactive HTML dashboard. Returns {html_path}."""
+    _risk_posture: dict = {}
+    _truth_path = output_dir / "portfolio-truth-latest.json"
+    if _truth_path.is_file():
+        try:
+            _truth_data = json.loads(_truth_path.read_text())
+            _projects = _truth_data.get("projects") or []
+            _tc: dict[str, int] = {}
+            _te: list[dict] = []
+            for _p in _projects:
+                _t = str((_p.get("risk") or {}).get("risk_tier") or "baseline")
+                _tc[_t] = _tc.get(_t, 0) + 1
+                if _t == "elevated":
+                    _te.append(
+                        {
+                            "repo": str((_p.get("identity") or {}).get("display_name") or ""),
+                            "risk_summary": str((_p.get("risk") or {}).get("risk_summary") or ""),
+                        }
+                    )
+            _risk_posture = {
+                "elevated_count": _tc.get("elevated", 0),
+                "moderate_count": _tc.get("moderate", 0),
+                "baseline_count": _tc.get("baseline", 0),
+                "deferred_count": _tc.get("deferred", 0),
+                "top_elevated": _te[:5],
+            }
+        except Exception:
+            pass
+
     html = _render_html(
         report_data,
         trend_data,
@@ -104,9 +133,12 @@ def export_html_dashboard(
         diff_data=diff_data,
         portfolio_profile=portfolio_profile,
         collection=collection,
+        risk_posture=_risk_posture,
     )
     output_dir.mkdir(parents=True, exist_ok=True)
-    date = report_data.get("generated_at", "")[:10] or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    date = report_data.get("generated_at", "")[:10] or datetime.now(timezone.utc).strftime(
+        "%Y-%m-%d"
+    )
     username = report_data.get("username", "unknown")
     html_path = output_dir / f"dashboard-{username}-{date}.html"
     html_path.write_text(html)
@@ -121,6 +153,7 @@ def _render_html(
     diff_data: dict | None = None,
     portfolio_profile: str = "default",
     collection: str | None = None,
+    risk_posture: dict | None = None,
 ) -> str:
     """Build the complete HTML string."""
     username = report_data.get("username", "unknown")
@@ -179,6 +212,7 @@ def _render_html(
         "<body>",
         _header_section(username, date, repos_audited, grade),
         _kpi_section(report_data),
+        _risk_posture_section(risk_posture or {}),
         _preflight_section(report_data),
         _operator_section(report_data),
         _weekly_review_pack_section(report_data, diff_data),
@@ -189,7 +223,7 @@ def _render_html(
         '<div class="section"><h2>Completeness vs Interest</h2>',
         '<canvas id="scatter" width="800" height="500"></canvas>',
         '<div id="tooltip" class="tooltip"></div>',
-        '</div>',
+        "</div>",
         _repo_table(analyst_context, score_history),
         _repo_drilldown_section(report_data, diff_data),
         _portfolio_trends_section(trend_data or []),
@@ -235,6 +269,39 @@ def _kpi_section(data: dict) -> str:
     </div>"""
 
 
+def _risk_posture_section(risk_posture: dict) -> str:
+    if not risk_posture:
+        return ""
+    elevated = risk_posture.get("elevated_count", 0)
+    moderate = risk_posture.get("moderate_count", 0)
+    baseline = risk_posture.get("baseline_count", 0)
+    deferred = risk_posture.get("deferred_count", 0)
+    top_items = risk_posture.get("top_elevated") or []
+    top_html = ""
+    if top_items:
+        items = "".join(
+            f"<li><strong>{escape(item.get('repo', ''))}</strong>: "
+            f"{escape(item.get('risk_summary', ''))}</li>"
+            for item in top_items[:5]
+        )
+        top_html = f"<ul>{items}</ul>"
+    return f"""
+    <div class="section">
+      <h2>Risk Posture</h2>
+      <div class="kpi-row">
+        <div class="kpi-card"><div class="kpi-label">Elevated</div>
+          <div class="kpi-value" style="color:#DC2626">{elevated}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Moderate</div>
+          <div class="kpi-value" style="color:#D97706">{moderate}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Baseline</div>
+          <div class="kpi-value" style="color:#16A34A">{baseline}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Deferred</div>
+          <div class="kpi-value" style="color:#6B7280">{deferred}</div></div>
+      </div>
+      {top_html}
+    </div>"""
+
+
 def _preflight_section(data: dict) -> str:
     summary = data.get("preflight_summary") or {}
     warnings = summary.get("warnings", 0)
@@ -251,9 +318,9 @@ def _preflight_section(data: dict) -> str:
     <div class="section">
       <h2>Preflight Diagnostics</h2>
       <div class="panel">
-        <div class="meta-line"><strong>Status:</strong> {escape(summary.get('status', 'unknown'))}</div>
+        <div class="meta-line"><strong>Status:</strong> {escape(summary.get("status", "unknown"))}</div>
         <div class="meta-line"><strong>Errors:</strong> {errors} | <strong>Warnings:</strong> {warnings}</div>
-        <ul class="bullet-list">{''.join(rows)}</ul>
+        <ul class="bullet-list">{"".join(rows)}</ul>
       </div>
     </div>"""
 
@@ -319,187 +386,187 @@ def _operator_section(data: dict) -> str:
     <div class="section">
       <h2>Operator Control Center</h2>
       <div class="panel">
-        <div class="meta-line"><strong>Headline:</strong> {escape(summary.get('headline', 'No operator triage items are currently surfaced.'))}</div>
+        <div class="meta-line"><strong>Headline:</strong> {escape(summary.get("headline", "No operator triage items are currently surfaced."))}</div>
         <div class="meta-line"><strong>Run Changes:</strong> {escape(run_change_summary)}</div>
         <div class="meta-line"><strong>Queue Pressure:</strong> {escape(queue_pressure_summary)}</div>
         <div class="meta-line"><strong>Trust / Actionability:</strong> {escape(trust_actionability_summary)}</div>
         <div class="meta-line"><strong>Top Recommendation:</strong> {escape(top_recommendation_summary)}</div>
-        <div class="meta-line"><strong>Source Run:</strong> {escape(summary.get('source_run_id', 'n/a'))}</div>
-        <div class="meta-line"><strong>Next Recommended Run:</strong> {escape(summary.get('next_recommended_run_mode', 'n/a'))}</div>
-        <div class="meta-line"><strong>Watch Strategy:</strong> {escape(summary.get('watch_strategy', 'manual'))}</div>
-        <div class="meta-line"><strong>Watch Decision:</strong> {escape(summary.get('watch_decision_summary', 'No watch guidance is recorded.'))}</div>
-        <div class="meta-line"><strong>What Changed:</strong> {escape(summary.get('what_changed', 'No operator change summary is recorded.'))}</div>
-        <div class="meta-line"><strong>Why It Matters:</strong> {escape(summary.get('why_it_matters', 'No additional operator impact is recorded.'))}</div>
-        <div class="meta-line"><strong>What To Do Next:</strong> {escape(summary.get('what_to_do_next', 'Continue the normal operator loop.'))}</div>
-        <div class="meta-line"><strong>Trend:</strong> {escape(summary.get('trend_summary', 'No trend summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Accountability:</strong> {escape(summary.get('accountability_summary', 'No accountability summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Follow-Through:</strong> {escape(summary.get('follow_through_summary', 'No follow-through signal is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Next Checkpoint:</strong> {escape(summary.get('follow_through_checkpoint_summary', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</div>
-        <div class="meta-line"><strong>Escalation:</strong> {escape(summary.get('follow_through_escalation_summary', 'No stronger follow-through escalation is currently surfaced.'))}</div>
-        <div class="meta-line"><strong>Recovery / Retirement:</strong> {escape(summary.get('follow_through_recovery_summary', 'No follow-through recovery or escalation-retirement signal is currently surfaced.'))}</div>
-        <div class="meta-line"><strong>Recovery Persistence:</strong> {escape(summary.get('follow_through_recovery_persistence_summary', 'No follow-through recovery persistence signal is currently surfaced.'))}</div>
-        <div class="meta-line"><strong>Relapse Churn:</strong> {escape(summary.get('follow_through_relapse_churn_summary', 'No relapse churn is currently surfaced.'))}</div>
-        <div class="meta-line"><strong>Recovery Freshness:</strong> {escape(summary.get('follow_through_recovery_freshness_summary', 'No follow-through recovery freshness signal is currently surfaced.'))}</div>
-        <div class="meta-line"><strong>Recovery Memory Reset:</strong> {escape(summary.get('follow_through_recovery_memory_reset_summary', 'No follow-through recovery memory reset signal is currently surfaced.'))}</div>
-        <div class="meta-line"><strong>Recovery Rebuild Strength:</strong> {escape(summary.get('follow_through_recovery_rebuild_strength_summary', 'No follow-through recovery rebuild-strength signal is currently surfaced.'))}</div>
-        <div class="meta-line"><strong>Recovery Reacquisition:</strong> {escape(summary.get('follow_through_recovery_reacquisition_summary', 'No follow-through recovery reacquisition signal is currently surfaced.'))}</div>
-        <div class="meta-line"><strong>Reacquisition Durability:</strong> {escape(summary.get('follow_through_recovery_reacquisition_durability_summary', 'No follow-through reacquisition durability signal is currently surfaced.'))}</div>
-        <div class="meta-line"><strong>Reacquisition Confidence:</strong> {escape(summary.get('follow_through_recovery_reacquisition_consolidation_summary', 'No follow-through reacquisition confidence-consolidation signal is currently surfaced.'))}</div>
-        <div class="meta-line"><strong>Reacquisition Softening Decay:</strong> {escape(summary.get('follow_through_reacquisition_softening_decay_summary', 'No reacquisition softening-decay signal is currently surfaced.'))}</div>
-        <div class="meta-line"><strong>Reacquisition Confidence Retirement:</strong> {escape(summary.get('follow_through_reacquisition_confidence_retirement_summary', 'No reacquisition confidence-retirement signal is currently surfaced.'))}</div>
-        <div class="meta-line"><strong>Revalidation Recovery:</strong> {escape(summary.get('follow_through_reacquisition_revalidation_recovery_summary', 'No post-revalidation recovery or confidence re-earning signal is currently surfaced.'))}</div>
-        <div class="meta-line"><strong>Primary Target:</strong> {escape(primary_target_label or 'No active target')}</div>
-        <div class="meta-line"><strong>Why This Is The Top Target:</strong> {escape(summary.get('primary_target_reason', 'No target rationale is recorded yet.'))}</div>
-        <div class="meta-line"><strong>What Counts As Done:</strong> {escape(summary.get('primary_target_done_criteria', 'No done-state guidance is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Closure Guidance:</strong> {escape(summary.get('closure_guidance', 'No closure guidance is recorded yet.'))}</div>
+        <div class="meta-line"><strong>Source Run:</strong> {escape(summary.get("source_run_id", "n/a"))}</div>
+        <div class="meta-line"><strong>Next Recommended Run:</strong> {escape(summary.get("next_recommended_run_mode", "n/a"))}</div>
+        <div class="meta-line"><strong>Watch Strategy:</strong> {escape(summary.get("watch_strategy", "manual"))}</div>
+        <div class="meta-line"><strong>Watch Decision:</strong> {escape(summary.get("watch_decision_summary", "No watch guidance is recorded."))}</div>
+        <div class="meta-line"><strong>What Changed:</strong> {escape(summary.get("what_changed", "No operator change summary is recorded."))}</div>
+        <div class="meta-line"><strong>Why It Matters:</strong> {escape(summary.get("why_it_matters", "No additional operator impact is recorded."))}</div>
+        <div class="meta-line"><strong>What To Do Next:</strong> {escape(summary.get("what_to_do_next", "Continue the normal operator loop."))}</div>
+        <div class="meta-line"><strong>Trend:</strong> {escape(summary.get("trend_summary", "No trend summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Accountability:</strong> {escape(summary.get("accountability_summary", "No accountability summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Follow-Through:</strong> {escape(summary.get("follow_through_summary", "No follow-through signal is recorded yet."))}</div>
+        <div class="meta-line"><strong>Next Checkpoint:</strong> {escape(summary.get("follow_through_checkpoint_summary", "Use the next run or linked artifact to confirm whether the recommendation moved."))}</div>
+        <div class="meta-line"><strong>Escalation:</strong> {escape(summary.get("follow_through_escalation_summary", "No stronger follow-through escalation is currently surfaced."))}</div>
+        <div class="meta-line"><strong>Recovery / Retirement:</strong> {escape(summary.get("follow_through_recovery_summary", "No follow-through recovery or escalation-retirement signal is currently surfaced."))}</div>
+        <div class="meta-line"><strong>Recovery Persistence:</strong> {escape(summary.get("follow_through_recovery_persistence_summary", "No follow-through recovery persistence signal is currently surfaced."))}</div>
+        <div class="meta-line"><strong>Relapse Churn:</strong> {escape(summary.get("follow_through_relapse_churn_summary", "No relapse churn is currently surfaced."))}</div>
+        <div class="meta-line"><strong>Recovery Freshness:</strong> {escape(summary.get("follow_through_recovery_freshness_summary", "No follow-through recovery freshness signal is currently surfaced."))}</div>
+        <div class="meta-line"><strong>Recovery Memory Reset:</strong> {escape(summary.get("follow_through_recovery_memory_reset_summary", "No follow-through recovery memory reset signal is currently surfaced."))}</div>
+        <div class="meta-line"><strong>Recovery Rebuild Strength:</strong> {escape(summary.get("follow_through_recovery_rebuild_strength_summary", "No follow-through recovery rebuild-strength signal is currently surfaced."))}</div>
+        <div class="meta-line"><strong>Recovery Reacquisition:</strong> {escape(summary.get("follow_through_recovery_reacquisition_summary", "No follow-through recovery reacquisition signal is currently surfaced."))}</div>
+        <div class="meta-line"><strong>Reacquisition Durability:</strong> {escape(summary.get("follow_through_recovery_reacquisition_durability_summary", "No follow-through reacquisition durability signal is currently surfaced."))}</div>
+        <div class="meta-line"><strong>Reacquisition Confidence:</strong> {escape(summary.get("follow_through_recovery_reacquisition_consolidation_summary", "No follow-through reacquisition confidence-consolidation signal is currently surfaced."))}</div>
+        <div class="meta-line"><strong>Reacquisition Softening Decay:</strong> {escape(summary.get("follow_through_reacquisition_softening_decay_summary", "No reacquisition softening-decay signal is currently surfaced."))}</div>
+        <div class="meta-line"><strong>Reacquisition Confidence Retirement:</strong> {escape(summary.get("follow_through_reacquisition_confidence_retirement_summary", "No reacquisition confidence-retirement signal is currently surfaced."))}</div>
+        <div class="meta-line"><strong>Revalidation Recovery:</strong> {escape(summary.get("follow_through_reacquisition_revalidation_recovery_summary", "No post-revalidation recovery or confidence re-earning signal is currently surfaced."))}</div>
+        <div class="meta-line"><strong>Primary Target:</strong> {escape(primary_target_label or "No active target")}</div>
+        <div class="meta-line"><strong>Why This Is The Top Target:</strong> {escape(summary.get("primary_target_reason", "No target rationale is recorded yet."))}</div>
+        <div class="meta-line"><strong>What Counts As Done:</strong> {escape(summary.get("primary_target_done_criteria", "No done-state guidance is recorded yet."))}</div>
+        <div class="meta-line"><strong>Closure Guidance:</strong> {escape(summary.get("closure_guidance", "No closure guidance is recorded yet."))}</div>
         <div class="meta-line"><strong>What We Tried:</strong> {escape(intervention_label)}</div>
-        <div class="meta-line"><strong>Resolution Evidence:</strong> {escape(summary.get('primary_target_resolution_evidence', 'No resolution evidence is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Primary Target Confidence:</strong> {escape(summary.get('primary_target_confidence_label', 'low'))} ({summary.get('primary_target_confidence_score', 0.0):.2f})</div>
-        <div class="meta-line"><strong>Confidence Reasons:</strong> {escape(', '.join(summary.get('primary_target_confidence_reasons', []) or ['No confidence rationale is recorded yet.']))}</div>
-        <div class="meta-line"><strong>Next Action Confidence:</strong> {escape(summary.get('next_action_confidence_label', 'low'))} ({summary.get('next_action_confidence_score', 0.0):.2f})</div>
-        <div class="meta-line"><strong>Trust Policy:</strong> {escape(summary.get('primary_target_trust_policy', 'monitor'))} — {escape(summary.get('primary_target_trust_policy_reason', 'No trust-policy reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Why This Confidence Is Actionable:</strong> {escape(summary.get('adaptive_confidence_summary', 'No adaptive confidence summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Trust Policy Exception:</strong> {escape(summary.get('primary_target_exception_status', 'none'))} — {escape(summary.get('primary_target_exception_reason', 'No trust-policy exception reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Exception Pattern Learning:</strong> {escape(summary.get('primary_target_exception_pattern_status', 'none'))} — {escape(summary.get('primary_target_exception_pattern_reason', 'No exception-pattern reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Trust Recovery:</strong> {escape(summary.get('primary_target_trust_recovery_status', 'none'))} — {escape(summary.get('primary_target_trust_recovery_reason', 'No trust-recovery reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Recovery Confidence:</strong> {escape(summary.get('primary_target_recovery_confidence_label', 'low'))} ({summary.get('primary_target_recovery_confidence_score', 0.0):.2f}) — {escape(summary.get('recovery_confidence_summary', 'No recovery-confidence summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Exception Retirement:</strong> {escape(summary.get('primary_target_exception_retirement_status', 'none'))} — {escape(summary.get('primary_target_exception_retirement_reason', 'No exception-retirement reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Policy Debt Cleanup:</strong> {escape(summary.get('primary_target_policy_debt_status', 'none'))} — {escape(summary.get('primary_target_policy_debt_reason', 'No policy-debt reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Class-Level Trust Normalization:</strong> {escape(summary.get('primary_target_class_normalization_status', 'none'))} — {escape(summary.get('primary_target_class_normalization_reason', 'No class-normalization reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Class Memory Freshness:</strong> {escape(summary.get('primary_target_class_memory_freshness_status', 'insufficient-data'))} — {escape(summary.get('primary_target_class_memory_freshness_reason', 'No class-memory freshness reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Trust Decay Controls:</strong> {escape(summary.get('primary_target_class_decay_status', 'none'))} — {escape(summary.get('primary_target_class_decay_reason', 'No class-decay reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Class Trust Reweighting:</strong> {escape(summary.get('primary_target_class_trust_reweight_direction', 'neutral'))} ({summary.get('primary_target_class_trust_reweight_score', 0.0):.2f})</div>
-        <div class="meta-line"><strong>Why Class Guidance Shifted:</strong> {escape(', '.join(summary.get('primary_target_class_trust_reweight_reasons', []) or ['No class reweighting rationale is recorded yet.']))}</div>
-        <div class="meta-line"><strong>Class Trust Momentum:</strong> {escape(summary.get('primary_target_class_trust_momentum_status', 'insufficient-data'))} ({summary.get('primary_target_class_trust_momentum_score', 0.0):.2f})</div>
-        <div class="meta-line"><strong>Reweighting Stability:</strong> {escape(summary.get('primary_target_class_reweight_stability_status', 'watch'))} — {escape(summary.get('primary_target_class_reweight_transition_status', 'none'))}: {escape(summary.get('primary_target_class_reweight_transition_reason', 'No class transition reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Class Transition Health:</strong> {escape(summary.get('primary_target_class_transition_health_status', 'none'))} — {escape(summary.get('primary_target_class_transition_health_reason', 'No class transition health reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Pending Transition Resolution:</strong> {escape(summary.get('primary_target_class_transition_resolution_status', 'none'))} — {escape(summary.get('primary_target_class_transition_resolution_reason', 'No class transition resolution reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Transition Closure Confidence:</strong> {escape(summary.get('primary_target_transition_closure_confidence_label', 'low'))} ({summary.get('primary_target_transition_closure_confidence_score', 0.0):.2f}) — {escape(summary.get('primary_target_transition_closure_likely_outcome', 'none'))}</div>
-        <div class="meta-line"><strong>Class Pending Debt Audit:</strong> {escape(summary.get('primary_target_class_pending_debt_status', 'none'))} — {escape(summary.get('primary_target_class_pending_debt_reason', 'No class pending-debt reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Pending Debt Freshness:</strong> {escape(summary.get('primary_target_pending_debt_freshness_status', 'insufficient-data'))} — {escape(summary.get('primary_target_pending_debt_freshness_reason', 'No pending-debt freshness reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Closure Forecast Reweighting:</strong> {escape(summary.get('primary_target_closure_forecast_reweight_direction', 'neutral'))} ({summary.get('primary_target_closure_forecast_reweight_score', 0.0):.2f})</div>
-        <div class="meta-line"><strong>Closure Forecast Momentum:</strong> {escape(summary.get('primary_target_closure_forecast_momentum_status', 'insufficient-data'))} ({summary.get('primary_target_closure_forecast_momentum_score', 0.0):.2f})</div>
-        <div class="meta-line"><strong>Closure Forecast Freshness:</strong> {escape(summary.get('primary_target_closure_forecast_freshness_status', 'insufficient-data'))} — {escape(summary.get('primary_target_closure_forecast_freshness_reason', 'No closure-forecast freshness reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Closure Forecast Hysteresis:</strong> {escape(summary.get('primary_target_closure_forecast_stability_status', 'watch'))} — {escape(summary.get('primary_target_closure_forecast_hysteresis_status', 'none'))}: {escape(summary.get('primary_target_closure_forecast_hysteresis_reason', 'No closure-forecast hysteresis reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Hysteresis Decay Controls:</strong> {escape(summary.get('primary_target_closure_forecast_decay_status', 'none'))} — {escape(summary.get('primary_target_closure_forecast_decay_reason', 'No closure-forecast decay reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Closure Forecast Refresh Recovery:</strong> {escape(summary.get('primary_target_closure_forecast_refresh_recovery_status', 'none'))} ({summary.get('primary_target_closure_forecast_refresh_recovery_score', 0.0):.2f})</div>
-        <div class="meta-line"><strong>Reacquisition Controls:</strong> {escape(summary.get('primary_target_closure_forecast_reacquisition_status', 'none'))} — {escape(summary.get('primary_target_closure_forecast_reacquisition_reason', 'No closure-forecast reacquisition reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reacquisition Persistence:</strong> {escape(summary.get('primary_target_closure_forecast_reacquisition_persistence_status', 'none'))} ({summary.get('primary_target_closure_forecast_reacquisition_persistence_score', 0.0):.2f}; {summary.get('primary_target_closure_forecast_reacquisition_age_runs', 0)} run(s))</div>
-        <div class="meta-line"><strong>Recovery Churn Controls:</strong> {escape(summary.get('primary_target_closure_forecast_recovery_churn_status', 'none'))} — {escape(summary.get('primary_target_closure_forecast_recovery_churn_reason', 'No recovery-churn reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reacquisition Freshness:</strong> {escape(summary.get('primary_target_closure_forecast_reacquisition_freshness_status', 'insufficient-data'))} — {escape(summary.get('primary_target_closure_forecast_reacquisition_freshness_reason', 'No reacquisition-freshness reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Persistence Reset Controls:</strong> {escape(summary.get('primary_target_closure_forecast_persistence_reset_status', 'none'))} — {escape(summary.get('primary_target_closure_forecast_persistence_reset_reason', 'No persistence-reset reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Refresh Recovery:</strong> {escape(summary.get('primary_target_closure_forecast_reset_refresh_recovery_status', 'none'))} ({summary.get('primary_target_closure_forecast_reset_refresh_recovery_score', 0.0):.2f})</div>
-        <div class="meta-line"><strong>Reset Re-entry Controls:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_status', 'none'))} — {escape(summary.get('primary_target_closure_forecast_reset_reentry_reason', 'No reset re-entry reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Persistence:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_persistence_status', 'none'))} ({summary.get('primary_target_closure_forecast_reset_reentry_persistence_score', 0.0):.2f}; {summary.get('primary_target_closure_forecast_reset_reentry_age_runs', 0)} run(s))</div>
-        <div class="meta-line"><strong>Reset Re-entry Churn Controls:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_churn_status', 'none'))} — {escape(summary.get('primary_target_closure_forecast_reset_reentry_churn_reason', 'No reset re-entry churn reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Freshness:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_freshness_status', 'insufficient-data'))} — {escape(summary.get('primary_target_closure_forecast_reset_reentry_freshness_reason', 'No reset re-entry freshness reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Reset Controls:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_reset_status', 'none'))} — {escape(summary.get('primary_target_closure_forecast_reset_reentry_reset_reason', 'No reset re-entry reset reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Refresh Recovery:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_refresh_recovery_status', 'none'))} ({summary.get('primary_target_closure_forecast_reset_reentry_refresh_recovery_score', 0.0):.2f})</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Controls:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_status', 'none'))} — {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reason', 'No reset re-entry rebuild reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Freshness:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_freshness_status', 'insufficient-data'))} — {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_freshness_reason', 'No reset re-entry rebuild freshness reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Reset Controls:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reset_status', 'none'))} — {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reset_reason', 'No reset re-entry rebuild reset reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Refresh Recovery:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_refresh_recovery_status', 'none'))} ({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_refresh_recovery_score', 0.0):.2f})</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-entry Controls:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_status', 'none'))} — {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_reason', 'No reset re-entry rebuild re-entry reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Persistence:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_persistence_status', 'none'))} ({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_persistence_score', 0.0):.2f}; {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_age_runs', 0)} run(s))</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Churn Controls:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_churn_status', 'none'))} — {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_churn_reason', 'No reset re-entry rebuild re-entry churn reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Freshness:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_freshness_status', 'insufficient-data'))} — {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_freshness_reason', 'No reset re-entry rebuild re-entry freshness reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Reset Controls:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_reset_status', 'none'))} — {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_reset_reason', 'No reset re-entry rebuild re-entry reset reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Refresh Recovery:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_status', 'none'))} — {escape(summary.get('closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_summary', 'No reset re-entry rebuild re-entry refresh recovery summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Controls:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_status', 'none'))} — {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reason', 'No reset re-entry rebuild re-entry restore reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Freshness:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_status', 'insufficient-data'))} — {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_reason', 'No reset re-entry rebuild re-entry restore freshness reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Reset Controls:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reset_status', 'none'))} — {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reset_reason', 'No reset re-entry rebuild re-entry restore reset reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Refresh Recovery:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_status', 'none'))} — {escape(summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_summary', 'No reset re-entry rebuild re-entry restore refresh recovery summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Controls:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_status', 'none'))} — {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reason', 'No reset re-entry rebuild re-entry restore re-restore reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Persistence:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_status', 'none'))} ({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_score', 0.0):.2f}; {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_age_runs', 0)} run(s))</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Churn Controls:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_status', 'none'))} — {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_reason', 'No reset re-entry rebuild re-entry restore re-restore churn reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Freshness:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_status', 'insufficient-data'))} — {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_reason', 'No reset re-entry rebuild re-entry restore re-restore freshness reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Reset Controls:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_status', 'none'))} — {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_reason', 'No reset re-entry rebuild re-entry restore re-restore reset reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Refresh Recovery:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_status', 'none'))} — {escape(summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_summary', 'No reset re-entry rebuild re-entry restore re-restore refresh recovery summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Controls:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status', 'none'))} — {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reason', 'No reset re-entry rebuild re-entry restore re-re-restore reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Persistence:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status', 'none'))} ({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score', 0.0):.2f}; {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs', 0)} run(s))</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Churn Controls:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status', 'none'))} — {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_reason', 'No reset re-entry rebuild re-entry restore re-re-restore churn reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status', 'insufficient-data'))} — {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_reason', 'No reset re-entry rebuild re-entry restore re-re-restore freshness reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Controls:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_status', 'none'))} — {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_reason', 'No reset re-entry rebuild re-entry restore re-re-restore reset reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status', 'none'))} — {escape(summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_summary', 'No reset re-entry rebuild re-entry restore re-re-restore refresh recovery summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Controls:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status', 'none'))} — {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_reason', 'No reset re-entry rebuild re-entry restore re-re-re-restore reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status', 'none'))} ({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score', 0.0):.2f}; {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs', 0)} run(s))</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status', 'none'))} — {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason', 'No reset re-entry rebuild re-entry restore re-re-re-restore churn reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Persistence:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_persistence_status', 'none'))} ({summary.get('primary_target_closure_forecast_reset_reentry_rebuild_persistence_score', 0.0):.2f}; {summary.get('primary_target_closure_forecast_reset_reentry_rebuild_age_runs', 0)} run(s))</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Churn Controls:</strong> {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_churn_status', 'none'))} — {escape(summary.get('primary_target_closure_forecast_reset_reentry_rebuild_churn_reason', 'No reset re-entry rebuild churn reason is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Recommendation Drift:</strong> {escape(summary.get('recommendation_drift_status', 'stable'))} — {escape(summary.get('recommendation_drift_summary', 'No recommendation-drift summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Exception Pattern Summary:</strong> {escape(summary.get('exception_pattern_summary', 'No exception-pattern summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Exception Retirement Summary:</strong> {escape(summary.get('exception_retirement_summary', 'No exception-retirement summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Policy Debt Summary:</strong> {escape(summary.get('policy_debt_summary', 'No policy-debt summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Trust Normalization Summary:</strong> {escape(summary.get('trust_normalization_summary', 'No trust-normalization summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Class Memory Summary:</strong> {escape(summary.get('class_memory_summary', 'No class-memory summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Class Decay Summary:</strong> {escape(summary.get('class_decay_summary', 'No class-decay summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Class Reweighting Summary:</strong> {escape(summary.get('class_reweighting_summary', 'No class reweighting summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Class Momentum Summary:</strong> {escape(summary.get('class_momentum_summary', 'No class momentum summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reweighting Stability Summary:</strong> {escape(summary.get('class_reweight_stability_summary', 'No reweighting stability summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Class Transition Health Summary:</strong> {escape(summary.get('class_transition_health_summary', 'No class transition health summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Pending Transition Resolution Summary:</strong> {escape(summary.get('class_transition_resolution_summary', 'No class transition resolution summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Transition Closure Confidence Summary:</strong> {escape(summary.get('transition_closure_confidence_summary', 'No transition-closure confidence summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Class Pending Debt Summary:</strong> {escape(summary.get('class_pending_debt_summary', 'No class pending-debt summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Class Pending Resolution Summary:</strong> {escape(summary.get('class_pending_resolution_summary', 'No class pending-resolution summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Pending Debt Freshness Summary:</strong> {escape(summary.get('pending_debt_freshness_summary', 'No pending-debt freshness summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Pending Debt Decay Summary:</strong> {escape(summary.get('pending_debt_decay_summary', 'No pending-debt decay summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Closure Forecast Reweighting Summary:</strong> {escape(summary.get('closure_forecast_reweighting_summary', 'No closure-forecast reweighting summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Closure Forecast Momentum Summary:</strong> {escape(summary.get('closure_forecast_momentum_summary', 'No closure-forecast momentum summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Closure Forecast Freshness Summary:</strong> {escape(summary.get('closure_forecast_freshness_summary', 'No closure-forecast freshness summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Closure Forecast Stability Summary:</strong> {escape(summary.get('closure_forecast_stability_summary', 'No closure-forecast stability summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Closure Forecast Hysteresis Summary:</strong> {escape(summary.get('closure_forecast_hysteresis_summary', 'No closure-forecast hysteresis summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Closure Forecast Decay Summary:</strong> {escape(summary.get('closure_forecast_decay_summary', 'No closure-forecast decay summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Closure Forecast Refresh Recovery Summary:</strong> {escape(summary.get('closure_forecast_refresh_recovery_summary', 'No closure-forecast refresh-recovery summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Closure Forecast Reacquisition Summary:</strong> {escape(summary.get('closure_forecast_reacquisition_summary', 'No closure-forecast reacquisition summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reacquisition Persistence Summary:</strong> {escape(summary.get('closure_forecast_reacquisition_persistence_summary', 'No reacquisition-persistence summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Recovery Churn Summary:</strong> {escape(summary.get('closure_forecast_recovery_churn_summary', 'No recovery-churn summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reacquisition Freshness Summary:</strong> {escape(summary.get('closure_forecast_reacquisition_freshness_summary', 'No reacquisition-freshness summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Persistence Reset Summary:</strong> {escape(summary.get('closure_forecast_persistence_reset_summary', 'No persistence-reset summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Refresh Recovery Summary:</strong> {escape(summary.get('closure_forecast_reset_refresh_recovery_summary', 'No reset-refresh recovery summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_summary', 'No reset re-entry summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Persistence Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_persistence_summary', 'No reset re-entry persistence summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Churn Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_churn_summary', 'No reset re-entry churn summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Freshness Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_freshness_summary', 'No reset re-entry freshness summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Reset Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_reset_summary', 'No reset re-entry reset summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Refresh Recovery Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_refresh_recovery_summary', 'No reset re-entry refresh-recovery summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_summary', 'No reset re-entry rebuild summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Freshness Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_freshness_summary', 'No reset re-entry rebuild-freshness summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Reset Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_reset_summary', 'No reset re-entry rebuild-reset summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Refresh Recovery Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_refresh_recovery_summary', 'No reset re-entry rebuild-refresh-recovery summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-entry Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_reentry_summary', 'No reset re-entry rebuild re-entry summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Persistence Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_reentry_persistence_summary', 'No reset re-entry rebuild re-entry persistence summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Churn Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_reentry_churn_summary', 'No reset re-entry rebuild re-entry churn summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Freshness Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_reentry_freshness_summary', 'No reset re-entry rebuild re-entry freshness summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Reset Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_reentry_reset_summary', 'No reset re-entry rebuild re-entry reset summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Refresh Recovery Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_summary', 'No reset re-entry rebuild re-entry refresh recovery summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_summary', 'No reset re-entry rebuild re-entry restore summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Freshness Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_summary', 'No reset re-entry rebuild re-entry restore freshness summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Reset Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_reset_summary', 'No reset re-entry rebuild re-entry restore reset summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Refresh Recovery Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_summary', 'No reset re-entry rebuild re-entry restore refresh recovery summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_summary', 'No reset re-entry rebuild re-entry restore re-restore summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Persistence Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_summary', 'No reset re-entry rebuild re-entry restore re-restore persistence summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Churn Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_summary', 'No reset re-entry rebuild re-entry restore re-restore churn summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Freshness Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_summary', 'No reset re-entry rebuild re-entry restore re-restore freshness summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Reset Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_summary', 'No reset re-entry rebuild re-entry restore re-restore reset summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Refresh Recovery Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_summary', 'No reset re-entry rebuild re-entry restore re-restore refresh recovery summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_summary', 'No reset re-entry rebuild re-entry restore re-re-restore summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Persistence Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_summary', 'No reset re-entry rebuild re-entry restore re-re-restore persistence summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Churn Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_summary', 'No reset re-entry rebuild re-entry restore re-re-restore churn summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_summary', 'No reset re-entry rebuild re-entry restore re-re-restore freshness summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_summary', 'No reset re-entry rebuild re-entry restore re-re-restore reset summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_summary', 'No reset re-entry rebuild re-entry restore re-re-restore refresh recovery summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_summary', 'No reset re-entry rebuild re-entry restore re-re-re-restore summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_summary', 'No reset re-entry rebuild re-entry restore re-re-re-restore persistence summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_summary', 'No reset re-entry rebuild re-entry restore re-re-re-restore churn summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Persistence Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_persistence_summary', 'No reset re-entry rebuild-persistence summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Reset Re-entry Rebuild Churn Summary:</strong> {escape(summary.get('closure_forecast_reset_reentry_rebuild_churn_summary', 'No reset re-entry rebuild-churn summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Recommendation Quality:</strong> {escape(summary.get('recommendation_quality_summary', 'No recommendation-quality summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Confidence Validation:</strong> {escape(summary.get('confidence_validation_status', 'insufficient-data'))} — {escape(summary.get('confidence_calibration_summary', 'No confidence-calibration summary is recorded yet.'))}</div>
-        <div class="meta-line"><strong>Recent Confidence Outcomes:</strong> {escape(_recent_confidence_outcomes_label(summary.get('recent_validation_outcomes') or []))}</div>
-        <div class="meta-line"><strong>Blocked:</strong> {counts.get('blocked', 0)} | <strong>Urgent:</strong> {counts.get('urgent', 0)} | <strong>Ready:</strong> {counts.get('ready', 0)} | <strong>Deferred:</strong> {counts.get('deferred', 0)}</div>
-        <ul class="bullet-list">{''.join(rows) or '<li>No triage items are currently surfaced.</li>'}</ul>
+        <div class="meta-line"><strong>Resolution Evidence:</strong> {escape(summary.get("primary_target_resolution_evidence", "No resolution evidence is recorded yet."))}</div>
+        <div class="meta-line"><strong>Primary Target Confidence:</strong> {escape(summary.get("primary_target_confidence_label", "low"))} ({summary.get("primary_target_confidence_score", 0.0):.2f})</div>
+        <div class="meta-line"><strong>Confidence Reasons:</strong> {escape(", ".join(summary.get("primary_target_confidence_reasons", []) or ["No confidence rationale is recorded yet."]))}</div>
+        <div class="meta-line"><strong>Next Action Confidence:</strong> {escape(summary.get("next_action_confidence_label", "low"))} ({summary.get("next_action_confidence_score", 0.0):.2f})</div>
+        <div class="meta-line"><strong>Trust Policy:</strong> {escape(summary.get("primary_target_trust_policy", "monitor"))} — {escape(summary.get("primary_target_trust_policy_reason", "No trust-policy reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Why This Confidence Is Actionable:</strong> {escape(summary.get("adaptive_confidence_summary", "No adaptive confidence summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Trust Policy Exception:</strong> {escape(summary.get("primary_target_exception_status", "none"))} — {escape(summary.get("primary_target_exception_reason", "No trust-policy exception reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Exception Pattern Learning:</strong> {escape(summary.get("primary_target_exception_pattern_status", "none"))} — {escape(summary.get("primary_target_exception_pattern_reason", "No exception-pattern reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Trust Recovery:</strong> {escape(summary.get("primary_target_trust_recovery_status", "none"))} — {escape(summary.get("primary_target_trust_recovery_reason", "No trust-recovery reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Recovery Confidence:</strong> {escape(summary.get("primary_target_recovery_confidence_label", "low"))} ({summary.get("primary_target_recovery_confidence_score", 0.0):.2f}) — {escape(summary.get("recovery_confidence_summary", "No recovery-confidence summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Exception Retirement:</strong> {escape(summary.get("primary_target_exception_retirement_status", "none"))} — {escape(summary.get("primary_target_exception_retirement_reason", "No exception-retirement reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Policy Debt Cleanup:</strong> {escape(summary.get("primary_target_policy_debt_status", "none"))} — {escape(summary.get("primary_target_policy_debt_reason", "No policy-debt reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Class-Level Trust Normalization:</strong> {escape(summary.get("primary_target_class_normalization_status", "none"))} — {escape(summary.get("primary_target_class_normalization_reason", "No class-normalization reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Class Memory Freshness:</strong> {escape(summary.get("primary_target_class_memory_freshness_status", "insufficient-data"))} — {escape(summary.get("primary_target_class_memory_freshness_reason", "No class-memory freshness reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Trust Decay Controls:</strong> {escape(summary.get("primary_target_class_decay_status", "none"))} — {escape(summary.get("primary_target_class_decay_reason", "No class-decay reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Class Trust Reweighting:</strong> {escape(summary.get("primary_target_class_trust_reweight_direction", "neutral"))} ({summary.get("primary_target_class_trust_reweight_score", 0.0):.2f})</div>
+        <div class="meta-line"><strong>Why Class Guidance Shifted:</strong> {escape(", ".join(summary.get("primary_target_class_trust_reweight_reasons", []) or ["No class reweighting rationale is recorded yet."]))}</div>
+        <div class="meta-line"><strong>Class Trust Momentum:</strong> {escape(summary.get("primary_target_class_trust_momentum_status", "insufficient-data"))} ({summary.get("primary_target_class_trust_momentum_score", 0.0):.2f})</div>
+        <div class="meta-line"><strong>Reweighting Stability:</strong> {escape(summary.get("primary_target_class_reweight_stability_status", "watch"))} — {escape(summary.get("primary_target_class_reweight_transition_status", "none"))}: {escape(summary.get("primary_target_class_reweight_transition_reason", "No class transition reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Class Transition Health:</strong> {escape(summary.get("primary_target_class_transition_health_status", "none"))} — {escape(summary.get("primary_target_class_transition_health_reason", "No class transition health reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Pending Transition Resolution:</strong> {escape(summary.get("primary_target_class_transition_resolution_status", "none"))} — {escape(summary.get("primary_target_class_transition_resolution_reason", "No class transition resolution reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Transition Closure Confidence:</strong> {escape(summary.get("primary_target_transition_closure_confidence_label", "low"))} ({summary.get("primary_target_transition_closure_confidence_score", 0.0):.2f}) — {escape(summary.get("primary_target_transition_closure_likely_outcome", "none"))}</div>
+        <div class="meta-line"><strong>Class Pending Debt Audit:</strong> {escape(summary.get("primary_target_class_pending_debt_status", "none"))} — {escape(summary.get("primary_target_class_pending_debt_reason", "No class pending-debt reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Pending Debt Freshness:</strong> {escape(summary.get("primary_target_pending_debt_freshness_status", "insufficient-data"))} — {escape(summary.get("primary_target_pending_debt_freshness_reason", "No pending-debt freshness reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Closure Forecast Reweighting:</strong> {escape(summary.get("primary_target_closure_forecast_reweight_direction", "neutral"))} ({summary.get("primary_target_closure_forecast_reweight_score", 0.0):.2f})</div>
+        <div class="meta-line"><strong>Closure Forecast Momentum:</strong> {escape(summary.get("primary_target_closure_forecast_momentum_status", "insufficient-data"))} ({summary.get("primary_target_closure_forecast_momentum_score", 0.0):.2f})</div>
+        <div class="meta-line"><strong>Closure Forecast Freshness:</strong> {escape(summary.get("primary_target_closure_forecast_freshness_status", "insufficient-data"))} — {escape(summary.get("primary_target_closure_forecast_freshness_reason", "No closure-forecast freshness reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Closure Forecast Hysteresis:</strong> {escape(summary.get("primary_target_closure_forecast_stability_status", "watch"))} — {escape(summary.get("primary_target_closure_forecast_hysteresis_status", "none"))}: {escape(summary.get("primary_target_closure_forecast_hysteresis_reason", "No closure-forecast hysteresis reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Hysteresis Decay Controls:</strong> {escape(summary.get("primary_target_closure_forecast_decay_status", "none"))} — {escape(summary.get("primary_target_closure_forecast_decay_reason", "No closure-forecast decay reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Closure Forecast Refresh Recovery:</strong> {escape(summary.get("primary_target_closure_forecast_refresh_recovery_status", "none"))} ({summary.get("primary_target_closure_forecast_refresh_recovery_score", 0.0):.2f})</div>
+        <div class="meta-line"><strong>Reacquisition Controls:</strong> {escape(summary.get("primary_target_closure_forecast_reacquisition_status", "none"))} — {escape(summary.get("primary_target_closure_forecast_reacquisition_reason", "No closure-forecast reacquisition reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reacquisition Persistence:</strong> {escape(summary.get("primary_target_closure_forecast_reacquisition_persistence_status", "none"))} ({summary.get("primary_target_closure_forecast_reacquisition_persistence_score", 0.0):.2f}; {summary.get("primary_target_closure_forecast_reacquisition_age_runs", 0)} run(s))</div>
+        <div class="meta-line"><strong>Recovery Churn Controls:</strong> {escape(summary.get("primary_target_closure_forecast_recovery_churn_status", "none"))} — {escape(summary.get("primary_target_closure_forecast_recovery_churn_reason", "No recovery-churn reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reacquisition Freshness:</strong> {escape(summary.get("primary_target_closure_forecast_reacquisition_freshness_status", "insufficient-data"))} — {escape(summary.get("primary_target_closure_forecast_reacquisition_freshness_reason", "No reacquisition-freshness reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Persistence Reset Controls:</strong> {escape(summary.get("primary_target_closure_forecast_persistence_reset_status", "none"))} — {escape(summary.get("primary_target_closure_forecast_persistence_reset_reason", "No persistence-reset reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Refresh Recovery:</strong> {escape(summary.get("primary_target_closure_forecast_reset_refresh_recovery_status", "none"))} ({summary.get("primary_target_closure_forecast_reset_refresh_recovery_score", 0.0):.2f})</div>
+        <div class="meta-line"><strong>Reset Re-entry Controls:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_status", "none"))} — {escape(summary.get("primary_target_closure_forecast_reset_reentry_reason", "No reset re-entry reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Persistence:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_persistence_status", "none"))} ({summary.get("primary_target_closure_forecast_reset_reentry_persistence_score", 0.0):.2f}; {summary.get("primary_target_closure_forecast_reset_reentry_age_runs", 0)} run(s))</div>
+        <div class="meta-line"><strong>Reset Re-entry Churn Controls:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_churn_status", "none"))} — {escape(summary.get("primary_target_closure_forecast_reset_reentry_churn_reason", "No reset re-entry churn reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Freshness:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_freshness_status", "insufficient-data"))} — {escape(summary.get("primary_target_closure_forecast_reset_reentry_freshness_reason", "No reset re-entry freshness reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Reset Controls:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_reset_status", "none"))} — {escape(summary.get("primary_target_closure_forecast_reset_reentry_reset_reason", "No reset re-entry reset reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Refresh Recovery:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_refresh_recovery_status", "none"))} ({summary.get("primary_target_closure_forecast_reset_reentry_refresh_recovery_score", 0.0):.2f})</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Controls:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_status", "none"))} — {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reason", "No reset re-entry rebuild reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Freshness:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_freshness_status", "insufficient-data"))} — {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_freshness_reason", "No reset re-entry rebuild freshness reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Reset Controls:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reset_status", "none"))} — {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reset_reason", "No reset re-entry rebuild reset reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Refresh Recovery:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_refresh_recovery_status", "none"))} ({summary.get("primary_target_closure_forecast_reset_reentry_rebuild_refresh_recovery_score", 0.0):.2f})</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-entry Controls:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_status", "none"))} — {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_reason", "No reset re-entry rebuild re-entry reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Persistence:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_persistence_status", "none"))} ({summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_persistence_score", 0.0):.2f}; {summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_age_runs", 0)} run(s))</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Churn Controls:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_churn_status", "none"))} — {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_churn_reason", "No reset re-entry rebuild re-entry churn reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Freshness:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_freshness_status", "insufficient-data"))} — {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_freshness_reason", "No reset re-entry rebuild re-entry freshness reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Reset Controls:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_reset_status", "none"))} — {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_reset_reason", "No reset re-entry rebuild re-entry reset reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Refresh Recovery:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_status", "none"))} — {escape(summary.get("closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_summary", "No reset re-entry rebuild re-entry refresh recovery summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Controls:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_status", "none"))} — {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reason", "No reset re-entry rebuild re-entry restore reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Freshness:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_status", "insufficient-data"))} — {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_reason", "No reset re-entry rebuild re-entry restore freshness reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Reset Controls:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reset_status", "none"))} — {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reset_reason", "No reset re-entry rebuild re-entry restore reset reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Refresh Recovery:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_status", "none"))} — {escape(summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_summary", "No reset re-entry rebuild re-entry restore refresh recovery summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Controls:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_status", "none"))} — {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reason", "No reset re-entry rebuild re-entry restore re-restore reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Persistence:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_status", "none"))} ({summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_score", 0.0):.2f}; {summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_age_runs", 0)} run(s))</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Churn Controls:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_status", "none"))} — {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_reason", "No reset re-entry rebuild re-entry restore re-restore churn reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Freshness:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_status", "insufficient-data"))} — {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_reason", "No reset re-entry rebuild re-entry restore re-restore freshness reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Reset Controls:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_status", "none"))} — {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_reason", "No reset re-entry rebuild re-entry restore re-restore reset reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Refresh Recovery:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_status", "none"))} — {escape(summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_summary", "No reset re-entry rebuild re-entry restore re-restore refresh recovery summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Controls:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status", "none"))} — {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reason", "No reset re-entry rebuild re-entry restore re-re-restore reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Persistence:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status", "none"))} ({summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score", 0.0):.2f}; {summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs", 0)} run(s))</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Churn Controls:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status", "none"))} — {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_reason", "No reset re-entry rebuild re-entry restore re-re-restore churn reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status", "insufficient-data"))} — {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_reason", "No reset re-entry rebuild re-entry restore re-re-restore freshness reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Controls:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_status", "none"))} — {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_reason", "No reset re-entry rebuild re-entry restore re-re-restore reset reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status", "none"))} — {escape(summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_summary", "No reset re-entry rebuild re-entry restore re-re-restore refresh recovery summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Controls:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status", "none"))} — {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_reason", "No reset re-entry rebuild re-entry restore re-re-re-restore reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status", "none"))} ({summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score", 0.0):.2f}; {summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs", 0)} run(s))</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status", "none"))} — {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason", "No reset re-entry rebuild re-entry restore re-re-re-restore churn reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Persistence:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_persistence_status", "none"))} ({summary.get("primary_target_closure_forecast_reset_reentry_rebuild_persistence_score", 0.0):.2f}; {summary.get("primary_target_closure_forecast_reset_reentry_rebuild_age_runs", 0)} run(s))</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Churn Controls:</strong> {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_churn_status", "none"))} — {escape(summary.get("primary_target_closure_forecast_reset_reentry_rebuild_churn_reason", "No reset re-entry rebuild churn reason is recorded yet."))}</div>
+        <div class="meta-line"><strong>Recommendation Drift:</strong> {escape(summary.get("recommendation_drift_status", "stable"))} — {escape(summary.get("recommendation_drift_summary", "No recommendation-drift summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Exception Pattern Summary:</strong> {escape(summary.get("exception_pattern_summary", "No exception-pattern summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Exception Retirement Summary:</strong> {escape(summary.get("exception_retirement_summary", "No exception-retirement summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Policy Debt Summary:</strong> {escape(summary.get("policy_debt_summary", "No policy-debt summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Trust Normalization Summary:</strong> {escape(summary.get("trust_normalization_summary", "No trust-normalization summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Class Memory Summary:</strong> {escape(summary.get("class_memory_summary", "No class-memory summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Class Decay Summary:</strong> {escape(summary.get("class_decay_summary", "No class-decay summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Class Reweighting Summary:</strong> {escape(summary.get("class_reweighting_summary", "No class reweighting summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Class Momentum Summary:</strong> {escape(summary.get("class_momentum_summary", "No class momentum summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reweighting Stability Summary:</strong> {escape(summary.get("class_reweight_stability_summary", "No reweighting stability summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Class Transition Health Summary:</strong> {escape(summary.get("class_transition_health_summary", "No class transition health summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Pending Transition Resolution Summary:</strong> {escape(summary.get("class_transition_resolution_summary", "No class transition resolution summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Transition Closure Confidence Summary:</strong> {escape(summary.get("transition_closure_confidence_summary", "No transition-closure confidence summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Class Pending Debt Summary:</strong> {escape(summary.get("class_pending_debt_summary", "No class pending-debt summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Class Pending Resolution Summary:</strong> {escape(summary.get("class_pending_resolution_summary", "No class pending-resolution summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Pending Debt Freshness Summary:</strong> {escape(summary.get("pending_debt_freshness_summary", "No pending-debt freshness summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Pending Debt Decay Summary:</strong> {escape(summary.get("pending_debt_decay_summary", "No pending-debt decay summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Closure Forecast Reweighting Summary:</strong> {escape(summary.get("closure_forecast_reweighting_summary", "No closure-forecast reweighting summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Closure Forecast Momentum Summary:</strong> {escape(summary.get("closure_forecast_momentum_summary", "No closure-forecast momentum summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Closure Forecast Freshness Summary:</strong> {escape(summary.get("closure_forecast_freshness_summary", "No closure-forecast freshness summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Closure Forecast Stability Summary:</strong> {escape(summary.get("closure_forecast_stability_summary", "No closure-forecast stability summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Closure Forecast Hysteresis Summary:</strong> {escape(summary.get("closure_forecast_hysteresis_summary", "No closure-forecast hysteresis summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Closure Forecast Decay Summary:</strong> {escape(summary.get("closure_forecast_decay_summary", "No closure-forecast decay summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Closure Forecast Refresh Recovery Summary:</strong> {escape(summary.get("closure_forecast_refresh_recovery_summary", "No closure-forecast refresh-recovery summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Closure Forecast Reacquisition Summary:</strong> {escape(summary.get("closure_forecast_reacquisition_summary", "No closure-forecast reacquisition summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reacquisition Persistence Summary:</strong> {escape(summary.get("closure_forecast_reacquisition_persistence_summary", "No reacquisition-persistence summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Recovery Churn Summary:</strong> {escape(summary.get("closure_forecast_recovery_churn_summary", "No recovery-churn summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reacquisition Freshness Summary:</strong> {escape(summary.get("closure_forecast_reacquisition_freshness_summary", "No reacquisition-freshness summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Persistence Reset Summary:</strong> {escape(summary.get("closure_forecast_persistence_reset_summary", "No persistence-reset summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Refresh Recovery Summary:</strong> {escape(summary.get("closure_forecast_reset_refresh_recovery_summary", "No reset-refresh recovery summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_summary", "No reset re-entry summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Persistence Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_persistence_summary", "No reset re-entry persistence summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Churn Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_churn_summary", "No reset re-entry churn summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Freshness Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_freshness_summary", "No reset re-entry freshness summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Reset Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_reset_summary", "No reset re-entry reset summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Refresh Recovery Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_refresh_recovery_summary", "No reset re-entry refresh-recovery summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_summary", "No reset re-entry rebuild summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Freshness Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_freshness_summary", "No reset re-entry rebuild-freshness summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Reset Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_reset_summary", "No reset re-entry rebuild-reset summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Refresh Recovery Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_refresh_recovery_summary", "No reset re-entry rebuild-refresh-recovery summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-entry Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_reentry_summary", "No reset re-entry rebuild re-entry summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Persistence Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_reentry_persistence_summary", "No reset re-entry rebuild re-entry persistence summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Churn Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_reentry_churn_summary", "No reset re-entry rebuild re-entry churn summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Freshness Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_reentry_freshness_summary", "No reset re-entry rebuild re-entry freshness summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Reset Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_reentry_reset_summary", "No reset re-entry rebuild re-entry reset summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Refresh Recovery Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_summary", "No reset re-entry rebuild re-entry refresh recovery summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_summary", "No reset re-entry rebuild re-entry restore summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Freshness Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_summary", "No reset re-entry rebuild re-entry restore freshness summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Reset Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_reset_summary", "No reset re-entry rebuild re-entry restore reset summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Refresh Recovery Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_summary", "No reset re-entry rebuild re-entry restore refresh recovery summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_summary", "No reset re-entry rebuild re-entry restore re-restore summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Persistence Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_summary", "No reset re-entry rebuild re-entry restore re-restore persistence summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Churn Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_summary", "No reset re-entry rebuild re-entry restore re-restore churn summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Freshness Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_summary", "No reset re-entry rebuild re-entry restore re-restore freshness summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Reset Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_summary", "No reset re-entry rebuild re-entry restore re-restore reset summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Refresh Recovery Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_summary", "No reset re-entry rebuild re-entry restore re-restore refresh recovery summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_summary", "No reset re-entry rebuild re-entry restore re-re-restore summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Persistence Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_summary", "No reset re-entry rebuild re-entry restore re-re-restore persistence summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Churn Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_summary", "No reset re-entry rebuild re-entry restore re-re-restore churn summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_summary", "No reset re-entry rebuild re-entry restore re-re-restore freshness summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_summary", "No reset re-entry rebuild re-entry restore re-re-restore reset summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_summary", "No reset re-entry rebuild re-entry restore re-re-restore refresh recovery summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_summary", "No reset re-entry rebuild re-entry restore re-re-re-restore summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_summary", "No reset re-entry rebuild re-entry restore re-re-re-restore persistence summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_summary", "No reset re-entry rebuild re-entry restore re-re-re-restore churn summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Persistence Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_persistence_summary", "No reset re-entry rebuild-persistence summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Churn Summary:</strong> {escape(summary.get("closure_forecast_reset_reentry_rebuild_churn_summary", "No reset re-entry rebuild-churn summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Recommendation Quality:</strong> {escape(summary.get("recommendation_quality_summary", "No recommendation-quality summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Confidence Validation:</strong> {escape(summary.get("confidence_validation_status", "insufficient-data"))} — {escape(summary.get("confidence_calibration_summary", "No confidence-calibration summary is recorded yet."))}</div>
+        <div class="meta-line"><strong>Recent Confidence Outcomes:</strong> {escape(_recent_confidence_outcomes_label(summary.get("recent_validation_outcomes") or []))}</div>
+        <div class="meta-line"><strong>Blocked:</strong> {counts.get("blocked", 0)} | <strong>Urgent:</strong> {counts.get("urgent", 0)} | <strong>Ready:</strong> {counts.get("ready", 0)} | <strong>Deferred:</strong> {counts.get("deferred", 0)}</div>
+        <ul class="bullet-list">{"".join(rows) or "<li>No triage items are currently surfaced.</li>"}</ul>
         <div class="meta-line"><strong>Recently Changed:</strong></div>
-        <ul class="bullet-list">{recent_markup or '<li>No recent operator changes were loaded.</li>'}</ul>
+        <ul class="bullet-list">{recent_markup or "<li>No recent operator changes were loaded.</li>"}</ul>
       </div>
     </div>"""
 
@@ -540,7 +607,7 @@ def _top_attention_section(data: dict) -> str:
     <div class="section">
       <h2>Top Attention / Next Action</h2>
       <div class="panel">
-        <ul class="bullet-list">{''.join(rows)}</ul>
+        <ul class="bullet-list">{"".join(rows)}</ul>
       </div>
     </div>"""
 
@@ -566,11 +633,11 @@ def _weekly_story_blocks(weekly_pack: dict) -> str:
         blocks.append(
             f"""
             <div class="panel">
-              <h3>{escape(section.get('label', 'Weekly Story'))}</h3>
-              <div class="meta-line"><strong>Summary:</strong> {escape(section.get('headline', 'No section summary is recorded yet.'))}</div>
-              <div class="meta-line"><strong>{escape(section.get('next_label', 'Next Step'))}:</strong> {escape(section.get('next_step', 'No next step is recorded yet.'))}</div>
-              <div class="meta-line"><strong>State:</strong> {escape(section.get('state', 'idle'))}</div>
-              <ul class="bullet-list">{_weekly_story_evidence_list(list(section.get('evidence_items') or []))}</ul>
+              <h3>{escape(section.get("label", "Weekly Story"))}</h3>
+              <div class="meta-line"><strong>Summary:</strong> {escape(section.get("headline", "No section summary is recorded yet."))}</div>
+              <div class="meta-line"><strong>{escape(section.get("next_label", "Next Step"))}:</strong> {escape(section.get("next_step", "No next step is recorded yet."))}</div>
+              <div class="meta-line"><strong>State:</strong> {escape(section.get("state", "idle"))}</div>
+              <ul class="bullet-list">{_weekly_story_evidence_list(list(section.get("evidence_items") or []))}</ul>
             </div>
             """
         )
@@ -579,18 +646,42 @@ def _weekly_story_blocks(weekly_pack: dict) -> str:
 
 def _operator_focus_blocks(weekly_pack: dict) -> str:
     focus_sections = [
-        ("Act Now", weekly_pack.get("top_act_now_items", []), "No immediate-action hotspots are currently surfaced."),
-        ("Watch Closely", weekly_pack.get("top_watch_closely_items", []), "No watch-closely hotspots are currently surfaced."),
-        ("Improving", weekly_pack.get("top_improving_items", []), "No clearly improving hotspots are currently surfaced."),
-        ("Fragile", weekly_pack.get("top_fragile_items", []), "No fragile hotspots are currently surfaced."),
-        ("Revalidate", weekly_pack.get("top_revalidate_items", []), "No revalidation hotspots are currently surfaced."),
+        (
+            "Act Now",
+            weekly_pack.get("top_act_now_items", []),
+            "No immediate-action hotspots are currently surfaced.",
+        ),
+        (
+            "Watch Closely",
+            weekly_pack.get("top_watch_closely_items", []),
+            "No watch-closely hotspots are currently surfaced.",
+        ),
+        (
+            "Improving",
+            weekly_pack.get("top_improving_items", []),
+            "No clearly improving hotspots are currently surfaced.",
+        ),
+        (
+            "Fragile",
+            weekly_pack.get("top_fragile_items", []),
+            "No fragile hotspots are currently surfaced.",
+        ),
+        (
+            "Revalidate",
+            weekly_pack.get("top_revalidate_items", []),
+            "No revalidation hotspots are currently surfaced.",
+        ),
     ]
     blocks = []
     for label, items, empty_message in focus_sections:
         if items:
             row_parts = []
             for item in items[:3]:
-                item_label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
+                item_label = (
+                    f"{item.get('repo')}: {item.get('title')}"
+                    if item.get("repo")
+                    else item.get("title", "Operator item")
+                )
                 row_parts.append(
                     f"<li><strong>{escape(item_label)}</strong>"
                     f" — {escape(item.get('operator_focus_summary', 'No operator focus bucket is currently surfaced.'))}</li>"
@@ -615,10 +706,13 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
             f"{item.get('intent_alignment', 'missing-contract')}: "
             f"{item.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.')}"
         )
-        attention_evidence = "; ".join(
-            f"{e.get('label', 'Item')}: {e.get('summary', 'No evidence summary is recorded yet.')}"
-            for e in (item.get("evidence_strip") or [])[:4]
-        ) or "No supporting evidence is currently surfaced."
+        attention_evidence = (
+            "; ".join(
+                f"{e.get('label', 'Item')}: {e.get('summary', 'No evidence summary is recorded yet.')}"
+                for e in (item.get("evidence_strip") or [])[:4]
+            )
+            or "No supporting evidence is currently surfaced."
+        )
         attention_rows.append(
             "<li>"
             f"<strong>{escape(item.get('repo', 'Portfolio'))}:</strong> {escape(item.get('title', 'Operator attention item'))}"
@@ -642,21 +736,21 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
         repo_cards.append(
             f"""
             <div class="panel">
-              <h3><a href="#{escape(briefing.get('anchor', 'repo'), quote=True)}">{escape(briefing.get('headline', briefing.get('repo', 'Repo briefing')))}</a></h3>
-              <div class="meta-line"><strong>Current State:</strong> {escape(briefing.get('current_state_line', 'No current-state summary is recorded yet.'))}</div>
-              <div class="meta-line"><strong>What Changed:</strong> {escape(briefing.get('what_changed_line', 'No change summary is recorded yet.'))}</div>
-              <div class="meta-line"><strong>Why It Matters:</strong> {escape(briefing.get('why_it_won', briefing.get('why_it_matters_line', 'No explanation summary is recorded yet.')))}</div>
-              <div class="meta-line"><strong>Where To Start:</strong> {escape(briefing.get('where_to_start_summary', 'No meaningful implementation hotspot is currently surfaced.'))}</div>
-              <div class="meta-line"><strong>What To Do Next:</strong> {escape(briefing.get('next_step', briefing.get('what_to_do_next_line', 'No next action is recorded yet.')))}</div>
-              <div class="meta-line"><strong>Operator Focus:</strong> {escape(briefing.get('operator_focus_line', 'Watch Closely: No operator focus bucket is currently surfaced.'))}</div>
-              <div class="meta-line"><strong>Catalog:</strong> {escape(briefing.get('catalog_line', 'No portfolio catalog contract is recorded yet.'))}</div>
-              <div class="meta-line"><strong>{escape(briefing.get('operating_path_line', 'Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet.'))}</strong></div>
-              <div class="meta-line"><strong>Intent Alignment:</strong> {escape(briefing.get('intent_alignment_line', 'missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.'))}</div>
-              <div class="meta-line"><strong>{escape(briefing.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.'))}</strong></div>
-              <div class="meta-line"><strong>Maturity Gap:</strong> {escape(briefing.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.'))}</div>
-              <div class="meta-line"><strong>Evidence:</strong> {escape('; '.join(f"{e.get('label', 'Item')}: {e.get('summary', 'No evidence summary is recorded yet.')}" for e in (briefing.get('evidence_strip') or [])[:4]) or 'No supporting evidence is currently surfaced.')}</div>
-              <div class="meta-line"><strong>Checkpoint Timing:</strong> {escape(briefing.get('checkpoint_timing_line', 'Unknown'))}</div>
-              <div class="meta-line"><strong>What Would Count As Progress:</strong> {escape(briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</div>
+              <h3><a href="#{escape(briefing.get("anchor", "repo"), quote=True)}">{escape(briefing.get("headline", briefing.get("repo", "Repo briefing")))}</a></h3>
+              <div class="meta-line"><strong>Current State:</strong> {escape(briefing.get("current_state_line", "No current-state summary is recorded yet."))}</div>
+              <div class="meta-line"><strong>What Changed:</strong> {escape(briefing.get("what_changed_line", "No change summary is recorded yet."))}</div>
+              <div class="meta-line"><strong>Why It Matters:</strong> {escape(briefing.get("why_it_won", briefing.get("why_it_matters_line", "No explanation summary is recorded yet.")))}</div>
+              <div class="meta-line"><strong>Where To Start:</strong> {escape(briefing.get("where_to_start_summary", "No meaningful implementation hotspot is currently surfaced."))}</div>
+              <div class="meta-line"><strong>What To Do Next:</strong> {escape(briefing.get("next_step", briefing.get("what_to_do_next_line", "No next action is recorded yet.")))}</div>
+              <div class="meta-line"><strong>Operator Focus:</strong> {escape(briefing.get("operator_focus_line", "Watch Closely: No operator focus bucket is currently surfaced."))}</div>
+              <div class="meta-line"><strong>Catalog:</strong> {escape(briefing.get("catalog_line", "No portfolio catalog contract is recorded yet."))}</div>
+              <div class="meta-line"><strong>{escape(briefing.get("operating_path_line", "Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet."))}</strong></div>
+              <div class="meta-line"><strong>Intent Alignment:</strong> {escape(briefing.get("intent_alignment_line", "missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists."))}</div>
+              <div class="meta-line"><strong>{escape(briefing.get("scorecard_line", "Scorecard: No maturity scorecard is recorded yet."))}</strong></div>
+              <div class="meta-line"><strong>Maturity Gap:</strong> {escape(briefing.get("maturity_gap_summary", "No maturity gap summary is recorded yet."))}</div>
+              <div class="meta-line"><strong>Evidence:</strong> {escape("; ".join(f"{e.get('label', 'Item')}: {e.get('summary', 'No evidence summary is recorded yet.')}" for e in (briefing.get("evidence_strip") or [])[:4]) or "No supporting evidence is currently surfaced.")}</div>
+              <div class="meta-line"><strong>Checkpoint Timing:</strong> {escape(briefing.get("checkpoint_timing_line", "Unknown"))}</div>
+              <div class="meta-line"><strong>What Would Count As Progress:</strong> {escape(briefing.get("checkpoint_line", "Use the next run or linked artifact to confirm whether the recommendation moved."))}</div>
             </div>
             """
         )
@@ -665,48 +759,48 @@ def _weekly_review_pack_section(report_data: dict, diff_data: dict | None) -> st
       <h2>Weekly Review Pack</h2>
       <div class="analyst-grid">
         <div class="panel">
-          <div class="meta-line"><strong>Product Mode:</strong> {escape(weekly_pack.get('product_mode_summary', 'Weekly Review: use this artifact for the normal workbook-first operator loop.'))}</div>
-          <div class="meta-line"><strong>Artifact Role:</strong> {escape(weekly_pack.get('artifact_role_summary', 'This artifact is the shared weekly handoff across workbook, HTML, Markdown, and review-pack.'))}</div>
-          <div class="meta-line"><strong>Suggested Reading Order:</strong> {escape(weekly_pack.get('suggested_reading_order', 'Read Dashboard, then Run Changes, then Review Queue.'))}</div>
-          <div class="meta-line"><strong>Next Best Workflow Step:</strong> {escape(weekly_pack.get('next_best_workflow_step', 'Open the standard workbook first, then use --control-center for read-only triage.'))}</div>
-          <div class="meta-line"><strong>Portfolio Headline:</strong> {escape(weekly_pack.get('portfolio_headline', 'No weekly headline is recorded yet.'))}</div>
-          <div class="meta-line"><strong>Run Changes:</strong> {escape(weekly_pack.get('run_change_summary', build_run_change_summary(diff_data)))}</div>
-          <div class="meta-line"><strong>Queue Pressure:</strong> {escape(weekly_pack.get('queue_pressure_summary', build_queue_pressure_summary(report_data, diff_data)))}</div>
-          <div class="meta-line"><strong>Trust / Actionability:</strong> {escape(weekly_pack.get('trust_actionability_summary', build_trust_actionability_summary(report_data)))}</div>
-          <div class="meta-line"><strong>What To Do This Week:</strong> {escape(weekly_pack.get('what_to_do_this_week', build_top_recommendation_summary(report_data)))}</div>
-          <div class="meta-line"><strong>Portfolio Catalog:</strong> {escape(weekly_pack.get('portfolio_catalog_summary', 'No portfolio catalog contract is recorded yet.'))}</div>
-          <div class="meta-line"><strong>Operating Paths:</strong> {escape(weekly_pack.get('operating_paths_summary', 'No normalized operating-path contract is recorded yet.'))}</div>
-          <div class="meta-line"><strong>Intent Alignment:</strong> {escape(weekly_pack.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.'))}</div>
-          <div class="meta-line"><strong>Scorecards:</strong> {escape(weekly_pack.get('scorecards_summary', 'No maturity scorecard is recorded yet.'))}</div>
-          <div class="meta-line"><strong>Implementation Hotspots:</strong> {escape(weekly_pack.get('implementation_hotspots_summary', 'No meaningful implementation hotspots are currently surfaced.'))}</div>
-          <div class="meta-line"><strong>Operator Outcomes:</strong> {escape(weekly_pack.get('operator_outcomes_summary', 'Not enough operator history is recorded yet to judge outcomes.'))}</div>
-          <div class="meta-line"><strong>Operator Effectiveness:</strong> {escape(weekly_pack.get('operator_effectiveness_line', 'Not enough judged recommendation history is recorded yet to judge operator effectiveness.'))}</div>
-          <div class="meta-line"><strong>High-Pressure Queue Trend:</strong> {escape(weekly_pack.get('high_pressure_queue_trend_line', 'High-pressure queue trend is not ready yet.'))}</div>
-          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['readiness']}:</strong> {escape(weekly_pack.get('action_sync_summary', 'No current campaign needs Action Sync yet, so the safest next move is to keep the story local.'))}</div>
-          <div class="meta-line"><strong>Next Action Sync Step:</strong> {escape(weekly_pack.get('next_action_sync_step', 'Stay local for now; no current campaign needs preview or apply.'))}</div>
-          <div class="meta-line"><strong>Apply Packet:</strong> {escape(weekly_pack.get('apply_readiness_summary', 'No current campaign has a safe execution handoff yet, so the local story should stay local for now.'))}</div>
-          <div class="meta-line"><strong>Next Apply Candidate:</strong> {escape(weekly_pack.get('next_apply_candidate', 'Stay local for now; no current campaign has a safe execution handoff.'))}</div>
-          <div class="meta-line"><strong>Action Sync Command Hint:</strong> {escape(weekly_pack.get('action_sync_command_hint', 'No Action Sync command is recommended yet.'))}</div>
-          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['post_apply_monitoring']}:</strong> {escape(weekly_pack.get('campaign_outcomes_summary', 'No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.'))}</div>
-          <div class="meta-line"><strong>Next Monitoring Step:</strong> {escape(weekly_pack.get('next_monitoring_step', 'Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.'))}</div>
-          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['campaign_tuning']}:</strong> {escape(weekly_pack.get('campaign_tuning_summary', 'Campaign tuning stays neutral until there is enough outcome history to bias tied recommendations.'))}</div>
-          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}:</strong> {escape(weekly_pack.get('next_tie_break_candidate', weekly_pack.get('next_tuned_campaign', 'No current campaign needs a tie-break candidate yet.')))}</div>
-          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['historical_portfolio_intelligence']}:</strong> {escape(weekly_pack.get('historical_portfolio_intelligence', 'Historical portfolio intelligence is still thin, so the weekly story should stay grounded in the current run and recent operator queue.'))}</div>
-          <div class="meta-line"><strong>Next Historical Focus:</strong> {escape(weekly_pack.get('next_historical_focus', 'Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet.'))}</div>
-          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}:</strong> {escape(weekly_pack.get('automation_guidance_summary', 'Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture.'))}</div>
-          <div class="meta-line"><strong>Next Safe Automation Step:</strong> {escape(weekly_pack.get('next_safe_automation_step', 'Stay local for now; no current campaign has a stronger safe automation posture than manual review.'))}</div>
-          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}:</strong> {escape(weekly_pack.get('approval_workflow_summary', 'No current approval needs review yet, so the approval workflow can stay local for now.'))}</div>
-          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['next_approval_review']}:</strong> {escape(weekly_pack.get('next_approval_review', 'Stay local for now; no current approval needs review.'))}</div>
+          <div class="meta-line"><strong>Product Mode:</strong> {escape(weekly_pack.get("product_mode_summary", "Weekly Review: use this artifact for the normal workbook-first operator loop."))}</div>
+          <div class="meta-line"><strong>Artifact Role:</strong> {escape(weekly_pack.get("artifact_role_summary", "This artifact is the shared weekly handoff across workbook, HTML, Markdown, and review-pack."))}</div>
+          <div class="meta-line"><strong>Suggested Reading Order:</strong> {escape(weekly_pack.get("suggested_reading_order", "Read Dashboard, then Run Changes, then Review Queue."))}</div>
+          <div class="meta-line"><strong>Next Best Workflow Step:</strong> {escape(weekly_pack.get("next_best_workflow_step", "Open the standard workbook first, then use --control-center for read-only triage."))}</div>
+          <div class="meta-line"><strong>Portfolio Headline:</strong> {escape(weekly_pack.get("portfolio_headline", "No weekly headline is recorded yet."))}</div>
+          <div class="meta-line"><strong>Run Changes:</strong> {escape(weekly_pack.get("run_change_summary", build_run_change_summary(diff_data)))}</div>
+          <div class="meta-line"><strong>Queue Pressure:</strong> {escape(weekly_pack.get("queue_pressure_summary", build_queue_pressure_summary(report_data, diff_data)))}</div>
+          <div class="meta-line"><strong>Trust / Actionability:</strong> {escape(weekly_pack.get("trust_actionability_summary", build_trust_actionability_summary(report_data)))}</div>
+          <div class="meta-line"><strong>What To Do This Week:</strong> {escape(weekly_pack.get("what_to_do_this_week", build_top_recommendation_summary(report_data)))}</div>
+          <div class="meta-line"><strong>Portfolio Catalog:</strong> {escape(weekly_pack.get("portfolio_catalog_summary", "No portfolio catalog contract is recorded yet."))}</div>
+          <div class="meta-line"><strong>Operating Paths:</strong> {escape(weekly_pack.get("operating_paths_summary", "No normalized operating-path contract is recorded yet."))}</div>
+          <div class="meta-line"><strong>Intent Alignment:</strong> {escape(weekly_pack.get("intent_alignment_summary", "Intent alignment cannot be judged until a portfolio catalog contract exists."))}</div>
+          <div class="meta-line"><strong>Scorecards:</strong> {escape(weekly_pack.get("scorecards_summary", "No maturity scorecard is recorded yet."))}</div>
+          <div class="meta-line"><strong>Implementation Hotspots:</strong> {escape(weekly_pack.get("implementation_hotspots_summary", "No meaningful implementation hotspots are currently surfaced."))}</div>
+          <div class="meta-line"><strong>Operator Outcomes:</strong> {escape(weekly_pack.get("operator_outcomes_summary", "Not enough operator history is recorded yet to judge outcomes."))}</div>
+          <div class="meta-line"><strong>Operator Effectiveness:</strong> {escape(weekly_pack.get("operator_effectiveness_line", "Not enough judged recommendation history is recorded yet to judge operator effectiveness."))}</div>
+          <div class="meta-line"><strong>High-Pressure Queue Trend:</strong> {escape(weekly_pack.get("high_pressure_queue_trend_line", "High-pressure queue trend is not ready yet."))}</div>
+          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS["readiness"]}:</strong> {escape(weekly_pack.get("action_sync_summary", "No current campaign needs Action Sync yet, so the safest next move is to keep the story local."))}</div>
+          <div class="meta-line"><strong>Next Action Sync Step:</strong> {escape(weekly_pack.get("next_action_sync_step", "Stay local for now; no current campaign needs preview or apply."))}</div>
+          <div class="meta-line"><strong>Apply Packet:</strong> {escape(weekly_pack.get("apply_readiness_summary", "No current campaign has a safe execution handoff yet, so the local story should stay local for now."))}</div>
+          <div class="meta-line"><strong>Next Apply Candidate:</strong> {escape(weekly_pack.get("next_apply_candidate", "Stay local for now; no current campaign has a safe execution handoff."))}</div>
+          <div class="meta-line"><strong>Action Sync Command Hint:</strong> {escape(weekly_pack.get("action_sync_command_hint", "No Action Sync command is recommended yet."))}</div>
+          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS["post_apply_monitoring"]}:</strong> {escape(weekly_pack.get("campaign_outcomes_summary", "No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local."))}</div>
+          <div class="meta-line"><strong>Next Monitoring Step:</strong> {escape(weekly_pack.get("next_monitoring_step", "Stay local for now; no recent Action Sync apply needs post-apply follow-up yet."))}</div>
+          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS["campaign_tuning"]}:</strong> {escape(weekly_pack.get("campaign_tuning_summary", "Campaign tuning stays neutral until there is enough outcome history to bias tied recommendations."))}</div>
+          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS["next_tie_break_candidate"]}:</strong> {escape(weekly_pack.get("next_tie_break_candidate", weekly_pack.get("next_tuned_campaign", "No current campaign needs a tie-break candidate yet.")))}</div>
+          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS["historical_portfolio_intelligence"]}:</strong> {escape(weekly_pack.get("historical_portfolio_intelligence", "Historical portfolio intelligence is still thin, so the weekly story should stay grounded in the current run and recent operator queue."))}</div>
+          <div class="meta-line"><strong>Next Historical Focus:</strong> {escape(weekly_pack.get("next_historical_focus", "Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet."))}</div>
+          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS["automation_guidance"]}:</strong> {escape(weekly_pack.get("automation_guidance_summary", "Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture."))}</div>
+          <div class="meta-line"><strong>Next Safe Automation Step:</strong> {escape(weekly_pack.get("next_safe_automation_step", "Stay local for now; no current campaign has a stronger safe automation posture than manual review."))}</div>
+          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS["approval_workflow"]}:</strong> {escape(weekly_pack.get("approval_workflow_summary", "No current approval needs review yet, so the approval workflow can stay local for now."))}</div>
+          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS["next_approval_review"]}:</strong> {escape(weekly_pack.get("next_approval_review", "Stay local for now; no current approval needs review."))}</div>
           {story_blocks}
-          <div class="meta-line"><strong>Operator Focus:</strong> {escape(weekly_pack.get('operator_focus_summary', 'No operator focus bucket is currently surfaced.'))}</div>
-          <div class="meta-line"><strong>Next Checkpoint:</strong> {escape(weekly_pack.get('follow_through_checkpoint_summary', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</div>
+          <div class="meta-line"><strong>Operator Focus:</strong> {escape(weekly_pack.get("operator_focus_summary", "No operator focus bucket is currently surfaced."))}</div>
+          <div class="meta-line"><strong>Next Checkpoint:</strong> {escape(weekly_pack.get("follow_through_checkpoint_summary", "Use the next run or linked artifact to confirm whether the recommendation moved."))}</div>
           {operator_focus_blocks}
           <h3>Top Attention</h3>
-          <ul class="bullet-list">{''.join(attention_rows) or '<li>No urgent attention items are currently surfaced.</li>'}</ul>
+          <ul class="bullet-list">{"".join(attention_rows) or "<li>No urgent attention items are currently surfaced.</li>"}</ul>
         </div>
         <div class="panel">
           <h3>Top Repo Drilldowns</h3>
-          {''.join(repo_cards) or "<div class='meta-line'>No repo drilldowns are recorded yet.</div>"}
+          {"".join(repo_cards) or "<div class='meta-line'>No repo drilldowns are recorded yet.</div>"}
         </div>
       </div>
     </div>"""
@@ -738,7 +832,7 @@ def _analyst_summary_section(context: dict) -> str:
     rows = []
     for entry in leaders[:5]:
         rows.append(
-            f"<tr><td>{escape(entry['name'])}</td><td class=\"num\">{entry['profile_score']:.3f}</td>"
+            f'<tr><td>{escape(entry["name"])}</td><td class="num">{entry["profile_score"]:.3f}</td>'
             f"<td>{escape(entry['tier'])}</td></tr>"
         )
     collection_bits = [
@@ -750,15 +844,15 @@ def _analyst_summary_section(context: dict) -> str:
       <h2>Analyst View</h2>
       <div class="analyst-grid">
         <div class="panel">
-          <div class="meta-line"><strong>Profile:</strong> {escape(context['profile_name'])}</div>
-          <div class="meta-line"><strong>Collection:</strong> {escape(context['collection_name'] or 'all')}</div>
-          <div class="pill-row">{''.join(collection_bits) or "<span class='pill'>No collections</span>"}</div>
+          <div class="meta-line"><strong>Profile:</strong> {escape(context["profile_name"])}</div>
+          <div class="meta-line"><strong>Collection:</strong> {escape(context["collection_name"] or "all")}</div>
+          <div class="pill-row">{"".join(collection_bits) or "<span class='pill'>No collections</span>"}</div>
         </div>
         <div class="panel">
           <h3>Profile Leaders</h3>
           <table class="compact-table">
             <thead><tr><th>Repo</th><th>Profile Score</th><th>Tier</th></tr></thead>
-            <tbody>{''.join(rows)}</tbody>
+            <tbody>{"".join(rows)}</tbody>
           </table>
         </div>
       </div>
@@ -781,7 +875,7 @@ def _lens_summary_section(report_data: dict) -> str:
     return f"""
     <div class="section">
       <h2>Decision Lenses</h2>
-      <div class="lens-grid">{''.join(cards)}</div>
+      <div class="lens-grid">{"".join(cards)}</div>
     </div>"""
 
 
@@ -797,22 +891,22 @@ def _security_overview_section(report_data: dict) -> str:
       <div class="lens-grid">
         <div class="lens-card">
           <div class="kpi-label">Avg Security Score</div>
-          <div class="lens-score">{posture.get('average_score', 0):.2f}</div>
+          <div class="lens-score">{posture.get("average_score", 0):.2f}</div>
           <div class="lens-text">Portfolio-wide merged security posture.</div>
         </div>
         <div class="lens-card">
           <div class="kpi-label">GitHub Coverage</div>
-          <div class="lens-score">{coverage.get('github', {}).get('available_repos', 0)}</div>
+          <div class="lens-score">{coverage.get("github", {}).get("available_repos", 0)}</div>
           <div class="lens-text">Repos with GitHub-native security evidence available.</div>
         </div>
         <div class="lens-card">
           <div class="kpi-label">Scorecard Coverage</div>
-          <div class="lens-score">{coverage.get('scorecard', {}).get('available_repos', 0)}</div>
+          <div class="lens-score">{coverage.get("scorecard", {}).get("available_repos", 0)}</div>
           <div class="lens-text">Repos with external Scorecard evidence loaded.</div>
         </div>
         <div class="lens-card">
           <div class="kpi-label">Open Alerts</div>
-          <div class="lens-score">{alerts.get('code_scanning', 0) + alerts.get('secret_scanning', 0)}</div>
+          <div class="lens-score">{alerts.get("code_scanning", 0) + alerts.get("secret_scanning", 0)}</div>
           <div class="lens-text">Combined code and secret scanning alerts.</div>
         </div>
       </div>
@@ -850,9 +944,19 @@ def _repo_table(analyst_context: dict, score_history: dict[str, list[float]] | N
         safe_collections = escape(collections)
         next_action = escape(explanation.get("next_best_action", "") or "")
         score_note = escape(explanation.get("next_tier_gap_summary", "") or "")
-        next_action_markup = f'<br><span class="muted"><strong>Next:</strong> {next_action}</span>' if next_action else ""
-        score_note_markup = f'<br><span class="muted"><strong>Gap:</strong> {score_note}</span>' if score_note else ""
-        repo_anchor = build_repo_briefing(a, {"audits": [a]}, None).get("anchor", f"repo-{escape(name.lower(), quote=True)}")
+        next_action_markup = (
+            f'<br><span class="muted"><strong>Next:</strong> {next_action}</span>'
+            if next_action
+            else ""
+        )
+        score_note_markup = (
+            f'<br><span class="muted"><strong>Gap:</strong> {score_note}</span>'
+            if score_note
+            else ""
+        )
+        repo_anchor = build_repo_briefing(a, {"audits": [a]}, None).get(
+            "anchor", f"repo-{escape(name.lower(), quote=True)}"
+        )
         link = f'<a href="#{escape(repo_anchor, quote=True)}">{safe_name}</a>'
         rows.append(
             f'<tr data-tier="{escape(tier, quote=True)}" '
@@ -861,20 +965,20 @@ def _repo_table(analyst_context: dict, score_history: dict[str, list[float]] | N
             f'data-collections="{escape(collections.lower(), quote=True)}" '
             f'data-overall="{score:.3f}" '
             f'data-profile="{profile_score:.3f}">'
-            f'<td>{link}</td>'
+            f"<td>{link}</td>"
             f'<td class="num">{profile_score:.3f}</td>'
             f'<td style="color:{gc};font-weight:bold;text-align:center">{escape(grade)}</td>'
             f'<td class="num">{score:.3f}</td>'
             f'<td class="num">{interest:.3f}</td>'
             f'<td style="color:{tc};font-weight:bold">{safe_tier}</td>'
-            f'<td>{safe_lang}</td>'
-            f'<td>{safe_collections or "—"}</td>'
+            f"<td>{safe_lang}</td>"
+            f"<td>{safe_collections or '—'}</td>"
             f'<td class="sparkline">{escape(spark)}</td>'
             f'<td class="desc">{safe_desc}'
             f"{next_action_markup}"
             f"{score_note_markup}"
-            f'</td>'
-            f'</tr>'
+            f"</td>"
+            f"</tr>"
         )
 
     collection_options = ['<option value="all">All Collections</option>']
@@ -907,7 +1011,7 @@ def _repo_table(analyst_context: dict, score_history: dict[str, list[float]] | N
           <option value="F">F</option>
         </select>
         <select id="filter-collection" onchange="filterTable()">
-          {''.join(collection_options)}
+          {"".join(collection_options)}
         </select>
         <input id="search" type="text" placeholder="Search repos..." oninput="filterTable()">
       </div>
@@ -916,13 +1020,17 @@ def _repo_table(analyst_context: dict, score_history: dict[str, list[float]] | N
           <th>Repo</th><th>Profile</th><th>Grade</th><th>Score</th><th>Interest</th>
           <th>Tier</th><th>Language</th><th>Collections</th><th>Trend</th><th>Description</th>
         </tr></thead>
-        <tbody>{''.join(rows)}</tbody>
+        <tbody>{"".join(rows)}</tbody>
       </table>
     </div>"""
 
 
 def _repo_drilldown_section(report_data: dict, diff_data: dict | None) -> str:
-    audits = sorted(report_data.get("audits", []) or [], key=lambda audit: audit.get("overall_score", 0.0), reverse=True)
+    audits = sorted(
+        report_data.get("audits", []) or [],
+        key=lambda audit: audit.get("overall_score", 0.0),
+        reverse=True,
+    )
     cards = []
     for audit in audits:
         briefing = build_repo_briefing(audit, report_data, diff_data)
@@ -932,22 +1040,22 @@ def _repo_drilldown_section(report_data: dict, diff_data: dict | None) -> str:
         next_steps = briefing.get("what_to_do_next", {})
         cards.append(
             f"""
-            <div class="panel" id="{escape(briefing.get('anchor', 'repo'), quote=True)}">
-              <h3>{escape(briefing.get('headline', briefing.get('repo', 'Repo briefing')))}</h3>
-              <div class="meta-line"><strong>Current State:</strong> {escape(briefing.get('current_state_line', 'No current-state summary is recorded yet.'))}</div>
-              <div class="meta-line"><strong>Description:</strong> {escape(current_state.get('description', 'No description recorded yet.'))}</div>
-              <div class="meta-line"><strong>Why This Repo Looks This Way:</strong> Strongest drivers: {escape(why.get('strongest_drivers', 'No strong positive drivers recorded yet.'))}. Biggest drags: {escape(why.get('biggest_drags', 'No major drag factors recorded yet.'))}. Next tier gap: {escape(why.get('next_tier_gap', 'No next-tier gap is recorded yet.'))}</div>
-              <div class="meta-line"><strong>What Changed:</strong> {escape(changed.get('last_movement', 'No change timing is recorded yet.'))} {escape(changed.get('recent_change_summary', 'No recent change summary is recorded yet.'))}</div>
-              <div class="meta-line"><strong>Hotspot Context:</strong> {escape(changed.get('top_hotspot_context', 'No hotspot context is recorded yet.'))}</div>
-              <div class="meta-line"><strong>Where To Start:</strong> {escape(briefing.get('where_to_start_summary', 'No meaningful implementation hotspot is currently surfaced.'))}</div>
-              <ul class="bullet-list">{''.join(f"<li>{escape(item.get('path', 'repo root'))}: {escape(item.get('signal_summary', 'No signal summary recorded yet.'))}</li>" for item in briefing.get('implementation_hotspots', [])[:3]) or '<li>No implementation hotspots are currently surfaced.</li>'}</ul>
-              <div class="meta-line"><strong>What To Do Next:</strong> {escape(next_steps.get('next_best_action', 'No clear next action is recorded yet.'))}</div>
-              <div class="meta-line"><strong>Rationale:</strong> {escape(next_steps.get('rationale', 'No action rationale is recorded yet.'))}</div>
-              <div class="meta-line"><strong>Follow-Through:</strong> {escape(briefing.get('follow_through_line', 'No follow-through evidence is recorded yet.'))}</div>
-              <div class="meta-line"><strong>Checkpoint Timing:</strong> {escape(briefing.get('checkpoint_timing_line', 'Unknown'))}</div>
-              <div class="meta-line"><strong>Escalation:</strong> {escape(briefing.get('escalation_line', 'Unknown: No stronger follow-through escalation is currently surfaced.'))}</div>
-              <div class="meta-line"><strong>What Would Count As Progress:</strong> {escape(briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.'))}</div>
-              <div class="meta-line"><strong>Linked Artifact:</strong> {escape(next_steps.get('linked_artifact', no_linked_artifact_summary()))}</div>
+            <div class="panel" id="{escape(briefing.get("anchor", "repo"), quote=True)}">
+              <h3>{escape(briefing.get("headline", briefing.get("repo", "Repo briefing")))}</h3>
+              <div class="meta-line"><strong>Current State:</strong> {escape(briefing.get("current_state_line", "No current-state summary is recorded yet."))}</div>
+              <div class="meta-line"><strong>Description:</strong> {escape(current_state.get("description", "No description recorded yet."))}</div>
+              <div class="meta-line"><strong>Why This Repo Looks This Way:</strong> Strongest drivers: {escape(why.get("strongest_drivers", "No strong positive drivers recorded yet."))}. Biggest drags: {escape(why.get("biggest_drags", "No major drag factors recorded yet."))}. Next tier gap: {escape(why.get("next_tier_gap", "No next-tier gap is recorded yet."))}</div>
+              <div class="meta-line"><strong>What Changed:</strong> {escape(changed.get("last_movement", "No change timing is recorded yet."))} {escape(changed.get("recent_change_summary", "No recent change summary is recorded yet."))}</div>
+              <div class="meta-line"><strong>Hotspot Context:</strong> {escape(changed.get("top_hotspot_context", "No hotspot context is recorded yet."))}</div>
+              <div class="meta-line"><strong>Where To Start:</strong> {escape(briefing.get("where_to_start_summary", "No meaningful implementation hotspot is currently surfaced."))}</div>
+              <ul class="bullet-list">{"".join(f"<li>{escape(item.get('path', 'repo root'))}: {escape(item.get('signal_summary', 'No signal summary recorded yet.'))}</li>" for item in briefing.get("implementation_hotspots", [])[:3]) or "<li>No implementation hotspots are currently surfaced.</li>"}</ul>
+              <div class="meta-line"><strong>What To Do Next:</strong> {escape(next_steps.get("next_best_action", "No clear next action is recorded yet."))}</div>
+              <div class="meta-line"><strong>Rationale:</strong> {escape(next_steps.get("rationale", "No action rationale is recorded yet."))}</div>
+              <div class="meta-line"><strong>Follow-Through:</strong> {escape(briefing.get("follow_through_line", "No follow-through evidence is recorded yet."))}</div>
+              <div class="meta-line"><strong>Checkpoint Timing:</strong> {escape(briefing.get("checkpoint_timing_line", "Unknown"))}</div>
+              <div class="meta-line"><strong>Escalation:</strong> {escape(briefing.get("escalation_line", "Unknown: No stronger follow-through escalation is currently surfaced."))}</div>
+              <div class="meta-line"><strong>What Would Count As Progress:</strong> {escape(briefing.get("checkpoint_line", "Use the next run or linked artifact to confirm whether the recommendation moved."))}</div>
+              <div class="meta-line"><strong>Linked Artifact:</strong> {escape(next_steps.get("linked_artifact", no_linked_artifact_summary()))}</div>
             </div>
             """
         )
@@ -955,7 +1063,7 @@ def _repo_drilldown_section(report_data: dict, diff_data: dict | None) -> str:
     <div class="section">
       <h2>Repo Drilldowns</h2>
       <div class="analyst-grid">
-        {''.join(cards) or "<div class='panel'>No repo drilldown content is recorded yet.</div>"}
+        {"".join(cards) or "<div class='panel'>No repo drilldown content is recorded yet.</div>"}
       </div>
     </div>"""
 
@@ -994,14 +1102,14 @@ def _run_changes_section(report_data: dict, diff_data: dict | None) -> str:
           <div class="meta-line"><strong>Summary:</strong> {escape(summary)}</div>
           <div class="meta-line"><strong>Why It Matters:</strong> {escape(weekly_reason)}</div>
           <div class="meta-line"><strong>What To Do Next:</strong> {escape(weekly_decision)}</div>
-          <div class="meta-line"><strong>Improving:</strong> {counts.get('score_improvements', 0)} | <strong>Regressing:</strong> {counts.get('score_regressions', 0)}</div>
-          <div class="meta-line"><strong>Promotions:</strong> {counts.get('tier_promotions', 0)} | <strong>Demotions:</strong> {counts.get('tier_demotions', 0)}</div>
-          <div class="meta-line"><strong>Security / Governance:</strong> {counts.get('security_changes', 0)} / {counts.get('collection_changes', 0)}</div>
+          <div class="meta-line"><strong>Improving:</strong> {counts.get("score_improvements", 0)} | <strong>Regressing:</strong> {counts.get("score_regressions", 0)}</div>
+          <div class="meta-line"><strong>Promotions:</strong> {counts.get("tier_promotions", 0)} | <strong>Demotions:</strong> {counts.get("tier_demotions", 0)}</div>
+          <div class="meta-line"><strong>Security / Governance:</strong> {counts.get("security_changes", 0)} / {counts.get("collection_changes", 0)}</div>
         </div>
         <div class="panel">
           <table class="compact-table">
             <thead><tr><th>Repo</th><th>Delta</th><th>Tier Change</th></tr></thead>
-            <tbody>{''.join(detail_rows) or f"<tr><td colspan='3'>{escape(no_baseline_summary())}</td></tr>"}</tbody>
+            <tbody>{"".join(detail_rows) or f"<tr><td colspan='3'>{escape(no_baseline_summary())}</td></tr>"}</tbody>
           </table>
         </div>
       </div>
@@ -1027,17 +1135,17 @@ def _compare_section(diff_data: dict | None) -> str:
       <h2>Compare</h2>
       <div class="analyst-grid">
         <div class="panel">
-          <div class="meta-line"><strong>Average score delta:</strong> {diff_data.get('average_score_delta', 0):+.3f}</div>
+          <div class="meta-line"><strong>Average score delta:</strong> {diff_data.get("average_score_delta", 0):+.3f}</div>
           <table class="compact-table">
             <thead><tr><th>Lens</th><th>Delta</th></tr></thead>
-            <tbody>{''.join(lens_rows) or "<tr><td colspan='2'>No lens changes</td></tr>"}</tbody>
+            <tbody>{"".join(lens_rows) or "<tr><td colspan='2'>No lens changes</td></tr>"}</tbody>
           </table>
         </div>
         <div class="panel">
           <h3>Top Movers</h3>
           <table class="compact-table">
             <thead><tr><th>Repo</th><th>Score Delta</th><th>Tier</th></tr></thead>
-            <tbody>{''.join(mover_rows) or "<tr><td colspan='3'>No significant changes</td></tr>"}</tbody>
+            <tbody>{"".join(mover_rows) or "<tr><td colspan='3'>No significant changes</td></tr>"}</tbody>
           </table>
         </div>
       </div>
@@ -1055,38 +1163,38 @@ def _campaign_section(report_data: dict) -> str:
         rows.append(
             f"<tr><td>{escape(item.get('repo', '—'))}</td>"
             f"<td>{escape(item.get('issue_title', '—') or '—')}</td>"
-            f"<td class=\"num\">{topic_count}</td>"
-            f"<td class=\"num\">{item.get('github_project_field_count', 0)}</td>"
-            f"<td class=\"num\">{item.get('notion_action_count', 0)}</td></tr>"
+            f'<td class="num">{topic_count}</td>'
+            f'<td class="num">{item.get("github_project_field_count", 0)}</td>'
+            f'<td class="num">{item.get("notion_action_count", 0)}</td></tr>'
         )
     return f"""
     <div class="section">
       <h2>Campaign</h2>
       <div class="analyst-grid">
         <div class="panel">
-          <div class="meta-line"><strong>Campaign:</strong> {escape(summary.get('label', summary.get('campaign_type', '—')))}</div>
-          <div class="meta-line"><strong>Actions:</strong> {summary.get('action_count', 0)}</div>
-          <div class="meta-line"><strong>Repos:</strong> {summary.get('repo_count', 0)}</div>
-          <div class="meta-line"><strong>Sync mode:</strong> {escape(report_data.get('writeback_preview', {}).get('sync_mode', 'reconcile'))}</div>
-          <div class="meta-line"><strong>Drift:</strong> {len(report_data.get('managed_state_drift', []) or [])}</div>
-          <div class="meta-line"><strong>Action Sync:</strong> {escape(report_data.get('next_action_sync_step', (report_data.get('operator_summary', {}).get('next_action_sync_step') or 'Stay local for now; no current campaign needs preview or apply.')))}</div>
-          <div class="meta-line"><strong>Apply Packet:</strong> {escape((report_data.get('apply_readiness_summary') or {}).get('summary', (report_data.get('operator_summary', {}).get('apply_readiness_summary', {}) or {}).get('summary', 'No current campaign has a safe execution handoff yet, so the local story should stay local for now.')))}</div>
-          <div class="meta-line"><strong>Command Hint:</strong> {escape((report_data.get('next_apply_candidate') or {}).get('apply_command') or (report_data.get('next_apply_candidate') or {}).get('preview_command') or ((report_data.get('operator_summary', {}).get('next_apply_candidate', {}) or {}).get('apply_command') or ((report_data.get('operator_summary', {}).get('next_apply_candidate', {}) or {}).get('preview_command') or 'No Action Sync command is recommended yet.')))}</div>
-          <div class="meta-line"><strong>Post-Apply Monitoring:</strong> {escape((report_data.get('campaign_outcomes_summary') or {}).get('summary', (report_data.get('operator_summary', {}).get('campaign_outcomes_summary', {}) or {}).get('summary', 'No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.')))}</div>
-          <div class="meta-line"><strong>Next Monitoring Step:</strong> {escape((report_data.get('next_monitoring_step') or {}).get('summary', (report_data.get('operator_summary', {}).get('next_monitoring_step', {}) or {}).get('summary', 'Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.')))}</div>
-          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['campaign_tuning']}:</strong> {escape((report_data.get('campaign_tuning_summary') or {}).get('summary', (report_data.get('operator_summary', {}).get('campaign_tuning_summary', {}) or {}).get('summary', 'Campaign tuning stays neutral until there is enough outcome history to bias tied recommendations.')))}</div>
-          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}:</strong> {escape((report_data.get('next_tuned_campaign') or {}).get('summary', (report_data.get('operator_summary', {}).get('next_tuned_campaign', {}) or {}).get('summary', 'No current campaign needs a tie-break candidate yet.')))}</div>
-          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}:</strong> {escape((report_data.get('automation_guidance_summary') or {}).get('summary', (report_data.get('operator_summary', {}).get('automation_guidance_summary', {}) or {}).get('summary', 'Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture.')))}</div>
-          <div class="meta-line"><strong>Next Safe Automation Step:</strong> {escape((report_data.get('next_safe_automation_step') or {}).get('summary', (report_data.get('operator_summary', {}).get('next_safe_automation_step', {}) or {}).get('summary', 'Stay local for now; no current campaign has a stronger safe automation posture than manual review.')))}</div>
-          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}:</strong> {escape((report_data.get('approval_workflow_summary') or {}).get('summary', (report_data.get('operator_summary', {}).get('approval_workflow_summary', {}) or {}).get('summary', 'No current approval needs review yet, so the approval workflow can stay local for now.')))}</div>
-          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS['next_approval_review']}:</strong> {escape((report_data.get('next_approval_review') or {}).get('summary', (report_data.get('operator_summary', {}).get('next_approval_review', {}) or {}).get('summary', 'Stay local for now; no current approval needs review.')))}</div>
-          <div class="meta-line"><strong>GitHub Projects:</strong> {escape(github_projects.get('status', 'disabled'))}
-            ({escape(github_projects.get('project_owner', '—'))} #{github_projects.get('project_number', 0)}, {github_projects.get('item_count', 0)} items)</div>
+          <div class="meta-line"><strong>Campaign:</strong> {escape(summary.get("label", summary.get("campaign_type", "—")))}</div>
+          <div class="meta-line"><strong>Actions:</strong> {summary.get("action_count", 0)}</div>
+          <div class="meta-line"><strong>Repos:</strong> {summary.get("repo_count", 0)}</div>
+          <div class="meta-line"><strong>Sync mode:</strong> {escape(report_data.get("writeback_preview", {}).get("sync_mode", "reconcile"))}</div>
+          <div class="meta-line"><strong>Drift:</strong> {len(report_data.get("managed_state_drift", []) or [])}</div>
+          <div class="meta-line"><strong>Action Sync:</strong> {escape(report_data.get("next_action_sync_step", (report_data.get("operator_summary", {}).get("next_action_sync_step") or "Stay local for now; no current campaign needs preview or apply.")))}</div>
+          <div class="meta-line"><strong>Apply Packet:</strong> {escape((report_data.get("apply_readiness_summary") or {}).get("summary", (report_data.get("operator_summary", {}).get("apply_readiness_summary", {}) or {}).get("summary", "No current campaign has a safe execution handoff yet, so the local story should stay local for now.")))}</div>
+          <div class="meta-line"><strong>Command Hint:</strong> {escape((report_data.get("next_apply_candidate") or {}).get("apply_command") or (report_data.get("next_apply_candidate") or {}).get("preview_command") or ((report_data.get("operator_summary", {}).get("next_apply_candidate", {}) or {}).get("apply_command") or ((report_data.get("operator_summary", {}).get("next_apply_candidate", {}) or {}).get("preview_command") or "No Action Sync command is recommended yet.")))}</div>
+          <div class="meta-line"><strong>Post-Apply Monitoring:</strong> {escape((report_data.get("campaign_outcomes_summary") or {}).get("summary", (report_data.get("operator_summary", {}).get("campaign_outcomes_summary", {}) or {}).get("summary", "No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.")))}</div>
+          <div class="meta-line"><strong>Next Monitoring Step:</strong> {escape((report_data.get("next_monitoring_step") or {}).get("summary", (report_data.get("operator_summary", {}).get("next_monitoring_step", {}) or {}).get("summary", "Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.")))}</div>
+          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS["campaign_tuning"]}:</strong> {escape((report_data.get("campaign_tuning_summary") or {}).get("summary", (report_data.get("operator_summary", {}).get("campaign_tuning_summary", {}) or {}).get("summary", "Campaign tuning stays neutral until there is enough outcome history to bias tied recommendations.")))}</div>
+          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS["next_tie_break_candidate"]}:</strong> {escape((report_data.get("next_tuned_campaign") or {}).get("summary", (report_data.get("operator_summary", {}).get("next_tuned_campaign", {}) or {}).get("summary", "No current campaign needs a tie-break candidate yet.")))}</div>
+          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS["automation_guidance"]}:</strong> {escape((report_data.get("automation_guidance_summary") or {}).get("summary", (report_data.get("operator_summary", {}).get("automation_guidance_summary", {}) or {}).get("summary", "Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture.")))}</div>
+          <div class="meta-line"><strong>Next Safe Automation Step:</strong> {escape((report_data.get("next_safe_automation_step") or {}).get("summary", (report_data.get("operator_summary", {}).get("next_safe_automation_step", {}) or {}).get("summary", "Stay local for now; no current campaign has a stronger safe automation posture than manual review.")))}</div>
+          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS["approval_workflow"]}:</strong> {escape((report_data.get("approval_workflow_summary") or {}).get("summary", (report_data.get("operator_summary", {}).get("approval_workflow_summary", {}) or {}).get("summary", "No current approval needs review yet, so the approval workflow can stay local for now.")))}</div>
+          <div class="meta-line"><strong>{ACTION_SYNC_CANONICAL_LABELS["next_approval_review"]}:</strong> {escape((report_data.get("next_approval_review") or {}).get("summary", (report_data.get("operator_summary", {}).get("next_approval_review", {}) or {}).get("summary", "Stay local for now; no current approval needs review.")))}</div>
+          <div class="meta-line"><strong>GitHub Projects:</strong> {escape(github_projects.get("status", "disabled"))}
+            ({escape(github_projects.get("project_owner", "—"))} #{github_projects.get("project_number", 0)}, {github_projects.get("item_count", 0)} items)</div>
         </div>
         <div class="panel">
           <table class="compact-table">
             <thead><tr><th>Repo</th><th>Managed Issue</th><th>Topics</th><th>Projects</th><th>Notion</th></tr></thead>
-            <tbody>{''.join(rows)}</tbody>
+            <tbody>{"".join(rows)}</tbody>
           </table>
         </div>
       </div>
@@ -1109,16 +1217,18 @@ def _writeback_results_section(report_data: dict) -> str:
         )
     drift_markup = ""
     if drift_rows:
-        drift_markup = f"<div class=\"meta-line\"><strong>Managed drift:</strong> {len(drift_rows)}</div>"
+        drift_markup = (
+            f'<div class="meta-line"><strong>Managed drift:</strong> {len(drift_rows)}</div>'
+        )
     return f"""
     <div class="section">
       <h2>Writeback Results</h2>
-      <div class="meta-line"><strong>Mode:</strong> {escape(writeback.get('mode', 'preview'))} |
-      <strong>Target:</strong> {escape(writeback.get('target', 'preview-only'))}</div>
+      <div class="meta-line"><strong>Mode:</strong> {escape(writeback.get("mode", "preview"))} |
+      <strong>Target:</strong> {escape(writeback.get("target", "preview-only"))}</div>
       {drift_markup}
       <table class="compact-table">
         <thead><tr><th>Repo</th><th>Target</th><th>Status</th><th>Details</th></tr></thead>
-        <tbody>{''.join(rows)}</tbody>
+        <tbody>{"".join(rows)}</tbody>
       </table>
     </div>"""
 
@@ -1140,14 +1250,14 @@ def _scenario_section(analyst_context: dict) -> str:
       <h2>Scenario Preview</h2>
       <div class="analyst-grid">
         <div class="panel">
-          <div class="meta-line"><strong>Projected average score delta:</strong> {projection.get('projected_average_score_delta', 0):+.3f}</div>
-          <div class="meta-line"><strong>Projected promotions:</strong> {projection.get('projected_tier_promotions', 0)}</div>
-          <div class="meta-line"><strong>Selected repos:</strong> {projection.get('selected_repo_count', 0)}</div>
+          <div class="meta-line"><strong>Projected average score delta:</strong> {projection.get("projected_average_score_delta", 0):+.3f}</div>
+          <div class="meta-line"><strong>Projected promotions:</strong> {projection.get("projected_tier_promotions", 0)}</div>
+          <div class="meta-line"><strong>Selected repos:</strong> {projection.get("selected_repo_count", 0)}</div>
         </div>
         <div class="panel">
           <table class="compact-table">
             <thead><tr><th>Lever</th><th>Lens</th><th>Repos</th><th>Avg Lift</th></tr></thead>
-            <tbody>{''.join(lever_rows) or "<tr><td colspan='4'>No scenario data</td></tr>"}</tbody>
+            <tbody>{"".join(lever_rows) or "<tr><td colspan='4'>No scenario data</td></tr>"}</tbody>
           </table>
         </div>
       </div>
@@ -1156,7 +1266,9 @@ def _scenario_section(analyst_context: dict) -> str:
 
 def _governance_section(report_data: dict) -> str:
     governance_summary = report_data.get("governance_summary", {}) or {}
-    preview = governance_summary.get("top_actions") or report_data.get("security_governance_preview", [])
+    preview = governance_summary.get("top_actions") or report_data.get(
+        "security_governance_preview", []
+    )
     governance_results = report_data.get("governance_results", {}).get("results", [])
     governance_drift = report_data.get("governance_drift", [])
     if not preview and not governance_results and not governance_drift:
@@ -1172,10 +1284,10 @@ def _governance_section(report_data: dict) -> str:
             f"<td>{escape(item.get('source', ''))}</td></tr>"
         )
     summary = (
-        f"<div class=\"meta-line\"><strong>Headline:</strong> {escape(governance_summary.get('headline', 'Governance state is being tracked.'))}</div>"
-        f"<div class=\"meta-line\"><strong>Status:</strong> {escape(governance_summary.get('status', 'preview'))}</div>"
-        f"<div class=\"meta-line\"><strong>Approved:</strong> {'yes' if report_data.get('governance_approval') else 'no'} | <strong>Needs Re-Approval:</strong> {'yes' if governance_summary.get('needs_reapproval') else 'no'}</div>"
-        f"<div class=\"meta-line\"><strong>Drift Count:</strong> {governance_summary.get('drift_count', len(governance_drift))} | <strong>Applied Results:</strong> {governance_summary.get('applied_count', len(governance_results))} | <strong>Rollback Available:</strong> {governance_summary.get('rollback_available_count', 0)}</div>"
+        f'<div class="meta-line"><strong>Headline:</strong> {escape(governance_summary.get("headline", "Governance state is being tracked."))}</div>'
+        f'<div class="meta-line"><strong>Status:</strong> {escape(governance_summary.get("status", "preview"))}</div>'
+        f'<div class="meta-line"><strong>Approved:</strong> {"yes" if report_data.get("governance_approval") else "no"} | <strong>Needs Re-Approval:</strong> {"yes" if governance_summary.get("needs_reapproval") else "no"}</div>'
+        f'<div class="meta-line"><strong>Drift Count:</strong> {governance_summary.get("drift_count", len(governance_drift))} | <strong>Applied Results:</strong> {governance_summary.get("applied_count", len(governance_results))} | <strong>Rollback Available:</strong> {governance_summary.get("rollback_available_count", 0)}</div>'
     )
     return f"""
     <div class="section">
@@ -1183,7 +1295,7 @@ def _governance_section(report_data: dict) -> str:
       {summary}
       <table class="compact-table">
         <thead><tr><th>Repo</th><th>State</th><th>Action</th><th>Expected Lift</th><th>Source</th></tr></thead>
-        <tbody>{''.join(rows)}</tbody>
+        <tbody>{"".join(rows)}</tbody>
       </table>
     </div>"""
 
@@ -1191,6 +1303,7 @@ def _governance_section(report_data: dict) -> str:
 # ── HTML section builders ─────────────────────────────────────────────
 def _tech_radar_section(data: dict, trend_data: list[dict] | None) -> str:
     from src.history import load_language_trends
+
     trends = load_language_trends()
 
     if not trends:
@@ -1219,7 +1332,7 @@ def _tech_radar_section(data: dict, trend_data: list[dict] | None) -> str:
       <h2>Tech Radar</h2>
       <table>
         <thead><tr><th>Language</th><th>Repos</th><th>Trend</th><th>Category</th></tr></thead>
-        <tbody>{''.join(rows)}</tbody>
+        <tbody>{"".join(rows)}</tbody>
       </table>
     </div>"""
 
@@ -1239,13 +1352,13 @@ def _distribution_section(data: dict) -> str:
             f'<span class="bar-label">{tier_name.capitalize()}</span>'
             f'<div class="bar-bg"><div class="bar-fill" style="width:{pct:.0f}%;background:{color}"></div></div>'
             f'<span class="bar-count">{count}</span>'
-            f'</div>'
+            f"</div>"
         )
 
     return f"""
     <div class="section">
       <h2>Tier Distribution</h2>
-      <div class="bar-chart">{''.join(tier_bars)}</div>
+      <div class="bar-chart">{"".join(tier_bars)}</div>
     </div>"""
 
 
@@ -1269,31 +1382,33 @@ def _portfolio_trends_section(trend_data: list[dict]) -> str:
 
     delta_html = (
         f'<p class="trends-delta">Score trend: '
-        f'<strong>{first_score:.3f}</strong> → <strong>{last_score:.3f}</strong> '
+        f"<strong>{first_score:.3f}</strong> → <strong>{last_score:.3f}</strong> "
         f'(<span style="color:{delta_color};font-weight:bold">{delta_sign}{delta:.3f}</span>)'
-        f'</p>'
+        f"</p>"
     )
 
     # Serialize trend points for the canvas script
-    trend_points = json.dumps([
-        {"date": t.get("date", ""), "score": round(t.get("average_score", 0), 4)}
-        for t in trend_data
-    ])
+    trend_points = json.dumps(
+        [
+            {"date": t.get("date", ""), "score": round(t.get("average_score", 0), 4)}
+            for t in trend_data
+        ]
+    )
 
     # Summary table rows
     rows = []
     for t in trend_data:
         dist = t.get("tier_distribution", {})
         rows.append(
-            f'<tr>'
-            f'<td>{escape(t.get("date", ""))}</td>'
+            f"<tr>"
+            f"<td>{escape(t.get('date', ''))}</td>"
             f'<td class="num">{t.get("average_score", 0):.3f}</td>'
             f'<td class="num">{t.get("repos_audited", 0)}</td>'
             f'<td class="num" style="color:#166534">{dist.get("shipped", 0)}</td>'
             f'<td class="num" style="color:#1565C0">{dist.get("functional", 0)}</td>'
             f'<td class="num" style="color:#D97706">{dist.get("wip", 0)}</td>'
             f'<td class="num" style="color:#C2410C">{dist.get("skeleton", 0)}</td>'
-            f'</tr>'
+            f"</tr>"
         )
 
     return f"""
@@ -1307,7 +1422,7 @@ def _portfolio_trends_section(trend_data: list[dict]) -> str:
             <th>Date</th><th>Avg Score</th><th>Repos Audited</th>
             <th>Shipped</th><th>Functional</th><th>WIP</th><th>Skeleton</th>
           </tr></thead>
-          <tbody>{''.join(rows)}</tbody>
+          <tbody>{"".join(rows)}</tbody>
         </table>
       </div>
     </div>

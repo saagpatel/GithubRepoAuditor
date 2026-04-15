@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import re
+from pathlib import Path
 from typing import Any
 
 from src.terminology import ACTION_SYNC_CANONICAL_LABELS
@@ -28,58 +30,96 @@ DIMENSION_LABELS = {
     "security": "Security",
 }
 
-NO_BASELINE_SUMMARY = (
-    "No prior baseline was available, so this view shows the current run summary and operator pressure without before/after deltas."
-)
-NO_HISTORY_SUMMARY = (
-    "No history is recorded yet, so this view is using the current run only."
-)
+NO_BASELINE_SUMMARY = "No prior baseline was available, so this view shows the current run summary and operator pressure without before/after deltas."
+NO_HISTORY_SUMMARY = "No history is recorded yet, so this view is using the current run only."
 NO_LINKED_ARTIFACT_SUMMARY = "No linked artifact available yet."
 NO_FOLLOW_THROUGH_SUMMARY = "No follow-through evidence is recorded yet."
-NO_FOLLOW_THROUGH_CHECKPOINT = "Use the next run or linked artifact to confirm whether the recommendation moved."
+NO_FOLLOW_THROUGH_CHECKPOINT = (
+    "Use the next run or linked artifact to confirm whether the recommendation moved."
+)
 NO_FOLLOW_THROUGH_ESCALATION = "No stronger follow-through escalation is currently surfaced."
-NO_FOLLOW_THROUGH_RECOVERY = "No follow-through recovery or escalation-retirement signal is currently surfaced."
-NO_FOLLOW_THROUGH_RECOVERY_PERSISTENCE = "No follow-through recovery persistence signal is currently surfaced."
+NO_FOLLOW_THROUGH_RECOVERY = (
+    "No follow-through recovery or escalation-retirement signal is currently surfaced."
+)
+NO_FOLLOW_THROUGH_RECOVERY_PERSISTENCE = (
+    "No follow-through recovery persistence signal is currently surfaced."
+)
 NO_FOLLOW_THROUGH_RELAPSE_CHURN = "No relapse churn is currently surfaced."
-NO_FOLLOW_THROUGH_RECOVERY_FRESHNESS = "No follow-through recovery freshness signal is currently surfaced."
-NO_FOLLOW_THROUGH_RECOVERY_DECAY = "No follow-through recovery freshness-decay signal is currently surfaced."
-NO_FOLLOW_THROUGH_RECOVERY_MEMORY_RESET = "No follow-through recovery memory reset signal is currently surfaced."
-NO_FOLLOW_THROUGH_RECOVERY_REBUILD_STRENGTH = "No follow-through recovery rebuild-strength signal is currently surfaced."
-NO_FOLLOW_THROUGH_RECOVERY_REACQUISITION = "No follow-through recovery reacquisition signal is currently surfaced."
-NO_FOLLOW_THROUGH_REACQUISITION_DURABILITY = "No follow-through reacquisition durability signal is currently surfaced."
-NO_FOLLOW_THROUGH_REACQUISITION_CONSOLIDATION = "No follow-through reacquisition confidence-consolidation signal is currently surfaced."
-NO_FOLLOW_THROUGH_REACQUISITION_SOFTENING_DECAY = "No reacquisition softening-decay signal is currently surfaced."
-NO_FOLLOW_THROUGH_REACQUISITION_CONFIDENCE_RETIREMENT = "No reacquisition confidence-retirement signal is currently surfaced."
-NO_FOLLOW_THROUGH_REACQUISITION_REVALIDATION_RECOVERY = "No post-revalidation recovery or confidence re-earning signal is currently surfaced."
+NO_FOLLOW_THROUGH_RECOVERY_FRESHNESS = (
+    "No follow-through recovery freshness signal is currently surfaced."
+)
+NO_FOLLOW_THROUGH_RECOVERY_DECAY = (
+    "No follow-through recovery freshness-decay signal is currently surfaced."
+)
+NO_FOLLOW_THROUGH_RECOVERY_MEMORY_RESET = (
+    "No follow-through recovery memory reset signal is currently surfaced."
+)
+NO_FOLLOW_THROUGH_RECOVERY_REBUILD_STRENGTH = (
+    "No follow-through recovery rebuild-strength signal is currently surfaced."
+)
+NO_FOLLOW_THROUGH_RECOVERY_REACQUISITION = (
+    "No follow-through recovery reacquisition signal is currently surfaced."
+)
+NO_FOLLOW_THROUGH_REACQUISITION_DURABILITY = (
+    "No follow-through reacquisition durability signal is currently surfaced."
+)
+NO_FOLLOW_THROUGH_REACQUISITION_CONSOLIDATION = (
+    "No follow-through reacquisition confidence-consolidation signal is currently surfaced."
+)
+NO_FOLLOW_THROUGH_REACQUISITION_SOFTENING_DECAY = (
+    "No reacquisition softening-decay signal is currently surfaced."
+)
+NO_FOLLOW_THROUGH_REACQUISITION_CONFIDENCE_RETIREMENT = (
+    "No reacquisition confidence-retirement signal is currently surfaced."
+)
+NO_FOLLOW_THROUGH_REACQUISITION_REVALIDATION_RECOVERY = (
+    "No post-revalidation recovery or confidence re-earning signal is currently surfaced."
+)
 NO_OPERATOR_FOCUS_SUMMARY = "No operator focus bucket is currently surfaced."
 NO_PORTFOLIO_CATALOG_SUMMARY = "No portfolio catalog contract is recorded yet."
 NO_OPERATING_PATHS_SUMMARY = "No normalized operating-path contract is recorded yet."
-NO_INTENT_ALIGNMENT_SUMMARY = "Intent alignment cannot be judged until a portfolio catalog contract exists."
+NO_INTENT_ALIGNMENT_SUMMARY = (
+    "Intent alignment cannot be judged until a portfolio catalog contract exists."
+)
 NO_SCORECARD_SUMMARY = "No maturity scorecard is recorded yet."
 NO_MATURITY_GAP_SUMMARY = "No maturity gap summary is recorded yet."
 NO_WHERE_TO_START_SUMMARY = "No meaningful implementation hotspot is currently surfaced."
 NO_OPERATOR_OUTCOMES_SUMMARY = "Not enough operator history is recorded yet to judge whether recent actions are improving portfolio outcomes."
-NO_OPERATOR_EFFECTIVENESS_SUMMARY = "Not enough judged recommendation history is recorded yet to judge operator effectiveness."
+NO_OPERATOR_EFFECTIVENESS_SUMMARY = (
+    "Not enough judged recommendation history is recorded yet to judge operator effectiveness."
+)
 NO_HIGH_PRESSURE_QUEUE_TREND = "High-pressure queue trend is not ready yet."
-NO_ACTION_SYNC_SUMMARY = "No current campaign needs Action Sync yet, so the safest next move is to keep the story local."
+NO_ACTION_SYNC_SUMMARY = (
+    "No current campaign needs Action Sync yet, so the safest next move is to keep the story local."
+)
 NO_ACTION_SYNC_STEP = "Stay local for now; no current campaign needs preview or apply."
 NO_ACTION_SYNC_LINE = "Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites."
 NO_APPLY_READINESS_SUMMARY = "No current campaign has a safe execution handoff yet, so the local story should stay local for now."
 NO_NEXT_APPLY_CANDIDATE = "Stay local for now; no current campaign has a safe execution handoff."
 NO_ACTION_SYNC_COMMAND_HINT = "No Action Sync command is recommended yet."
 NO_CAMPAIGN_OUTCOMES_SUMMARY = "No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local."
-NO_NEXT_MONITORING_STEP = "Stay local for now; no recent Action Sync apply needs post-apply follow-up yet."
-NO_POST_APPLY_MONITORING_LINE = "Post-Apply Monitoring: no recent Action Sync apply needs follow-up yet."
+NO_NEXT_MONITORING_STEP = (
+    "Stay local for now; no recent Action Sync apply needs post-apply follow-up yet."
+)
+NO_POST_APPLY_MONITORING_LINE = (
+    "Post-Apply Monitoring: no recent Action Sync apply needs follow-up yet."
+)
 NO_CAMPAIGN_TUNING_SUMMARY = "Campaign tuning stays neutral until there is enough outcome history to bias tied recommendations."
 NO_NEXT_TUNED_CAMPAIGN = "No current campaign needs a tie-break candidate yet."
-NO_CAMPAIGN_TUNING_LINE = "Campaign Tuning: recommendations stay neutral until more outcome history is available."
+NO_CAMPAIGN_TUNING_LINE = (
+    "Campaign Tuning: recommendations stay neutral until more outcome history is available."
+)
 NO_HISTORICAL_PORTFOLIO_INTELLIGENCE_SUMMARY = "Historical portfolio intelligence is still thin, so the weekly story should stay grounded in the current run and recent operator queue."
 NO_NEXT_HISTORICAL_FOCUS = "Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet."
 NO_HISTORICAL_INTELLIGENCE_LINE = "Historical Portfolio Intelligence: keep the weekly story anchored in the current run until more cross-run evidence accumulates."
 NO_AUTOMATION_GUIDANCE_SUMMARY = "Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture."
 NO_NEXT_SAFE_AUTOMATION_STEP = "Stay local for now; no current campaign has a stronger safe automation posture than manual review."
-NO_AUTOMATION_GUIDANCE_LINE = "Automation Guidance: keep the next step human-led until a bounded safe posture is surfaced."
-NO_APPROVAL_WORKFLOW_SUMMARY = "No current approval needs review yet, so the approval workflow can stay local for now."
+NO_AUTOMATION_GUIDANCE_LINE = (
+    "Automation Guidance: keep the next step human-led until a bounded safe posture is surfaced."
+)
+NO_APPROVAL_WORKFLOW_SUMMARY = (
+    "No current approval needs review yet, so the approval workflow can stay local for now."
+)
 NO_NEXT_APPROVAL_REVIEW = "Stay local for now; no current approval needs review."
 NO_APPROVAL_WORKFLOW_LINE = "Approval Workflow: no current approval needs review yet."
 
@@ -103,6 +143,8 @@ PRODUCT_MODE_LABELS = {
     "deep-dive": "Deep Dive",
     "action-sync": "Action Sync",
 }
+
+
 def _metadata(audit: Any) -> dict[str, Any]:
     metadata = getattr(audit, "metadata", None)
     if metadata is None:
@@ -110,6 +152,42 @@ def _metadata(audit: Any) -> dict[str, Any]:
     if hasattr(metadata, "to_dict"):
         return metadata.to_dict()
     return metadata
+
+
+def _extract_risk_posture(output_dir: Path | None) -> dict[str, Any]:
+    """Load portfolio-truth-latest.json and extract risk tier summary. Returns {} if unavailable."""
+    if not output_dir:
+        return {}
+    truth_path = output_dir / "portfolio-truth-latest.json"
+    if not truth_path.is_file():
+        return {}
+    try:
+        truth = json.loads(truth_path.read_text())
+    except Exception:
+        return {}
+    projects = truth.get("projects") or []
+    tier_counts: dict[str, int] = {}
+    top_elevated: list[dict[str, Any]] = []
+    for project in projects:
+        risk = project.get("risk") or {}
+        tier = str(risk.get("risk_tier") or "baseline")
+        tier_counts[tier] = tier_counts.get(tier, 0) + 1
+        if tier == "elevated":
+            identity = project.get("identity") or {}
+            top_elevated.append(
+                {
+                    "repo": str(identity.get("display_name") or ""),
+                    "risk_summary": str(risk.get("risk_summary") or ""),
+                }
+            )
+    return {
+        "elevated_count": tier_counts.get("elevated", 0),
+        "moderate_count": tier_counts.get("moderate", 0),
+        "baseline_count": tier_counts.get("baseline", 0),
+        "deferred_count": tier_counts.get("deferred", 0),
+        "tier_counts": tier_counts,
+        "top_elevated": top_elevated[:5],
+    }
 
 
 def _mapping(value: Any) -> dict[str, Any]:
@@ -202,7 +280,11 @@ def _product_mode_key(report_data: Any, diff_data: dict | None = None) -> str:
         return "action-sync"
     if len(audits) == 1 and not operator_summary.get("source_run_id"):
         return "deep-dive"
-    if diff_data is None and not data.get("diff_data") and not operator_summary.get("source_run_id"):
+    if (
+        diff_data is None
+        and not data.get("diff_data")
+        and not operator_summary.get("source_run_id")
+    ):
         return "first-run"
     return "weekly-review"
 
@@ -326,8 +408,14 @@ def _repo_last_movement(repo_name: str, report_data: Any, diff_data: dict | None
     change = _repo_change(repo_name, diff_data)
     if change:
         delta = change.get("delta")
-        if delta is None and change.get("new_score") is not None and change.get("old_score") is not None:
-            delta = float(change.get("new_score", 0.0) or 0.0) - float(change.get("old_score", 0.0) or 0.0)
+        if (
+            delta is None
+            and change.get("new_score") is not None
+            and change.get("old_score") is not None
+        ):
+            delta = float(change.get("new_score", 0.0) or 0.0) - float(
+                change.get("old_score", 0.0) or 0.0
+            )
         if delta is not None:
             delta_value = round(float(delta or 0.0), 3)
             if abs(delta_value) < 0.005:
@@ -354,16 +442,34 @@ def _repo_last_movement(repo_name: str, report_data: Any, diff_data: dict | None
     return no_history_summary()
 
 
-def _repo_change_summary(repo_name: str, audit: Any, report_data: Any, diff_data: dict | None) -> str:
+def _repo_change_summary(
+    repo_name: str, audit: Any, report_data: Any, diff_data: dict | None
+) -> str:
     change = _repo_change(repo_name, diff_data)
     if change:
         delta = change.get("delta")
-        if delta is None and change.get("new_score") is not None and change.get("old_score") is not None:
-            delta = float(change.get("new_score", 0.0) or 0.0) - float(change.get("old_score", 0.0) or 0.0)
+        if (
+            delta is None
+            and change.get("new_score") is not None
+            and change.get("old_score") is not None
+        ):
+            delta = float(change.get("new_score", 0.0) or 0.0) - float(
+                change.get("old_score", 0.0) or 0.0
+            )
         if delta is not None:
             delta_value = round(float(delta or 0.0), 3)
-            direction = "improved" if delta_value > 0.005 else "regressed" if delta_value < -0.005 else "held flat"
-            summary = f"Score {direction} {abs(delta_value):.3f} since the last run." if direction != "held flat" else "Score held flat since the last run."
+            direction = (
+                "improved"
+                if delta_value > 0.005
+                else "regressed"
+                if delta_value < -0.005
+                else "held flat"
+            )
+            summary = (
+                f"Score {direction} {abs(delta_value):.3f} since the last run."
+                if direction != "held flat"
+                else "Score held flat since the last run."
+            )
             old_tier = change.get("old_tier")
             new_tier = change.get("new_tier")
             if old_tier and new_tier and old_tier != new_tier:
@@ -378,7 +484,11 @@ def _repo_change_summary(repo_name: str, audit: Any, report_data: Any, diff_data
 
     hotspots = _hotspots(audit)
     if hotspots:
-        return str(hotspots[0].get("summary") or hotspots[0].get("title") or "Current-run hotspot pressure is present.")
+        return str(
+            hotspots[0].get("summary")
+            or hotspots[0].get("title")
+            or "Current-run hotspot pressure is present."
+        )
 
     return no_baseline_summary()
 
@@ -467,7 +577,9 @@ def _top_dimension_labels(scores: dict[str, float], *, reverse: bool) -> list[st
     for dimension, score in ordered:
         if dimension == "interest":
             continue
-        labels.append(f"{DIMENSION_LABELS.get(dimension, dimension.replace('_', ' ').title())} ({score:.2f})")
+        labels.append(
+            f"{DIMENSION_LABELS.get(dimension, dimension.replace('_', ' ').title())} ({score:.2f})"
+        )
         if len(labels) == 3:
             break
     return labels
@@ -491,10 +603,11 @@ def build_score_explanation(audit: Any) -> dict[str, Any]:
         "top_positive_drivers": _top_dimension_labels(scores, reverse=True),
         "top_negative_drivers": _top_dimension_labels(scores, reverse=False),
         "next_tier_gap_summary": _next_tier_gap_summary(_overall_score(audit)),
-        "next_best_action": best_action.get("title") or best_action.get("action") or "Review the current hotspot and pick the next best repo action.",
-        "next_best_action_rationale": best_action.get("rationale") or (
-            hotspots[0].get("summary") if hotspots else "No dominant rationale is recorded yet."
-        ),
+        "next_best_action": best_action.get("title")
+        or best_action.get("action")
+        or "Review the current hotspot and pick the next best repo action.",
+        "next_best_action_rationale": best_action.get("rationale")
+        or (hotspots[0].get("summary") if hotspots else "No dominant rationale is recorded yet."),
     }
 
 
@@ -505,17 +618,41 @@ def build_repo_briefing(
 ) -> dict[str, Any]:
     metadata = _metadata(audit)
     repo_name = _repo_name(audit)
-    explanation = _mapping((_mapping(audit).get("score_explanation") if isinstance(audit, dict) else getattr(audit, "score_explanation", None)))
+    explanation = _mapping(
+        (
+            _mapping(audit).get("score_explanation")
+            if isinstance(audit, dict)
+            else getattr(audit, "score_explanation", None)
+        )
+    )
     if not explanation:
         explanation = _mapping(build_score_explanation(audit))
     current_state = {
         "score": round(_overall_score(audit), 3),
-        "grade": _mapping(audit).get("grade") if isinstance(audit, dict) else getattr(audit, "grade", ""),
-        "tier": _mapping(audit).get("completeness_tier") if isinstance(audit, dict) else getattr(audit, "completeness_tier", ""),
+        "grade": _mapping(audit).get("grade")
+        if isinstance(audit, dict)
+        else getattr(audit, "grade", ""),
+        "tier": _mapping(audit).get("completeness_tier")
+        if isinstance(audit, dict)
+        else getattr(audit, "completeness_tier", ""),
         "language": metadata.get("language") or "Unknown",
         "trend": _repo_trend_label(repo_name, audit, report_data),
-        "badges": _string_list(list(_mapping(audit).get("badges", []) if isinstance(audit, dict) else getattr(audit, "badges", []) or []), fallback="None"),
-        "flags": _string_list(list(_mapping(audit).get("flags", []) if isinstance(audit, dict) else getattr(audit, "flags", []) or []), fallback="None"),
+        "badges": _string_list(
+            list(
+                _mapping(audit).get("badges", [])
+                if isinstance(audit, dict)
+                else getattr(audit, "badges", []) or []
+            ),
+            fallback="None",
+        ),
+        "flags": _string_list(
+            list(
+                _mapping(audit).get("flags", [])
+                if isinstance(audit, dict)
+                else getattr(audit, "flags", []) or []
+            ),
+            fallback="None",
+        ),
         "url": metadata.get("html_url", ""),
         "description": metadata.get("description") or "No description recorded yet.",
     }
@@ -525,8 +662,13 @@ def build_repo_briefing(
     last_movement = _repo_last_movement(repo_name, report_data, diff_data)
     recent_change_summary = _repo_change_summary(repo_name, audit, report_data, diff_data)
     hotspot_context = _repo_hotspot_context(audit)
-    next_best_action = explanation.get("next_best_action") or "Review the current hotspot and pick the next best repo action."
-    next_best_action_rationale = explanation.get("next_best_action_rationale") or "No action rationale is recorded yet."
+    next_best_action = (
+        explanation.get("next_best_action")
+        or "Review the current hotspot and pick the next best repo action."
+    )
+    next_best_action_rationale = (
+        explanation.get("next_best_action_rationale") or "No action rationale is recorded yet."
+    )
     top_action_candidates = _repo_action_candidates(audit)
     queue_item = _repo_queue_item(repo_name, report_data)
     review_target = _repo_review_target(repo_name, report_data)
@@ -540,30 +682,74 @@ def build_repo_briefing(
     follow_through_escalation_summary = build_follow_through_escalation_summary(handoff_source)
     follow_through_recovery = build_follow_through_recovery_status_label(handoff_source)
     follow_through_recovery_summary = build_follow_through_recovery_summary(handoff_source)
-    follow_through_recovery_persistence = build_follow_through_recovery_persistence_status_label(handoff_source)
-    follow_through_recovery_persistence_summary = build_follow_through_recovery_persistence_summary(handoff_source)
+    follow_through_recovery_persistence = build_follow_through_recovery_persistence_status_label(
+        handoff_source
+    )
+    follow_through_recovery_persistence_summary = build_follow_through_recovery_persistence_summary(
+        handoff_source
+    )
     follow_through_relapse_churn = build_follow_through_relapse_churn_status_label(handoff_source)
-    follow_through_relapse_churn_summary = build_follow_through_relapse_churn_summary(handoff_source)
-    follow_through_recovery_freshness = build_follow_through_recovery_freshness_status_label(handoff_source)
-    follow_through_recovery_freshness_summary = build_follow_through_recovery_freshness_summary(handoff_source)
+    follow_through_relapse_churn_summary = build_follow_through_relapse_churn_summary(
+        handoff_source
+    )
+    follow_through_recovery_freshness = build_follow_through_recovery_freshness_status_label(
+        handoff_source
+    )
+    follow_through_recovery_freshness_summary = build_follow_through_recovery_freshness_summary(
+        handoff_source
+    )
     follow_through_recovery_decay = build_follow_through_recovery_decay_status_label(handoff_source)
-    follow_through_recovery_decay_summary = build_follow_through_recovery_decay_summary(handoff_source)
-    follow_through_recovery_memory_reset = build_follow_through_recovery_memory_reset_status_label(handoff_source)
-    follow_through_recovery_memory_reset_summary = build_follow_through_recovery_memory_reset_summary(handoff_source)
-    follow_through_recovery_rebuild_strength = build_follow_through_recovery_rebuild_strength_status_label(handoff_source)
-    follow_through_recovery_rebuild_strength_summary = build_follow_through_recovery_rebuild_strength_summary(handoff_source)
-    follow_through_recovery_reacquisition = build_follow_through_recovery_reacquisition_status_label(handoff_source)
-    follow_through_recovery_reacquisition_summary = build_follow_through_recovery_reacquisition_summary(handoff_source)
-    follow_through_reacquisition_durability = build_follow_through_reacquisition_durability_status_label(handoff_source)
-    follow_through_reacquisition_durability_summary = build_follow_through_reacquisition_durability_summary(handoff_source)
-    follow_through_reacquisition_consolidation = build_follow_through_reacquisition_consolidation_status_label(handoff_source)
-    follow_through_reacquisition_consolidation_summary = build_follow_through_reacquisition_consolidation_summary(handoff_source)
-    follow_through_reacquisition_softening_decay = build_follow_through_reacquisition_softening_decay_status_label(handoff_source)
-    follow_through_reacquisition_softening_decay_summary = build_follow_through_reacquisition_softening_decay_summary(handoff_source)
-    follow_through_reacquisition_confidence_retirement = build_follow_through_reacquisition_confidence_retirement_status_label(handoff_source)
-    follow_through_reacquisition_confidence_retirement_summary = build_follow_through_reacquisition_confidence_retirement_summary(handoff_source)
-    follow_through_reacquisition_revalidation_recovery = build_follow_through_reacquisition_revalidation_recovery_status_label(handoff_source)
-    follow_through_reacquisition_revalidation_recovery_summary = build_follow_through_reacquisition_revalidation_recovery_summary(handoff_source)
+    follow_through_recovery_decay_summary = build_follow_through_recovery_decay_summary(
+        handoff_source
+    )
+    follow_through_recovery_memory_reset = build_follow_through_recovery_memory_reset_status_label(
+        handoff_source
+    )
+    follow_through_recovery_memory_reset_summary = (
+        build_follow_through_recovery_memory_reset_summary(handoff_source)
+    )
+    follow_through_recovery_rebuild_strength = (
+        build_follow_through_recovery_rebuild_strength_status_label(handoff_source)
+    )
+    follow_through_recovery_rebuild_strength_summary = (
+        build_follow_through_recovery_rebuild_strength_summary(handoff_source)
+    )
+    follow_through_recovery_reacquisition = (
+        build_follow_through_recovery_reacquisition_status_label(handoff_source)
+    )
+    follow_through_recovery_reacquisition_summary = (
+        build_follow_through_recovery_reacquisition_summary(handoff_source)
+    )
+    follow_through_reacquisition_durability = (
+        build_follow_through_reacquisition_durability_status_label(handoff_source)
+    )
+    follow_through_reacquisition_durability_summary = (
+        build_follow_through_reacquisition_durability_summary(handoff_source)
+    )
+    follow_through_reacquisition_consolidation = (
+        build_follow_through_reacquisition_consolidation_status_label(handoff_source)
+    )
+    follow_through_reacquisition_consolidation_summary = (
+        build_follow_through_reacquisition_consolidation_summary(handoff_source)
+    )
+    follow_through_reacquisition_softening_decay = (
+        build_follow_through_reacquisition_softening_decay_status_label(handoff_source)
+    )
+    follow_through_reacquisition_softening_decay_summary = (
+        build_follow_through_reacquisition_softening_decay_summary(handoff_source)
+    )
+    follow_through_reacquisition_confidence_retirement = (
+        build_follow_through_reacquisition_confidence_retirement_status_label(handoff_source)
+    )
+    follow_through_reacquisition_confidence_retirement_summary = (
+        build_follow_through_reacquisition_confidence_retirement_summary(handoff_source)
+    )
+    follow_through_reacquisition_revalidation_recovery = (
+        build_follow_through_reacquisition_revalidation_recovery_status_label(handoff_source)
+    )
+    follow_through_reacquisition_revalidation_recovery_summary = (
+        build_follow_through_reacquisition_revalidation_recovery_summary(handoff_source)
+    )
     operator_focus = build_operator_focus(handoff_source)
     operator_focus_summary = build_operator_focus_summary(handoff_source)
     operator_focus_line = build_operator_focus_line(handoff_source)
@@ -594,8 +780,12 @@ def build_repo_briefing(
             f"{current_state['tier'] or 'unrated'} tier, {current_state['language']}, trend: {current_state['trend']}"
         ),
         "why_this_repo_looks_this_way": {
-            "strongest_drivers": _string_list(list(strongest_drivers), fallback="No strong positive drivers recorded yet."),
-            "biggest_drags": _string_list(list(biggest_drags), fallback="No major drag factors recorded yet."),
+            "strongest_drivers": _string_list(
+                list(strongest_drivers), fallback="No strong positive drivers recorded yet."
+            ),
+            "biggest_drags": _string_list(
+                list(biggest_drags), fallback="No major drag factors recorded yet."
+            ),
             "next_tier_gap": str(next_tier_gap),
         },
         "why_it_matters_line": (
@@ -695,21 +885,45 @@ def build_repo_briefing(
         "maturity_gap_summary": maturity_gap_summary,
         "maturity_gap_line": f"Maturity Gap: {maturity_gap_summary}",
         "action_sync_stage": str(handoff_source.get("action_sync_stage") or "idle"),
-        "action_sync_reason": str(handoff_source.get("action_sync_reason") or "No current Action Sync guidance is surfaced for this repo."),
+        "action_sync_reason": str(
+            handoff_source.get("action_sync_reason")
+            or "No current Action Sync guidance is surfaced for this repo."
+        ),
         "suggested_campaign": str(handoff_source.get("suggested_campaign") or ""),
-        "suggested_writeback_target": str(handoff_source.get("suggested_writeback_target") or "none"),
+        "suggested_writeback_target": str(
+            handoff_source.get("suggested_writeback_target") or "none"
+        ),
         "apply_packet_state": str(handoff_source.get("apply_packet_state") or "stay-local"),
-        "apply_packet_summary": str(handoff_source.get("apply_packet_summary") or "No current apply packet is surfaced for this repo."),
+        "apply_packet_summary": str(
+            handoff_source.get("apply_packet_summary")
+            or "No current apply packet is surfaced for this repo."
+        ),
         "apply_packet_command": str(handoff_source.get("apply_packet_command") or ""),
         "post_apply_state": str(handoff_source.get("post_apply_state") or "no-recent-apply"),
-        "post_apply_summary": str(handoff_source.get("post_apply_summary") or "No post-apply monitoring is surfaced for this repo yet."),
-        "campaign_tuning_status": str(handoff_source.get("campaign_tuning_status") or "insufficient-evidence"),
-        "campaign_tuning_summary": str(handoff_source.get("campaign_tuning_summary") or "No campaign tuning evidence is surfaced for this repo yet."),
+        "post_apply_summary": str(
+            handoff_source.get("post_apply_summary")
+            or "No post-apply monitoring is surfaced for this repo yet."
+        ),
+        "campaign_tuning_status": str(
+            handoff_source.get("campaign_tuning_status") or "insufficient-evidence"
+        ),
+        "campaign_tuning_summary": str(
+            handoff_source.get("campaign_tuning_summary")
+            or "No campaign tuning evidence is surfaced for this repo yet."
+        ),
         "automation_posture": str(handoff_source.get("automation_posture") or "manual-only"),
-        "automation_summary": str(handoff_source.get("automation_summary") or "No automation guidance is surfaced for this repo yet."),
+        "automation_summary": str(
+            handoff_source.get("automation_summary")
+            or "No automation guidance is surfaced for this repo yet."
+        ),
         "automation_command": str(handoff_source.get("automation_command") or ""),
-        "historical_intelligence_status": str(handoff_source.get("historical_intelligence_status") or "insufficient-evidence"),
-        "historical_intelligence_summary": str(handoff_source.get("historical_intelligence_summary") or "No historical intelligence evidence is surfaced for this repo yet."),
+        "historical_intelligence_status": str(
+            handoff_source.get("historical_intelligence_status") or "insufficient-evidence"
+        ),
+        "historical_intelligence_summary": str(
+            handoff_source.get("historical_intelligence_summary")
+            or "No historical intelligence evidence is surfaced for this repo yet."
+        ),
         "resurfacing_reason_line": follow_through_resurfacing_reason,
     }
 
@@ -718,6 +932,7 @@ def build_weekly_review_pack(
     report_data: Any,
     diff_data: dict | None = None,
     *,
+    output_dir: Path | None = None,
     repo_limit: int = 3,
     attention_limit: int = 5,
 ) -> dict[str, Any]:
@@ -769,7 +984,9 @@ def build_weekly_review_pack(
         "suggested_reading_order": suggested_reading_order,
         "next_best_workflow_step": next_best_workflow_step,
         "portfolio_headline": str(portfolio_headline),
-        "run_change_summary": build_run_change_summary(diff_data if diff_data is not None else data.get("diff_data")),
+        "run_change_summary": build_run_change_summary(
+            diff_data if diff_data is not None else data.get("diff_data")
+        ),
         "queue_pressure_summary": build_queue_pressure_summary(data, diff_data),
         "trust_actionability_summary": build_trust_actionability_summary(data),
         "top_recommendation_summary": top_recommendation,
@@ -826,63 +1043,108 @@ def build_weekly_review_pack(
             or build_next_safe_automation_step_line(data) != NO_NEXT_SAFE_AUTOMATION_STEP
             else NO_AUTOMATION_GUIDANCE_LINE
         ),
-        "top_ready_for_review_approvals": list(operator_summary.get("top_ready_for_review_approvals") or []),
-        "top_needs_reapproval_approvals": list(operator_summary.get("top_needs_reapproval_approvals") or []),
-        "top_overdue_approval_followups": list(operator_summary.get("top_overdue_approval_followups") or []),
-        "top_due_soon_approval_followups": list(operator_summary.get("top_due_soon_approval_followups") or []),
-        "top_approved_manual_approvals": list(operator_summary.get("top_approved_manual_approvals") or []),
+        "top_ready_for_review_approvals": list(
+            operator_summary.get("top_ready_for_review_approvals") or []
+        ),
+        "top_needs_reapproval_approvals": list(
+            operator_summary.get("top_needs_reapproval_approvals") or []
+        ),
+        "top_overdue_approval_followups": list(
+            operator_summary.get("top_overdue_approval_followups") or []
+        ),
+        "top_due_soon_approval_followups": list(
+            operator_summary.get("top_due_soon_approval_followups") or []
+        ),
+        "top_approved_manual_approvals": list(
+            operator_summary.get("top_approved_manual_approvals") or []
+        ),
         "top_blocked_approvals": list(operator_summary.get("top_blocked_approvals") or []),
         "top_apply_ready_campaigns": list(operator_summary.get("top_apply_ready_campaigns") or []),
-        "top_preview_ready_campaigns": list(operator_summary.get("top_preview_ready_campaigns") or []),
-        "top_drift_review_campaigns": list(operator_summary.get("top_drift_review_campaigns") or []),
+        "top_preview_ready_campaigns": list(
+            operator_summary.get("top_preview_ready_campaigns") or []
+        ),
+        "top_drift_review_campaigns": list(
+            operator_summary.get("top_drift_review_campaigns") or []
+        ),
         "top_blocked_campaigns": list(operator_summary.get("top_blocked_campaigns") or []),
-        "top_ready_to_apply_packets": list(operator_summary.get("top_ready_to_apply_packets") or []),
-        "top_needs_approval_packets": list(operator_summary.get("top_needs_approval_packets") or []),
+        "top_ready_to_apply_packets": list(
+            operator_summary.get("top_ready_to_apply_packets") or []
+        ),
+        "top_needs_approval_packets": list(
+            operator_summary.get("top_needs_approval_packets") or []
+        ),
         "top_review_drift_packets": list(operator_summary.get("top_review_drift_packets") or []),
         "top_monitor_now_campaigns": list(operator_summary.get("top_monitor_now_campaigns") or []),
-        "top_holding_clean_campaigns": list(operator_summary.get("top_holding_clean_campaigns") or []),
+        "top_holding_clean_campaigns": list(
+            operator_summary.get("top_holding_clean_campaigns") or []
+        ),
         "top_reopened_campaigns": list(operator_summary.get("top_reopened_campaigns") or []),
-        "top_drift_returned_campaigns": list(operator_summary.get("top_drift_returned_campaigns") or []),
+        "top_drift_returned_campaigns": list(
+            operator_summary.get("top_drift_returned_campaigns") or []
+        ),
         "top_proven_campaigns": list(operator_summary.get("top_proven_campaigns") or []),
         "top_caution_campaigns": list(operator_summary.get("top_caution_campaigns") or []),
-        "top_thin_evidence_campaigns": list(operator_summary.get("top_thin_evidence_campaigns") or []),
+        "top_thin_evidence_campaigns": list(
+            operator_summary.get("top_thin_evidence_campaigns") or []
+        ),
         "top_relapsing_repos": list(operator_summary.get("top_relapsing_repos") or []),
-        "top_persistent_pressure_repos": list(operator_summary.get("top_persistent_pressure_repos") or []),
+        "top_persistent_pressure_repos": list(
+            operator_summary.get("top_persistent_pressure_repos") or []
+        ),
         "top_improving_repos": list(operator_summary.get("top_improving_repos") or []),
         "top_holding_repos": list(operator_summary.get("top_holding_repos") or []),
-        "top_preview_safe_campaigns": list(operator_summary.get("top_preview_safe_campaigns") or []),
-        "top_apply_manual_campaigns": list(operator_summary.get("top_apply_manual_campaigns") or []),
-        "top_approval_first_campaigns": list(operator_summary.get("top_approval_first_campaigns") or []),
-        "top_follow_up_safe_campaigns": list(operator_summary.get("top_follow_up_safe_campaigns") or []),
+        "top_preview_safe_campaigns": list(
+            operator_summary.get("top_preview_safe_campaigns") or []
+        ),
+        "top_apply_manual_campaigns": list(
+            operator_summary.get("top_apply_manual_campaigns") or []
+        ),
+        "top_approval_first_campaigns": list(
+            operator_summary.get("top_approval_first_campaigns") or []
+        ),
+        "top_follow_up_safe_campaigns": list(
+            operator_summary.get("top_follow_up_safe_campaigns") or []
+        ),
         "top_manual_only_campaigns": list(operator_summary.get("top_manual_only_campaigns") or []),
         "top_attention": top_attention,
         "repo_briefings": repo_briefings,
-        "top_below_target_scorecard_items": list(_mapping(data).get("scorecards_summary", {}).get("top_below_target_repos") or []),
+        "top_below_target_scorecard_items": list(
+            _mapping(data).get("scorecards_summary", {}).get("top_below_target_repos") or []
+        ),
         "what_to_do_this_week": what_to_do_this_week,
-        "follow_through_summary": str(operator_summary.get("follow_through_summary") or NO_FOLLOW_THROUGH_SUMMARY),
+        "follow_through_summary": str(
+            operator_summary.get("follow_through_summary") or NO_FOLLOW_THROUGH_SUMMARY
+        ),
         "follow_through_checkpoint_summary": str(
-            operator_summary.get("follow_through_checkpoint_summary") or NO_FOLLOW_THROUGH_CHECKPOINT
+            operator_summary.get("follow_through_checkpoint_summary")
+            or NO_FOLLOW_THROUGH_CHECKPOINT
         ),
         "follow_through_escalation_summary": str(
-            operator_summary.get("follow_through_escalation_summary") or NO_FOLLOW_THROUGH_ESCALATION
+            operator_summary.get("follow_through_escalation_summary")
+            or NO_FOLLOW_THROUGH_ESCALATION
         ),
         "follow_through_recovery_summary": str(
             operator_summary.get("follow_through_recovery_summary") or NO_FOLLOW_THROUGH_RECOVERY
         ),
         "follow_through_recovery_persistence_summary": str(
-            operator_summary.get("follow_through_recovery_persistence_summary") or NO_FOLLOW_THROUGH_RECOVERY_PERSISTENCE
+            operator_summary.get("follow_through_recovery_persistence_summary")
+            or NO_FOLLOW_THROUGH_RECOVERY_PERSISTENCE
         ),
         "follow_through_relapse_churn_summary": str(
-            operator_summary.get("follow_through_relapse_churn_summary") or NO_FOLLOW_THROUGH_RELAPSE_CHURN
+            operator_summary.get("follow_through_relapse_churn_summary")
+            or NO_FOLLOW_THROUGH_RELAPSE_CHURN
         ),
         "follow_through_recovery_freshness_summary": str(
-            operator_summary.get("follow_through_recovery_freshness_summary") or NO_FOLLOW_THROUGH_RECOVERY_FRESHNESS
+            operator_summary.get("follow_through_recovery_freshness_summary")
+            or NO_FOLLOW_THROUGH_RECOVERY_FRESHNESS
         ),
         "follow_through_recovery_decay_summary": str(
-            operator_summary.get("follow_through_recovery_decay_summary") or NO_FOLLOW_THROUGH_RECOVERY_DECAY
+            operator_summary.get("follow_through_recovery_decay_summary")
+            or NO_FOLLOW_THROUGH_RECOVERY_DECAY
         ),
         "follow_through_recovery_memory_reset_summary": str(
-            operator_summary.get("follow_through_recovery_memory_reset_summary") or NO_FOLLOW_THROUGH_RECOVERY_MEMORY_RESET
+            operator_summary.get("follow_through_recovery_memory_reset_summary")
+            or NO_FOLLOW_THROUGH_RECOVERY_MEMORY_RESET
         ),
         "follow_through_recovery_rebuild_strength_summary": str(
             operator_summary.get("follow_through_recovery_rebuild_strength_summary")
@@ -913,44 +1175,98 @@ def build_weekly_review_pack(
             or NO_FOLLOW_THROUGH_REACQUISITION_REVALIDATION_RECOVERY
         ),
         "top_unattempted_items": list(operator_summary.get("top_unattempted_items") or []),
-        "top_stale_follow_through_items": list(operator_summary.get("top_stale_follow_through_items") or []),
-        "top_overdue_follow_through_items": list(operator_summary.get("top_overdue_follow_through_items") or []),
+        "top_stale_follow_through_items": list(
+            operator_summary.get("top_stale_follow_through_items") or []
+        ),
+        "top_overdue_follow_through_items": list(
+            operator_summary.get("top_overdue_follow_through_items") or []
+        ),
         "top_escalation_items": list(operator_summary.get("top_escalation_items") or []),
-        "top_recovering_follow_through_items": list(operator_summary.get("top_recovering_follow_through_items") or []),
-        "top_retiring_follow_through_items": list(operator_summary.get("top_retiring_follow_through_items") or []),
-        "top_relapsing_follow_through_items": list(operator_summary.get("top_relapsing_follow_through_items") or []),
-        "top_fragile_recovery_items": list(operator_summary.get("top_fragile_recovery_items") or []),
-        "top_sustained_recovery_items": list(operator_summary.get("top_sustained_recovery_items") or []),
-        "top_churn_follow_through_items": list(operator_summary.get("top_churn_follow_through_items") or []),
+        "top_recovering_follow_through_items": list(
+            operator_summary.get("top_recovering_follow_through_items") or []
+        ),
+        "top_retiring_follow_through_items": list(
+            operator_summary.get("top_retiring_follow_through_items") or []
+        ),
+        "top_relapsing_follow_through_items": list(
+            operator_summary.get("top_relapsing_follow_through_items") or []
+        ),
+        "top_fragile_recovery_items": list(
+            operator_summary.get("top_fragile_recovery_items") or []
+        ),
+        "top_sustained_recovery_items": list(
+            operator_summary.get("top_sustained_recovery_items") or []
+        ),
+        "top_churn_follow_through_items": list(
+            operator_summary.get("top_churn_follow_through_items") or []
+        ),
         "top_fresh_recovery_items": list(operator_summary.get("top_fresh_recovery_items") or []),
         "top_stale_recovery_items": list(operator_summary.get("top_stale_recovery_items") or []),
-        "top_softening_recovery_items": list(operator_summary.get("top_softening_recovery_items") or []),
+        "top_softening_recovery_items": list(
+            operator_summary.get("top_softening_recovery_items") or []
+        ),
         "top_reset_recovery_items": list(operator_summary.get("top_reset_recovery_items") or []),
-        "top_rebuilding_recovery_items": list(operator_summary.get("top_rebuilding_recovery_items") or []),
-        "top_rebuilding_recovery_strength_items": list(operator_summary.get("top_rebuilding_recovery_strength_items") or []),
-        "top_reacquiring_recovery_items": list(operator_summary.get("top_reacquiring_recovery_items") or []),
-        "top_reacquired_recovery_items": list(operator_summary.get("top_reacquired_recovery_items") or []),
-        "top_fragile_reacquisition_items": list(operator_summary.get("top_fragile_reacquisition_items") or []),
+        "top_rebuilding_recovery_items": list(
+            operator_summary.get("top_rebuilding_recovery_items") or []
+        ),
+        "top_rebuilding_recovery_strength_items": list(
+            operator_summary.get("top_rebuilding_recovery_strength_items") or []
+        ),
+        "top_reacquiring_recovery_items": list(
+            operator_summary.get("top_reacquiring_recovery_items") or []
+        ),
+        "top_reacquired_recovery_items": list(
+            operator_summary.get("top_reacquired_recovery_items") or []
+        ),
+        "top_fragile_reacquisition_items": list(
+            operator_summary.get("top_fragile_reacquisition_items") or []
+        ),
         "top_just_reacquired_items": list(operator_summary.get("top_just_reacquired_items") or []),
-        "top_holding_reacquired_items": list(operator_summary.get("top_holding_reacquired_items") or []),
-        "top_durable_reacquired_items": list(operator_summary.get("top_durable_reacquired_items") or []),
-        "top_softening_reacquired_items": list(operator_summary.get("top_softening_reacquired_items") or []),
-        "top_fragile_reacquisition_confidence_items": list(operator_summary.get("top_fragile_reacquisition_confidence_items") or []),
-        "top_softening_reacquisition_items": list(operator_summary.get("top_softening_reacquisition_items") or []),
-        "top_revalidation_needed_reacquisition_items": list(operator_summary.get("top_revalidation_needed_reacquisition_items") or []),
-        "top_retired_reacquisition_confidence_items": list(operator_summary.get("top_retired_reacquisition_confidence_items") or []),
-        "top_under_revalidation_recovery_items": list(operator_summary.get("top_under_revalidation_recovery_items") or []),
-        "top_rebuilding_restored_confidence_items": list(operator_summary.get("top_rebuilding_restored_confidence_items") or []),
-        "top_reearning_confidence_items": list(operator_summary.get("top_reearning_confidence_items") or []),
-        "top_just_reearned_confidence_items": list(operator_summary.get("top_just_reearned_confidence_items") or []),
-        "top_holding_reearned_confidence_items": list(operator_summary.get("top_holding_reearned_confidence_items") or []),
+        "top_holding_reacquired_items": list(
+            operator_summary.get("top_holding_reacquired_items") or []
+        ),
+        "top_durable_reacquired_items": list(
+            operator_summary.get("top_durable_reacquired_items") or []
+        ),
+        "top_softening_reacquired_items": list(
+            operator_summary.get("top_softening_reacquired_items") or []
+        ),
+        "top_fragile_reacquisition_confidence_items": list(
+            operator_summary.get("top_fragile_reacquisition_confidence_items") or []
+        ),
+        "top_softening_reacquisition_items": list(
+            operator_summary.get("top_softening_reacquisition_items") or []
+        ),
+        "top_revalidation_needed_reacquisition_items": list(
+            operator_summary.get("top_revalidation_needed_reacquisition_items") or []
+        ),
+        "top_retired_reacquisition_confidence_items": list(
+            operator_summary.get("top_retired_reacquisition_confidence_items") or []
+        ),
+        "top_under_revalidation_recovery_items": list(
+            operator_summary.get("top_under_revalidation_recovery_items") or []
+        ),
+        "top_rebuilding_restored_confidence_items": list(
+            operator_summary.get("top_rebuilding_restored_confidence_items") or []
+        ),
+        "top_reearning_confidence_items": list(
+            operator_summary.get("top_reearning_confidence_items") or []
+        ),
+        "top_just_reearned_confidence_items": list(
+            operator_summary.get("top_just_reearned_confidence_items") or []
+        ),
+        "top_holding_reearned_confidence_items": list(
+            operator_summary.get("top_holding_reearned_confidence_items") or []
+        ),
         "top_act_now_items": grouped_focus_items["act-now"][:3],
         "top_watch_closely_items": grouped_focus_items["watch-closely"][:3],
         "top_improving_items": grouped_focus_items["improving"][:3],
         "top_fragile_items": grouped_focus_items["fragile"][:3],
         "top_revalidate_items": grouped_focus_items["revalidate"][:3],
     }
-    return finalize_weekly_pack(apply_weekly_scheduling_overlay(weekly_pack, operator_summary))
+    result = finalize_weekly_pack(apply_weekly_scheduling_overlay(weekly_pack, operator_summary))
+    result["risk_posture"] = _extract_risk_posture(output_dir)
+    return result
 
 
 def build_run_change_counts(diff_data: dict | None) -> dict[str, int]:
@@ -969,8 +1285,18 @@ def build_run_change_counts(diff_data: dict | None) -> dict[str, int]:
         }
 
     tier_changes = diff_data.get("tier_changes", []) or []
-    promotions = sum(1 for item in tier_changes if item.get("new_tier") != item.get("old_tier") and (item.get("new_score", 0) >= item.get("old_score", 0)))
-    demotions = sum(1 for item in tier_changes if item.get("new_tier") != item.get("old_tier") and (item.get("new_score", 0) < item.get("old_score", 0)))
+    promotions = sum(
+        1
+        for item in tier_changes
+        if item.get("new_tier") != item.get("old_tier")
+        and (item.get("new_score", 0) >= item.get("old_score", 0))
+    )
+    demotions = sum(
+        1
+        for item in tier_changes
+        if item.get("new_tier") != item.get("old_tier")
+        and (item.get("new_score", 0) < item.get("old_score", 0))
+    )
     return {
         "new_repos": len(diff_data.get("new_repos", []) or []),
         "removed_repos": len(diff_data.get("removed_repos", []) or []),
@@ -1077,7 +1403,9 @@ def no_follow_through_reacquisition_revalidation_recovery() -> str:
 
 def build_follow_through_status_label(value: Any) -> str:
     mapped = _mapping(value)
-    status = str(mapped.get("follow_through_status", value if isinstance(value, str) else "") or "unknown")
+    status = str(
+        mapped.get("follow_through_status", value if isinstance(value, str) else "") or "unknown"
+    )
     labels = {
         "untouched": "Untouched",
         "attempted": "Attempted",
@@ -1101,7 +1429,10 @@ def build_follow_through_checkpoint(value: Any) -> str:
 
 def build_follow_through_checkpoint_status_label(value: Any) -> str:
     mapped = _mapping(value)
-    status = str(mapped.get("follow_through_checkpoint_status", value if isinstance(value, str) else "") or "unknown")
+    status = str(
+        mapped.get("follow_through_checkpoint_status", value if isinstance(value, str) else "")
+        or "unknown"
+    )
     labels = {
         "not-due": "Not Due",
         "due-soon": "Due Soon",
@@ -1114,7 +1445,10 @@ def build_follow_through_checkpoint_status_label(value: Any) -> str:
 
 def build_follow_through_escalation_status_label(value: Any) -> str:
     mapped = _mapping(value)
-    status = str(mapped.get("follow_through_escalation_status", value if isinstance(value, str) else "") or "unknown")
+    status = str(
+        mapped.get("follow_through_escalation_status", value if isinstance(value, str) else "")
+        or "unknown"
+    )
     labels = {
         "none": "None",
         "watch": "Watch",
@@ -1133,7 +1467,10 @@ def build_follow_through_escalation_summary(value: Any) -> str:
 
 def build_follow_through_recovery_status_label(value: Any) -> str:
     mapped = _mapping(value)
-    status = str(mapped.get("follow_through_recovery_status", value if isinstance(value, str) else "") or "none")
+    status = str(
+        mapped.get("follow_through_recovery_status", value if isinstance(value, str) else "")
+        or "none"
+    )
     labels = {
         "none": "None",
         "recovering": "Recovering",
@@ -1152,7 +1489,12 @@ def build_follow_through_recovery_summary(value: Any) -> str:
 
 def build_follow_through_recovery_persistence_status_label(value: Any) -> str:
     mapped = _mapping(value)
-    status = str(mapped.get("follow_through_recovery_persistence_status", value if isinstance(value, str) else "") or "none")
+    status = str(
+        mapped.get(
+            "follow_through_recovery_persistence_status", value if isinstance(value, str) else ""
+        )
+        or "none"
+    )
     labels = {
         "none": "None",
         "just-recovering": "Just Recovering",
@@ -1168,12 +1510,18 @@ def build_follow_through_recovery_persistence_status_label(value: Any) -> str:
 
 def build_follow_through_recovery_persistence_summary(value: Any) -> str:
     mapped = _mapping(value)
-    return str(mapped.get("follow_through_recovery_persistence_summary") or NO_FOLLOW_THROUGH_RECOVERY_PERSISTENCE)
+    return str(
+        mapped.get("follow_through_recovery_persistence_summary")
+        or NO_FOLLOW_THROUGH_RECOVERY_PERSISTENCE
+    )
 
 
 def build_follow_through_relapse_churn_status_label(value: Any) -> str:
     mapped = _mapping(value)
-    status = str(mapped.get("follow_through_relapse_churn_status", value if isinstance(value, str) else "") or "none")
+    status = str(
+        mapped.get("follow_through_relapse_churn_status", value if isinstance(value, str) else "")
+        or "none"
+    )
     labels = {
         "none": "None",
         "watch": "Watch",
@@ -1187,12 +1535,19 @@ def build_follow_through_relapse_churn_status_label(value: Any) -> str:
 
 def build_follow_through_relapse_churn_summary(value: Any) -> str:
     mapped = _mapping(value)
-    return str(mapped.get("follow_through_relapse_churn_summary") or NO_FOLLOW_THROUGH_RELAPSE_CHURN)
+    return str(
+        mapped.get("follow_through_relapse_churn_summary") or NO_FOLLOW_THROUGH_RELAPSE_CHURN
+    )
 
 
 def build_follow_through_recovery_freshness_status_label(value: Any) -> str:
     mapped = _mapping(value)
-    status = str(mapped.get("follow_through_recovery_freshness_status", value if isinstance(value, str) else "") or "none")
+    status = str(
+        mapped.get(
+            "follow_through_recovery_freshness_status", value if isinstance(value, str) else ""
+        )
+        or "none"
+    )
     labels = {
         "none": "None",
         "fresh": "Fresh",
@@ -1206,12 +1561,18 @@ def build_follow_through_recovery_freshness_status_label(value: Any) -> str:
 
 def build_follow_through_recovery_freshness_summary(value: Any) -> str:
     mapped = _mapping(value)
-    return str(mapped.get("follow_through_recovery_freshness_summary") or NO_FOLLOW_THROUGH_RECOVERY_FRESHNESS)
+    return str(
+        mapped.get("follow_through_recovery_freshness_summary")
+        or NO_FOLLOW_THROUGH_RECOVERY_FRESHNESS
+    )
 
 
 def build_follow_through_recovery_decay_status_label(value: Any) -> str:
     mapped = _mapping(value)
-    status = str(mapped.get("follow_through_recovery_decay_status", value if isinstance(value, str) else "") or "none")
+    status = str(
+        mapped.get("follow_through_recovery_decay_status", value if isinstance(value, str) else "")
+        or "none"
+    )
     labels = {
         "none": "None",
         "softening": "Softening",
@@ -1225,12 +1586,19 @@ def build_follow_through_recovery_decay_status_label(value: Any) -> str:
 
 def build_follow_through_recovery_decay_summary(value: Any) -> str:
     mapped = _mapping(value)
-    return str(mapped.get("follow_through_recovery_decay_summary") or NO_FOLLOW_THROUGH_RECOVERY_DECAY)
+    return str(
+        mapped.get("follow_through_recovery_decay_summary") or NO_FOLLOW_THROUGH_RECOVERY_DECAY
+    )
 
 
 def build_follow_through_recovery_memory_reset_status_label(value: Any) -> str:
     mapped = _mapping(value)
-    status = str(mapped.get("follow_through_recovery_memory_reset_status", value if isinstance(value, str) else "") or "none")
+    status = str(
+        mapped.get(
+            "follow_through_recovery_memory_reset_status", value if isinstance(value, str) else ""
+        )
+        or "none"
+    )
     labels = {
         "none": "None",
         "reset-watch": "Reset Watch",
@@ -1244,13 +1612,20 @@ def build_follow_through_recovery_memory_reset_status_label(value: Any) -> str:
 
 def build_follow_through_recovery_memory_reset_summary(value: Any) -> str:
     mapped = _mapping(value)
-    return str(mapped.get("follow_through_recovery_memory_reset_summary") or NO_FOLLOW_THROUGH_RECOVERY_MEMORY_RESET)
+    return str(
+        mapped.get("follow_through_recovery_memory_reset_summary")
+        or NO_FOLLOW_THROUGH_RECOVERY_MEMORY_RESET
+    )
 
 
 def build_follow_through_recovery_rebuild_strength_status_label(value: Any) -> str:
     mapped = _mapping(value)
     status = str(
-        mapped.get("follow_through_recovery_rebuild_strength_status", value if isinstance(value, str) else "") or "none"
+        mapped.get(
+            "follow_through_recovery_rebuild_strength_status",
+            value if isinstance(value, str) else "",
+        )
+        or "none"
     )
     labels = {
         "none": "None",
@@ -1274,7 +1649,10 @@ def build_follow_through_recovery_rebuild_strength_summary(value: Any) -> str:
 def build_follow_through_recovery_reacquisition_status_label(value: Any) -> str:
     mapped = _mapping(value)
     status = str(
-        mapped.get("follow_through_recovery_reacquisition_status", value if isinstance(value, str) else "") or "none"
+        mapped.get(
+            "follow_through_recovery_reacquisition_status", value if isinstance(value, str) else ""
+        )
+        or "none"
     )
     labels = {
         "none": "None",
@@ -1299,7 +1677,10 @@ def build_follow_through_recovery_reacquisition_summary(value: Any) -> str:
 def build_follow_through_reacquisition_durability_status_label(value: Any) -> str:
     mapped = _mapping(value)
     status = str(
-        mapped.get("follow_through_recovery_reacquisition_durability_status", value if isinstance(value, str) else "")
+        mapped.get(
+            "follow_through_recovery_reacquisition_durability_status",
+            value if isinstance(value, str) else "",
+        )
         or "none"
     )
     labels = {
@@ -1354,7 +1735,10 @@ def build_follow_through_reacquisition_consolidation_summary(value: Any) -> str:
 def build_follow_through_reacquisition_softening_decay_status_label(value: Any) -> str:
     mapped = _mapping(value)
     status = str(
-        mapped.get("follow_through_reacquisition_softening_decay_status", value if isinstance(value, str) else "")
+        mapped.get(
+            "follow_through_reacquisition_softening_decay_status",
+            value if isinstance(value, str) else "",
+        )
         or "none"
     )
     labels = {
@@ -1379,7 +1763,10 @@ def build_follow_through_reacquisition_softening_decay_summary(value: Any) -> st
 def build_follow_through_reacquisition_confidence_retirement_status_label(value: Any) -> str:
     mapped = _mapping(value)
     status = str(
-        mapped.get("follow_through_reacquisition_confidence_retirement_status", value if isinstance(value, str) else "")
+        mapped.get(
+            "follow_through_reacquisition_confidence_retirement_status",
+            value if isinstance(value, str) else "",
+        )
         or "none"
     )
     labels = {
@@ -1404,7 +1791,10 @@ def build_follow_through_reacquisition_confidence_retirement_summary(value: Any)
 def build_follow_through_reacquisition_revalidation_recovery_status_label(value: Any) -> str:
     mapped = _mapping(value)
     status = str(
-        mapped.get("follow_through_reacquisition_revalidation_recovery_status", value if isinstance(value, str) else "")
+        mapped.get(
+            "follow_through_reacquisition_revalidation_recovery_status",
+            value if isinstance(value, str) else "",
+        )
         or "none"
     )
     labels = {
@@ -1433,7 +1823,9 @@ def _operator_focus_bucket_key(value: Any) -> str:
     checkpoint_status = str(mapped.get("follow_through_checkpoint_status") or "").strip()
     escalation_status = str(mapped.get("follow_through_escalation_status") or "").strip()
     relapse_churn_status = str(mapped.get("follow_through_relapse_churn_status") or "").strip()
-    recovery_persistence_status = str(mapped.get("follow_through_recovery_persistence_status") or "").strip()
+    recovery_persistence_status = str(
+        mapped.get("follow_through_recovery_persistence_status") or ""
+    ).strip()
     recovery_status = str(mapped.get("follow_through_recovery_status") or "").strip()
     reacquisition_durability_status = str(
         mapped.get("follow_through_recovery_reacquisition_durability_status") or ""
@@ -1441,7 +1833,9 @@ def _operator_focus_bucket_key(value: Any) -> str:
     reacquisition_confidence_status = str(
         mapped.get("follow_through_recovery_reacquisition_consolidation_status") or ""
     ).strip()
-    softening_status = str(mapped.get("follow_through_reacquisition_softening_decay_status") or "").strip()
+    softening_status = str(
+        mapped.get("follow_through_reacquisition_softening_decay_status") or ""
+    ).strip()
     confidence_retirement_status = str(
         mapped.get("follow_through_reacquisition_confidence_retirement_status") or ""
     ).strip()
@@ -1449,7 +1843,11 @@ def _operator_focus_bucket_key(value: Any) -> str:
         mapped.get("follow_through_reacquisition_revalidation_recovery_status") or ""
     ).strip()
 
-    if lane in {"blocked", "urgent"} or checkpoint_status == "overdue" or escalation_status == "escalate-now":
+    if (
+        lane in {"blocked", "urgent"}
+        or checkpoint_status == "overdue"
+        or escalation_status == "escalate-now"
+    ):
         return "act-now"
     if confidence_retirement_status == "revalidation-needed" or revalidation_recovery_status in {
         "under-revalidation",
@@ -1496,39 +1894,54 @@ def build_operator_focus_summary(value: Any) -> str:
     mapped = _mapping(value)
     focus_key = _operator_focus_bucket_key(mapped)
     if focus_key == "act-now":
-        return _first_nonempty(
-            mapped.get("lane_reason"),
-            build_follow_through_escalation_summary(mapped),
-            build_follow_through_checkpoint(mapped),
-            mapped.get("summary"),
-        ) or "Immediate operator action is still required."
+        return (
+            _first_nonempty(
+                mapped.get("lane_reason"),
+                build_follow_through_escalation_summary(mapped),
+                build_follow_through_checkpoint(mapped),
+                mapped.get("summary"),
+            )
+            or "Immediate operator action is still required."
+        )
     if focus_key == "revalidate":
-        return _first_nonempty(
-            build_follow_through_reacquisition_revalidation_recovery_summary(mapped),
-            build_follow_through_reacquisition_confidence_retirement_summary(mapped),
-            build_follow_through_checkpoint(mapped),
-        ) or "This target still needs revalidation before confidence can be restored."
+        return (
+            _first_nonempty(
+                build_follow_through_reacquisition_revalidation_recovery_summary(mapped),
+                build_follow_through_reacquisition_confidence_retirement_summary(mapped),
+                build_follow_through_checkpoint(mapped),
+            )
+            or "This target still needs revalidation before confidence can be restored."
+        )
     if focus_key == "fragile":
-        return _first_nonempty(
-            build_follow_through_reacquisition_revalidation_recovery_summary(mapped),
-            build_follow_through_reacquisition_softening_decay_summary(mapped),
-            build_follow_through_relapse_churn_summary(mapped),
-            build_follow_through_recovery_persistence_summary(mapped),
-            build_follow_through_reacquisition_consolidation_summary(mapped),
-        ) or "Progress is visible, but the restored posture is still fragile."
+        return (
+            _first_nonempty(
+                build_follow_through_reacquisition_revalidation_recovery_summary(mapped),
+                build_follow_through_reacquisition_softening_decay_summary(mapped),
+                build_follow_through_relapse_churn_summary(mapped),
+                build_follow_through_recovery_persistence_summary(mapped),
+                build_follow_through_reacquisition_consolidation_summary(mapped),
+            )
+            or "Progress is visible, but the restored posture is still fragile."
+        )
     if focus_key == "improving":
-        return _first_nonempty(
-            build_follow_through_reacquisition_revalidation_recovery_summary(mapped),
-            build_follow_through_reacquisition_consolidation_summary(mapped),
-            build_follow_through_reacquisition_durability_summary(mapped),
-            build_follow_through_recovery_summary(mapped),
-        ) or "The current path is stabilizing and regaining trust."
-    return _first_nonempty(
-        build_follow_through_summary(mapped),
-        build_follow_through_checkpoint(mapped),
-        mapped.get("lane_reason"),
-        mapped.get("summary"),
-    ) or "Keep this item in view while waiting for clearer evidence."
+        return (
+            _first_nonempty(
+                build_follow_through_reacquisition_revalidation_recovery_summary(mapped),
+                build_follow_through_reacquisition_consolidation_summary(mapped),
+                build_follow_through_reacquisition_durability_summary(mapped),
+                build_follow_through_recovery_summary(mapped),
+            )
+            or "The current path is stabilizing and regaining trust."
+        )
+    return (
+        _first_nonempty(
+            build_follow_through_summary(mapped),
+            build_follow_through_checkpoint(mapped),
+            mapped.get("lane_reason"),
+            mapped.get("summary"),
+        )
+        or "Keep this item in view while waiting for clearer evidence."
+    )
 
 
 def build_operator_focus_line(value: Any) -> str:
@@ -1626,13 +2039,17 @@ def build_operator_effectiveness_line(report_data: Any) -> str:
 
 def build_high_pressure_queue_trend_line(report_data: Any) -> str:
     operator_summary = _mapping(_mapping(report_data).get("operator_summary"))
-    return str(operator_summary.get("high_pressure_queue_trend_summary") or NO_HIGH_PRESSURE_QUEUE_TREND)
+    return str(
+        operator_summary.get("high_pressure_queue_trend_summary") or NO_HIGH_PRESSURE_QUEUE_TREND
+    )
 
 
 def build_action_sync_summary(report_data: Any) -> str:
     summary = _mapping(_mapping(report_data).get("action_sync_summary"))
     if not summary:
-        summary = _mapping(_mapping(report_data).get("operator_summary")).get("action_sync_summary") or {}
+        summary = (
+            _mapping(_mapping(report_data).get("operator_summary")).get("action_sync_summary") or {}
+        )
     return str(_mapping(summary).get("summary") or NO_ACTION_SYNC_SUMMARY)
 
 
@@ -1657,21 +2074,30 @@ def build_action_sync_readiness_line(report_data: Any) -> str:
 def build_apply_readiness_summary(report_data: Any) -> str:
     summary = _mapping(_mapping(report_data).get("apply_readiness_summary"))
     if not summary:
-        summary = _mapping(_mapping(report_data).get("operator_summary")).get("apply_readiness_summary") or {}
+        summary = (
+            _mapping(_mapping(report_data).get("operator_summary")).get("apply_readiness_summary")
+            or {}
+        )
     return str(_mapping(summary).get("summary") or NO_APPLY_READINESS_SUMMARY)
 
 
 def build_next_apply_candidate_line(report_data: Any) -> str:
     candidate = _mapping(_mapping(report_data).get("next_apply_candidate"))
     if not candidate:
-        candidate = _mapping(_mapping(report_data).get("operator_summary")).get("next_apply_candidate") or {}
+        candidate = (
+            _mapping(_mapping(report_data).get("operator_summary")).get("next_apply_candidate")
+            or {}
+        )
     return str(_mapping(candidate).get("summary") or NO_NEXT_APPLY_CANDIDATE)
 
 
 def build_action_sync_command_hint(report_data: Any) -> str:
     candidate = _mapping(_mapping(report_data).get("next_apply_candidate"))
     if not candidate:
-        candidate = _mapping(_mapping(report_data).get("operator_summary")).get("next_apply_candidate") or {}
+        candidate = (
+            _mapping(_mapping(report_data).get("operator_summary")).get("next_apply_candidate")
+            or {}
+        )
     return str(
         _mapping(candidate).get("apply_command")
         or _mapping(candidate).get("preview_command")
@@ -1682,28 +2108,39 @@ def build_action_sync_command_hint(report_data: Any) -> str:
 def build_campaign_outcomes_summary(report_data: Any) -> str:
     summary = _mapping(_mapping(report_data).get("campaign_outcomes_summary"))
     if not summary:
-        summary = _mapping(_mapping(report_data).get("operator_summary")).get("campaign_outcomes_summary") or {}
+        summary = (
+            _mapping(_mapping(report_data).get("operator_summary")).get("campaign_outcomes_summary")
+            or {}
+        )
     return str(_mapping(summary).get("summary") or NO_CAMPAIGN_OUTCOMES_SUMMARY)
 
 
 def build_next_monitoring_step_line(report_data: Any) -> str:
     step = _mapping(_mapping(report_data).get("next_monitoring_step"))
     if not step:
-        step = _mapping(_mapping(report_data).get("operator_summary")).get("next_monitoring_step") or {}
+        step = (
+            _mapping(_mapping(report_data).get("operator_summary")).get("next_monitoring_step")
+            or {}
+        )
     return str(_mapping(step).get("summary") or NO_NEXT_MONITORING_STEP)
 
 
 def build_campaign_tuning_summary(report_data: Any) -> str:
     summary = _mapping(_mapping(report_data).get("campaign_tuning_summary"))
     if not summary:
-        summary = _mapping(_mapping(report_data).get("operator_summary")).get("campaign_tuning_summary") or {}
+        summary = (
+            _mapping(_mapping(report_data).get("operator_summary")).get("campaign_tuning_summary")
+            or {}
+        )
     return str(_mapping(summary).get("summary") or NO_CAMPAIGN_TUNING_SUMMARY)
 
 
 def build_next_tuned_campaign_line(report_data: Any) -> str:
     campaign = _mapping(_mapping(report_data).get("next_tuned_campaign"))
     if not campaign:
-        campaign = _mapping(_mapping(report_data).get("operator_summary")).get("next_tuned_campaign") or {}
+        campaign = (
+            _mapping(_mapping(report_data).get("operator_summary")).get("next_tuned_campaign") or {}
+        )
     return str(_mapping(campaign).get("summary") or NO_NEXT_TUNED_CAMPAIGN)
 
 
@@ -1714,42 +2151,64 @@ def build_next_tie_break_candidate_line(report_data: Any) -> str:
 def build_historical_portfolio_intelligence_summary(report_data: Any) -> str:
     summary = _mapping(_mapping(report_data).get("intervention_ledger_summary"))
     if not summary:
-        summary = _mapping(_mapping(report_data).get("operator_summary")).get("intervention_ledger_summary") or {}
+        summary = (
+            _mapping(_mapping(report_data).get("operator_summary")).get(
+                "intervention_ledger_summary"
+            )
+            or {}
+        )
     return str(_mapping(summary).get("summary") or NO_HISTORICAL_PORTFOLIO_INTELLIGENCE_SUMMARY)
 
 
 def build_next_historical_focus_line(report_data: Any) -> str:
     focus = _mapping(_mapping(report_data).get("next_historical_focus"))
     if not focus:
-        focus = _mapping(_mapping(report_data).get("operator_summary")).get("next_historical_focus") or {}
+        focus = (
+            _mapping(_mapping(report_data).get("operator_summary")).get("next_historical_focus")
+            or {}
+        )
     return str(_mapping(focus).get("summary") or NO_NEXT_HISTORICAL_FOCUS)
 
 
 def build_automation_guidance_summary(report_data: Any) -> str:
     summary = _mapping(_mapping(report_data).get("automation_guidance_summary"))
     if not summary:
-        summary = _mapping(_mapping(report_data).get("operator_summary")).get("automation_guidance_summary") or {}
+        summary = (
+            _mapping(_mapping(report_data).get("operator_summary")).get(
+                "automation_guidance_summary"
+            )
+            or {}
+        )
     return str(_mapping(summary).get("summary") or NO_AUTOMATION_GUIDANCE_SUMMARY)
 
 
 def build_next_safe_automation_step_line(report_data: Any) -> str:
     step = _mapping(_mapping(report_data).get("next_safe_automation_step"))
     if not step:
-        step = _mapping(_mapping(report_data).get("operator_summary")).get("next_safe_automation_step") or {}
+        step = (
+            _mapping(_mapping(report_data).get("operator_summary")).get("next_safe_automation_step")
+            or {}
+        )
     return str(_mapping(step).get("summary") or NO_NEXT_SAFE_AUTOMATION_STEP)
 
 
 def build_approval_workflow_summary(report_data: Any) -> str:
     summary = _mapping(_mapping(report_data).get("approval_workflow_summary"))
     if not summary:
-        summary = _mapping(_mapping(report_data).get("operator_summary")).get("approval_workflow_summary") or {}
+        summary = (
+            _mapping(_mapping(report_data).get("operator_summary")).get("approval_workflow_summary")
+            or {}
+        )
     return str(_mapping(summary).get("summary") or NO_APPROVAL_WORKFLOW_SUMMARY)
 
 
 def build_next_approval_review_line(report_data: Any) -> str:
     step = _mapping(_mapping(report_data).get("next_approval_review"))
     if not step:
-        step = _mapping(_mapping(report_data).get("operator_summary")).get("next_approval_review") or {}
+        step = (
+            _mapping(_mapping(report_data).get("operator_summary")).get("next_approval_review")
+            or {}
+        )
     return str(_mapping(step).get("summary") or NO_NEXT_APPROVAL_REVIEW)
 
 
@@ -1789,7 +2248,9 @@ def build_automation_line(value: Any) -> str:
         return f"{ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}: {summary}"
     posture = str(mapped.get("automation_posture") or "").strip()
     if posture:
-        return f"{ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}: {posture.replace('-', ' ')}."
+        return (
+            f"{ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}: {posture.replace('-', ' ')}."
+        )
     return NO_AUTOMATION_GUIDANCE_LINE
 
 
@@ -1803,7 +2264,11 @@ def build_action_sync_line(value: Any) -> str:
     target = str(mapped.get("suggested_writeback_target") or "").strip()
     if not stage and not campaign:
         return NO_ACTION_SYNC_LINE
-    campaign_label = PRODUCT_MODE_LABELS.get(campaign, campaign.replace("-", " ").title()) if campaign in PRODUCT_MODE_LABELS else campaign.replace("-", " ").title()
+    campaign_label = (
+        PRODUCT_MODE_LABELS.get(campaign, campaign.replace("-", " ").title())
+        if campaign in PRODUCT_MODE_LABELS
+        else campaign.replace("-", " ").title()
+    )
     if target and target != "none":
         return f"Action Sync: {campaign_label or 'Campaign'} is {stage or 'idle'} — recommended target {target}."
     return f"Action Sync: {campaign_label or 'Campaign'} is {stage or 'idle'} — stay local until prerequisites are healthy."
@@ -1845,12 +2310,16 @@ def build_campaign_tuning_line(value: Any) -> str:
     return f"Campaign Tuning: {summary or status.replace('-', ' ').title()}"
 
 
-def _build_operator_focus_item(mapped: dict[str, Any], review_summary: dict[str, Any]) -> dict[str, Any]:
+def _build_operator_focus_item(
+    mapped: dict[str, Any], review_summary: dict[str, Any]
+) -> dict[str, Any]:
     return {
         "repo": mapped.get("repo") or mapped.get("repo_name") or "Portfolio",
         "title": str(mapped.get("title") or mapped.get("summary") or "Operator attention item"),
         "lane": mapped.get("lane_label") or mapped.get("lane") or "ready",
-        "why": str(mapped.get("lane_reason") or mapped.get("summary") or "Operator pressure is active."),
+        "why": str(
+            mapped.get("lane_reason") or mapped.get("summary") or "Operator pressure is active."
+        ),
         "next_step": str(
             mapped.get("recommended_action")
             or mapped.get("next_step")
@@ -1865,30 +2334,72 @@ def _build_operator_focus_item(mapped: dict[str, Any], review_summary: dict[str,
         "follow_through_escalation_summary": build_follow_through_escalation_summary(mapped),
         "follow_through_recovery": build_follow_through_recovery_status_label(mapped),
         "follow_through_recovery_summary": build_follow_through_recovery_summary(mapped),
-        "follow_through_recovery_persistence": build_follow_through_recovery_persistence_status_label(mapped),
-        "follow_through_recovery_persistence_summary": build_follow_through_recovery_persistence_summary(mapped),
+        "follow_through_recovery_persistence": build_follow_through_recovery_persistence_status_label(
+            mapped
+        ),
+        "follow_through_recovery_persistence_summary": build_follow_through_recovery_persistence_summary(
+            mapped
+        ),
         "follow_through_relapse_churn": build_follow_through_relapse_churn_status_label(mapped),
         "follow_through_relapse_churn_summary": build_follow_through_relapse_churn_summary(mapped),
-        "follow_through_recovery_freshness": build_follow_through_recovery_freshness_status_label(mapped),
-        "follow_through_recovery_freshness_summary": build_follow_through_recovery_freshness_summary(mapped),
+        "follow_through_recovery_freshness": build_follow_through_recovery_freshness_status_label(
+            mapped
+        ),
+        "follow_through_recovery_freshness_summary": build_follow_through_recovery_freshness_summary(
+            mapped
+        ),
         "follow_through_recovery_decay": build_follow_through_recovery_decay_status_label(mapped),
-        "follow_through_recovery_decay_summary": build_follow_through_recovery_decay_summary(mapped),
-        "follow_through_recovery_memory_reset": build_follow_through_recovery_memory_reset_status_label(mapped),
-        "follow_through_recovery_memory_reset_summary": build_follow_through_recovery_memory_reset_summary(mapped),
-        "follow_through_recovery_rebuild_strength": build_follow_through_recovery_rebuild_strength_status_label(mapped),
-        "follow_through_recovery_rebuild_strength_summary": build_follow_through_recovery_rebuild_strength_summary(mapped),
-        "follow_through_recovery_reacquisition": build_follow_through_recovery_reacquisition_status_label(mapped),
-        "follow_through_recovery_reacquisition_summary": build_follow_through_recovery_reacquisition_summary(mapped),
-        "follow_through_reacquisition_durability": build_follow_through_reacquisition_durability_status_label(mapped),
-        "follow_through_reacquisition_durability_summary": build_follow_through_reacquisition_durability_summary(mapped),
-        "follow_through_reacquisition_confidence": build_follow_through_reacquisition_consolidation_status_label(mapped),
-        "follow_through_reacquisition_confidence_summary": build_follow_through_reacquisition_consolidation_summary(mapped),
-        "follow_through_reacquisition_softening_decay": build_follow_through_reacquisition_softening_decay_status_label(mapped),
-        "follow_through_reacquisition_softening_decay_summary": build_follow_through_reacquisition_softening_decay_summary(mapped),
-        "follow_through_reacquisition_confidence_retirement": build_follow_through_reacquisition_confidence_retirement_status_label(mapped),
-        "follow_through_reacquisition_confidence_retirement_summary": build_follow_through_reacquisition_confidence_retirement_summary(mapped),
-        "follow_through_reacquisition_revalidation_recovery": build_follow_through_reacquisition_revalidation_recovery_status_label(mapped),
-        "follow_through_reacquisition_revalidation_recovery_summary": build_follow_through_reacquisition_revalidation_recovery_summary(mapped),
+        "follow_through_recovery_decay_summary": build_follow_through_recovery_decay_summary(
+            mapped
+        ),
+        "follow_through_recovery_memory_reset": build_follow_through_recovery_memory_reset_status_label(
+            mapped
+        ),
+        "follow_through_recovery_memory_reset_summary": build_follow_through_recovery_memory_reset_summary(
+            mapped
+        ),
+        "follow_through_recovery_rebuild_strength": build_follow_through_recovery_rebuild_strength_status_label(
+            mapped
+        ),
+        "follow_through_recovery_rebuild_strength_summary": build_follow_through_recovery_rebuild_strength_summary(
+            mapped
+        ),
+        "follow_through_recovery_reacquisition": build_follow_through_recovery_reacquisition_status_label(
+            mapped
+        ),
+        "follow_through_recovery_reacquisition_summary": build_follow_through_recovery_reacquisition_summary(
+            mapped
+        ),
+        "follow_through_reacquisition_durability": build_follow_through_reacquisition_durability_status_label(
+            mapped
+        ),
+        "follow_through_reacquisition_durability_summary": build_follow_through_reacquisition_durability_summary(
+            mapped
+        ),
+        "follow_through_reacquisition_confidence": build_follow_through_reacquisition_consolidation_status_label(
+            mapped
+        ),
+        "follow_through_reacquisition_confidence_summary": build_follow_through_reacquisition_consolidation_summary(
+            mapped
+        ),
+        "follow_through_reacquisition_softening_decay": build_follow_through_reacquisition_softening_decay_status_label(
+            mapped
+        ),
+        "follow_through_reacquisition_softening_decay_summary": build_follow_through_reacquisition_softening_decay_summary(
+            mapped
+        ),
+        "follow_through_reacquisition_confidence_retirement": build_follow_through_reacquisition_confidence_retirement_status_label(
+            mapped
+        ),
+        "follow_through_reacquisition_confidence_retirement_summary": build_follow_through_reacquisition_confidence_retirement_summary(
+            mapped
+        ),
+        "follow_through_reacquisition_revalidation_recovery": build_follow_through_reacquisition_revalidation_recovery_status_label(
+            mapped
+        ),
+        "follow_through_reacquisition_revalidation_recovery_summary": build_follow_through_reacquisition_revalidation_recovery_summary(
+            mapped
+        ),
         "operator_focus": build_operator_focus(mapped),
         "operator_focus_summary": build_operator_focus_summary(mapped),
         "operator_focus_line": build_operator_focus_line(mapped),
@@ -1898,31 +2409,52 @@ def _build_operator_focus_item(mapped: dict[str, Any], review_summary: dict[str,
         "scorecard_line": build_scorecard_line(mapped),
         "maturity_gap_summary": build_maturity_gap_summary(mapped),
         "action_sync_stage": str(mapped.get("action_sync_stage") or "idle"),
-        "action_sync_reason": str(mapped.get("action_sync_reason") or "No current Action Sync guidance is surfaced for this item."),
+        "action_sync_reason": str(
+            mapped.get("action_sync_reason")
+            or "No current Action Sync guidance is surfaced for this item."
+        ),
         "suggested_campaign": str(mapped.get("suggested_campaign") or ""),
         "suggested_writeback_target": str(mapped.get("suggested_writeback_target") or "none"),
         "action_sync_line": build_action_sync_line(mapped),
         "apply_packet_state": str(mapped.get("apply_packet_state") or "stay-local"),
-        "apply_packet_summary": str(mapped.get("apply_packet_summary") or "No current apply packet is surfaced for this item."),
+        "apply_packet_summary": str(
+            mapped.get("apply_packet_summary")
+            or "No current apply packet is surfaced for this item."
+        ),
         "apply_packet_command": str(mapped.get("apply_packet_command") or ""),
         "apply_packet_line": build_apply_packet_line(mapped),
         "post_apply_state": str(mapped.get("post_apply_state") or "no-recent-apply"),
-        "post_apply_summary": str(mapped.get("post_apply_summary") or "No post-apply monitoring is surfaced for this item yet."),
+        "post_apply_summary": str(
+            mapped.get("post_apply_summary")
+            or "No post-apply monitoring is surfaced for this item yet."
+        ),
         "post_apply_line": build_post_apply_monitoring_line(mapped),
-        "campaign_tuning_status": str(mapped.get("campaign_tuning_status") or "insufficient-evidence"),
-        "campaign_tuning_summary": str(mapped.get("campaign_tuning_summary") or "No campaign tuning evidence is surfaced for this item yet."),
+        "campaign_tuning_status": str(
+            mapped.get("campaign_tuning_status") or "insufficient-evidence"
+        ),
+        "campaign_tuning_summary": str(
+            mapped.get("campaign_tuning_summary")
+            or "No campaign tuning evidence is surfaced for this item yet."
+        ),
         "campaign_tuning_line": build_campaign_tuning_line(mapped),
         "approval_state": str(mapped.get("approval_state") or "not-applicable"),
-        "approval_summary": str(mapped.get("approval_summary") or "No approval workflow is surfaced for this item yet."),
+        "approval_summary": str(
+            mapped.get("approval_summary") or "No approval workflow is surfaced for this item yet."
+        ),
         "approval_line": build_approval_workflow_line(mapped),
         "automation_posture": str(mapped.get("automation_posture") or "manual-only"),
-        "automation_summary": str(mapped.get("automation_summary") or "No automation guidance is surfaced for this item yet."),
+        "automation_summary": str(
+            mapped.get("automation_summary")
+            or "No automation guidance is surfaced for this item yet."
+        ),
         "automation_command": str(mapped.get("automation_command") or ""),
         "automation_line": build_automation_line(mapped),
     }
 
 
-def _build_operator_focus_summary_from_groups(grouped_items: dict[str, list[dict[str, Any]]]) -> str:
+def _build_operator_focus_summary_from_groups(
+    grouped_items: dict[str, list[dict[str, Any]]],
+) -> str:
     counts = {bucket: len(grouped_items.get(bucket, [])) for bucket in OPERATOR_FOCUS_DISPLAY_ORDER}
 
     def _labels(bucket: str) -> str:
@@ -1935,21 +2467,15 @@ def _build_operator_focus_summary_from_groups(grouped_items: dict[str, list[dict
             f"{counts['act-now']} item(s) need immediate action first, led by {_labels('act-now')}."
         )
     if counts["revalidate"]:
-        return (
-            f"{counts['revalidate']} item(s) are in a revalidation posture, led by {_labels('revalidate')}."
-        )
+        return f"{counts['revalidate']} item(s) are in a revalidation posture, led by {_labels('revalidate')}."
     if counts["fragile"]:
-        return (
-            f"{counts['fragile']} item(s) are improving but still fragile, led by {_labels('fragile')}."
-        )
+        return f"{counts['fragile']} item(s) are improving but still fragile, led by {_labels('fragile')}."
     if counts["improving"]:
         return (
             f"{counts['improving']} item(s) are clearly improving, led by {_labels('improving')}."
         )
     if counts["watch-closely"]:
-        return (
-            f"{counts['watch-closely']} item(s) should stay visible while more evidence arrives, led by {_labels('watch-closely')}."
-        )
+        return f"{counts['watch-closely']} item(s) should stay visible while more evidence arrives, led by {_labels('watch-closely')}."
     return NO_OPERATOR_FOCUS_SUMMARY
 
 
@@ -2028,7 +2554,9 @@ def build_trust_actionability_summary(report_data: Any) -> str:
     return "No trust-policy guidance is recorded yet."
 
 
-def build_last_movement_label(item: dict[str, Any], review_summary: dict[str, Any] | None = None) -> str:
+def build_last_movement_label(
+    item: dict[str, Any], review_summary: dict[str, Any] | None = None
+) -> str:
     updated_at = item.get("updated_at")
     if updated_at:
         return f"Updated {str(updated_at)[:10]}"

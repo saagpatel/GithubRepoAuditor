@@ -11,7 +11,12 @@ def _make_report() -> dict:
         "average_score": 0.62,
         "portfolio_grade": "C",
         "tier_distribution": {"functional": 1},
-        "collections": {"showcase": {"description": "Best examples", "repos": [{"name": "RepoC", "reason": "Operator focus"}]}},
+        "collections": {
+            "showcase": {
+                "description": "Best examples",
+                "repos": [{"name": "RepoC", "reason": "Operator focus"}],
+            }
+        },
         "profiles": {
             "default": {
                 "description": "Balanced",
@@ -25,9 +30,15 @@ def _make_report() -> dict:
         "scenario_summary": {"top_levers": [], "portfolio_projection": {}},
         "portfolio_catalog_summary": {"summary": "1/1 repos have an explicit catalog contract."},
         "operating_paths_summary": {"summary": "Maintain 1"},
-        "intent_alignment_summary": {"summary": "1 aligned, 0 needing review, and 0 missing a contract."},
-        "scorecards_summary": {"summary": "0 repos are on track, 1 is below target, and 0 are missing a valid program."},
-        "implementation_hotspots_summary": {"summary": "1 repos have concrete implementation pressure. Start with RepoC in file src/core.py."},
+        "intent_alignment_summary": {
+            "summary": "1 aligned, 0 needing review, and 0 missing a contract."
+        },
+        "scorecards_summary": {
+            "summary": "0 repos are on track, 1 is below target, and 0 are missing a valid program."
+        },
+        "implementation_hotspots_summary": {
+            "summary": "1 repos have concrete implementation pressure. Start with RepoC in file src/core.py."
+        },
         "audits": [
             {
                 "metadata": {
@@ -44,11 +55,36 @@ def _make_report() -> dict:
                 "badges": [],
                 "flags": [],
                 "lenses": {
-                    "ship_readiness": {"score": 0.62, "orientation": "higher-is-better", "summary": "Ready enough", "drivers": []},
-                    "showcase_value": {"score": 0.58, "orientation": "higher-is-better", "summary": "Good story", "drivers": []},
-                    "security_posture": {"score": 0.55, "orientation": "higher-is-better", "summary": "Watch", "drivers": []},
-                    "momentum": {"score": 0.52, "orientation": "higher-is-better", "summary": "Holding", "drivers": []},
-                    "portfolio_fit": {"score": 0.64, "orientation": "higher-is-better", "summary": "Fits", "drivers": []},
+                    "ship_readiness": {
+                        "score": 0.62,
+                        "orientation": "higher-is-better",
+                        "summary": "Ready enough",
+                        "drivers": [],
+                    },
+                    "showcase_value": {
+                        "score": 0.58,
+                        "orientation": "higher-is-better",
+                        "summary": "Good story",
+                        "drivers": [],
+                    },
+                    "security_posture": {
+                        "score": 0.55,
+                        "orientation": "higher-is-better",
+                        "summary": "Watch",
+                        "drivers": [],
+                    },
+                    "momentum": {
+                        "score": 0.52,
+                        "orientation": "higher-is-better",
+                        "summary": "Holding",
+                        "drivers": [],
+                    },
+                    "portfolio_fit": {
+                        "score": 0.64,
+                        "orientation": "higher-is-better",
+                        "summary": "Fits",
+                        "drivers": [],
+                    },
                 },
                 "security_posture": {"label": "watch", "score": 0.55},
                 "action_candidates": [{"title": "Recheck restored evidence"}],
@@ -234,9 +270,18 @@ def test_review_pack_includes_revalidation_recovery_section(tmp_path):
     assert "Scorecard: Maintain — Operating (target Strong)" in content
     assert "Maturity Gap: testing, ci are still below the maintain bar." in content
     assert "Action Sync: Security Review is preview-ready — recommended target all." in content
-    assert "Campaign Tuning: Security Review should win ties because recent outcomes are proven." in content
-    assert "Historical Portfolio Intelligence: RepoC is improving after intervention and should be watched for durable quieting." in content
-    assert "Automation Guidance: Security Review is preview-safe: use a preview-only step first." in content
+    assert (
+        "Campaign Tuning: Security Review should win ties because recent outcomes are proven."
+        in content
+    )
+    assert (
+        "Historical Portfolio Intelligence: RepoC is improving after intervention and should be watched for durable quieting."
+        in content
+    )
+    assert (
+        "Automation Guidance: Security Review is preview-safe: use a preview-only step first."
+        in content
+    )
     assert "Follow-Through Revalidation Recovery and Confidence Re-Earning" not in content
 
 
@@ -272,4 +317,32 @@ def test_review_pack_includes_github_projects_campaign_context(tmp_path):
     content = path.read_text()
 
     assert "GitHub Projects: configured (octo-org #7, 1 items)" in content
-    assert "RepoC: [Repo Auditor] Security Review | 3 project fields | 1 managed topics | 1 Notion actions" in content
+    assert (
+        "RepoC: [Repo Auditor] Security Review | 3 project fields | 1 managed topics | 1 Notion actions"
+        in content
+    )
+
+
+def test_export_review_pack_includes_risk_posture(tmp_path) -> None:
+    import json
+
+    truth = {
+        "schema_version": "0.4.0",
+        "projects": [
+            {
+                "identity": {"display_name": "RiskyProject"},
+                "risk": {"risk_tier": "elevated", "risk_summary": "No tests, no docs."},
+            },
+            {
+                "identity": {"display_name": "SafeProject"},
+                "risk": {"risk_tier": "baseline", "risk_summary": "All good."},
+            },
+        ],
+    }
+    (tmp_path / "portfolio-truth-latest.json").write_text(json.dumps(truth))
+    report = _make_report()
+    path = export_review_pack(report, tmp_path)["review_pack_path"]
+    content = path.read_text()
+    assert "## Risk Posture" in content
+    assert "Elevated: 1" in content
+    assert "RiskyProject" in content
