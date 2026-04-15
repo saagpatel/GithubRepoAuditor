@@ -5,17 +5,19 @@ from dataclasses import dataclass
 from pathlib import Path
 
 PRIMARY_CONTEXT_CANDIDATES = ("CLAUDE.md", "AGENTS.md")
-SUPPORTING_CONTEXT_FILES = frozenset({
-    "DISCOVERY-SUMMARY.md",
-    "IMPLEMENTATION-ROADMAP.md",
-    "RESUMPTION-PROMPT.md",
-    "HANDOFF.md",
-    "STATUS.md",
-    "PROJECT.md",
-    "PLAN.md",
-    "ROADMAP.md",
-    "NOTES.md",
-})
+SUPPORTING_CONTEXT_FILES = frozenset(
+    {
+        "DISCOVERY-SUMMARY.md",
+        "IMPLEMENTATION-ROADMAP.md",
+        "RESUMPTION-PROMPT.md",
+        "HANDOFF.md",
+        "STATUS.md",
+        "PROJECT.md",
+        "PLAN.md",
+        "ROADMAP.md",
+        "NOTES.md",
+    }
+)
 MANAGED_CONTEXT_START = "<!-- portfolio-context:start -->"
 MANAGED_CONTEXT_END = "<!-- portfolio-context:end -->"
 TEMPORARY_PROJECT_PATTERNS = (
@@ -88,20 +90,24 @@ DERIVED_KEY_TO_LABEL = {
     "known_risks_present": "known risks",
     "next_recommended_move_present": "next recommended move",
 }
-STANDARD_SIGNAL_FILES = frozenset({
-    "IMPLEMENTATION-ROADMAP.md",
-    "RESUMPTION-PROMPT.md",
-    "HANDOFF.md",
-    "STATUS.md",
-    "PROJECT.md",
-    "PLAN.md",
-})
-FULL_SIGNAL_FILES = frozenset({
-    "DISCOVERY-SUMMARY.md",
-    "IMPLEMENTATION-ROADMAP.md",
-    "RESUMPTION-PROMPT.md",
-    "HANDOFF.md",
-})
+STANDARD_SIGNAL_FILES = frozenset(
+    {
+        "IMPLEMENTATION-ROADMAP.md",
+        "RESUMPTION-PROMPT.md",
+        "HANDOFF.md",
+        "STATUS.md",
+        "PROJECT.md",
+        "PLAN.md",
+    }
+)
+FULL_SIGNAL_FILES = frozenset(
+    {
+        "DISCOVERY-SUMMARY.md",
+        "IMPLEMENTATION-ROADMAP.md",
+        "RESUMPTION-PROMPT.md",
+        "HANDOFF.md",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -118,6 +124,8 @@ class ContextAnalysis:
     supporting_context_files: list[str]
 
 
+# Utility: prefers CLAUDE.md over AGENTS.md when both present.
+# Called internally by analyze_project_context() in this module.
 def choose_primary_context_file(context_files: list[str]) -> str:
     normalized = {Path(item).name for item in context_files}
     if "CLAUDE.md" in normalized:
@@ -125,7 +133,9 @@ def choose_primary_context_file(context_files: list[str]) -> str:
     return "AGENTS.md"
 
 
-def analyze_project_context(project_path: Path, context_files: list[str], *, readme_text: str = "") -> ContextAnalysis:
+def analyze_project_context(
+    project_path: Path, context_files: list[str], *, readme_text: str = ""
+) -> ContextAnalysis:
     primary_context_file = choose_primary_context_file(context_files)
     context_file_names = {Path(item).name for item in context_files}
     primary_exists = primary_context_file in context_file_names

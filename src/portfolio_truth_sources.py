@@ -13,63 +13,73 @@ from src.registry_parser import _normalize
 
 MAX_CONTEXT_DEPTH = 2
 MAX_CONTEXT_BYTES = 32_000
-SKIP_DIRS = frozenset({
-    ".git",
-    ".github",
-    ".venv",
-    ".tox",
-    "__pycache__",
-    "node_modules",
-    "vendor",
-    "dist",
-    "build",
-    ".next",
-    ".nuxt",
-    "coverage",
-    ".pytest_cache",
-    ".mypy_cache",
-    ".ruff_cache",
-    ".turbo",
-    ".idea",
-    ".vscode",
-})
-TEXT_ALLOWLIST = frozenset({
-    "README.md",
-    "README.txt",
-    "AGENTS.md",
-    "CLAUDE.md",
-    "DISCOVERY-SUMMARY.md",
-    "IMPLEMENTATION-ROADMAP.md",
-    "RESUMPTION-PROMPT.md",
-    "HANDOFF.md",
-    "STATUS.md",
-    "PROJECT.md",
-    "PLAN.md",
-    "ROADMAP.md",
-    "NOTES.md",
-})
-MANIFEST_ALLOWLIST = frozenset({
-    "package.json",
-    "pyproject.toml",
-    "Cargo.toml",
-    "requirements.txt",
-    "Package.swift",
-    "tauri.conf.json",
-    "project.godot",
-})
-PROJECT_MARKERS = frozenset({
-    "README.md",
-    "AGENTS.md",
-    "CLAUDE.md",
-    "package.json",
-    "pyproject.toml",
-    "Cargo.toml",
-    "Package.swift",
-    "project.godot",
-    "tauri.conf.json",
-    "src",
-    "tests",
-})
+SKIP_DIRS = frozenset(
+    {
+        ".git",
+        ".github",
+        ".venv",
+        ".tox",
+        "__pycache__",
+        "node_modules",
+        "vendor",
+        "dist",
+        "build",
+        ".next",
+        ".nuxt",
+        "coverage",
+        ".pytest_cache",
+        ".mypy_cache",
+        ".ruff_cache",
+        ".turbo",
+        ".idea",
+        ".vscode",
+    }
+)
+TEXT_ALLOWLIST = frozenset(
+    {
+        "README.md",
+        "README.txt",
+        "AGENTS.md",
+        "CLAUDE.md",
+        "DISCOVERY-SUMMARY.md",
+        "IMPLEMENTATION-ROADMAP.md",
+        "RESUMPTION-PROMPT.md",
+        "HANDOFF.md",
+        "STATUS.md",
+        "PROJECT.md",
+        "PLAN.md",
+        "ROADMAP.md",
+        "NOTES.md",
+    }
+)
+MANIFEST_ALLOWLIST = frozenset(
+    {
+        "package.json",
+        "pyproject.toml",
+        "Cargo.toml",
+        "requirements.txt",
+        "Package.swift",
+        "tauri.conf.json",
+        "project.godot",
+    }
+)
+PROJECT_MARKERS = frozenset(
+    {
+        "README.md",
+        "AGENTS.md",
+        "CLAUDE.md",
+        "package.json",
+        "pyproject.toml",
+        "Cargo.toml",
+        "Package.swift",
+        "project.godot",
+        "tauri.conf.json",
+        "src",
+        "tests",
+    }
+)
+
+
 def discover_workspace_projects(
     workspace_root: Path,
     *,
@@ -83,9 +93,15 @@ def discover_workspace_projects(
         if child.name.startswith(".") or not child.is_dir() or child.is_symlink():
             continue
         if _is_project_dir(child):
-            discovered.append(_inspect_project_dir(child, workspace_root, catalog_data=catalog_data, now=now))
+            discovered.append(
+                _inspect_project_dir(child, workspace_root, catalog_data=catalog_data, now=now)
+            )
             continue
-        discovered.extend(_discover_nested_projects(child, workspace_root, catalog_data=catalog_data, now=now, depth=2))
+        discovered.extend(
+            _discover_nested_projects(
+                child, workspace_root, catalog_data=catalog_data, now=now, depth=2
+            )
+        )
     return discovered
 
 
@@ -105,9 +121,15 @@ def _discover_nested_projects(
         if child.name.startswith(".") or not child.is_dir() or child.is_symlink():
             continue
         if _is_project_dir(child):
-            discovered.append(_inspect_project_dir(child, workspace_root, catalog_data=catalog_data, now=now))
+            discovered.append(
+                _inspect_project_dir(child, workspace_root, catalog_data=catalog_data, now=now)
+            )
             continue
-        discovered.extend(_discover_nested_projects(child, workspace_root, catalog_data=catalog_data, now=now, depth=depth - 1))
+        discovered.extend(
+            _discover_nested_projects(
+                child, workspace_root, catalog_data=catalog_data, now=now, depth=depth - 1
+            )
+        )
     return discovered
 
 
@@ -162,7 +184,9 @@ def load_legacy_registry_rows(path: Path | None) -> dict[str, dict[str, str]]:
     return rows
 
 
-def load_safe_notion_project_context(config_dir: Path = Path("config")) -> dict[str, dict[str, str]]:
+def load_safe_notion_project_context(
+    config_dir: Path = Path("config"),
+) -> dict[str, dict[str, str]]:
     raw_context = load_notion_project_context(config_dir) or {}
     sanitized: dict[str, dict[str, str]] = {}
     for name, context in raw_context.items():
@@ -210,7 +234,9 @@ def _inspect_project_dir(
         "supporting_context_files": context_analysis.supporting_context_files,
         "stack": stack,
         "last_meaningful_activity_at": last_activity,
-        "inferred_tool_provenance": _infer_tool_provenance(project_path, group_entry, context_files),
+        "inferred_tool_provenance": _infer_tool_provenance(
+            project_path, group_entry, context_files
+        ),
         "now": now,
     }
 
@@ -227,7 +253,9 @@ def _is_project_dir(path: Path) -> bool:
         return True
     if any(name.endswith((".xcodeproj", ".xcworkspace")) for name in names):
         return True
-    visible_files = [child for child in children if child.is_file() and not child.name.startswith(".")]
+    visible_files = [
+        child for child in children if child.is_file() and not child.name.startswith(".")
+    ]
     return bool(visible_files)
 
 
@@ -264,6 +292,8 @@ def _classify_context_quality(project_path: Path, context_files: list[str]) -> s
     return analyze_project_context(project_path, context_files).context_quality
 
 
+# Utility: reads context file text, respecting size and allowlist limits.
+# Called indirectly via context analysis pipeline.
 def read_context_text(project_path: Path, relative_file: str) -> str:
     path = project_path / relative_file
     if not path.is_file() or path.stat().st_size > MAX_CONTEXT_BYTES:
@@ -273,6 +303,8 @@ def read_context_text(project_path: Path, relative_file: str) -> str:
     return path.read_text(errors="replace")
 
 
+# Utility: returns True if context quality is "boilerplate".
+# Called indirectly via context analysis pipeline.
 def detect_boilerplate_context(project_path: Path, context_files: list[str]) -> bool:
     return analyze_project_context(project_path, context_files).context_quality == "boilerplate"
 
@@ -331,10 +363,18 @@ def _gather_git_facts(project_path: Path) -> dict[str, Any]:
             check=False,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired):
-        return {"has_git": True, "last_commit_at": None, "repo_full_name": _git_remote_full_name(project_path)}
+        return {
+            "has_git": True,
+            "last_commit_at": None,
+            "repo_full_name": _git_remote_full_name(project_path),
+        }
 
     if result.returncode != 0 or not result.stdout.strip():
-        return {"has_git": True, "last_commit_at": None, "repo_full_name": _git_remote_full_name(project_path)}
+        return {
+            "has_git": True,
+            "last_commit_at": None,
+            "repo_full_name": _git_remote_full_name(project_path),
+        }
 
     try:
         return {
@@ -343,7 +383,11 @@ def _gather_git_facts(project_path: Path) -> dict[str, Any]:
             "repo_full_name": _git_remote_full_name(project_path),
         }
     except ValueError:
-        return {"has_git": True, "last_commit_at": None, "repo_full_name": _git_remote_full_name(project_path)}
+        return {
+            "has_git": True,
+            "last_commit_at": None,
+            "repo_full_name": _git_remote_full_name(project_path),
+        }
 
 
 def _git_remote_full_name(project_path: Path) -> str:
@@ -390,9 +434,17 @@ def _latest_meaningful_mtime(project_path: Path) -> datetime | None:
             continue
         if not path.is_file():
             continue
-        if path.name.startswith(".") and path.name not in TEXT_ALLOWLIST and path.name not in MANIFEST_ALLOWLIST:
+        if (
+            path.name.startswith(".")
+            and path.name not in TEXT_ALLOWLIST
+            and path.name not in MANIFEST_ALLOWLIST
+        ):
             continue
-        if path.name not in TEXT_ALLOWLIST and path.name not in MANIFEST_ALLOWLIST and path.suffix not in {".py", ".rs", ".ts", ".tsx", ".js", ".jsx", ".swift", ".gd"}:
+        if (
+            path.name not in TEXT_ALLOWLIST
+            and path.name not in MANIFEST_ALLOWLIST
+            and path.suffix not in {".py", ".rs", ".ts", ".tsx", ".js", ".jsx", ".swift", ".gd"}
+        ):
             continue
         try:
             mtime = path.stat().st_mtime
@@ -404,7 +456,9 @@ def _latest_meaningful_mtime(project_path: Path) -> datetime | None:
     return datetime.fromtimestamp(latest, tz=timezone.utc)
 
 
-def _infer_tool_provenance(project_path: Path, group_entry: dict[str, Any], context_files: list[str]) -> str:
+def _infer_tool_provenance(
+    project_path: Path, group_entry: dict[str, Any], context_files: list[str]
+) -> str:
     declared = str(group_entry.get("tool_provenance", "") or "").strip().lower()
     if declared:
         return declared
