@@ -182,6 +182,8 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     assert alpha.derived.project_summary_present is True
     assert alpha.derived.next_recommended_move_present is True
     assert hasattr(alpha.declared, "doctor_standard")
+    assert hasattr(alpha.declared, "automation_eligible")
+    assert alpha.declared.automation_eligible is False
     assert hasattr(alpha, "risk")
     assert alpha.risk.risk_tier in {"elevated", "moderate", "baseline", "deferred"}
 

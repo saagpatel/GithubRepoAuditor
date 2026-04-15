@@ -114,7 +114,7 @@ def test_build_weekly_command_center_digest_surfaces_truth_and_guardrails() -> N
     )
 
     assert digest["contract_version"] == "weekly_command_center_digest_v1"
-    assert digest["authority_cap"] == "report-only"
+    assert digest["authority_cap"] == "bounded-automation"
     assert digest["decision_quality"]["status"] == "needs-skepticism"
     assert digest["portfolio_truth"]["project_count"] == 3
     assert digest["portfolio_truth"]["investigate_override_count"] == 2

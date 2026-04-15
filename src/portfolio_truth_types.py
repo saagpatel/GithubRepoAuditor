@@ -63,6 +63,7 @@ class DeclaredFields:
     tool_provenance: str = ""
     notes: str = ""
     doctor_standard: str = ""
+    automation_eligible: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return dataclasses.asdict(self)

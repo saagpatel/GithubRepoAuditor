@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 CONTRACT_VERSION = "portfolio_risk_v1"
-AUTHORITY_CAP = "advisory-only"
+AUTHORITY_CAP = "bounded-automation"
 
 VALID_RISK_TIERS = frozenset({"elevated", "moderate", "baseline", "deferred"})
 VALID_DOCTOR_STANDARDS = frozenset({"full", "basic"})

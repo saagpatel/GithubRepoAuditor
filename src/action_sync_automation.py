@@ -11,8 +11,9 @@ AUTOMATION_PRIORITY = {
     "manual-only": 1,
     "preview-safe": 2,
     "apply-manual": 3,
-    "follow-up-safe": 4,
-    "quiet-safe": 5,
+    "auto-apply-safe": 4,
+    "follow-up-safe": 5,
+    "quiet-safe": 6,
 }
 
 MANUAL_MONITORING_STATES = frozenset({"drift-returned", "reopened", "rollback-watch"})
@@ -41,7 +42,9 @@ def _historical_statuses(
     queue: list[dict[str, Any]],
     intervention_bundle: dict[str, Any],
 ) -> dict[str, set[str]]:
-    statuses: dict[str, set[str]] = {campaign_type: set() for campaign_type in CAMPAIGN_DISPLAY_ORDER}
+    statuses: dict[str, set[str]] = {
+        campaign_type: set() for campaign_type in CAMPAIGN_DISPLAY_ORDER
+    }
     for item in queue:
         campaign_type = str(item.get("suggested_campaign") or "").strip()
         status = str(item.get("historical_intelligence_status") or "").strip()
@@ -185,7 +188,11 @@ def _posture(
         return "manual-only"
     if execution_state == "review-drift":
         return "manual-only"
-    if execution_state == "needs-approval" and blocker_types and blocker_types.issubset({"governance-approval"}):
+    if (
+        execution_state == "needs-approval"
+        and blocker_types
+        and blocker_types.issubset({"governance-approval"})
+    ):
         return "approval-first"
     if execution_state == "needs-approval":
         return "manual-only"
@@ -195,7 +202,9 @@ def _posture(
         return "apply-manual"
     if monitoring_state in FOLLOW_UP_MONITORING_STATES:
         return "follow-up-safe"
-    if historical_statuses and historical_statuses.issubset(HISTORICAL_QUIET_STATUSES | {"improving-after-intervention"}):
+    if historical_statuses and historical_statuses.issubset(
+        HISTORICAL_QUIET_STATUSES | {"improving-after-intervention"}
+    ):
         return "quiet-safe"
     return "quiet-safe"
 
@@ -276,7 +285,9 @@ def build_action_sync_automation_bundle(
 ) -> dict[str, Any]:
     readiness_by_campaign = {
         str(item.get("campaign_type") or ""): dict(item)
-        for item in ((readiness_bundle.get("campaign_readiness_summary") or {}).get("campaigns") or [])
+        for item in (
+            (readiness_bundle.get("campaign_readiness_summary") or {}).get("campaigns") or []
+        )
     }
     packets_by_campaign = {
         str(item.get("campaign_type") or ""): dict(item)
@@ -332,18 +343,25 @@ def build_action_sync_automation_bundle(
     if next_safe:
         next_safe["summary"] = _next_safe_summary(next_safe)
 
-    automation_by_campaign = {
-        str(item.get("campaign_type") or ""): item
-        for item in records
-    }
+    automation_by_campaign = {str(item.get("campaign_type") or ""): item for item in records}
     return {
         "action_sync_automation": records,
         "automation_guidance_summary": _guidance_summary(records),
         "next_safe_automation_step": next_safe,
-        "top_preview_safe_campaigns": [item for item in ordered if item.get("automation_posture") == "preview-safe"][:3],
-        "top_apply_manual_campaigns": [item for item in ordered if item.get("automation_posture") == "apply-manual"][:3],
-        "top_approval_first_campaigns": [item for item in ordered if item.get("automation_posture") == "approval-first"][:3],
-        "top_follow_up_safe_campaigns": [item for item in ordered if item.get("automation_posture") == "follow-up-safe"][:3],
-        "top_manual_only_campaigns": [item for item in ordered if item.get("automation_posture") == "manual-only"][:3],
+        "top_preview_safe_campaigns": [
+            item for item in ordered if item.get("automation_posture") == "preview-safe"
+        ][:3],
+        "top_apply_manual_campaigns": [
+            item for item in ordered if item.get("automation_posture") == "apply-manual"
+        ][:3],
+        "top_approval_first_campaigns": [
+            item for item in ordered if item.get("automation_posture") == "approval-first"
+        ][:3],
+        "top_follow_up_safe_campaigns": [
+            item for item in ordered if item.get("automation_posture") == "follow-up-safe"
+        ][:3],
+        "top_manual_only_campaigns": [
+            item for item in ordered if item.get("automation_posture") == "manual-only"
+        ][:3],
         "operator_queue": _queue_automation(queue, automation_by_campaign),
     }

@@ -448,6 +448,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Capture a local follow-up review for an already-approved campaign packet",
     )
     parser.add_argument(
+        "--auto-apply-approved",
+        action="store_true",
+        help="Automatically apply approved campaign packets for repos that pass the automation trust bar",
+    )
+    parser.add_argument(
         "--approval-reviewer",
         type=str,
         default=None,
@@ -2391,6 +2396,116 @@ def _apply_requested_reconciliation(report: AuditReport, args, audits: list[Repo
             )
 
 
+def _run_auto_apply_approved_mode(args, output_dir: Path) -> None:
+    """Apply approved campaign packets for repos that pass the automation trust bar."""
+    import json
+
+    from src.approval_ledger import load_approval_ledger_bundle
+    from src.auto_apply import (
+        build_trust_bar_index,
+        filter_safe_actions,
+        filter_trusted_repo_actions,
+        get_approved_manual_campaigns,
+    )
+    from src.github_client import GitHubClient
+    from src.ops_writeback import (
+        apply_github_writeback,
+        build_campaign_bundle,
+        summarize_writeback_results,
+    )
+    from src.warehouse import load_latest_campaign_state
+
+    cache = None if getattr(args, "no_cache", False) else None
+    client: GitHubClient | None = (
+        GitHubClient(token=args.token, cache=cache) if getattr(args, "token", None) else None
+    )
+
+    try:
+        _report_path, _diff_dict, report = _refresh_latest_report_state(output_dir, args)
+    except FileNotFoundError:
+        print_info("No existing audit report found in output directory. Run a normal audit first.")
+        return
+
+    truth_path = output_dir / "portfolio-truth-latest.json"
+    if not truth_path.exists():
+        print_info("No portfolio truth snapshot found. Run --portfolio-truth first.")
+        return
+
+    truth_snapshot = json.loads(truth_path.read_text())
+    decision_quality_status = (
+        (report.operator_summary or {})
+        .get("decision_quality_v1", {})
+        .get("decision_quality_status", "")
+    )
+    trust_bar_index = build_trust_bar_index(truth_snapshot, decision_quality_status)
+
+    bundle = load_approval_ledger_bundle(
+        output_dir,
+        report.to_dict(),
+        list(report.operator_queue or []),
+        approval_view="all",
+    )
+    approved_campaigns = get_approved_manual_campaigns(bundle)
+
+    if not approved_campaigns:
+        print_info("No approved-manual campaign packets found.")
+        return
+
+    total_applied = 0
+    total_skipped = 0
+    for record in approved_campaigns:
+        campaign_type = str(record.get("subject_key") or "")
+        if not campaign_type:
+            continue
+        _campaign_summary, actions = build_campaign_bundle(
+            report.to_dict(),
+            campaign_type=campaign_type,
+            portfolio_profile=getattr(args, "portfolio_profile", None),
+            collection_name=getattr(args, "collection", None),
+            max_actions=None,
+            writeback_target="github",
+        )
+        safe_actions = filter_safe_actions(actions)
+        trusted_actions = filter_trusted_repo_actions(safe_actions, trust_bar_index)
+
+        if not trusted_actions:
+            skipped_repos = {str(a.get("repo") or "") for a in actions} - {
+                str(a.get("repo") or "") for a in trusted_actions
+            }
+            print_info(
+                f"Campaign {campaign_type!r}: 0 eligible actions "
+                f"(skipped repos: {', '.join(sorted(skipped_repos)) or 'none'})"
+            )
+            total_skipped += len(actions)
+            continue
+
+        if client is None:
+            print_info(
+                f"Campaign {campaign_type!r}: {len(trusted_actions)} eligible actions "
+                "but no GitHub client available (dry run)."
+            )
+            continue
+
+        previous_state = load_latest_campaign_state(output_dir, campaign_type)
+        github_results, _refs, _drift, _closure = apply_github_writeback(
+            client,
+            trusted_actions,
+            previous_state=previous_state,
+            sync_mode=str(record.get("sync_mode") or "reconcile"),
+            campaign_summary=_campaign_summary,
+            github_projects_config=None,
+            operator_context={},
+        )
+        summary = summarize_writeback_results(github_results, "github", apply=True)
+        applied_count = int(summary.get("applied_count", 0))
+        total_applied += applied_count
+        print_info(
+            f"Campaign {campaign_type!r}: applied {applied_count} / {len(trusted_actions)} actions."
+        )
+
+    print_info(f"Auto-apply complete: {total_applied} applied, {total_skipped} skipped.")
+
+
 def _run_portfolio_truth_mode(args) -> None:
     from src.portfolio_truth_publish import publish_portfolio_truth
 
@@ -3524,6 +3639,12 @@ def main() -> None:
         parser.error(
             "--control-center is the read-only Weekly Review entrypoint. Remove campaign/writeback flags or run a normal audit for Action Sync."
         )
+    if getattr(args, "auto_apply_approved", False) and (
+        args.writeback_apply or args.approve_packet or args.campaign
+    ):
+        parser.error(
+            "--auto-apply-approved runs its own bounded apply loop. Remove --writeback-apply, --approve-packet, or --campaign."
+        )
 
     if args.approval_center:
         report_output_dir = Path(args.output_dir)
@@ -3662,6 +3783,10 @@ def main() -> None:
             print_info(f"Approval follow-up receipt Markdown: {receipt_md}")
         print_info(f"Approval center JSON: {approval_json}")
         print_info(f"Approval center Markdown: {approval_md}")
+        return
+
+    if getattr(args, "auto_apply_approved", False):
+        _run_auto_apply_approved_mode(args, Path(args.output_dir))
         return
 
     if portfolio_truth_mode:

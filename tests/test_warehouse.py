@@ -272,7 +272,7 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
             "operator_effectiveness_summary": report.operator_effectiveness_summary,
             "decision_quality_v1": {
                 "contract_version": "decision_quality_v1",
-                "authority_cap": "advisory-only",
+                "authority_cap": "bounded-automation",
                 "evidence_window_runs": 6,
                 "validation_window_runs": 2,
                 "judged_recommendation_count": 4,
@@ -299,7 +299,7 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
             "recommendation_quality_summary": "Strong recommendation because the next step is tied directly to the current top target.",
             "confidence_validation_status": "healthy",
             "decision_quality_status": "trusted",
-            "decision_quality_authority_cap": "advisory-only",
+            "decision_quality_authority_cap": "bounded-automation",
             "human_skepticism_required": False,
             "downgrade_reasons": [],
             "confidence_window_runs": 6,
@@ -511,7 +511,7 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     assert latest_runs[0]["portfolio_outcomes_summary"]["summary"].startswith("Managed action closure")
     assert latest_runs[0]["operator_effectiveness_summary"]["summary"].startswith("recommendation validation")
     assert latest_runs[0]["decision_quality_summary"]["contract_version"] == "decision_quality_v1"
-    assert latest_runs[0]["decision_quality_summary"]["authority_cap"] == "advisory-only"
+    assert latest_runs[0]["decision_quality_summary"]["authority_cap"] == "bounded-automation"
     assert latest_runs[0]["high_pressure_queue_history"][0]["high_pressure_count"] == 1
     assert latest_runs[0]["campaign_outcomes_summary"]["summary"].startswith("Promotion Push was applied recently")
     assert latest_runs[0]["automation_guidance_summary"]["summary"].startswith("Use a non-mutating follow-up")
@@ -540,7 +540,7 @@ def test_write_warehouse_snapshot_persists_core_entities(tmp_path):
     assert operator_state["portfolio_outcomes_summary"]["summary"].startswith("Managed action closure")
     assert operator_state["operator_effectiveness_summary"]["summary"].startswith("recommendation validation")
     assert operator_state["decision_quality_summary"]["decision_quality_status"] == "trusted"
-    assert operator_state["decision_quality_summary"]["authority_cap"] == "advisory-only"
+    assert operator_state["decision_quality_summary"]["authority_cap"] == "bounded-automation"
     assert operator_state["high_pressure_queue_history"][0]["high_pressure_count"] == 1
     assert operator_state["campaign_outcomes_summary"]["summary"].startswith("Promotion Push was applied recently")
     assert operator_state["campaign_tuning_summary"]["summary"].startswith("Promotion Push should win ties")
