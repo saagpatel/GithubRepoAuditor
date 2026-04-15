@@ -145,6 +145,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional cap on how many eligible recovery targets to apply in one run",
     )
     parser.add_argument(
+        "--allow-dirty-worktree",
+        action="store_true",
+        help="Allow context recovery to apply to repos with uncommitted changes",
+    )
+    parser.add_argument(
         "--workspace-root",
         type=Path,
         default=DEFAULT_PORTFOLIO_WORKSPACE,
@@ -2453,7 +2458,11 @@ def _run_portfolio_context_recovery_mode(args) -> None:
         legacy_registry_path=legacy_registry_path,
         include_notion=True,
     )
-    plan = build_context_recovery_plan(build_result.snapshot, workspace_root=workspace_root)
+    plan = build_context_recovery_plan(
+        build_result.snapshot,
+        workspace_root=workspace_root,
+        allow_dirty=bool(getattr(args, "allow_dirty_worktree", False)),
+    )
     plan_json, plan_markdown = write_context_recovery_plan_artifacts(plan, output_dir=output_dir)
     print_info(f"Context recovery plan JSON: {plan_json}")
     print_info(f"Context recovery plan Markdown: {plan_markdown}")

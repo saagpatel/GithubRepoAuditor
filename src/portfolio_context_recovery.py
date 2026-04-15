@@ -67,6 +67,7 @@ def build_context_recovery_plan(
     snapshot: PortfolioTruthSnapshot,
     *,
     workspace_root: Path,
+    allow_dirty: bool = False,
 ) -> ContextRecoveryPlan:
     targets: list[ContextRecoveryTarget] = []
     target_projects = [
@@ -86,11 +87,12 @@ def build_context_recovery_plan(
         if reason:
             status = "excluded"
         else:
-            dirty_reason = _dirty_worktree_reason(project_path, project.identity.has_git)
-            if dirty_reason:
-                status = "skipped"
-                reason = dirty_reason
-            else:
+            if not allow_dirty:
+                dirty_reason = _dirty_worktree_reason(project_path, project.identity.has_git)
+                if dirty_reason:
+                    status = "skipped"
+                    reason = dirty_reason
+            if status == "eligible":
                 ambiguous_reason = _ambiguous_primary_context_reason(project_path)
                 if ambiguous_reason:
                     status = "skipped"
