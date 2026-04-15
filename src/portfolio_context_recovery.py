@@ -79,7 +79,9 @@ def build_context_recovery_plan(
 
     for index, project in enumerate(target_projects, start=1):
         project_path = workspace_root / project.identity.path
-        reason = temporary_project_reason(project.identity.project_key, project.identity.display_name)
+        reason = temporary_project_reason(
+            project.identity.project_key, project.identity.display_name
+        )
         status = "eligible"
         if reason:
             status = "excluded"
@@ -157,7 +159,9 @@ def apply_context_recovery_plan(
         target_file = project_path / target.primary_context_file
         try:
             existing_text = target_file.read_text(errors="replace") if target_file.exists() else ""
-            managed_block = render_managed_context_block(_build_context_sections(project, project_path))
+            managed_block = render_managed_context_block(
+                _build_context_sections(project, project_path)
+            )
             target_file.write_text(upsert_managed_context_block(existing_text, managed_block))
             updated.append(target.project_key)
             if target.suggested_catalog_seed:
@@ -180,6 +184,8 @@ def apply_context_recovery_plan(
     )
 
 
+# Utility: renders ContextRecoveryPlan as human-readable Markdown.
+# Called by write_context_recovery_plan_artifacts() which is wired to CLI.
 def render_context_recovery_plan_markdown(plan: ContextRecoveryPlan) -> str:
     eligible = [project for project in plan.projects if project.status == "eligible"]
     skipped = [project for project in plan.projects if project.status == "skipped"]
@@ -280,8 +286,10 @@ def _suggested_catalog_seed(project: PortfolioTruthProject) -> dict[str, str]:
     seed = {
         "owner": project.declared.owner or "d",
         "lifecycle_state": project.declared.lifecycle_state or "active",
-        "review_cadence": project.declared.review_cadence or ("weekly" if project.derived.activity_status == "active" else "monthly"),
-        "intended_disposition": project.declared.intended_disposition or _infer_disposition(project),
+        "review_cadence": project.declared.review_cadence
+        or ("weekly" if project.derived.activity_status == "active" else "monthly"),
+        "intended_disposition": project.declared.intended_disposition
+        or _infer_disposition(project),
     }
     category = project.declared.category or ""
     tool_provenance = project.declared.tool_provenance or ""
@@ -449,7 +457,10 @@ def _stack_fallback(project: PortfolioTruthProject, project_path: Path) -> str:
         lines.append("- Rust workspace contract is defined in `Cargo.toml`.")
     if (project_path / "runner.py").is_file():
         lines.append("- The repo includes a Python runner for task execution.")
-    return "\n".join(lines) or "- Stack still needs a deeper explicit handoff beyond this minimum context."
+    return (
+        "\n".join(lines)
+        or "- Stack still needs a deeper explicit handoff beyond this minimum context."
+    )
 
 
 def _run_fallback(project_path: Path) -> str:
@@ -467,9 +478,13 @@ def _risk_fallback(project: PortfolioTruthProject, project_path: Path) -> str:
         "- This repo only has minimum-viable recovery context today; deeper handoff details may still live in the README and supporting docs."
     ]
     if not project.identity.has_git:
-        lines.append("- This project is not tracked as a local git repository, so change detection and dirty-worktree safety checks are weaker.")
+        lines.append(
+            "- This project is not tracked as a local git repository, so change detection and dirty-worktree safety checks are weaker."
+        )
     if project_path.name != project_path.name.strip():
-        lines.append("- The on-disk folder name still carries whitespace drift that can make scripted paths easier to misread.")
+        lines.append(
+            "- The on-disk folder name still carries whitespace drift that can make scripted paths easier to misread."
+        )
     return "\n".join(lines)
 
 

@@ -22,6 +22,8 @@ def _labelize(value: str) -> str:
     return value.replace("-", " ").replace("_", " ").title()
 
 
+# Utility: resolves catalog entry to (path, provenance) tuple.
+# Called internally by build_operating_path_entry() in this module.
 def resolve_declared_operating_path(entry: dict[str, Any]) -> tuple[str, str]:
     explicit_path = _normalize_key(entry.get("operating_path"))
     if explicit_path in VALID_OPERATING_PATHS:
@@ -138,9 +140,7 @@ def build_operating_path_entry(
 
     path_override = INVESTIGATE_OVERRIDE if path_confidence == "low" else ""
     if path_override:
-        rationale_parts.append(
-            "Treat this repo as investigate until path confidence improves."
-        )
+        rationale_parts.append("Treat this repo as investigate until path confidence improves.")
 
     rationale = " ".join(part for part in rationale_parts if part).strip()
     if not rationale:
@@ -163,7 +163,9 @@ def build_operating_path_line(value: dict[str, Any]) -> str:
     path = _normalize_key(value.get("operating_path"))
     override = _normalize_key(value.get("path_override"))
     confidence = _normalize_key(value.get("path_confidence")) or "legacy"
-    rationale = _safe_text(value.get("path_rationale")) or "No operating-path rationale is recorded yet."
+    rationale = (
+        _safe_text(value.get("path_rationale")) or "No operating-path rationale is recorded yet."
+    )
 
     if path:
         headline = _labelize(path)
