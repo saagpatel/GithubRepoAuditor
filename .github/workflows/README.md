@@ -2,7 +2,7 @@
 
 ## `ci.yml` — Continuous Integration
 
-Runs on every push and pull request to `main`. Tests against Python 3.11, 3.12, and 3.13.
+Runs on every push and pull request to `main`. Tests against Python 3.11, 3.12, and 3.13 using Node 24-compatible GitHub Actions.
 
 Steps:
 1. Install dependencies via `pip install -e ".[dev]"`
@@ -14,7 +14,7 @@ No secrets are required for CI.
 
 ## `audit.yml` — Weekly Automated Audit
 
-Runs every Sunday at 06:00 UTC, or manually via `workflow_dispatch`.
+Runs every Sunday at 06:00 UTC, or manually via `workflow_dispatch`. Uses Node 24-compatible GitHub Actions.
 
 Steps:
 1. Install the package with config support.
