@@ -144,6 +144,9 @@ def build_operator_snapshot(
     triage_view: str = "all",
 ) -> dict:
     queue: list[dict] = []
+    age_reference = _parse_report_datetime(report_data.get("generated_at")) or datetime.now(
+        timezone.utc
+    )
     preflight = report_data.get("preflight_summary") or {}
     review_summary = report_data.get("review_summary") or {}
     review_targets = report_data.get("review_targets") or []
@@ -174,6 +177,7 @@ def build_operator_snapshot(
                     "recommended_fix", "Resolve the setup blocker before the next run."
                 ),
                 source_run_id=review_summary.get("source_run_id", ""),
+                age_reference=age_reference,
                 links=[],
             )
         )
@@ -192,6 +196,7 @@ def build_operator_snapshot(
                 ),
                 recommended_action="Inspect the managed issue, topics, or custom properties before closing or applying more campaign work.",
                 source_run_id=review_summary.get("source_run_id", ""),
+                age_reference=age_reference,
                 links=_links_from_payload(drift),
             )
         )
@@ -213,6 +218,7 @@ def build_operator_snapshot(
                 summary=drift.get("drift_type", "Governance drift detected."),
                 recommended_action="Review the governed control state and re-approve before any apply step if the fingerprint changed.",
                 source_run_id=review_summary.get("source_run_id", ""),
+                age_reference=age_reference,
                 links=_links_from_payload(drift),
             )
         )
@@ -231,6 +237,7 @@ def build_operator_snapshot(
                 ),
                 recommended_action="Review the governed controls and re-approve them before the next manual apply step.",
                 source_run_id=review_summary.get("source_run_id", ""),
+                age_reference=age_reference,
                 links=[],
             )
         )
@@ -251,6 +258,7 @@ def build_operator_snapshot(
                     "recommended_next_step", "Review the repo before reprioritizing work."
                 ),
                 source_run_id=review_summary.get("source_run_id", ""),
+                age_reference=age_reference,
                 links=[],
             )
         )
@@ -276,6 +284,7 @@ def build_operator_snapshot(
                     else "Inspect the latest changes and decide on next action."
                 ),
                 source_run_id=review_summary.get("source_run_id", ""),
+                age_reference=age_reference,
                 links=[],
             )
         )
@@ -292,6 +301,7 @@ def build_operator_snapshot(
                 summary=f"{campaign_summary.get('action_count', 0)} actions across {campaign_summary.get('repo_count', 0)} repos.",
                 recommended_action=f"Review the {writeback_preview.get('sync_mode', 'reconcile')} queue before any manual writeback.",
                 source_run_id=review_summary.get("source_run_id", ""),
+                age_reference=age_reference,
                 links=[],
             )
         )
@@ -310,6 +320,7 @@ def build_operator_snapshot(
                 summary=action.get("why", "A governed control is ready for operator review."),
                 recommended_action="Review prerequisites and approve the governed control if the repo is ready.",
                 source_run_id=review_summary.get("source_run_id", ""),
+                age_reference=age_reference,
                 links=_links_from_payload(action),
             )
         )
@@ -326,6 +337,7 @@ def build_operator_snapshot(
                 summary=f"{rollback_preview.get('item_count', 0)} managed changes exist but not all are fully reversible.",
                 recommended_action="Review rollback exposure before the next manual apply or close decision.",
                 source_run_id=review_summary.get("source_run_id", ""),
+                age_reference=age_reference,
                 links=[],
             )
         )
@@ -618,9 +630,10 @@ def _queue_item(
     summary: str,
     recommended_action: str,
     source_run_id: str,
+    age_reference: datetime | None = None,
     links: list[dict],
 ) -> dict:
-    age_days = _age_days_from_run_id(source_run_id)
+    age_days = _age_days_from_run_id(source_run_id, age_reference=age_reference)
     lane_label = LANE_LABELS.get(lane, lane.replace("-", " ").title())
     return {
         "item_id": item_id,
@@ -863,7 +876,19 @@ def _links_from_payload(payload: dict) -> list[dict]:
     return links
 
 
-def _age_days_from_run_id(source_run_id: str) -> int:
+def _parse_report_datetime(value: object) -> datetime | None:
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _age_days_from_run_id(source_run_id: str, *, age_reference: datetime | None = None) -> int:
     if not source_run_id or ":" not in source_run_id:
         return 0
     timestamp = source_run_id.split(":", 1)[1]
@@ -873,7 +898,10 @@ def _age_days_from_run_id(source_run_id: str) -> int:
         return 0
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
-    return max(0, (datetime.now(timezone.utc) - dt).days)
+    reference = age_reference or datetime.now(timezone.utc)
+    if reference.tzinfo is None:
+        reference = reference.replace(tzinfo=timezone.utc)
+    return max(0, (reference.astimezone(timezone.utc) - dt.astimezone(timezone.utc)).days)
 
 
 def _dedupe_queue(queue: list[dict]) -> list[dict]:

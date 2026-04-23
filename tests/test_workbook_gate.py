@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from src.workbook_gate import record_manual_signoff, run_workbook_gate
+from src.workbook_gate import format_gate_result, record_manual_signoff, run_workbook_gate
 
 
 def test_workbook_gate_generates_artifacts_and_validates(tmp_path):
@@ -58,6 +58,11 @@ def test_record_manual_signoff_marks_gate_ready_and_updates_artifacts(tmp_path):
     checklist = (tmp_path / "workbook-gate-checklist.md").read_text()
     assert "[x]" in checklist
     assert "Dana" in checklist
+    formatted = format_gate_result(result)
+    assert "Release status: ready" in formatted
+    assert "Manual signoff: passed" in formatted
+    assert "Workbook release gate is ready." in formatted
+    assert "complete the manual desktop Excel checklist" not in formatted
 
 
 def test_record_manual_signoff_marks_gate_blocked_on_failure(tmp_path):
