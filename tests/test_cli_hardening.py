@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from argparse import Namespace
 from dataclasses import replace
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -440,6 +441,45 @@ def test_main_doctor_writes_artifact_and_exits_cleanly(monkeypatch, tmp_path, ca
     assert "Next step: run `audit testuser --html`" in (captured.out + captured.err)
 
 
+def test_main_approval_center_writes_artifacts_without_apply(monkeypatch, tmp_path, sample_metadata, capsys):
+    args = _make_args(approval_center=True, output_dir=str(tmp_path))
+    report = cli._report_from_dict(_make_report_dict(sample_metadata))
+    approval_json = tmp_path / "approval-center-testuser-2026-03-29.json"
+    approval_md = tmp_path / "approval-center-testuser-2026-03-29.md"
+
+    def _write_approval_center_artifacts(report_arg, output_dir, *, approval_view):
+        assert report_arg.username == "testuser"
+        assert output_dir == tmp_path
+        assert approval_view == "all"
+        approval_json.write_text("{}")
+        approval_md.write_text("# approval\n")
+        return (
+            approval_json,
+            approval_md,
+            {
+                "approval_workflow_summary": {"summary": "Approval queue needs local review."},
+                "next_approval_review": {"summary": "Review governance approval next."},
+            },
+        )
+
+    monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
+    monkeypatch.setattr(
+        cli,
+        "_refresh_latest_report_state",
+        lambda _output_dir, _args: (tmp_path / "audit-report-testuser-2026-03-29.json", {}, report),
+    )
+    monkeypatch.setattr(cli, "_write_approval_center_artifacts", _write_approval_center_artifacts)
+
+    cli.main()
+
+    assert approval_json.is_file()
+    assert approval_md.is_file()
+    captured = capsys.readouterr()
+    combined = captured.out + captured.err
+    assert "Approval queue needs local review." in combined
+    assert "Review governance approval next." in combined
+
+
 def test_main_control_center_writes_artifacts_without_audit(monkeypatch, tmp_path, sample_metadata, capsys):
     args = _make_args(control_center=True, output_dir=str(tmp_path))
     report_path = tmp_path / "audit-report-testuser-2026-03-29.json"
@@ -472,6 +512,187 @@ def test_main_control_center_requires_latest_report(monkeypatch):
         cli.main()
 
     assert exc.value.code == 2
+
+
+def test_main_approve_governance_captures_local_approval(monkeypatch, tmp_path, sample_metadata, capsys):
+    args = _make_args(
+        approve_governance=True,
+        governance_scope="all",
+        approval_reviewer="local-reviewer",
+        approval_note="looks good",
+        output_dir=str(tmp_path),
+    )
+    report = cli._report_from_dict(_make_report_dict(sample_metadata))
+    approval_json = tmp_path / "approval-center-testuser-2026-03-29.json"
+    approval_md = tmp_path / "approval-center-testuser-2026-03-29.md"
+    saved: dict[str, object] = {}
+    bundle_calls = {"count": 0}
+
+    ledger_record = {
+        "approval_id": "governance:all",
+        "approval_state": "ready-for-review",
+        "approval_subject_type": "governance",
+        "subject_key": "all",
+        "fingerprint": "fp-1",
+        "source_run_id": "run-1",
+        "label": "Governance approvals",
+        "summary": "Governance approvals are ready for local review.",
+    }
+    updated_record = {
+        **ledger_record,
+        "approval_state": "approved-manual",
+        "summary": "Governance approval captured locally.",
+    }
+
+    def _load_approval_ledger_bundle(_output_dir, _report_data, _queue, *, approval_view):
+        assert approval_view == "all"
+        bundle_calls["count"] += 1
+        record = ledger_record if bundle_calls["count"] == 1 else updated_record
+        return {"approval_ledger": [record]}
+
+    def _save_approval_record(_output_dir, record):
+        saved["record"] = record
+
+    def _write_approval_center_artifacts(report_arg, output_dir, *, approval_view):
+        assert report_arg.username == "testuser"
+        assert output_dir == tmp_path
+        assert approval_view == "all"
+        approval_json.write_text("{}")
+        approval_md.write_text("# approval\n")
+        return (
+            approval_json,
+            approval_md,
+            {
+                "approval_workflow_summary": {"summary": "Approval workflow refreshed."},
+                "next_approval_review": {"summary": "No urgent follow-up review is due."},
+            },
+        )
+
+    monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
+    monkeypatch.setattr(
+        cli,
+        "_utcnow",
+        lambda: datetime(2026, 4, 17, tzinfo=timezone.utc),
+    )
+    monkeypatch.setattr(
+        cli,
+        "_refresh_latest_report_state",
+        lambda _output_dir, _args: (tmp_path / "audit-report-testuser-2026-03-29.json", {}, report),
+    )
+    monkeypatch.setattr(cli, "_refresh_shared_artifacts_from_report", lambda *_a, **_k: {})
+    monkeypatch.setattr(cli, "_write_approval_center_artifacts", _write_approval_center_artifacts)
+    monkeypatch.setattr("src.approval_ledger.load_approval_ledger_bundle", _load_approval_ledger_bundle)
+    monkeypatch.setattr(
+        "src.approval_ledger.build_approval_record",
+        lambda ledger_record, *, reviewer, note="": {
+            "approval_id": ledger_record["approval_id"],
+            "approval_subject_type": ledger_record["approval_subject_type"],
+            "subject_key": ledger_record["subject_key"],
+            "source_run_id": ledger_record["source_run_id"],
+            "fingerprint": ledger_record["fingerprint"],
+            "approved_at": "2026-03-29T00:00:00+00:00",
+            "approved_by": reviewer,
+            "approval_note": note,
+        },
+    )
+    monkeypatch.setattr("src.warehouse.save_approval_record", _save_approval_record)
+
+    cli.main()
+
+    assert saved["record"]["approval_id"] == "governance:all"
+    assert saved["record"]["approved_by"] == "local-reviewer"
+    assert approval_json.is_file()
+    assert approval_md.is_file()
+    receipt_json = tmp_path / "approval-receipt-testuser-2026-04-17.json"
+    receipt_md = tmp_path / "approval-receipt-testuser-2026-04-17.md"
+    assert receipt_json.is_file()
+    assert receipt_md.is_file()
+    captured = capsys.readouterr()
+    combined = captured.out + captured.err
+    assert "Governance approval captured locally." in combined
+    assert "Approval receipt JSON" in combined
+
+
+def test_main_generate_manifest_writes_artifact(monkeypatch, tmp_path, sample_metadata, capsys):
+    args = _make_args(generate_manifest=True, output_dir=str(tmp_path))
+    report_path = tmp_path / "audit-report-testuser-2026-03-29.json"
+    manifest_path = tmp_path / "improvement-manifest.json"
+    report_data = _make_report_dict(sample_metadata)
+
+    monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
+    monkeypatch.setattr(cli, "_load_latest_report", lambda _output_dir: (report_path, report_data))
+    monkeypatch.setattr("src.repo_improver.generate_manifest", lambda data: [{"repo": "testuser/test-repo"}])
+
+    def _write_manifest(manifest, output_dir):
+        assert manifest == [{"repo": "testuser/test-repo"}]
+        assert output_dir == tmp_path
+        manifest_path.write_text("[]")
+        return manifest_path
+
+    monkeypatch.setattr("src.repo_improver.write_manifest", _write_manifest)
+
+    cli.main()
+
+    assert manifest_path.is_file()
+    captured = capsys.readouterr()
+    assert "Improvement manifest:" in (captured.out + captured.err)
+
+
+def test_main_apply_improvements_writes_execution_report(monkeypatch, tmp_path, capsys):
+    args = _make_args(
+        apply_metadata=True,
+        apply_readmes=True,
+        improvements_file=tmp_path / "improvements.json",
+        output_dir=str(tmp_path),
+        dry_run=True,
+    )
+    execution_report = tmp_path / "improvement-execution-report.json"
+    args.improvements_file.write_text("{}")
+
+    monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
+    monkeypatch.setattr(
+        "src.repo_improver.load_improvements",
+        lambda path: {
+            "testuser/test-repo": {
+                "repo": "testuser/test-repo",
+                "name": "test-repo",
+                "description": "Updated description",
+                "topics": ["python"],
+                "readme": "# Test Repo",
+            }
+        },
+    )
+
+    metadata_calls: dict[str, object] = {}
+    readme_calls: dict[str, object] = {}
+
+    def _apply_metadata_updates(client, owner, updates, *, dry_run=False):
+        metadata_calls["owner"] = owner
+        metadata_calls["updates"] = updates
+        metadata_calls["dry_run"] = dry_run
+        return [{"repo": "test-repo", "actions": [{"type": "description", "dry_run": True}]}]
+
+    def _apply_readme_updates(client, owner, updates, *, dry_run=False):
+        readme_calls["owner"] = owner
+        readme_calls["updates"] = updates
+        readme_calls["dry_run"] = dry_run
+        return [{"repo": "test-repo", "dry_run": True}]
+
+    monkeypatch.setattr("src.repo_improver.apply_metadata_updates", _apply_metadata_updates)
+    monkeypatch.setattr("src.repo_improver.apply_readme_updates", _apply_readme_updates)
+    monkeypatch.setattr("src.repo_improver.generate_execution_report", lambda results, output_dir: execution_report)
+
+    cli.main()
+
+    assert metadata_calls["owner"] == "testuser"
+    assert metadata_calls["dry_run"] is True
+    assert readme_calls["owner"] == "testuser"
+    assert readme_calls["dry_run"] is True
+    captured = capsys.readouterr()
+    combined = captured.out + captured.err
+    assert "Metadata updates: 1 actions previewed" in combined
+    assert "README updates: 1 repos previewed" in combined
+    assert "Execution report:" in combined
 
 
 def test_main_auto_preflight_blocks_on_errors(monkeypatch):

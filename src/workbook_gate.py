@@ -1368,6 +1368,8 @@ def format_gate_result(result: dict) -> str:
     if errors:
         lines.append("Validation errors:")
         lines.extend(f"- {error}" for error in errors)
+    elif result.get("release_status") == "ready":
+        lines.append("Validation checks passed. Workbook release gate is ready.")
     else:
         lines.append("Validation checks passed. Final release step: complete the manual desktop Excel checklist.")
     return "\n".join(lines)

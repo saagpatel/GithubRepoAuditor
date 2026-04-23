@@ -34,3 +34,42 @@ Phases 0–26 complete. 456 tests, 43 test files, 11 analyzers (extensible via -
 - Do not full-clone repos — shallow clone (depth=1) only
 - Do not hardcode the GitHub username — accept it as a CLI argument
 - Do not skip private repos — use the token if provided
+<!-- portfolio-context:start -->
+# Portfolio Context
+
+## What This Project Is
+
+Python portfolio operator that audits GitHub repos across 10+ dimensions and packages a weekly story across Excel, Markdown, HTML dashboard, review-pack, control-center, and handoff surfaces. Ground-truth metrics on what's shipped vs abandoned across 100+ repos.
+
+## Current State
+
+Arc D (Phases 119-122) complete. Full local suite is expected to stay green; rerun `python3 -m pytest -q -p no:cacheprovider` for the current test count before reporting release status. Bounded-automation infrastructure wired — `--auto-apply-approved` flag with trust bar (automation_eligible + baseline risk + trusted decision quality). Weekly command center, portfolio truth snapshot, operator control center, warehouse all operational.
+
+## Stack
+
+- Python 3.11+, requests, pathlib, sqlite3
+- Output: JSON + Markdown + Excel (openpyxl, 55 sheets) + HTML + PDF
+- GitHub REST API v3 (no PyGithub), GitHub Contents API for writeback
+- Notion API for two-way sync
+
+## How To Run
+
+```
+uv run python -m src.cli <github_username> [flags]
+uv run pytest
+python -m ruff check src/ tests/
+```
+
+Common flags: `--control-center`, `--portfolio-truth`, `--portfolio-context-recovery`, `--campaign <name> --writeback-target github`, `--campaign <name> --writeback-target all --github-projects`, `--approval-center`, `--auto-apply-approved --dry-run`.
+
+## Known Risks
+
+- GitHub API rate limit (5000/hr authenticated): full-portfolio runs on large accounts may need --resume
+- Excel workbook generation is slow on 100+ repos (openpyxl, no streaming)
+- Portfolio-truth sources depend on local workspace scan — must be run from the machine that has repos cloned
+- Auto-apply trust bar is new (Arc D) — not yet battle-tested across multiple cycles
+
+## Next Recommended Move
+
+Phase 119: clear remaining elevated repos by enriching their context files. Then Phase 123: first automated run with 2-3 catalog-opted repos. See docs/plans/2026-04-15-arc-d-closeout.md for Arc E/F/G sequencing.
+<!-- portfolio-context:end -->

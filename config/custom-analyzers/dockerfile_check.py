@@ -1,15 +1,22 @@
 """Example custom analyzer — checks if a repo has a Dockerfile."""
+
 from pathlib import Path
+
 from src.analyzers.base import BaseAnalyzer
-from src.models import AnalyzerResult, RepoMetadata
 from src.github_client import GitHubClient
+from src.models import AnalyzerResult, RepoMetadata
 
 
 class DockerfileAnalyzer(BaseAnalyzer):
     name = "dockerfile"
     weight = 0.0  # Advisory — doesn't affect score
 
-    def analyze(self, repo_path: Path, metadata: RepoMetadata, github_client: GitHubClient | None = None) -> AnalyzerResult:
+    def analyze(
+        self,
+        repo_path: Path,
+        metadata: RepoMetadata,
+        github_client: GitHubClient | None = None,
+    ) -> AnalyzerResult:
         dockerfile = repo_path / "Dockerfile"
         compose = repo_path / "docker-compose.yml"
         compose_alt = repo_path / "compose.yml"

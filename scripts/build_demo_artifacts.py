@@ -1,18 +1,34 @@
 from __future__ import annotations
 
 import json
-import sys
-from pathlib import Path
+
+from _bootstrap import ensure_project_root
+
+ROOT = ensure_project_root()
 
 
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+def _load_demo_tools() -> tuple[object, object, object, object, object, object, object]:
+    from src.excel_export import export_excel
+    from src.operator_control_center import (
+        control_center_artifact_payload,
+        render_control_center_markdown,
+    )
+    from src.report_enrichment import (
+        build_run_change_counts,
+        build_run_change_summary,
+        build_score_explanation,
+    )
+    from src.web_export import export_html_dashboard
 
-from src.operator_control_center import control_center_artifact_payload, render_control_center_markdown
-from src.report_enrichment import build_run_change_counts, build_run_change_summary, build_score_explanation
-from src.web_export import export_html_dashboard
-from src.excel_export import export_excel
+    return (
+        control_center_artifact_payload,
+        render_control_center_markdown,
+        build_run_change_counts,
+        build_run_change_summary,
+        build_score_explanation,
+        export_html_dashboard,
+        export_excel,
+    )
 
 FIXTURE_PATH = ROOT / "fixtures" / "demo" / "sample-report.json"
 OUTPUT_DIR = ROOT / "output" / "demo"
@@ -84,6 +100,15 @@ def _demo_diff_data() -> dict:
 
 
 def main() -> None:
+    (
+        control_center_artifact_payload,
+        render_control_center_markdown,
+        build_run_change_counts,
+        build_run_change_summary,
+        build_score_explanation,
+        export_html_dashboard,
+        export_excel,
+    ) = _load_demo_tools()
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     report_data = json.loads(FIXTURE_PATH.read_text())
     diff_data = _demo_diff_data()

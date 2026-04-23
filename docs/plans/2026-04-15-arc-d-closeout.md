@@ -90,7 +90,13 @@ Phase 123 (first automated run) requires:
 3. At least 2-3 repos with `automation_eligible: true` in `config/portfolio-catalog.yaml`
 4. At least 1 approved-manual campaign packet targeting those repos
 
-See the Phase 123 section in `docs/plans/shimmying-tinkering-rocket.md` for the full runbook.
+Runbook:
+1. Run `audit <github-username> --portfolio-truth` and confirm the opted-in repos have `risk_tier: "baseline"`.
+2. Run `audit <github-username> --approval-center` and confirm the target campaign packet is `approved-manual`.
+3. Dry-run the bounded apply path with `audit <github-username> --auto-apply-approved --dry-run`.
+4. Review the receipt and excluded-action list; only continue if all writes target the safe mutation allowlist.
+5. Run the non-dry-run `--auto-apply-approved` path for the same approved packet.
+6. Rerun `audit <github-username> --control-center` and confirm the weekly command-center digest shows the action holding cleanly.
 
 ---
 

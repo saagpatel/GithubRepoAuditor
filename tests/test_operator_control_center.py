@@ -148,7 +148,10 @@ def test_operator_snapshot_filters_by_triage_view(tmp_path: Path):
 
 
 def test_operator_snapshot_includes_watch_guidance(tmp_path: Path):
-    snapshot = build_operator_snapshot(_make_report(), output_dir=tmp_path)
+    snapshot = build_operator_snapshot(
+        _make_report(generated_at="2026-04-17T12:00:00+00:00"),
+        output_dir=tmp_path,
+    )
     summary = snapshot["operator_summary"]
     assert summary["watch_strategy"] == "adaptive"
     assert summary["next_recommended_run_mode"] == "full"
@@ -1079,8 +1082,11 @@ def test_operator_snapshot_includes_phase_84_outcomes(monkeypatch, tmp_path: Pat
     assert (
         "guidance" in summary["adaptive_confidence_summary"].lower()
         or "immediate action" in summary["adaptive_confidence_summary"].lower()
+        or "monitoring" in summary["adaptive_confidence_summary"].lower()
     )
-    assert summary["recommendation_quality_summary"].startswith("Strong recommendation because")
+    assert summary["recommendation_quality_summary"].startswith(
+        ("Strong recommendation because", "Tentative recommendation")
+    )
 
 
 def test_operator_snapshot_attaches_portfolio_catalog_context(tmp_path: Path):

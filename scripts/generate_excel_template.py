@@ -1,17 +1,20 @@
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
+from _bootstrap import ensure_project_root
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 from openpyxl.workbook.defined_name import DefinedName
 
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+ROOT = ensure_project_root()
 
-from src.excel_template import DEFAULT_TEMPLATE_PATH, TEMPLATE_INFO_SHEET, TEMPLATE_SHEETS
+
+def _load_template_constants() -> tuple[object, object, object]:
+    from src.excel_template import DEFAULT_TEMPLATE_PATH, TEMPLATE_INFO_SHEET, TEMPLATE_SHEETS
+
+    return DEFAULT_TEMPLATE_PATH, TEMPLATE_INFO_SHEET, TEMPLATE_SHEETS
+
+
+DEFAULT_TEMPLATE_PATH, TEMPLATE_INFO_SHEET, TEMPLATE_SHEETS = _load_template_constants()
 
 
 SECTION_FILL = PatternFill("solid", fgColor="E2E8F0")

@@ -1,26 +1,29 @@
 from __future__ import annotations
 
 import json
-import sys
 import tempfile
 from copy import deepcopy
 from pathlib import Path
 from time import perf_counter
 
+from _bootstrap import ensure_project_root
 
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+ROOT = ensure_project_root()
 
-from src.excel_export import export_excel
-from src.report_enrichment import build_score_explanation
-from src.web_export import export_html_dashboard
+
+def _load_export_tools() -> tuple[object, object, object]:
+    from src.excel_export import export_excel
+    from src.report_enrichment import build_score_explanation
+    from src.web_export import export_html_dashboard
+
+    return export_excel, build_score_explanation, export_html_dashboard
 
 FIXTURE_PATH = ROOT / "fixtures" / "demo" / "sample-report.json"
 OUTPUT_PATH = ROOT / "output" / "demo" / "benchmark-results.json"
 
 
 def _large_fixture(target_repos: int = 90) -> dict:
+    _, build_score_explanation, _ = _load_export_tools()
     base = json.loads(FIXTURE_PATH.read_text())
     template_audits = base.get("audits", [])
     audits = []
@@ -44,6 +47,7 @@ def _large_fixture(target_repos: int = 90) -> dict:
 
 
 def main() -> None:
+    export_excel, _, export_html_dashboard = _load_export_tools()
     report_data = _large_fixture()
     start = perf_counter()
     with tempfile.TemporaryDirectory() as temp_dir:

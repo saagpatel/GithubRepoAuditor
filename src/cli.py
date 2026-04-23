@@ -34,6 +34,7 @@ from src.baseline_context import (
     normalize_scoring_profile,
 )
 from src.cache import ResponseCache
+from src.cli_mode_validation import validate_cli_mode_args
 from src.cli_output import create_progress, print_info, print_status, print_warning
 from src.cloner import clone_workspace
 from src.github_client import GitHubClient
@@ -83,6 +84,10 @@ CLI_MODE_EXAMPLES = """Examples by mode:
 
 def _date_str(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%d")
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 def _gh_auth_token() -> str | None:
@@ -1113,6 +1118,56 @@ def _write_approval_center_artifacts(
     return json_path, md_path, payload
 
 
+def _write_control_center_artifacts(
+    report_data: dict,
+    snapshot: dict,
+    output_dir: Path,
+    *,
+    username: str,
+    generated_at: datetime,
+    report_reference: str,
+    diff_dict: dict | None = None,
+) -> tuple[Path, Path, Path, Path, dict]:
+    from src.operator_control_center import (
+        control_center_artifact_payload,
+        render_control_center_markdown,
+    )
+    from src.weekly_command_center import (
+        build_weekly_command_center_digest,
+        load_latest_portfolio_truth,
+        write_weekly_command_center_artifacts,
+    )
+
+    json_path, md_path = _latest_control_center_paths(output_dir, username, generated_at)
+    snapshot.setdefault("operator_summary", {})["control_center_reference"] = str(json_path)
+    portfolio_truth_path, portfolio_truth = load_latest_portfolio_truth(output_dir)
+    weekly_digest = build_weekly_command_center_digest(
+        report_data,
+        snapshot,
+        diff_data=diff_dict,
+        portfolio_truth=portfolio_truth,
+        portfolio_truth_reference=str(portfolio_truth_path) if portfolio_truth_path else "",
+        control_center_reference=str(json_path),
+        report_reference=report_reference,
+        generated_at=generated_at.isoformat(),
+    )
+    weekly_json, weekly_md = write_weekly_command_center_artifacts(
+        output_dir,
+        username=username,
+        generated_at=generated_at,
+        digest=weekly_digest,
+    )
+    payload = control_center_artifact_payload(report_data, snapshot)
+    payload["weekly_command_center_digest_v1"] = weekly_digest
+    payload["weekly_command_center_reference"] = {
+        "json_path": str(weekly_json),
+        "markdown_path": str(weekly_md),
+    }
+    json_path.write_text(json.dumps(payload, indent=2))
+    md_path.write_text(render_control_center_markdown(snapshot, username, generated_at.isoformat()))
+    return json_path, md_path, weekly_json, weekly_md, payload
+
+
 def _write_approval_receipt(
     output_dir: Path,
     username: str,
@@ -1179,18 +1234,9 @@ def _refresh_shared_artifacts_from_report(
 ) -> dict[str, Path]:
     from src.excel_export import export_excel
     from src.history import load_repo_score_history, load_trend_data
-    from src.operator_control_center import (
-        control_center_artifact_payload,
-        render_control_center_markdown,
-    )
     from src.review_pack import export_review_pack
     from src.warehouse import write_warehouse_snapshot
     from src.web_export import export_html_dashboard
-    from src.weekly_command_center import (
-        build_weekly_command_center_digest,
-        load_latest_portfolio_truth,
-        write_weekly_command_center_artifacts,
-    )
 
     approval_json, approval_md, _payload = _write_approval_center_artifacts(
         report,
@@ -1231,41 +1277,22 @@ def _refresh_shared_artifacts_from_report(
         collection=args.collection,
     )
     artifact_generated_at = _report_artifact_datetime(json_path, report.generated_at)
-    control_json, control_md = _latest_control_center_paths(
-        output_dir, report.username, artifact_generated_at
-    )
-    report.operator_summary["control_center_reference"] = str(control_json)
     snapshot = {
         "operator_summary": report.operator_summary,
         "operator_queue": report.operator_queue,
     }
-    portfolio_truth_path, portfolio_truth = load_latest_portfolio_truth(output_dir)
-    weekly_digest = build_weekly_command_center_digest(
-        report.to_dict(),
-        snapshot,
-        diff_data=diff_dict,
-        portfolio_truth=portfolio_truth,
-        portfolio_truth_reference=str(portfolio_truth_path) if portfolio_truth_path else "",
-        control_center_reference=str(control_json),
-        report_reference=str(json_path),
-        generated_at=artifact_generated_at.isoformat(),
+    control_json, control_md, weekly_json, weekly_md, _control_payload = (
+        _write_control_center_artifacts(
+            report.to_dict(),
+            snapshot,
+            output_dir,
+            username=report.username,
+            generated_at=artifact_generated_at,
+            report_reference=str(json_path),
+            diff_dict=diff_dict,
+        )
     )
-    weekly_json, weekly_md = write_weekly_command_center_artifacts(
-        output_dir,
-        username=report.username,
-        generated_at=artifact_generated_at,
-        digest=weekly_digest,
-    )
-    control_payload = control_center_artifact_payload(report.to_dict(), snapshot)
-    control_payload["weekly_command_center_digest_v1"] = weekly_digest
-    control_payload["weekly_command_center_reference"] = {
-        "json_path": str(weekly_json),
-        "markdown_path": str(weekly_md),
-    }
-    control_json.write_text(json.dumps(control_payload, indent=2))
-    control_md.write_text(
-        render_control_center_markdown(snapshot, report.username, artifact_generated_at.isoformat())
-    )
+    report.operator_summary["control_center_reference"] = str(control_json)
     write_warehouse_snapshot(report, output_dir, json_path)
     return {
         "json_path": json_path,
@@ -1276,6 +1303,462 @@ def _refresh_shared_artifacts_from_report(
         "approval_center_json": approval_json,
         "approval_center_md": approval_md,
     }
+
+
+def _run_control_center_mode(args, parser) -> None:
+    from src.diff import diff_reports
+    from src.governance_activation import build_governance_summary
+    from src.history import find_previous
+    from src.operator_control_center import build_operator_snapshot, normalize_review_state
+
+    output_dir = Path(args.output_dir)
+    report_path, report_data = _load_latest_report(output_dir)
+    if not report_path or not report_data:
+        parser.error("No existing audit report found in output directory")
+
+    diff_dict = None
+    previous_path = find_previous(report_path.name)
+    if previous_path:
+        diff_dict = diff_reports(
+            previous_path,
+            report_path,
+            portfolio_profile=args.portfolio_profile,
+            collection_name=args.collection,
+        ).to_dict()
+
+    report_data["latest_report_path"] = str(report_path)
+    normalized = normalize_review_state(
+        report_data,
+        output_dir=output_dir,
+        diff_data=diff_dict,
+        portfolio_profile=args.portfolio_profile,
+        collection_name=args.collection,
+    )
+    normalized["governance_summary"] = build_governance_summary(normalized)
+    snapshot = build_operator_snapshot(
+        normalized,
+        output_dir=output_dir,
+        triage_view=args.triage_view,
+    )
+    artifact_generated_at = _report_artifact_datetime(
+        report_path,
+        _parse_iso_dt(normalized.get("generated_at")) or datetime.now(timezone.utc),
+    )
+    json_artifact, md_artifact, weekly_json, weekly_md, _payload = (
+        _write_control_center_artifacts(
+            normalized,
+            snapshot,
+            output_dir,
+            username=normalized.get("username", args.username),
+            generated_at=artifact_generated_at,
+            report_reference=str(report_path),
+            diff_dict=diff_dict,
+        )
+    )
+    _print_control_center_summary(snapshot)
+    print_info(f"Control center JSON: {json_artifact}")
+    print_info(f"Control center Markdown: {md_artifact}")
+    print_info(f"Weekly command center JSON: {weekly_json}")
+    print_info(f"Weekly command center Markdown: {weekly_md}")
+    print_info(_control_center_next_step_hint())
+
+
+def _run_approval_center_mode(args, parser) -> None:
+    report_output_dir = Path(args.output_dir)
+    try:
+        _report_path, _diff_dict, report = _refresh_latest_report_state(report_output_dir, args)
+    except FileNotFoundError:
+        parser.error("No existing audit report found in output directory")
+    approval_json, approval_md, payload = _write_approval_center_artifacts(
+        report,
+        report_output_dir,
+        approval_view=args.approval_view,
+    )
+    print_info(
+        payload.get("approval_workflow_summary", {}).get(
+            "summary", "No current approval needs review yet."
+        )
+    )
+    print_info(
+        payload.get("next_approval_review", {}).get(
+            "summary", "Stay local for now; no current approval needs review."
+        )
+    )
+    print_info(f"Approval center JSON: {approval_json}")
+    print_info(f"Approval center Markdown: {approval_md}")
+
+
+def _run_approval_capture_mode(args, parser) -> None:
+    from src.approval_ledger import (
+        build_approval_followup_record,
+        build_approval_record,
+        load_approval_ledger_bundle,
+    )
+    from src.warehouse import save_approval_followup_event, save_approval_record
+
+    report_output_dir = Path(args.output_dir)
+    try:
+        _report_path, diff_dict, report = _refresh_latest_report_state(report_output_dir, args)
+    except FileNotFoundError:
+        parser.error("No existing audit report found in output directory")
+    bundle = load_approval_ledger_bundle(
+        report_output_dir,
+        report.to_dict(),
+        list(report.operator_queue or []),
+        approval_view="all",
+    )
+    ledger = {str(item.get("approval_id") or ""): item for item in bundle.get("approval_ledger", [])}
+    if args.approve_governance or args.review_governance:
+        approval_id = f"governance:{args.governance_scope}"
+    else:
+        approval_id = f"campaign:{args.campaign}"
+    ledger_record = ledger.get(approval_id)
+    if not ledger_record:
+        parser.error("No matching approval subject is surfaced in the latest report.")
+
+    if args.approve_governance or args.approve_packet:
+        if ledger_record.get("approval_state") == "blocked":
+            parser.error(
+                "That approval subject is blocked by non-approval prerequisites and cannot be approved yet."
+            )
+        if ledger_record.get("approval_state") == "not-applicable":
+            parser.error("That approval subject is not part of the current approval workflow.")
+        approval_record = build_approval_record(
+            ledger_record,
+            reviewer=args.approval_reviewer,
+            note=args.approval_note or "",
+        )
+        save_approval_record(report_output_dir, approval_record)
+    else:
+        if ledger_record.get("approval_state") in {
+            "ready-for-review",
+            "needs-reapproval",
+            "blocked",
+            "not-applicable",
+        }:
+            parser.error(
+                "That approval subject is not currently eligible for a recurring local follow-up review."
+            )
+        if str(ledger_record.get("follow_up_command") or "").strip() == "":
+            parser.error(
+                "That approval subject does not currently expose a follow-up review command."
+            )
+        followup_event = build_approval_followup_record(
+            ledger_record,
+            reviewer=args.approval_reviewer,
+            note=args.approval_note or "",
+        )
+        save_approval_followup_event(report_output_dir, followup_event)
+
+    _report_path, diff_dict, report = _refresh_latest_report_state(report_output_dir, args)
+    _refresh_shared_artifacts_from_report(report, report_output_dir, args, diff_dict=diff_dict)
+    approval_json, approval_md, _payload = _write_approval_center_artifacts(
+        report,
+        report_output_dir,
+        approval_view="all",
+    )
+    updated_bundle = load_approval_ledger_bundle(
+        report_output_dir,
+        report.to_dict(),
+        list(report.operator_queue or []),
+        approval_view="all",
+    )
+    updated_record = next(
+        (
+            item
+            for item in updated_bundle.get("approval_ledger", [])
+            if item.get("approval_id") == approval_id
+        ),
+        ledger_record,
+    )
+    if args.approve_governance or args.approve_packet:
+        receipt_payload = {**updated_record, **approval_record}
+        receipt_json, receipt_md = _write_approval_receipt(
+            report_output_dir,
+            report.username,
+            generated_at=_utcnow(),
+            receipt=receipt_payload,
+        )
+        print_info(receipt_payload.get("summary", "Local approval captured."))
+        print_info(f"Approval receipt JSON: {receipt_json}")
+        print_info(f"Approval receipt Markdown: {receipt_md}")
+    else:
+        receipt_payload = {**updated_record, **followup_event}
+        receipt_json, receipt_md = _write_followup_review_receipt(
+            report_output_dir,
+            report.username,
+            generated_at=_utcnow(),
+            receipt=receipt_payload,
+        )
+        print_info(receipt_payload.get("summary", "Local follow-up review captured."))
+        print_info(f"Approval follow-up receipt JSON: {receipt_json}")
+        print_info(f"Approval follow-up receipt Markdown: {receipt_md}")
+    print_info(f"Approval center JSON: {approval_json}")
+    print_info(f"Approval center Markdown: {approval_md}")
+
+
+def _run_doctor_mode(args, config_inspection) -> None:
+    from src.diagnostics import format_diagnostics_report, run_diagnostics, write_diagnostics_report
+
+    result = run_diagnostics(args, config_inspection=config_inspection, full=True)
+    output_dir = Path(args.output_dir)
+    artifact_path = write_diagnostics_report(result, output_dir, args.username)
+    print(format_diagnostics_report(result))
+    print_info(f"Diagnostics artifact: {artifact_path}")
+    print_info(_doctor_next_step_hint(args.username))
+    if result.blocking_errors:
+        raise SystemExit(1)
+
+
+def _run_generate_manifest_mode(args, parser) -> None:
+    from src.repo_improver import generate_manifest, write_manifest
+
+    output_dir = Path(args.output_dir)
+    _report_path, report_data = _load_latest_report(output_dir)
+    if not report_data:
+        parser.error("No existing audit report found in output directory")
+    manifest = generate_manifest(report_data)
+    manifest_path = write_manifest(manifest, output_dir)
+    print_info(f"Improvement manifest: {manifest_path} ({len(manifest)} repos)")
+
+
+def _run_apply_improvements_mode(args, parser) -> None:
+    from src.repo_improver import (
+        apply_metadata_updates,
+        apply_readme_updates,
+        generate_execution_report,
+        load_improvements,
+    )
+
+    improvements_file = getattr(args, "improvements_file", None)
+    if not improvements_file:
+        parser.error("--apply-metadata / --apply-readmes requires --improvements-file")
+    improvements = load_improvements(improvements_file)
+    cache = None if args.no_cache else ResponseCache()
+    client = GitHubClient(token=args.token, cache=cache)
+    output_dir = Path(args.output_dir)
+    dry_run = getattr(args, "dry_run", False)
+    updates = list(improvements.values())
+
+    all_results: list[dict] = []
+    if getattr(args, "apply_metadata", False):
+        results = apply_metadata_updates(client, args.username, updates, dry_run=dry_run)
+        all_results.extend(results)
+        ok_count = sum(
+            1 for r in results for a in r.get("actions", []) if a.get("ok") or a.get("dry_run")
+        )
+        print_info(f"Metadata updates: {ok_count} actions {'previewed' if dry_run else 'applied'}")
+
+    if getattr(args, "apply_readmes", False):
+        results = apply_readme_updates(client, args.username, updates, dry_run=dry_run)
+        all_results.extend(results)
+        ok_count = sum(1 for r in results if r.get("ok") or r.get("dry_run"))
+        print_info(f"README updates: {ok_count} repos {'previewed' if dry_run else 'pushed'}")
+
+    report_path = generate_execution_report(all_results, output_dir)
+    print_info(f"Execution report: {report_path}")
+
+
+def _run_main_audit_cycle(args, config_inspection) -> None:
+    from src.diagnostics import format_preflight_summary, run_diagnostics, should_block_run
+
+    if args.preflight_mode != "off":
+        preflight = run_diagnostics(args, config_inspection=config_inspection, full=False)
+        setattr(args, "_preflight_summary", preflight.to_preflight_summary())
+        print_info(format_preflight_summary(preflight))
+        if preflight.status != "ok":
+            for check in [item for item in preflight.checks if item.status != "ok"][:5]:
+                print_warning(f"{check.summary} ({check.category})")
+        if should_block_run(preflight, args.preflight_mode):
+            raise SystemExit(1)
+
+    custom_weights, scoring_profile_name = _load_scoring_profile(args.scoring_profile)
+
+    if not args.token:
+        print_warning(
+            "No token provided. Only public repos will be fetched.\n"
+            "  Set GITHUB_TOKEN or pass --token for private repo access."
+        )
+
+    cache = None if args.no_cache else ResponseCache()
+    client = GitHubClient(token=args.token, cache=cache)
+    output_dir = Path(args.output_dir)
+
+    all_repos, errors = _fetch_repo_metadata(args, client)
+    total_fetched = len(all_repos)
+    repos = _filter_repos(
+        all_repos,
+        skip_forks=args.skip_forks,
+        skip_archived=args.skip_archived,
+    )
+    _print_filter_summary(all_repos, repos, args)
+
+    if getattr(args, "dry_run", False):
+        _print_dry_run_summary(repos)
+        return
+
+    if args.repos:
+        _run_targeted_audit(
+            args,
+            client,
+            output_dir,
+            all_repos=all_repos,
+            errors=errors,
+            custom_weights=custom_weights,
+            scoring_profile_name=scoring_profile_name,
+            watch_plan=getattr(args, "_watch_plan", None),
+            latest_trusted_baseline=getattr(args, "_latest_trusted_watch_baseline", None),
+        )
+        return
+
+    if args.incremental:
+        _run_incremental_audit(
+            args,
+            client,
+            output_dir,
+            all_repos=all_repos,
+            errors=errors,
+            custom_weights=custom_weights,
+            scoring_profile_name=scoring_profile_name,
+            watch_plan=getattr(args, "_watch_plan", None),
+            latest_trusted_baseline=getattr(args, "_latest_trusted_watch_baseline", None),
+        )
+        return
+
+    resumed_names: set[str] = set()
+    resumed_audits: list[RepoAudit] = []
+    if getattr(args, "resume", False):
+        from src.progress import load_progress
+
+        saved = load_progress(output_dir)
+        if saved:
+            completed_dicts, _run_meta = saved
+            for audit_dict in completed_dicts:
+                try:
+                    resumed_audits.append(_audit_from_dict(audit_dict))
+                    resumed_names.add(audit_dict.get("metadata", {}).get("name", ""))
+                except Exception:
+                    pass
+            if resumed_audits:
+                print_info(f"Resumed {len(resumed_audits)} previously completed repo(s)")
+                repos = [r for r in repos if r.name not in resumed_names]
+
+    runtime_stats: dict[str, float] = {}
+    audits = _analyze_repos(
+        repos,
+        args=args,
+        client=client,
+        portfolio_lang_freq=_portfolio_lang_freq_for_filtered_baseline(repos),
+        custom_weights=custom_weights,
+        runtime_stats=runtime_stats,
+    )
+    all_audits = resumed_audits + audits
+
+    if all_audits:
+        audits = all_audits
+        baseline_context = build_baseline_context_from_args(
+            args,
+            scoring_profile=scoring_profile_name,
+            portfolio_baseline_size=len(repos),
+        )
+        report = AuditReport.from_audits(
+            args.username,
+            audits,
+            errors,
+            total_fetched,
+            scoring_profile=scoring_profile_name,
+            run_mode="full",
+            portfolio_baseline_size=len(repos),
+            baseline_signature=baseline_context["baseline_signature"],
+            baseline_context=baseline_context,
+        )
+        report.watch_state = build_watch_state(
+            args,
+            scoring_profile=scoring_profile_name,
+            portfolio_baseline_size=len(repos),
+            run_mode="full",
+            watch_plan=getattr(args, "_watch_plan", None),
+            latest_trusted_baseline=getattr(args, "_latest_trusted_watch_baseline", None),
+            full_refresh_interval_days=FULL_REFRESH_DAYS,
+        )
+        report.preflight_summary = getattr(args, "_preflight_summary", {})
+        report.runtime_breakdown = runtime_stats
+        _apply_requested_reconciliation(report, args, audits)
+        outputs = _write_report_outputs(report, args, output_dir, client=client, cache=cache)
+        _print_output_summary(
+            f"Audited {report.repos_audited} repos for {report.username}", report, outputs
+        )
+
+        if getattr(args, "create_issues", False):
+            from src.issue_creator import create_audit_issues
+            from src.quick_wins import find_quick_wins
+
+            quick_wins = find_quick_wins(audits)
+            issue_result = create_audit_issues(
+                quick_wins,
+                args.username,
+                client,
+                dry_run=getattr(args, "dry_run", False),
+            )
+            print_info(
+                f"Issues: {len(issue_result['created'])} created, "
+                f"{len(issue_result['skipped'])} skipped (already exist)"
+            )
+
+        if getattr(args, "summary", False) and outputs.get("json_path"):
+            from src.diff import diff_reports, print_diff_summary
+            from src.history import find_previous
+
+            prev_path = find_previous(outputs["json_path"].name)
+            if prev_path:
+                diff = diff_reports(
+                    prev_path,
+                    outputs["json_path"],
+                    portfolio_profile=args.portfolio_profile,
+                    collection_name=args.collection,
+                )
+                print_diff_summary(diff)
+
+        return
+
+    raw_path = _write_json(
+        args.username,
+        repos,
+        errors,
+        total_fetched,
+        output_dir,
+    )
+    print(
+        f"\n✓ Fetched {total_fetched} repos for {args.username}\n"
+        f"  Included: {len(repos)} | Errors: {len(errors)}\n"
+        f"  Output: {raw_path}",
+    )
+
+
+def _run_watch_mode(args, config_inspection) -> None:
+    from src.recurring_review import choose_watch_plan
+    from src.watch import run_watch_loop
+
+    def _run_watch_once() -> None:
+        watch_plan = choose_watch_plan(
+            Path(args.output_dir),
+            args,
+            scoring_profile=normalize_scoring_profile(args.scoring_profile),
+        )
+        print_info(f"Watch decision: {watch_plan.mode} ({watch_plan.reason})")
+        original_incremental = args.incremental
+        original_repos = args.repos
+        setattr(args, "_watch_plan", watch_plan)
+        setattr(args, "_latest_trusted_watch_baseline", watch_plan.latest_trusted_baseline)
+        try:
+            args.incremental = watch_plan.mode == "incremental"
+            args.repos = None
+            _run_main_audit_cycle(args, config_inspection)
+        finally:
+            args.incremental = original_incremental
+            args.repos = original_repos
+
+    run_watch_loop(_run_watch_once, interval=args.watch_interval)
 
 
 def _doctor_next_step_hint(username: str) -> str:
@@ -3520,13 +4003,6 @@ def main() -> None:
 
     # Load config file and merge into args (CLI flags take precedence)
     from src.config import inspect_config, merge_config_with_args
-    from src.diagnostics import (
-        format_diagnostics_report,
-        format_preflight_summary,
-        run_diagnostics,
-        should_block_run,
-        write_diagnostics_report,
-    )
 
     config_inspection = inspect_config(Path(args.config) if args.config else None)
     if config_inspection.data:
@@ -3535,140 +4011,12 @@ def main() -> None:
     if not getattr(args, "approval_reviewer", None):
         args.approval_reviewer = default_approval_reviewer()
 
-    # Validate mutually exclusive registry flags
-    if args.registry and args.notion_registry:
-        parser.error("--registry and --notion-registry cannot be used together")
-    if args.sync_registry:
-        parser.error(
-            "--sync-registry has been retired. Use --portfolio-truth to regenerate project-registry.md from the canonical truth snapshot."
-        )
-    portfolio_truth_mode = bool(getattr(args, "portfolio_truth", False))
-    portfolio_context_recovery_mode = bool(getattr(args, "portfolio_context_recovery", False))
-    apply_context_recovery = bool(getattr(args, "apply_context_recovery", False))
-    context_recovery_limit = getattr(args, "context_recovery_limit", None)
-
-    if portfolio_truth_mode and portfolio_context_recovery_mode:
-        parser.error(
-            "--portfolio-truth and --portfolio-context-recovery are separate standalone modes; run one at a time."
-        )
-    standalone_portfolio_modes = portfolio_truth_mode or portfolio_context_recovery_mode
-    if apply_context_recovery and not portfolio_context_recovery_mode:
-        parser.error("--apply-context-recovery requires --portfolio-context-recovery.")
-    if context_recovery_limit is not None and context_recovery_limit <= 0:
-        parser.error("--context-recovery-limit must be a positive integer.")
-    if standalone_portfolio_modes and (
-        args.control_center
-        or args.approval_center
-        or args.campaign
-        or args.writeback_apply
-        or args.writeback_target
-        or args.github_projects
-        or args.doctor
-    ):
-        parser.error(
-            "Portfolio truth and context recovery are standalone workspace modes and cannot be combined with control-center, doctor, or Action Sync flags."
-        )
-
-    # Implied flag dependencies
-    if args.upload_badges:
-        args.badges = True
-    if args.notion_sync:
-        args.notion = True
-    if args.writeback_apply and not args.writeback_target:
-        parser.error("--writeback-apply requires --writeback-target")
-    if args.writeback_target and not args.campaign:
-        parser.error(
-            "--writeback-target belongs to Action Sync mode. Add --campaign <name> before choosing a writeback target."
-        )
-    if args.github_projects and not args.campaign:
-        parser.error(
-            "--github-projects belongs to Action Sync mode. Add --campaign <name> before enabling GitHub Projects mirroring."
-        )
-    if args.github_projects and args.writeback_target not in {"github", "all"}:
-        parser.error(
-            "--github-projects only runs inside Action Sync with --writeback-target github or all."
-        )
-    if args.approve_packet and not args.campaign:
-        parser.error("--approve-packet requires --campaign")
-    if args.review_packet and not args.campaign:
-        parser.error("--review-packet requires --campaign")
-    if args.approve_packet and args.writeback_apply:
-        parser.error(
-            "--approve-packet captures local approval only. Remove --writeback-apply and run apply separately."
-        )
-    if args.review_packet and args.writeback_apply:
-        parser.error(
-            "--review-packet captures a local follow-up review only. Remove --writeback-apply and run apply separately."
-        )
-    if args.approve_governance and args.approval_center:
-        parser.error(
-            "--approve-governance captures a local approval. Remove --approval-center for read-only mode."
-        )
-    if args.review_governance and args.approval_center:
-        parser.error(
-            "--review-governance captures a local follow-up review. Remove --approval-center for read-only mode."
-        )
-    if args.approval_center and args.control_center:
-        parser.error(
-            "--approval-center and --control-center are separate read-only views; run one at a time."
-        )
-    if args.approve_governance and args.review_governance:
-        parser.error(
-            "--approve-governance and --review-governance are separate local actions; run one at a time."
-        )
-    if args.approve_packet and args.review_packet:
-        parser.error(
-            "--approve-packet and --review-packet are separate local actions; run one at a time."
-        )
-    if args.approval_center and (
-        args.campaign
-        or args.writeback_target
-        or args.writeback_apply
-        or args.github_projects
-        or args.approve_governance
-        or args.approve_packet
-        or args.review_governance
-        or args.review_packet
-    ):
-        parser.error(
-            "--approval-center is the read-only approval view. Remove campaign, writeback, or approval-capture flags."
-        )
-    if args.control_center and (
-        args.campaign or args.writeback_target or args.writeback_apply or args.github_projects
-    ):
-        parser.error(
-            "--control-center is the read-only Weekly Review entrypoint. Remove campaign/writeback flags or run a normal audit for Action Sync."
-        )
-    if getattr(args, "auto_apply_approved", False) and (
-        args.writeback_apply or args.approve_packet or args.campaign
-    ):
-        parser.error(
-            "--auto-apply-approved runs its own bounded apply loop. Remove --writeback-apply, --approve-packet, or --campaign."
-        )
+    mode_state = validate_cli_mode_args(args, parser.error)
+    portfolio_truth_mode = mode_state.portfolio_truth_mode
+    portfolio_context_recovery_mode = mode_state.portfolio_context_recovery_mode
 
     if args.approval_center:
-        report_output_dir = Path(args.output_dir)
-        try:
-            _report_path, _diff_dict, report = _refresh_latest_report_state(report_output_dir, args)
-        except FileNotFoundError:
-            parser.error("No existing audit report found in output directory")
-        approval_json, approval_md, payload = _write_approval_center_artifacts(
-            report,
-            report_output_dir,
-            approval_view=args.approval_view,
-        )
-        print_info(
-            payload.get("approval_workflow_summary", {}).get(
-                "summary", "No current approval needs review yet."
-            )
-        )
-        print_info(
-            payload.get("next_approval_review", {}).get(
-                "summary", "Stay local for now; no current approval needs review."
-            )
-        )
-        print_info(f"Approval center JSON: {approval_json}")
-        print_info(f"Approval center Markdown: {approval_md}")
+        _run_approval_center_mode(args, parser)
         return
 
     if (
@@ -3677,112 +4025,7 @@ def main() -> None:
         or args.review_governance
         or args.review_packet
     ):
-        from src.approval_ledger import (
-            build_approval_followup_record,
-            build_approval_record,
-            load_approval_ledger_bundle,
-        )
-        from src.warehouse import save_approval_followup_event, save_approval_record
-
-        report_output_dir = Path(args.output_dir)
-        try:
-            _report_path, diff_dict, report = _refresh_latest_report_state(report_output_dir, args)
-        except FileNotFoundError:
-            parser.error("No existing audit report found in output directory")
-        bundle = load_approval_ledger_bundle(
-            report_output_dir,
-            report.to_dict(),
-            list(report.operator_queue or []),
-            approval_view="all",
-        )
-        ledger = {
-            str(item.get("approval_id") or ""): item for item in bundle.get("approval_ledger", [])
-        }
-        if args.approve_governance or args.review_governance:
-            approval_id = f"governance:{args.governance_scope}"
-        else:
-            approval_id = f"campaign:{args.campaign}"
-        ledger_record = ledger.get(approval_id)
-        if not ledger_record:
-            parser.error("No matching approval subject is surfaced in the latest report.")
-        if args.approve_governance or args.approve_packet:
-            if ledger_record.get("approval_state") == "blocked":
-                parser.error(
-                    "That approval subject is blocked by non-approval prerequisites and cannot be approved yet."
-                )
-            if ledger_record.get("approval_state") == "not-applicable":
-                parser.error("That approval subject is not part of the current approval workflow.")
-            approval_record = build_approval_record(
-                ledger_record,
-                reviewer=args.approval_reviewer,
-                note=args.approval_note or "",
-            )
-            save_approval_record(report_output_dir, approval_record)
-        else:
-            if ledger_record.get("approval_state") in {
-                "ready-for-review",
-                "needs-reapproval",
-                "blocked",
-                "not-applicable",
-            }:
-                parser.error(
-                    "That approval subject is not currently eligible for a recurring local follow-up review."
-                )
-            if str(ledger_record.get("follow_up_command") or "").strip() == "":
-                parser.error(
-                    "That approval subject does not currently expose a follow-up review command."
-                )
-            followup_event = build_approval_followup_record(
-                ledger_record,
-                reviewer=args.approval_reviewer,
-                note=args.approval_note or "",
-            )
-            save_approval_followup_event(report_output_dir, followup_event)
-        _report_path, diff_dict, report = _refresh_latest_report_state(report_output_dir, args)
-        _refresh_shared_artifacts_from_report(report, report_output_dir, args, diff_dict=diff_dict)
-        approval_json, approval_md, payload = _write_approval_center_artifacts(
-            report,
-            report_output_dir,
-            approval_view="all",
-        )
-        updated_bundle = load_approval_ledger_bundle(
-            report_output_dir,
-            report.to_dict(),
-            list(report.operator_queue or []),
-            approval_view="all",
-        )
-        updated_record = next(
-            (
-                item
-                for item in updated_bundle.get("approval_ledger", [])
-                if item.get("approval_id") == approval_id
-            ),
-            ledger_record,
-        )
-        if args.approve_governance or args.approve_packet:
-            receipt_payload = {**updated_record, **approval_record}
-            receipt_json, receipt_md = _write_approval_receipt(
-                report_output_dir,
-                report.username,
-                generated_at=datetime.now(timezone.utc),
-                receipt=receipt_payload,
-            )
-            print_info(receipt_payload.get("summary", "Local approval captured."))
-            print_info(f"Approval receipt JSON: {receipt_json}")
-            print_info(f"Approval receipt Markdown: {receipt_md}")
-        else:
-            receipt_payload = {**updated_record, **followup_event}
-            receipt_json, receipt_md = _write_followup_review_receipt(
-                report_output_dir,
-                report.username,
-                generated_at=datetime.now(timezone.utc),
-                receipt=receipt_payload,
-            )
-            print_info(receipt_payload.get("summary", "Local follow-up review captured."))
-            print_info(f"Approval follow-up receipt JSON: {receipt_json}")
-            print_info(f"Approval follow-up receipt Markdown: {receipt_md}")
-        print_info(f"Approval center JSON: {approval_json}")
-        print_info(f"Approval center Markdown: {approval_md}")
+        _run_approval_capture_mode(args, parser)
         return
 
     if getattr(args, "auto_apply_approved", False):
@@ -3797,365 +4040,24 @@ def main() -> None:
         return
 
     if args.doctor:
-        result = run_diagnostics(args, config_inspection=config_inspection, full=True)
-        output_dir = Path(args.output_dir)
-        artifact_path = write_diagnostics_report(result, output_dir, args.username)
-        print(format_diagnostics_report(result))
-        print_info(f"Diagnostics artifact: {artifact_path}")
-        print_info(_doctor_next_step_hint(args.username))
-        if result.blocking_errors:
-            raise SystemExit(1)
+        _run_doctor_mode(args, config_inspection)
         return
 
     if args.control_center:
-        from src.diff import diff_reports
-        from src.governance_activation import build_governance_summary
-        from src.history import find_previous
-        from src.operator_control_center import (
-            build_operator_snapshot,
-            control_center_artifact_payload,
-            normalize_review_state,
-            render_control_center_markdown,
-        )
-        from src.weekly_command_center import (
-            build_weekly_command_center_digest,
-            load_latest_portfolio_truth,
-            write_weekly_command_center_artifacts,
-        )
-
-        output_dir = Path(args.output_dir)
-        report_path, report_data = _load_latest_report(output_dir)
-        if not report_path or not report_data:
-            parser.error("No existing audit report found in output directory")
-
-        diff_dict = None
-        previous_path = find_previous(report_path.name)
-        if previous_path:
-            diff_dict = diff_reports(
-                previous_path,
-                report_path,
-                portfolio_profile=args.portfolio_profile,
-                collection_name=args.collection,
-            ).to_dict()
-
-        report_data["latest_report_path"] = str(report_path)
-        normalized = normalize_review_state(
-            report_data,
-            output_dir=output_dir,
-            diff_data=diff_dict,
-            portfolio_profile=args.portfolio_profile,
-            collection_name=args.collection,
-        )
-        normalized["governance_summary"] = build_governance_summary(normalized)
-        snapshot = build_operator_snapshot(
-            normalized,
-            output_dir=output_dir,
-            triage_view=args.triage_view,
-        )
-        artifact_generated_at = _report_artifact_datetime(
-            report_path,
-            _parse_iso_dt(normalized.get("generated_at")) or datetime.now(timezone.utc),
-        )
-        json_artifact, md_artifact = _latest_control_center_paths(
-            output_dir,
-            normalized.get("username", args.username),
-            artifact_generated_at,
-        )
-        snapshot.setdefault("operator_summary", {})["control_center_reference"] = str(json_artifact)
-        portfolio_truth_path, portfolio_truth = load_latest_portfolio_truth(output_dir)
-        weekly_digest = build_weekly_command_center_digest(
-            normalized,
-            snapshot,
-            diff_data=diff_dict,
-            portfolio_truth=portfolio_truth,
-            portfolio_truth_reference=str(portfolio_truth_path) if portfolio_truth_path else "",
-            control_center_reference=str(json_artifact),
-            report_reference=str(report_path),
-            generated_at=artifact_generated_at.isoformat(),
-        )
-        weekly_json, weekly_md = write_weekly_command_center_artifacts(
-            output_dir,
-            username=normalized.get("username", args.username),
-            generated_at=artifact_generated_at,
-            digest=weekly_digest,
-        )
-        control_payload = control_center_artifact_payload(normalized, snapshot)
-        control_payload["weekly_command_center_digest_v1"] = weekly_digest
-        control_payload["weekly_command_center_reference"] = {
-            "json_path": str(weekly_json),
-            "markdown_path": str(weekly_md),
-        }
-        json_artifact.write_text(json.dumps(control_payload, indent=2))
-        md_artifact.write_text(
-            render_control_center_markdown(
-                snapshot,
-                normalized.get("username", args.username),
-                artifact_generated_at.isoformat(),
-            )
-        )
-        _print_control_center_summary(snapshot)
-        print_info(f"Control center JSON: {json_artifact}")
-        print_info(f"Control center Markdown: {md_artifact}")
-        print_info(f"Weekly command center JSON: {weekly_json}")
-        print_info(f"Weekly command center Markdown: {weekly_md}")
-        print_info(_control_center_next_step_hint())
+        _run_control_center_mode(args, parser)
         return
 
     # ── Improvement campaign workflow (standalone, no audit needed) ────
     if getattr(args, "generate_manifest", False):
-        from src.repo_improver import generate_manifest, write_manifest
-
-        output_dir = Path(args.output_dir)
-        report_path, report_data = _load_latest_report(output_dir)
-        if not report_data:
-            parser.error("No existing audit report found in output directory")
-        manifest = generate_manifest(report_data)
-        manifest_path = write_manifest(manifest, output_dir)
-        print_info(f"Improvement manifest: {manifest_path} ({len(manifest)} repos)")
+        _run_generate_manifest_mode(args, parser)
         return
 
     if getattr(args, "apply_metadata", False) or getattr(args, "apply_readmes", False):
-        from src.repo_improver import (
-            apply_metadata_updates,
-            apply_readme_updates,
-            generate_execution_report,
-            load_improvements,
-        )
-
-        improvements_file = getattr(args, "improvements_file", None)
-        if not improvements_file:
-            parser.error("--apply-metadata / --apply-readmes requires --improvements-file")
-        improvements = load_improvements(improvements_file)
-        cache = None if args.no_cache else ResponseCache()
-        client = GitHubClient(token=args.token, cache=cache)
-        output_dir = Path(args.output_dir)
-        dry_run = getattr(args, "dry_run", False)
-        updates = list(improvements.values())
-
-        all_results: list[dict] = []
-        if getattr(args, "apply_metadata", False):
-            results = apply_metadata_updates(client, args.username, updates, dry_run=dry_run)
-            all_results.extend(results)
-            ok_count = sum(
-                1 for r in results for a in r.get("actions", []) if a.get("ok") or a.get("dry_run")
-            )
-            print_info(
-                f"Metadata updates: {ok_count} actions {'previewed' if dry_run else 'applied'}"
-            )
-
-        if getattr(args, "apply_readmes", False):
-            results = apply_readme_updates(client, args.username, updates, dry_run=dry_run)
-            all_results.extend(results)
-            ok_count = sum(1 for r in results if r.get("ok") or r.get("dry_run"))
-            print_info(f"README updates: {ok_count} repos {'previewed' if dry_run else 'pushed'}")
-
-        report_path = generate_execution_report(all_results, output_dir)
-        print_info(f"Execution report: {report_path}")
+        _run_apply_improvements_mode(args, parser)
         return
-
-    def _run_once() -> None:
-        if args.preflight_mode != "off":
-            preflight = run_diagnostics(args, config_inspection=config_inspection, full=False)
-            setattr(args, "_preflight_summary", preflight.to_preflight_summary())
-            print_info(format_preflight_summary(preflight))
-            if preflight.status != "ok":
-                for check in [item for item in preflight.checks if item.status != "ok"][:5]:
-                    print_warning(f"{check.summary} ({check.category})")
-            if should_block_run(preflight, args.preflight_mode):
-                raise SystemExit(1)
-
-        custom_weights, scoring_profile_name = _load_scoring_profile(args.scoring_profile)
-
-        if not args.token:
-            print_warning(
-                "No token provided. Only public repos will be fetched.\n"
-                "  Set GITHUB_TOKEN or pass --token for private repo access."
-            )
-
-        cache = None if args.no_cache else ResponseCache()
-        client = GitHubClient(token=args.token, cache=cache)
-        output_dir = Path(args.output_dir)
-
-        # Fetch all repo metadata from GitHub API (REST or GraphQL depending on flag)
-        all_repos, errors = _fetch_repo_metadata(args, client)
-        total_fetched = len(all_repos)
-        repos = _filter_repos(
-            all_repos,
-            skip_forks=args.skip_forks,
-            skip_archived=args.skip_archived,
-        )
-        _print_filter_summary(all_repos, repos, args)
-
-        # Dry-run: preview repos and exit early
-        if getattr(args, "dry_run", False):
-            _print_dry_run_summary(repos)
-            return
-
-        # Dispatch to partial run mode if requested
-        if args.repos:
-            _run_targeted_audit(
-                args,
-                client,
-                output_dir,
-                all_repos=all_repos,
-                errors=errors,
-                custom_weights=custom_weights,
-                scoring_profile_name=scoring_profile_name,
-                watch_plan=getattr(args, "_watch_plan", None),
-                latest_trusted_baseline=getattr(args, "_latest_trusted_watch_baseline", None),
-            )
-            return
-
-        if args.incremental:
-            _run_incremental_audit(
-                args,
-                client,
-                output_dir,
-                all_repos=all_repos,
-                errors=errors,
-                custom_weights=custom_weights,
-                scoring_profile_name=scoring_profile_name,
-                watch_plan=getattr(args, "_watch_plan", None),
-                latest_trusted_baseline=getattr(args, "_latest_trusted_watch_baseline", None),
-            )
-            return
-
-        # Resume: load previously completed audits and skip re-analyzing them
-        resumed_names: set[str] = set()
-        resumed_audits: list[RepoAudit] = []
-        if getattr(args, "resume", False):
-            from src.progress import load_progress
-
-            saved = load_progress(output_dir)
-            if saved:
-                completed_dicts, _run_meta = saved
-                for audit_dict in completed_dicts:
-                    try:
-                        resumed_audits.append(_audit_from_dict(audit_dict))
-                        resumed_names.add(audit_dict.get("metadata", {}).get("name", ""))
-                    except Exception:
-                        pass
-                if resumed_audits:
-                    print_info(f"Resumed {len(resumed_audits)} previously completed repo(s)")
-                    repos = [r for r in repos if r.name not in resumed_names]
-
-        runtime_stats: dict[str, float] = {}
-        audits = _analyze_repos(
-            repos,
-            args=args,
-            client=client,
-            portfolio_lang_freq=_portfolio_lang_freq_for_filtered_baseline(repos),
-            custom_weights=custom_weights,
-            runtime_stats=runtime_stats,
-        )
-        all_audits = resumed_audits + audits
-
-        # Full audit path: score every repo and write all output formats
-        if all_audits:
-            audits = all_audits
-            baseline_context = build_baseline_context_from_args(
-                args,
-                scoring_profile=scoring_profile_name,
-                portfolio_baseline_size=len(repos),
-            )
-            report = AuditReport.from_audits(
-                args.username,
-                audits,
-                errors,
-                total_fetched,
-                scoring_profile=scoring_profile_name,
-                run_mode="full",
-                portfolio_baseline_size=len(repos),
-                baseline_signature=baseline_context["baseline_signature"],
-                baseline_context=baseline_context,
-            )
-            report.watch_state = build_watch_state(
-                args,
-                scoring_profile=scoring_profile_name,
-                portfolio_baseline_size=len(repos),
-                run_mode="full",
-                watch_plan=getattr(args, "_watch_plan", None),
-                latest_trusted_baseline=getattr(args, "_latest_trusted_watch_baseline", None),
-                full_refresh_interval_days=FULL_REFRESH_DAYS,
-            )
-            report.preflight_summary = getattr(args, "_preflight_summary", {})
-            report.runtime_breakdown = runtime_stats
-            _apply_requested_reconciliation(report, args, audits)
-            outputs = _write_report_outputs(report, args, output_dir, client=client, cache=cache)
-            _print_output_summary(
-                f"Audited {report.repos_audited} repos for {report.username}", report, outputs
-            )
-
-            if getattr(args, "create_issues", False):
-                from src.issue_creator import create_audit_issues
-                from src.quick_wins import find_quick_wins
-
-                quick_wins = find_quick_wins(audits)
-                issue_result = create_audit_issues(
-                    quick_wins,
-                    args.username,
-                    client,
-                    dry_run=getattr(args, "dry_run", False),
-                )
-                print_info(
-                    f"Issues: {len(issue_result['created'])} created, "
-                    f"{len(issue_result['skipped'])} skipped (already exist)"
-                )
-
-            if getattr(args, "summary", False) and outputs.get("json_path"):
-                from src.diff import diff_reports, print_diff_summary
-                from src.history import find_previous
-
-                prev_path = find_previous(outputs["json_path"].name)
-                if prev_path:
-                    diff = diff_reports(
-                        prev_path,
-                        outputs["json_path"],
-                        portfolio_profile=args.portfolio_profile,
-                        collection_name=args.collection,
-                    )
-                    print_diff_summary(diff)
-
-            return
-
-        # Fallback: --skip-clone was used, write raw metadata only
-        raw_path = _write_json(
-            args.username,
-            repos,
-            errors,
-            total_fetched,
-            output_dir,
-        )
-        print(
-            f"\n✓ Fetched {total_fetched} repos for {args.username}\n"
-            f"  Included: {len(repos)} | Errors: {len(errors)}\n"
-            f"  Output: {raw_path}",
-        )
 
     if args.watch:
-        from src.recurring_review import choose_watch_plan
-        from src.watch import run_watch_loop
-
-        def _run_watch_once() -> None:
-            watch_plan = choose_watch_plan(
-                Path(args.output_dir),
-                args,
-                scoring_profile=normalize_scoring_profile(args.scoring_profile),
-            )
-            print_info(f"Watch decision: {watch_plan.mode} ({watch_plan.reason})")
-            original_incremental = args.incremental
-            original_repos = args.repos
-            setattr(args, "_watch_plan", watch_plan)
-            setattr(args, "_latest_trusted_watch_baseline", watch_plan.latest_trusted_baseline)
-            try:
-                args.incremental = watch_plan.mode == "incremental"
-                args.repos = None
-                _run_once()
-            finally:
-                args.incremental = original_incremental
-                args.repos = original_repos
-
-        run_watch_loop(_run_watch_once, interval=args.watch_interval)
+        _run_watch_mode(args, config_inspection)
         return
 
-    _run_once()
+    _run_main_audit_cycle(args, config_inspection)

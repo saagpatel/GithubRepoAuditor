@@ -8,6 +8,7 @@ Steps:
 1. Install dependencies via `pip install -e ".[dev]"`
 2. Run the full test suite with `pytest tests/ -v --tb=short`
 3. Lint with `ruff check src/ tests/`
+4. Type-check the extracted operator trend seams with scoped `mypy`
 
 No secrets are required for CI.
 

@@ -290,3 +290,299 @@ repos:
     intended_disposition: experiment
     category: fun
     tool_provenance: codex
+  APIReverse:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: vanity
+    tool_provenance: claude-code
+  ArguMap:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: vanity
+    tool_provenance: claude-code
+  AssistSupport:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: it-work
+    tool_provenance: codex
+  bridge-db:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    tool_provenance: claude-code
+    category: vanity
+  Codec:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: vanity
+    tool_provenance: claude-code
+  DNSWatcher:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    tool_provenance: codex
+    category: vanity
+  GlassLayer:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: vanity
+    tool_provenance: claude-code
+  IncidentReview:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: it-work
+    tool_provenance: codex
+  ink:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: vanity
+    tool_provenance: claude-code
+  Interruption Resume Studio:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: it-work
+    tool_provenance: claude-code
+  mcpforge:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    tool_provenance: claude-code
+  ModelColosseum:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: vanity
+    tool_provenance: claude-code
+  NetworkDecoder:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: vanity
+    tool_provenance: claude-code
+  NetworkMapper:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    tool_provenance: claude-code
+  NeuralNetwork:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    tool_provenance: claude-code
+  notification-hub:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    tool_provenance: claude-code
+    category: vanity
+  Premise:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: vanity
+    tool_provenance: claude-code
+  Pulse Orbit:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: vanity
+    tool_provenance: claude-code
+  ReturnRadar:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: vanity
+    tool_provenance: claude-code
+  Signal & Noise:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    tool_provenance: claude-code
+  Sovereign:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: fun
+    tool_provenance: claude-code
+  SpecCompanion:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: vanity
+    tool_provenance: codex
+  thought-trails:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: vanity
+    tool_provenance: claude-code
+  TradeOffAtlas:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: vanity
+    tool_provenance: claude-code
+  Afterimage:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    tool_provenance: claude-code
+  Calibrate:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    tool_provenance: claude-code
+  GhostRoutes:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    tool_provenance: claude-code
+  Liminal:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    tool_provenance: claude-code
+  Nocturne:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    tool_provenance: claude-code
+  Redact:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    tool_provenance: claude-code
+  RoomTone:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    tool_provenance: claude-code
+  TideEngine:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    tool_provenance: claude-code
+  Wavelength:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    tool_provenance: claude-code
+  ComplianceKit:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: commercial
+    tool_provenance: claude-code
+  ConvictionMapper:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: vanity
+    tool_provenance: claude-code
+  DevToolsTranslator:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: vanity
+  GPT_RAG:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: infrastructure
+    tool_provenance: codex
+  visual-album-studio:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: fun
+    tool_provenance: codex
+  IncidentWorkbench:
+    owner: d
+    lifecycle_state: maintenance
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: it-work
+  KBFreshnessDetector:
+    owner: d
+    lifecycle_state: maintenance
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: it-work
+  LoreKeeper:
+    owner: d
+    lifecycle_state: maintenance
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: fun
+    tool_provenance: codex
+  PersonalKBDrafter:
+    owner: d
+    lifecycle_state: maintenance
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: it-work
+  PomGambler:
+    owner: d
+    lifecycle_state: maintenance
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: fun
+    tool_provenance: codex
+  ScreenshotAnnotate:
+    owner: d
+    lifecycle_state: maintenance
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: it-work
+  TicketHandoff:
+    owner: d
+    lifecycle_state: maintenance
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: it-work
