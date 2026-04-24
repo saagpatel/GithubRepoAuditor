@@ -100,6 +100,43 @@ class TestGitHubClientHardening:
         assert client.get_code_scanning_alert_count("o", "r")["http_status"] == 404
         assert client.get_sbom_exportability("o", "r")["available"] is False
 
+    def test_security_alert_endpoint_403_and_404_are_not_warnings(self, monkeypatch, caplog):
+        client = GitHubClient()
+
+        def _raise(status_code):
+            response = requests.Response()
+            response.status_code = status_code
+            raise requests.HTTPError(response=response)
+
+        monkeypatch.setattr(client, "_fetch_json", lambda *a, **k: _raise(403))
+
+        with caplog.at_level("WARNING"):
+            assert client.get_secret_scanning_alert_count("o", "r")["http_status"] == 403
+
+        assert "secret scanning alerts" not in caplog.text
+
+        monkeypatch.setattr(client, "_fetch_json", lambda *a, **k: _raise(404))
+        caplog.clear()
+
+        with caplog.at_level("WARNING"):
+            assert client.get_code_scanning_alert_count("o", "r")["http_status"] == 404
+
+        assert "code scanning alerts" not in caplog.text
+
+    def test_security_alert_endpoint_unexpected_http_errors_still_warn(
+        self, monkeypatch, caplog
+    ):
+        client = GitHubClient()
+        response = requests.Response()
+        response.status_code = 500
+        error = requests.HTTPError(response=response)
+        monkeypatch.setattr(client, "_fetch_json", lambda *a, **k: (_ for _ in ()).throw(error))
+
+        with caplog.at_level("WARNING"):
+            assert client.get_code_scanning_alert_count("o", "r")["http_status"] == 500
+
+        assert "Failed to fetch code scanning alerts for o/r" in caplog.text
+
     def test_get_repo_topics_reads_names_payload(self, monkeypatch):
         client = GitHubClient()
         monkeypatch.setattr(client, "_fetch_json", lambda *a, **k: {"names": ["python", "ghra-showcase"]})

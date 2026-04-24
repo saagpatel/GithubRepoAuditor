@@ -2,12 +2,13 @@
 
 ## Status
 
-PR #120 and PR #121 are merged into `main`.
+PR #120, PR #121, and PR #122 are merged into `main`.
 
 - PR #120 closed the workbook/export and operator-trend refactor batch, stabilized time-sensitive tests, and refreshed stale operator docs.
 - PR #121 updated GitHub Actions to Node 24-compatible major versions.
-- Latest verified local branch before this note: `main` aligned with `origin/main` at merge commit `eb28f67`.
-- Latest verified GitHub main CI after PR #121: passed.
+- PR #122 recorded the post-merge rehearsal state and restored `python3 -m src.cli --help` behavior.
+- Latest verified local branch before this note update: `main` aligned with `origin/main` at merge commit `743d833`.
+- Latest verified GitHub main CI after PR #122: passed.
 
 No P1/P2/P3 review findings from the April repair list remain open.
 
@@ -68,6 +69,6 @@ Recommended maintainability pass:
 ## Follow-Ups
 
 1. Complete manual desktop Excel signoff for the generated workbook if this rehearsal becomes a release record.
-2. Reduce GitHub security endpoint warning noise; the audit completed, but unavailable code/secret-scanning endpoints produced a long warning stream.
-3. Use `python3 -m src` or the installed `audit` console script after `pip install -e ".[dev,config]"`; this branch also restores `python3 -m src.cli --help` behavior.
+2. Reduce GitHub security endpoint warning noise; expected 403/404 responses from code/secret-scanning alert endpoints should be summarized or quieted without hiding real API outages.
+3. Use `python3 -m src` or the installed `audit` console script after `pip install -e ".[dev,config]"`; PR #122 restored `python3 -m src.cli --help` behavior.
 4. Start Phase 123 only after explicit catalog eligibility and approval-center readiness exist.
