@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 import tomllib
 from pathlib import Path
 
@@ -26,6 +28,19 @@ def _requirements_names() -> set[str]:
 def test_pyproject_exposes_audit_console_script():
     data = tomllib.loads((ROOT / "pyproject.toml").read_text())
     assert data["project"]["scripts"]["audit"] == "src.cli:main"
+
+
+def test_cli_module_executes_help():
+    result = subprocess.run(
+        [sys.executable, "-m", "src.cli", "--help"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    assert "usage: github-repo-auditor" in result.stdout
+    assert "--control-center" in result.stdout
 
 
 def test_requirements_cover_runtime_and_config_dependencies():

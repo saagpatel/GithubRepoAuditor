@@ -4061,3 +4061,7 @@ def main() -> None:
         return
 
     _run_main_audit_cycle(args, config_inspection)
+
+
+if __name__ == "__main__":
+    main()
