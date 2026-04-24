@@ -41,7 +41,16 @@ Follow-up gate results:
 - Approval center still reported no current approval needs review.
 - `--auto-apply-approved --dry-run` still reported no approved-manual campaign packets.
 
-Do not live-apply from this state. The next safe implementation step is to make the campaign packet generation or approval flow explicitly show the automation-eligible subset before capturing any local campaign approval.
+Do not live-apply from this state. The campaign packet generation and approval flow now carry an `automation_subset` field, and `--auto-apply-approved --dry-run` prints the trust-bar counts before looking for approved packets. The next safe implementation step is to regenerate the relevant packet and confirm the visible subset before capturing any local campaign approval.
+
+Follow-up implementation check:
+
+- `python3 -m src saagpatel --repos mcpforge TradeOffAtlas TideEngine --campaign security-review --writeback-target github --max-actions 10`
+  - `security-review` packet now shows 3 automation-eligible repos and 0 eligible actions.
+  - `promotion-push` packet now shows 3 automation-eligible repos and 1 eligible action on `TideEngine`.
+- `python3 -m src saagpatel --auto-apply-approved --dry-run`
+  - Trust-bar summary reports 3 opted-in repos, 3 baseline opted-in repos, and 0 full trust-bar repos because decision quality is still `insufficient-data`.
+  - No approved-manual campaign packets exist yet.
 
 ## Candidate Shortlist
 
@@ -75,11 +84,15 @@ Secondary candidates if one of the first three is rejected:
    python3 -m src saagpatel --campaign security-review --writeback-target github
    ```
 
+   Confirm the packet's `automation_subset` lists only the intentionally opted-in repos and separates eligible from non-eligible actions.
+
 5. Review the approval center:
 
    ```bash
    python3 -m src saagpatel --approval-center
    ```
+
+   Confirm the approval record preserves the same `automation_subset` before capturing approval.
 
 6. Only after the packet is intentionally approved, run:
 
@@ -87,7 +100,7 @@ Secondary candidates if one of the first three is rejected:
    python3 -m src saagpatel --auto-apply-approved --dry-run
    ```
 
-7. Live apply remains blocked until the dry run shows exactly the expected repo/action set.
+7. Live apply remains blocked until the dry run's trust-bar summary and eligible action output show exactly the expected repo/action set.
 
 ## Not Done Here
 

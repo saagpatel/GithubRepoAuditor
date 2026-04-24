@@ -453,6 +453,7 @@ def _campaign_record(
     review_checklist = [
         "Confirm the campaign target, sync mode, and top repos are still the intended next step.",
         "Review approval-only blockers and rollback coverage before capturing approval.",
+        "Confirm the automation-eligible subset before any auto-apply dry run or live apply.",
         "Keep apply separate from approval capture.",
     ]
     review_command = f"audit {_username(report_data)} --approval-center --approval-view ready"
@@ -494,6 +495,7 @@ def _campaign_record(
         "blocker_types": sorted(blocker_types),
         "recommended_target": packet.get("recommended_target", "none"),
         "sync_mode": packet.get("sync_mode", "reconcile"),
+        "automation_subset": dict(packet.get("automation_subset") or {}),
     }
     return _derive_follow_up_fields(
         report_data,

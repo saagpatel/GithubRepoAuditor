@@ -52,6 +52,39 @@ def build_trust_bar_index(
     return index
 
 
+def summarize_trust_bar(
+    truth_snapshot: dict[str, Any],
+    decision_quality_status: str,
+) -> dict[str, Any]:
+    """Return operator-facing counts for the automation trust bar."""
+    index = build_trust_bar_index(truth_snapshot, decision_quality_status)
+    automation_eligible: list[str] = []
+    baseline_eligible: list[str] = []
+    trusted_repos: list[str] = []
+    for project in truth_snapshot.get("projects", []):
+        repo_name = str(project.get("identity", {}).get("display_name", "") or "")
+        if not repo_name:
+            continue
+        declared = project.get("declared") or {}
+        risk = project.get("risk") or {}
+        if bool(declared.get("automation_eligible", False)):
+            automation_eligible.append(repo_name)
+            if str(risk.get("risk_tier") or "elevated") == "baseline":
+                baseline_eligible.append(repo_name)
+        if index.get(repo_name, False):
+            trusted_repos.append(repo_name)
+
+    return {
+        "decision_quality_status": decision_quality_status or "unknown",
+        "automation_eligible_count": len(automation_eligible),
+        "automation_eligible_repos": sorted(automation_eligible),
+        "baseline_eligible_count": len(baseline_eligible),
+        "baseline_eligible_repos": sorted(baseline_eligible),
+        "trusted_repo_count": len(trusted_repos),
+        "trusted_repos": sorted(trusted_repos),
+    }
+
+
 def get_approved_manual_campaigns(ledger_bundle: dict[str, Any]) -> list[dict[str, Any]]:
     """Return approval ledger records with approval_state: approved-manual."""
     return [
