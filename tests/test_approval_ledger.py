@@ -120,6 +120,14 @@ def test_campaign_approval_can_become_approved_but_manual(tmp_path: Path) -> Non
                 "apply_command": "audit testuser --campaign security-review --writeback-target all --writeback-apply",
                 "top_repos": ["user/RepoA"],
                 "actions": [{"action_id": "action-1"}],
+                "automation_subset": {
+                    "automation_eligible_repos": ["RepoA"],
+                    "automation_eligible_repo_count": 1,
+                    "automation_eligible_action_repos": ["RepoA"],
+                    "automation_eligible_action_repo_count": 1,
+                    "automation_eligible_action_count": 1,
+                    "non_eligible_action_count": 1,
+                },
             }
         ],
         "action_sync_automation": [
@@ -139,6 +147,18 @@ def test_campaign_approval_can_become_approved_but_manual(tmp_path: Path) -> Non
 
     assert second_record["approval_state"] == "approved-manual"
     assert second_record["manual_apply_command"].endswith("--writeback-apply")
+    assert second_record["automation_subset"] == {
+        "automation_eligible_repos": ["RepoA"],
+        "automation_eligible_repo_count": 1,
+        "automation_eligible_action_repos": ["RepoA"],
+        "automation_eligible_action_repo_count": 1,
+        "automation_eligible_action_count": 1,
+        "non_eligible_action_count": 1,
+    }
+    assert any(
+        "automation-eligible subset" in item
+        for item in second_record["review_checklist"]
+    )
 
 
 def test_approved_campaign_can_surface_overdue_follow_up_review(tmp_path: Path) -> None:

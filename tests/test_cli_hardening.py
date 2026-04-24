@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from argparse import Namespace
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -512,6 +513,65 @@ def test_main_control_center_requires_latest_report(monkeypatch):
         cli.main()
 
     assert exc.value.code == 2
+
+
+def test_auto_apply_dry_run_prints_automation_trust_bar(
+    monkeypatch,
+    tmp_path,
+    sample_metadata,
+    capsys,
+):
+    args = _make_args(output_dir=str(tmp_path), token=None)
+    report_data = _make_report_dict(sample_metadata)
+    report_data["operator_summary"] = {
+        "decision_quality_v1": {"decision_quality_status": "trusted"}
+    }
+    report = cli._report_from_dict(report_data)
+    truth_path = tmp_path / "portfolio-truth-latest.json"
+    truth_path.write_text(
+        json.dumps(
+            {
+                "projects": [
+                    {
+                        "identity": {"display_name": "Alpha"},
+                        "declared": {"automation_eligible": True},
+                        "risk": {"risk_tier": "baseline"},
+                    },
+                    {
+                        "identity": {"display_name": "Beta"},
+                        "declared": {"automation_eligible": True},
+                        "risk": {"risk_tier": "elevated"},
+                    },
+                    {
+                        "identity": {"display_name": "Gamma"},
+                        "declared": {"automation_eligible": False},
+                        "risk": {"risk_tier": "baseline"},
+                    },
+                ]
+            }
+        )
+    )
+
+    monkeypatch.setattr(
+        cli,
+        "_refresh_latest_report_state",
+        lambda _output_dir, _args: (tmp_path / "audit-report-testuser-2026-03-29.json", {}, report),
+    )
+    monkeypatch.setattr(
+        "src.approval_ledger.load_approval_ledger_bundle",
+        lambda *_args, **_kwargs: {"approval_ledger": []},
+    )
+
+    cli._run_auto_apply_approved_mode(args, tmp_path)
+
+    captured = capsys.readouterr()
+    combined = captured.out + captured.err
+    normalized = " ".join(combined.split())
+    assert "Automation trust bar: 2 opted-in repos" in normalized
+    assert "1 baseline opted-in repos" in normalized
+    assert "1 repos pass the full trust bar" in normalized
+    assert "Automation-eligible repos: Alpha, Beta" in normalized
+    assert "No approved-manual campaign packets found." in normalized
 
 
 def test_main_approve_governance_captures_local_approval(monkeypatch, tmp_path, sample_metadata, capsys):

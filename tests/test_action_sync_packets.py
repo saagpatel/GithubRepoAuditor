@@ -149,6 +149,48 @@ def test_packet_is_preview_next_when_campaign_is_preview_ready():
     assert packet["apply_command"] == ""
 
 
+def test_packet_surfaces_automation_eligible_subset():
+    report_data = _report_data()
+    for audit in report_data["audits"]:
+        if audit["metadata"]["name"] == "RepoSecure":
+            audit["portfolio_catalog"] = {
+                "repo": "RepoSecure",
+                "automation_eligible": True,
+            }
+
+    bundle = _bundle(report_data)
+    packet = _packet(bundle, "security-review")
+
+    assert packet["action_count"] == 1
+    assert packet["automation_subset"] == {
+        "automation_eligible_repos": ["RepoSecure"],
+        "automation_eligible_repo_count": 1,
+        "automation_eligible_action_repos": ["RepoSecure"],
+        "automation_eligible_action_repo_count": 1,
+        "automation_eligible_action_count": 1,
+        "non_eligible_action_count": 0,
+    }
+
+
+def test_packet_surfaces_non_eligible_actions_separately():
+    report_data = _report_data()
+    for audit in report_data["audits"]:
+        if audit["metadata"]["name"] == "RepoSecure":
+            audit["portfolio_catalog"] = {
+                "repo": "RepoSecure",
+                "automation_eligible": True,
+            }
+
+    bundle = _bundle(report_data)
+    packet = _packet(bundle, "promotion-push")
+
+    assert packet["action_count"] == 1
+    assert packet["automation_subset"]["automation_eligible_repos"] == ["RepoSecure"]
+    assert packet["automation_subset"]["automation_eligible_action_repos"] == []
+    assert packet["automation_subset"]["automation_eligible_action_count"] == 0
+    assert packet["automation_subset"]["non_eligible_action_count"] == 1
+
+
 def test_packet_is_review_drift_when_managed_drift_exists():
     bundle = _bundle(
         _report_data(

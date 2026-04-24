@@ -34,6 +34,47 @@ def _campaign_actions(report_data: dict[str, Any], campaign_type: str) -> list[d
     return actions
 
 
+def _automation_eligible_repo_names(report_data: dict[str, Any]) -> set[str]:
+    names: set[str] = set()
+    for audit in report_data.get("audits", []) or []:
+        catalog = audit.get("portfolio_catalog") or {}
+        if not catalog.get("automation_eligible"):
+            continue
+        repo_name = str(
+            catalog.get("repo")
+            or audit.get("metadata", {}).get("name")
+            or ""
+        ).strip()
+        if repo_name:
+            names.add(repo_name)
+    return names
+
+
+def _automation_subset(
+    report_data: dict[str, Any],
+    actions: list[dict[str, Any]],
+) -> dict[str, Any]:
+    eligible_repos = _automation_eligible_repo_names(report_data)
+    eligible_action_repos = sorted(
+        {
+            str(action.get("repo") or "")
+            for action in actions
+            if str(action.get("repo") or "") in eligible_repos
+        }
+    )
+    eligible_action_count = sum(
+        1 for action in actions if str(action.get("repo") or "") in eligible_repos
+    )
+    return {
+        "automation_eligible_repos": sorted(eligible_repos),
+        "automation_eligible_repo_count": len(eligible_repos),
+        "automation_eligible_action_repos": eligible_action_repos,
+        "automation_eligible_action_repo_count": len(eligible_action_repos),
+        "automation_eligible_action_count": eligible_action_count,
+        "non_eligible_action_count": max(0, len(actions) - eligible_action_count),
+    }
+
+
 def _github_projects_enabled_and_healthy(report_data: dict[str, Any]) -> bool:
     github_projects = ((report_data.get("writeback_preview") or {}).get("github_projects") or {})
     return bool(github_projects.get("enabled")) and _github_projects_ready(report_data)
@@ -272,6 +313,7 @@ def build_action_sync_packets_bundle(
             "preview_command": preview_command,
             "apply_command": apply_command,
             "top_repos": list(readiness_record.get("top_repos") or []),
+            "automation_subset": _automation_subset(report_data, actions),
         }
         packet["summary"] = _packet_summary(packet)
         packets.append(packet)

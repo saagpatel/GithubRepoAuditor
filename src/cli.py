@@ -1053,6 +1053,7 @@ def _refresh_latest_report_state(
     report_data["latest_report_path"] = str(report_path)
     report_data["governance_summary"] = build_governance_summary(report_data)
     report = _report_from_dict(report_data)
+    report = _apply_portfolio_catalog(report, args)
     report = _enrich_report_with_operator_state(
         report,
         output_dir=output_dir,
@@ -2889,6 +2890,7 @@ def _run_auto_apply_approved_mode(args, output_dir: Path) -> None:
         filter_safe_actions,
         filter_trusted_repo_actions,
         get_approved_manual_campaigns,
+        summarize_trust_bar,
     )
     from src.github_client import GitHubClient
     from src.ops_writeback import (
@@ -2921,6 +2923,19 @@ def _run_auto_apply_approved_mode(args, output_dir: Path) -> None:
         .get("decision_quality_status", "")
     )
     trust_bar_index = build_trust_bar_index(truth_snapshot, decision_quality_status)
+    trust_bar_summary = summarize_trust_bar(truth_snapshot, decision_quality_status)
+    print_info(
+        "Automation trust bar: "
+        f"{trust_bar_summary['automation_eligible_count']} opted-in repos; "
+        f"{trust_bar_summary['baseline_eligible_count']} baseline opted-in repos; "
+        f"{trust_bar_summary['trusted_repo_count']} repos pass the full trust bar "
+        f"(decision quality: {trust_bar_summary['decision_quality_status']})."
+    )
+    if trust_bar_summary["automation_eligible_repos"]:
+        print_info(
+            "Automation-eligible repos: "
+            + ", ".join(trust_bar_summary["automation_eligible_repos"])
+        )
 
     bundle = load_approval_ledger_bundle(
         output_dir,
@@ -3396,6 +3411,7 @@ def _write_report_outputs(
             f"{len([c for c in diff.score_changes if abs(c['delta']) > 0.05])} significant score changes"
         )
 
+    report = _apply_portfolio_catalog(report, args)
     report = _enrich_report_with_operator_state(
         report,
         output_dir=output_dir,

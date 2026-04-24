@@ -8,6 +8,7 @@ from src.auto_apply import (
     filter_safe_actions,
     filter_trusted_repo_actions,
     get_approved_manual_campaigns,
+    summarize_trust_bar,
 )
 
 # ---------------------------------------------------------------------------
@@ -86,6 +87,46 @@ def test_trust_bar_index_skips_projects_without_display_name():
     snapshot = {"projects": [{"identity": {}, "declared": {}, "risk": {}}]}
     index = build_trust_bar_index(snapshot, "trusted")
     assert index == {}
+
+
+# ---------------------------------------------------------------------------
+# summarize_trust_bar
+# ---------------------------------------------------------------------------
+
+
+def test_summarize_trust_bar_surfaces_opt_in_baseline_and_trusted_repos():
+    snapshot = {
+        "projects": [
+            _project("Alpha", automation_eligible=True, risk_tier="baseline"),
+            _project("Beta", automation_eligible=True, risk_tier="elevated"),
+            _project("Gamma", automation_eligible=False, risk_tier="baseline"),
+        ]
+    }
+
+    summary = summarize_trust_bar(snapshot, "trusted")
+
+    assert summary["decision_quality_status"] == "trusted"
+    assert summary["automation_eligible_count"] == 2
+    assert summary["automation_eligible_repos"] == ["Alpha", "Beta"]
+    assert summary["baseline_eligible_count"] == 1
+    assert summary["baseline_eligible_repos"] == ["Alpha"]
+    assert summary["trusted_repo_count"] == 1
+    assert summary["trusted_repos"] == ["Alpha"]
+
+
+def test_summarize_trust_bar_keeps_opt_in_counts_when_portfolio_not_trusted():
+    snapshot = {
+        "projects": [
+            _project("Alpha", automation_eligible=True, risk_tier="baseline"),
+        ]
+    }
+
+    summary = summarize_trust_bar(snapshot, "")
+
+    assert summary["decision_quality_status"] == "unknown"
+    assert summary["automation_eligible_repos"] == ["Alpha"]
+    assert summary["baseline_eligible_repos"] == ["Alpha"]
+    assert summary["trusted_repos"] == []
 
 
 # ---------------------------------------------------------------------------
