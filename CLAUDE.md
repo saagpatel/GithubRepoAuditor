@@ -71,5 +71,5 @@ Common flags: `--control-center`, `--portfolio-truth`, `--portfolio-context-reco
 
 ## Next Recommended Move
 
-Phase 119: clear remaining elevated repos by enriching their context files. Then Phase 123: first automated run with 2-3 catalog-opted repos. See docs/plans/2026-04-15-arc-d-closeout.md for Arc E/F/G sequencing.
+Complete manual workbook signoff if the 2026-04-24 rehearsal should become a release record, then prepare Phase 123 by selecting 2-3 low-risk catalog-opted repos, confirming approval-center readiness, and rerunning `--auto-apply-approved --dry-run` before any live apply. See docs/plans/2026-04-24-post-merge-current-state.md and docs/plans/2026-04-15-arc-d-closeout.md for the current gates and Arc E/F/G sequencing.
 <!-- portfolio-context:end -->

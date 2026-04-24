@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 API_BASE = "https://api.github.com"
 REST_API_VERSION = "2026-03-10"
+EXPECTED_SECURITY_ENDPOINT_UNAVAILABLE_STATUSES = {403, 404}
 
 
 class GitHubClientError(Exception):
@@ -327,6 +328,26 @@ class GitHubClient:
         response = getattr(exc, "response", None)
         return response.status_code if response is not None else None
 
+    def _log_security_endpoint_error(
+        self,
+        *,
+        endpoint: str,
+        owner: str,
+        repo: str,
+        exc: requests.HTTPError,
+    ) -> None:
+        status = self._http_error_status(exc)
+        if status in EXPECTED_SECURITY_ENDPOINT_UNAVAILABLE_STATUSES:
+            logger.debug(
+                "%s endpoint unavailable for %s/%s: %s",
+                endpoint,
+                owner,
+                repo,
+                exc,
+            )
+            return
+        logger.warning("Failed to fetch %s for %s/%s: %s", endpoint, owner, repo, exc)
+
     def get_repo_security_and_analysis(self, owner: str, repo: str) -> dict:
         """Fetch repo-level security_and_analysis metadata when available."""
         try:
@@ -360,7 +381,12 @@ class GitHubClient:
             }
         except requests.HTTPError as exc:
             status = self._http_error_status(exc)
-            logger.warning("Failed to fetch secret scanning alerts for %s/%s: %s", owner, repo, exc)
+            self._log_security_endpoint_error(
+                endpoint="secret scanning alerts",
+                owner=owner,
+                repo=repo,
+                exc=exc,
+            )
             return {
                 "available": False,
                 "http_status": status,
@@ -382,7 +408,12 @@ class GitHubClient:
             }
         except requests.HTTPError as exc:
             status = self._http_error_status(exc)
-            logger.warning("Failed to fetch code scanning alerts for %s/%s: %s", owner, repo, exc)
+            self._log_security_endpoint_error(
+                endpoint="code scanning alerts",
+                owner=owner,
+                repo=repo,
+                exc=exc,
+            )
             return {
                 "available": False,
                 "http_status": status,
