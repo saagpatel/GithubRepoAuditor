@@ -71,5 +71,5 @@ Common flags: `--control-center`, `--portfolio-truth`, `--portfolio-context-reco
 
 ## Next Recommended Move
 
-Complete manual workbook signoff if the 2026-04-24 rehearsal should become a release record, then prepare Phase 123 by selecting 2-3 low-risk catalog-opted repos, confirming approval-center readiness, and rerunning `--auto-apply-approved --dry-run` before any live apply. See docs/plans/2026-04-24-phase-123-readiness-prep.md, docs/plans/2026-04-24-post-merge-current-state.md, and docs/plans/2026-04-15-arc-d-closeout.md for the current gates and Arc E/F/G sequencing.
+Complete manual workbook signoff if the 2026-04-24 rehearsal should become a release record. Phase 123 has its first three catalog opt-ins (`mcpforge`, `TradeOffAtlas`, `TideEngine`), but live apply remains blocked until campaign packet generation or approval review clearly shows the automation-eligible subset and `--auto-apply-approved --dry-run` reports the expected eligible actions. See docs/plans/2026-04-24-phase-123-readiness-prep.md, docs/plans/2026-04-24-post-merge-current-state.md, and docs/plans/2026-04-15-arc-d-closeout.md for the current gates and Arc E/F/G sequencing.
 <!-- portfolio-context:end -->

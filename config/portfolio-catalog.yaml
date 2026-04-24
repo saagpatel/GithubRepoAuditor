@@ -366,6 +366,7 @@ repos:
     review_cadence: weekly
     intended_disposition: maintain
     tool_provenance: claude-code
+    automation_eligible: true
   ModelColosseum:
     owner: d
     lifecycle_state: active
@@ -454,6 +455,7 @@ repos:
     intended_disposition: maintain
     category: vanity
     tool_provenance: claude-code
+    automation_eligible: true
   Afterimage:
     owner: d
     lifecycle_state: active
@@ -502,6 +504,7 @@ repos:
     review_cadence: weekly
     intended_disposition: maintain
     tool_provenance: claude-code
+    automation_eligible: true
   Wavelength:
     owner: d
     lifecycle_state: active
