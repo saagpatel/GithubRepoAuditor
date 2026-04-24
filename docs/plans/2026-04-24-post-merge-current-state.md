@@ -49,7 +49,7 @@ Reasons:
 - Approval center has no current approval needing review.
 - Auto-apply dry run found no approved-manual campaign packets.
 
-The safe next Phase 123 preparation is to choose 2-3 low-risk candidate repos, make their catalog/truth state explicitly automation-eligible, approve a bounded campaign packet, then rerun the dry-run gate before any live apply.
+The safe next Phase 123 preparation is to choose 2-3 low-risk candidate repos, make their catalog/truth state explicitly automation-eligible, approve a bounded campaign packet, then rerun the dry-run gate before any live apply. The current candidate shortlist and prep commands are recorded in `docs/plans/2026-04-24-phase-123-readiness-prep.md`.
 
 ## Maintenance Findings
 
