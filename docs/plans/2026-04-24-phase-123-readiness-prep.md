@@ -52,6 +52,29 @@ Follow-up implementation check:
   - Trust-bar summary reports 3 opted-in repos, 3 baseline opted-in repos, and 0 full trust-bar repos because decision quality is still `insufficient-data`.
   - No approved-manual campaign packets exist yet.
 
+## Decision-Quality Evidence Audit
+
+The decision-quality gate is still correctly blocking Phase 123 live apply.
+
+Fresh read-only probes from `main` at `3dcfeb1`:
+
+- `python3 -m src saagpatel --portfolio-truth --registry-output output/project-registry.md --portfolio-report-output output/PORTFOLIO-AUDIT-REPORT.md`
+  - Generated `output/portfolio-truth-latest.json` for 115 projects.
+  - Current automation opt-ins remain `mcpforge`, `TradeOffAtlas`, and `TideEngine`.
+- `python3 -m src saagpatel --control-center`
+  - Refreshed the control-center and weekly-command-center artifacts from the latest report.
+  - `decision_quality_v1.decision_quality_status` stayed `insufficient-data`.
+  - `confidence_validation_status` stayed `insufficient-data`.
+  - Current judged confidence outcomes: 2 total, with 1 validated and 1 partially validated.
+  - Downgrade reasons: `insufficient-calibration-history`, `primary-target-monitor-only`, and `next-action-needs-verification`.
+- `python3 -m src saagpatel --approval-center`
+  - No current approval needs review.
+- `python3 -m src saagpatel --auto-apply-approved --dry-run`
+  - Trust-bar summary still reports 3 opted-in repos, 3 baseline opted-in repos, and 0 full trust-bar repos.
+  - No approved-manual campaign packets exist.
+
+Conclusion: this does not look like an automation-subset wiring bug. The system has too little judged recommendation history to honestly promote decision quality to `trusted`, and the current trust policies are still `monitor` / `verify-first`. Do not capture a campaign approval yet.
+
 ## Candidate Shortlist
 
 These are candidates for manual opt-in review, not automatic opt-ins. They currently have baseline risk, high path confidence, active or recent activity, full context, and no portfolio-truth warnings:
@@ -78,7 +101,11 @@ Secondary candidates if one of the first three is rejected:
    python3 -m src saagpatel --portfolio-truth --registry-output output/project-registry.md --portfolio-report-output output/PORTFOLIO-AUDIT-REPORT.md
    ```
 
-4. Preview a bounded campaign packet, starting with the lowest-risk campaign that has useful local actions:
+4. Collect or wire more judged recommendation outcomes until `decision_quality_v1` has enough evidence to leave `insufficient-data`.
+
+   The current known floor is 2 judged outcomes, which is not enough for the automation trust bar. Prefer repeated normal review cycles over synthetic evidence. If there is real missing evidence in the warehouse or report history, fix that wiring separately and rerun the probes.
+
+5. Preview a bounded campaign packet, starting with the lowest-risk campaign that has useful local actions:
 
    ```bash
    python3 -m src saagpatel --campaign security-review --writeback-target github
@@ -86,7 +113,7 @@ Secondary candidates if one of the first three is rejected:
 
    Confirm the packet's `automation_subset` lists only the intentionally opted-in repos and separates eligible from non-eligible actions.
 
-5. Review the approval center:
+6. Review the approval center:
 
    ```bash
    python3 -m src saagpatel --approval-center
@@ -94,13 +121,13 @@ Secondary candidates if one of the first three is rejected:
 
    Confirm the approval record preserves the same `automation_subset` before capturing approval.
 
-6. Only after the packet is intentionally approved, run:
+7. Only after the packet is intentionally approved, run:
 
    ```bash
    python3 -m src saagpatel --auto-apply-approved --dry-run
    ```
 
-7. Live apply remains blocked until the dry run's trust-bar summary and eligible action output show exactly the expected repo/action set.
+8. Live apply remains blocked until the dry run's trust-bar summary and eligible action output show exactly the expected repo/action set.
 
 ## Not Done Here
 
