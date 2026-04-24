@@ -18,7 +18,7 @@ Automated audit tool that clones all repos from a GitHub user account, analyzes 
 - All output files go to `output/` directory
 
 ## Current State
-Phases 0–26 complete. 456 tests, 43 test files, 11 analyzers (extensible via --analyzers-dir plugin API), 51 CLI flags. Outputs: JSON, Markdown, Excel (55 sheets, 36-column All Repos), HTML dashboard, PDF report. GitHub Actions CI + scheduled weekly audit. Config file, watch mode, dry-run, resume, terminal diff summary, GitHub Issues auto-creation, OSV.dev vulnerability checking, code complexity trends. Full Notion two-way sync, shields.io badges, AI narrative, scoring profiles, archive automation. Portfolio improvement campaigns: batch metadata/README/governance/build-readiness/community-profile updates via Contents API. Phase 26: community profile — CODE_OF_CONDUCT (104 repos), issue templates (101 repos), PR template (105 repos), CHANGELOG (76 repos), stale branch cleanup.
+Workbook-first portfolio operator with shared JSON, Markdown, Excel, HTML, review-pack, control-center, scheduled-handoff, approval-center, and portfolio-truth surfaces. Do not trust hardcoded test or test-file counts in docs; rerun `python3 -m pytest -q -p no:cacheprovider` and inspect `tests/` before reporting release status. Use `docs/plans/` for current phase status, deferred work, and closeout workflow.
 
 ## Key Decisions
 | Decision | Choice | Why |

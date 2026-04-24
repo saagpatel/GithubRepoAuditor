@@ -78,7 +78,7 @@ Note: `AUTHORITY_CAP` is decorative metadata for operator review surfaces — no
 - `tests/test_portfolio_catalog.py` — 2 new tests for `automation_eligible` parsing
 - `tests/test_portfolio_truth.py` — 1 new assertion that `automation_eligible` appears in truth snapshot
 
-Total test count after Arc D: **828 tests** (up from 809 at Arc A start).
+At the original Arc D closeout, the suite had grown from 809 tests to the low 800s. Treat that as historical context only; rerun `python3 -m pytest -q -p no:cacheprovider` for the current test count before reporting release status.
 
 ---
 
