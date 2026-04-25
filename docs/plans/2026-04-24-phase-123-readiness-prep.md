@@ -129,6 +129,17 @@ Approval routing and local approval pass:
 
 Current conclusion: the approval gate is now satisfied locally, but live apply is still blocked by the decision-quality trust bar. Do not run live auto-apply. The next safe step is a non-mutating control-center/approval-center cycle after the current approved packet has had a chance to stabilize; only revisit auto-apply when `decision_quality_v1.decision_quality_status` returns to `trusted` and dry-run shows exactly the expected eligible `TideEngine` action.
 
+Trust-recovery progress visibility:
+
+- `python3 -m src saagpatel --control-center`
+  - Still reports `decision_quality_v1.decision_quality_status=use-with-review`.
+  - Still reports `primary_target_trust_policy=verify-first` and `next_action_trust_policy=verify-first`.
+  - Now makes the recovery gate explicit: trust recovery is blocked by recent trust-policy flip churn, with stable progress at 2/3 run(s) and 1 more stable confirming run needed.
+- `python3 -m src saagpatel --approval-center`
+  - Confirms `Promotion Push` remains `approved-manual`.
+
+Current conclusion: do not rerun live apply. The next useful signal is one more non-mutating confirming cycle that keeps `Promotion Push` stable enough for `decision_quality_v1` to return to `trusted`; until then, the dry-run/live-apply gate should remain closed.
+
 ## Candidate Shortlist
 
 These are candidates for manual opt-in review, not automatic opt-ins. They currently have baseline risk, high path confidence, active or recent activity, full context, and no portfolio-truth warnings:

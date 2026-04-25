@@ -3,6 +3,15 @@ from __future__ import annotations
 from typing import Any, Callable
 
 
+def _recovery_progress(history_meta: dict[str, Any], trust_recovery_window_runs: int) -> str:
+    stable_count = int(history_meta.get("stable_policy_run_count", 0) or 0)
+    needed = max(int(trust_recovery_window_runs or 0), 1)
+    remaining = max(needed - stable_count, 0)
+    if remaining == 1:
+        return f" Stable progress: {stable_count}/{needed} run(s), with 1 more stable confirming run needed."
+    return f" Stable progress: {stable_count}/{needed} run(s), with {remaining} more stable confirming run(s) needed."
+
+
 def trust_recovery_for_target(
     target: dict[str, Any],
     history_meta: dict[str, Any],
@@ -32,7 +41,8 @@ def trust_recovery_for_target(
     if history_meta.get("recent_policy_flip_count", 0) > 0:
         return (
             "blocked",
-            "Trust recovery is blocked because the target is still flipping trust policy inside the recent recovery window.",
+            "Trust recovery is blocked because the target is still flipping trust policy inside the recent recovery window."
+            + _recovery_progress(history_meta, trust_recovery_window_runs),
             trust_policy,
             trust_policy_reason,
         )

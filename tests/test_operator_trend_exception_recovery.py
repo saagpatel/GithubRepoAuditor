@@ -40,6 +40,34 @@ def test_trust_recovery_for_target_earns_act_with_review_when_stable() -> None:
     assert policy_reason == reason
 
 
+def test_blocked_trust_recovery_reports_stable_progress() -> None:
+    status, reason, policy, policy_reason = trust_recovery_for_target(
+        {
+            "repo": "RepoA",
+            "title": "Review campaign",
+            "lane": "ready",
+            "kind": "campaign",
+            "trust_exception_status": "softened-for-flip-churn",
+        },
+        {
+            "recent_reopened": False,
+            "recent_policy_flip_count": 1,
+            "same_or_lower_pressure_path": True,
+            "stable_policy_run_count": 2,
+        },
+        {"confidence_validation_status": "healthy"},
+        trust_policy="verify-first",
+        trust_policy_reason="Need verification first.",
+        trust_recovery_window_runs=3,
+    )
+
+    assert status == "blocked"
+    assert policy == "verify-first"
+    assert policy_reason == "Need verification first."
+    assert "2/3 run(s)" in reason
+    assert "1 more stable confirming run needed" in reason
+
+
 def test_recovery_pattern_reason_preserves_candidate_message() -> None:
     assert (
         recovery_pattern_reason("candidate", "")
