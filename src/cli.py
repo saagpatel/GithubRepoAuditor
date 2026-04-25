@@ -2977,6 +2977,13 @@ def _run_auto_apply_approved_mode(args, output_dir: Path) -> None:
             total_skipped += len(actions)
             continue
 
+        if getattr(args, "dry_run", False):
+            print_info(
+                f"Campaign {campaign_type!r}: {len(trusted_actions)} eligible actions "
+                "but dry-run mode is enabled; no GitHub writes were attempted."
+            )
+            continue
+
         if client is None:
             print_info(
                 f"Campaign {campaign_type!r}: {len(trusted_actions)} eligible actions "
