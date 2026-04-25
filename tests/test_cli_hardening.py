@@ -81,6 +81,7 @@ def _make_args(**overrides) -> Namespace:
         "apply_metadata": False,
         "apply_readmes": False,
         "improvements_file": None,
+        "dry_run": False,
     }
     defaults.update(overrides)
     return Namespace(**defaults)
@@ -572,6 +573,98 @@ def test_auto_apply_dry_run_prints_automation_trust_bar(
     assert "1 repos pass the full trust bar" in normalized
     assert "Automation-eligible repos: Alpha, Beta" in normalized
     assert "No approved-manual campaign packets found." in normalized
+
+
+def test_auto_apply_dry_run_does_not_call_github_writeback(
+    monkeypatch,
+    tmp_path,
+    sample_metadata,
+    capsys,
+):
+    args = _make_args(output_dir=str(tmp_path), token="token", dry_run=True)
+    report_data = _make_report_dict(sample_metadata)
+    report_data["operator_summary"] = {
+        "decision_quality_v1": {"decision_quality_status": "trusted"},
+        "action_sync_packets": [
+            {
+                "campaign_type": "promotion-push",
+                "label": "Promotion Push",
+                "execution_state": "ready-to-apply",
+                "recommended_target": "github",
+                "sync_mode": "reconcile",
+                "action_count": 1,
+                "blocker_types": [],
+                "actions": [{"action_id": "action-1"}],
+            }
+        ],
+        "action_sync_automation": [
+            {"campaign_type": "promotion-push", "automation_posture": "approval-first"}
+        ],
+    }
+    report = cli._report_from_dict(report_data)
+    (tmp_path / "portfolio-truth-latest.json").write_text(
+        json.dumps(
+            {
+                "projects": [
+                    {
+                        "identity": {"display_name": "test-repo"},
+                        "declared": {"automation_eligible": True},
+                        "risk": {"risk_tier": "baseline"},
+                    }
+                ]
+            }
+        )
+    )
+    monkeypatch.setattr(
+        cli,
+        "_refresh_latest_report_state",
+        lambda _output_dir, _args: (tmp_path / "audit-report-testuser-2026-03-29.json", {}, report),
+    )
+    monkeypatch.setattr(
+        "src.approval_ledger.load_approval_ledger_bundle",
+        lambda *_args, **_kwargs: {
+            "approval_ledger": [
+                {
+                    "approval_id": "campaign:promotion-push",
+                    "approval_subject_type": "campaign",
+                    "subject_key": "promotion-push",
+                    "approval_state": "approved-manual",
+                    "sync_mode": "reconcile",
+                }
+            ]
+        },
+    )
+    monkeypatch.setattr(
+        "src.ops_writeback.build_campaign_bundle",
+        lambda *_args, **_kwargs: (
+            {"campaign_type": "promotion-push"},
+            [
+                {
+                    "action_id": "action-1",
+                    "repo": "test-repo",
+                    "repo_full_name": "testuser/test-repo",
+                    "writeback_targets": {
+                        "github": {
+                            "managed_topics": ["ghra-call-promotion-push"],
+                            "issue_title": "[Repo Auditor] Promotion Push",
+                        }
+                    },
+                }
+            ],
+        ),
+    )
+
+    def _apply_github_writeback(*_args, **_kwargs):
+        raise AssertionError("dry-run must not call apply_github_writeback")
+
+    monkeypatch.setattr("src.ops_writeback.apply_github_writeback", _apply_github_writeback)
+
+    cli._run_auto_apply_approved_mode(args, tmp_path)
+
+    captured = capsys.readouterr()
+    normalized = " ".join((captured.out + captured.err).split())
+    assert "1 eligible actions but dry-run mode is enabled" in normalized
+    assert "Auto-apply complete: 0 applied, 0 skipped." in normalized
 
 
 def test_main_approve_governance_captures_local_approval(monkeypatch, tmp_path, sample_metadata, capsys):
