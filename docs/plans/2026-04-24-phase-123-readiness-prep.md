@@ -41,7 +41,7 @@ Follow-up gate results:
 - Approval center still reported no current approval needs review.
 - `--auto-apply-approved --dry-run` still reported no approved-manual campaign packets.
 
-Do not live-apply from this state. The campaign packet generation and approval flow now carry an `automation_subset` field, and `--auto-apply-approved --dry-run` prints the trust-bar counts before looking for approved packets. The next safe implementation step is to regenerate the relevant packet and confirm the visible subset before capturing any local campaign approval.
+Do not live-apply from this state. The campaign packet generation and approval flow now carry an `automation_subset` field, and `--auto-apply-approved --dry-run` prints the trust-bar counts before looking for approved packets. The next safe step is to review the visible `promotion-push` packet and decide whether the single eligible `TideEngine` action should be approved manually.
 
 Follow-up implementation check:
 
@@ -54,7 +54,7 @@ Follow-up implementation check:
 
 ## Decision-Quality Evidence Audit
 
-The decision-quality gate is still correctly blocking Phase 123 live apply.
+The decision-quality gate is no longer the active blocker.
 
 Fresh read-only probes from `main` at `3dcfeb1`:
 
@@ -74,6 +74,41 @@ Fresh read-only probes from `main` at `3dcfeb1`:
   - No approved-manual campaign packets exist.
 
 Conclusion: this does not look like an automation-subset wiring bug. The system has too little judged recommendation history to honestly promote decision quality to `trusted`, and the current trust policies are still `monitor` / `verify-first`. Do not capture a campaign approval yet.
+
+Follow-up calibration pass:
+
+- Two non-live targeted audit/control-center cycles added enough judged outcomes to reach the calibration floor.
+- A small action-selection fix now lets ready and chronic targets use concrete closure guidance before quiet-streak monitor guidance.
+- `python3 -m src saagpatel --control-center`
+  - `decision_quality_v1.decision_quality_status` is now `trusted`.
+  - `confidence_validation_status` is `healthy`.
+  - Judged confidence outcomes: 4 total, with 1 validated and 3 partially validated.
+  - `primary_target_trust_policy` and `next_action_trust_policy` are both `act-with-review`.
+  - Downgrade reasons are empty.
+- `python3 -m src saagpatel --auto-apply-approved --dry-run`
+  - Trust-bar summary reports 3 opted-in repos, 3 baseline opted-in repos, and 3 full trust-bar repos.
+  - No approved-manual campaign packets exist.
+
+Conclusion: Phase 123 is now blocked only on the local approval step. Do not live-apply yet. Review the `promotion-push` packet first because it is the only current packet with an automation-eligible action (`TideEngine`).
+
+Post-preview refinement:
+
+- `python3 -m src saagpatel --repos mcpforge TradeOffAtlas TideEngine --campaign promotion-push --writeback-target github --max-actions 10`
+  - Completed as a bounded non-live targeted preview.
+  - Refreshed the portfolio packet set; `promotion-push` remains apply-ready with 20 actions across 17 repos and 1 automation-eligible action on `TideEngine`.
+  - The full unbounded `promotion-push` preview was stopped after it stayed silent during full-portfolio analysis; use the bounded `--repos mcpforge TradeOffAtlas TideEngine` preview while Phase 123 is still in approval prep.
+- `python3 -m src saagpatel --control-center`
+  - `decision_quality_v1.decision_quality_status` is `trusted`.
+  - `confidence_validation_status` is `healthy`.
+  - `primary_target_trust_policy` and `next_action_trust_policy` are both `act-with-review`.
+  - The next action now names the concrete manual review: review the reconcile queue before any manual writeback.
+- `python3 -m src saagpatel --approval-center`
+  - No current approval needs review.
+- `python3 -m src saagpatel --auto-apply-approved --dry-run`
+  - Trust-bar summary reports 3 opted-in repos, 3 baseline opted-in repos, and 3 full trust-bar repos.
+  - No approved-manual campaign packets exist.
+
+Current conclusion: the data sufficiency gate is clear, but there is still no local approval record. The next human action is to review the `promotion-push` reconcile packet and decide whether the single automation-eligible `TideEngine` action should receive manual approval.
 
 ## Candidate Shortlist
 
@@ -101,14 +136,12 @@ Secondary candidates if one of the first three is rejected:
    python3 -m src saagpatel --portfolio-truth --registry-output output/project-registry.md --portfolio-report-output output/PORTFOLIO-AUDIT-REPORT.md
    ```
 
-4. Collect or wire more judged recommendation outcomes until `decision_quality_v1` has enough evidence to leave `insufficient-data`.
+4. Confirm `decision_quality_v1.decision_quality_status` remains `trusted` in the latest control-center output.
 
-   The current known floor is 2 judged outcomes, which is not enough for the automation trust bar. Prefer repeated normal review cycles over synthetic evidence. If there is real missing evidence in the warehouse or report history, fix that wiring separately and rerun the probes.
-
-5. Preview a bounded campaign packet, starting with the lowest-risk campaign that has useful local actions:
+5. Preview a bounded campaign packet, starting with the lowest-risk campaign that has useful eligible actions:
 
    ```bash
-   python3 -m src saagpatel --campaign security-review --writeback-target github
+   python3 -m src saagpatel --repos mcpforge TradeOffAtlas TideEngine --campaign promotion-push --writeback-target github --max-actions 10
    ```
 
    Confirm the packet's `automation_subset` lists only the intentionally opted-in repos and separates eligible from non-eligible actions.

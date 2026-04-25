@@ -1477,8 +1477,6 @@ def _next_operator_action(
 ) -> str:
     if top_item.get("kind") == "setup" and top_item.get("recommended_action"):
         return top_item["recommended_action"]
-    if resolution_trend.get("trend_status") == "quiet":
-        return f"Keep the operator loop light and only escalate if the next run breaks the {resolution_trend.get('quiet_streak_runs', 0)}-run quiet streak."
     if resolution_trend.get("decision_memory_status") == "reopened" and top_item.get(
         "closure_guidance"
     ):
@@ -1487,6 +1485,10 @@ def _next_operator_action(
         return top_item["closure_guidance"]
     if top_item.get("newly_stale") and top_item.get("closure_guidance"):
         return top_item["closure_guidance"]
+    if top_item.get("lane") == "ready" and top_item.get("closure_guidance"):
+        return top_item["closure_guidance"]
+    if resolution_trend.get("trend_status") == "quiet":
+        return f"Keep the operator loop light and only escalate if the next run breaks the {resolution_trend.get('quiet_streak_runs', 0)}-run quiet streak."
     if resolution_trend.get("trend_status") == "worsening" and top_item.get("recommended_action"):
         return top_item["recommended_action"]
     if resolution_trend.get("trend_status") == "improving" and top_item.get("recommended_action"):
