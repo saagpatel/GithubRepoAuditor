@@ -67,6 +67,11 @@ def _follow_up_command(report_data: dict[str, Any]) -> str:
     return f"audit {_username(report_data)}{FOLLOW_UP_COMMAND_SUFFIX}"
 
 
+def _has_automation_subset_actions(packet: dict[str, Any]) -> bool:
+    subset = _copy_mapping(packet.get("automation_subset"))
+    return int(subset.get("automation_eligible_action_count") or 0) > 0
+
+
 def _review_required(
     posture: str,
     packet: dict[str, Any],
@@ -199,6 +204,8 @@ def _posture(
     if execution_state == "preview-next":
         return "preview-safe"
     if execution_state == "ready-to-apply":
+        if _has_automation_subset_actions(packet):
+            return "approval-first"
         return "apply-manual"
     if monitoring_state in FOLLOW_UP_MONITORING_STATES:
         return "follow-up-safe"
@@ -332,7 +339,7 @@ def build_action_sync_automation_bundle(
             "review_required": _review_required(posture, packet, monitoring, history),
             "recommended_command": command,
             "recommended_follow_up": follow_up,
-            "requires_approval": bool(packet.get("approvals_required")),
+            "requires_approval": posture == "approval-first" or bool(packet.get("approvals_required")),
             "action_count": int(packet.get("action_count", readiness.get("action_count", 0)) or 0),
             "summary": _summary(label, posture, reason, command, follow_up),
         }

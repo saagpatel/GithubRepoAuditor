@@ -167,6 +167,31 @@ def test_automation_classifies_preview_apply_approval_follow_up_and_quiet() -> N
     assert _automation(bundle, "maintenance-cleanup")["recommended_command"] == ""
 
 
+def test_automation_routes_apply_ready_subset_through_approval_first() -> None:
+    bundle = _bundle(
+        packet_overrides={
+            "promotion-push": {
+                **_packet_record("promotion-push", "ready-to-apply"),
+                "automation_subset": {
+                    "automation_eligible_repos": ["TideEngine"],
+                    "automation_eligible_repo_count": 1,
+                    "automation_eligible_action_repos": ["TideEngine"],
+                    "automation_eligible_action_repo_count": 1,
+                    "automation_eligible_action_count": 1,
+                    "non_eligible_action_count": 1,
+                },
+            },
+        },
+    )
+
+    automation = _automation(bundle, "promotion-push")
+
+    assert automation["automation_posture"] == "approval-first"
+    assert automation["recommended_command"] == ""
+    assert automation["requires_approval"] is True
+    assert bundle["next_safe_automation_step"]["campaign_type"] == "promotion-push"
+
+
 def test_automation_downgrades_to_manual_only_for_monitoring_or_history_risk() -> None:
     monitoring_bundle = _bundle(
         packet_overrides={
