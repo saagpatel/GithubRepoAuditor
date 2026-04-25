@@ -110,6 +110,25 @@ Post-preview refinement:
 
 Current conclusion: the data sufficiency gate is clear, but there is still no local approval record. The next human action is to review the `promotion-push` reconcile packet and decide whether the single automation-eligible `TideEngine` action should receive manual approval.
 
+Approval routing and local approval pass:
+
+- Apply-ready packets with an `automation_subset.automation_eligible_action_count` greater than zero now route through `approval-first` instead of generic `apply-manual`, so the approval center can surface the local approval subject before any auto-apply dry run.
+- `python3 -m src saagpatel --approval-center --approval-view ready`
+  - Surfaced `Promotion Push` as the strongest approval review candidate.
+- `python3 -m src saagpatel --campaign promotion-push --approve-packet --approval-reviewer local-operator --approval-note "Phase 123 dry-run approval for the single automation-eligible TideEngine promotion-push action after bounded packet review; no live apply authorized here."`
+  - Captured local approval only.
+  - Wrote `output/approval-receipt-saagpatel-2026-04-25.json` and `.md`.
+  - Preserved the `automation_subset`: 3 opted-in repos, 1 automation-eligible action repo (`TideEngine`), and 19 non-eligible actions.
+- `python3 -m src saagpatel --approval-center`
+  - Shows `campaign:promotion-push` as `approved-manual`.
+  - Manual apply remains explicit and separate.
+- `python3 -m src saagpatel --auto-apply-approved --dry-run`
+  - Found the approved packet, but applied nothing.
+  - Trust-bar summary is now 3 opted-in repos, 3 baseline opted-in repos, and 0 full trust-bar repos because the latest repeated preview lowered decision quality to `use-with-review`.
+  - Skipped all 20 `promotion-push` actions, including `TideEngine`.
+
+Current conclusion: the approval gate is now satisfied locally, but live apply is still blocked by the decision-quality trust bar. Do not run live auto-apply. The next safe step is a non-mutating control-center/approval-center cycle after the current approved packet has had a chance to stabilize; only revisit auto-apply when `decision_quality_v1.decision_quality_status` returns to `trusted` and dry-run shows exactly the expected eligible `TideEngine` action.
+
 ## Candidate Shortlist
 
 These are candidates for manual opt-in review, not automatic opt-ins. They currently have baseline risk, high path confidence, active or recent activity, full context, and no portfolio-truth warnings:
@@ -136,7 +155,7 @@ Secondary candidates if one of the first three is rejected:
    python3 -m src saagpatel --portfolio-truth --registry-output output/project-registry.md --portfolio-report-output output/PORTFOLIO-AUDIT-REPORT.md
    ```
 
-4. Confirm `decision_quality_v1.decision_quality_status` remains `trusted` in the latest control-center output.
+4. Confirm `decision_quality_v1.decision_quality_status` is `trusted` in the latest control-center output. If it is `use-with-review`, stop before live apply and let the trust posture recover through a confirming non-mutating cycle.
 
 5. Preview a bounded campaign packet, starting with the lowest-risk campaign that has useful eligible actions:
 
@@ -152,7 +171,7 @@ Secondary candidates if one of the first three is rejected:
    python3 -m src saagpatel --approval-center
    ```
 
-   Confirm the approval record preserves the same `automation_subset` before capturing approval.
+   Confirm the approval record preserves the same `automation_subset` before capturing approval. As of the latest pass, `promotion-push` is already `approved-manual` locally for the `TideEngine` subset.
 
 7. Only after the packet is intentionally approved, run:
 
@@ -160,10 +179,10 @@ Secondary candidates if one of the first three is rejected:
    python3 -m src saagpatel --auto-apply-approved --dry-run
    ```
 
-8. Live apply remains blocked until the dry run's trust-bar summary and eligible action output show exactly the expected repo/action set.
+8. Live apply remains blocked until the dry run's trust-bar summary and eligible action output show exactly the expected repo/action set. The latest dry run still applied 0 actions because decision quality was `use-with-review`.
 
 ## Not Done Here
 
-- No campaign packet was approved.
+- A local `promotion-push` campaign approval was captured for the single automation-eligible `TideEngine` action.
 - No writeback apply or auto-apply live command was run.
 - Manual desktop Excel signoff for the 2026-04-24 workbook remains outside this prep note.

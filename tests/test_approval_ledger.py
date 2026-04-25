@@ -161,6 +161,50 @@ def test_campaign_approval_can_become_approved_but_manual(tmp_path: Path) -> Non
     )
 
 
+def test_apply_ready_campaign_with_automation_subset_is_ready_for_review(tmp_path: Path) -> None:
+    report = _base_report()
+    report["governance_preview"] = {"fingerprint": "gov-fingerprint-a", "actions": []}
+    report["operator_summary"] = {
+        "action_sync_packets": [
+            {
+                "campaign_type": "promotion-push",
+                "label": "Promotion Push",
+                "execution_state": "ready-to-apply",
+                "recommended_target": "all",
+                "sync_mode": "reconcile",
+                "action_count": 2,
+                "blocker_types": [],
+                "rollback_status": "ready",
+                "apply_command": "audit testuser --campaign promotion-push --writeback-target all --writeback-apply",
+                "top_repos": ["TideEngine"],
+                "actions": [{"action_id": "action-1"}],
+                "automation_subset": {
+                    "automation_eligible_repos": ["TideEngine"],
+                    "automation_eligible_repo_count": 1,
+                    "automation_eligible_action_repos": ["TideEngine"],
+                    "automation_eligible_action_repo_count": 1,
+                    "automation_eligible_action_count": 1,
+                    "non_eligible_action_count": 1,
+                },
+            }
+        ],
+        "action_sync_automation": [
+            {
+                "campaign_type": "promotion-push",
+                "automation_posture": "approval-first",
+            }
+        ],
+    }
+
+    bundle = load_approval_ledger_bundle(tmp_path, report, [])
+    record = next(item for item in bundle["approval_ledger"] if item["approval_id"] == "campaign:promotion-push")
+
+    assert record["approval_state"] == "ready-for-review"
+    assert record["apply_ready_after_approval"] is True
+    assert record["automation_subset"]["automation_eligible_action_count"] == 1
+    assert bundle["next_approval_review"]["approval_id"] == "campaign:promotion-push"
+
+
 def test_approved_campaign_can_surface_overdue_follow_up_review(tmp_path: Path) -> None:
     report = _base_report()
     report["generated_at"] = "2026-04-21T12:00:00+00:00"
