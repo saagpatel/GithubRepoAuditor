@@ -72,15 +72,23 @@ def build_decision_quality_v1(
     validation_status = str(
         confidence_calibration.get("confidence_validation_status", "insufficient-data")
     )
+    has_active_target = _has_active_target(resolution_trend)
     downgrade_reasons = _downgrade_reasons(
         validation_status=validation_status,
         confidence=confidence,
         resolution_trend=resolution_trend,
+        has_active_target=has_active_target,
     )
     human_skepticism_required = bool(
         validation_status in {"mixed", "noisy", "insufficient-data"}
-        or confidence.get("primary_target_trust_policy") in {"verify-first", "monitor"}
-        or confidence.get("next_action_trust_policy") in {"verify-first", "monitor"}
+        or (
+            has_active_target
+            and confidence.get("primary_target_trust_policy") in {"verify-first", "monitor"}
+        )
+        or (
+            has_active_target
+            and confidence.get("next_action_trust_policy") in {"verify-first", "monitor"}
+        )
         or downgrade_reasons
     )
     return {
@@ -302,9 +310,13 @@ def _decision_quality_status(
         return "needs-skepticism"
     if validation_status == "insufficient-data":
         return "insufficient-data"
-    if human_skepticism_required or confidence.get("primary_target_trust_policy") == "monitor":
+    if human_skepticism_required:
         return "use-with-review"
     return "trusted"
+
+
+def _has_active_target(resolution_trend: dict[str, Any]) -> bool:
+    return bool(resolution_trend.get("primary_target"))
 
 
 def _downgrade_reasons(
@@ -312,6 +324,7 @@ def _downgrade_reasons(
     validation_status: str,
     confidence: dict[str, Any],
     resolution_trend: dict[str, Any],
+    has_active_target: bool | None = None,
 ) -> list[str]:
     reasons: list[str] = []
     if validation_status == "mixed":
@@ -323,14 +336,16 @@ def _downgrade_reasons(
 
     primary_policy = str(confidence.get("primary_target_trust_policy", "monitor"))
     next_policy = str(confidence.get("next_action_trust_policy", "monitor"))
-    if primary_policy == "verify-first":
-        reasons.append("primary-target-needs-verification")
-    elif primary_policy == "monitor":
-        reasons.append("primary-target-monitor-only")
-    if next_policy == "verify-first":
-        reasons.append("next-action-needs-verification")
-    elif next_policy == "monitor":
-        reasons.append("next-action-monitor-only")
+    active_target = _has_active_target(resolution_trend) if has_active_target is None else has_active_target
+    if active_target:
+        if primary_policy == "verify-first":
+            reasons.append("primary-target-needs-verification")
+        elif primary_policy == "monitor":
+            reasons.append("primary-target-monitor-only")
+        if next_policy == "verify-first":
+            reasons.append("next-action-needs-verification")
+        elif next_policy == "monitor":
+            reasons.append("next-action-monitor-only")
 
     if str(resolution_trend.get("primary_target_exception_status", "none")) not in {"", "none"}:
         reasons.append("trust-exception-active")

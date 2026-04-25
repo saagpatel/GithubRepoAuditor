@@ -140,6 +140,25 @@ Trust-recovery progress visibility:
 
 Current conclusion: do not rerun live apply. The next useful signal is one more non-mutating confirming cycle that keeps `Promotion Push` stable enough for `decision_quality_v1` to return to `trusted`; until then, the dry-run/live-apply gate should remain closed.
 
+Trust gate repair and bounded dry-run pass:
+
+- Approved manual campaign packets now suppress the obsolete `campaign-ready:<campaign>` review queue item while their follow-up state is still fresh, so local approval no longer leaves stale review debt in the operator queue.
+- The control center now recalculates its primary target after approval-ledger queue updates, so decision quality uses the final approval-adjusted queue rather than a pre-approval target.
+- Healthy quiet runs with no active primary target can now be `trusted`; monitor-only guidance remains conservative when there is an active target or noisy calibration.
+- Auto-apply safety filtering now recognizes the repo auditor's real GitHub writeback target shape (`writeback_targets.github.managed_topics` and `issue_title`) instead of requiring a synthetic `mutation_target` field.
+- `python3 -m src saagpatel --control-center`
+  - `decision_quality_v1.decision_quality_status` is `trusted`.
+  - `human_skepticism_required` is `False`.
+  - Downgrade reasons are empty.
+  - `Promotion Push is ready for review` is no longer the primary target after the approved packet is accounted for.
+- `python3 -m src saagpatel --auto-apply-approved --dry-run`
+  - Trust-bar summary reports 3 opted-in repos, 3 baseline opted-in repos, and 3 full trust-bar repos.
+  - Finds exactly 1 eligible `promotion-push` action after trust filtering.
+  - Applies 0 changes in dry-run mode.
+  - Still emits expected GitHub custom-property read warnings for this account/repo shape: `404` on repo custom property values and org custom property schema.
+
+Current conclusion: the trusted dry-run gate is now satisfied for the single expected `TideEngine` action. No live apply has been run. The next decision is whether to run the explicit live apply command for the approved packet, accepting the known custom-property read warnings as non-blocking for this dry-run path.
+
 ## Candidate Shortlist
 
 These are candidates for manual opt-in review, not automatic opt-ins. They currently have baseline risk, high path confidence, active or recent activity, full context, and no portfolio-truth warnings:
@@ -190,10 +209,11 @@ Secondary candidates if one of the first three is rejected:
    python3 -m src saagpatel --auto-apply-approved --dry-run
    ```
 
-8. Live apply remains blocked until the dry run's trust-bar summary and eligible action output show exactly the expected repo/action set. The latest dry run still applied 0 actions because decision quality was `use-with-review`.
+8. Live apply remains blocked until the dry run's trust-bar summary and eligible action output show exactly the expected repo/action set. The latest dry run now satisfies that gate for exactly 1 `promotion-push` action on `TideEngine`; no live apply has been run.
 
 ## Not Done Here
 
 - A local `promotion-push` campaign approval was captured for the single automation-eligible `TideEngine` action.
+- The trusted dry-run gate now finds exactly that 1 eligible action and applies 0 changes in dry-run mode.
 - No writeback apply or auto-apply live command was run.
 - Manual desktop Excel signoff for the 2026-04-24 workbook remains outside this prep note.

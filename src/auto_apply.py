@@ -97,11 +97,28 @@ def get_approved_manual_campaigns(ledger_bundle: dict[str, Any]) -> list[dict[st
 
 def filter_safe_actions(actions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Keep only actions whose mutation_target is in the safe allowlist."""
-    return [
-        action
-        for action in actions
-        if str(action.get("mutation_target") or "") in SAFE_MUTATION_TARGETS
-    ]
+    return [action for action in actions if _is_safe_action(action)]
+
+
+def _is_safe_action(action: dict[str, Any]) -> bool:
+    targets = _action_mutation_targets(action)
+    return bool(targets) and all(target in SAFE_MUTATION_TARGETS for target in targets)
+
+
+def _action_mutation_targets(action: dict[str, Any]) -> set[str]:
+    explicit_target = str(action.get("mutation_target") or "").strip()
+    if explicit_target:
+        return {explicit_target}
+    writeback_targets = action.get("writeback_targets") or {}
+    inferred: set[str] = set()
+    github_target = writeback_targets.get("github") or {}
+    if github_target.get("managed_topics"):
+        inferred.add("github-topics")
+    if github_target.get("issue_title"):
+        inferred.add("github-issue")
+    if writeback_targets.get("notion"):
+        inferred.add("notion-action")
+    return inferred
 
 
 def filter_trusted_repo_actions(
