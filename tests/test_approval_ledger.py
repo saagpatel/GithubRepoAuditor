@@ -205,6 +205,109 @@ def test_apply_ready_campaign_with_automation_subset_is_ready_for_review(tmp_pat
     assert bundle["next_approval_review"]["approval_id"] == "campaign:promotion-push"
 
 
+def test_approved_campaign_suppresses_stale_ready_review_queue_item(tmp_path: Path) -> None:
+    report = _base_report()
+    report["governance_preview"] = {"fingerprint": "gov-fingerprint-a", "actions": []}
+    report["operator_summary"] = {
+        "action_sync_packets": [
+            {
+                "campaign_type": "promotion-push",
+                "label": "Promotion Push",
+                "execution_state": "ready-to-apply",
+                "recommended_target": "all",
+                "sync_mode": "reconcile",
+                "action_count": 2,
+                "blocker_types": [],
+                "rollback_status": "ready",
+                "apply_command": "audit testuser --campaign promotion-push --writeback-target all --writeback-apply",
+                "top_repos": ["TideEngine"],
+                "actions": [{"action_id": "action-1"}],
+            }
+        ],
+        "action_sync_automation": [
+            {
+                "campaign_type": "promotion-push",
+                "automation_posture": "approval-first",
+            }
+        ],
+    }
+    queue = [
+        {
+            "item_id": "campaign-ready:promotion-push",
+            "kind": "campaign",
+            "lane": "ready",
+            "title": "Promotion Push is ready for review",
+        }
+    ]
+
+    first_bundle = load_approval_ledger_bundle(tmp_path, report, queue)
+    first_record = next(
+        item for item in first_bundle["approval_ledger"] if item["approval_id"] == "campaign:promotion-push"
+    )
+    save_approval_record(tmp_path, build_approval_record(first_record, reviewer="sam", note="Approved manually"))
+
+    second_bundle = load_approval_ledger_bundle(tmp_path, report, queue)
+
+    assert second_bundle["top_approved_manual_approvals"][0]["approval_id"] == "campaign:promotion-push"
+    assert all(
+        item.get("item_id") != "campaign-ready:promotion-push"
+        for item in second_bundle["operator_queue"]
+    )
+
+
+def test_overdue_approved_campaign_keeps_ready_review_queue_item(tmp_path: Path) -> None:
+    report = _base_report()
+    report["generated_at"] = "2026-04-21T12:00:00+00:00"
+    report["run_id"] = "testuser:2026-04-21T12:00:00+00:00"
+    report["governance_preview"] = {"fingerprint": "gov-fingerprint-a", "actions": []}
+    report["operator_summary"] = {
+        "action_sync_packets": [
+            {
+                "campaign_type": "promotion-push",
+                "label": "Promotion Push",
+                "execution_state": "ready-to-apply",
+                "recommended_target": "all",
+                "sync_mode": "reconcile",
+                "action_count": 2,
+                "blocker_types": [],
+                "rollback_status": "ready",
+                "apply_command": "audit testuser --campaign promotion-push --writeback-target all --writeback-apply",
+                "top_repos": ["TideEngine"],
+                "actions": [{"action_id": "action-1"}],
+            }
+        ],
+        "action_sync_automation": [
+            {
+                "campaign_type": "promotion-push",
+                "automation_posture": "approval-first",
+            }
+        ],
+    }
+    queue = [
+        {
+            "item_id": "campaign-ready:promotion-push",
+            "kind": "campaign",
+            "lane": "ready",
+            "title": "Promotion Push is ready for review",
+        }
+    ]
+    first_bundle = load_approval_ledger_bundle(tmp_path, report, queue)
+    first_record = next(
+        item for item in first_bundle["approval_ledger"] if item["approval_id"] == "campaign:promotion-push"
+    )
+    approval_record = build_approval_record(first_record, reviewer="sam", note="Approved manually")
+    approval_record["approved_at"] = "2026-04-01T12:00:00+00:00"
+    save_approval_record(tmp_path, approval_record)
+
+    second_bundle = load_approval_ledger_bundle(tmp_path, report, queue)
+
+    assert second_bundle["top_overdue_approval_followups"][0]["approval_id"] == "campaign:promotion-push"
+    assert any(
+        item.get("item_id") == "campaign-ready:promotion-push"
+        for item in second_bundle["operator_queue"]
+    )
+
+
 def test_approved_campaign_can_surface_overdue_follow_up_review(tmp_path: Path) -> None:
     report = _base_report()
     report["generated_at"] = "2026-04-21T12:00:00+00:00"

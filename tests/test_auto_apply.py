@@ -200,6 +200,28 @@ def test_filter_safe_actions_mixed():
     assert "github-custom-properties" in targets
 
 
+def test_filter_safe_actions_infers_safe_github_writeback_targets():
+    actions = [
+        {
+            "repo": "Alpha",
+            "writeback_targets": {
+                "github": {
+                    "managed_topics": ["ghra-call-promotion-push"],
+                    "issue_title": "[Repo Auditor] Promotion Push",
+                }
+            },
+        }
+    ]
+
+    assert filter_safe_actions(actions) == actions
+
+
+def test_filter_safe_actions_excludes_actions_without_known_targets():
+    actions = [{"repo": "Alpha", "writeback_targets": {}}]
+
+    assert filter_safe_actions(actions) == []
+
+
 def test_filter_safe_actions_empty():
     assert filter_safe_actions([]) == []
 

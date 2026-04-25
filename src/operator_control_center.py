@@ -470,6 +470,13 @@ def build_operator_snapshot(
     queue = action_sync_automation.get("operator_queue", queue) or queue
     approval_ledger = load_approval_ledger_bundle(output_dir, report_data, queue)
     queue = approval_ledger.get("operator_queue", queue) or queue
+    resolution_trend = _operator_resolution_trend._build_resolution_trend(
+        queue,
+        history,
+        evidence_bundle.get("events") or [],
+        confidence_calibration=confidence_calibration,
+        current_generated_at=report_data.get("generated_at", ""),
+    )
     follow_through = _operator_follow_through._build_follow_through_with_queue(
         resolution_trend, queue
     )

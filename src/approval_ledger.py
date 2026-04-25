@@ -513,8 +513,10 @@ def _queue_approval(
     governance_record = approval_by_key.get("governance:all", {})
     for item in queue:
         mapped = dict(item)
-        campaign_type = str(mapped.get("suggested_campaign") or "").strip()
+        campaign_type = _queue_campaign_type(mapped)
         record = approval_by_key.get(f"campaign:{campaign_type}", {})
+        if _suppresses_campaign_review_item(mapped, record):
+            continue
         if str(mapped.get("kind") or "") == "governance":
             record = governance_record
         mapped["approval_state"] = str(record.get("approval_state") or "not-applicable")
@@ -526,6 +528,33 @@ def _queue_approval(
         mapped["approval_line"] = f"{ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}: {mapped['approval_summary']}"
         enriched.append(mapped)
     return enriched
+
+
+def _queue_campaign_type(item: dict[str, Any]) -> str:
+    campaign_type = str(item.get("suggested_campaign") or "").strip()
+    if campaign_type:
+        return campaign_type
+    item_id = str(item.get("item_id") or "")
+    if item_id.startswith("campaign-ready:"):
+        return item_id.removeprefix("campaign-ready:").strip()
+    return ""
+
+
+def _suppresses_campaign_review_item(
+    item: dict[str, Any],
+    approval_record: dict[str, Any],
+) -> bool:
+    if str(item.get("kind") or "") != "campaign":
+        return False
+    if not _queue_campaign_type(item):
+        return False
+    if str(approval_record.get("approval_subject_type") or "") != "campaign":
+        return False
+    approval_state = str(approval_record.get("approval_state") or "")
+    follow_up_state = str(approval_record.get("follow_up_state") or "")
+    if approval_state not in {"approved-manual", "applied"}:
+        return False
+    return follow_up_state not in {"overdue-follow-up", "due-soon-follow-up", "needs-reapproval"}
 
 
 def _summary(records: list[dict[str, Any]]) -> dict[str, Any]:
