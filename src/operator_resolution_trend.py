@@ -21675,12 +21675,18 @@ def _primary_target_done_criteria(primary_target: dict) -> str:
 def _closure_guidance(primary_target: dict, done_criteria: str) -> str:
     if not primary_target:
         return "No active closure target is open right now."
+    done_condition = done_criteria
+    if done_condition.startswith("Make ") and " and confirm " in done_condition:
+        decision, confirmation = done_condition[5:].split(" and confirm ", 1)
+        done_condition = f"{decision[0].lower()}{decision[1:]} is made and {confirmation}"
+    elif done_condition.startswith("Make "):
+        done_condition = f"{done_condition[5:6].lower()}{done_condition[6:]} is complete"
+    elif done_condition:
+        done_condition = f"{done_condition[0].lower()}{done_condition[1:]}"
     action = primary_target.get("recommended_action", "")
     if action:
-        return (
-            f"{action} Treat this as done only when {done_criteria[0].lower() + done_criteria[1:]}"
-        )
-    return f"Treat this as done only when {done_criteria[0].lower() + done_criteria[1:]}"
+        return f"{action} Treat this as done only when {done_condition}"
+    return f"Treat this as done only when {done_condition}"
 
 
 def _operator_confidence_summary(

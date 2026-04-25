@@ -5,6 +5,7 @@ from pathlib import Path
 import src.operator_control_center as operator_control_center
 import src.operator_follow_through as operator_follow_through
 import src.operator_resolution_trend as operator_resolution_trend
+import src.operator_snapshot_packaging as operator_snapshot_packaging
 from src.operator_control_center import (
     build_operator_snapshot,
     normalize_review_state,
@@ -2412,6 +2413,52 @@ def test_operator_snapshot_marks_generic_low_priority_ready_work_as_low_confiden
     assert target["confidence_score"] < 0.45
     assert summary["next_action_confidence_label"] == "low"
     assert summary["recommendation_quality_summary"].startswith("Tentative recommendation;")
+
+
+def test_next_operator_action_prioritizes_chronic_closure_over_quiet_streak():
+    action = operator_snapshot_packaging._next_operator_action(
+        {
+            "kind": "campaign",
+            "aging_status": "chronic",
+            "closure_guidance": "Review the reconcile queue before any manual writeback.",
+            "recommended_action": "Review the reconcile queue before any manual writeback.",
+        },
+        watch_guidance={},
+        follow_through={},
+        resolution_trend={"trend_status": "quiet", "quiet_streak_runs": 6},
+    )
+
+    assert action == "Review the reconcile queue before any manual writeback."
+
+
+def test_next_operator_action_prioritizes_ready_closure_over_quiet_streak():
+    action = operator_snapshot_packaging._next_operator_action(
+        {
+            "kind": "campaign",
+            "lane": "ready",
+            "aging_status": "watch",
+            "closure_guidance": "Review the reconcile queue before any manual writeback.",
+            "recommended_action": "Review the reconcile queue before any manual writeback.",
+        },
+        watch_guidance={},
+        follow_through={},
+        resolution_trend={"trend_status": "quiet", "quiet_streak_runs": 7},
+    )
+
+    assert action == "Review the reconcile queue before any manual writeback."
+
+
+def test_closure_guidance_makes_ready_done_criteria_readable():
+    done_criteria = operator_resolution_trend._primary_target_done_criteria(
+        {"kind": "campaign", "lane": "ready"}
+    )
+    guidance = operator_resolution_trend._closure_guidance(
+        {"recommended_action": "Review the reconcile queue before any manual writeback."},
+        done_criteria,
+    )
+
+    assert "when the manual decision is made" in guidance
+    assert "when make the manual decision" not in guidance
 
 
 def test_operator_snapshot_calibrates_healthy_confidence_history(tmp_path: Path, monkeypatch):
