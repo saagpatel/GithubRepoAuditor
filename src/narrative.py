@@ -1,4 +1,5 @@
 """AI portfolio narrative — generates human-readable analysis using Claude API."""
+
 from __future__ import annotations
 
 import json
@@ -18,14 +19,14 @@ def _build_prompt(report_data: dict) -> str:
     return f"""Analyze this developer's GitHub portfolio and write a concise 3-paragraph narrative.
 
 Portfolio stats:
-- {report_data.get('repos_audited', 0)} repositories audited
-- Average completeness score: {report_data.get('average_score', 0):.2f} / 1.00
-- Portfolio grade: {report_data.get('portfolio_grade', '?')}
+- {report_data.get("repos_audited", 0)} repositories audited
+- Average completeness score: {report_data.get("average_score", 0):.2f} / 1.00
+- Portfolio grade: {report_data.get("portfolio_grade", "?")}
 - Tier distribution: {json.dumps(tiers)}
-- Top languages: {', '.join(f'{language} ({count} repos)' for language, count in top_langs)}
-- Highest scored: {', '.join(summary.get('highest_scored', [])[:5])}
-- Lowest scored: {', '.join(summary.get('lowest_scored', [])[:5])}
-- Most active: {', '.join(summary.get('most_active', [])[:5])}
+- Top languages: {", ".join(f"{language} ({count} repos)" for language, count in top_langs)}
+- Highest scored: {", ".join(summary.get("highest_scored", [])[:5])}
+- Lowest scored: {", ".join(summary.get("lowest_scored", [])[:5])}
+- Most active: {", ".join(summary.get("most_active", [])[:5])}
 
 Write exactly 3 paragraphs:
 1. Overall portfolio assessment — strengths and character
@@ -50,12 +51,14 @@ def generate_narrative(report_data: dict, output_dir: Path) -> dict:
 
     prompt = _build_prompt(report_data)
     username = report_data.get("username", "unknown")
-    date = report_data.get("generated_at", "")[:10] or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    date = report_data.get("generated_at", "")[:10] or datetime.now(timezone.utc).strftime(
+        "%Y-%m-%d"
+    )
 
     try:
         client = anthropic.Anthropic(api_key=api_key)
         message = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-6",
             max_tokens=1024,
             messages=[{"role": "user", "content": prompt}],
         )
