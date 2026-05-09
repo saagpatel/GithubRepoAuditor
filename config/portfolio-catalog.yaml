@@ -223,6 +223,19 @@ repos:
     intended_disposition: maintain
     category: vanity
     tool_provenance: claude-code
+  SignalFlow:
+    owner: d
+    purpose: local-first visual dataflow desktop app for node-based pipelines and local LLM workflows
+    lifecycle_state: active
+    criticality: medium
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: productivity
+    tool_provenance: codex
+    maturity_program: maintain
+    target_maturity: operating
+    automation_eligible: false
+    notes: Security posture inspected on 2026-05-09; secret scanning has zero alerts, while CodeQL remains a manual follow-up.
   TabTriage:
     owner: d
     lifecycle_state: active
