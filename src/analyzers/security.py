@@ -70,6 +70,7 @@ PLACEHOLDER_SECRET_VALUES = frozenset({
     "dummy-secret",
     "example-secret",
     "placeholder-secret",
+    "supersecretkey",
     "your-secret-here",
 })
 
@@ -175,9 +176,16 @@ def _is_ignored_secret_match(match: re.Match) -> bool:
         return False
 
     normalized = value.strip("\"'").lower()
+    normalized_token = re.sub(r"[\s_]+", "-", normalized)
     if normalized in PLACEHOLDER_SECRET_VALUES:
         return True
-    if normalized.startswith(("example-", "test-", "dummy-", "placeholder-")):
+    if normalized_token in PLACEHOLDER_SECRET_VALUES:
+        return True
+    if normalized_token.startswith(("example-", "test-", "dummy-", "placeholder-")):
+        return True
+    if "secret" in normalized_token and any(
+        marker in normalized_token for marker in ("test", "fake", "mock", "fixture")
+    ):
         return True
     if value.startswith("${{") and "secrets." in value:
         return True

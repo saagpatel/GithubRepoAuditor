@@ -67,6 +67,15 @@ class TestSecretScanning:
         found = _scan_secrets(tmp_path)
         assert found == []
 
+    def test_ignores_test_secret_fixture_values(self, tmp_path):
+        (tmp_path / "test_slack.py").write_text(
+            'SIGNING_SECRET = "test_signing_secret_abc"\n'
+            'SLASH_SECRET = "slash_test_signing_secret_xyz"\n'
+            'WEBHOOK_SECRET = "supersecretkey"\n'
+        )
+        found = _scan_secrets(tmp_path)
+        assert found == []
+
     def test_clean_repo_no_secrets(self, tmp_path):
         (tmp_path / "main.py").write_text('print("hello world")')
         found = _scan_secrets(tmp_path)
