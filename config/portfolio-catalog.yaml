@@ -74,6 +74,19 @@ groups:
     tool_provenance: claude-code
     order: 70
 repos:
+  AIGCCore:
+    owner: d
+    purpose: local-first AI governance core with offline enforcement and hash-chained audit exports
+    lifecycle_state: active
+    criticality: high
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: infrastructure
+    tool_provenance: codex
+    maturity_program: maintain
+    target_maturity: operating
+    automation_eligible: false
+    notes: Security posture inspected on 2026-05-09; secret scanning has zero alerts, while open code-scanning alerts require manual triage before automation.
   AuraForge:
     owner: d
     purpose: local-first AI planning workspace for app specs and handoff-ready build plans
