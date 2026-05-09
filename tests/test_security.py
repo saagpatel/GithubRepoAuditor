@@ -44,6 +44,29 @@ class TestSecretScanning:
         found = _scan_secrets(tmp_path)
         assert len(found) >= 1
 
+    def test_ignores_github_actions_secret_references(self, tmp_path):
+        workflow = tmp_path / ".github" / "workflows"
+        workflow.mkdir(parents=True)
+        (workflow / "release.yml").write_text(
+            'env:\n  APPLE_CERTIFICATE: "${{ secrets.APPLE_CERTIFICATE }}"\n'
+        )
+        found = _scan_secrets(tmp_path)
+        assert found == []
+
+    def test_ignores_runtime_generated_shell_values(self, tmp_path):
+        (tmp_path / "release.sh").write_text(
+            'KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"\n'
+        )
+        found = _scan_secrets(tmp_path)
+        assert found == []
+
+    def test_ignores_common_test_placeholder_values(self, tmp_path):
+        (tmp_path / "oauth.test.ts").write_text(
+            'const config = { client_secret: "client-secret" };\n'
+        )
+        found = _scan_secrets(tmp_path)
+        assert found == []
+
     def test_clean_repo_no_secrets(self, tmp_path):
         (tmp_path / "main.py").write_text('print("hello world")')
         found = _scan_secrets(tmp_path)

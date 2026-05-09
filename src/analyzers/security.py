@@ -17,8 +17,20 @@ SECRET_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("GitHub Token", re.compile(r"ghp_[a-zA-Z0-9]{36}")),
     ("GitHub OAuth", re.compile(r"gho_[a-zA-Z0-9]{36}")),
     ("Slack Token", re.compile(r"xox[bpors]-[a-zA-Z0-9-]+")),
-    ("Generic API Key", re.compile(r"""(?:api[_-]?key|apikey)\s*[:=]\s*['"][a-zA-Z0-9]{20,}['"]""", re.IGNORECASE)),
-    ("Generic Secret", re.compile(r"""(?:secret|password|passwd)\s*[:=]\s*['"][^'"]{8,}['"]""", re.IGNORECASE)),
+    (
+        "Generic API Key",
+        re.compile(
+            r"""(?:api[_-]?key|apikey)\s*[:=]\s*['"](?P<value>[a-zA-Z0-9]{20,})['"]""",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "Generic Secret",
+        re.compile(
+            r"""(?:secret|password|passwd)\s*[:=]\s*['"](?P<value>[^'"]{8,})['"]""",
+            re.IGNORECASE,
+        ),
+    ),
     ("Private Key Header", re.compile(r"-----BEGIN (?:RSA |EC |DSA )?PRIVATE KEY-----")),
 ]
 
@@ -50,6 +62,15 @@ CODE_EXTENSIONS = frozenset({
     ".py", ".js", ".ts", ".tsx", ".jsx", ".rs", ".go", ".java",
     ".rb", ".php", ".swift", ".kt", ".scala", ".sh", ".bash",
     ".yml", ".yaml", ".toml", ".json", ".xml", ".env.example",
+})
+
+PLACEHOLDER_SECRET_VALUES = frozenset({
+    "client-secret",
+    "test-secret",
+    "dummy-secret",
+    "example-secret",
+    "placeholder-secret",
+    "your-secret-here",
 })
 
 
@@ -133,7 +154,10 @@ def _scan_secrets(repo_path: Path, max_files: int = 200) -> list[tuple[str, str]
         try:
             content = path.read_text(errors="replace")[:10_000]  # First 10KB
             for label, pattern in SECRET_PATTERNS:
-                if pattern.search(content):
+                if any(
+                    not _is_ignored_secret_match(match)
+                    for match in pattern.finditer(content)
+                ):
                     rel = path.relative_to(repo_path)
                     found.append((label, str(rel)))
                     break  # One finding per file is enough
@@ -141,6 +165,25 @@ def _scan_secrets(repo_path: Path, max_files: int = 200) -> list[tuple[str, str]
             continue
 
     return found
+
+
+def _is_ignored_secret_match(match: re.Match) -> bool:
+    """Return true for safe secret-looking placeholders or runtime references."""
+    try:
+        value = match.group("value").strip()
+    except IndexError:
+        return False
+
+    normalized = value.strip("\"'").lower()
+    if normalized in PLACEHOLDER_SECRET_VALUES:
+        return True
+    if normalized.startswith(("example-", "test-", "dummy-", "placeholder-")):
+        return True
+    if value.startswith("${{") and "secrets." in value:
+        return True
+    if value.startswith("$("):
+        return True
+    return False
 
 
 def _find_dangerous_files(repo_path: Path) -> list[Path]:
