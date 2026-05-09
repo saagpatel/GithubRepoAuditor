@@ -72,6 +72,27 @@ class TestSecretScanning:
             'SIGNING_SECRET = "test_signing_secret_abc"\n'
             'SLASH_SECRET = "slash_test_signing_secret_xyz"\n'
             'WEBHOOK_SECRET = "supersecretkey"\n'
+            'DEFAULT_WEBHOOK_SECRET = "dev-webhook-secret"\n'
+            'TEST_ADMIN_PASSWORD = "test-only-password"\n'
+        )
+        found = _scan_secrets(tmp_path)
+        assert found == []
+
+    def test_ignores_fake_slack_tokens_and_placeholders(self, tmp_path):
+        (tmp_path / "settings.tsx").write_text(
+            'const fakeToken = "xoxb-fake-token";\n'
+            'const placeholder = "xoxb-your-bot-token";\n'
+        )
+        found = _scan_secrets(tmp_path)
+        assert found == []
+
+    def test_ignores_shell_fallback_and_template_secret_values(self, tmp_path):
+        (tmp_path / "smoke.sh").write_text(
+            'export AUTH_SECRET="${E2E_AUTH_SECRET:-playwright-secret}"\n'
+            'PGPASSWORD="${POSTGRES_PASSWORD:-change-me}"\n'
+        )
+        (tmp_path / "get_refresh_token.py").write_text(
+            'line = f\'VAS_YT_CLIENT_SECRET="{client_secret}"\'\n'
         )
         found = _scan_secrets(tmp_path)
         assert found == []

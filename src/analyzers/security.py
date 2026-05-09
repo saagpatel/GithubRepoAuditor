@@ -16,7 +16,7 @@ SECRET_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("AWS Access Key", re.compile(r"AKIA[0-9A-Z]{16}")),
     ("GitHub Token", re.compile(r"ghp_[a-zA-Z0-9]{36}")),
     ("GitHub OAuth", re.compile(r"gho_[a-zA-Z0-9]{36}")),
-    ("Slack Token", re.compile(r"xox[bpors]-[a-zA-Z0-9-]+")),
+    ("Slack Token", re.compile(r"(?P<value>xox[bpors]-[a-zA-Z0-9-]+)")),
     (
         "Generic API Key",
         re.compile(
@@ -66,10 +66,14 @@ CODE_EXTENSIONS = frozenset({
 
 PLACEHOLDER_SECRET_VALUES = frozenset({
     "client-secret",
+    "change-me",
+    "dev-webhook-secret",
     "test-secret",
+    "test-only-password",
     "dummy-secret",
     "example-secret",
     "placeholder-secret",
+    "playwright-secret",
     "supersecretkey",
     "your-secret-here",
 })
@@ -183,10 +187,24 @@ def _is_ignored_secret_match(match: re.Match) -> bool:
         return True
     if normalized_token.startswith(("example-", "test-", "dummy-", "placeholder-")):
         return True
-    if "secret" in normalized_token and any(
-        marker in normalized_token for marker in ("test", "fake", "mock", "fixture")
+    if normalized_token.startswith("xox") and any(
+        marker in normalized_token for marker in ("fake", "test", "dummy", "your", "placeholder")
     ):
         return True
+    if "secret" in normalized_token and any(
+        marker in normalized_token
+        for marker in ("test", "fake", "mock", "fixture", "dev", "playwright")
+    ):
+        return True
+    if normalized.startswith("{") and normalized.endswith("}") and re.fullmatch(
+        r"\{[a-zA-Z_][a-zA-Z0-9_]*\}", normalized
+    ):
+        return True
+    if value.startswith("${") and ":-" in value:
+        fallback = value.rsplit(":-", 1)[-1].rstrip("}").strip("\"'").lower()
+        fallback_token = re.sub(r"[\s_]+", "-", fallback)
+        if fallback_token in PLACEHOLDER_SECRET_VALUES:
+            return True
     if value.startswith("${{") and "secrets." in value:
         return True
     if value.startswith("$("):
