@@ -2740,6 +2740,11 @@ def _analysis_worker_count(args) -> int:
     return requested
 
 
+def _use_analysis_progress(workers: int) -> bool:
+    """Use rich progress only when it can render visibly for the operator."""
+    return workers > 1 and sys.stderr.isatty()
+
+
 def _select_target_repos(
     target_names: list[str], repos: list[RepoMetadata]
 ) -> tuple[list[RepoMetadata], list[str]]:
@@ -2822,7 +2827,7 @@ def _analyze_repos(
             print_info("Analyzing with 1 worker for reliable full-audit progress.")
         else:
             print_info(f"Analyzing with {workers} workers.")
-        progress = create_progress() if workers > 1 else None
+        progress = create_progress() if _use_analysis_progress(workers) else None
         analyze_start = perf_counter()
         if progress:
             with progress:

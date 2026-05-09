@@ -103,6 +103,17 @@ def test_analysis_worker_count_reads_env_when_flag_missing(monkeypatch):
     assert cli._analysis_worker_count(_make_args(analysis_workers=None)) == 3
 
 
+def test_analysis_progress_is_disabled_when_stderr_is_not_tty(monkeypatch):
+    monkeypatch.setattr(cli.sys.stderr, "isatty", lambda: False)
+    assert cli._use_analysis_progress(4) is False
+
+
+def test_analysis_progress_is_enabled_for_parallel_tty(monkeypatch):
+    monkeypatch.setattr(cli.sys.stderr, "isatty", lambda: True)
+    assert cli._use_analysis_progress(4) is True
+    assert cli._use_analysis_progress(1) is False
+
+
 class FakeParser:
     def __init__(self, args: Namespace) -> None:
         self.args = args
