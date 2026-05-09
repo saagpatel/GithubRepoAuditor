@@ -156,6 +156,8 @@ This layer does not widen authority:
 - it never auto-runs `--writeback-apply`
 - campaign approvals are limited to approval-eligible packets; access/config blockers remain blocked rather than approvable
 
+For the current operator checklist before capturing any campaign approval, see `docs/plans/2026-05-09-manual-approval-packet-workflow.md`.
+
 Follow-up freshness is additive:
 
 - `approval_state` still describes validity and apply posture

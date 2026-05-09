@@ -51,6 +51,14 @@ Current gate:
 - Phase 123 remains preview-ready, but live apply is not ready because there are no approved-manual campaign packets and no repo currently passes the full auto-apply trust bar.
 - The full-audit stall path was narrowed by making repo analysis default to one visible worker; use `--analysis-workers <n>` or `GITHUB_REPO_AUDITOR_ANALYSIS_WORKERS=<n>` only when intentionally opting back into parallel analysis.
 
+Follow-up current-state refresh after the security noise cleanup:
+
+- Control center now reports everything currently surfaced as safe to defer, with `0` blocked, `0` urgent, `0` ready, and `5` deferred queue items.
+- Approval center still has no current approval needs review and no approved-manual packets.
+- The latest Action Sync story remains preview-only: campaign previews are available, but no packet approval has been captured.
+- The current strongest safe automation step is a preview of `security-review`; do not capture approval or run apply until a ready approval packet is visible.
+- The manual approval-packet operating path is recorded in `docs/plans/2026-05-09-manual-approval-packet-workflow.md`.
+
 ## Rehearsal Results
 
 Live weekly rehearsal was run from current `main` with the repo-native CLI entrypoint:
