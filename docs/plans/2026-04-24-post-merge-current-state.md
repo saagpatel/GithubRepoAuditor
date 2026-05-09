@@ -12,6 +12,45 @@ PR #120, PR #121, and PR #122 are merged into `main`.
 
 No P1/P2/P3 review findings from the April repair list remain open.
 
+## 2026-05-09 Refresh
+
+A bounded current-state refresh was run after returning to the project:
+
+```bash
+python3 -m src saagpatel --doctor
+python3 -m src saagpatel --html --review-pack --badges --excel-mode standard
+python3 -m src saagpatel --control-center
+python3 -m src saagpatel --portfolio-truth --registry-output output/project-registry.md --portfolio-report-output output/PORTFOLIO-AUDIT-REPORT.md
+python3 -m src saagpatel --approval-center
+python3 -m src saagpatel --auto-apply-approved --dry-run
+python3 -m src saagpatel --campaign security-review --writeback-target all
+python3 -m src saagpatel --campaign promotion-push --writeback-target all
+```
+
+Observed results:
+
+- Doctor completed with no blocking errors.
+- Doctor warnings were optional setup gaps: no `audit-config.yaml` and no `config/notion-config.json`.
+- Full audit completed against 115 GitHub repos after the analysis path was changed to default to one visible worker.
+- Fresh May 9 artifacts were generated, including audit report, workbook, HTML dashboard, badges, review pack, control center, weekly command center, approval center, portfolio truth, and warehouse outputs.
+- Audit score summary: average score `0.70`; tiers reported as `59 functional`, `45 shipped`, `8 wip`, and `3 skeleton`.
+- Portfolio truth regenerated for 116 projects.
+- Portfolio truth still has one known warning: duplicate `OrbitForge` display names require path-qualified registry labels.
+- Control center now reads from the fresh May 9 full audit and remains urgent/sticky, led by `AuraForge` momentum drift.
+- Approval center shows no current approval needs review; approval remains local-only.
+- Auto-apply dry run reports 2 opted-in repos, 2 baseline opted-in repos, and 0 full trust-bar repos because decision quality is still `use-with-review`.
+- Safe campaign previews completed with no live GitHub writes: `security-review` produced 20 preview actions across 18 repos, and `promotion-push` produced 20 preview actions across 15 repos.
+
+Safety adjustment:
+
+- `mcpforge` was removed from automation eligibility because the refreshed truth layer now classifies it as elevated risk: weak active context, investigate override, and missing run instructions.
+- Do not re-add `mcpforge` to automation eligibility until its context quality and path confidence are repaired.
+
+Current gate:
+
+- Phase 123 remains preview-ready, but live apply is not ready because there are no approved-manual campaign packets and no repo currently passes the full auto-apply trust bar.
+- The full-audit stall path was narrowed by making repo analysis default to one visible worker; use `--analysis-workers <n>` or `GITHUB_REPO_AUDITOR_ANALYSIS_WORKERS=<n>` only when intentionally opting back into parallel analysis.
+
 ## Rehearsal Results
 
 Live weekly rehearsal was run from current `main` with the repo-native CLI entrypoint:

@@ -45,6 +45,7 @@ def _make_args(**overrides) -> Namespace:
         "review_pack": False,
         "scorecard": False,
         "security_offline": False,
+        "analysis_workers": None,
         "campaign": None,
         "writeback_target": None,
         "writeback_apply": False,
@@ -85,6 +86,21 @@ def _make_args(**overrides) -> Namespace:
     }
     defaults.update(overrides)
     return Namespace(**defaults)
+
+
+def test_analysis_worker_count_defaults_to_reliable_single_worker(monkeypatch):
+    monkeypatch.delenv("GITHUB_REPO_AUDITOR_ANALYSIS_WORKERS", raising=False)
+    assert cli._analysis_worker_count(_make_args()) == 1
+
+
+def test_analysis_worker_count_uses_bounded_cli_value():
+    assert cli._analysis_worker_count(_make_args(analysis_workers=2)) == 2
+    assert cli._analysis_worker_count(_make_args(analysis_workers=99)) == cli.MAX_ANALYSIS_WORKERS
+
+
+def test_analysis_worker_count_reads_env_when_flag_missing(monkeypatch):
+    monkeypatch.setenv("GITHUB_REPO_AUDITOR_ANALYSIS_WORKERS", "3")
+    assert cli._analysis_worker_count(_make_args(analysis_workers=None)) == 3
 
 
 class FakeParser:

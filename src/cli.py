@@ -50,7 +50,8 @@ from src.reporter import (
 from src.scorer import score_repo
 from src.terminology import ACTION_SYNC_CANONICAL_LABELS
 
-ANALYSIS_WORKERS = 4
+DEFAULT_ANALYSIS_WORKERS = 1
+MAX_ANALYSIS_WORKERS = 8
 DEFAULT_PORTFOLIO_WORKSPACE = Path.home() / "Projects"
 CLI_MODE_GUIDE = """GitHub portfolio operating system with four product modes:
   First Run     setup, baseline creation, first workbook, first control-center read
@@ -331,6 +332,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--security-offline",
         action="store_true",
         help="Use local security analysis only and skip GitHub-native or external security enrichment",
+    )
+    parser.add_argument(
+        "--analysis-workers",
+        type=int,
+        default=None,
+        help=(
+            "Number of repo-analysis workers. Defaults to 1 for reliable, visible full "
+            "audits. Set GITHUB_REPO_AUDITOR_ANALYSIS_WORKERS or pass this flag to opt "
+            "into parallel analysis."
+        ),
     )
     parser.add_argument(
         "--campaign",
@@ -2697,6 +2708,38 @@ def _portfolio_lang_freq_for_filtered_baseline(repos: list[RepoMetadata]) -> dic
     return _compute_portfolio_lang_freq(repos)
 
 
+def _analysis_worker_count(args) -> int:
+    """Return the bounded repo-analysis worker count for this run."""
+    raw_value = getattr(args, "analysis_workers", None)
+    if raw_value is None:
+        raw_value = os.environ.get("GITHUB_REPO_AUDITOR_ANALYSIS_WORKERS")
+
+    if raw_value in {None, ""}:
+        return DEFAULT_ANALYSIS_WORKERS
+
+    try:
+        requested = int(raw_value)
+    except (TypeError, ValueError):
+        print_warning(
+            "Invalid analysis worker count; using the reliable single-worker default."
+        )
+        return DEFAULT_ANALYSIS_WORKERS
+
+    if requested < 1:
+        print_warning(
+            "Analysis worker count must be at least 1; using the reliable single-worker default."
+        )
+        return DEFAULT_ANALYSIS_WORKERS
+
+    if requested > MAX_ANALYSIS_WORKERS:
+        print_warning(
+            f"Analysis worker count capped at {MAX_ANALYSIS_WORKERS} to avoid GitHub API stalls."
+        )
+        return MAX_ANALYSIS_WORKERS
+
+    return requested
+
+
 def _select_target_repos(
     target_names: list[str], repos: list[RepoMetadata]
 ) -> tuple[list[RepoMetadata], list[str]]:
@@ -2757,7 +2800,6 @@ def _analyze_repos(
             security_offline=args.security_offline,
         )
 
-    progress = create_progress()
     clone_start = perf_counter()
     with clone_workspace(
         repos,
@@ -2775,7 +2817,12 @@ def _analyze_repos(
         analyzable = [
             (index, repo_meta, repo_path) for index, repo_meta, repo_path in analyzable if repo_path
         ]
-        workers = min(ANALYSIS_WORKERS, max(1, len(analyzable)))
+        workers = min(_analysis_worker_count(args), max(1, len(analyzable)))
+        if workers == 1:
+            print_info("Analyzing with 1 worker for reliable full-audit progress.")
+        else:
+            print_info(f"Analyzing with {workers} workers.")
+        progress = create_progress() if workers > 1 else None
         analyze_start = perf_counter()
         if progress:
             with progress:

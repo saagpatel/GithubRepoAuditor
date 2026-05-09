@@ -366,7 +366,7 @@ repos:
     review_cadence: weekly
     intended_disposition: maintain
     tool_provenance: claude-code
-    automation_eligible: true
+    automation_eligible: false
   ModelColosseum:
     owner: d
     lifecycle_state: active

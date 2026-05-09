@@ -97,6 +97,20 @@ Fix:
 
 Targeted and incremental reruns depend on the full filtered portfolio baseline, both for merged outputs and for stable portfolio comparisons.
 
+### Full audit appears stuck during analysis
+
+Symptoms:
+- the run prints `Cloned <n>/<n> repos. Analyzing...`
+- no report artifacts are written yet
+- GitHub-backed analysis stays quiet longer than expected
+
+Fix:
+- use the default analysis path first; it runs one repo-analysis worker and prints each repo as it starts
+- if you intentionally need the older parallel behavior, pass `--analysis-workers <n>`
+- or set `GITHUB_REPO_AUDITOR_ANALYSIS_WORKERS=<n>` for a temporary speed-oriented run
+
+Keep worker counts low when GitHub API enrichment is enabled. The default favors a reliable, visible weekly run over parallel analysis that can make long network waits look frozen.
+
 ### Missing incremental fingerprints
 
 Symptoms:
