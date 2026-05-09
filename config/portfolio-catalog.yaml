@@ -74,6 +74,19 @@ groups:
     tool_provenance: claude-code
     order: 70
 repos:
+  AuraForge:
+    owner: d
+    purpose: local-first AI planning workspace for app specs and handoff-ready build plans
+    lifecycle_state: active
+    criticality: medium
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: productivity
+    tool_provenance: codex
+    maturity_program: maintain
+    target_maturity: operating
+    automation_eligible: false
+    notes: Security posture inspected on 2026-05-09; secret scanning is enabled with zero alerts, while CodeQL remains a manual follow-up.
   ApplyKit:
     owner: d
     purpose: deterministic local-first application packet generation
