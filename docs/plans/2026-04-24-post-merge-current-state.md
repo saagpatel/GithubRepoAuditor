@@ -113,6 +113,12 @@ Recommended maintainability pass:
 3. Preserve the scoped mypy command in `.github/workflows/ci.yml` during the consolidation.
 4. Verify with full pytest, Ruff, scoped mypy, `python3 -m src --help`, `python3 -m src.cli --help`, and `make workbook-gate`.
 
+2026-05-09 implementation note:
+
+- The first closure-forecast modernization pass added four conceptual facade modules and routed `operator_resolution_trend.py` through them.
+- Compatibility imports remain stable; the original `operator_trend_closure_forecast_*` modules were not removed.
+- Details are recorded in `docs/plans/2026-05-09-closure-forecast-modernization.md`.
+
 ## Follow-Ups
 
 1. Complete manual desktop Excel signoff for the generated workbook if this rehearsal becomes a release record.
