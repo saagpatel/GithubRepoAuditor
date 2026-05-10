@@ -535,9 +535,6 @@ from src.excel_workbook_helpers import (
 from src.excel_workbook_helpers import add_table as _add_table
 from src.excel_workbook_helpers import clear_worksheet as _clear_worksheet
 from src.excel_workbook_helpers import configure_sheet_view as _configure_sheet_view
-from src.excel_workbook_helpers import (
-    finalize_workbook_structure as _finalize_workbook_structure,
-)
 from src.excel_workbook_helpers import get_or_create_sheet as _get_or_create_sheet
 from src.excel_workbook_helpers import set_autofilter as _set_autofilter
 from src.excel_workbook_helpers import set_defined_name as _set_defined_name
@@ -1802,7 +1799,6 @@ def _build_excel_workbook(
             build_navigation=_build_navigation,
             inject_sheet_navigation=_inject_sheet_navigation,
             apply_workbook_named_ranges=_apply_workbook_named_ranges,
-            finalize_workbook_structure=_finalize_workbook_structure,
             template_info_sheet=TEMPLATE_INFO_SHEET,
         ),
     )

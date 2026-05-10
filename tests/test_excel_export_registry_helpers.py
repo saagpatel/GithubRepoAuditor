@@ -4,6 +4,7 @@ from src.excel_export_registry_helpers import build_excel_workbook_runtime
 from src.excel_workbook_helpers import (
     CORE_VISIBLE_SHEETS,
     DEFAULT_PREFERRED_SHEET_ORDER,
+    finalize_workbook_structure,
     run_workbook_build_steps,
 )
 
@@ -60,7 +61,6 @@ def _runtime_kwargs() -> dict:
         "build_navigation": _noop,
         "inject_sheet_navigation": _noop,
         "apply_workbook_named_ranges": _noop,
-        "finalize_workbook_structure": _noop,
     }
     return {**builders, "template_info_sheet": "Template Info"}
 
@@ -69,6 +69,7 @@ def test_workbook_runtime_owns_default_structure_contracts() -> None:
     runtime = build_excel_workbook_runtime(**_runtime_kwargs())
 
     assert runtime["run_workbook_build_steps"] is run_workbook_build_steps
+    assert runtime["finalize_workbook_structure"] is finalize_workbook_structure
     assert runtime["core_visible_sheets"] == CORE_VISIBLE_SHEETS
     assert runtime["core_visible_sheets"] is not CORE_VISIBLE_SHEETS
     assert runtime["preferred_order"] == DEFAULT_PREFERRED_SHEET_ORDER
@@ -79,10 +80,12 @@ def test_workbook_runtime_allows_explicit_structure_contracts() -> None:
     runtime = build_excel_workbook_runtime(
         **_runtime_kwargs(),
         run_workbook_build_steps=_noop,
+        finalize_workbook_structure=_noop,
         core_visible_sheets={"Dashboard"},
         preferred_order=["Dashboard", "Index"],
     )
 
     assert runtime["run_workbook_build_steps"] is _noop
+    assert runtime["finalize_workbook_structure"] is _noop
     assert runtime["core_visible_sheets"] == {"Dashboard"}
     assert runtime["preferred_order"] == ["Dashboard", "Index"]
