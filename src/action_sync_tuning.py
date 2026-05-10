@@ -221,6 +221,17 @@ def _tuned_next_action_sync_step(record: dict[str, Any]) -> str:
     return "Stay local for now; no current campaign needs preview or apply."
 
 
+def _execution_next_action_sync_step(packet: dict[str, Any]) -> str:
+    label = str(packet.get("label") or packet.get("campaign_type") or "Campaign")
+    target = str(packet.get("recommended_target") or "none")
+    execution_state = str(packet.get("execution_state") or "stay-local")
+    if execution_state == "review-drift":
+        return f"Review managed drift in {label} before any further Action Sync to {target}."
+    if execution_state == "needs-approval":
+        return f"{label} needs approval or rollback review before it is safe to apply to {target}."
+    return ""
+
+
 def _next_tuned_campaign_summary(record: dict[str, Any], tuning: dict[str, Any]) -> str:
     label = str(record.get("label") or record.get("campaign_type") or "Campaign")
     stage = READINESS_STAGE_LABELS.get(str(record.get("readiness_stage") or "idle"), "idle")
@@ -386,12 +397,20 @@ def build_action_sync_tuning_bundle(
         "summary": "Stay local for now; no current campaign has a safe execution handoff.",
     }
     next_tuned = _next_tuned_campaign(readiness_records, tuning_by_campaign)
+    execution_next_step = _execution_next_action_sync_step(next_apply_candidate)
     queue = _queue_tuning_lines(queue, tuning_by_campaign)
     return {
         "action_sync_tuning": tuning_records,
         "campaign_tuning_summary": _campaign_tuning_summary(readiness_records, tuning_by_campaign),
         "next_tuned_campaign": next_tuned,
-        "next_action_sync_step": _tuned_next_action_sync_step(readiness_by_campaign.get(next_tuned.get("campaign_type", ""), {})) if next_tuned.get("campaign_type") else "Stay local for now; no current campaign needs preview or apply.",
+        "next_action_sync_step": execution_next_step
+        or (
+            _tuned_next_action_sync_step(
+                readiness_by_campaign.get(next_tuned.get("campaign_type", ""), {})
+            )
+            if next_tuned.get("campaign_type")
+            else "Stay local for now; no current campaign needs preview or apply."
+        ),
         "next_apply_candidate": next_apply_candidate,
         "top_apply_ready_campaigns": _sorted_stage_group(readiness_records, tuning_by_campaign, stage_key="readiness_stage", stage_value="apply-ready"),
         "top_preview_ready_campaigns": _sorted_stage_group(readiness_records, tuning_by_campaign, stage_key="readiness_stage", stage_value="preview-ready"),

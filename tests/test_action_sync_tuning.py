@@ -235,3 +235,26 @@ def test_tuning_breaks_ties_within_same_execution_state_but_not_across_execution
     assert stronger_state_bundle["next_apply_candidate"]["execution_state"] == "ready-to-apply"
     assert stronger_state_bundle["operator_queue"][0]["campaign_tuning_status"] == "proven"
     assert stronger_state_bundle["operator_queue"][0]["campaign_tuning_line"].startswith("Campaign Tuning:")
+
+
+def test_tuning_next_action_sync_step_honors_packet_execution_blockers() -> None:
+    bundle = _bundle(
+        readiness_records=[
+            _readiness_record("security-review", "apply-ready"),
+        ],
+        packet_records=[
+            {
+                **_packet_record("security-review", "needs-approval"),
+                "blocker_types": ["rollback-coverage"],
+                "blockers": ["Rollback coverage is missing."],
+                "rollback_status": "missing",
+                "apply_command": "",
+            },
+        ],
+        outcome_history=[],
+    )
+
+    assert bundle["next_apply_candidate"]["execution_state"] == "needs-approval"
+    assert bundle["next_action_sync_step"] == (
+        "Security Review needs approval or rollback review before it is safe to apply to all."
+    )

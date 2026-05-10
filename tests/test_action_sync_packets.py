@@ -237,6 +237,42 @@ def test_packet_is_needs_approval_for_governance_or_rollback_gaps():
     assert "rollback-coverage" in rollback_packet["blocker_types"]
 
 
+def test_packet_treats_non_reversible_action_runs_as_rollback_gaps():
+    report_data = _report_data(
+        campaign_summary={
+            "campaign_type": "security-review",
+            "label": "Security Review",
+            "action_count": 1,
+            "repo_count": 1,
+        },
+        writeback_results={"mode": "preview"},
+    )
+    _, actions = build_campaign_bundle(
+        report_data,
+        campaign_type="security-review",
+        portfolio_profile="default",
+        collection_name=None,
+        max_actions=20,
+        writeback_target=None,
+    )
+    report_data["action_runs"] = [
+        {
+            "campaign_type": "security-review",
+            "action_id": actions[0]["action_id"],
+            "status": "preview",
+            "rollback_state": "non-reversible",
+        }
+    ]
+
+    bundle = _bundle(report_data)
+    packet = _packet(bundle, "security-review")
+
+    assert packet["execution_state"] == "needs-approval"
+    assert packet["rollback_status"] == "missing"
+    assert "rollback-coverage" in packet["blocker_types"]
+    assert packet["apply_command"] == ""
+
+
 def test_packet_is_ready_to_apply_when_readiness_and_rollback_are_healthy():
     report_data = _report_data(
         campaign_summary={

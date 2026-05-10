@@ -96,9 +96,14 @@ def _rollback_status(report_data: dict[str, Any], campaign_type: str, actions: l
     if not actions:
         return "not-applicable"
 
+    action_ids = {str(action.get("action_id") or "") for action in actions}
     rollback_preview = report_data.get("rollback_preview") or {}
     items = list(rollback_preview.get("items") or [])
-    action_ids = {str(action.get("action_id") or "") for action in actions}
+    items.extend(
+        row
+        for row in report_data.get("action_runs") or []
+        if str(row.get("campaign_type") or "") == campaign_type
+    )
     matching = [item for item in items if str(item.get("action_id") or "") in action_ids]
     if not matching:
         active_campaign = campaign_type == str((report_data.get("campaign_summary") or {}).get("campaign_type") or "")
