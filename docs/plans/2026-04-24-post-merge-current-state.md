@@ -123,6 +123,7 @@ Recommended maintainability pass:
 
 - The closure-forecast sequence is complete through reset-family consolidation and wrapper-retirement audit.
 - The first workbook-surface modernization pass moved `CORE_VISIBLE_SHEETS` from `src/excel_export.py` into `src/excel_workbook_helpers.py` while preserving compatibility through `src/excel_export.py`.
+- The second workbook-surface modernization pass moved default workbook structure wiring into `src/excel_export_registry_helpers.py`; `src/excel_export.py` still re-exports the structure constants for compatibility.
 - Details are recorded in `docs/plans/2026-05-10-excel-workbook-contract-modernization.md`.
 
 ## Follow-Ups

@@ -528,9 +528,9 @@ from src.excel_timeline_helpers import (
     extend_score_history_with_current as _extend_score_history_with_current,
 )
 from src.excel_timeline_helpers import review_status_counts as _review_status_counts
+from src.excel_workbook_helpers import CORE_VISIBLE_SHEETS as CORE_VISIBLE_SHEETS
 from src.excel_workbook_helpers import (
-    CORE_VISIBLE_SHEETS,
-    DEFAULT_PREFERRED_SHEET_ORDER,
+    DEFAULT_PREFERRED_SHEET_ORDER as DEFAULT_PREFERRED_SHEET_ORDER,
 )
 from src.excel_workbook_helpers import add_table as _add_table
 from src.excel_workbook_helpers import clear_worksheet as _clear_worksheet
@@ -1805,9 +1805,7 @@ def _build_excel_workbook(
             inject_sheet_navigation=_inject_sheet_navigation,
             apply_workbook_named_ranges=_apply_workbook_named_ranges,
             finalize_workbook_structure=_finalize_workbook_structure,
-            core_visible_sheets=CORE_VISIBLE_SHEETS,
             template_info_sheet=TEMPLATE_INFO_SHEET,
-            preferred_order=list(DEFAULT_PREFERRED_SHEET_ORDER),
         ),
     )
 
