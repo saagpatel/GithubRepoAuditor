@@ -74,6 +74,7 @@ PLACEHOLDER_SECRET_VALUES = frozenset({
     "example-secret",
     "placeholder-secret",
     "playwright-secret",
+    "required",
     "supersecretkey",
     "your-secret-here",
 })
@@ -209,6 +210,10 @@ def _is_ignored_secret_match(match: re.Match, path: Path | None = None) -> bool:
     if "secret" in normalized_token and any(
         marker in normalized_token
         for marker in ("test", "fake", "mock", "fixture", "dev", "playwright")
+    ):
+        return True
+    if "password" in normalized_token and any(
+        marker in normalized_token for marker in ("test", "smoke", "fixture", "placeholder")
     ):
         return True
     if normalized.startswith("{") and normalized.endswith("}") and re.fullmatch(

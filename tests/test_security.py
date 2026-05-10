@@ -63,6 +63,14 @@ class TestSecretScanning:
     def test_ignores_common_test_placeholder_values(self, tmp_path):
         (tmp_path / "oauth.test.ts").write_text(
             'const config = { client_secret: "client-secret" };\n'
+            'const smokePassword = "resume-smoke-password";\n'
+        )
+        found = _scan_secrets(tmp_path)
+        assert found == []
+
+    def test_ignores_ui_validation_labels(self, tmp_path):
+        (tmp_path / "settings-panel.tsx").write_text(
+            "if (!smtpPassword) newErrors.smtpPassword = 'Required';\n"
         )
         found = _scan_secrets(tmp_path)
         assert found == []
