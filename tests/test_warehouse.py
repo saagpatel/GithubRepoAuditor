@@ -574,6 +574,59 @@ def test_write_warehouse_snapshot_defaults_empty_campaign_outcomes_for_older_sty
     assert operator_state["decision_quality_summary"]["decision_quality_status"] == "insufficient-data"
 
 
+def test_write_warehouse_snapshot_expands_multi_action_target_results(tmp_path):
+    audit = score_repo(_make_metadata(), _make_results())
+
+    from src.models import AuditReport
+
+    report = AuditReport.from_audits("user", [audit], [], 1)
+    report.writeback_results = {
+        "mode": "apply",
+        "target": "github",
+        "results": [
+            {
+                "action_ids": ["security-review-active", "security-review-stale"],
+                "repo_full_name": "user/warehouse-repo",
+                "target": "github-issue",
+                "status": "reopened",
+                "number": 12,
+                "url": "https://github.com/user/warehouse-repo/issues/12",
+            }
+        ],
+    }
+
+    db_path = write_warehouse_snapshot(report, tmp_path)
+
+    conn = sqlite3.connect(db_path)
+    try:
+        rows = conn.execute(
+            """
+            SELECT action_id, repo_id, target, status, external_key
+            FROM campaign_target_snapshots
+            ORDER BY action_id
+            """
+        ).fetchall()
+    finally:
+        conn.close()
+
+    assert rows == [
+        (
+            "security-review-active",
+            "user/warehouse-repo",
+            "github-issue",
+            "reopened",
+            "12",
+        ),
+        (
+            "security-review-stale",
+            "user/warehouse-repo",
+            "github-issue",
+            "reopened",
+            "12",
+        ),
+    ]
+
+
 def test_approval_workflow_summary_and_records_round_trip(tmp_path):
     audit = score_repo(_make_metadata(), _make_results())
 

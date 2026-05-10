@@ -1398,6 +1398,24 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
             ),
         )
 
+    def _campaign_target_action_ids(result: dict[str, object]) -> list[str]:
+        action_id = result.get("action_id")
+        if isinstance(action_id, str) and action_id:
+            return [action_id]
+        action_ids = result.get("action_ids")
+        if isinstance(action_ids, list):
+            return [item for item in action_ids if isinstance(item, str) and item]
+        repo_id = str(result.get("repo_full_name") or "")
+        target_id = str(result.get("target") or "")
+        external_key = str(
+            result.get("number")
+            or result.get("page_id")
+            or result.get("url")
+            or repo_id
+            or "unknown"
+        )
+        return [f"unattributed:{repo_id}:{target_id}:{external_key}"]
+
     for result in (
         report.writeback_results.get("results", [])
         if isinstance(report.writeback_results, dict)
@@ -1421,26 +1439,27 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
                     json.dumps(result),
                 ),
             )
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO campaign_target_snapshots (
-                    run_id, action_id, repo_id, target, status, external_key,
-                    before_json, after_json, expected_json, details_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    run_id,
-                    result.get("action_id", ""),
-                    result.get("repo_full_name", ""),
-                    target,
-                    result.get("status", "unknown"),
-                    str(result.get("number") or result.get("url") or ""),
-                    json.dumps(result.get("before", {})),
-                    json.dumps(result.get("after", {})),
-                    json.dumps(result.get("expected", {})),
-                    json.dumps(result),
-                ),
-            )
+            for action_id in _campaign_target_action_ids(result):
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO campaign_target_snapshots (
+                        run_id, action_id, repo_id, target, status, external_key,
+                        before_json, after_json, expected_json, details_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        run_id,
+                        action_id,
+                        result.get("repo_full_name", ""),
+                        target,
+                        result.get("status", "unknown"),
+                        str(result.get("number") or result.get("url") or ""),
+                        json.dumps(result.get("before", {})),
+                        json.dumps(result.get("after", {})),
+                        json.dumps(result.get("expected", {})),
+                        json.dumps(result),
+                    ),
+                )
         elif target.startswith("notion"):
             conn.execute(
                 """
@@ -1455,26 +1474,27 @@ def _insert_run(conn: sqlite3.Connection, report: AuditReport, report_path: Path
                     json.dumps(result),
                 ),
             )
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO campaign_target_snapshots (
-                    run_id, action_id, repo_id, target, status, external_key,
-                    before_json, after_json, expected_json, details_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    run_id,
-                    result.get("action_id", ""),
-                    result.get("repo_full_name", ""),
-                    target,
-                    result.get("status", "unknown"),
-                    str(result.get("page_id") or result.get("url") or ""),
-                    json.dumps(result.get("before", {})),
-                    json.dumps(result.get("after", {})),
-                    json.dumps(result.get("expected", {})),
-                    json.dumps(result),
-                ),
-            )
+            for action_id in _campaign_target_action_ids(result):
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO campaign_target_snapshots (
+                        run_id, action_id, repo_id, target, status, external_key,
+                        before_json, after_json, expected_json, details_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        run_id,
+                        action_id,
+                        result.get("repo_full_name", ""),
+                        target,
+                        result.get("status", "unknown"),
+                        str(result.get("page_id") or result.get("url") or ""),
+                        json.dumps(result.get("before", {})),
+                        json.dumps(result.get("after", {})),
+                        json.dumps(result.get("expected", {})),
+                        json.dumps(result),
+                    ),
+                )
 
     for action_id, refs in report.external_refs.items():
         for ref_key, ref_value in refs.items():
