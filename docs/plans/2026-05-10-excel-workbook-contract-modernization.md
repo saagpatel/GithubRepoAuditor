@@ -2,7 +2,7 @@
 
 ## Status
 
-The first three workbook-surface modernization passes are implemented.
+The first four workbook-surface modernization passes are implemented.
 
 These passes are intentionally behavior-preserving. They move stable workbook structure ownership out of `src/excel_export.py` and into the helper/runtime layer, where workbook ordering, visibility, and finalization helpers already live.
 
@@ -13,6 +13,7 @@ These passes are intentionally behavior-preserving. They move stable workbook st
 - `src/workbook_gate.py` now reads `CORE_VISIBLE_SHEETS` from the workbook helper layer instead of the exporter module.
 - `src/excel_export_registry_helpers.py` now owns the default runtime wiring for `CORE_VISIBLE_SHEETS` and `DEFAULT_PREFERRED_SHEET_ORDER`.
 - `src/excel_export_registry_helpers.py` also owns the default workbook build-step executor wiring.
+- `src/excel_export_registry_helpers.py` also owns the default workbook finalization wiring.
 - `src/excel_export.py` still re-exports the workbook structure constants, but no longer passes them through every runtime build call.
 - `tests/test_excel_export_registry_helpers.py` protects the default and explicit runtime structure contracts.
 - The exporter still owns workbook build adapters and the public `export_excel(...)` entrypoint.
@@ -27,6 +28,7 @@ This keeps workbook behavior stable while making future cleanup easier:
 - the release gate depends on the workbook contract layer,
 - the workbook runtime helper owns the default structure wiring,
 - the workbook runtime helper owns the default build-step executor wiring,
+- the workbook runtime helper owns the default workbook finalization wiring,
 - and `src/excel_export.py` remains a compatibility facade for existing tests and callers.
 
 ## Verification
@@ -55,6 +57,14 @@ ruff check src/excel_export.py src/excel_export_registry_helpers.py src/excel_wo
 mypy src/excel_export.py src/excel_export_registry_helpers.py src/excel_workbook_helpers.py src/workbook_gate.py --ignore-missing-imports
 ```
 
+Focused verification for the fourth pass:
+
+```bash
+python3 -m pytest tests/test_excel_export_registry_helpers.py tests/test_excel_enhanced.py tests/test_workbook_gate.py -q -p no:cacheprovider
+ruff check src/excel_export.py src/excel_export_registry_helpers.py src/excel_workbook_helpers.py src/workbook_gate.py tests/test_excel_export_registry_helpers.py tests/test_excel_enhanced.py tests/test_workbook_gate.py
+mypy src/excel_export.py src/excel_export_registry_helpers.py src/excel_workbook_helpers.py src/workbook_gate.py --ignore-missing-imports
+```
+
 Closeout verification:
 
 ```bash
@@ -70,4 +80,4 @@ The workbook gate's automated checks passed. Manual desktop Excel signoff remain
 
 ## Next Step
 
-Continue with small workbook-contract or exporter-adapter moves only when the ownership boundary is obvious. Do not rewrite sheet rendering or workbook generation in a broad pass.
+Checkpoint: the obvious low-risk workbook runtime wiring moves are now complete. Pause the workbook/exporter lane unless a future discovery pass finds another clear adapter boundary with strong tests. Do not rewrite sheet rendering or workbook generation in a broad pass.
