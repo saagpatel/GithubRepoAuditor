@@ -5,10 +5,12 @@ import json
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 from xml.etree import ElementTree as ET
 
-from src.excel_export import CORE_VISIBLE_SHEETS, export_excel
+from src.excel_export import export_excel
 from src.excel_template import DEFAULT_TEMPLATE_PATH, load_workbook_allowing_native_sparklines
+from src.excel_workbook_helpers import CORE_VISIBLE_SHEETS
 
 DEFAULT_GATE_DIR = Path("output") / "workbook-gate"
 RESULT_FILENAME = "workbook-gate-result.json"
@@ -1218,7 +1220,7 @@ def run_workbook_gate(output_dir: Path = DEFAULT_GATE_DIR) -> dict:
     validation_errors = _flatten_failed_checks(automated_sections)
     manual_signoff = _manual_signoff_template(standard_path)
     checklist_path = _write_manual_checklist(output_dir, manual_signoff)
-    result = {
+    result: dict[str, Any] = {
         "status": "ok" if not validation_errors else "error",
         "report_path": str(report_path),
         "standard_workbook": str(standard_path),

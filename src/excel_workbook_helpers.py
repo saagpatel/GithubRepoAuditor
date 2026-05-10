@@ -1,3 +1,5 @@
+from typing import Any, Callable
+
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.workbook.defined_name import DefinedName
@@ -22,6 +24,29 @@ DEFAULT_PREFERRED_SHEET_ORDER = [
     "Governance Controls",
     "Print Pack",
 ]
+
+CORE_VISIBLE_SHEETS = {
+    "Index",
+    "Dashboard",
+    "All Repos",
+    "Portfolio Explorer",
+    "Portfolio Catalog",
+    "Scorecards",
+    "Implementation Hotspots",
+    "Operator Outcomes",
+    "Approval Ledger",
+    "Historical Intelligence",
+    "Repo Detail",
+    "By Lens",
+    "By Collection",
+    "Trend Summary",
+    "Run Changes",
+    "Review Queue",
+    "Campaigns",
+    "Governance Controls",
+    "Executive Summary",
+    "Print Pack",
+}
 
 
 def set_autofilter(ws, max_col: int, max_row: int, start_row: int = 1) -> None:
@@ -133,7 +158,9 @@ def finalize_workbook_structure(
     wb.calculation.forceFullCalc = True
 
 
-def run_workbook_build_steps(steps: list[tuple[object, tuple, dict]]) -> None:
+def run_workbook_build_steps(
+    steps: list[tuple[Callable[..., Any], tuple[Any, ...], dict[str, Any]]],
+) -> None:
     for builder, args, kwargs in steps:
         builder(*args, **kwargs)
 

@@ -529,6 +529,7 @@ from src.excel_timeline_helpers import (
 )
 from src.excel_timeline_helpers import review_status_counts as _review_status_counts
 from src.excel_workbook_helpers import (
+    CORE_VISIBLE_SHEETS,
     DEFAULT_PREFERRED_SHEET_ORDER,
 )
 from src.excel_workbook_helpers import add_table as _add_table
@@ -564,29 +565,6 @@ from src.weekly_scheduling_overlay import resolve_weekly_story_value
 # Tier display order
 TIER_ORDER = ["shipped", "functional", "wip", "skeleton", "abandoned"]
 PIE_COLORS = ["166534", "1565C0", "D97706", "C2410C", "6B7280"]
-CORE_VISIBLE_SHEETS = {
-    "Index",
-    "Dashboard",
-    "All Repos",
-    "Portfolio Explorer",
-    "Portfolio Catalog",
-    "Scorecards",
-    "Implementation Hotspots",
-    "Operator Outcomes",
-    "Approval Ledger",
-    "Historical Intelligence",
-    "Repo Detail",
-    "By Lens",
-    "By Collection",
-    "Trend Summary",
-    "Run Changes",
-    "Review Queue",
-    "Campaigns",
-    "Governance Controls",
-    "Executive Summary",
-    "Print Pack",
-}
-
 RADAR_DIMS = REPO_PROFILE_RADAR_DIMS
 RADAR_LABELS = REPO_PROFILE_RADAR_LABELS
 
