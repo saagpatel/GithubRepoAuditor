@@ -2,9 +2,9 @@
 
 ## Status
 
-The first four closure-forecast modernization passes are implemented.
+The first five closure-forecast modernization passes are implemented.
 
-These passes are intentionally behavior-preserving. The first pass added conceptual facade modules for the sprawling `operator_trend_closure_forecast_*` helper family and routed `operator_resolution_trend.py` through those facades. The second pass moved the core implementation behind the core facade. The third pass moved the freshness implementation behind the freshness controls facade. The fourth pass moved the reacquisition implementation behind the reacquisition controls facade. Existing module paths remain importable.
+These passes are intentionally behavior-preserving. The first pass added conceptual facade modules for the sprawling `operator_trend_closure_forecast_*` helper family and routed `operator_resolution_trend.py` through those facades. The second pass moved the core implementation behind the core facade. The third pass moved the freshness implementation behind the freshness controls facade. The fourth pass moved the reacquisition implementation behind the reacquisition controls facade. The fifth pass moved the reset-family implementation behind the reset controls facade. Existing module paths remain importable.
 
 ## What Changed
 
@@ -34,6 +34,12 @@ Fourth-pass implementation move:
 - `src/operator_trend_closure_forecast_reacquisition_controls.py` now owns reacquisition, refresh recovery, persistence, churn, reacquisition freshness, and persistence-reset helpers.
 - `src/operator_trend_closure_forecast_reacquisition.py` and `src/operator_trend_closure_forecast_reacquisition_freshness.py` are compatibility wrappers.
 - Existing reacquisition, reacquisition freshness, and facade tests still cover old import paths.
+
+Fifth-pass implementation move:
+
+- `src/operator_trend_closure_forecast_reset_controls.py` now owns reset refresh, reset reentry freshness, reset reentry rebuild, rebuild freshness, rebuild persistence, reentry restore, rerestore, and rererestore helpers.
+- The old reset-family modules are compatibility wrappers.
+- Existing reset-family and facade tests still cover old import paths.
 
 ## Compatibility Rule
 
@@ -88,6 +94,14 @@ ruff check src/operator_trend_closure_forecast_reacquisition.py src/operator_tre
 mypy src/operator_trend_closure_forecast_reacquisition.py src/operator_trend_closure_forecast_reacquisition_freshness.py src/operator_trend_closure_forecast_reacquisition_controls.py --ignore-missing-imports
 ```
 
+Completed during the fifth reset-family consolidation pass:
+
+```bash
+python3 -m pytest tests/test_operator_trend_closure_forecast_reset_refresh.py tests/test_operator_trend_closure_forecast_reset_reentry_freshness.py tests/test_operator_trend_closure_forecast_reset_reentry_rebuild.py tests/test_operator_trend_closure_forecast_reset_reentry_rebuild_freshness.py tests/test_operator_trend_closure_forecast_reset_reentry_rebuild_persistence.py tests/test_operator_trend_closure_forecast_reset_reentry_rebuild_reentry_restore.py tests/test_operator_trend_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness.py tests/test_operator_trend_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence.py tests/test_operator_trend_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_recovery.py tests/test_operator_trend_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence.py tests/test_operator_trend_closure_forecast_facades.py -q -p no:cacheprovider
+ruff check src/operator_trend_closure_forecast_reset*.py tests/test_operator_trend_closure_forecast_reset*.py tests/test_operator_trend_closure_forecast_facades.py
+mypy src/operator_trend_closure_forecast_reset*.py --ignore-missing-imports
+```
+
 ## Next Consolidation Step
 
-The next pass can move reset, reentry, rebuild, restore, and rerestore implementation behind `operator_trend_closure_forecast_reset_controls.py`. Keep the old reset-family modules as compatibility wrappers until all downstream callers are migrated or explicitly retired.
+The closure-forecast implementation bodies now sit behind the four conceptual facade modules. The next cleanup pass can either keep this compatibility state stable while downstream callers settle, or do a separate retire-old-wrapper audit once import usage proves the wrappers are no longer needed.
