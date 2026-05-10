@@ -205,6 +205,46 @@ def test_apply_ready_campaign_with_automation_subset_is_ready_for_review(tmp_pat
     assert bundle["next_approval_review"]["approval_id"] == "campaign:promotion-push"
 
 
+def test_apply_manual_campaign_is_visible_but_not_ready_for_approval(tmp_path: Path) -> None:
+    report = _base_report()
+    report["governance_preview"] = {"fingerprint": "gov-fingerprint-a", "actions": []}
+    report["operator_summary"] = {
+        "action_sync_packets": [
+            {
+                "campaign_type": "security-review",
+                "label": "Security Review",
+                "execution_state": "ready-to-apply",
+                "recommended_target": "all",
+                "sync_mode": "reconcile",
+                "action_count": 2,
+                "blocker_types": [],
+                "rollback_status": "ready",
+                "apply_command": "audit testuser --campaign security-review --writeback-target all --writeback-apply",
+                "top_repos": ["RepoA"],
+                "actions": [{"action_id": "action-1"}],
+            }
+        ],
+        "action_sync_automation": [
+            {
+                "campaign_type": "security-review",
+                "automation_posture": "apply-manual",
+                "recommended_command": "Manual apply only: audit testuser --campaign security-review --writeback-target all --writeback-apply",
+            }
+        ],
+    }
+
+    bundle = load_approval_ledger_bundle(tmp_path, report, [])
+    record = next(item for item in bundle["approval_ledger"] if item["approval_id"] == "campaign:security-review")
+    ready_bundle = load_approval_ledger_bundle(tmp_path, report, [], approval_view="ready")
+
+    assert record["approval_state"] == "not-applicable"
+    assert record["approval_command"] == ""
+    assert "Manual apply only" in record["manual_apply_command"]
+    assert bundle["approval_workflow_summary"]["counts"]["not-applicable"] == 1
+    assert "explicit manual apply decision" in bundle["next_approval_review"]["summary"]
+    assert ready_bundle["approval_ledger"] == []
+
+
 def test_approved_campaign_suppresses_stale_ready_review_queue_item(tmp_path: Path) -> None:
     report = _base_report()
     report["governance_preview"] = {"fingerprint": "gov-fingerprint-a", "actions": []}

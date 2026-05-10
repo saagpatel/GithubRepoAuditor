@@ -411,11 +411,12 @@ def _campaign_record(
     approval_id = f"campaign:{campaign_type}"
     source_run_id = _latest_report_run_id(report_data)
     blocker_types = set(str(item) for item in (packet.get("blocker_types") or []))
+    automation_posture = str(automation.get("automation_posture") or "")
     eligible = bool(
         campaign_type
         and (
             str(packet.get("execution_state") or "") == "needs-approval"
-            or str(automation.get("automation_posture") or "") == "approval-first"
+            or automation_posture in {"approval-first", "apply-manual"}
         )
     )
     if not eligible:
@@ -444,6 +445,8 @@ def _campaign_record(
         state = "applied"
     elif has_matching:
         state = "approved-manual"
+    elif automation_posture == "apply-manual":
+        state = "not-applicable"
     elif apply_ready_after_approval:
         state = "ready-for-review"
     else:
@@ -459,7 +462,10 @@ def _campaign_record(
     review_command = f"audit {_username(report_data)} --approval-center --approval-view ready"
     approval_command = f"audit {_username(report_data)} --campaign {campaign_type} --approve-packet"
     manual_apply_command = ""
-    if state in {"approved-manual", "applied"}:
+    if state == "not-applicable":
+        approval_command = ""
+        manual_apply_command = str(automation.get("recommended_command") or packet.get("apply_command") or "")
+    elif state in {"approved-manual", "applied"}:
         manual_apply_command = str(packet.get("apply_command") or "")
     if state == "needs-reapproval":
         summary_line = f"{label} needs re-approval because the approval fingerprint or approval-only blockers changed."
@@ -471,6 +477,8 @@ def _campaign_record(
         summary_line = f"{label} is blocked by non-approval prerequisites, so approval alone cannot clear the path."
     elif state == "applied":
         summary_line = f"{label} has already been applied with a matching approval and does not need a fresh approval yet."
+    elif state == "not-applicable":
+        summary_line = f"{label} is manual-apply only; no approval-center packet is required before the explicit apply decision."
     else:
         summary_line = f"{label} does not currently participate in the approval workflow."
 
@@ -559,10 +567,21 @@ def _suppresses_campaign_review_item(
 
 def _summary(records: list[dict[str, Any]]) -> dict[str, Any]:
     actionable = [item for item in records if item.get("approval_state") != "not-applicable"]
+    counts = {
+        state: sum(1 for item in records if item.get("approval_state") == state)
+        for state in APPROVAL_STATE_PRIORITY
+    }
     if not actionable:
+        manual_only = [item for item in records if item.get("approval_state") == "not-applicable"]
+        if manual_only:
+            label = str(manual_only[0].get("label") or manual_only[0].get("subject_key") or "A campaign")
+            return {
+                "summary": f"No approval packet needs review; {label} is available only as an explicit manual apply decision.",
+                "counts": counts,
+            }
         return {
             "summary": "No current approval needs review yet, so the approval workflow can stay local for now.",
-            "counts": {state: 0 for state in APPROVAL_STATE_PRIORITY},
+            "counts": counts,
         }
     ordered = sorted(
         actionable,
@@ -588,16 +607,19 @@ def _summary(records: list[dict[str, Any]]) -> dict[str, Any]:
         summary = f"{label} has already been applied and does not need a new approval yet."
     return {
         "summary": summary,
-        "counts": {
-            state: sum(1 for item in actionable if item.get("approval_state") == state)
-            for state in APPROVAL_STATE_PRIORITY
-        },
+        "counts": counts,
     }
 
 
 def _next_review(records: list[dict[str, Any]]) -> dict[str, Any]:
     actionable = [item for item in records if item.get("approval_state") != "not-applicable"]
     if not actionable:
+        manual_only = [item for item in records if item.get("approval_state") == "not-applicable"]
+        if manual_only:
+            top = dict(manual_only[0])
+            label = str(top.get("label") or top.get("subject_key") or "Campaign")
+            top["summary"] = f"No approval review is needed; {label} remains a separate explicit manual apply decision."
+            return top
         return {"summary": "Stay local for now; no current approval needs review."}
     ordered = sorted(
         actionable,
@@ -687,6 +709,7 @@ def render_approval_center_markdown(payload: dict[str, Any]) -> str:
         ("Due Soon Follow-Up", "due-soon-follow-up"),
         ("Approved But Manual", "approved-manual"),
         ("Blocked", "blocked"),
+        ("No Approval Needed", "not-applicable"),
     )
     lines = [
         f"# {ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}: {payload.get('username', 'unknown')}",

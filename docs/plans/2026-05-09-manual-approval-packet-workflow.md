@@ -49,6 +49,12 @@ python3 -m src saagpatel --approval-center --approval-view ready
 
 If the approval center still shows no ready packet, stay local and keep the operator loop quiet. If it surfaces a ready packet, review the generated campaign artifacts before approval.
 
+2026-05-10 diagnostic update:
+
+- A campaign can be `apply-manual` without having an approval-center packet. That means the preview path is healthy, but the next step is a separate explicit manual apply decision, not `--approve-packet`.
+- Approval center now distinguishes this state in its full view as `No Approval Needed` while keeping `--approval-view ready` empty until a true approval-gated packet exists.
+- `security-review` is currently in that manual-apply-only lane; do not treat the empty ready queue as a stall.
+
 ## Approval Evidence Checklist
 
 Before running `--approve-packet`, confirm:
