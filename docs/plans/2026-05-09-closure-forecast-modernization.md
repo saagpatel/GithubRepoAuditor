@@ -2,9 +2,9 @@
 
 ## Status
 
-The first three closure-forecast modernization passes are implemented.
+The first four closure-forecast modernization passes are implemented.
 
-These passes are intentionally behavior-preserving. The first pass added conceptual facade modules for the sprawling `operator_trend_closure_forecast_*` helper family and routed `operator_resolution_trend.py` through those facades. The second pass moved the core implementation behind the core facade. The third pass moved the freshness implementation behind the freshness controls facade. Existing module paths remain importable.
+These passes are intentionally behavior-preserving. The first pass added conceptual facade modules for the sprawling `operator_trend_closure_forecast_*` helper family and routed `operator_resolution_trend.py` through those facades. The second pass moved the core implementation behind the core facade. The third pass moved the freshness implementation behind the freshness controls facade. The fourth pass moved the reacquisition implementation behind the reacquisition controls facade. Existing module paths remain importable.
 
 ## What Changed
 
@@ -28,6 +28,12 @@ Third-pass implementation move:
 - `src/operator_trend_closure_forecast_freshness_controls.py` now owns freshness, evidence, decay, and freshness-hotspot helpers.
 - `src/operator_trend_closure_forecast_freshness.py` is a compatibility wrapper.
 - Existing freshness, reacquisition, reset-reentry freshness, and facade tests still cover old import paths.
+
+Fourth-pass implementation move:
+
+- `src/operator_trend_closure_forecast_reacquisition_controls.py` now owns reacquisition, refresh recovery, persistence, churn, reacquisition freshness, and persistence-reset helpers.
+- `src/operator_trend_closure_forecast_reacquisition.py` and `src/operator_trend_closure_forecast_reacquisition_freshness.py` are compatibility wrappers.
+- Existing reacquisition, reacquisition freshness, and facade tests still cover old import paths.
 
 ## Compatibility Rule
 
@@ -74,6 +80,14 @@ ruff check src/operator_trend_closure_forecast_freshness.py src/operator_trend_c
 mypy src/operator_trend_closure_forecast_freshness.py src/operator_trend_closure_forecast_freshness_controls.py --ignore-missing-imports
 ```
 
+Completed during the fourth reacquisition consolidation pass:
+
+```bash
+python3 -m pytest tests/test_operator_trend_closure_forecast_reacquisition.py tests/test_operator_trend_closure_forecast_reacquisition_freshness.py tests/test_operator_trend_closure_forecast_facades.py -q -p no:cacheprovider
+ruff check src/operator_trend_closure_forecast_reacquisition.py src/operator_trend_closure_forecast_reacquisition_freshness.py src/operator_trend_closure_forecast_reacquisition_controls.py tests/test_operator_trend_closure_forecast_reacquisition.py tests/test_operator_trend_closure_forecast_reacquisition_freshness.py tests/test_operator_trend_closure_forecast_facades.py
+mypy src/operator_trend_closure_forecast_reacquisition.py src/operator_trend_closure_forecast_reacquisition_freshness.py src/operator_trend_closure_forecast_reacquisition_controls.py --ignore-missing-imports
+```
+
 ## Next Consolidation Step
 
-The next pass can move reacquisition implementation behind `operator_trend_closure_forecast_reacquisition_controls.py`. Keep the old reacquisition and reacquisition freshness modules as compatibility wrappers until all downstream callers are migrated or explicitly retired.
+The next pass can move reset, reentry, rebuild, restore, and rerestore implementation behind `operator_trend_closure_forecast_reset_controls.py`. Keep the old reset-family modules as compatibility wrappers until all downstream callers are migrated or explicitly retired.
