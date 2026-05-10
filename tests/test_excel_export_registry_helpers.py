@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from src.excel_export_registry_helpers import build_excel_workbook_runtime
-from src.excel_workbook_helpers import CORE_VISIBLE_SHEETS, DEFAULT_PREFERRED_SHEET_ORDER
+from src.excel_workbook_helpers import (
+    CORE_VISIBLE_SHEETS,
+    DEFAULT_PREFERRED_SHEET_ORDER,
+    run_workbook_build_steps,
+)
 
 
 def _noop(*_args, **_kwargs) -> None:
@@ -10,7 +14,6 @@ def _noop(*_args, **_kwargs) -> None:
 
 def _runtime_kwargs() -> dict:
     builders = {
-        "run_workbook_build_steps": _noop,
         "build_dashboard": _noop,
         "build_all_repos": _noop,
         "build_portfolio_explorer": _noop,
@@ -65,6 +68,7 @@ def _runtime_kwargs() -> dict:
 def test_workbook_runtime_owns_default_structure_contracts() -> None:
     runtime = build_excel_workbook_runtime(**_runtime_kwargs())
 
+    assert runtime["run_workbook_build_steps"] is run_workbook_build_steps
     assert runtime["core_visible_sheets"] == CORE_VISIBLE_SHEETS
     assert runtime["core_visible_sheets"] is not CORE_VISIBLE_SHEETS
     assert runtime["preferred_order"] == DEFAULT_PREFERRED_SHEET_ORDER
@@ -74,9 +78,11 @@ def test_workbook_runtime_owns_default_structure_contracts() -> None:
 def test_workbook_runtime_allows_explicit_structure_contracts() -> None:
     runtime = build_excel_workbook_runtime(
         **_runtime_kwargs(),
+        run_workbook_build_steps=_noop,
         core_visible_sheets={"Dashboard"},
         preferred_order=["Dashboard", "Index"],
     )
 
+    assert runtime["run_workbook_build_steps"] is _noop
     assert runtime["core_visible_sheets"] == {"Dashboard"}
     assert runtime["preferred_order"] == ["Dashboard", "Index"]

@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
-from src.excel_workbook_helpers import CORE_VISIBLE_SHEETS, DEFAULT_PREFERRED_SHEET_ORDER
+from src.excel_workbook_helpers import (
+    CORE_VISIBLE_SHEETS,
+    DEFAULT_PREFERRED_SHEET_ORDER,
+)
+from src.excel_workbook_helpers import (
+    run_workbook_build_steps as default_run_workbook_build_steps,
+)
 
 
 def build_excel_workbook_runtime(
     *,
-    run_workbook_build_steps,
     build_dashboard,
     build_all_repos,
     build_portfolio_explorer,
@@ -58,14 +63,16 @@ def build_excel_workbook_runtime(
     apply_workbook_named_ranges,
     finalize_workbook_structure,
     template_info_sheet: str,
+    run_workbook_build_steps: Callable[..., Any] | None = None,
     core_visible_sheets: set[str] | None = None,
     preferred_order: list[str] | None = None,
 ) -> dict[str, Any]:
+    build_steps_runner = run_workbook_build_steps or default_run_workbook_build_steps
     visible_sheets = set(CORE_VISIBLE_SHEETS if core_visible_sheets is None else core_visible_sheets)
     sheet_order = list(DEFAULT_PREFERRED_SHEET_ORDER if preferred_order is None else preferred_order)
 
     return {
-        "run_workbook_build_steps": run_workbook_build_steps,
+        "run_workbook_build_steps": build_steps_runner,
         "build_dashboard": build_dashboard,
         "build_all_repos": build_all_repos,
         "build_portfolio_explorer": build_portfolio_explorer,

@@ -2,7 +2,7 @@
 
 ## Status
 
-The first two workbook-surface modernization passes are implemented.
+The first three workbook-surface modernization passes are implemented.
 
 These passes are intentionally behavior-preserving. They move stable workbook structure ownership out of `src/excel_export.py` and into the helper/runtime layer, where workbook ordering, visibility, and finalization helpers already live.
 
@@ -12,6 +12,7 @@ These passes are intentionally behavior-preserving. They move stable workbook st
 - `src/excel_export.py` imports and re-exports `CORE_VISIBLE_SHEETS` for compatibility with existing callers.
 - `src/workbook_gate.py` now reads `CORE_VISIBLE_SHEETS` from the workbook helper layer instead of the exporter module.
 - `src/excel_export_registry_helpers.py` now owns the default runtime wiring for `CORE_VISIBLE_SHEETS` and `DEFAULT_PREFERRED_SHEET_ORDER`.
+- `src/excel_export_registry_helpers.py` also owns the default workbook build-step executor wiring.
 - `src/excel_export.py` still re-exports the workbook structure constants, but no longer passes them through every runtime build call.
 - `tests/test_excel_export_registry_helpers.py` protects the default and explicit runtime structure contracts.
 - The exporter still owns workbook build adapters and the public `export_excel(...)` entrypoint.
@@ -25,6 +26,7 @@ This keeps workbook behavior stable while making future cleanup easier:
 - workbook structure constants live beside workbook structure helpers,
 - the release gate depends on the workbook contract layer,
 - the workbook runtime helper owns the default structure wiring,
+- the workbook runtime helper owns the default build-step executor wiring,
 - and `src/excel_export.py` remains a compatibility facade for existing tests and callers.
 
 ## Verification
@@ -38,6 +40,14 @@ mypy src/excel_export.py src/excel_workbook_helpers.py src/workbook_gate.py --ig
 ```
 
 Focused verification for the second pass:
+
+```bash
+python3 -m pytest tests/test_excel_export_registry_helpers.py tests/test_excel_enhanced.py tests/test_workbook_gate.py -q -p no:cacheprovider
+ruff check src/excel_export.py src/excel_export_registry_helpers.py src/excel_workbook_helpers.py src/workbook_gate.py tests/test_excel_export_registry_helpers.py tests/test_excel_enhanced.py tests/test_workbook_gate.py
+mypy src/excel_export.py src/excel_export_registry_helpers.py src/excel_workbook_helpers.py src/workbook_gate.py --ignore-missing-imports
+```
+
+Focused verification for the third pass:
 
 ```bash
 python3 -m pytest tests/test_excel_export_registry_helpers.py tests/test_excel_enhanced.py tests/test_workbook_gate.py -q -p no:cacheprovider

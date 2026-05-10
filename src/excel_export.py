@@ -539,7 +539,6 @@ from src.excel_workbook_helpers import (
     finalize_workbook_structure as _finalize_workbook_structure,
 )
 from src.excel_workbook_helpers import get_or_create_sheet as _get_or_create_sheet
-from src.excel_workbook_helpers import run_workbook_build_steps as _run_workbook_build_steps
 from src.excel_workbook_helpers import set_autofilter as _set_autofilter
 from src.excel_workbook_helpers import set_defined_name as _set_defined_name
 from src.excel_workbook_helpers import sheet_location as _sheet_location
@@ -1757,7 +1756,6 @@ def _build_excel_workbook(
         excel_mode=excel_mode,
         risk_lookup=risk_lookup,
         **_build_excel_workbook_runtime(
-            run_workbook_build_steps=_run_workbook_build_steps,
             build_dashboard=_build_dashboard,
             build_all_repos=_build_all_repos,
             build_portfolio_explorer=_build_portfolio_explorer,
