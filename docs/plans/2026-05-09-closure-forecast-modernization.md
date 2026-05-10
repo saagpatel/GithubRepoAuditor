@@ -104,4 +104,4 @@ mypy src/operator_trend_closure_forecast_reset*.py --ignore-missing-imports
 
 ## Next Consolidation Step
 
-The closure-forecast implementation bodies now sit behind the four conceptual facade modules. The next cleanup pass can either keep this compatibility state stable while downstream callers settle, or do a separate retire-old-wrapper audit once import usage proves the wrappers are no longer needed.
+The closure-forecast implementation bodies now sit behind the four conceptual facade modules. The wrapper-retirement audit in `docs/plans/2026-05-10-closure-forecast-wrapper-retirement-audit.md` found that the wrappers should stay for now because old-path imports remain part of the tested compatibility contract.
