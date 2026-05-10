@@ -13,9 +13,9 @@ if TYPE_CHECKING:
 
 # Patterns that strongly suggest exposed secrets
 SECRET_PATTERNS: list[tuple[str, re.Pattern]] = [
-    ("AWS Access Key", re.compile(r"AKIA[0-9A-Z]{16}")),
-    ("GitHub Token", re.compile(r"ghp_[a-zA-Z0-9]{36}")),
-    ("GitHub OAuth", re.compile(r"gho_[a-zA-Z0-9]{36}")),
+    ("AWS Access Key", re.compile(r"(?P<value>AKIA[0-9A-Z]{16})")),
+    ("GitHub Token", re.compile(r"(?P<value>ghp_[a-zA-Z0-9]{36})")),
+    ("GitHub OAuth", re.compile(r"(?P<value>gho_[a-zA-Z0-9]{36})")),
     ("Slack Token", re.compile(r"(?P<value>xox[bpors]-[a-zA-Z0-9-]+)")),
     (
         "Generic API Key",
@@ -105,16 +105,16 @@ class SecurityAnalyzer(BaseAnalyzer):
         details["secrets_found"] = len(secrets_found)
         if secrets_found:
             score -= min(0.5, len(secrets_found) * 0.1)
-            for label, path in secrets_found[:5]:
-                findings.append(f"Potential {label} in {path}")
+            for label, secret_path in secrets_found[:5]:
+                findings.append(f"Potential {label} in {secret_path}")
 
         # 2. Check for dangerous files
         dangerous = _find_dangerous_files(repo_path)
         details["dangerous_files"] = [str(p) for p in dangerous]
         if dangerous:
             score -= min(0.3, len(dangerous) * 0.1)
-            for path in dangerous[:5]:
-                findings.append(f"Dangerous file committed: {path.name}")
+            for dangerous_path in dangerous[:5]:
+                findings.append(f"Dangerous file committed: {dangerous_path.name}")
 
         # 3. Check for security config
         for config_path in SECURITY_CONFIGS:
@@ -160,7 +160,7 @@ def _scan_secrets(repo_path: Path, max_files: int = 200) -> list[tuple[str, str]
             content = path.read_text(errors="replace")[:10_000]  # First 10KB
             for label, pattern in SECRET_PATTERNS:
                 if any(
-                    not _is_ignored_secret_match(match)
+                    not _is_ignored_secret_match(match, path)
                     for match in pattern.finditer(content)
                 ):
                     rel = path.relative_to(repo_path)
@@ -172,24 +172,39 @@ def _scan_secrets(repo_path: Path, max_files: int = 200) -> list[tuple[str, str]
     return found
 
 
-def _is_ignored_secret_match(match: re.Match) -> bool:
+def _is_ignored_secret_match(match: re.Match, path: Path | None = None) -> bool:
     """Return true for safe secret-looking placeholders or runtime references."""
     try:
         value = match.group("value").strip()
     except IndexError:
+        snippet = match.string[match.start(): match.start() + 120].lower()
+        if "..." in snippet:
+            return True
         return False
 
     normalized = value.strip("\"'").lower()
     normalized_token = re.sub(r"[\s_]+", "-", normalized)
+    path_parts = {part.lower() for part in (path.parts if path else ())}
+    is_test_path = bool(path_parts & {"test", "tests", "__tests__"})
     if normalized in PLACEHOLDER_SECRET_VALUES:
         return True
     if normalized_token in PLACEHOLDER_SECRET_VALUES:
         return True
     if normalized_token.startswith(("example-", "test-", "dummy-", "placeholder-")):
         return True
+    if normalized.endswith("example") or "example" in normalized_token:
+        return True
+    if normalized.startswith(").strip()") or normalized.endswith(").strip()"):
+        return True
+    if normalized.endswith("..."):
+        return True
+    if is_test_path and re.fullmatch(r"[0-9a-f]{32,}", normalized):
+        return True
     if normalized_token.startswith("xox") and any(
         marker in normalized_token for marker in ("fake", "test", "dummy", "your", "placeholder")
     ):
+        return True
+    if normalized_token.startswith("xox") and len(normalized_token) < 24:
         return True
     if "secret" in normalized_token and any(
         marker in normalized_token

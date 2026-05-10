@@ -82,9 +82,46 @@ class TestSecretScanning:
         (tmp_path / "settings.tsx").write_text(
             'const fakeToken = "xoxb-fake-token";\n'
             'const placeholder = "xoxb-your-bot-token";\n'
+            'const wrongKind = "xoxp-not-bot-token";\n'
         )
         found = _scan_secrets(tmp_path)
         assert found == []
+
+    def test_ignores_example_keys_and_safe_prompt_labels(self, tmp_path):
+        (tmp_path / "detector.rs").write_text(
+            'let text = "My key is AKIAIOSFODNN7EXAMPLE and here it is.";\n'
+        )
+        (tmp_path / "setup_keyring.py").write_text(
+            'client_secret = getpass.getpass("Client Secret: ").strip()\n'
+            "if not client_secret:\n"
+            '    print("Error: client_secret is required")\n'
+        )
+        found = _scan_secrets(tmp_path)
+        assert found == []
+
+    def test_ignores_truncated_private_key_detector_fixture(self, tmp_path):
+        (tmp_path / "detector.rs").write_text(
+            'let text = "-----BEGIN RSA PRIVATE KEY-----\\nMIIEpAIBAAKCAQEA...";\n'
+        )
+        found = _scan_secrets(tmp_path)
+        assert found == []
+
+    def test_ignores_hex_test_encryption_secret_fixture(self, tmp_path):
+        tests = tmp_path / "src" / "__tests__"
+        tests.mkdir(parents=True)
+        (tests / "encryption.test.ts").write_text(
+            "const secret = "
+            "'0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';\n"
+        )
+        found = _scan_secrets(tmp_path)
+        assert found == []
+
+    def test_detects_real_looking_aws_key_outside_examples(self, tmp_path):
+        (tmp_path / "config.py").write_text(
+            'AWS_KEY = "AKIA1234567890ABCDEF"\n'
+        )
+        found = _scan_secrets(tmp_path)
+        assert found == [("AWS Access Key", "config.py")]
 
     def test_ignores_shell_fallback_and_template_secret_values(self, tmp_path):
         (tmp_path / "smoke.sh").write_text(
