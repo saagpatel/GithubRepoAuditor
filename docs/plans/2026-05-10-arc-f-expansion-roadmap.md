@@ -100,7 +100,7 @@ Status legend: ✅ in Arc F sprints · 📋 Arc F backlog · ⏸ deferred (with 
 | 4.3 | Async fetch layer (`--fetch-workers`, httpx) | ✅ Shipped | `bc2f95f` (S2.1) |
 | 4.4 | Per-(repo, sha, analyzer) cache in warehouse DB | ✅ Shipped | `0375053` + `ef038f6` (S2.2 + NamedStyle fix) |
 | 4.5 | `audit serve` — FastAPI + HTMX local web UI | ✅ Shipped @ `4da1496` + `220a6fa` | S4.1 |
-| 4.6 | PyPI publish + `shiv` binary | ✅ | S4.2 |
+| 4.6 | PyPI publish + `shiv` binary | ✅ Shipped @ `1316aaf` | S4.2 |
 | 4.7 | CLI subcommand restructure (`audit run/triage/report`) | ✅ | S4.3 |
 | 4.8 | structlog + per-phase timings to `run-telemetry.jsonl` | 📋 | post-S4 |
 | 4.9 | Plugin architecture via entry-points | 📋 | post-S4 |
