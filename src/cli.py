@@ -589,6 +589,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Query OSV.dev for known vulnerabilities in repo dependencies",
     )
     parser.add_argument(
+        "--ghas-alerts",
+        action="store_true",
+        help=(
+            "Fetch open Dependabot/CodeQL/Secret-scanning alert counts from GitHub. "
+            "Implied by --vuln-check."
+        ),
+    )
+    parser.add_argument(
         "--generate-manifest",
         action="store_true",
         help="Generate an improvement manifest from the latest audit report",
@@ -3769,6 +3777,24 @@ def _write_report_outputs(
             )
             vuln_path.write_text(json.dumps(vulns, indent=2, default=str))
             print_info(f"Vulnerability report: {vuln_path}")
+
+    if getattr(args, "ghas_alerts", False) or getattr(args, "vuln_check", False):
+        from src.ghas_alerts import fetch_ghas_alerts, format_ghas_summary
+
+        ghas_token: str | None = getattr(args, "token", None) or None
+        ghas_data = fetch_ghas_alerts(
+            report_data.get("audits", []),
+            token=ghas_token,
+            cache=cache,
+        )
+        print_info(format_ghas_summary(ghas_data))
+        if ghas_data:
+            ghas_path = (
+                output_dir
+                / f"ghas-alerts-{report.username}-{_date_str(report.generated_at)}.json"
+            )
+            ghas_path.write_text(json.dumps(ghas_data, indent=2, default=str))
+            print_info(f"GHAS alerts report: {ghas_path}")
 
     if args.narrative:
         from src.narrative import generate_narrative
