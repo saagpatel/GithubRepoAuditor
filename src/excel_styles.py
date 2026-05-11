@@ -3,10 +3,18 @@
 Centralized colors, fonts, named styles, and helper functions.
 All sheets import from here for consistent visual language.
 """
+
 from __future__ import annotations
 
-from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.styles import Alignment, Border, Font, NamedStyle, PatternFill, Side
 from openpyxl.worksheet.hyperlink import Hyperlink
+
+# ── Named Style Registry ──────────────────────────────────────────────
+# Maps workbook id → set of registered style names.  Each workbook gets
+# its own copy of the NamedStyles on first use; subsequent calls just look
+# up the cached name string, bypassing openpyxl's per-assignment hash chain.
+
+_REGISTERED_WORKBOOKS: dict[int, set[str]] = {}
 
 # ── Color Palette ────────────────────────────────────────────────────
 
@@ -124,15 +132,67 @@ def style_header_row(ws, row: int, max_col: int) -> None:
         cell.border = THIN_BORDER
 
 
+def _ensure_data_named_styles(wb) -> None:
+    """Register data-cell NamedStyles on *wb* once per workbook instance.
+
+    NamedStyle assignment (``cell.style = name``) bypasses openpyxl's
+    per-attribute IndexedList hash chain, which is the dominant CPU hotspot
+    when styling tens-of-thousands of data cells (see S2.0 profile findings).
+    """
+    wb_id = id(wb)
+    if wb_id in _REGISTERED_WORKBOOKS:
+        return
+    registered: set[str] = set()
+    _REGISTERED_WORKBOOKS[wb_id] = registered
+
+    _thin = Border(
+        left=Side(style="thin", color=LIGHT_BORDER),
+        right=Side(style="thin", color=LIGHT_BORDER),
+        top=Side(style="thin", color=LIGHT_BORDER),
+        bottom=Side(style="thin", color=LIGHT_BORDER),
+    )
+    _data_font = Font("Calibri", 11)
+
+    for name, alignment in (
+        ("data_left", Alignment(horizontal="left", vertical="center")),
+        ("data_center", Alignment(horizontal="center", vertical="center")),
+        ("data_right", Alignment(horizontal="right", vertical="center")),
+    ):
+        ns = NamedStyle(name)
+        ns.font = _data_font
+        ns.border = _thin
+        ns.alignment = alignment
+        wb.add_named_style(ns)
+        registered.add(name)
+
+
 def style_data_cell(cell, align: str = "left") -> None:
-    """Apply standard data cell styling."""
-    cell.font = DATA_FONT
-    cell.border = THIN_BORDER
-    cell.alignment = LEFT if align == "left" else (CENTER if align == "center" else RIGHT)
+    """Apply standard data cell styling via a cached NamedStyle.
+
+    Uses NamedStyle on first call per workbook to avoid per-attribute
+    hash-chain overhead in openpyxl's IndexedList (the dominant hotspot
+    for large sheets with many styled cells).
+    """
+    wb = cell.parent.parent
+    _ensure_data_named_styles(wb)
+    if align == "left":
+        cell.style = "data_left"
+    elif align == "center":
+        cell.style = "data_center"
+    else:
+        cell.style = "data_right"
 
 
-def apply_zebra_stripes(ws, start_row: int, end_row: int, max_col: int, skip_cols: set[int] | None = None) -> None:
-    """Apply alternating row shading, optionally skipping columns with semantic coloring."""
+def apply_zebra_stripes(
+    ws, start_row: int, end_row: int, max_col: int, skip_cols: set[int] | None = None
+) -> None:
+    """Apply alternating row shading, optionally skipping columns with semantic coloring.
+
+    No-ops on hidden sheets: zebra fill is purely cosmetic and the ZEBRA_FILL
+    PatternFill hash chain adds measurable overhead at scale (see S2.0 profile).
+    """
+    if ws.sheet_state == "hidden":
+        return
     skip = skip_cols or set()
     for row in range(start_row, end_row + 1):
         if row % 2 == 0:
@@ -142,15 +202,25 @@ def apply_zebra_stripes(ws, start_row: int, end_row: int, max_col: int, skip_col
 
 
 def auto_width(ws, max_col: int, max_row: int, min_width: int = 8, max_width: int = 55) -> None:
-    """Auto-size columns based on content."""
+    """Auto-size columns based on content.
+
+    No-ops on hidden sheets: column sizing is cosmetically irrelevant when the
+    sheet is not visible, and scanning cell values adds measurable overhead at
+    scale (see S2.0 profile findings).
+    """
+    if ws.sheet_state == "hidden":
+        return
     from openpyxl.utils import get_column_letter
+
     for col in range(1, max_col + 1):
         max_len = 0
         for row in range(1, min(max_row + 1, 150)):
             val = ws.cell(row=row, column=col).value
             if val:
                 max_len = max(max_len, len(str(val)))
-        ws.column_dimensions[get_column_letter(col)].width = max(min_width, min(max_len + 3, max_width))
+        ws.column_dimensions[get_column_letter(col)].width = max(
+            min_width, min(max_len + 3, max_width)
+        )
 
 
 def write_kpi_card(
