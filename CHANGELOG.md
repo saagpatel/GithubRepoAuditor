@@ -7,6 +7,38 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-05-11
+### Added
+- `audit serve` local web UI (FastAPI + HTMX): portfolio dashboard, per-repo drill-down, run history, approval queue, and SSE-streamed `audit run` trigger. Requires `pip install -e '.[serve]'` (Arc F S4.1).
+- `audit run / triage / report / serve` subcommands. Legacy flat invocation (`audit <user> --flag`) still works and emits one `DeprecationWarning` per process (Arc F S4.3).
+- PyPI publish workflow + `shiv` single-file binary distribution. `make build`, `make shiv`, `make release`, `scripts/release.sh`, and `.github/workflows/release.yml` for tagged GitHub Releases (Arc F S4.2).
+- Weekly Operator Briefing (`--briefing`, `--briefing-voice`) — structured weekly digest with shipped-this-week, needs-attention top-5, portfolio health delta, and per-repo suggested next action (Arc F S3.2).
+- Portfolio semantic index (`--reindex`, `--reindex-force`, `--semantic-search`, `--ask`, `--embedder {voyage,local}`) — voyage-code-3 (default) + sqlite-vec virtual table, `sentence-transformers/all-MiniLM-L6-v2` local fallback. Cross-repo similarity drives a duplicate-group lane in the control-center (Arc F S3.1, S3.4).
+- Operator preference memory (`output/operator_prefs.json`, `--reset-prefs`) — suppresses suggestions the operator has rejected 3+ times in a row (Arc F S3.3).
+- LLM cost guard (`--max-llm-spend USD`) + per-call records in `output/run-telemetry.jsonl` (Arc F S3.5).
+- GitHub Models as alternate narrative provider (`--narrative-provider {anthropic,github-models}`, `--narrative-model`) (Arc F S1.2).
+- Dependabot/CodeQL/Secret-scanning alerts surfaced in the risk overlay (`--ghas-alerts`) (Arc F S1.3).
+- README staleness + release-shipped signals (`has_any_release`, `release_count`, `latest_release_age_days`) (Arc F S1.4).
+- mutmut pre-release mutation-testing gate on `src/auto_apply.py` + `src/scorer.py` (~93% combined kill rate). Documented in `docs/release-gates.md` (Arc F S1.5).
+- Async fetch layer (`--fetch-mode {sync,async}`, `--fetch-workers N`) via httpx + asyncio.Semaphore. 9.7x speedup on the mock benchmark (Arc F S2.1).
+- Per-(repo, commit-sha, analyzer) cache backed by SQLite with `--no-analyzer-cache` and `--reconcile-cache` controls (Arc F S2.2).
+- SBOM fetch via GitHub API (`--sbom-source github`) + OSSF Scorecard (`--ossf-scorecard`) (Arc F S2.3).
+- New docs: `docs/audit-serve.md` (operator guide for the web UI), `docs/audit-cli-migration.md` (flat → subcommand migration walkthrough).
+
+### Changed
+- README now leads with subcommand-form quick start and `uv tool install` / `pipx` / `.pyz` install paths. Development install demoted to its own section (Arc F S4.4).
+- Workbook generation 8.1x faster on a 90-repo synthetic portfolio via NamedStyle registration + auto-width/zebra-stripe skips on hidden sheets (Arc F S2.0).
+- `--briefing` is now mutually exclusive with `--narrative` and produces the structured weekly output.
+
+### Fixed
+- NamedStyle registration cache no longer breaks across `Workbook` lifetimes (Python `id()` recycling). Marker is now stored as a workbook attribute (Arc F S2.0).
+- `libyears.compute_libyears` silently zeroing `dep_count` (incidental fix during S2.3).
+- `audit --serve` runs standalone without requiring a GitHub username positional (Arc F S4.1 follow-up).
+
+### Stopped / Deferred
+- xlsxwriter migration (S1.1) — `excel_template.py` reads existing workbooks (xlsxwriter is write-only) and 49 helper modules use back-reference APIs. Pivoted to S2.0 profile-first workbook speedup.
+- `hatch-vcs` migration deferred from S4.2 — kept static `__version__` to avoid downstream churn.
+
 ## [0.18.0] - 2026-03-29
 ### Added
 - Excel radar chart sheet for per-repo dimension scores
