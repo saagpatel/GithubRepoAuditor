@@ -117,18 +117,35 @@ Each sprint is ≈ 2 weeks of focused work and ships behind a feature flag where
 
 **Goal:** Within 2 weeks, every full-portfolio run is faster, every report has GHAS data and shipped-release signals, and the auto-apply path is hardened by mutation testing.
 
-#### S1.1 — xlsxwriter migration
+#### S1.1 — Excel write-path optimization (openpyxl write_only mode)
 
-- **Goal:** Cut workbook generation wall-clock by 3-5x and drop peak RAM by ~80% on 100+ repo runs.
-- **Scope:** Introduce an `excel_engine` adapter that abstracts the workbook/worksheet API. Default engine becomes `xlsxwriter` with `constant_memory=True`. Keep an `--excel-engine openpyxl` escape hatch for one minor version while we validate parity.
-- **Files likely affected:** `src/excel_export.py`, `src/excel_workbook_helpers.py`, `src/excel_styles.py`, all `src/excel_*_helpers.py` (mechanical type swap behind adapter), `pyproject.toml`, tests under `tests/test_excel_*.py`.
-- **Constraints:** xlsxwriter constant_memory mode forbids back-references to already-written cells. Confirm every helper writes top-to-bottom only (the current registry pattern suggests yes — verify before flipping the default).
+- **Decision history:** Initial scope was a full xlsxwriter migration. Inspection of the actual surface (49 excel_*.py modules, 43 import sites, heavy use of `merge_cells`/`conditional_formatting.add`/`add_chart`/`Table`/`DefinedName`, plus `excel_template.py` calling `openpyxl.load_workbook` on a committed template) showed xlsxwriter is not a drop-in: it cannot read existing xlsx files (no `load_workbook`), and `constant_memory=True` forbids the back-reference patterns used in many helpers. Pivoted to openpyxl's own streaming `write_only=True` mode (2026-05-10).
+- **Goal:** Reduce peak RAM during workbook generation on 100+ repo runs by switching the from-scratch standard-workbook path to openpyxl's streaming mode where viable, while keeping the template-driven path on regular openpyxl.
+- **Constraints to validate first** (write_only mode):
+  - `WriteOnlyWorksheet.append(row)` only — no `ws.cell(...)`.
+  - `merge_cells`, `conditional_formatting.add`, and inline cell mutation are **not supported** on write-only sheets.
+  - Charts can be added at workbook close time, but data must be already written.
+  - Workbook-level features (defined names, hyperlinks, tables) still work.
+- **Scope (likely phased):**
+  1. **Phase 1 — Investigation pass.** Catalog every helper by which write_only-incompatible API it uses. Identify a subset of sheets that are pure tabular `append`-only (good streaming candidates) vs. sheets that genuinely need back-reference features (stay on regular openpyxl).
+  2. **Phase 2 — Adapter introduction.** Add a thin `excel_engine` adapter giving each helper a `make_sheet(name, streaming: bool)` factory. Streaming sheets get write_only behavior; non-streaming keep the current pattern. No behavior change at this stage — wire the adapter, default everything to `streaming=False`.
+  3. **Phase 3 — Flip streaming on for safe sheets.** Per the Phase-1 catalog, set `streaming=True` for tabular sheets (likely `All Repos`, `Portfolio Explorer`, `Run Changes`, `Historical Intelligence`, possibly `Repo Detail`).
+  4. **Phase 4 — Validate.** Benchmark vs. baseline; run snapshot tests; if any sheet's output differs, document or revert.
+- **Files likely affected:** `src/excel_export.py`, `src/excel_workbook_helpers.py`, new `src/excel_engine.py`, the helpers for the streaming-eligible sheets only, `pyproject.toml`, `tests/test_excel_*.py`.
 - **Tests required:**
-  - Existing workbook tests must pass unchanged on the new engine.
-  - Add a benchmark test (skippable via `pytest -m 'not benchmark'`) measuring workbook gen time on a 100-repo fixture.
-  - Snapshot test on at least one full workbook to confirm sheet count, sheet names, and a handful of representative cells match openpyxl output byte-for-byte (or with documented differences).
-- **Effort:** Small (1-2 days).
-- **Exit criteria:** `make test` green, benchmark shows ≥ 3x speedup, snapshot diff is empty or explained, the `--excel-engine` flag works in both directions.
+  - Existing workbook tests pass unchanged.
+  - New benchmark test (gated by `-m benchmark`) timing workbook gen on a 100-repo fixture.
+  - Snapshot test confirming streaming-eligible sheets produce identical content (sheet name, row count, key cell values) before and after.
+- **Effort (revised):** Medium (3-5 days), split into the four phases above.
+- **Exit criteria:** Phase 1 catalog committed; at least one sheet converted to streaming with passing tests; benchmark shows a measurable peak-RAM drop on the 100-repo fixture; `--excel-engine` legacy escape hatch documented.
+- **Stop condition:** If Phase 1 reveals that fewer than 3 sheets are streaming-eligible, S1.1 ships only the investigation report + adapter scaffolding, and the bulk RAM optimization moves to Sprint 2 with a different approach (likely: profile to find the real bottleneck, which may not be openpyxl at all).
+
+- **Phase 1 result (2026-05-10):** Stop condition triggered. The streaming catalog in `docs/plans/2026-05-10-s1.1-phase1-streaming-catalog.md` confirms:
+  1. `write_only=True` is a workbook-level flag — `WriteOnlyWorksheet` and regular `Worksheet` cannot coexist in one `Workbook`. The pipeline passes a single shared `wb` through 49 helper modules, so splitting is impractical.
+  2. **All 20 visible sheets** use at least one write-only-incompatible API (`ws.cell()`, `merge_cells`, `add_table`, `data_validation`, or `freeze_panes` post-write). Streaming-eligible count: **0**.
+  3. Both candidate streaming engines (xlsxwriter constant_memory, openpyxl write_only) are therefore architecturally blocked.
+- **S1.1 decision:** Ship the Phase 1 catalog doc only. Defer Excel write-path optimization to a **Sprint 2 profile-first work item** ("S2.0 — Profile workbook generation"), which will use `cProfile` + memory-profiler to identify the actual bottlenecks (suspected: column-width sizing loops, per-cell style instantiation, `clear_worksheet` calls). The real win likely comes from in-place algorithm changes inside the existing openpyxl path, not an engine swap.
+- **S1.1 ships:** ✅ Phase 1 investigation report committed. Phases 2-4 cancelled.
 
 #### S1.2 — GitHub Models alternate narrative provider
 
@@ -187,6 +204,12 @@ A weekly full-portfolio run finishes ≥ 30% faster, every report contains GHAS 
 ### Sprint 2 — Fetch parallelism + cache + platform reads
 
 **Goal:** Cut the wall-clock of a full-portfolio run in half again, and start eliminating the shallow-clone for analyzers that can read from GitHub directly.
+
+#### S2.0 — Profile workbook generation (pulled from S1.1 stop condition)
+
+- **Scope:** Run `cProfile` + `memory_profiler` against `audit <user> --html` on a 100-repo fixture. Identify the top 5 CPU hotspots and top 3 memory accumulators in the Excel write path. Likely suspects: column-width auto-sizing loops, per-cell style instantiation, `clear_worksheet` overhead, and unnecessary `NamedStyle` recreation across sheets. Produce a ranked findings report and an opportunistic-fix list.
+- **Effort:** Small (1-2 days for profiling + report; implementation of fixes is a separate sized item depending on findings).
+- **Exit criteria:** Profiling report committed, top-3 quick wins implemented if they're contained to single functions; larger structural changes added to the Sprint 2 backlog.
 
 #### S2.1 — Async fetch layer (`--fetch-workers N`, httpx)
 
