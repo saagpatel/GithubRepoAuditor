@@ -499,3 +499,197 @@ class TestCLIIntegration:
 
         mock_idx.search.assert_called_once_with("rust database", k=5)
         assert results[0].repo_name == "RustDB"
+
+
+# ---------------------------------------------------------------------------
+# Arc F S3.4: find_neighbors and find_duplicate_groups
+# ---------------------------------------------------------------------------
+
+
+class _ControlledEmbedder:
+    """Embedder that maps repo descriptions to pre-set unit vectors.
+
+    Two repos that share the same vector key will have cosine distance=0
+    (similarity=1.0), so they will form a duplicate group at any threshold < 1.
+    """
+
+    name = "controlled-fake"
+    dimension = 4
+
+    def __init__(self, vec_map: dict[str, list[float]]) -> None:
+        """vec_map: {text_snippet → 4-dim unit vector}. Default vector used for unknowns."""
+        self._vec_map = vec_map
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        results = []
+        for t in texts:
+            for key, vec in self._vec_map.items():
+                if key in t:
+                    results.append(list(vec))
+                    break
+            else:
+                # Default: hash-based distinct vector (same as _FakeEmbedder)
+                import hashlib as _hl
+
+                h = _hl.md5(t.encode()).digest()
+                v = [h[i] / 255.0 for i in range(4)]
+                norm = sum(x**2 for x in v) ** 0.5
+                results.append([x / norm for x in v] if norm > 0 else [0.25] * 4)
+        return results
+
+
+def _make_controlled_index(
+    tmp_path: Path,
+    repos: list[tuple[str, str]],  # [(repo_name, vec_key), ...]
+    vec_map: dict[str, list[float]],
+) -> SemanticIndex:
+    """Build a SemanticIndex where each repo embeds to a controlled vector."""
+    embedder = _ControlledEmbedder(vec_map)
+    db = tmp_path / "warehouse.db"
+    idx = SemanticIndex(db, embedder)
+    audits = [_make_audit(name, description=f"{vec_key} project") for name, vec_key in repos]
+    idx.reindex(audits)
+    return idx
+
+
+class TestFindNeighbors:
+    """Tests for SemanticIndex.find_neighbors()."""
+
+    def test_find_neighbors_happy_path(self, tmp_path: Path) -> None:
+        """Top-K neighbors returned, excluding the query repo itself."""
+        idx = _make_index(tmp_path)
+        audits = [
+            _make_audit("RepoA", description="fast Rust database engine"),
+            _make_audit("RepoB", description="fast Rust storage engine"),
+            _make_audit("RepoC", description="fast Rust database engine"),  # same as A
+            _make_audit("RepoD", description="Python ML framework"),
+            _make_audit("RepoE", description="Go microservice toolkit"),
+        ]
+        idx.reindex(audits)
+
+        neighbors = idx.find_neighbors("RepoA", k=3)
+
+        assert isinstance(neighbors, list)
+        assert len(neighbors) <= 3
+        # RepoA itself must not appear
+        repo_names = [n.repo_name for n in neighbors]
+        assert "RepoA" not in repo_names
+
+    def test_find_neighbors_missing_repo_returns_empty(self, tmp_path: Path) -> None:
+        """find_neighbors for a repo not in the index returns [] without raising."""
+        idx = _make_index(tmp_path)
+        idx.reindex([_make_audit("RepoA", description="something")])
+
+        result = idx.find_neighbors("NonExistentRepo", k=3)
+
+        assert result == []
+
+    def test_find_neighbors_results_sorted_by_distance(self, tmp_path: Path) -> None:
+        """Results must be ascending by distance (most similar first)."""
+        idx = _make_index(tmp_path)
+        audits = [_make_audit(f"Repo{i}", description=f"repo number {i}") for i in range(6)]
+        idx.reindex(audits)
+
+        neighbors = idx.find_neighbors("Repo0", k=4)
+
+        distances = [n.score for n in neighbors]
+        assert distances == sorted(distances), (
+            "find_neighbors should return results in ascending distance order"
+        )
+
+
+class TestFindDuplicateGroups:
+    """Tests for SemanticIndex.find_duplicate_groups()."""
+
+    # Unit vectors in 4-d for controlled similarity
+    _VEC_A = [1.0, 0.0, 0.0, 0.0]  # "concept-A"
+    _VEC_B = [0.0, 1.0, 0.0, 0.0]  # "concept-B"
+
+    def test_clear_group_detected(self, tmp_path: Path) -> None:
+        """3 identical-vector repos → 1 duplicate group of 3."""
+        vec_map = {"concept-A": self._VEC_A, "concept-B": self._VEC_B}
+        repos = [
+            ("RepoAlpha", "concept-A"),
+            ("RepoBeta", "concept-A"),
+            ("RepoGamma", "concept-A"),
+            ("RepoX", "concept-B"),
+            ("RepoY", "concept-B"),
+        ]
+        idx = _make_controlled_index(tmp_path, repos, vec_map)
+
+        groups = idx.find_duplicate_groups(threshold=0.85)
+
+        # Expect at least the concept-A group
+        a_groups = [
+            g for g in groups if all(m in g.members for m in ["RepoAlpha", "RepoBeta", "RepoGamma"])
+        ]
+        assert len(a_groups) == 1, f"Expected a group with all 3 concept-A repos, got: {groups}"
+        assert len(a_groups[0].members) == 3
+
+    def test_threshold_filtering(self, tmp_path: Path) -> None:
+        """Setting threshold=1.0 requires perfect identity; only identical-vector repos group."""
+        vec_map = {"concept-A": self._VEC_A}
+        repos = [
+            ("RepoAlpha", "concept-A"),
+            ("RepoBeta", "concept-A"),
+        ]
+        idx = _make_controlled_index(tmp_path, repos, vec_map)
+
+        # At threshold=0.99, these two identical vectors still group
+        groups_low = idx.find_duplicate_groups(threshold=0.99)
+        assert any(len(g.members) >= 2 for g in groups_low)
+
+        # Very high threshold near 1.0 — identical vectors have distance=0, so sim=1.0
+        # threshold=0.9999 should still group distance=0 pairs (sim=1.0 > 0.9999)
+        groups_high = idx.find_duplicate_groups(threshold=0.9999)
+        assert any(len(g.members) >= 2 for g in groups_high)
+
+    def test_no_groups_when_all_dissimilar(self, tmp_path: Path) -> None:
+        """Dissimilar repos produce no duplicate groups."""
+        idx = _make_index(tmp_path)
+        audits = [
+            _make_audit("Rust1", description="a fast Rust database engine unique1"),
+            _make_audit("Py2", description="Python machine learning MLML unique2"),
+            _make_audit("Go3", description="Go microservices framework unique3"),
+        ]
+        idx.reindex(audits)
+
+        # Very high threshold; distinct hashed vectors are unlikely to be this close
+        groups = idx.find_duplicate_groups(threshold=0.999)
+
+        assert groups == [], f"Expected no groups for dissimilar repos, got {groups}"
+
+    def test_representative_is_most_recently_pushed(self, tmp_path: Path) -> None:
+        """The representative is the member with the most recent pushed_at."""
+        from datetime import timezone
+
+        vec_map = {"concept-A": self._VEC_A}
+        # Build audits manually so we can set distinct pushed_at timestamps
+        old = _make_audit("OldRepo", description="concept-A project")
+        old.metadata.pushed_at = datetime(2023, 1, 1, tzinfo=timezone.utc)
+        new = _make_audit("NewRepo", description="concept-A project")
+        new.metadata.pushed_at = datetime(2025, 6, 1, tzinfo=timezone.utc)
+
+        embedder = _ControlledEmbedder(vec_map)
+        db = tmp_path / "warehouse.db"
+        idx = SemanticIndex(db, embedder)
+        idx.reindex([old, new])
+
+        groups = idx.find_duplicate_groups(threshold=0.85)
+
+        assert len(groups) >= 1
+        assert groups[0].representative == "NewRepo"
+
+    def test_env_var_threshold_override(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """SEMANTIC_DUPLICATE_THRESHOLD env var overrides the default threshold."""
+        vec_map = {"concept-A": self._VEC_A}
+        repos = [("RepoAlpha", "concept-A"), ("RepoBeta", "concept-A")]
+        idx = _make_controlled_index(tmp_path, repos, vec_map)
+
+        # Set threshold so high that identical-vector pairs still pass
+        monkeypatch.setenv("SEMANTIC_DUPLICATE_THRESHOLD", "0.9")
+        groups = idx.find_duplicate_groups()  # uses env var
+
+        assert any(len(g.members) >= 2 for g in groups)

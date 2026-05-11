@@ -524,3 +524,93 @@ class TestControlCenterArcFLanes:
         queue = snapshot.get("operator_queue", [])
         arc_f_items = [i for i in queue if "arc-f:" in i.get("item_id", "")]
         assert not arc_f_items
+
+
+# ---------------------------------------------------------------------------
+# Arc F S3.4: control-center duplicate-group lane entries
+# ---------------------------------------------------------------------------
+
+
+class _FakeDuplicateGroup:
+    """Minimal stand-in for DuplicateGroup dataclass."""
+
+    def __init__(self, members, representative, min_pairwise_cosine):
+        self.members = members
+        self.representative = representative
+        self.min_pairwise_cosine = min_pairwise_cosine
+
+
+class _FakeSemanticIndex:
+    """Stub SemanticIndex that returns a fixed list of DuplicateGroups."""
+
+    def __init__(self, groups):
+        self._groups = groups
+
+    def find_duplicate_groups(self, **kwargs):
+        return self._groups
+
+
+class TestControlCenterDuplicateGroupLanes:
+    def _snapshot_with_index(self, report_data: dict, tmp_path: Path, semantic_index) -> dict:
+        return build_operator_snapshot(
+            report_data, output_dir=tmp_path, semantic_index=semantic_index
+        )
+
+    def test_duplicate_group_lane_entry_appears(self, tmp_path: Path) -> None:
+        """When semantic_index returns duplicate groups, lane entries appear in the queue."""
+        group = _FakeDuplicateGroup(
+            members=["ArgueMap", "ConvictionMapper", "TradeoffAtlas"],
+            representative="TradeoffAtlas",
+            min_pairwise_cosine=0.91,
+        )
+        fake_idx = _FakeSemanticIndex([group])
+
+        report = _make_report_data([_make_audit_with_arc_f("ArgueMap")])
+        snapshot = self._snapshot_with_index(report, tmp_path, fake_idx)
+
+        queue = snapshot.get("operator_queue", [])
+        dup_items = [i for i in queue if "arc-f:duplicate-group:" in i.get("item_id", "")]
+        assert len(dup_items) == 1
+
+        item = dup_items[0]
+        assert item["lane"] == "ready"
+        assert "ArgueMap" in item["summary"] or "ConvictionMapper" in item["summary"]
+        assert item["priority"] == 35
+
+    def test_duplicate_group_summary_contains_all_members(self, tmp_path: Path) -> None:
+        """The lane entry summary mentions all member repo names."""
+        group = _FakeDuplicateGroup(
+            members=["RepoA", "RepoB", "RepoC"],
+            representative="RepoC",
+            min_pairwise_cosine=0.88,
+        )
+        fake_idx = _FakeSemanticIndex([group])
+
+        report = _make_report_data([_make_audit_with_arc_f("RepoA")])
+        snapshot = self._snapshot_with_index(report, tmp_path, fake_idx)
+
+        queue = snapshot.get("operator_queue", [])
+        dup_items = [i for i in queue if "arc-f:duplicate-group:" in i.get("item_id", "")]
+        assert dup_items
+        combined = dup_items[0]["title"] + dup_items[0]["summary"]
+        for name in ["RepoA", "RepoB", "RepoC"]:
+            assert name in combined
+
+    def test_no_duplicate_entries_without_semantic_index(self, tmp_path: Path) -> None:
+        """When semantic_index=None, no duplicate-group lane entries are generated."""
+        report = _make_report_data([_make_audit_with_arc_f("SomeRepo")])
+        snapshot = build_operator_snapshot(report, output_dir=tmp_path, semantic_index=None)
+
+        queue = snapshot.get("operator_queue", [])
+        dup_items = [i for i in queue if "arc-f:duplicate-group:" in i.get("item_id", "")]
+        assert dup_items == []
+
+    def test_no_duplicate_entries_when_groups_empty(self, tmp_path: Path) -> None:
+        """When semantic_index returns no groups, no duplicate-group entries are added."""
+        fake_idx = _FakeSemanticIndex([])
+        report = _make_report_data([_make_audit_with_arc_f("SomeRepo")])
+        snapshot = self._snapshot_with_index(report, tmp_path, fake_idx)
+
+        queue = snapshot.get("operator_queue", [])
+        dup_items = [i for i in queue if "arc-f:duplicate-group:" in i.get("item_id", "")]
+        assert dup_items == []

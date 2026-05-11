@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -17,6 +18,8 @@ from src.warehouse import (
     load_recent_operator_evidence,
     load_review_history,
 )
+
+logger = logging.getLogger(__name__)
 
 LANE_ORDER = {"blocked": 0, "urgent": 1, "ready": 2, "deferred": 3}
 LANE_LABELS = {
@@ -185,6 +188,7 @@ def build_operator_snapshot(
     *,
     output_dir: Path,
     triage_view: str = "all",
+    semantic_index: object | None = None,
 ) -> dict:
     queue: list[dict] = []
     age_reference = _parse_report_datetime(report_data.get("generated_at")) or datetime.now(
@@ -478,6 +482,40 @@ def build_operator_snapshot(
                     else [],
                 )
             )
+
+    # Arc F S3.4: surface cross-repo duplicate groups when a semantic index is available.
+    if semantic_index is not None:
+        try:
+            from src.semantic_index import DuplicateGroup
+
+            dup_groups: list[DuplicateGroup] = semantic_index.find_duplicate_groups()  # type: ignore[union-attr]
+            for group in dup_groups:
+                members_str = ", ".join(group.members)
+                lane = "ready"
+                queue.append(
+                    _queue_item(
+                        item_id=f"arc-f:duplicate-group:{group.representative}",
+                        kind="review",
+                        lane=lane,
+                        priority=35,
+                        repo=group.representative,
+                        title=f"Possible duplicate group: {members_str}",
+                        summary=(
+                            f"Repos {members_str} are semantically similar "
+                            f"(min pairwise cosine {group.min_pairwise_cosine:.3f}). "
+                            "Consider picking a canonical repo and archiving or merging the others."
+                        ),
+                        recommended_action=(
+                            f"Review {members_str} — pick one canonical project, "
+                            "archive or merge the rest to reduce portfolio fragmentation."
+                        ),
+                        source_run_id=review_summary.get("source_run_id", ""),
+                        age_reference=age_reference,
+                        links=[],
+                    )
+                )
+        except Exception as exc:
+            logger.warning("arc-f:duplicate-groups: failed to build lane entries: %s", exc)
 
     queue = _dedupe_queue(queue)
     queue.sort(

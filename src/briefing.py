@@ -239,6 +239,7 @@ def _build_suggestions(
     model: str,
     *,
     prefs: dict | None = None,
+    semantic_index: object | None = None,
 ) -> tuple[list[Suggestion], list[str]]:
     """Generate one-sentence "suggested next action" for top-N repos.
 
@@ -246,6 +247,10 @@ def _build_suggestions(
 
     Returns ``(suggestions, suppressed_names)`` where *suppressed_names* lists
     repo names that were filtered out by active operator preference suppressions.
+
+    If *semantic_index* is provided (a :class:`SemanticIndex` instance), the
+    top-N repo summaries are enriched with their nearest neighbors so that the
+    LLM prompt can suggest cross-repo consolidation opportunities.
     """
     from src.operator_prefs import is_suppressed
 
@@ -278,6 +283,23 @@ def _build_suggestions(
     if provider is None:
         return [], suppressed_names
 
+    # Optionally enrich each repo summary with related repos from semantic index
+    related_by_repo: dict[str, list[str]] = {}
+    if semantic_index is not None:
+        for audit in top_repos:
+            name = audit.get("metadata", {}).get("name", "")
+            if not name:
+                continue
+            try:
+                neighbors = semantic_index.find_neighbors(name, k=3)  # type: ignore[union-attr]
+                related = [
+                    n.repo_name for n in neighbors if n.score <= 0.3
+                ]  # distance ≤ 0.3 → sim ≥ 0.7
+                if related:
+                    related_by_repo[name] = related
+            except Exception as exc:
+                logger.debug("briefing: semantic neighbor lookup failed for %r: %s", name, exc)
+
     # Build a compact summary per repo
     summaries = []
     for audit in top_repos:
@@ -286,14 +308,24 @@ def _build_suggestions(
         lang = audit.get("metadata", {}).get("language") or "unknown"
         hotspots = audit.get("hotspots", [])
         top_hotspot = hotspots[0].get("title", "no hotspot") if hotspots else "no hotspot"
-        summaries.append(f"- {name} (lang={lang}, score={score:.2f}, top-hotspot={top_hotspot})")
+        line = f"- {name} (lang={lang}, score={score:.2f}, top-hotspot={top_hotspot})"
+        related = related_by_repo.get(name, [])
+        if related:
+            line += f" [related: {', '.join(related)}]"
+        summaries.append(line)
 
     repo_block = "\n".join(summaries)
+    cross_repo_note = (
+        " Where repos share a 'related' annotation, consider whether consolidation "
+        "or cross-repo patterns would be the most impactful suggestion."
+        if related_by_repo
+        else ""
+    )
     prompt = (
         "You are a portfolio advisor. For each repository below, write ONE short, actionable "
         "sentence (under 20 words) suggesting the single most impactful improvement the developer "
         "should make this week. Return ONLY a JSON array of strings, one per repo, in the same "
-        "order as the input.\n\n"
+        f"order as the input.{cross_repo_note}\n\n"
         f"Repositories:\n{repo_block}\n\n"
         "Response (JSON array only, no explanation):"
     )
@@ -349,16 +381,23 @@ def build_briefing(
     provider: NarrativeProvider | None = None,
     model: str = _ANTHROPIC_BRIEFING_MODEL,
     prefs: dict | None = None,
+    semantic_index: object | None = None,
 ) -> Briefing:
     """Build a structured weekly operator briefing from audit data.
 
     Pass *prefs* (loaded via ``operator_prefs.load_prefs``) to filter out
     suggestions for actions the operator has repeatedly declined.
+
+    Pass *semantic_index* (a :class:`~src.semantic_index.SemanticIndex` instance)
+    to enrich the LLM suggestion prompt with cross-repo "related repos" context.
+    If ``None``, behaviour is identical to S3.2 (no enrichment, backward compat).
     """
     shipped = _build_shipped(audits)
     needs_attention = _build_needs_attention(audits)
     health_delta = _build_health_delta(audits, use_history=use_history)
-    suggestions, suppressed_by_prefs = _build_suggestions(audits, provider, model, prefs=prefs)
+    suggestions, suppressed_by_prefs = _build_suggestions(
+        audits, provider, model, prefs=prefs, semantic_index=semantic_index
+    )
 
     return Briefing(
         username=username,
@@ -553,10 +592,15 @@ def generate_briefing(
     model: str | None = None,
     github_token: str | None = None,
     write_voice: bool = False,
+    semantic_index: object | None = None,
 ) -> dict:
     """
     Generate the weekly operator briefing.
     Returns a dict with briefing_path (and optionally voice_path), or {skipped, reason}.
+
+    Pass *semantic_index* (a :class:`~src.semantic_index.SemanticIndex` instance) to
+    enrich suggestion prompts with cross-repo related-repos context.  Defaults to ``None``
+    (backward-compatible, no enrichment).
     """
     audits: list[dict] = report_data.get("audits", [])
     username = report_data.get("username", "unknown")
@@ -607,6 +651,7 @@ def generate_briefing(
         provider=provider_obj,
         model=resolved_model,
         prefs=prefs or None,
+        semantic_index=semantic_index,
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)

@@ -46,6 +46,15 @@ class SearchResult:
     snippet: str
 
 
+@dataclass
+class DuplicateGroup:
+    """A set of repos whose pairwise cosine similarity exceeds the configured threshold."""
+
+    members: list[str]
+    representative: str  # the member with the most recent push (or first alphabetically)
+    min_pairwise_cosine: float
+
+
 @runtime_checkable
 class Embedder(Protocol):
     """Minimal protocol for text embedders."""
@@ -406,6 +415,210 @@ class SemanticIndex:
             snippet = f"repo: {repo_name}"
             results.append(SearchResult(repo_name=repo_name, score=distance, snippet=snippet))
         return results
+
+    def find_neighbors(self, repo_name: str, k: int = 5) -> list[SearchResult]:
+        """Return the top-K most similar repos to *repo_name* (excluding itself).
+
+        If *repo_name* is not in the index, returns an empty list without raising.
+        Results are ordered by ascending cosine distance (most similar first).
+        """
+        conn = self._connect()
+        try:
+            row = conn.execute(
+                "SELECT rowid FROM repo_embedding_meta WHERE repo_name = ?",
+                (repo_name,),
+            ).fetchone()
+            if row is None:
+                logger.debug("find_neighbors: repo %r not in index, returning []", repo_name)
+                return []
+
+            rowid = row[0]
+            vec_row = conn.execute(
+                "SELECT embedding FROM repo_embeddings WHERE rowid = ?",
+                (rowid,),
+            ).fetchone()
+            if vec_row is None:
+                logger.debug("find_neighbors: no embedding for repo %r, returning []", repo_name)
+                return []
+
+            vec_str = vec_row[0]
+            # Fetch k+1 to account for the repo itself appearing in results
+            rows = conn.execute(
+                """
+                SELECT m.repo_name, e.distance, m.doc_sha256
+                FROM repo_embeddings e
+                JOIN repo_embedding_meta m ON e.rowid = m.rowid
+                WHERE e.embedding MATCH ?
+                  AND k = ?
+                ORDER BY e.distance
+                """,
+                (vec_str, k + 1),
+            ).fetchall()
+
+            results = []
+            for rname, distance, _sha in rows:
+                if rname == repo_name:
+                    continue
+                snippet = f"repo: {rname}"
+                results.append(SearchResult(repo_name=rname, score=distance, snippet=snippet))
+                if len(results) >= k:
+                    break
+            return results
+        finally:
+            conn.close()
+
+    def find_duplicate_groups(
+        self,
+        *,
+        threshold: float | None = None,
+        min_group_size: int = 2,
+    ) -> list[DuplicateGroup]:
+        """Detect candidate duplicate repos via all-pairs cosine similarity.
+
+        Pairs with cosine *similarity* above *threshold* are grouped using union-find
+        for transitive closure.  Returns only groups with at least *min_group_size*
+        members.
+
+        The default threshold is read from the ``SEMANTIC_DUPLICATE_THRESHOLD`` env var
+        (float) or falls back to ``0.85``.
+
+        Note: cosine *distance* stored in the index is 1 - similarity.  The threshold
+        comparison is: ``(1 - distance) >= threshold``, i.e. distance <= (1 - threshold).
+
+        O(N²) similarity checks — fast enough for portfolios up to ~500 repos.
+        """
+        if threshold is None:
+            threshold = float(os.environ.get("SEMANTIC_DUPLICATE_THRESHOLD", "0.85"))
+
+        conn = self._connect()
+        try:
+            meta_rows = conn.execute(
+                "SELECT rowid, repo_name, pushed_at FROM repo_embedding_meta ORDER BY rowid"
+            ).fetchall()
+        finally:
+            conn.close()
+
+        if len(meta_rows) < min_group_size:
+            return []
+
+        rowids = [r[0] for r in meta_rows]
+        names = [r[1] for r in meta_rows]
+        pushed_ats = [r[2] for r in meta_rows]
+
+        # Load all embedding vectors once
+        conn = self._connect()
+        try:
+            vecs: dict[int, str] = {}
+            for rowid in rowids:
+                row = conn.execute(
+                    "SELECT embedding FROM repo_embeddings WHERE rowid = ?",
+                    (rowid,),
+                ).fetchone()
+                if row is not None:
+                    vecs[rowid] = row[0]
+        finally:
+            conn.close()
+
+        # All-pairs similarity: for each pair (i < j), compute similarity
+        # using the vec index's own distance metric (ask for k=N, filter by distance)
+        # For efficiency, use the stored vectors directly rather than re-querying.
+        # We compute cosine similarity from the stored distance: similarity = 1 - distance.
+        distance_threshold = 1.0 - threshold
+
+        # Union-find for transitive closure
+        parent: dict[int, int] = {i: i for i in range(len(names))}
+
+        def _find(x: int) -> int:
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            return x
+
+        def _union(a: int, b: int) -> None:
+            ra, rb = _find(a), _find(b)
+            if ra != rb:
+                parent[rb] = ra
+
+        # Track min pairwise cosine distance per group root (we accumulate and reduce later)
+        pair_distances: dict[tuple[int, int], float] = {}
+
+        conn = self._connect()
+        try:
+            for i, (rowid_i, name_i) in enumerate(zip(rowids, names)):
+                if rowid_i not in vecs:
+                    continue
+                # Use vec index to find neighbors of repo i with distance <= threshold
+                n_total = len(names)
+                rows = conn.execute(
+                    """
+                    SELECT m.repo_name, e.distance
+                    FROM repo_embeddings e
+                    JOIN repo_embedding_meta m ON e.rowid = m.rowid
+                    WHERE e.embedding MATCH ?
+                      AND k = ?
+                    ORDER BY e.distance
+                    """,
+                    (vecs[rowid_i], n_total),
+                ).fetchall()
+
+                for rname_j, dist in rows:
+                    if rname_j == name_i:
+                        continue
+                    if dist > distance_threshold:
+                        continue
+                    # Find j index
+                    try:
+                        j = names.index(rname_j)
+                    except ValueError:
+                        continue
+                    _union(i, j)
+                    key = (min(i, j), max(i, j))
+                    pair_distances[key] = min(pair_distances.get(key, dist), dist)
+        finally:
+            conn.close()
+
+        # Collect groups from union-find
+        groups: dict[int, list[int]] = {}
+        for i in range(len(names)):
+            root = _find(i)
+            groups.setdefault(root, []).append(i)
+
+        result: list[DuplicateGroup] = []
+        for root, members_idx in groups.items():
+            if len(members_idx) < min_group_size:
+                continue
+
+            member_names = [names[i] for i in members_idx]
+
+            # Compute min pairwise cosine similarity (= 1 - max pairwise distance)
+            relevant_dists = [
+                dist
+                for (a, b), dist in pair_distances.items()
+                if a in members_idx and b in members_idx
+            ]
+            min_pairwise_cosine = 1.0 - max(relevant_dists) if relevant_dists else threshold
+
+            # Representative = most recently pushed, or first alphabetically as tiebreak
+            best_idx = members_idx[0]
+            best_pushed = pushed_ats[best_idx]
+            for idx in members_idx[1:]:
+                pt = pushed_ats[idx]
+                if pt is not None and (best_pushed is None or pt > best_pushed):
+                    best_idx = idx
+                    best_pushed = pt
+            representative = names[best_idx]
+
+            result.append(
+                DuplicateGroup(
+                    members=sorted(member_names),
+                    representative=representative,
+                    min_pairwise_cosine=round(min_pairwise_cosine, 4),
+                )
+            )
+
+        # Sort by group size descending, then representative name
+        result.sort(key=lambda g: (-len(g.members), g.representative))
+        return result
 
 
 # ---------------------------------------------------------------------------

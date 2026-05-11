@@ -382,3 +382,101 @@ class TestCLIIntegration:
         parser = build_parser()
         with pytest.raises(SystemExit):
             parser.parse_args(["testuser", "--narrative", "--briefing"])
+
+
+# ---------------------------------------------------------------------------
+# Arc F S3.4: semantic index enrichment in briefing suggestions
+# ---------------------------------------------------------------------------
+
+
+class _FakeSemanticIndex:
+    """Stub SemanticIndex for briefing tests — returns pre-canned neighbors."""
+
+    def __init__(self, neighbor_map: dict[str, list]) -> None:
+        self._neighbor_map = neighbor_map
+
+    def find_neighbors(self, repo_name: str, k: int = 3):
+        from src.semantic_index import SearchResult
+
+        return [
+            SearchResult(repo_name=n, score=0.1, snippet=f"repo: {n}")
+            for n in self._neighbor_map.get(repo_name, [])
+        ][:k]
+
+
+class TestBriefingSemanticEnrichment:
+    """Tests for semantic_index integration in build_briefing / _build_suggestions."""
+
+    def _make_low_score_audit(self, name: str) -> dict:
+        """Return a minimal audit dict with a low overall_score to reach top-3."""
+        return {
+            "metadata": {"name": name, "language": "Python", "pushed_at": _days_ago_iso(5)},
+            "overall_score": 0.1,
+            "hotspots": [{"category": "readme", "title": "No README"}],
+            "analyzer_results": [
+                {
+                    "dimension": "activity",
+                    "score": 0.3,
+                    "max_score": 1.0,
+                    "findings": [],
+                    "details": {"days_since_push": 5, "archived": False},
+                }
+            ],
+        }
+
+    def test_briefing_with_semantic_index_passes_related_repos(self) -> None:
+        """When a semantic index is provided, find_neighbors is called for top-3 repos."""
+        neighbor_map = {"RepoA": ["RepoB", "RepoC"], "RepoB": [], "RepoC": []}
+        fake_idx = _FakeSemanticIndex(neighbor_map)
+
+        audits = [
+            self._make_low_score_audit("RepoA"),
+            self._make_low_score_audit("RepoB"),
+            self._make_low_score_audit("RepoC"),
+        ]
+
+        captured: list[str] = []
+
+        class _CapturingProvider:
+            def generate(self, prompt: str, model: str, **kwargs) -> str:
+                captured.append(prompt)
+                return '["fix readme", "add tests", "update deps"]'
+
+        briefing = build_briefing(
+            audits,
+            "user",
+            "2026-05-11",
+            use_history=False,
+            provider=_CapturingProvider(),
+            semantic_index=fake_idx,
+        )
+
+        assert len(captured) == 1
+        prompt = captured[0]
+        # Prompt should contain the related repos annotation for RepoA
+        assert "related:" in prompt or "RepoB" in prompt or "RepoC" in prompt
+        assert len(briefing.suggestions) == 3
+
+    def test_briefing_without_semantic_index_unchanged(self) -> None:
+        """When semantic_index=None, build_briefing behaves identically to S3.2."""
+        audits = [
+            self._make_low_score_audit("RepoX"),
+            self._make_low_score_audit("RepoY"),
+        ]
+
+        class _SimpleProvider:
+            def generate(self, prompt: str, model: str, **kwargs) -> str:
+                # Verify no "related:" annotation was injected
+                assert "related:" not in prompt
+                return '["improve docs", "add CI"]'
+
+        briefing = build_briefing(
+            audits,
+            "user",
+            "2026-05-11",
+            use_history=False,
+            provider=_SimpleProvider(),
+            semantic_index=None,
+        )
+
+        assert len(briefing.suggestions) == 2
