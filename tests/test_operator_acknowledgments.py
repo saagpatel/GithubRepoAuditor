@@ -7,6 +7,7 @@ from src.operator_acknowledgments import (
     build_acknowledgment_record,
     directional_signature,
     find_matching_change,
+    find_sibling_changes,
     is_change_acknowledged,
     load_acknowledgments,
     save_acknowledgment,
@@ -171,3 +172,81 @@ def test_find_matching_change_returns_none_when_missing():
         material_changes=[_make_change()],
     )
     assert found is None
+
+
+def test_find_sibling_changes_security_change_finds_security_lens_delta():
+    primary = _make_change(
+        change_type="security-change",
+        details={"old_label": "watch", "new_label": "critical"},
+    )
+    sibling = _make_change(
+        change_type="lens-delta",
+        title="RepoA shifted on security posture",
+        details={"lens": "security_posture", "delta": -0.1},
+    )
+    unrelated = _make_change(
+        change_type="lens-delta",
+        title="RepoA shifted on momentum",
+        details={"lens": "momentum", "delta": -0.1},
+    )
+
+    siblings = find_sibling_changes(primary, [primary, sibling, unrelated])
+
+    assert siblings == [sibling]
+
+
+def test_find_sibling_changes_security_lens_delta_finds_security_change():
+    primary = _make_change(
+        change_type="lens-delta",
+        title="RepoA shifted on security posture",
+        details={"lens": "security_posture", "delta": -0.1},
+    )
+    sibling = _make_change(
+        change_type="security-change",
+        details={"old_label": "watch", "new_label": "critical"},
+    )
+
+    siblings = find_sibling_changes(primary, [primary, sibling])
+
+    assert siblings == [sibling]
+
+
+def test_find_sibling_changes_non_security_lens_delta_has_no_security_sibling():
+    primary = _make_change(
+        change_type="lens-delta",
+        title="RepoA shifted on momentum",
+        details={"lens": "momentum", "delta": -0.1},
+    )
+    other = _make_change(
+        change_type="security-change",
+        details={"old_label": "watch", "new_label": "critical"},
+    )
+
+    siblings = find_sibling_changes(primary, [primary, other])
+
+    assert siblings == []
+
+
+def test_find_sibling_changes_different_repo_is_not_a_sibling():
+    primary = _make_change(
+        change_type="security-change",
+        details={"old_label": "watch", "new_label": "critical"},
+    )
+    other_repo = _make_change(
+        change_type="lens-delta",
+        repo_name="RepoB",
+        title="RepoB shifted on security posture",
+        details={"lens": "security_posture", "delta": -0.1},
+    )
+
+    siblings = find_sibling_changes(primary, [primary, other_repo])
+
+    assert siblings == []
+
+
+def test_find_sibling_changes_returns_empty_when_no_repo():
+    primary = _make_change(repo_name="")
+
+    siblings = find_sibling_changes(primary, [primary])
+
+    assert siblings == []

@@ -1549,6 +1549,7 @@ def _run_acknowledgment_capture_mode(args, parser) -> None:
     from src.operator_acknowledgments import (
         build_acknowledgment_record,
         find_matching_change,
+        find_sibling_changes,
         save_acknowledgment,
     )
     from src.recurring_review import MATERIALITY_THRESHOLDS, evaluate_material_changes
@@ -1599,6 +1600,18 @@ def _run_acknowledgment_capture_mode(args, parser) -> None:
         f"Acknowledged {args.acknowledge_kind} for {args.acknowledge_target} "
         f"(change_key={record['change_key'][:12]}…, reviewer={reviewer})"
     )
+
+    for sibling in find_sibling_changes(matched, material_changes):
+        sibling_record = build_acknowledgment_record(
+            sibling, reviewer=reviewer, note=args.acknowledge_note
+        )
+        save_acknowledgment(output_dir, args.username, sibling_record)
+        print_info(
+            f"Acknowledged sibling {sibling.get('change_type')} for "
+            f"{sibling.get('repo_name')} "
+            f"(change_key={sibling_record['change_key'][:12]}…)"
+        )
+
     print_info(f"Acknowledgment store: {saved_path}")
     print_info("Run --control-center to confirm the item is filtered from the queue.")
 

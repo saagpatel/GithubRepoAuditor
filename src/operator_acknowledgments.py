@@ -120,3 +120,41 @@ def find_matching_change(
             continue
         return change
     return None
+
+
+def find_sibling_changes(primary: dict, material_changes: list[dict]) -> list[dict]:
+    """Return changes that represent the same underlying event as primary.
+
+    A single security posture movement currently emits both a `security-change`
+    entry and a `lens-delta` entry for `security_posture` on the same repo,
+    each with its own `change_key`. Treat those as siblings so one operator
+    acknowledgment can clear both halves of the same logical event.
+    """
+    primary_type = primary.get("change_type")
+    primary_repo = primary.get("repo_name")
+    primary_key = primary.get("change_key")
+    if not primary_repo:
+        return []
+
+    siblings: list[dict] = []
+    for change in material_changes:
+        if change.get("change_key") == primary_key:
+            continue
+        if change.get("repo_name") != primary_repo:
+            continue
+        if _is_security_event_pair(primary_type, change.get("change_type"), primary, change):
+            siblings.append(change)
+    return siblings
+
+
+def _is_security_event_pair(
+    primary_type: str | None,
+    candidate_type: str | None,
+    primary: dict,
+    candidate: dict,
+) -> bool:
+    if primary_type == "security-change" and candidate_type == "lens-delta":
+        return (candidate.get("details") or {}).get("lens") == "security_posture"
+    if primary_type == "lens-delta" and candidate_type == "security-change":
+        return (primary.get("details") or {}).get("lens") == "security_posture"
+    return False

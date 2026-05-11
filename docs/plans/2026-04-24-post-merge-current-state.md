@@ -129,6 +129,16 @@ Recommended maintainability pass:
 - The workbook/exporter lane should pause unless future discovery finds another clear adapter boundary; broad sheet-rendering rewrites remain out of scope.
 - Details are recorded in `docs/plans/2026-05-10-excel-workbook-contract-modernization.md`.
 
+2026-05-11 implementation note:
+
+- The recurring-review queue now supports operator acknowledgment capture: `--acknowledge-target <repo> --acknowledge-kind <type> --acknowledge-reviewer <name> --acknowledge-note <text>` writes to `output/operator-acknowledgments-<username>.json` and filters the change from both `material_changes` and `review_targets` on the next read.
+- The filter is applied on both the fresh-bundle path (`build_review_bundle` in `src/recurring_review.py`) and the cached-report early-return path (`normalize_review_state` in `src/operator_control_center.py`), so `--control-center` reflects new acknowledgments without requiring a fresh full audit.
+- Each ack stores a directional signature (security old/new label, lens-delta sign, tier old/new) so a regression in the opposite direction still surfaces.
+- Sibling-key suppression: a single security posture movement emits both a `security-change` and a `lens-delta` for `security_posture` with distinct `change_key`s; acknowledging either now also captures a paired ack for the sibling, so one CLI invocation clears one logical event.
+- Incidental fix: `src/recurring_review._change` for lens-delta had `details={"lens": ..., "delta": lens_delta, **item}` where the spread clobbered `delta` with the parent's overall-score delta; reordering restores per-lens values. Signature derivation also falls back through `details.lens_deltas[lens]` so reports generated before the fix can still be acknowledged.
+- Live verification: the residual GithubRepoAuditor lens-change item from the post-PR-#155/#156 healthy state was successfully acknowledged and dropped from the ready queue.
+- Shipped via PR #157 (initial flag) and the follow-up PR for sibling-key suppression.
+
 ## Follow-Ups
 
 1. Complete manual desktop Excel signoff for the generated workbook if this rehearsal becomes a release record.
