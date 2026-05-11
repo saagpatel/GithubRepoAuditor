@@ -160,7 +160,8 @@ def _compute_readme_staleness(repo_path: Path, readme_name: str) -> dict:
     - ``readme_last_touched_days`` — days since README was last committed (None if unknown)
     - ``code_last_touched_days``   — days since any code file was last committed (None if no code)
     - ``readme_staleness_ratio``   — readme_days / max(code_days, 1); None if either is unknown
-    - ``readme_stale``             — True if ratio < 0.2 AND code_last_touched_days < 90
+    - ``readme_stale``             — True if ratio > 5.0 AND code_last_touched_days < 90
+      (README is 5x older than the code AND code is being actively touched)
     """
     now_ts = int(time.time())
 
@@ -180,7 +181,7 @@ def _compute_readme_staleness(repo_path: Path, readme_name: str) -> dict:
 
     if readme_days is not None and code_days is not None:
         staleness_ratio = readme_days / max(code_days, 1)
-        stale = staleness_ratio < 0.2 and code_days < 90
+        stale = staleness_ratio > 5.0 and code_days < 90
     elif readme_days is not None and code_days is None:
         # Docs-only repo — skip staleness
         pass

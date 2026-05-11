@@ -9,14 +9,11 @@ import subprocess
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 from src.analyzers.activity import ActivityAnalyzer
 from src.analyzers.readme import ReadmeAnalyzer, _compute_readme_staleness
 from src.models import RepoMetadata
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -132,12 +129,10 @@ class TestReadmeStaleness:
         assert staleness["readme_staleness_ratio"] is not None
         assert isinstance(staleness["readme_stale"], bool)
 
-    def test_old_readme_vs_fresh_code_not_flagged_stale(self, tmp_path: Path) -> None:
-        """README 365 days old, code 7 days old → ratio = 365/7 ≈ 52 (>> 0.2) → NOT stale.
+    def test_old_readme_vs_fresh_code_flags_stale(self, tmp_path: Path) -> None:
+        """README 365 days old, code 7 days old → ratio ≈ 52 (>> 5) AND code < 90 → STALE.
 
-        The stale flag uses: ratio < 0.2 AND code_days < 90.
-        readme_days/code_days = 365/7 >> 0.2 so the condition is false.
-        (Stale = README proportionally newer than code with fresh code activity.)
+        Stale = README has not kept up with active code changes.
         """
         now = int(time.time())
         readme_ts = now - 365 * 86400
@@ -148,14 +143,15 @@ class TestReadmeStaleness:
 
         assert staleness["readme_last_touched_days"] is not None
         assert staleness["code_last_touched_days"] is not None
-        # ratio = readme_days / code_days ≈ 365/7 >> 1
         assert staleness["readme_staleness_ratio"] is not None
-        assert staleness["readme_staleness_ratio"] > 1.0
-        # Per spec: stale = ratio < 0.2 AND code < 90 — false here (ratio >> 0.2)
-        assert staleness["readme_stale"] is False
+        assert staleness["readme_staleness_ratio"] > 5.0
+        assert staleness["readme_stale"] is True
 
-    def test_fresh_readme_vs_old_code_flags_stale(self, tmp_path: Path) -> None:
-        """README touched 1 day ago, code 60 days ago → ratio ~0.017 < 0.2, code < 90 → stale."""
+    def test_fresh_readme_vs_old_code_not_flagged_stale(self, tmp_path: Path) -> None:
+        """README touched 1 day ago, code 60 days ago → ratio ≈ 0.017 → NOT stale.
+
+        Low ratio means README is fresher than code, so docs are not lagging.
+        """
         now = int(time.time())
         readme_ts = now - 1 * 86400   # 1 day ago
         code_ts = now - 60 * 86400    # 60 days ago
@@ -163,9 +159,8 @@ class TestReadmeStaleness:
 
         staleness = _compute_readme_staleness(repo, "README.md")
 
-        # ratio = 1/60 ≈ 0.017 < 0.2, code_days = 60 < 90 → stale
-        assert staleness["readme_stale"] is True
-        assert staleness["readme_staleness_ratio"] < 0.2
+        assert staleness["readme_stale"] is False
+        assert staleness["readme_staleness_ratio"] < 1.0
 
     def test_no_readme_returns_none_fields(self, tmp_path: Path) -> None:
         """When repo_path has no git history for README, new fields are None."""
@@ -259,11 +254,9 @@ class TestActivityReleaseSignals:
 
     def test_repo_with_three_releases(self, tmp_path: Path) -> None:
         """has_any_release=True, release_count=3, latest_release_age_days correct."""
-        now = datetime.now(timezone.utc)
-        # Latest release published 30 days ago
-        pub = (now.replace(microsecond=0).isoformat()).replace("+00:00", "Z")
-        # Hack: set 30 days ago
         from datetime import timedelta
+
+        now = datetime.now(timezone.utc)
         pub30 = (now - timedelta(days=30)).isoformat().replace("+00:00", "Z")
         pub60 = (now - timedelta(days=60)).isoformat().replace("+00:00", "Z")
         pub90 = (now - timedelta(days=90)).isoformat().replace("+00:00", "Z")
