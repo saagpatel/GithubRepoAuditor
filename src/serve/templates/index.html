@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Audit Serve{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Portfolio Dashboard</h1>
+  <p class="meta">
+    {{ total }} repos &middot; last snapshot: <code>{{ generated_at }}</code>
+    <button
+      class="btn btn-sm"
+      hx-get="/"
+      hx-target="#dashboard-body"
+      hx-swap="innerHTML"
+    >Refresh</button>
+  </p>
+</div>
+
+<div id="dashboard-body">
+  <div class="grid-2">
+    <section>
+      <h2>Top 5 by Risk</h2>
+      {% if top_risk %}
+      <table>
+        <thead>
+          <tr><th>Repo</th><th>Risk Score</th></tr>
+        </thead>
+        <tbody>
+          {% for r in top_risk %}
+          <tr>
+            <td><a href="/repos/{{ r.name }}">{{ r.name }}</a></td>
+            <td class="score score-risk">{{ "%.1f"|format(r.risk_score|default(r.risk)|float) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="empty">No data — run <code>audit &lt;username&gt; --portfolio-truth</code> first.</p>
+      {% endif %}
+    </section>
+
+    <section>
+      <h2>Top 5 by Gap (low completeness)</h2>
+      {% if top_gap %}
+      <table>
+        <thead>
+          <tr><th>Repo</th><th>Completeness</th></tr>
+        </thead>
+        <tbody>
+          {% for r in top_gap %}
+          {% set comp = r.completeness_score|default(r.completeness)|float %}
+          <tr>
+            <td><a href="/repos/{{ r.name }}">{{ r.name }}</a></td>
+            <td class="score score-gap">{{ "%.1f"|format(comp) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="empty">No data — run <code>audit &lt;username&gt; --portfolio-truth</code> first.</p>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

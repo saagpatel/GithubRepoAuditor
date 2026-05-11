@@ -744,6 +744,23 @@ def build_parser() -> argparse.ArgumentParser:
             "'local' uses sentence-transformers/all-MiniLM-L6-v2 (requires [semantic] extra)."
         ),
     )
+    # ── Serve mode ────────────────────────────────────────────────────────────
+    parser.add_argument(
+        "--serve",
+        action="store_true",
+        help="Start local web UI (FastAPI + HTMX) for portfolio artefacts. Requires [serve] extra.",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8080,
+        help="Port for --serve (default: 8080)",
+    )
+    parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Host for --serve (default: 127.0.0.1)",
+    )
     return parser
 
 
@@ -4628,6 +4645,23 @@ def _run_semantic_search_mode(args: object, query: str) -> None:
         print_info(f"     {r.snippet}")
 
 
+# ── Serve mode ───────────────────────────────────────────────────────────────
+def _run_serve_mode(args: object) -> None:
+    """Launch the local FastAPI + HTMX web UI (requires [serve] extra)."""
+    try:
+        from src.serve.app import run_serve
+    except ImportError:
+        import sys
+
+        sys.exit("audit serve requires the [serve] extra.\nInstall with: pip install -e '.[serve]'")
+    output_dir = Path(getattr(args, "output_dir", "output"))
+    run_serve(
+        port=getattr(args, "port", 8080),
+        host=getattr(args, "host", "127.0.0.1"),
+        output_dir=output_dir,
+    )
+
+
 # ── Main entry point ──────────────────────────────────────────────────
 def main() -> None:
     parser = build_parser()
@@ -4698,6 +4732,10 @@ def main() -> None:
 
     if getattr(args, "apply_metadata", False) or getattr(args, "apply_readmes", False):
         _run_apply_improvements_mode(args, parser)
+        return
+
+    if getattr(args, "serve", False):
+        _run_serve_mode(args)
         return
 
     if args.watch:
