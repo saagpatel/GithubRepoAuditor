@@ -21,8 +21,65 @@ def score_explanation_for_audit(audit: dict) -> dict:
     return build_score_explanation(audit)
 
 
+def _arc_f_detail_cols(audit: dict, ghas_lookup: dict | None) -> list[object]:
+    """Return Arc F sprint-1 columns appended after the base 70-column row.
+
+    Columns 71-78 (1-based):
+      71: readme_stale (Yes/No/—)
+      72: readme_staleness_ratio (float or —)
+      73: readme_last_touched_days (int or —)
+      74: code_last_touched_days (int or —)
+      75: has_any_release (Yes/No)
+      76: latest_release_age_days (int or —)
+      77: ossf_score (float or —)
+      78: ossf_top_failing (comma-joined first 3 failing check names or —)
+    """
+    details = {
+        result["dimension"]: result.get("details", {})
+        for result in audit.get("analyzer_results", [])
+    }
+    readme = details.get("readme", {})
+    activity = details.get("activity", {})
+
+    readme_stale = readme.get("readme_stale")
+    readme_stale_val: str = (
+        "Yes" if readme_stale is True else ("No" if readme_stale is False else "—")
+    )
+    ratio = readme.get("readme_staleness_ratio")
+    ratio_val: object = round(ratio, 2) if ratio is not None else "—"
+    readme_days = readme.get("readme_last_touched_days")
+    readme_days_val: object = readme_days if readme_days is not None else "—"
+    code_days = readme.get("code_last_touched_days")
+    code_days_val: object = code_days if code_days is not None else "—"
+
+    has_release = activity.get("has_any_release")
+    has_release_val: str = "Yes" if has_release else "No"
+    rel_age = activity.get("latest_release_age_days")
+    rel_age_val: object = rel_age if rel_age is not None else "—"
+
+    ossf = audit.get("ossf_scorecard", {})
+    ossf_score_val: object = (
+        round(ossf["score"], 1) if ossf.get("available") and ossf.get("score") is not None else "—"
+    )
+    failing = [c.get("name", "") for c in (ossf.get("checks") or []) if c.get("score", 1) == 0][:3]
+    ossf_failing_val: str = ", ".join(f for f in failing if f) or "—"
+
+    return [
+        readme_stale_val,
+        ratio_val,
+        readme_days_val,
+        code_days_val,
+        has_release_val,
+        rel_age_val,
+        ossf_score_val,
+        ossf_failing_val,
+    ]
+
+
 def repo_detail_rows(
-    data: dict, score_history: dict[str, list[float]] | None
+    data: dict,
+    score_history: dict[str, list[float]] | None,
+    ghas_lookup: dict | None = None,
 ) -> tuple[list[list[object]], list[list[object]], list[list[object]]]:
     memberships = collection_memberships(data)
     history = extend_score_history_with_current(data, score_history)
@@ -42,7 +99,9 @@ def repo_detail_rows(
             f"{item.get('path', 'repo root')}: {item.get('signal_summary', 'No signal summary recorded yet.')}"
             for item in (briefing.get("implementation_hotspots") or [])[:3]
         ]
-        action_titles = [item.get("title", "") for item in (audit.get("action_candidates") or [])[:3]]
+        action_titles = [
+            item.get("title", "") for item in (audit.get("action_candidates") or [])[:3]
+        ]
         lenses = audit.get("lenses", {})
         scores = history.get(repo_name, [])
         detail_rows.append(
@@ -221,6 +280,7 @@ def repo_detail_rows(
                 implementation_hotspot_lines[2]
                 if len(implementation_hotspot_lines) > 2
                 else "No third implementation hotspot is currently surfaced.",
+                *_arc_f_detail_cols(audit, ghas_lookup),
             ]
         )
 

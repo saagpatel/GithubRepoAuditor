@@ -564,6 +564,7 @@ PIE_COLORS = ["166534", "1565C0", "D97706", "C2410C", "6B7280"]
 RADAR_DIMS = REPO_PROFILE_RADAR_DIMS
 RADAR_LABELS = REPO_PROFILE_RADAR_LABELS
 
+
 def _apply_workbook_named_ranges(
     wb: Workbook,
     data: dict,
@@ -996,6 +997,7 @@ def _build_security(wb: Workbook, data: dict) -> None:
         heatmap_amber=HEATMAP_AMBER,
         heatmap_green=HEATMAP_GREEN,
         auto_width=auto_width,
+        ghas_lookup=data.get("ghas_alerts") or None,
     )
 
 

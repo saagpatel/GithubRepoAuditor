@@ -13,6 +13,12 @@ SECURITY_HEADERS = [
     "Dependabot",
     "GitHub",
     "Findings",
+    "Dep Critical",
+    "Dep High",
+    "CodeQL Critical",
+    "CodeQL High",
+    "Secrets Open",
+    "OSSF Score",
 ]
 
 SECURITY_CONTROLS_HEADERS = [
@@ -37,7 +43,26 @@ SUPPLY_CHAIN_HEADERS = [
 SECURITY_DEBT_HEADERS = ["Repo", "Priority", "Action", "Expected Lift", "Effort", "Source"]
 
 
-def build_security_sheet_rows(audits: list[dict[str, Any]]) -> list[list[Any]]:
+def _extract_ghas_counts(ghas_entry: dict[str, Any]) -> tuple[int, int, int, int, int]:
+    """Extract (dep_critical, dep_high, cs_critical, cs_high, ss_open) from a GHAS entry.
+
+    Returns zeros for any missing or unavailable category.
+    """
+    dep = ghas_entry.get("dependabot", {})
+    cs = ghas_entry.get("code_scanning", {})
+    ss = ghas_entry.get("secret_scanning", {})
+    dep_critical = dep.get("critical", 0) if dep.get("available") else 0
+    dep_high = dep.get("high", 0) if dep.get("available") else 0
+    cs_critical = cs.get("critical", 0) if cs.get("available") else 0
+    cs_high = cs.get("high", 0) if cs.get("available") else 0
+    ss_open = ss.get("open", 0) if ss.get("available") else 0
+    return dep_critical, dep_high, cs_critical, cs_high, ss_open
+
+
+def build_security_sheet_rows(
+    audits: list[dict[str, Any]],
+    ghas_lookup: dict[str, dict[str, Any]] | None = None,
+) -> list[list[Any]]:
     ranked_audits = sorted(
         audits, key=lambda audit: audit.get("security_posture", {}).get("score", 1.0)
     )
@@ -47,9 +72,27 @@ def build_security_sheet_rows(audits: list[dict[str, Any]]) -> list[list[Any]]:
         local = posture.get("local", {})
         github = posture.get("github", {})
         metadata = audit.get("metadata", {})
+        repo_name = metadata.get("name", "")
+
+        # GHAS counts — from lookup if provided, otherwise "—"
+        ghas_entry: dict[str, Any] = (ghas_lookup or {}).get(repo_name, {})
+        if ghas_entry:
+            dep_c, dep_h, cs_c, cs_h, ss_o = _extract_ghas_counts(ghas_entry)
+            dep_critical: int | str = dep_c
+            dep_high: int | str = dep_h
+            cs_critical: int | str = cs_c
+            cs_high: int | str = cs_h
+            ss_open: int | str = ss_o
+        else:
+            dep_critical = dep_high = cs_critical = cs_high = ss_open = "—"
+
+        # OSSF Scorecard score
+        ossf = audit.get("ossf_scorecard", {})
+        ossf_score: float | str = ossf.get("score", "—") if ossf.get("available") else "—"
+
         rows.append(
             [
-                metadata.get("name", ""),
+                repo_name,
                 round(posture.get("score", 0), 2),
                 local.get("secrets_found", posture.get("secrets_found", 0)),
                 ", ".join(
@@ -62,6 +105,12 @@ def build_security_sheet_rows(audits: list[dict[str, Any]]) -> list[list[Any]]:
                 "Yes" if posture.get("has_dependabot") else "No",
                 "Yes" if github.get("provider_available") else "No",
                 "; ".join(posture.get("evidence", [])[:3]),
+                dep_critical,
+                dep_high,
+                cs_critical,
+                cs_high,
+                ss_open,
+                ossf_score,
             ]
         )
     return rows
@@ -174,11 +223,12 @@ def build_security_sheet(
     heatmap_amber: str,
     heatmap_green: str,
     auto_width,
+    ghas_lookup: dict[str, dict[str, Any]] | None = None,
 ) -> None:
     ws = get_or_create_sheet(wb, "Security")
     ws.sheet_properties.tabColor = "991B1B"
     configure_sheet_view(ws, zoom=105, show_grid_lines=True)
-    rows = build_security_sheet_rows_fn(data.get("audits", []))
+    rows = build_security_sheet_rows_fn(data.get("audits", []), ghas_lookup=ghas_lookup)
     max_row = write_security_table_fn(
         ws,
         rows,
@@ -210,7 +260,7 @@ def build_security_sheet(
         ws.conditional_formatting.add(
             f"B2:B{max_row}",
             icon_set_rule("3TrafficLights1", "num", [0, 0.4, 0.7]),
-    )
+        )
     auto_width(ws, len(security_headers), max_row)
 
 

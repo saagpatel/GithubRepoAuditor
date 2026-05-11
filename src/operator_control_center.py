@@ -385,6 +385,100 @@ def build_operator_snapshot(
             )
         )
 
+    # Arc F Sprint-1: surface README staleness and GHAS critical alerts from audit data.
+    ghas_lookup: dict = report_data.get("ghas_alerts") or {}
+    for audit in report_data.get("audits", []):
+        meta = audit.get("metadata", {})
+        repo_name = meta.get("name", "")
+        details_map = {
+            r["dimension"]: r.get("details", {}) for r in audit.get("analyzer_results", [])
+        }
+        # README stale → Needs Attention Now
+        readme_details = details_map.get("readme", {})
+        if readme_details.get("readme_stale") is True:
+            queue.append(
+                _queue_item(
+                    item_id=f"arc-f:readme-stale:{repo_name}",
+                    kind="review",
+                    lane="urgent",
+                    priority=55,
+                    repo=repo_name,
+                    title=f"{repo_name}: README is stale",
+                    summary=(
+                        f"README last touched {readme_details.get('readme_last_touched_days', '?')} days ago "
+                        f"vs code last touched {readme_details.get('code_last_touched_days', '?')} days ago "
+                        f"(ratio {readme_details.get('readme_staleness_ratio', '?'):.1f}x)."
+                        if isinstance(readme_details.get("readme_staleness_ratio"), (int, float))
+                        else "README has not been updated to reflect recent code activity."
+                    ),
+                    recommended_action="Update the README to reflect the current state of the project.",
+                    source_run_id=review_summary.get("source_run_id", ""),
+                    age_reference=age_reference,
+                    links=[{"label": "Open Repo", "url": meta.get("html_url", "")}]
+                    if meta.get("html_url")
+                    else [],
+                )
+            )
+        # GHAS critical counts → Blocked (any critical Dependabot, CodeQL, or open Secret scanning)
+        ghas_entry = ghas_lookup.get(repo_name, {})
+        if ghas_entry:
+            dep_critical = ghas_entry.get("dependabot", {}).get("critical", 0) or 0
+            cs_critical = ghas_entry.get("code_scanning", {}).get("critical", 0) or 0
+            ss_open = ghas_entry.get("secret_scanning", {}).get("open", 0) or 0
+            if (
+                (ghas_entry.get("dependabot", {}).get("available") and dep_critical >= 1)
+                or (ghas_entry.get("code_scanning", {}).get("available") and cs_critical >= 1)
+                or (ghas_entry.get("secret_scanning", {}).get("available") and ss_open >= 1)
+            ):
+                parts = []
+                if dep_critical:
+                    parts.append(f"{dep_critical} Dependabot critical")
+                if cs_critical:
+                    parts.append(f"{cs_critical} CodeQL critical")
+                if ss_open:
+                    parts.append(f"{ss_open} secret-scanning open")
+                queue.append(
+                    _queue_item(
+                        item_id=f"arc-f:ghas-critical:{repo_name}",
+                        kind="review",
+                        lane="blocked",
+                        priority=88,
+                        repo=repo_name,
+                        title=f"{repo_name}: critical GHAS alerts",
+                        summary=f"Open security alerts: {', '.join(parts)}.",
+                        recommended_action="Resolve or dismiss critical GHAS alerts before shipping.",
+                        source_run_id=review_summary.get("source_run_id", ""),
+                        age_reference=age_reference,
+                        links=[{"label": "Open Repo", "url": meta.get("html_url", "")}]
+                        if meta.get("html_url")
+                        else [],
+                    )
+                )
+        # OSSF Scorecard low score → flag in operator brief (no lane change)
+        ossf = audit.get("ossf_scorecard", {})
+        if (
+            ossf.get("available")
+            and isinstance(ossf.get("score"), (int, float))
+            and ossf["score"] < 5.0
+        ):
+            queue.append(
+                _queue_item(
+                    item_id=f"arc-f:ossf-low:{repo_name}",
+                    kind="review",
+                    lane="ready",
+                    priority=40,
+                    repo=repo_name,
+                    title=f"{repo_name}: low OSSF Scorecard ({ossf['score']:.1f}/10)",
+                    summary=f"OSSF Scorecard score {ossf['score']:.1f}/10 is below the 5.0 threshold.",
+                    recommended_action="Review OSSF Scorecard checks and improve the weakest controls.",
+                    source_run_id=review_summary.get("source_run_id", ""),
+                    age_reference=age_reference,
+                    links=[{"label": "Open Repo", "url": meta.get("html_url", "")}]
+                    if meta.get("html_url")
+                    else [],
+                )
+            )
+
     queue = _dedupe_queue(queue)
     queue.sort(
         key=lambda item: (

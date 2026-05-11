@@ -74,9 +74,7 @@ def build_repo_detail_sheet_content(
         if existing_selection in repo_names
         else (repo_names[0] if repo_names else "")
     )
-    validation_formula = (
-        f"=Data_RepoDetail!$A$2:$A${len(repo_names) + 1}" if repo_names else None
-    )
+    validation_formula = f"=Data_RepoDetail!$A$2:$A${len(repo_names) + 1}" if repo_names else None
     return {
         "default_repo": default_repo,
         "validation_formula": validation_formula,
@@ -150,7 +148,9 @@ def build_repo_detail_sheet_content(
 
 def write_repo_detail_summary_rows(ws, summary_rows, *, style_data_cell, subheader_font) -> None:
     for item in summary_rows:
-        ws.cell(row=item["row"], column=item["label_col"], value=item["label"]).font = subheader_font
+        ws.cell(
+            row=item["row"], column=item["label_col"], value=item["label"]
+        ).font = subheader_font
         style_data_cell(
             ws.cell(row=item["row"], column=item["value_col"], value=item["formula"]),
             "left",
@@ -546,6 +546,31 @@ def build_repo_detail_sheet(
         style_data_cell=style_data_cell,
         subheader_font=subheader_font,
     )
+
+    # Arc F Sprint-1 signals section (columns 71-78 in Data_RepoDetail)
+    ws["A34"] = "Arc F Signals"
+    ws["A34"].font = section_font
+    arc_f_rows = [
+        ("README Stale", 71, "—"),
+        ("Staleness Ratio", 72, "—"),
+        ("README Last Touched (days)", 73, "—"),
+        ("Code Last Touched (days)", 74, "—"),
+        ("Has Any Release", 75, "No"),
+        ("Latest Release Age (days)", 76, "—"),
+        ("OSSF Score", 77, "—"),
+        ("OSSF Top Failing Checks", 78, "—"),
+    ]
+    for row_offset, (label, col_idx, fallback) in enumerate(arc_f_rows, 1):
+        row = 34 + row_offset
+        ws.cell(row=row, column=1, value=label).font = subheader_font
+        style_data_cell(
+            ws.cell(
+                row=row,
+                column=2,
+                value=repo_detail_lookup_formula(col_idx, fallback, allow_blank=True),
+            ),
+            "left",
+        )
 
     nav_row = populate_repo_detail_handoff_section(ws, style_data_cell, subheader_font)
     auto_width(ws, 8, nav_row)
