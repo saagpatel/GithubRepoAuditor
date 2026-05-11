@@ -117,7 +117,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "username",
-        help="GitHub username to audit",
+        nargs="?",
+        default=None,
+        help="GitHub username to audit (omit when using --serve)",
     )
     parser.add_argument(
         "--token",
@@ -4677,6 +4679,15 @@ def main() -> None:
     setattr(args, "_preflight_summary", {})
     if not getattr(args, "approval_reviewer", None):
         args.approval_reviewer = default_approval_reviewer()
+
+    if getattr(args, "serve", False):
+        _run_serve_mode(args)
+        return
+
+    if args.username is None:
+        parser.error(
+            "the following arguments are required: username (omit only when using --serve)"
+        )
 
     mode_state = validate_cli_mode_args(args, parser.error)
     portfolio_truth_mode = mode_state.portfolio_truth_mode
