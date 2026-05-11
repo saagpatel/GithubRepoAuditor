@@ -1,6 +1,13 @@
 # Product Modes
 
-GitHub Repo Auditor now works best when you think about it as one operating system with four product modes. The flags stay the same underneath; this guide is the shared map for the docs, CLI help, workbook, HTML, Markdown, review-pack, and scheduled-handoff wording.
+GitHub Repo Auditor now works best when you think about it as one operating system with
+four product modes. The flags stay the same underneath; this guide is the shared map for
+the docs, CLI help, workbook, HTML, Markdown, review-pack, and scheduled-handoff wording.
+
+As of Arc F Sprint 4.3 the CLI has four subcommands (`run`, `triage`, `report`, `serve`).
+Examples below show the subcommand form first. The flat form (`audit <user> --flag`) still
+works and shows a deprecation warning. See [docs/audit-cli-migration.md](audit-cli-migration.md)
+for the full mapping.
 
 ## First Run
 
@@ -9,9 +16,9 @@ Use this mode when you are setting the system up or coming back after a long gap
 Recommended path:
 
 ```bash
-audit <github-username> --doctor
-audit <github-username> --html
-audit <github-username> --control-center
+audit run <github-username> --doctor
+audit run <github-username> --html
+audit triage <github-username> --control-center
 ```
 
 Goal:
@@ -26,18 +33,14 @@ Use this mode for the normal ongoing operator loop.
 Recommended path:
 
 ```bash
-audit <github-username> --html
-audit <github-username> --control-center
+audit run <github-username> --html
+audit triage <github-username> --control-center
 ```
 
 Goal:
 - refresh the portfolio story
 - read the workbook in order
 - decide what needs attention now versus what can safely wait
-- optionally add `--narrative-provider anthropic` or `--narrative-provider github-models` to generate an AI narrative summary; pair with `--narrative-model <name>` to override the default model
-- optionally add `--ghas-alerts` to pull open Dependabot, CodeQL, and Secret-scanning counts; also triggered automatically when `--vuln-check` is set
-- optionally add `--ossf-scorecard` to enrich repos with pre-computed OSSF Scorecard scores; low-score repos are flagged in the operator brief automatically
-- optionally add `--fetch-mode async --fetch-workers 10` for accelerated triage on large portfolios (~9.7x speedup); default is `--fetch-mode sync` which preserves existing behavior
 
 Visible weekly surfaces now share one compact weekly-story contract:
 - one headline
@@ -80,8 +83,8 @@ Use this mode only after the local workbook and control-center story is already 
 Typical flags:
 
 ```bash
-audit <github-username> --campaign <name> --writeback-target github
-audit <github-username> --campaign <name> --writeback-target all --github-projects
+audit report <github-username> --campaign <name> --writeback-target github
+audit report <github-username> --campaign <name> --writeback-target all --github-projects
 ```
 
 Goal:
@@ -200,7 +203,119 @@ Each section should answer the same three questions quickly:
 
 ## Default guidance
 
-- `--doctor` is the recommended first step.
+- `audit run <user> --doctor` is the recommended first step.
 - `--excel-mode standard` is the default and recommended workbook path.
-- `--control-center` is the read-only daily operator entrypoint.
+- `audit triage <user> --control-center` is the read-only daily operator entrypoint.
 - `template` workbook mode, scorecards config, catalog config, campaigns, writeback, GitHub Projects, and Notion sync are advanced workflows.
+
+---
+
+## Subcommand flag reference
+
+The four subcommands group flags by workflow. All subcommands accept the shared globals
+`--token`, `--output-dir`, `--config`, and `--verbose`.
+
+### audit run
+
+Fetch, clone, analyze, and score all repos for the given username.
+
+```
+audit run <username> [flags]
+```
+
+Key flags:
+
+| Flag | Description |
+|------|-------------|
+| `--repos REPO [REPO ...]` | Targeted mode — re-audit only these repos |
+| `--incremental` | Re-audit only repos with new pushes since last run |
+| `--html` | Generate interactive HTML dashboard |
+| `--briefing` | Generate structured weekly operator briefing |
+| `--narrative` | Generate AI portfolio narrative |
+| `--fetch-mode {sync,async}` | Per-repo enrichment strategy (default: sync) |
+| `--analysis-workers N` | Parallel analysis workers (default: 1) |
+| `--no-cache` | Bypass API response cache |
+| `--reindex` | Rebuild portfolio semantic index after audit |
+| `--embedder {voyage,local}` | Embedder backend for `--reindex` |
+| `--scoring-profile NAME` | Custom scoring profile |
+| `--watch` | Re-run audit on interval |
+| `--skip-forks` | Exclude forked repos |
+| `--skip-archived` | Exclude archived repos |
+| `--graphql` | Use GraphQL API for faster bulk fetch |
+| `--badges` | Generate Shields.io badge files |
+| `--pdf` | Generate PDF audit report |
+| `--vuln-check` | Query OSV.dev for known vulnerabilities |
+| `--doctor` | Run setup diagnostics only (no audit) |
+| `--resume` | Resume a partial audit run |
+
+### audit triage
+
+Inspect control-center, approval queues, acknowledgments, and semantic search.
+
+```
+audit triage <username> [flags]
+```
+
+Key flags:
+
+| Flag | Description |
+|------|-------------|
+| `--control-center` | Show latest operator state (read-only) |
+| `--approval-center` | Show latest approval workflow state |
+| `--triage-view {all,urgent,ready,blocked,deferred}` | Filter control-center output |
+| `--approval-view {all,ready,approved,needs-reapproval,blocked,applied}` | Filter approval output |
+| `--semantic-search QUERY` | Semantic search against portfolio index |
+| `--ask QUERY` | Alias for `--semantic-search` |
+| `--auto-apply-approved` | Apply approved packets for repos passing trust bar |
+| `--dry-run` | Preview without making changes |
+| `--approve-governance` | Capture a governance approval |
+| `--approve-packet` | Capture a campaign approval |
+| `--review-governance` | Capture a governance follow-up review |
+| `--review-packet` | Capture a campaign follow-up review |
+| `--reset-prefs` | Clear operator suppression hints |
+| `--acknowledge-target REPO` | Repo to acknowledge in review queue |
+| `--acknowledge-kind KIND` | Change type to acknowledge |
+
+### audit report
+
+Portfolio truth, Excel workbooks, campaigns, writebacks, and context recovery.
+
+```
+audit report <username> [flags]
+```
+
+Key flags:
+
+| Flag | Description |
+|------|-------------|
+| `--portfolio-truth` | Generate canonical portfolio truth snapshot |
+| `--portfolio-context-recovery` | Build active/recent weak-context recovery plan |
+| `--apply-context-recovery` | Apply eligible context recovery updates |
+| `--excel-mode {template,standard}` | Workbook style (default: standard) |
+| `--campaign NAME` | Build a managed campaign view |
+| `--writeback-target {github,notion,all}` | External system to receive writeback |
+| `--writeback-apply` | Execute live writeback (not preview) |
+| `--github-projects` | Mirror campaign actions into GitHub Projects v2 |
+| `--campaign-sync-mode {reconcile,append-only,close-missing}` | Record strategy |
+| `--diff PREVIOUS_REPORT` | Compare against a previous report |
+| `--notion-sync` | Push audit events to Notion API |
+| `--collection NAME` | Filter outputs to a named collection |
+| `--portfolio-profile NAME` | Custom portfolio profile |
+
+### audit serve
+
+Serve portfolio artefacts via a local FastAPI + HTMX web UI.
+Requires the `[serve]` extra (`pip install -e '.[serve]'`).
+See [docs/audit-serve.md](audit-serve.md) for the full operator guide.
+
+```
+audit serve [flags]
+```
+
+Key flags:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--port PORT` | `8080` | Port to listen on |
+| `--host HOST` | `127.0.0.1` | Interface to bind |
+| `--output-dir DIR` | `./output` | Directory where audit output lives |

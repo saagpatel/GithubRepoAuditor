@@ -110,3 +110,71 @@ The following survivors are confirmed equivalent mutants — behavioral tests ca
 | **Combined** | **354** | **328** | **25** | **92.9%** |
 
 (1 timeout excluded from denominator; 1 suspicious counted as killed)
+
+## Distribution Gate (scope: PyPI + shiv binary)
+
+Run before any public release tag. Requires the `[build]` extra:
+
+```bash
+pip install -e '.[build]'   # installs shiv, build, twine
+```
+
+### Steps
+
+```bash
+make build        # python -m build → dist/*.whl + dist/*.tar.gz
+make dist-check   # python -m twine check dist/*  (must be clean)
+make shiv         # builds dist/audit.pyz via shiv
+```
+
+Verify the shiv binary boots:
+
+```bash
+./dist/audit.pyz --help
+```
+
+Expected: help text printed, exit 0. Any import error or missing-extra warning is a
+blocking failure.
+
+### Gate criteria
+
+All three must pass before tagging:
+
+1. `make build` exits 0 with a `.whl` and `.tar.gz` present in `dist/`.
+2. `python -m twine check dist/*` reports no errors or warnings.
+3. `./dist/audit.pyz --help` exits 0 and prints the CLI help text.
+
+### Notes
+
+- The GitHub Actions `release.yml` workflow runs these same steps on every `v*` tag
+  and uploads all three artifacts to the GitHub Release.
+- TWINE upload to PyPI is manual-only (run `scripts/release.sh`); CI only checks and
+  uploads to GitHub Releases.
+- The `[serve]` extra is not bundled in the shiv binary by default. Users who need the
+  web UI should install via `uv tool install 'githubrepoauditor[serve]'`.
+
+## Web UI Gate (scope: audit serve)
+
+Run when any change touches `src/serve/` or `tests/test_serve.py`.
+
+### Steps
+
+```bash
+python3 -m pytest tests/test_serve.py -q -p no:cacheprovider
+```
+
+The test file covers:
+
+- Route smoke tests: all 5 routes (`/`, `/repos/{name}`, `/runs`, `/approvals`,
+  `/runs/new`) return 200 or the expected status code.
+- 404 for an unknown repo name at `/repos/{name}`.
+- 422 / rejection for disallowed flags in `POST /runs/new`.
+- Shell-metacharacter injection strings rejected by `validate_flags`.
+- SSE happy-path: `/runs/new/stream/{run_id}` yields output lines.
+- Runner unit tests: `spawn_run` and `validate_flags` behave correctly.
+- CLI flag wiring: `audit serve --port` and `--host` propagate to `run_serve`.
+
+### Gate criteria
+
+All tests in `tests/test_serve.py` must pass. Any injection-rejection test failure is a
+blocking issue — do not ship a serve release with a failing injection test.
