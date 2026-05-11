@@ -150,16 +150,16 @@ def _apply_acknowledgment_filter(data: dict, output_dir: Path) -> None:
     ]
     if len(filtered_changes) == len(raw_changes):
         return
-    acknowledged_repos = {
-        change.get("repo_name")
-        for change in raw_changes
-        if is_change_acknowledged(change, acknowledgments)
+    raw_repos = {change.get("repo_name") for change in raw_changes if change.get("repo_name")}
+    remaining_repos = {
+        change.get("repo_name") for change in filtered_changes if change.get("repo_name")
     }
+    fully_acknowledged_repos = raw_repos - remaining_repos
     data["material_changes"] = filtered_changes
     data["review_targets"] = [
         target
         for target in data.get("review_targets") or []
-        if target.get("repo") not in acknowledged_repos
+        if target.get("repo") not in fully_acknowledged_repos
     ]
     if not filtered_changes and "review_summary" in data:
         summary = dict(data["review_summary"])

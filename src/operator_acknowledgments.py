@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -67,7 +68,7 @@ def directional_signature(change: dict) -> dict:
     if change_type == "score-delta":
         delta = details.get("delta", 0.0)
         return {"delta_sign": _sign(delta)}
-    return {}
+    return {"details_fingerprint": _details_fingerprint(details)}
 
 
 def _sign(value: float) -> int:
@@ -76,6 +77,18 @@ def _sign(value: float) -> int:
     if value < 0:
         return -1
     return 0
+
+
+def _details_fingerprint(details: dict) -> str:
+    """Stable fingerprint over a change's details for unhandled change kinds.
+
+    Acks for kinds without an explicit directional signature (hotspot-change,
+    campaign-drift, governance-drift, rollback-exposure) only suppress the
+    change when its details are byte-identical to when acknowledged. Any
+    change to the underlying payload re-surfaces the item.
+    """
+    payload = json.dumps(details, sort_keys=True, default=str).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()[:16]
 
 
 def is_change_acknowledged(change: dict, acknowledgments: list[dict]) -> bool:

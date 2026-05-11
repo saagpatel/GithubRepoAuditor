@@ -8276,3 +8276,92 @@ def test_operator_snapshot_includes_action_sync_readiness_and_queue_handoff(tmp_
         "auto-apply-safe",
     }
     assert "Automation Guidance:" in repo_item["automation_line"]
+
+
+def _ack_change(change_key: str) -> dict:
+    return {
+        "change_key": change_key,
+        "change_type": "lens-delta",
+        "repo_name": "RepoA",
+        "title": "ack",
+        "signature": {"lens": "security_posture", "delta_sign": 1},
+        "acknowledged_at": "2026-05-11T00:00:00+00:00",
+        "reviewer": "alice",
+        "note": "reviewed",
+    }
+
+
+def test_acknowledgment_filter_keeps_review_target_when_repo_has_remaining_changes(
+    tmp_path: Path,
+):
+    import json
+
+    acks = {
+        "version": 1,
+        "username": "tester",
+        "acknowledgments": [_ack_change("acked-key")],
+    }
+    (tmp_path / "operator-acknowledgments-tester.json").write_text(json.dumps(acks))
+
+    data = {
+        "username": "tester",
+        "material_changes": [
+            {
+                "change_key": "acked-key",
+                "change_type": "lens-delta",
+                "repo_name": "RepoA",
+                "title": "ack",
+                "details": {"lens": "security_posture", "delta": 0.1},
+            },
+            {
+                "change_key": "still-open",
+                "change_type": "hotspot-change",
+                "repo_name": "RepoA",
+                "title": "RepoA has a new or worsened hotspot",
+                "details": {"new_primary": "src/x.py"},
+            },
+        ],
+        "review_targets": [{"repo": "RepoA", "reason": "needs review"}],
+        "review_summary": {"safe_to_defer": False, "material_change_count": 2},
+    }
+
+    operator_control_center._apply_acknowledgment_filter(data, tmp_path)
+
+    assert [c["change_key"] for c in data["material_changes"]] == ["still-open"]
+    assert [t["repo"] for t in data["review_targets"]] == ["RepoA"]
+
+
+def test_acknowledgment_filter_drops_review_target_when_repo_fully_acknowledged(
+    tmp_path: Path,
+):
+    import json
+
+    acks = {
+        "version": 1,
+        "username": "tester",
+        "acknowledgments": [_ack_change("acked-key")],
+    }
+    (tmp_path / "operator-acknowledgments-tester.json").write_text(json.dumps(acks))
+
+    data = {
+        "username": "tester",
+        "material_changes": [
+            {
+                "change_key": "acked-key",
+                "change_type": "lens-delta",
+                "repo_name": "RepoA",
+                "title": "ack",
+                "details": {"lens": "security_posture", "delta": 0.1},
+            }
+        ],
+        "review_targets": [
+            {"repo": "RepoA", "reason": "needs review"},
+            {"repo": "RepoB", "reason": "unrelated"},
+        ],
+        "review_summary": {"safe_to_defer": False, "material_change_count": 1},
+    }
+
+    operator_control_center._apply_acknowledgment_filter(data, tmp_path)
+
+    assert data["material_changes"] == []
+    assert [t["repo"] for t in data["review_targets"]] == ["RepoB"]

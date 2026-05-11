@@ -102,9 +102,48 @@ def test_directional_signature_lens_delta_falls_back_to_lens_deltas_map():
     }
 
 
-def test_directional_signature_unknown_type_returns_empty():
+def test_directional_signature_unknown_type_returns_details_fingerprint():
     change = _make_change(change_type="campaign-drift", details={"foo": "bar"})
-    assert directional_signature(change) == {}
+    sig = directional_signature(change)
+    assert set(sig.keys()) == {"details_fingerprint"}
+    assert isinstance(sig["details_fingerprint"], str)
+    assert len(sig["details_fingerprint"]) == 16
+
+
+def test_directional_signature_unknown_type_fingerprint_changes_with_details():
+    a = _make_change(change_type="hotspot-change", details={"new_primary": "x", "new_count": 1})
+    b = _make_change(change_type="hotspot-change", details={"new_primary": "y", "new_count": 1})
+    assert directional_signature(a) != directional_signature(b)
+
+
+def test_is_change_acknowledged_rejects_hotspot_with_changed_details():
+    original = _make_change(
+        change_type="hotspot-change",
+        details={"new_primary": "src/a.py", "new_count": 1, "old_count": 0},
+    )
+    ack = build_acknowledgment_record(original, reviewer="alice", note="reviewed")
+
+    new_hotspot = _make_change(
+        change_type="hotspot-change",
+        details={"new_primary": "src/b.py", "new_count": 2, "old_count": 0},
+    )
+
+    assert is_change_acknowledged(new_hotspot, [ack]) is False
+
+
+def test_is_change_acknowledged_matches_hotspot_with_identical_details():
+    original = _make_change(
+        change_type="hotspot-change",
+        details={"new_primary": "src/a.py", "new_count": 1, "old_count": 0},
+    )
+    ack = build_acknowledgment_record(original, reviewer="alice", note="reviewed")
+
+    repeat = _make_change(
+        change_type="hotspot-change",
+        details={"new_primary": "src/a.py", "new_count": 1, "old_count": 0},
+    )
+
+    assert is_change_acknowledged(repeat, [ack]) is True
 
 
 def test_is_change_acknowledged_matches_same_signature():

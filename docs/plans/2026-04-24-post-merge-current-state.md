@@ -137,7 +137,7 @@ Recommended maintainability pass:
 - Sibling-key suppression: a single security posture movement emits both a `security-change` and a `lens-delta` for `security_posture` with distinct `change_key`s; acknowledging either now also captures a paired ack for the sibling, so one CLI invocation clears one logical event.
 - Incidental fix: `src/recurring_review._change` for lens-delta had `details={"lens": ..., "delta": lens_delta, **item}` where the spread clobbered `delta` with the parent's overall-score delta; reordering restores per-lens values. Signature derivation also falls back through `details.lens_deltas[lens]` so reports generated before the fix can still be acknowledged.
 - Live verification: the residual GithubRepoAuditor lens-change item from the post-PR-#155/#156 healthy state was successfully acknowledged and dropped from the ready queue.
-- Shipped via PR #157 (initial flag) and the follow-up PR for sibling-key suppression.
+- Shipped via PR #157 (initial flag), PR #158 (sibling-key suppression), and a defensive-defaults follow-up that addresses the two Codex review comments left on PR #157: `directional_signature` now returns a stable details fingerprint for unhandled change kinds (hotspot-change, campaign-drift, governance-drift, rollback-exposure) instead of `{}`, so acknowledging one no longer silently suppresses materially different later events; `_apply_acknowledgment_filter` now keeps `review_targets` for repos that still have unacknowledged material_changes, only dropping targets when every change for the repo has been acknowledged.
 
 ## Follow-Ups
 
