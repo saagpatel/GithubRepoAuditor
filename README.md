@@ -133,15 +133,46 @@ Treat campaign/writeback, GitHub Projects, Notion sync, catalog overrides, score
 
 ### Installation
 
+**Recommended (isolated tool environment):**
+
+```bash
+uv tool install github-repo-auditor
+```
+
+**Alternative with pipx:**
+
+```bash
+pipx install github-repo-auditor
+```
+
+**No Python install required — portable single-file binary:**
+
+Download `audit.pyz` from the [latest GitHub Release](https://github.com/saagpatel/GithubRepoAuditor/releases/latest):
+
+```bash
+curl -LO https://github.com/saagpatel/GithubRepoAuditor/releases/latest/download/audit.pyz
+chmod +x audit.pyz
+./audit.pyz --help
+```
+
+The `.pyz` archive is a self-contained [shiv](https://shiv.readthedocs.io/) zipapp. It includes all base dependencies and runs on any Python 3.11+ system without a separate installation step.
+
+**Optional extras** (add after `[`):
+
+| Extra | Adds |
+|---|---|
+| `[serve]` | `audit serve` local web UI (FastAPI + HTMX) |
+| `[semantic]` | Portfolio semantic search index |
+
+```bash
+uv tool install "github-repo-auditor[serve]"
+```
+
+**Development install (from source):**
+
 ```bash
 git clone https://github.com/saagpatel/GithubRepoAuditor.git
 cd GithubRepoAuditor
-python3 -m pip install -e ".[config]"
-```
-
-For contributor or local-dev work:
-
-```bash
 python3 -m pip install -e ".[dev,config]"
 ```
 

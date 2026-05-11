@@ -1,4 +1,4 @@
-.PHONY: install install-dev doctor audit control-center demo benchmark workbook-gate workbook-signoff test lint format type-check run clean release-gate
+.PHONY: install install-dev doctor audit control-center demo benchmark workbook-gate workbook-signoff test lint format type-check run clean release-gate build shiv dist-check release
 
 PYTHON := python3
 USERNAME ?= saagpatel
@@ -68,5 +68,27 @@ print(f'Kill rate: {rate:.1%}'); \
 exit(0 if rate >= 0.85 else 1)"
 
 clean:
-	rm -rf .pytest_cache __pycache__ dist build *.egg-info
+	rm -rf .pytest_cache __pycache__ dist build *.egg-info src/*.egg-info
 	find . -type d -name __pycache__ -exec rm -rf {} +
+
+# ── Distribution targets ────────────────────────────────────────────────────
+
+build:
+	@echo "=== Building wheel + sdist ==="
+	$(PYTHON) -m build
+	@echo "=== Build complete: dist/ ==="
+
+dist-check:
+	@echo "=== Running twine check ==="
+	$(PYTHON) -m twine check dist/*
+
+shiv:
+	@echo "=== Building shiv single-file binary ==="
+	@command -v shiv >/dev/null 2>&1 || { echo "shiv not installed — run: pip install shiv"; exit 1; }
+	@mkdir -p dist
+	shiv -c audit -o dist/audit.pyz . --python "/usr/bin/env python3"
+	@echo "=== dist/audit.pyz ready. Test: ./dist/audit.pyz --help ==="
+
+release: build dist-check
+	@echo "=== Uploading to PyPI via scripts/release.sh ==="
+	bash scripts/release.sh
