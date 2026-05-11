@@ -350,6 +350,25 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--fetch-mode",
+        choices=["sync", "async"],
+        default="sync",
+        help=(
+            "Per-repo enrichment fetch strategy.  'sync' (default) uses the existing "
+            "sequential requests path.  'async' enables the httpx-based parallel fetcher "
+            "which pre-fetches all enrichment endpoints concurrently before analysis."
+        ),
+    )
+    parser.add_argument(
+        "--fetch-workers",
+        type=int,
+        default=10,
+        help=(
+            "Max concurrent in-flight HTTP requests for the async enrichment fetcher "
+            "(only used when --fetch-mode async is set).  Default: 10."
+        ),
+    )
+    parser.add_argument(
         "--campaign",
         choices=[
             "security-review",
@@ -2967,6 +2986,35 @@ def _analyze_repos(
             scorecard_enabled=args.scorecard,
             security_offline=args.security_offline,
         )
+
+    # ── Optional async enrichment prefetch ───────────────────────────────────
+    _fetch_mode: str = getattr(args, "fetch_mode", "sync")
+    if _fetch_mode == "async" and repos:
+        from src.github_client_async import fetch_enrichment_sync as _async_prefetch
+
+        _fetch_workers: int = max(1, getattr(args, "fetch_workers", 10))
+        print_info(
+            f"Pre-fetching enrichment for {len(repos)} repos "
+            f"(async, concurrency={_fetch_workers})..."
+        )
+        _prefetch_start = perf_counter()
+        try:
+            _repo_pairs = [(r.full_name.split("/")[0], r.name) for r in repos if "/" in r.full_name]
+            _async_prefetch(
+                _repo_pairs,
+                token=client.token,
+                max_concurrency=_fetch_workers,
+                cache=client.cache,
+            )
+            _prefetch_elapsed = perf_counter() - _prefetch_start
+            print_info(f"Async enrichment prefetch complete in {_prefetch_elapsed:.1f}s.")
+            if runtime_stats is not None:
+                runtime_stats["async_prefetch_seconds"] = round(_prefetch_elapsed, 3)
+        except Exception as _prefetch_err:
+            print_warning(
+                f"Async enrichment prefetch failed ({_prefetch_err!r}); "
+                "falling back to per-repo sync fetch."
+            )
 
     clone_start = perf_counter()
     with clone_workspace(

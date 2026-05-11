@@ -18,6 +18,7 @@ dependencies = [
     "rich>=13.0",
     "anthropic>=0.40.0",
     "fpdf2>=2.7.0",
+    "httpx>=0.27",
 ]
 
 [project.optional-dependencies]
