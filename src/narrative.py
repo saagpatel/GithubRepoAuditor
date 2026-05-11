@@ -7,7 +7,10 @@ import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from src.llm_cost import CostTracker
 
 # Allow override via env var for testing / proxies
 GITHUB_MODELS_BASE_URL = os.environ.get(
@@ -32,7 +35,15 @@ class AnthropicProvider:
     def __init__(self, api_key: str) -> None:
         self._api_key = api_key
 
-    def generate(self, prompt: str, model: str, max_tokens: int) -> str:
+    def generate(
+        self,
+        prompt: str,
+        model: str,
+        max_tokens: int,
+        *,
+        cost_tracker: CostTracker | None = None,
+        feature: str = "narrative",
+    ) -> str:
         import anthropic
 
         client = anthropic.Anthropic(api_key=self._api_key)
@@ -41,6 +52,15 @@ class AnthropicProvider:
             max_tokens=max_tokens,
             messages=[{"role": "user", "content": prompt}],
         )
+        if cost_tracker is not None:
+            usage = message.usage
+            cost_tracker.record_call(
+                provider="anthropic",
+                model=model,
+                input_tokens=usage.input_tokens,
+                output_tokens=usage.output_tokens,
+                feature=feature,
+            )
         return message.content[0].text
 
 
@@ -51,7 +71,15 @@ class GitHubModelsProvider:
     def __init__(self, github_token: str) -> None:
         self._github_token = github_token
 
-    def generate(self, prompt: str, model: str, max_tokens: int) -> str:
+    def generate(
+        self,
+        prompt: str,
+        model: str,
+        max_tokens: int,
+        *,
+        cost_tracker: CostTracker | None = None,
+        feature: str = "narrative",
+    ) -> str:
         import requests
 
         url = f"{GITHUB_MODELS_BASE_URL}/chat/completions"
@@ -78,6 +106,15 @@ class GitHubModelsProvider:
 
         response.raise_for_status()
         data = response.json()
+        if cost_tracker is not None:
+            usage = data.get("usage", {})
+            cost_tracker.record_call(
+                provider="github-models",
+                model=model,
+                input_tokens=usage.get("prompt_tokens", 0),
+                output_tokens=usage.get("completion_tokens", 0),
+                feature=feature,
+            )
         return data["choices"][0]["message"]["content"]
 
 
@@ -166,6 +203,7 @@ def generate_narrative(
     provider_name: str | None = None,
     model: str | None = None,
     github_token: str | None = None,
+    cost_tracker: CostTracker | None = None,
 ) -> dict:
     """Generate AI narrative. Returns {narrative_path} or {skipped, reason}."""
     try:
@@ -186,7 +224,9 @@ def generate_narrative(
     )
 
     try:
-        narrative_text = provider.generate(prompt, resolved_model, max_tokens=1024)
+        narrative_text = provider.generate(
+            prompt, resolved_model, max_tokens=1024, cost_tracker=cost_tracker, feature="narrative"
+        )
     except PermissionError as exc:
         print(f"  Narrative generation failed: {exc}", file=sys.stderr)
         return {"skipped": True, "reason": str(exc)}

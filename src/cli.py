@@ -500,6 +500,18 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--max-llm-spend",
+        type=float,
+        default=None,
+        metavar="USD",
+        dest="max_llm_spend",
+        help=(
+            "Halt run if total LLM API spend would exceed this USD threshold. "
+            "Default disabled. Telemetry is always written to output/run-telemetry.jsonl "
+            "when --narrative or --briefing is used."
+        ),
+    )
+    parser.add_argument(
         "--config",
         default=None,
         help="Path to audit-config.yaml (default: ./audit-config.yaml if exists)",
@@ -4085,28 +4097,56 @@ def _write_report_outputs(
         ossf_path.write_text(json.dumps(ossf_data, indent=2, default=str))
         print_info(f"OSSF Scorecard report: {ossf_path}")
 
+    # ── LLM cost tracking ────────────────────────────────────────────────────
+    _uses_llm = args.narrative or getattr(args, "briefing", False)
+    _cost_tracker = None
+    if _uses_llm:
+        from src.llm_cost import BudgetExceededError, CostTracker
+
+        _cost_tracker = CostTracker(
+            budget_usd=getattr(args, "max_llm_spend", None),
+            output_path=output_dir,
+        )
+
     if args.narrative:
         from src.narrative import generate_narrative
 
-        generate_narrative(
-            report_data,
-            output_dir,
-            provider_name=args.narrative_provider,
-            model=args.narrative_model,
-            github_token=args.token,
-        )
+        try:
+            generate_narrative(
+                report_data,
+                output_dir,
+                provider_name=args.narrative_provider,
+                model=args.narrative_model,
+                github_token=args.token,
+                cost_tracker=_cost_tracker,
+            )
+        except BudgetExceededError as exc:
+            print(f"\nERROR: {exc}", file=sys.stderr)
+            if _cost_tracker is not None:
+                _cost_tracker.write_telemetry()
+            sys.exit(1)
 
     if getattr(args, "briefing", False):
         from src.briefing import generate_briefing
 
-        generate_briefing(
-            report_data,
-            output_dir,
-            provider_name=args.narrative_provider,
-            model=args.narrative_model,
-            github_token=args.token,
-            write_voice=getattr(args, "briefing_voice", False),
-        )
+        try:
+            generate_briefing(
+                report_data,
+                output_dir,
+                provider_name=args.narrative_provider,
+                model=args.narrative_model,
+                github_token=args.token,
+                write_voice=getattr(args, "briefing_voice", False),
+                cost_tracker=_cost_tracker,
+            )
+        except BudgetExceededError as exc:
+            print(f"\nERROR: {exc}", file=sys.stderr)
+            if _cost_tracker is not None:
+                _cost_tracker.write_telemetry()
+            sys.exit(1)
+
+    if _cost_tracker is not None:
+        _cost_tracker.write_telemetry()
 
     cache_info = ""
     if cache:

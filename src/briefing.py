@@ -9,8 +9,12 @@ import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from src.narrative import NarrativeProvider, _resolve_provider
+
+if TYPE_CHECKING:
+    from src.llm_cost import CostTracker
 
 logger = logging.getLogger(__name__)
 
@@ -240,6 +244,7 @@ def _build_suggestions(
     *,
     prefs: dict | None = None,
     semantic_index: object | None = None,
+    cost_tracker: CostTracker | None = None,
 ) -> tuple[list[Suggestion], list[str]]:
     """Generate one-sentence "suggested next action" for top-N repos.
 
@@ -331,7 +336,9 @@ def _build_suggestions(
     )
 
     try:
-        raw = provider.generate(prompt, model, max_tokens=150)
+        raw = provider.generate(
+            prompt, model, max_tokens=150, cost_tracker=cost_tracker, feature="briefing-suggestion"
+        )
     except Exception as exc:
         logger.warning("briefing suggestion LLM call failed: %s", exc)
         return [], suppressed_names
@@ -382,6 +389,7 @@ def build_briefing(
     model: str = _ANTHROPIC_BRIEFING_MODEL,
     prefs: dict | None = None,
     semantic_index: object | None = None,
+    cost_tracker: CostTracker | None = None,
 ) -> Briefing:
     """Build a structured weekly operator briefing from audit data.
 
@@ -391,12 +399,20 @@ def build_briefing(
     Pass *semantic_index* (a :class:`~src.semantic_index.SemanticIndex` instance)
     to enrich the LLM suggestion prompt with cross-repo "related repos" context.
     If ``None``, behaviour is identical to S3.2 (no enrichment, backward compat).
+
+    Pass *cost_tracker* (a :class:`~src.llm_cost.CostTracker` instance) to record
+    LLM spend and enforce an optional budget cap.
     """
     shipped = _build_shipped(audits)
     needs_attention = _build_needs_attention(audits)
     health_delta = _build_health_delta(audits, use_history=use_history)
     suggestions, suppressed_by_prefs = _build_suggestions(
-        audits, provider, model, prefs=prefs, semantic_index=semantic_index
+        audits,
+        provider,
+        model,
+        prefs=prefs,
+        semantic_index=semantic_index,
+        cost_tracker=cost_tracker,
     )
 
     return Briefing(
@@ -593,6 +609,7 @@ def generate_briefing(
     github_token: str | None = None,
     write_voice: bool = False,
     semantic_index: object | None = None,
+    cost_tracker: CostTracker | None = None,
 ) -> dict:
     """
     Generate the weekly operator briefing.
@@ -601,6 +618,9 @@ def generate_briefing(
     Pass *semantic_index* (a :class:`~src.semantic_index.SemanticIndex` instance) to
     enrich suggestion prompts with cross-repo related-repos context.  Defaults to ``None``
     (backward-compatible, no enrichment).
+
+    Pass *cost_tracker* (a :class:`~src.llm_cost.CostTracker` instance) to record
+    LLM spend and enforce an optional budget cap.
     """
     audits: list[dict] = report_data.get("audits", [])
     username = report_data.get("username", "unknown")
@@ -652,6 +672,7 @@ def generate_briefing(
         model=resolved_model,
         prefs=prefs or None,
         semantic_index=semantic_index,
+        cost_tracker=cost_tracker,
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)
