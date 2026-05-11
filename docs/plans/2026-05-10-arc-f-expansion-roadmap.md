@@ -65,10 +65,10 @@ Status legend: ✅ in Arc F sprints · 📋 Arc F backlog · ⏸ deferred (with 
 
 | # | Feature | Status | Sprint |
 |---|---|---|---|
-| 2.1 | Portfolio semantic index (`--semantic-search`, `--ask`) | ✅ | S3.1 |
-| 2.2 | Weekly Operator Briefing (`--briefing`) | ✅ | S3.2 |
-| 2.3 | Operator preference memory | ✅ | S3.3 |
-| 2.4 | Cross-repo duplication detector | 📋 | post-S3 (built on 2.1) |
+| 2.1 | Portfolio semantic index (`--semantic-search`, `--ask`) | ✅ Shipped | `44839de` (S3.1) |
+| 2.2 | Weekly Operator Briefing (`--briefing`) | ✅ Shipped | `0438428` (S3.2) |
+| 2.3 | Operator preference memory | ✅ Shipped | `e0fec52` (S3.3) |
+| 2.4 | Cross-repo duplication detector | ✅ Shipped | `03dc2bc` (S3.4) |
 | 2.5 | Agentic README/description authoring (`--draft-readmes`) | 📋 | post-S4 |
 | 2.6 | Planner agent for campaign authoring (`--plan-campaign`) | 📋 | post-S4 |
 | 2.7 | Eval-driven scoring tuning (`--tune-scoring-profile`) | 📋 | post-S4 |
@@ -464,3 +464,36 @@ These are documented and scoped — they just don't fit the 90-day window. They 
 **Branch state:** `feat/arc-f-expansion-roadmap`, 18 commits ahead of `main`. 1285 tests pass. Ruff clean. Not pushed.
 
 **Next:** Sprint 3 begins with **S3.1 — Portfolio semantic index** (sqlite-vec + voyage-code-3 embeddings), then S3.2 (Weekly Operator Briefing), S3.3 (Operator preference memory), S3.4 (semantic index integrations — duplication detector + briefing enrichment), S3.5 (LLM spend cost guard).
+
+### Sprint 3 closeout (2026-05-11)
+
+**Shipped (all 5 items):**
+
+- **S3.1 — Portfolio semantic index.** New `src/semantic_index.py` (433 lines). `voyage-code-3` default embedder (512-dim, cosine distance), `sentence-transformers/all-MiniLM-L6-v2` local fallback (384-dim). `sqlite-vec` virtual table `repo_embeddings` + metadata table in the warehouse. `--reindex`, `--reindex-force`, `--semantic-search`, `--ask`, `--embedder {voyage,local}` flags. Reindex skips unchanged docs via `doc_sha256` comparison. `[semantic]` optional extra in `pyproject.toml`. +32 tests. Commit `44839de`.
+- **S3.2 — Weekly Operator Briefing.** New `src/briefing.py` (586 lines). Sections: shipped-this-week, needs-attention (top-5 by gap heuristic), portfolio health delta (warehouse-historical), suggested next action (Haiku-equivalent LLM, 1 sentence per top-3 repos). Voice-readable plain-text variant. Reuses S1.2's narrative provider strategy. `--briefing` mutually exclusive with `--narrative`; `--briefing-voice` for TTS file. +31 tests. Commit `0438428`.
+- **S3.3 — Operator preference memory.** New `src/operator_prefs.py` (365 lines) + `output/operator_prefs.json` schema. Detects 3+ consecutive rejections of `(action_type, target_context)` and writes auto suppression hints. `manual: true` entries are preserved across runs. Atomic tmp+rename writes. `--reset-prefs` flag. Briefing's suggestion generator consults prefs and records `suppressed_by_prefs` for observability. +12 tests. Commit `e0fec52`.
+- **S3.4 — Semantic index integrations.** Two cheap wins atop S3.1: (a) `find_neighbors(repo_name, k)` and `find_duplicate_groups(threshold=0.85)` on `SemanticIndex` with union-find transitive closure. Control-center adds duplicate-group lane entries (`lane: ready`, `priority: 35`). (b) Briefing's suggestion prompt now includes `related_repos` context for cross-repo aware suggestions. Both integrations degrade gracefully when no index exists. `SEMANTIC_DUPLICATE_THRESHOLD` env override. +13 tests. Commit `03dc2bc`.
+- **S3.5 — LLM spend cost guard.** New `src/llm_cost.py` (253 lines) with `CostTracker`, `BudgetExceededError`, per-model PRICES table (7 models documented, conservative `_UNKNOWN_PRICE` fallback). Wired into both `AnthropicProvider` and `GitHubModelsProvider` — each `generate()` records token usage automatically. `--max-llm-spend USD` flag halts the run if budget would be exceeded. Per-call records append to `output/run-telemetry.jsonl`. +14 tests. Commit `e661829`.
+
+**Sprint 3 success-bar grading:**
+
+- Portfolio semantic index queryable via `--ask`: ✅ shipped.
+- Briefing replaces narrative as the structured weekly output: ✅ shipped.
+- Suggestions no longer repeat what the operator has rejected: ✅ shipped via prefs.
+- Duplicate groups surface in control-center: ✅ shipped.
+- LLM spend is observable and budget-gateable: ✅ shipped.
+
+**Lessons:**
+
+1. **Subagent worktree branch lineage is brittle when worktrees are run in parallel and dispatched against a moving branch tip.** S3.1 and S3.5's commits ended up on different ancestor lines than expected (one auto-landed via the worktree merge, the other needed a manual cherry-pick). Detection: always run `git log --oneline -3` after each cherry-pick attempt to confirm what's on HEAD before claiming "shipped".
+2. **Pricing tables for external APIs are maintenance debt.** S3.5's `PRICES` dict will go stale; the conservative `_UNKNOWN_PRICE` fallback (over-estimates cost) ensures stale data fails closed, not open. Worth a quarterly review reminder.
+3. **Provider Protocol signature drift matters for subclass tests.** S3.2 set `generate(self, prompt, model, **kwargs)` while the Protocol said `generate(self, prompt, model, max_tokens)`. Mypy caught it post-hoc. Future Protocol changes should ripple-update the provider classes in the same commit.
+
+**Plan housekeeping:**
+
+- Inventory rows 2.1, 2.2, 2.3, 2.4 flipped to "✅ Shipped @ \<SHA\>".
+- S3.5 (LLM cost guard) was not in the original inventory — appears in this closeout as a sprint-level addition. Add a row to Theme 2 in the next plan revision if Arc F continues.
+
+**Branch state:** `feat/arc-f-expansion-roadmap`, 27 commits ahead of `main`. 1388 tests pass. Ruff clean. Not pushed.
+
+**Next:** **Sprint 4 — UI + distribution + CLI restructure.** S4.1 (`audit serve` FastAPI + HTMX), S4.2 (PyPI + shiv binary), S4.3 (CLI subcommand restructure `audit run/triage/report`), S4.4 (docs refresh), S4.5 (Arc F closeout). The semantic index + briefing + cost guard from Sprint 3 are now the inputs to the live web UI's most important views.
