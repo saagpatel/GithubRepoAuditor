@@ -457,10 +457,26 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Generate archive candidate report for consistently low-scoring repos",
     )
-    parser.add_argument(
+    # ── Narrative / briefing (mutually exclusive) ─────────────────────────────
+    narrative_or_briefing = parser.add_mutually_exclusive_group()
+    narrative_or_briefing.add_argument(
         "--narrative",
         action="store_true",
         help="Generate AI portfolio narrative (requires ANTHROPIC_API_KEY or GitHub token with models: read scope)",
+    )
+    narrative_or_briefing.add_argument(
+        "--briefing",
+        action="store_true",
+        help=(
+            "Generate a structured weekly operator briefing (Markdown + optional voice-readable). "
+            "Includes: shipped-this-week, needs-attention top-5, portfolio health delta, "
+            "and LLM-authored one-liner suggestions for top-3 repos."
+        ),
+    )
+    parser.add_argument(
+        "--briefing-voice",
+        action="store_true",
+        help="When used with --briefing, also write a voice-readable plain-text variant (.voice.txt).",
     )
     parser.add_argument(
         "--narrative-provider",
@@ -469,7 +485,8 @@ def build_parser() -> argparse.ArgumentParser:
         dest="narrative_provider",
         help=(
             "Narrative inference provider. Defaults to 'anthropic' when ANTHROPIC_API_KEY is set, "
-            "'github-models' when a GitHub token is available, otherwise skipped."
+            "'github-models' when a GitHub token is available, otherwise skipped. "
+            "Also used by --briefing for LLM suggestions."
         ),
     )
     parser.add_argument(
@@ -478,7 +495,8 @@ def build_parser() -> argparse.ArgumentParser:
         dest="narrative_model",
         help=(
             "Model name for narrative generation. "
-            "Defaults: claude-sonnet-4-6 (anthropic), gpt-4o-mini (github-models)."
+            "Defaults: claude-sonnet-4-6 (anthropic), gpt-4o-mini (github-models). "
+            "For --briefing, defaults to claude-haiku-4-5 / gpt-4o-mini (cheaper)."
         ),
     )
     parser.add_argument(
@@ -4046,6 +4064,18 @@ def _write_report_outputs(
             provider_name=args.narrative_provider,
             model=args.narrative_model,
             github_token=args.token,
+        )
+
+    if getattr(args, "briefing", False):
+        from src.briefing import generate_briefing
+
+        generate_briefing(
+            report_data,
+            output_dir,
+            provider_name=args.narrative_provider,
+            model=args.narrative_model,
+            github_token=args.token,
+            write_voice=getattr(args, "briefing_voice", False),
         )
 
     cache_info = ""

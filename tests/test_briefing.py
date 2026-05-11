@@ -1,0 +1,384 @@
+"""Tests for the weekly operator briefing module (Arc F S3.2)."""
+
+from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from src.briefing import (
+    Briefing,
+    NeedsAttentionRepo,
+    ScoreMover,
+    ShippedRepo,
+    Suggestion,
+    _build_health_delta,
+    _parse_suggestions_json,
+    build_briefing,
+    generate_briefing,
+    render_markdown,
+    render_voice,
+)
+
+# ── Factories ─────────────────────────────────────────────────────────────────
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _days_ago_iso(days: int) -> str:
+    return (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+
+
+def _make_audit(
+    name: str = "TestRepo",
+    language: str = "Python",
+    overall_score: float = 0.5,
+    pushed_days_ago: int = 10,
+    automation_eligible: bool = False,
+    days_since_push_override: int | None = None,
+) -> dict:
+    pushed_at = _days_ago_iso(pushed_days_ago)
+    days_since = (
+        days_since_push_override if days_since_push_override is not None else pushed_days_ago
+    )
+    return {
+        "metadata": {
+            "name": name,
+            "language": language,
+            "pushed_at": pushed_at,
+        },
+        "overall_score": overall_score,
+        "analyzer_results": [
+            {
+                "dimension": "activity",
+                "score": 0.4,
+                "max_score": 1.0,
+                "findings": [],
+                "details": {"days_since_push": days_since, "archived": False},
+            }
+        ],
+        "portfolio_catalog": {
+            "automation_eligible": automation_eligible,
+        },
+        "hotspots": [{"title": "Add README", "severity": "high"}],
+    }
+
+
+def _make_report(audits: list[dict] | None = None, username: str = "testuser") -> dict:
+    return {
+        "username": username,
+        "generated_at": "2026-05-11T12:00:00Z",
+        "audits": audits or [],
+    }
+
+
+# ── Build briefing — happy path ───────────────────────────────────────────────
+
+
+class TestBuildBriefingHappyPath:
+    def test_shipped_section_populated(self):
+        audits = [
+            _make_audit("RepoA", pushed_days_ago=2, overall_score=0.7),
+            _make_audit("RepoB", pushed_days_ago=10, overall_score=0.3),
+        ]
+        briefing = build_briefing(audits, "user", "2026-05-11", use_history=False)
+        names = [r.name for r in briefing.shipped_this_week]
+        assert "RepoA" in names
+        assert "RepoB" not in names  # 10 days > 7-day window
+
+    def test_needs_attention_populated(self):
+        audits = [
+            _make_audit("LowScore", overall_score=0.1, pushed_days_ago=200),
+            _make_audit("HighScore", overall_score=0.95, pushed_days_ago=1),
+        ]
+        briefing = build_briefing(audits, "user", "2026-05-11", use_history=False)
+        assert len(briefing.needs_attention) >= 1
+        top = briefing.needs_attention[0]
+        assert top.name == "LowScore"
+
+    def test_health_delta_empty_without_history(self):
+        audits = [_make_audit("RepoA")]
+        briefing = build_briefing(audits, "user", "2026-05-11", use_history=False)
+        assert briefing.health_delta == {"up": [], "down": []}
+
+    def test_suggestions_empty_without_provider(self):
+        audits = [_make_audit("RepoA")]
+        briefing = build_briefing(audits, "user", "2026-05-11", use_history=False, provider=None)
+        assert briefing.suggestions == []
+
+    def test_automation_status_eligible(self):
+        audits = [_make_audit("AutoRepo", pushed_days_ago=1, automation_eligible=True)]
+        briefing = build_briefing(audits, "user", "2026-05-11", use_history=False)
+        assert briefing.shipped_this_week[0].automation_status == "eligible"
+
+    def test_automation_status_not_eligible(self):
+        audits = [_make_audit("ManualRepo", pushed_days_ago=1, automation_eligible=False)]
+        briefing = build_briefing(audits, "user", "2026-05-11", use_history=False)
+        assert briefing.shipped_this_week[0].automation_status == "not-eligible"
+
+
+# ── Empty week ────────────────────────────────────────────────────────────────
+
+
+class TestEmptyWeek:
+    def test_no_shipped_repos_when_all_old(self):
+        audits = [
+            _make_audit("OldRepo1", pushed_days_ago=30),
+            _make_audit("OldRepo2", pushed_days_ago=60),
+        ]
+        briefing = build_briefing(audits, "user", "2026-05-11", use_history=False)
+        assert briefing.shipped_this_week == []
+
+    def test_briefing_still_renders_without_shipped(self):
+        audits = [_make_audit("OldRepo", pushed_days_ago=30)]
+        briefing = build_briefing(audits, "user", "2026-05-11", use_history=False)
+        md = render_markdown(briefing)
+        assert "No commits pushed in the last 7 days" in md
+
+    def test_empty_audits_produces_valid_briefing(self):
+        briefing = build_briefing([], "user", "2026-05-11", use_history=False)
+        assert briefing.shipped_this_week == []
+        assert briefing.needs_attention == []
+        md = render_markdown(briefing)
+        assert "Weekly Operator Briefing" in md
+
+
+# ── No warehouse history ──────────────────────────────────────────────────────
+
+
+class TestNoWarehouseHistory:
+    def test_health_delta_graceful_without_history_file(self):
+        audits = [_make_audit("Repo")]
+        with patch("src.briefing._build_health_delta") as mock_delta:
+            mock_delta.return_value = {"up": [], "down": []}
+            briefing = build_briefing(audits, "user", "2026-05-11", use_history=False)
+        assert briefing.health_delta == {"up": [], "down": []}
+
+    def test_build_health_delta_returns_empty_when_use_history_false(self):
+        audits = [_make_audit("Repo")]
+        result = _build_health_delta(audits, use_history=False)
+        assert result == {"up": [], "down": []}
+
+    def test_health_delta_graceful_on_load_error(self):
+        audits = [_make_audit("Repo")]
+        with patch("src.history.load_repo_score_history", side_effect=OSError("no file")):
+            result = _build_health_delta(audits, use_history=True)
+        assert result == {"up": [], "down": []}
+
+
+# ── Markdown rendering ─────────────────────────────────────────────────────────
+
+
+class TestMarkdownRendering:
+    def _make_full_briefing(self) -> Briefing:
+        return Briefing(
+            username="alice",
+            date="2026-05-11",
+            shipped_this_week=[
+                ShippedRepo(name="Alpha", language="Python", automation_status="eligible"),
+                ShippedRepo(name="Beta", language="TypeScript", automation_status="not-eligible"),
+            ],
+            needs_attention=[
+                NeedsAttentionRepo(
+                    name="OldRepo",
+                    overall_score=0.2,
+                    days_since_push=120,
+                    reason="low completeness",
+                )
+            ],
+            health_delta={
+                "up": [ScoreMover(name="UpRepo", old_score=0.5, new_score=0.65, delta=0.15)],
+                "down": [ScoreMover(name="DownRepo", old_score=0.8, new_score=0.7, delta=-0.1)],
+            },
+            suggestions=[
+                Suggestion(name="Alpha", action="Add unit tests to improve coverage."),
+                Suggestion(name="OldRepo", action="Update README with usage examples."),
+            ],
+        )
+
+    def test_section_headings_present(self):
+        md = render_markdown(self._make_full_briefing())
+        assert "## Shipped This Week" in md
+        assert "## Needs Attention" in md
+        assert "## Portfolio Health Delta" in md
+        assert "## Suggested Next Actions" in md
+
+    def test_table_formatting_for_shipped(self):
+        md = render_markdown(self._make_full_briefing())
+        assert "| Alpha |" in md
+        assert "| Python |" in md
+        assert "| eligible |" in md
+
+    def test_all_suggestions_present(self):
+        md = render_markdown(self._make_full_briefing())
+        assert "**Alpha**" in md
+        assert "Add unit tests" in md
+        assert "**OldRepo**" in md
+        assert "Update README" in md
+
+    def test_score_movers_in_delta_section(self):
+        md = render_markdown(self._make_full_briefing())
+        assert "UpRepo" in md
+        assert "DownRepo" in md
+        assert "+0.150" in md or "0.150" in md
+
+
+# ── Voice rendering ────────────────────────────────────────────────────────────
+
+
+class TestVoiceRendering:
+    def _make_full_briefing(self) -> Briefing:
+        return Briefing(
+            username="alice",
+            date="2026-05-11",
+            shipped_this_week=[
+                ShippedRepo(name="Alpha", language="Python", automation_status="eligible"),
+            ],
+            needs_attention=[
+                NeedsAttentionRepo(
+                    name="OldRepo",
+                    overall_score=0.2,
+                    days_since_push=120,
+                    reason="low completeness",
+                )
+            ],
+            health_delta={
+                "up": [ScoreMover(name="UpRepo", old_score=0.5, new_score=0.65, delta=0.15)],
+                "down": [],
+            },
+            suggestions=[
+                Suggestion(name="Alpha", action="Add unit tests."),
+            ],
+        )
+
+    def test_no_markdown_tables(self):
+        voice = render_voice(self._make_full_briefing())
+        assert "|" not in voice
+
+    def test_no_markdown_headers(self):
+        voice = render_voice(self._make_full_briefing())
+        assert "##" not in voice
+        assert "**" not in voice
+
+    def test_paragraph_structure_with_blank_lines(self):
+        voice = render_voice(self._make_full_briefing())
+        paragraphs = [p for p in voice.split("\n\n") if p.strip()]
+        assert len(paragraphs) >= 4  # header + 4 sections
+
+    def test_content_all_sections_present(self):
+        voice = render_voice(self._make_full_briefing())
+        assert "Shipped this week" in voice
+        assert "Needs attention" in voice
+        assert "Portfolio health delta" in voice
+        assert "Suggested next actions" in voice
+
+    def test_no_pipe_chars_anywhere(self):
+        voice = render_voice(self._make_full_briefing())
+        assert "|" not in voice
+
+
+# ── LLM provider failure ──────────────────────────────────────────────────────
+
+
+class TestLLMProviderFailure:
+    def test_provider_exception_yields_empty_suggestions(self):
+        mock_provider = MagicMock()
+        mock_provider.generate.side_effect = RuntimeError("provider down")
+
+        audits = [_make_audit("RepoA", overall_score=0.2)]
+        briefing = build_briefing(
+            audits,
+            "user",
+            "2026-05-11",
+            use_history=False,
+            provider=mock_provider,
+        )
+        assert briefing.suggestions == []
+
+    def test_provider_exception_does_not_raise(self):
+        mock_provider = MagicMock()
+        mock_provider.generate.side_effect = ConnectionError("timeout")
+
+        audits = [_make_audit("RepoA", overall_score=0.1)]
+        # Should not raise
+        briefing = build_briefing(
+            audits, "user", "2026-05-11", use_history=False, provider=mock_provider
+        )
+        assert isinstance(briefing, Briefing)
+
+
+# ── LLM JSON parse failure ────────────────────────────────────────────────────
+
+
+class TestLLMJsonParseFail:
+    def _top_repos(self) -> list[dict]:
+        return [_make_audit("RepoA"), _make_audit("RepoB")]
+
+    def test_non_json_returns_empty(self):
+        result = _parse_suggestions_json("Sure, I cannot provide that.", self._top_repos())
+        assert result == []
+
+    def test_partial_json_uses_regex_fallback(self):
+        raw = 'Here are my suggestions: ["Add CI pipeline", "Write tests"]'
+        result = _parse_suggestions_json(raw, self._top_repos())
+        assert len(result) == 2
+        assert result[0].name == "RepoA"
+        assert "CI" in result[0].action
+
+    def test_valid_json_array_parsed_correctly(self):
+        raw = '["Improve docs", "Fix security issue"]'
+        result = _parse_suggestions_json(raw, self._top_repos())
+        assert result[0].action == "Improve docs"
+        assert result[1].action == "Fix security issue"
+
+    def test_provider_returns_non_json_no_crash(self):
+        mock_provider = MagicMock()
+        mock_provider.generate.return_value = "I think you should work on documentation."
+
+        audits = [_make_audit("RepoA", overall_score=0.1)]
+        briefing = build_briefing(
+            audits, "user", "2026-05-11", use_history=False, provider=mock_provider
+        )
+        # Regex fallback may or may not extract something; either way no crash
+        assert isinstance(briefing.suggestions, list)
+
+
+# ── CLI integration ────────────────────────────────────────────────────────────
+
+
+class TestCLIIntegration:
+    def test_briefing_writes_markdown_file(self, tmp_path):
+        report = _make_report([_make_audit("Repo1", pushed_days_ago=2)])
+        with patch("src.briefing._resolve_provider", return_value=None):
+            result = generate_briefing(report, tmp_path, write_voice=False)
+        assert "briefing_path" in result
+        md_path = result["briefing_path"]
+        assert md_path.exists()
+        assert "Weekly Operator Briefing" in md_path.read_text()
+
+    def test_briefing_voice_flag_writes_both_files(self, tmp_path):
+        report = _make_report([_make_audit("Repo1", pushed_days_ago=2)])
+        with patch("src.briefing._resolve_provider", return_value=None):
+            result = generate_briefing(report, tmp_path, write_voice=True)
+        assert "briefing_path" in result
+        assert "voice_path" in result
+        assert result["voice_path"].exists()
+        assert "|" not in result["voice_path"].read_text()
+
+    def test_briefing_uses_output_dir_from_report(self, tmp_path):
+        report = _make_report()
+        subdir = tmp_path / "output"
+        with patch("src.briefing._resolve_provider", return_value=None):
+            result = generate_briefing(report, subdir, write_voice=False)
+        assert result["briefing_path"].parent == subdir
+
+    def test_mutually_exclusive_narrative_and_briefing(self):
+        """argparse rejects --narrative together with --briefing."""
+        from src.cli import build_parser
+
+        parser = build_parser()
+        with pytest.raises(SystemExit):
+            parser.parse_args(["testuser", "--narrative", "--briefing"])
