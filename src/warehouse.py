@@ -567,6 +567,20 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             summary TEXT NOT NULL,
             PRIMARY KEY (run_id, repo_id)
         );
+
+        CREATE TABLE IF NOT EXISTS analyzer_cache (
+            repo_name        TEXT NOT NULL,
+            commit_sha       TEXT NOT NULL,
+            analyzer_name    TEXT NOT NULL,
+            inputs_hash      TEXT NOT NULL,
+            result_json      TEXT NOT NULL,
+            computed_at      TEXT NOT NULL,
+            schema_version   INTEGER NOT NULL DEFAULT 1,
+            PRIMARY KEY (repo_name, commit_sha, analyzer_name, inputs_hash)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_analyzer_cache_repo_sha
+            ON analyzer_cache (repo_name, commit_sha);
         """
     )
     conn.execute(
@@ -601,16 +615,34 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     )
     _ensure_column(conn, "audit_runs", "scorecards_summary_json", "TEXT NOT NULL DEFAULT '{}'")
     _ensure_column(conn, "audit_runs", "scorecard_programs_json", "TEXT NOT NULL DEFAULT '{}'")
-    _ensure_column(conn, "audit_runs", "portfolio_outcomes_summary_json", "TEXT NOT NULL DEFAULT '{}'")
-    _ensure_column(conn, "audit_runs", "operator_effectiveness_summary_json", "TEXT NOT NULL DEFAULT '{}'")
-    _ensure_column(conn, "audit_runs", "decision_quality_summary_json", "TEXT NOT NULL DEFAULT '{}'")
-    _ensure_column(conn, "audit_runs", "high_pressure_queue_history_json", "TEXT NOT NULL DEFAULT '[]'")
-    _ensure_column(conn, "audit_runs", "action_sync_outcomes_summary_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(
+        conn, "audit_runs", "portfolio_outcomes_summary_json", "TEXT NOT NULL DEFAULT '{}'"
+    )
+    _ensure_column(
+        conn, "audit_runs", "operator_effectiveness_summary_json", "TEXT NOT NULL DEFAULT '{}'"
+    )
+    _ensure_column(
+        conn, "audit_runs", "decision_quality_summary_json", "TEXT NOT NULL DEFAULT '{}'"
+    )
+    _ensure_column(
+        conn, "audit_runs", "high_pressure_queue_history_json", "TEXT NOT NULL DEFAULT '[]'"
+    )
+    _ensure_column(
+        conn, "audit_runs", "action_sync_outcomes_summary_json", "TEXT NOT NULL DEFAULT '{}'"
+    )
     _ensure_column(conn, "audit_runs", "campaign_tuning_summary_json", "TEXT NOT NULL DEFAULT '{}'")
-    _ensure_column(conn, "audit_runs", "historical_portfolio_intelligence_json", "TEXT NOT NULL DEFAULT '{}'")
-    _ensure_column(conn, "audit_runs", "automation_guidance_summary_json", "TEXT NOT NULL DEFAULT '{}'")
-    _ensure_column(conn, "audit_runs", "approval_workflow_summary_json", "TEXT NOT NULL DEFAULT '{}'")
-    _ensure_column(conn, "audit_runs", "implementation_hotspots_summary_json", "TEXT NOT NULL DEFAULT '{}'")
+    _ensure_column(
+        conn, "audit_runs", "historical_portfolio_intelligence_json", "TEXT NOT NULL DEFAULT '{}'"
+    )
+    _ensure_column(
+        conn, "audit_runs", "automation_guidance_summary_json", "TEXT NOT NULL DEFAULT '{}'"
+    )
+    _ensure_column(
+        conn, "audit_runs", "approval_workflow_summary_json", "TEXT NOT NULL DEFAULT '{}'"
+    )
+    _ensure_column(
+        conn, "audit_runs", "implementation_hotspots_summary_json", "TEXT NOT NULL DEFAULT '{}'"
+    )
     _ensure_column(
         conn, "portfolio_catalog_entries", "maturity_program", "TEXT NOT NULL DEFAULT ''"
     )
@@ -1712,7 +1744,10 @@ def save_approval_record(output_dir: Path, record: dict) -> None:
                 json.dumps(record),
             ),
         )
-        if record.get("approval_subject_type") == "governance" and record.get("subject_key") == "all":
+        if (
+            record.get("approval_subject_type") == "governance"
+            and record.get("subject_key") == "all"
+        ):
             conn.execute(
                 """
                 INSERT OR REPLACE INTO governance_approvals (
@@ -1734,8 +1769,12 @@ def save_approval_record(output_dir: Path, record: dict) -> None:
                             "approved_at": record.get("approved_at", ""),
                             "scope": record.get("subject_key", "all"),
                             "fingerprint": record.get("fingerprint", ""),
-                            "action_count": int((record.get("details_json") or {}).get("action_count", 0) or 0),
-                            "applyable_count": int((record.get("details_json") or {}).get("applyable_count", 0) or 0),
+                            "action_count": int(
+                                (record.get("details_json") or {}).get("action_count", 0) or 0
+                            ),
+                            "applyable_count": int(
+                                (record.get("details_json") or {}).get("applyable_count", 0) or 0
+                            ),
                             "status": "approved",
                             "approved_by": record.get("approved_by", ""),
                             "approval_note": record.get("approval_note", ""),
@@ -2093,8 +2132,10 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
         if not decision_quality_summary:
             from src import operator_decision_quality as _operator_decision_quality
 
-            decision_quality_summary = _operator_decision_quality.historical_decision_quality_from_summary(
-                operator_summary
+            decision_quality_summary = (
+                _operator_decision_quality.historical_decision_quality_from_summary(
+                    operator_summary
+                )
             )
         results.append(
             {
@@ -2118,16 +2159,32 @@ def load_latest_audit_runs(output_dir: Path, username: str, limit: int = 20) -> 
                 ),
                 "scorecards_summary": json.loads(row["scorecards_summary_json"] or "{}"),
                 "scorecard_programs": json.loads(row["scorecard_programs_json"] or "{}"),
-                "portfolio_outcomes_summary": json.loads(row["portfolio_outcomes_summary_json"] or "{}"),
-                "operator_effectiveness_summary": json.loads(row["operator_effectiveness_summary_json"] or "{}"),
+                "portfolio_outcomes_summary": json.loads(
+                    row["portfolio_outcomes_summary_json"] or "{}"
+                ),
+                "operator_effectiveness_summary": json.loads(
+                    row["operator_effectiveness_summary_json"] or "{}"
+                ),
                 "decision_quality_summary": decision_quality_summary,
-                "high_pressure_queue_history": json.loads(row["high_pressure_queue_history_json"] or "[]"),
-                "campaign_outcomes_summary": json.loads(row["action_sync_outcomes_summary_json"] or "{}"),
+                "high_pressure_queue_history": json.loads(
+                    row["high_pressure_queue_history_json"] or "[]"
+                ),
+                "campaign_outcomes_summary": json.loads(
+                    row["action_sync_outcomes_summary_json"] or "{}"
+                ),
                 "campaign_tuning_summary": json.loads(row["campaign_tuning_summary_json"] or "{}"),
-                "automation_guidance_summary": json.loads(row["automation_guidance_summary_json"] or "{}"),
-                "approval_workflow_summary": json.loads(row["approval_workflow_summary_json"] or "{}"),
-                "intervention_ledger_summary": json.loads(row["historical_portfolio_intelligence_json"] or "{}"),
-                "implementation_hotspots_summary": json.loads(row["implementation_hotspots_summary_json"] or "{}"),
+                "automation_guidance_summary": json.loads(
+                    row["automation_guidance_summary_json"] or "{}"
+                ),
+                "approval_workflow_summary": json.loads(
+                    row["approval_workflow_summary_json"] or "{}"
+                ),
+                "intervention_ledger_summary": json.loads(
+                    row["historical_portfolio_intelligence_json"] or "{}"
+                ),
+                "implementation_hotspots_summary": json.loads(
+                    row["implementation_hotspots_summary_json"] or "{}"
+                ),
                 "campaign_summary": json.loads(row["campaign_summary_json"] or "{}"),
                 "writeback_preview": json.loads(row["writeback_preview_json"] or "{}"),
                 "writeback_results": json.loads(row["writeback_results_json"] or "{}"),
@@ -2338,7 +2395,9 @@ def load_recent_action_runs(output_dir: Path, username: str, limit: int = 400) -
     return [dict(row) for row in rows]
 
 
-def load_recent_campaign_drift_events(output_dir: Path, username: str, limit: int = 200) -> list[dict]:
+def load_recent_campaign_drift_events(
+    output_dir: Path, username: str, limit: int = 200
+) -> list[dict]:
     conn = _connect(output_dir)
     if conn is None:
         return []
@@ -2547,7 +2606,9 @@ def load_recent_repo_scorecards(output_dir: Path, username: str, limit: int = 20
     return [dict(row) for row in rows]
 
 
-def load_recent_implementation_hotspots(output_dir: Path, username: str, limit: int = 400) -> list[dict]:
+def load_recent_implementation_hotspots(
+    output_dir: Path, username: str, limit: int = 400
+) -> list[dict]:
     conn = _connect(output_dir)
     if conn is None:
         return []
@@ -2676,8 +2737,8 @@ def load_latest_operator_state(output_dir: Path, username: str) -> dict | None:
     if not decision_quality_summary:
         from src import operator_decision_quality as _operator_decision_quality
 
-        decision_quality_summary = _operator_decision_quality.historical_decision_quality_from_summary(
-            operator_summary
+        decision_quality_summary = (
+            _operator_decision_quality.historical_decision_quality_from_summary(operator_summary)
         )
     return {
         "run_id": row["run_id"],
@@ -2693,15 +2754,21 @@ def load_latest_operator_state(output_dir: Path, username: str) -> dict | None:
         "scorecards_summary": json.loads(row["scorecards_summary_json"] or "{}"),
         "scorecard_programs": json.loads(row["scorecard_programs_json"] or "{}"),
         "portfolio_outcomes_summary": json.loads(row["portfolio_outcomes_summary_json"] or "{}"),
-        "operator_effectiveness_summary": json.loads(row["operator_effectiveness_summary_json"] or "{}"),
+        "operator_effectiveness_summary": json.loads(
+            row["operator_effectiveness_summary_json"] or "{}"
+        ),
         "decision_quality_summary": decision_quality_summary,
         "high_pressure_queue_history": json.loads(row["high_pressure_queue_history_json"] or "[]"),
         "campaign_outcomes_summary": json.loads(row["action_sync_outcomes_summary_json"] or "{}"),
         "campaign_tuning_summary": json.loads(row["campaign_tuning_summary_json"] or "{}"),
         "automation_guidance_summary": json.loads(row["automation_guidance_summary_json"] or "{}"),
         "approval_workflow_summary": json.loads(row["approval_workflow_summary_json"] or "{}"),
-        "intervention_ledger_summary": json.loads(row["historical_portfolio_intelligence_json"] or "{}"),
-        "implementation_hotspots_summary": json.loads(row["implementation_hotspots_summary_json"] or "{}"),
+        "intervention_ledger_summary": json.loads(
+            row["historical_portfolio_intelligence_json"] or "{}"
+        ),
+        "implementation_hotspots_summary": json.loads(
+            row["implementation_hotspots_summary_json"] or "{}"
+        ),
         "review_summary": json.loads(row["review_summary_json"] or "{}"),
         "review_alerts": json.loads(row["review_alerts_json"] or "[]"),
         "material_changes": json.loads(row["material_changes_json"] or "[]"),

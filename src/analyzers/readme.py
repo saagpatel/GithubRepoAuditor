@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 import subprocess
@@ -15,8 +16,16 @@ README_NAMES = ("README.md", "README", "README.rst", "readme.md", "Readme.md")
 
 # Source-code extensions used for staleness comparison.
 _CODE_GLOBS = (
-    "*.py", "*.ts", "*.tsx", "*.js", "*.jsx",
-    "*.swift", "*.rs", "*.go", "*.java", "*.kt",
+    "*.py",
+    "*.ts",
+    "*.tsx",
+    "*.js",
+    "*.jsx",
+    "*.swift",
+    "*.rs",
+    "*.go",
+    "*.java",
+    "*.kt",
 )
 
 SETUP_HEADINGS = re.compile(
@@ -28,6 +37,45 @@ SETUP_HEADINGS = re.compile(
 class ReadmeAnalyzer(BaseAnalyzer):
     name = "readme"
     weight = 0.15
+
+    def cache_inputs_hash(
+        self,
+        repo_path: Path | None,
+        metadata: RepoMetadata,
+    ) -> str | None:
+        """Hash README bytes + git last-touched timestamps for README and code files.
+
+        The staleness calculation inside analyze() depends on these timestamps, so
+        including them in the hash ensures we recompute when the commit history
+        changes even if the file bytes did not.
+        """
+        if repo_path is None:
+            return None
+        readme_path = None
+        for name in README_NAMES:
+            candidate = repo_path / name
+            if candidate.is_file():
+                readme_path = candidate
+                break
+        if readme_path is None:
+            # No README — sentinel so identical "no README" results can be cached.
+            h = hashlib.sha256(b"no-readme")
+            h.update(b"\x00")
+            return h.hexdigest()
+        try:
+            readme_bytes = readme_path.read_bytes()
+        except OSError:
+            return None
+        readme_ts = _git_last_touched_unix(repo_path, readme_path.name)
+        code_ts = _git_last_touched_unix(repo_path, *_CODE_GLOBS)
+        h = hashlib.sha256()
+        h.update(readme_bytes)
+        h.update(b"\x00")
+        h.update(str(readme_ts).encode())
+        h.update(b"\x00")
+        h.update(str(code_ts).encode())
+        h.update(b"\x00")
+        return h.hexdigest()
 
     def analyze(
         self,
@@ -132,7 +180,11 @@ def _git_last_touched_unix(repo_path: Path, *pathspecs: str) -> int | None:
     matching commits exist.
     """
     cmd = [
-        "git", "log", "-1", "--format=%ct", "--",
+        "git",
+        "log",
+        "-1",
+        "--format=%ct",
+        "--",
         *pathspecs,
     ]
     try:

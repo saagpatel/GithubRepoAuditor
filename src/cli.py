@@ -211,6 +211,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Bypass API response cache",
     )
     parser.add_argument(
+        "--no-analyzer-cache",
+        action="store_true",
+        help="Disable per-(repo, sha, analyzer) result cache for this run (reads and writes). "
+        "Useful for reconcile gates that need fresh analyzer output.",
+    )
+    parser.add_argument(
         "--repos",
         nargs="+",
         default=None,
@@ -2921,10 +2927,35 @@ def _analyze_repos(
 
     audits: list[RepoAudit] = []
 
+    # Open a warehouse connection for the analyzer result cache unless disabled.
+    _no_analyzer_cache: bool = getattr(args, "no_analyzer_cache", False)
+    _warehouse_conn = None
+    if not _no_analyzer_cache:
+        import sqlite3 as _sqlite3
+
+        from src.warehouse import WAREHOUSE_FILENAME
+        from src.warehouse import _ensure_schema as _warehouse_ensure_schema
+
+        _output_dir = Path(getattr(args, "output_dir", "output"))
+        _db_path = _output_dir / WAREHOUSE_FILENAME
+        try:
+            _output_dir.mkdir(parents=True, exist_ok=True)
+            _warehouse_conn = _sqlite3.connect(str(_db_path))
+            _warehouse_ensure_schema(_warehouse_conn)
+        except Exception as _cache_err:
+            print_warning(f"Could not open warehouse for analyzer cache: {_cache_err}")
+            _warehouse_conn = None
+
     def _analyze_one(repo_meta: RepoMetadata, repo_path: Path) -> RepoAudit:
         worker_client = GitHubClient(token=client.token, cache=client.cache)
+        _commit_sha = repo_meta.pushed_at.isoformat() if repo_meta.pushed_at else ""
         results = run_all_analyzers(
-            repo_path, repo_meta, worker_client, extra_analyzers=extra_analyzers
+            repo_path,
+            repo_meta,
+            worker_client,
+            extra_analyzers=extra_analyzers,
+            conn=_warehouse_conn,
+            commit_sha=_commit_sha,
         )
         return score_repo(
             repo_meta,
@@ -3025,6 +3056,11 @@ def _analyze_repos(
             runtime_stats["analyzer_seconds"] = round(perf_counter() - analyze_start, 3)
 
     print_info("Clones cleaned up")
+    if _warehouse_conn is not None:
+        try:
+            _warehouse_conn.close()
+        except Exception:
+            pass
     return audits
 
 
@@ -3790,8 +3826,7 @@ def _write_report_outputs(
         print_info(format_ghas_summary(ghas_data))
         if ghas_data:
             ghas_path = (
-                output_dir
-                / f"ghas-alerts-{report.username}-{_date_str(report.generated_at)}.json"
+                output_dir / f"ghas-alerts-{report.username}-{_date_str(report.generated_at)}.json"
             )
             ghas_path.write_text(json.dumps(ghas_data, indent=2, default=str))
             print_info(f"GHAS alerts report: {ghas_path}")

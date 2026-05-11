@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -38,6 +39,35 @@ MANIFESTS = (
 class DependenciesAnalyzer(BaseAnalyzer):
     name = "dependencies"
     weight = 0.10
+
+    def cache_inputs_hash(
+        self,
+        repo_path: Path | None,
+        metadata: RepoMetadata,
+    ) -> str | None:
+        """Hash the bytes of all present lockfiles + manifest files.
+
+        Returns None if repo_path is not available or no dependency files exist,
+        so the analyzer runs unconditionally in those cases.
+        """
+        if repo_path is None:
+            return None
+        pieces: list[bytes] = []
+        for fname in LOCKFILES + MANIFESTS:
+            fpath = repo_path / fname
+            if fpath.is_file():
+                try:
+                    pieces.append(fname.encode())
+                    pieces.append(fpath.read_bytes())
+                except OSError:
+                    pass
+        if not pieces:
+            return None
+        h = hashlib.sha256()
+        for piece in pieces:
+            h.update(piece)
+            h.update(b"\x00")
+        return h.hexdigest()
 
     def analyze(
         self,
@@ -86,6 +116,7 @@ class DependenciesAnalyzer(BaseAnalyzer):
             try:
                 from src.cache import ResponseCache
                 from src.libyears import compute_libyears
+
                 cache = ResponseCache(ttl=86400)  # 24hr for registries
                 libyears_data = compute_libyears(repo_path, found_manifests, cache)
                 details.update(libyears_data)
@@ -114,7 +145,9 @@ def _count_dependencies(repo_path: Path, manifests: list[str]) -> int | None:
             return sum(
                 1
                 for line in lines
-                if line.strip() and not line.strip().startswith("#") and not line.strip().startswith("-")
+                if line.strip()
+                and not line.strip().startswith("#")
+                and not line.strip().startswith("-")
             )
         except OSError:
             pass
