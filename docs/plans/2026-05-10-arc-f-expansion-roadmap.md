@@ -497,3 +497,73 @@ These are documented and scoped — they just don't fit the 90-day window. They 
 **Branch state:** `feat/arc-f-expansion-roadmap`, 27 commits ahead of `main`. 1388 tests pass. Ruff clean. Not pushed.
 
 **Next:** **Sprint 4 — UI + distribution + CLI restructure.** S4.1 (`audit serve` FastAPI + HTMX), S4.2 (PyPI + shiv binary), S4.3 (CLI subcommand restructure `audit run/triage/report`), S4.4 (docs refresh), S4.5 (Arc F closeout). The semantic index + briefing + cost guard from Sprint 3 are now the inputs to the live web UI's most important views.
+
+### Sprint 4 closeout (2026-05-11)
+
+**Shipped (all 5 items):**
+
+- **S4.1 — `audit serve` FastAPI + HTMX local web UI.** New `src/serve/` package (app/routes/runner/templates/static, 12 files). Routes: `/` (dashboard from `portfolio-truth-latest.json`), `/repos/{name}` (per-repo drill-down), `/runs` (warehouse-backed run browser), `/approvals` (approval queue with HTMX form actions), `/runs/new` (form + SSE-streamed stdout). HTMX 2.0.4 via CDN, Jinja2 templates, minimal hand-rolled CSS. Subprocess safety: flag allowlist + shell-metachar rejection + `subprocess.Popen([...])` list form. New `[serve]` optional extra in `pyproject.toml`. +36 tests. Commits `4da1496` (initial) + `220a6fa` (fix: make `username` positional optional so `--serve` works standalone).
+- **S4.2 — PyPI publish + shiv binary.** `Makefile` with `build`/`dist-check`/`shiv`/`release` targets. `scripts/release.sh` for manual PyPI push (reads `TWINE_API_TOKEN`, never hardcoded). `.github/workflows/release.yml` for `v*`-tagged GitHub Releases (build + shiv + upload). `dist/audit.pyz` is a 16 MB single-file zipapp executable on any Python 3.11+ system. New `[build]` optional extra (`shiv`, `build`, `twine`). README install section leads with `uv tool install` / `pipx install` / `.pyz` download. Deferred: `hatch-vcs` migration (kept setuptools static `__version__` to avoid downstream churn — flagged as future work). Commit `1316aaf`.
+- **S4.3 — CLI subcommand restructure (`audit run / triage / report / serve`).** New `build_subcommand_parser()` coexists with legacy `build_parser()`. Flag-family mapping hits the exit criteria: `run` 20 non-global flags (limit 20), `triage` 15 (limit 15), `report` 24 (limit 25). Legacy flat invocation (`audit <user> --flag`) auto-detected via GitHub username regex (`[a-zA-Z0-9][a-zA-Z0-9-]{0,38}`), rewritten to subcommand form, emits one `DeprecationWarning` per process. `audit serve` available both as subcommand and as legacy `--serve` flag (preserves S4.1 surface). All ~103 flags remain accessible. +45 tests. Commit `9ee3932`.
+- **S4.4 — Documentation refresh.** README now leads with the subcommand form, install via `uv tool install githubrepoauditor`, daily flow showing `audit serve` → browse → trigger. `docs/modes.md` gains four subcommand sub-sections with flag tables. `docs/release-gates.md` gains Distribution Gate and Web UI Gate sections (appended to existing S1.5 mutmut content). New `docs/audit-serve.md` (operator guide) and `docs/audit-cli-migration.md` (before→after flag mapping for the 8 most common invocations). Commit `93d827b`.
+- **S4.5 — This closeout.**
+
+**Sprint 4 success-bar grading:**
+
+- Operator completes a full triage cycle in the browser: ✅ shipped via S4.1 (browse latest → drill repo → approve → trigger apply run, all via `audit serve`).
+- One-command install on a fresh machine: ✅ shipped via S4.2 (`uv tool install githubrepoauditor` plus the `audit.pyz` download path).
+- `audit triage --help` fits on one screen: ✅ shipped via S4.3 (15 non-global flags).
+- README leads with `audit serve`: ✅ shipped via S4.4.
+- Trust bar still holds after async/cache/CLI restructure: ✅ confirmed via 1469 passing tests at `93d827b`; no regression in approval-ledger or auto-apply paths.
+
+**Lessons:**
+
+1. **Subagent worktree branch-base brittleness — again.** S4.4's worktree branched from `d9cf875` (a `main` ancestor, pre-Arc-F) instead of `d7423c5` (the current Arc F tip). Surfaced as: agent reported "1000 tests pass" instead of 1469, and `docs/release-gates.md` cherry-picked with a conflict because the agent's base lacked the S1.5 mutmut content. Detection signal that worked: comparing the agent's reported test count to the expected count exposed the wrong-base problem before merge. **Action for Arc G:** assert the worktree's `git merge-base HEAD feat/<branch>` equals the expected tip before letting the subagent commit, or pass `--base <SHA>` to the worktree creator.
+2. **Boot tests catch CLI wiring bugs the unit suite misses.** S4.1 shipped with `python -m src --serve` rejected because the `username` positional was still required (subagent never exercised the standalone serve path in a real subprocess — only via `TestClient`). The 5-line `curl localhost:<port>/` boot test caught it in seconds. **Action:** every new top-level CLI mode should have a one-line "process boots, route returns 200" smoke baked into the verification step.
+3. **Two-parser coexistence is a clean CLI-migration pattern.** S4.3's legacy + subcommand parser pair sidestepped the "rewrite or break tests" tradeoff entirely — the subcommand parser detects which mode the user invoked, then re-parses through the legacy parser for full flag validation. No existing tests touched. Worth remembering when a future arc needs to migrate a similarly-sized flag surface.
+
+**Plan housekeeping:**
+
+- Inventory rows 4.5, 4.6, 4.7 flipped to "✅ Shipped @ \<SHA\>".
+- S4.4 (docs refresh) and S4.5 (this closeout) are sprint-level — they appear here only, not in the table.
+
+**Branch state:** `feat/arc-f-expansion-roadmap`, 37 commits ahead of `main`. 1469 tests pass. Ruff clean. Not pushed.
+
+---
+
+## Arc F closeout (2026-05-11)
+
+Arc F shipped over four sprints, ~10 calendar days end to end, on a single feature branch (`feat/arc-f-expansion-roadmap`). 37 commits on top of `main`. 1469 tests pass at tip (up from 1285 at Arc F kickoff — +184 net new tests). Ruff clean throughout. No prod regressions; trust bar held.
+
+**Inventory tally (from the table at the top of this doc):**
+
+- 8 items shipped as planned.
+- 1 item stopped (S1.1 — xlsxwriter migration; investigation revealed architectural blocker, pivoted to S2.0 profile-first which delivered 8.1x workbook speedup via NamedStyle registration).
+- 4 sprint-level items not in inventory (S2.0, S2.4, S2.5, S3.5, S4.4, S4.5) — all shipped, captured in sprint closeouts above.
+- 0 items deferred from the original plan.
+
+**What changed for the operator:**
+
+- **A new way in:** `audit serve` puts every artifact behind a local web UI — dashboard, per-repo drill-down, run history, approval queue, run trigger with live SSE output. The daily flow is now "open the URL" rather than "remember which Markdown to grep".
+- **A new way to ask:** `audit run --briefing` produces a structured weekly briefing (shipped-this-week, needs-attention top-5, portfolio health delta, suggested next action) instead of the older free-form narrative; `audit triage --semantic-search` and `audit triage --ask` query the portfolio embedding index for cross-repo recall.
+- **A new way to trust:** the suggestion engine reads `output/operator_prefs.json` and suppresses repeated rejected suggestions; LLM spend is observable via `output/run-telemetry.jsonl` and gateable via `--max-llm-spend`.
+- **A new way to install:** `uv tool install githubrepoauditor`, `pipx install githubrepoauditor`, or the `audit.pyz` single-file binary download from GitHub Releases (no Python install required on the host).
+- **A new way to invoke:** `audit run / triage / report / serve` subcommands replace 70 flat flags. Legacy form still works (with a one-time deprecation warning per process).
+- **Faster underneath:** the per-(repo, sha, analyzer) cache (S2.2) plus the async fetch layer (S2.1) cut typical repeated-run time meaningfully (9.7x on the mock benchmark; real-world depends on cache hit rate). Workbook generation 8.1x faster (S2.0 NamedStyle fix).
+- **More signal:** Dependabot/CodeQL/Secret-scanning alerts (S1.3), SBOM via GitHub API (S2.3), OSSF Scorecard scores (S2.3), README staleness (S1.4), release-shipped signals (S1.4), all surfaced through existing analyzer and workbook paths.
+
+**Backlog status:** The 15-item post-90-day backlog in the original plan is unchanged. Three items become candidate Sprint 5 starters once Arc F merges:
+
+1. Agentic README/description authoring (`--draft-readmes`) — builds directly on S3.1 (semantic index) + S3.3 (operator preferences).
+2. Planner agent for campaign authoring (`--plan-campaign "goal"`).
+3. Tiered maturity + Initiative tracker (4-tier Cortex-style with deadline-bound initiatives).
+
+The web UI (S4.1) is now the natural extension point for any of these — they can ship UI-first rather than CLI-first.
+
+**Three durable lessons captured across the arc:**
+
+1. **External-API specs go stale; live behavior is the contract.** S2.3 found the GitHub SBOM endpoint was a single sync GET rather than the documented async polling flow. Future plans citing external APIs should mark citations as "as of \<date\>" rather than committed contract.
+2. **Module-level state keyed by `id(obj)` is unsafe across object lifetimes.** S2.0's NamedStyle bug taught us this — Python recycles `id()` after GC. Store registration markers as attributes on the object, not in module-level dicts.
+3. **Subagent worktree branch-base brittleness is a real, repeatable hazard.** It bit us in S3.1/S3.5 (cherry-pick auto-landed vs manual) and again in S4.4 (wrong base entirely). Detection signal: compare the agent's reported test count to current tip. Action for Arc G: validate `merge-base` matches expected tip before allowing subagent commit, or pass `--base <SHA>` explicitly.
+
+**Ready to merge:** `feat/arc-f-expansion-roadmap` is mergeable to `main`. 1469 tests, ruff clean, no pushed remote. Suggest squash-merge to one or a small number of feat commits per sprint, preserving the closeouts in the squashed body so the Arc F narrative survives. Or land as four sprint-merge commits (one per sprint) plus a single docs commit for the plan doc itself.
