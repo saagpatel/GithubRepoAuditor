@@ -10,11 +10,16 @@ from openpyxl.styles import Alignment, Border, Font, NamedStyle, PatternFill, Si
 from openpyxl.worksheet.hyperlink import Hyperlink
 
 # ── Named Style Registry ──────────────────────────────────────────────
-# Maps workbook id → set of registered style names.  Each workbook gets
-# its own copy of the NamedStyles on first use; subsequent calls just look
-# up the cached name string, bypassing openpyxl's per-assignment hash chain.
+# We need an idempotency marker per Workbook so we don't register the same
+# NamedStyle twice (openpyxl raises on duplicate names). We previously used
+# `dict[id(wb), ...]` but Python recycles id() values after GC, which caused
+# a freshly-allocated Workbook to inherit a stale "already registered" entry
+# from a GC'd predecessor and then fail at cell.style = "data_left".
+#
+# Storing the marker as a private attribute on the Workbook itself ties the
+# lifetime of the marker to the lifetime of the workbook — no recycling.
 
-_REGISTERED_WORKBOOKS: dict[int, set[str]] = {}
+_REGISTERED_ATTR = "_gha_named_styles_registered"
 
 # ── Color Palette ────────────────────────────────────────────────────
 
@@ -139,11 +144,8 @@ def _ensure_data_named_styles(wb) -> None:
     per-attribute IndexedList hash chain, which is the dominant CPU hotspot
     when styling tens-of-thousands of data cells (see S2.0 profile findings).
     """
-    wb_id = id(wb)
-    if wb_id in _REGISTERED_WORKBOOKS:
+    if getattr(wb, _REGISTERED_ATTR, False):
         return
-    registered: set[str] = set()
-    _REGISTERED_WORKBOOKS[wb_id] = registered
 
     _thin = Border(
         left=Side(style="thin", color=LIGHT_BORDER),
@@ -153,17 +155,21 @@ def _ensure_data_named_styles(wb) -> None:
     )
     _data_font = Font("Calibri", 11)
 
+    existing = set(wb.named_styles)
     for name, alignment in (
         ("data_left", Alignment(horizontal="left", vertical="center")),
         ("data_center", Alignment(horizontal="center", vertical="center")),
         ("data_right", Alignment(horizontal="right", vertical="center")),
     ):
+        if name in existing:
+            continue
         ns = NamedStyle(name)
         ns.font = _data_font
         ns.border = _thin
         ns.alignment = alignment
         wb.add_named_style(ns)
-        registered.add(name)
+
+    setattr(wb, _REGISTERED_ATTR, True)
 
 
 def style_data_cell(cell, align: str = "left") -> None:
