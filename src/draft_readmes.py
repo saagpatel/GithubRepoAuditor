@@ -397,3 +397,156 @@ def _packet_fingerprint(packet: DraftReadmePacket) -> str:
     """Content fingerprint for deduplication."""
     material = f"{packet.repo_name}:{packet.proposed_readme[:500]}"
     return hashlib.sha1(material.encode()).hexdigest()[:16]
+
+
+# ── Ledger readback ───────────────────────────────────────────────────────────
+
+_STALE_DAYS = 30
+
+
+def load_approved_drafts(
+    warehouse_path: Path,
+    username: str | None = None,
+) -> list[DraftReadmePacket]:
+    """Read approval records where approval_subject_type='draft-readme' AND status='approved-manual'.
+
+    Hydrates each record's details_json back into a DraftReadmePacket.
+    Skips records older than 30 days (likely stale).
+    """
+    from src.warehouse import load_approval_records
+
+    all_records = load_approval_records(warehouse_path, username or "", limit=500)
+
+    cutoff = datetime.now(timezone.utc).replace(microsecond=0)
+    packets: list[DraftReadmePacket] = []
+
+    for record in all_records:
+        if record.get("approval_subject_type") != "draft-readme":
+            continue
+        if record.get("status") != "approved-manual":
+            continue
+
+        # Staleness check — approved_at or generated_at
+        ts_str: str = str(record.get("approved_at") or record.get("generated_at") or "")
+        if ts_str:
+            try:
+                ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                age_days = (cutoff - ts).days
+                if age_days > _STALE_DAYS:
+                    logger.debug(
+                        "load_approved_drafts: skipping stale packet for %s (age=%d days)",
+                        record.get("subject_key"),
+                        age_days,
+                    )
+                    continue
+            except ValueError:
+                pass  # Unparseable timestamp — keep the record
+
+        try:
+            packet = DraftReadmePacket(
+                repo_name=str(record.get("repo_name") or record.get("subject_key") or ""),
+                current_readme_sha=record.get("current_readme_sha") or None,
+                proposed_readme=str(record.get("proposed_readme") or ""),
+                diff_summary=str(record.get("diff_summary") or record.get("approval_note") or ""),
+                llm_provider=str(record.get("llm_provider") or ""),
+                llm_model=str(record.get("llm_model") or ""),
+                llm_cost_usd=float(record.get("llm_cost_usd") or 0.0),
+                generated_at=str(record.get("generated_at") or record.get("approved_at") or ""),
+                context_repos=list(record.get("context_repos") or []),
+            )
+        except (TypeError, ValueError) as exc:
+            logger.warning(
+                "load_approved_drafts: could not hydrate packet for %s: %s",
+                record.get("subject_key"),
+                exc,
+            )
+            continue
+
+        if not packet.repo_name or not packet.proposed_readme:
+            logger.debug(
+                "load_approved_drafts: skipping incomplete packet for subject_key=%s",
+                record.get("subject_key"),
+            )
+            continue
+
+        packets.append(packet)
+
+    return packets
+
+
+def mark_draft_applied(
+    output_dir: Path,
+    packet: DraftReadmePacket,
+    *,
+    apply_result: dict,
+) -> None:
+    """Update the ledger record for *packet* to status='applied'.
+
+    Re-saves the existing record with status mutated to 'applied' and an
+    apply_result embedded so the operator can see what happened.
+    Uses INSERT OR REPLACE semantics — safe to call multiple times.
+    On failure (missing warehouse), logs a warning rather than raising.
+    """
+    from src.warehouse import load_approval_records, save_approval_record
+
+    records = load_approval_records(output_dir, "", limit=500)
+
+    # Find the matching record by subject_key + approval_subject_type
+    matching = [
+        r
+        for r in records
+        if r.get("approval_subject_type") == "draft-readme"
+        and r.get("subject_key") == packet.repo_name
+        and r.get("status") == "approved-manual"
+    ]
+
+    if not matching:
+        logger.warning(
+            "mark_draft_applied: no approved-manual record found for %s — skipping state update",
+            packet.repo_name,
+        )
+        return
+
+    for record in matching:
+        updated = dict(record)
+        updated["status"] = "applied"
+        updated["apply_result"] = apply_result
+        updated["applied_at"] = datetime.now(timezone.utc).isoformat()
+        save_approval_record(output_dir, updated)
+
+
+def record_draft_apply_failure(
+    output_dir: Path,
+    packet: DraftReadmePacket,
+    *,
+    error: str,
+) -> None:
+    """Append a failure event to the ledger without changing the record state.
+
+    The record stays 'approved-manual' so the operator can retry.
+    Writes a new approval_followup_event with event_type='apply-failure'.
+    """
+    import uuid
+
+    from src.warehouse import save_approval_followup_event
+
+    event = {
+        "event_id": "af-" + str(uuid.uuid4())[:16],
+        "approval_id": "dr-"
+        + hashlib.sha1(
+            f"draft-readme:{packet.repo_name}:{packet.generated_at}".encode()
+        ).hexdigest()[:16],
+        "fingerprint": _packet_fingerprint(packet),
+        "approval_subject_type": "draft-readme",
+        "subject_key": packet.repo_name,
+        "source_run_id": "",
+        "reviewed_at": datetime.now(timezone.utc).isoformat(),
+        "reviewed_by": "system",
+        "review_note": f"apply-failure: {error}",
+        "cadence_days": 0,
+        "event_type": "apply-failure",
+        "error": error,
+    }
+    save_approval_followup_event(output_dir, event)

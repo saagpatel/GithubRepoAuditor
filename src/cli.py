@@ -2381,29 +2381,106 @@ def _run_apply_improvements_mode(args, parser) -> None:
     )
 
     improvements_file = getattr(args, "improvements_file", None)
-    if not improvements_file:
+    apply_readmes = getattr(args, "apply_readmes", False)
+    apply_metadata = getattr(args, "apply_metadata", False)
+
+    # --apply-metadata always needs a file; --apply-readmes can read from ledger instead.
+    if apply_metadata and not improvements_file:
+        parser.error("--apply-metadata requires --improvements-file")
+    if not apply_readmes and not apply_metadata:
         parser.error("--apply-metadata / --apply-readmes requires --improvements-file")
-    improvements = load_improvements(improvements_file)
+
     cache = None if args.no_cache else ResponseCache()
     client = GitHubClient(token=args.token, cache=cache)
     output_dir = Path(args.output_dir)
     dry_run = getattr(args, "dry_run", False)
-    updates = list(improvements.values())
+
+    # Load file-based updates (may be empty if no file supplied)
+    file_updates: list[dict] = []
+    if improvements_file:
+        file_updates = list(load_improvements(improvements_file).values())
 
     all_results: list[dict] = []
-    if getattr(args, "apply_metadata", False):
-        results = apply_metadata_updates(client, args.username, updates, dry_run=dry_run)
+
+    if apply_metadata:
+        results = apply_metadata_updates(client, args.username, file_updates, dry_run=dry_run)
         all_results.extend(results)
         ok_count = sum(
             1 for r in results for a in r.get("actions", []) if a.get("ok") or a.get("dry_run")
         )
         print_info(f"Metadata updates: {ok_count} actions {'previewed' if dry_run else 'applied'}")
 
-    if getattr(args, "apply_readmes", False):
-        results = apply_readme_updates(client, args.username, updates, dry_run=dry_run)
-        all_results.extend(results)
-        ok_count = sum(1 for r in results if r.get("ok") or r.get("dry_run"))
-        print_info(f"README updates: {ok_count} repos {'previewed' if dry_run else 'pushed'}")
+    if apply_readmes:
+        # Build the merged update list:
+        #   1) file-based packets (if --improvements-file provided)
+        #   2) approved ledger packets (if any, de-duplicated by repo name)
+        readme_updates: list[dict] = list(file_updates)
+        ledger_packets_by_repo: dict[str, object] = {}
+
+        from src.draft_readmes import (
+            load_approved_drafts,
+            mark_draft_applied,
+            record_draft_apply_failure,
+        )
+
+        ledger_packets = load_approved_drafts(output_dir, getattr(args, "username", None))
+        for pkt in ledger_packets:
+            # Convert DraftReadmePacket → shape expected by apply_readme_updates
+            # apply_readme_updates expects: {name: str, readme: str}
+            # De-duplicate: file-based takes precedence (already present in readme_updates).
+            file_names = {(u.get("name") or u.get("repo", "").split("/")[-1]) for u in file_updates}
+            if pkt.repo_name not in file_names:
+                readme_updates.append({"name": pkt.repo_name, "readme": pkt.proposed_readme})
+                ledger_packets_by_repo[pkt.repo_name] = pkt
+
+        if not readme_updates:
+            print_info("README updates: 0 repos to apply (no file and no approved ledger packets).")
+        else:
+            if dry_run:
+                # Print per-repo preview lines for ledger-sourced packets so the operator
+                # can see what would be pushed.  File-based packets are also covered because
+                # apply_readme_updates returns {"dry_run": True} records when dry_run=True.
+                for pkt_repo, _pkt in ledger_packets_by_repo.items():
+                    upd = next(
+                        (
+                            u
+                            for u in readme_updates
+                            if (u.get("name") or u.get("repo", "").split("/")[-1]) == pkt_repo
+                        ),
+                        None,
+                    )
+                    if upd is not None:
+                        char_count = len(upd.get("readme", ""))
+                        print_info(
+                            f"  [dry-run] would push README to {pkt_repo}: {char_count} chars"
+                        )
+
+            results = apply_readme_updates(client, args.username, readme_updates, dry_run=dry_run)
+            all_results.extend(results)
+
+            # State transitions for ledger-sourced packets (live apply only)
+            if not dry_run:
+                for result in results:
+                    repo_name = result.get("repo", "")
+                    if repo_name not in ledger_packets_by_repo:
+                        continue
+                    pkt = ledger_packets_by_repo[repo_name]
+                    if result.get("ok"):
+                        mark_draft_applied(output_dir, pkt, apply_result=result)  # type: ignore[arg-type]
+                    else:
+                        error_msg = str(result.get("error") or "unknown error")
+                        record_draft_apply_failure(output_dir, pkt, error=error_msg)  # type: ignore[arg-type]
+
+            ok_count = sum(1 for r in results if r.get("ok") or r.get("dry_run"))
+            verb = "previewed" if dry_run else "pushed"
+            print_info(
+                f"README updates: {ok_count} repos {verb}"
+                + (
+                    f" ({len(ledger_packets_by_repo)} from ledger)"
+                    if ledger_packets_by_repo
+                    else ""
+                )
+            )
 
     report_path = generate_execution_report(all_results, output_dir)
     print_info(f"Execution report: {report_path}")

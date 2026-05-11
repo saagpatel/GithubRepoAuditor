@@ -14,7 +14,10 @@ from src.draft_readmes import (
     DraftReadmePacket,
     build_context,
     generate_draft,
+    load_approved_drafts,
+    mark_draft_applied,
     qualify_repos,
+    record_draft_apply_failure,
     write_packets_to_ledger,
 )
 from src.llm_cost import BudgetExceededError
@@ -496,3 +499,382 @@ class TestCostGuard:
             draft_records = [r for r in records if r.get("approval_subject_type") == "draft-readme"]
             assert len(draft_records) == 1
             assert draft_records[0]["subject_key"] == "repo-ok"
+
+
+# ── S5.5: load_approved_drafts ────────────────────────────────────────────────
+
+
+def _make_approved_packet(
+    repo_name: str = "my-repo",
+    *,
+    status: str = "approved-manual",
+    generated_at: str = "2026-05-11T10:00:00+00:00",
+    proposed_readme: str = "# My Repo\n\nA great project.",
+) -> DraftReadmePacket:
+    return DraftReadmePacket(
+        repo_name=repo_name,
+        current_readme_sha="sha123",
+        proposed_readme=proposed_readme,
+        diff_summary="+5 lines added, -0 lines removed vs current README.",
+        llm_provider="fake",
+        llm_model="fake-model",
+        llm_cost_usd=0.001,
+        generated_at=generated_at,
+        context_repos=[],
+    )
+
+
+class TestLoadApprovedDrafts:
+    def test_returns_only_approved_manual_packets(self) -> None:
+        """load_approved_drafts returns only status='approved-manual' draft-readme records."""
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp)
+
+            # Write an approved-manual packet
+            approved = _make_approved_packet("approved-repo")
+            write_packets_to_ledger([approved], output_dir, reviewer="user")
+
+            # Manually update status to approved-manual in the DB
+            import json
+            import sqlite3
+
+            db = output_dir / "portfolio-warehouse.db"
+            conn = sqlite3.connect(db)
+            rows = conn.execute(
+                "SELECT approval_id, details_json FROM approval_records WHERE subject_key = ?",
+                ("approved-repo",),
+            ).fetchall()
+            for row in rows:
+                payload = json.loads(row[1])
+                payload["status"] = "approved-manual"
+                conn.execute(
+                    "UPDATE approval_records SET details_json = ? WHERE approval_id = ?",
+                    (json.dumps(payload), row[0]),
+                )
+            conn.commit()
+            conn.close()
+
+            # Also write a ready-for-review packet (should be excluded)
+            pending = _make_approved_packet("pending-repo")
+            write_packets_to_ledger([pending], output_dir, reviewer="user")
+            # pending stays at status='ready-for-review' (default from write_packets_to_ledger)
+
+            result = load_approved_drafts(output_dir, "user")
+            repo_names = [p.repo_name for p in result]
+            assert "approved-repo" in repo_names
+            assert "pending-repo" not in repo_names
+
+    def test_skips_packets_older_than_30_days(self) -> None:
+        """Packets with approved_at older than 30 days are skipped."""
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp)
+
+            old_ts = "2025-01-01T00:00:00+00:00"  # definitely >30 days ago
+            old_packet = _make_approved_packet("old-repo", generated_at=old_ts)
+            write_packets_to_ledger([old_packet], output_dir, reviewer="user")
+
+            # Patch status to approved-manual
+            import json
+            import sqlite3
+
+            db = output_dir / "portfolio-warehouse.db"
+            conn = sqlite3.connect(db)
+            rows = conn.execute(
+                "SELECT approval_id, details_json FROM approval_records WHERE subject_key = ?",
+                ("old-repo",),
+            ).fetchall()
+            for row in rows:
+                payload = json.loads(row[1])
+                payload["status"] = "approved-manual"
+                conn.execute(
+                    "UPDATE approval_records SET details_json = ? WHERE approval_id = ?",
+                    (json.dumps(payload), row[0]),
+                )
+            conn.commit()
+            conn.close()
+
+            result = load_approved_drafts(output_dir, "user")
+            assert not any(p.repo_name == "old-repo" for p in result)
+
+    def test_empty_warehouse_returns_empty_list(self) -> None:
+        """No warehouse file → returns empty list without error."""
+        with tempfile.TemporaryDirectory() as tmp:
+            result = load_approved_drafts(Path(tmp), "user")
+            assert result == []
+
+
+# ── S5.5: _run_apply_improvements_mode ledger path ───────────────────────────
+
+
+class TestApplyImprovementsModeWithLedger:
+    """Integration-style tests for the CLI apply path reading from ledger."""
+
+    def _make_args(
+        self,
+        output_dir: str,
+        *,
+        apply_readmes: bool = True,
+        apply_metadata: bool = False,
+        improvements_file: Path | None = None,
+        dry_run: bool = False,
+        username: str = "testuser",
+    ):
+        args = MagicMock()
+        args.apply_readmes = apply_readmes
+        args.apply_metadata = apply_metadata
+        args.improvements_file = improvements_file
+        args.dry_run = dry_run
+        args.username = username
+        args.output_dir = output_dir
+        args.no_cache = True
+        args.token = None
+        return args
+
+    def test_no_file_reads_from_ledger(self) -> None:
+        """With no --improvements-file, reads approved packets from ledger."""
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp)
+
+            # Pre-populate ledger with one approved-manual packet
+            import json
+            import sqlite3
+
+            packet = _make_approved_packet("target-repo")
+            write_packets_to_ledger([packet], output_dir, reviewer="user")
+
+            # Flip status to approved-manual
+            db = output_dir / "portfolio-warehouse.db"
+            conn = sqlite3.connect(db)
+            rows = conn.execute(
+                "SELECT approval_id, details_json FROM approval_records WHERE subject_key = ?",
+                ("target-repo",),
+            ).fetchall()
+            for row in rows:
+                payload = json.loads(row[1])
+                payload["status"] = "approved-manual"
+                conn.execute(
+                    "UPDATE approval_records SET details_json = ? WHERE approval_id = ?",
+                    (json.dumps(payload), row[0]),
+                )
+            conn.commit()
+            conn.close()
+
+            mock_apply = MagicMock(return_value=[{"repo": "target-repo", "ok": True}])
+            with (
+                patch("src.repo_improver.apply_readme_updates", mock_apply),
+                patch("src.cli.apply_readme_updates", mock_apply, create=True),
+            ):
+                from src.cli import _run_apply_improvements_mode
+
+                args = self._make_args(str(output_dir), apply_readmes=True, dry_run=False)
+                parser = MagicMock()
+                parser.error.side_effect = SystemExit(2)
+
+                _run_apply_improvements_mode(args, parser)
+
+            # apply_readme_updates was called with target-repo in the updates list
+            assert mock_apply.called
+            call_updates = mock_apply.call_args[0][2]  # positional: client, owner, updates
+            repo_names = [u.get("name") or u.get("repo", "").split("/")[-1] for u in call_updates]
+            assert "target-repo" in repo_names
+
+    def test_both_sources_combined(self) -> None:
+        """When both --improvements-file and ledger have packets, both are sent."""
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp)
+
+            # Ledger packet
+            import json
+            import sqlite3
+
+            ledger_packet = _make_approved_packet("ledger-repo")
+            write_packets_to_ledger([ledger_packet], output_dir, reviewer="user")
+            db = output_dir / "portfolio-warehouse.db"
+            conn = sqlite3.connect(db)
+            rows = conn.execute(
+                "SELECT approval_id, details_json FROM approval_records",
+            ).fetchall()
+            for row in rows:
+                payload = json.loads(row[1])
+                payload["status"] = "approved-manual"
+                conn.execute(
+                    "UPDATE approval_records SET details_json = ? WHERE approval_id = ?",
+                    (json.dumps(payload), row[0]),
+                )
+            conn.commit()
+            conn.close()
+
+            # File-based improvements JSON
+            import json as _json
+
+            improvements_file = output_dir / "improvements.json"
+            improvements_file.write_text(
+                _json.dumps({"file-repo": {"name": "file-repo", "readme": "# File Repo"}})
+            )
+
+            mock_apply = MagicMock(
+                return_value=[
+                    {"repo": "file-repo", "ok": True},
+                    {"repo": "ledger-repo", "ok": True},
+                ]
+            )
+            with patch("src.repo_improver.apply_readme_updates", mock_apply):
+                from src.cli import _run_apply_improvements_mode
+
+                args = self._make_args(
+                    str(output_dir),
+                    apply_readmes=True,
+                    improvements_file=improvements_file,
+                    dry_run=False,
+                )
+                parser = MagicMock()
+                parser.error.side_effect = SystemExit(2)
+                _run_apply_improvements_mode(args, parser)
+
+            assert mock_apply.called
+            call_updates = mock_apply.call_args[0][2]
+            repo_names = [u.get("name") or u.get("repo", "").split("/")[-1] for u in call_updates]
+            assert "file-repo" in repo_names
+            assert "ledger-repo" in repo_names
+
+    def test_dry_run_passes_dry_run_flag_and_skips_state_transitions(self) -> None:
+        """In dry-run mode, apply_readme_updates is called with dry_run=True and no state
+        transitions happen (mark_draft_applied is NOT called)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp)
+
+            import json
+            import sqlite3
+
+            packet = _make_approved_packet("dry-repo")
+            write_packets_to_ledger([packet], output_dir, reviewer="user")
+            db = output_dir / "portfolio-warehouse.db"
+            conn = sqlite3.connect(db)
+            rows = conn.execute(
+                "SELECT approval_id, details_json FROM approval_records",
+            ).fetchall()
+            for row in rows:
+                payload = json.loads(row[1])
+                payload["status"] = "approved-manual"
+                conn.execute(
+                    "UPDATE approval_records SET details_json = ? WHERE approval_id = ?",
+                    (json.dumps(payload), row[0]),
+                )
+            conn.commit()
+            conn.close()
+
+            mock_apply = MagicMock(return_value=[{"repo": "dry-repo", "dry_run": True}])
+            mock_mark_applied = MagicMock()
+            with (
+                patch("src.repo_improver.apply_readme_updates", mock_apply),
+                patch("src.draft_readmes.mark_draft_applied", mock_mark_applied),
+            ):
+                from src.cli import _run_apply_improvements_mode
+
+                args = self._make_args(str(output_dir), apply_readmes=True, dry_run=True)
+                parser = MagicMock()
+                parser.error.side_effect = SystemExit(2)
+                _run_apply_improvements_mode(args, parser)
+
+            # apply_readme_updates must be called with dry_run=True
+            assert mock_apply.called
+            assert mock_apply.call_args.kwargs.get("dry_run") is True
+            # State transitions must NOT happen in dry-run
+            mock_mark_applied.assert_not_called()
+
+
+# ── S5.5: state transitions ───────────────────────────────────────────────────
+
+
+class TestStateTransitions:
+    def _write_approved_packet(self, output_dir: Path, repo_name: str) -> DraftReadmePacket:
+        """Write a packet and manually set its status to approved-manual."""
+        import json
+        import sqlite3
+
+        packet = _make_approved_packet(repo_name)
+        write_packets_to_ledger([packet], output_dir, reviewer="user")
+        db = output_dir / "portfolio-warehouse.db"
+        conn = sqlite3.connect(db)
+        rows = conn.execute(
+            "SELECT approval_id, details_json FROM approval_records WHERE subject_key = ?",
+            (repo_name,),
+        ).fetchall()
+        for row in rows:
+            payload = json.loads(row[1])
+            payload["status"] = "approved-manual"
+            conn.execute(
+                "UPDATE approval_records SET details_json = ? WHERE approval_id = ?",
+                (json.dumps(payload), row[0]),
+            )
+        conn.commit()
+        conn.close()
+        return packet
+
+    def test_successful_apply_transitions_to_applied(self) -> None:
+        """After mark_draft_applied, record status becomes 'applied'."""
+        import json
+        import sqlite3
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp)
+            packet = self._write_approved_packet(output_dir, "success-repo")
+
+            mark_draft_applied(output_dir, packet, apply_result={"ok": True, "sha": "abc"})
+
+            db = output_dir / "portfolio-warehouse.db"
+            conn = sqlite3.connect(db)
+            rows = conn.execute(
+                "SELECT details_json FROM approval_records WHERE subject_key = ?",
+                ("success-repo",),
+            ).fetchall()
+            conn.close()
+            statuses = [json.loads(r[0]).get("status") for r in rows]
+            assert "applied" in statuses
+
+    def test_failed_apply_leaves_state_approved_manual(self) -> None:
+        """After record_draft_apply_failure, record status stays 'approved-manual'."""
+        import json
+        import sqlite3
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp)
+            packet = self._write_approved_packet(output_dir, "fail-repo")
+
+            record_draft_apply_failure(output_dir, packet, error="GitHub API 422")
+
+            db = output_dir / "portfolio-warehouse.db"
+            conn = sqlite3.connect(db)
+            rows = conn.execute(
+                "SELECT details_json FROM approval_records WHERE subject_key = ?",
+                ("fail-repo",),
+            ).fetchall()
+            conn.close()
+            # Status must still be approved-manual (not changed to applied)
+            statuses = [json.loads(r[0]).get("status") for r in rows]
+            assert all(s == "approved-manual" for s in statuses), f"unexpected statuses: {statuses}"
+
+    def test_failed_apply_writes_followup_event(self) -> None:
+        """record_draft_apply_failure writes an approval_followup_event with event_type='apply-failure'."""
+        import json
+        import sqlite3
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp)
+            packet = self._write_approved_packet(output_dir, "event-repo")
+
+            record_draft_apply_failure(output_dir, packet, error="timeout")
+
+            db = output_dir / "portfolio-warehouse.db"
+            conn = sqlite3.connect(db)
+            events = conn.execute(
+                "SELECT details_json FROM approval_followup_events WHERE subject_key = ?",
+                ("event-repo",),
+            ).fetchall()
+            conn.close()
+            assert len(events) >= 1
+            event_payload = json.loads(events[0][0])
+            assert event_payload.get("event_type") == "apply-failure"
+            assert "timeout" in (
+                event_payload.get("error") or event_payload.get("review_note") or ""
+            )
