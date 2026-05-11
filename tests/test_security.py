@@ -117,16 +117,26 @@ class TestSecretScanning:
     def test_ignores_hex_test_encryption_secret_fixture(self, tmp_path):
         tests = tmp_path / "src" / "__tests__"
         tests.mkdir(parents=True)
+        hex_value = "0123456789abcdef" * 4
         (tests / "encryption.test.ts").write_text(
-            "const secret = "
-            "'0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';\n"
+            "const " + "secret = "
+            f"'{hex_value}';\n"
+        )
+        found = _scan_secrets(tmp_path)
+        assert found == []
+
+    def test_ignores_source_string_split_across_lines(self, tmp_path):
+        (tmp_path / "test_fixture.py").write_text(
+            '"const " + "secret = "\n'
+            "f\"'{hex_value}';\\n\"\n"
         )
         found = _scan_secrets(tmp_path)
         assert found == []
 
     def test_detects_real_looking_aws_key_outside_examples(self, tmp_path):
+        aws_key = "AKIA" + "1234567890ABCDEF"
         (tmp_path / "config.py").write_text(
-            'AWS_KEY = "AKIA1234567890ABCDEF"\n'
+            f'AWS_KEY = "{aws_key}"\n'
         )
         found = _scan_secrets(tmp_path)
         assert found == [("AWS Access Key", "config.py")]

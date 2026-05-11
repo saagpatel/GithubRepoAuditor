@@ -27,7 +27,7 @@ SECRET_PATTERNS: list[tuple[str, re.Pattern]] = [
     (
         "Generic Secret",
         re.compile(
-            r"""(?:secret|password|passwd)\s*[:=]\s*['"](?P<value>[^'"]{8,})['"]""",
+            r"""(?:secret|password|passwd)\s*[:=]\s*['"](?P<value>[^'"\r\n]{8,})['"]""",
             re.IGNORECASE,
         ),
     ),
