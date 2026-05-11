@@ -19,7 +19,6 @@ from src.excel_repo_data_helpers import _arc_f_detail_cols, repo_detail_rows
 from src.excel_security_sheet_helpers import SECURITY_HEADERS, build_security_sheet_rows
 from src.operator_control_center import build_operator_snapshot
 
-
 # ─────────────────────────────────────────────────────────────
 # Shared fixture helpers
 # ─────────────────────────────────────────────────────────────
