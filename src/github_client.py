@@ -284,17 +284,31 @@ class GitHubClient:
             logger.warning("Failed to fetch languages for %s/%s: %s", owner, repo, exc)
             return {}
 
-    def get_releases(self, owner: str, repo: str, count: int = 20) -> list[dict]:
-        """Fetch releases for a repo."""
+    def get_releases(
+        self, owner: str, repo: str, per_page: int = 10
+    ) -> tuple[list[dict], bool]:
+        """Fetch releases for a repo.
+
+        Returns a (releases, available) tuple.
+        ``available`` is False only on 404 (releases disabled or no access).
+        Other HTTP errors are logged and treated as transient; available stays True.
+        Release count is capped at *per_page* (default 10); callers should document
+        this cap if they report the count to end-users.
+        """
+        url = f"{API_BASE}/repos/{owner}/{repo}/releases"
         try:
-            data = self._fetch_json(
-                f"{API_BASE}/repos/{owner}/{repo}/releases",
-                {"per_page": str(count)},
-            )
-            return data if isinstance(data, list) else []
+            data = self._fetch_json(url, {"per_page": str(per_page)})
+            releases = data if isinstance(data, list) else []
+            return releases, True
         except requests.HTTPError as exc:
+            status = self._http_error_status(exc)
+            if status == 404:
+                logger.debug(
+                    "Releases endpoint unavailable for %s/%s (404)", owner, repo
+                )
+                return [], False
             logger.warning("Failed to fetch releases for %s/%s: %s", owner, repo, exc)
-            return []
+            return [], True
 
     def get_pull_requests(
         self, owner: str, repo: str, state: str = "all", count: int = 50

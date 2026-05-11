@@ -100,11 +100,35 @@ class ActivityAnalyzer(BaseAnalyzer):
             if bus_factor > 0:
                 findings.append(f"Bus factor: {bus_factor}")
 
-            # Release frequency
-            releases = github_client.get_releases(owner, metadata.name)
+            # Release frequency + shipped signal
+            # get_releases returns (list, available); capped at 10 per fetch.
+            releases, releases_available = github_client.get_releases(
+                owner, metadata.name, per_page=10
+            )
+            details["releases_available"] = releases_available
+            details["has_any_release"] = bool(releases)
             details["release_count"] = len(releases)
             if releases:
                 findings.append(f"Releases: {len(releases)}")
+
+                # Latest release age
+                latest = releases[0]  # GitHub API returns newest first
+                latest_pub = latest.get("published_at") or latest.get("created_at")
+                if latest_pub:
+                    try:
+                        latest_dt = datetime.fromisoformat(
+                            latest_pub.replace("Z", "+00:00")
+                        )
+                        details["latest_release_age_days"] = (now - latest_dt).days
+                    except (ValueError, TypeError):
+                        details["latest_release_age_days"] = None
+                else:
+                    details["latest_release_age_days"] = None
+
+                details["latest_release_is_prerelease"] = bool(
+                    latest.get("prerelease", False)
+                )
+
                 # Compute cadence if 2+ releases
                 if len(releases) >= 2:
                     dates = []
@@ -117,9 +141,16 @@ class ActivityAnalyzer(BaseAnalyzer):
                                 pass
                     if len(dates) >= 2:
                         dates.sort()
-                        gaps = [(dates[i+1] - dates[i]).days for i in range(len(dates)-1)]
+                        gaps = [(dates[i + 1] - dates[i]).days for i in range(len(dates) - 1)]
                         avg_cadence = sum(gaps) / len(gaps)
                         details["release_cadence_days"] = round(avg_cadence)
+            else:
+                details["latest_release_age_days"] = None
+                details["latest_release_is_prerelease"] = False
+                if not releases_available:
+                    findings.append("Releases endpoint unavailable (404)")
+                else:
+                    findings.append("No releases found")
         else:
             findings.append("Skipped API-based activity checks")
 
