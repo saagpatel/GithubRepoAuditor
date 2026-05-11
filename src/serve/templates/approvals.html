@@ -29,6 +29,14 @@
         </span>
       </td>
       <td class="action-cell">
+        {% if r.approval_subject_type == "draft-readme" %}
+        <button
+          class="btn btn-sm btn-secondary"
+          hx-get="/approvals/{{ r.approval_id }}/draft-diff"
+          hx-target="#diff-{{ loop.index }}"
+          hx-swap="innerHTML"
+        >View diff</button>
+        {% endif %}
         <button
           class="btn btn-sm btn-approve"
           hx-post="/approvals/{{ r.approval_id }}/approve"
@@ -43,6 +51,13 @@
         >Reject</button>
       </td>
     </tr>
+    {% if r.approval_subject_type == "draft-readme" %}
+    <tr>
+      <td colspan="5">
+        <div id="diff-{{ loop.index }}" class="draft-diff-container"></div>
+      </td>
+    </tr>
+    {% endif %}
     {% endfor %}
   </tbody>
 </table>

@@ -251,6 +251,140 @@ class TestNewRunRoute:
         assert resp.status_code == 422
 
 
+def _seed_draft_readme_records(output_dir: Path) -> tuple[str, str]:
+    """Insert two draft-readme approval records into the warehouse DB.
+
+    Returns (record_id_1, record_id_2).
+    """
+    from src.warehouse import save_approval_record
+
+    id1 = "dr-aabbccdd00000001"
+    id2 = "dr-aabbccdd00000002"
+
+    save_approval_record(
+        output_dir,
+        {
+            "approval_id": id1,
+            "fingerprint": "fp-001",
+            "approval_subject_type": "draft-readme",
+            "subject_key": "repo-with-readme",
+            "source_run_id": "",
+            "approved_at": "2026-01-10T00:00:00",
+            "approved_by": "test",
+            "approval_note": "+5 lines added, -2 lines removed vs current README.",
+            "action_type": "draft-readme",
+            "target_context": "repo-with-readme",
+            "decision": "",
+            "status": "ready-for-review",
+            "repo_name": "repo-with-readme",
+            "current_readme_sha": "abc123def456",
+            "proposed_readme": "# repo-with-readme\n\nThis is the proposed README.",
+            "diff_summary": "+5 lines added, -2 lines removed vs current README.",
+            "llm_provider": "test",
+            "llm_model": "test-model",
+            "llm_cost_usd": 0.0,
+            "generated_at": "2026-01-10T00:00:00",
+            "context_repos": [],
+        },
+    )
+    save_approval_record(
+        output_dir,
+        {
+            "approval_id": id2,
+            "fingerprint": "fp-002",
+            "approval_subject_type": "draft-readme",
+            "subject_key": "repo-no-readme",
+            "source_run_id": "",
+            "approved_at": "2026-01-11T00:00:00",
+            "approved_by": "test",
+            "approval_note": "Created new README from scratch.",
+            "action_type": "draft-readme",
+            "target_context": "repo-no-readme",
+            "decision": "",
+            "status": "ready-for-review",
+            "repo_name": "repo-no-readme",
+            "current_readme_sha": None,
+            "proposed_readme": "# repo-no-readme\n\nBrand new README.",
+            "diff_summary": "Created new README from scratch.",
+            "llm_provider": "test",
+            "llm_model": "test-model",
+            "llm_cost_usd": 0.0,
+            "generated_at": "2026-01-11T00:00:00",
+            "context_repos": [],
+        },
+    )
+    return id1, id2
+
+
+class TestDraftReadmeApprovals:
+    """Tests for draft-readme packet display and diff partial (Arc G S5.4)."""
+
+    def test_approvals_lists_both_draft_readme_records(self, output_dir: Path) -> None:
+        id1, id2 = _seed_draft_readme_records(output_dir)
+        app = create_app(output_dir=output_dir)
+        c = TestClient(app, raise_server_exceptions=True)
+        resp = c.get("/approvals")
+        assert resp.status_code == 200
+        assert "repo-with-readme" in resp.text
+        assert "repo-no-readme" in resp.text
+
+    def test_draft_diff_returns_200_with_proposed_readme(self, output_dir: Path) -> None:
+        id1, _id2 = _seed_draft_readme_records(output_dir)
+        app = create_app(output_dir=output_dir)
+        c = TestClient(app, raise_server_exceptions=True)
+        resp = c.get(f"/approvals/{id1}/draft-diff")
+        assert resp.status_code == 200
+        assert "This is the proposed README." in resp.text
+
+    def test_draft_diff_non_draft_readme_returns_404(self, output_dir: Path) -> None:
+        """A record with a different approval_subject_type should return 404."""
+        from src.warehouse import save_approval_record
+
+        save_approval_record(
+            output_dir,
+            {
+                "approval_id": "campaign-zz9999",
+                "fingerprint": "fp-campaign",
+                "approval_subject_type": "campaign",
+                "subject_key": "repo-alpha",
+                "source_run_id": "",
+                "approved_at": "2026-01-05T00:00:00",
+                "approved_by": "test",
+                "approval_note": "",
+            },
+        )
+        app = create_app(output_dir=output_dir)
+        c = TestClient(app, raise_server_exceptions=True)
+        resp = c.get("/approvals/campaign-zz9999/draft-diff")
+        assert resp.status_code == 404
+
+    def test_draft_diff_nonexistent_record_returns_404(self, output_dir: Path) -> None:
+        app = create_app(output_dir=output_dir)
+        c = TestClient(app, raise_server_exceptions=True)
+        resp = c.get("/approvals/nonexistent-record-id/draft-diff")
+        assert resp.status_code == 404
+
+    def test_draft_diff_partial_has_no_html_or_body_tags(self, output_dir: Path) -> None:
+        """The partial must be HTMX-injectable: no <html> or <body> wrapper."""
+        id1, _id2 = _seed_draft_readme_records(output_dir)
+        app = create_app(output_dir=output_dir)
+        c = TestClient(app, raise_server_exceptions=True)
+        resp = c.get(f"/approvals/{id1}/draft-diff")
+        assert resp.status_code == 200
+        body = resp.text.lower()
+        assert "<html" not in body
+        assert "<body" not in body
+
+    def test_approvals_shows_view_diff_button_for_draft_readme(self, output_dir: Path) -> None:
+        id1, _id2 = _seed_draft_readme_records(output_dir)
+        app = create_app(output_dir=output_dir)
+        c = TestClient(app, raise_server_exceptions=True)
+        resp = c.get("/approvals")
+        assert resp.status_code == 200
+        assert "View diff" in resp.text
+        assert f"/approvals/{id1}/draft-diff" in resp.text
+
+
 class TestApprovalActions:
     def test_approve_records_intent(self, client: TestClient, output_dir: Path) -> None:
         resp = client.post("/approvals/appr-999/approve")

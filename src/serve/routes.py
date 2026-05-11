@@ -220,6 +220,48 @@ async def approvals(request: Request) -> HTMLResponse:
     )
 
 
+@router.get("/approvals/{record_id}/draft-diff", response_class=HTMLResponse)
+async def draft_diff(request: Request, record_id: str) -> HTMLResponse:
+    """Return an HTMX partial showing proposed vs current README for a draft-readme packet."""
+    output_dir = _output_dir(request)
+    record: dict[str, Any] | None = None
+    try:
+        from src.warehouse import load_approval_records
+
+        all_records = load_approval_records(output_dir, username="")
+        record = next(
+            (r for r in all_records if r.get("approval_id") == record_id),
+            None,
+        )
+    except Exception:
+        pass
+
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"Record '{record_id}' not found")
+
+    if record.get("approval_subject_type") != "draft-readme":
+        raise HTTPException(
+            status_code=404,
+            detail=f"Record '{record_id}' is not a draft-readme packet",
+        )
+
+    proposed_readme: str = record.get("proposed_readme") or ""
+    current_readme_sha: str | None = record.get("current_readme_sha") or None
+    repo_name: str = record.get("repo_name") or record.get("subject_key") or record_id
+    diff_summary: str = record.get("diff_summary") or ""
+
+    return templates.TemplateResponse(
+        request,
+        "draft_diff.html",
+        {
+            "repo_name": repo_name,
+            "proposed_readme": proposed_readme,
+            "current_readme_sha": current_readme_sha,
+            "diff_summary": diff_summary,
+        },
+    )
+
+
 @router.post("/approvals/{approval_id}/approve", response_class=HTMLResponse)
 async def approve_action(request: Request, approval_id: str) -> HTMLResponse:
     """Record intent into session log; does NOT mutate the approval state."""
