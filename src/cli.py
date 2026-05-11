@@ -16,8 +16,10 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
+import warnings
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
@@ -50,6 +52,9 @@ from src.reporter import (
 from src.scorer import score_repo
 from src.terminology import ACTION_SYNC_CANONICAL_LABELS
 
+# Emitted at most once per process when legacy flat invocation is used.
+_LEGACY_WARNING_EMITTED: bool = False
+
 DEFAULT_ANALYSIS_WORKERS = 1
 MAX_ANALYSIS_WORKERS = 8
 DEFAULT_PORTFOLIO_WORKSPACE = Path.home() / "Projects"
@@ -65,22 +70,23 @@ Recommended defaults:
   - Use --control-center for read-only daily triage
   - Treat campaigns, writeback, catalog overrides, scorecards overrides, and GitHub Projects as advanced workflows"""
 
-CLI_MODE_EXAMPLES = """Examples by mode:
-  First Run:
-    audit <github-username> --doctor
-    audit <github-username> --html
-    audit <github-username> --control-center
+CLI_MODE_EXAMPLES = """Subcommands: run, triage, report, serve
+  Run `audit run --help`, `audit triage --help`, or `audit report --help` for flags.
 
-  Weekly Review:
-    audit <github-username> --html
-    audit <github-username> --control-center
+Subcommand form (preferred):
+  audit run   <github-username> --html
+  audit run   <github-username> --repos <repo-name>
+  audit triage <github-username> --control-center
+  audit triage <github-username> --approval-center
+  audit report <github-username> --portfolio-truth
+  audit report <github-username> --campaign security-review --writeback-target github
+  audit serve  [--port 8080]
 
-  Deep Dive:
-    audit <github-username> --repos <repo-name> --html
-
-  Action Sync:
-    audit <github-username> --campaign security-review --writeback-target github
-    audit <github-username> --campaign security-review --writeback-target all --github-projects"""
+Legacy flat form (deprecated, still supported):
+  audit <github-username> --doctor
+  audit <github-username> --html
+  audit <github-username> --control-center
+  audit <github-username> --campaign security-review --writeback-target all --github-projects"""
 
 
 def _date_str(dt: datetime) -> str:
@@ -105,6 +111,217 @@ def _gh_auth_token() -> str | None:
     except (FileNotFoundError, subprocess.TimeoutExpired):
         pass
     return None
+
+
+# ── Subcommand builders ───────────────────────────────────────────────
+#
+# Each builder defines the PRIMARY (help-visible) flags for its subcommand.
+# The legacy flat parser at the top level accepts ALL flags so that existing
+# invocations (`audit username --flag`) continue to work unchanged.
+#
+# Global flags shared across all subcommands: --token, --output-dir, --config, --verbose
+
+def _add_global_flags(parser: argparse.ArgumentParser) -> None:
+    """Add flags that appear on every subcommand."""
+    parser.add_argument(
+        "username",
+        nargs="?",
+        default=None,
+        help="GitHub username to audit",
+    )
+    parser.add_argument(
+        "--token",
+        default=os.environ.get("GITHUB_TOKEN") or _gh_auth_token(),
+        help="GitHub personal access token (default: $GITHUB_TOKEN or `gh auth token`)",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default="output",
+        help="Directory for output files (default: output/)",
+    )
+    parser.add_argument(
+        "--config",
+        default=None,
+        help="Path to audit-config.yaml (default: ./audit-config.yaml if exists)",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Print detailed output",
+    )
+
+
+def _build_run_subparser(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
+    """Subcommand: `audit run` — produce a fresh audit."""
+    p = subparsers.add_parser(
+        "run",
+        help="Run a fresh audit against a GitHub user's repos",
+        description="Fetch, clone, analyze, and score all repos for the given username.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    _add_global_flags(p)
+    p.add_argument(
+        "--repos",
+        nargs="+",
+        default=None,
+        metavar="REPO",
+        help="Audit only these specific repos (targeted mode)",
+    )
+    p.add_argument("--skip-forks", action="store_true", help="Exclude forked repos")
+    p.add_argument("--skip-archived", action="store_true", help="Exclude archived repos")
+    p.add_argument("--skip-clone", action="store_true", help="Skip clone step (metadata only)")
+    p.add_argument("--incremental", action="store_true", help="Re-audit only repos changed since last run")
+    p.add_argument("--graphql", action="store_true", help="Use GraphQL API for faster bulk fetch")
+    p.add_argument("--badges", action="store_true", help="Generate Shields.io badge files")
+    p.add_argument("--html", action="store_true", help="Generate interactive HTML dashboard")
+    p.add_argument("--pdf", action="store_true", help="Generate PDF audit report")
+    p.add_argument("--narrative", action="store_true", help="Generate AI portfolio narrative")
+    p.add_argument("--briefing", action="store_true", help="Generate structured weekly operator briefing")
+    p.add_argument(
+        "--fetch-mode",
+        choices=["sync", "async"],
+        default="sync",
+        help="Per-repo enrichment fetch strategy (default: sync)",
+    )
+    p.add_argument("--analysis-workers", type=int, default=None, help="Number of repo-analysis workers")
+    p.add_argument("--no-cache", action="store_true", help="Bypass API response cache")
+    p.add_argument(
+        "--scoring-profile",
+        type=str,
+        default=None,
+        metavar="NAME",
+        help="Custom scoring profile from config/scoring-profiles/NAME.json",
+    )
+    p.add_argument("--watch", action="store_true", help="Re-run audit on interval (see --watch-interval)")
+    p.add_argument("--resume", action="store_true", help="Resume a partial audit run")
+    p.add_argument("--vuln-check", action="store_true", help="Query OSV.dev for known vulnerabilities")
+    p.add_argument("--reindex", action="store_true", help="Rebuild portfolio semantic index after audit")
+    p.add_argument(
+        "--embedder",
+        choices=["voyage", "local"],
+        default="voyage",
+        help="Embedder backend for --reindex (default: voyage)",
+    )
+
+
+def _build_triage_subparser(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
+    """Subcommand: `audit triage` — review existing run + approval workflows."""
+    p = subparsers.add_parser(
+        "triage",
+        help="Review operator state and manage approval workflows",
+        description="Inspect control-center, approval queues, acknowledgments, and semantic search.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    _add_global_flags(p)
+    p.add_argument("--control-center", action="store_true", help="Show latest operator state")
+    p.add_argument("--approval-center", action="store_true", help="Show latest approval workflow state")
+    p.add_argument(
+        "--triage-view",
+        choices=["all", "urgent", "ready", "blocked", "deferred"],
+        default="all",
+        help="Filter control-center output (default: all)",
+    )
+    p.add_argument(
+        "--approval-view",
+        choices=["all", "ready", "approved", "needs-reapproval", "blocked", "applied"],
+        default="all",
+        help="Filter approval-center output (default: all)",
+    )
+    p.add_argument(
+        "--auto-apply-approved",
+        action="store_true",
+        help="Apply approved campaign packets for repos passing the automation trust bar",
+    )
+    p.add_argument("--dry-run", action="store_true", help="Preview without making changes")
+    p.add_argument("--approve-governance", action="store_true", help="Capture a governance approval")
+    p.add_argument("--approve-packet", action="store_true", help="Capture a campaign approval")
+    p.add_argument("--review-governance", action="store_true", help="Capture a governance follow-up review")
+    p.add_argument("--review-packet", action="store_true", help="Capture a campaign follow-up review")
+    p.add_argument("--reset-prefs", action="store_true", help="Clear operator suppression hints")
+    p.add_argument("--acknowledge-target", type=str, default=None, help="Repo to acknowledge in review queue")
+    p.add_argument("--acknowledge-kind", type=str, default=None, help="Change type to acknowledge")
+    p.add_argument("--semantic-search", default=None, metavar="QUERY", help="Semantic search against portfolio index")
+    p.add_argument("--ask", default=None, metavar="QUERY", help="Alias for --semantic-search")
+
+
+def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
+    """Subcommand: `audit report` — generate exports, packets, and writebacks."""
+    p = subparsers.add_parser(
+        "report",
+        help="Generate exports, campaign packets, and writeback actions",
+        description="Portfolio truth, Excel workbooks, campaigns, writebacks, and context recovery.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    _add_global_flags(p)
+    p.add_argument("--portfolio-truth", action="store_true", help="Generate canonical portfolio truth snapshot")
+    p.add_argument("--portfolio-context-recovery", action="store_true", help="Build active/recent weak-context recovery plan")
+    p.add_argument("--apply-context-recovery", action="store_true", help="Apply eligible context recovery updates")
+    p.add_argument(
+        "--excel-mode",
+        choices=["template", "standard"],
+        default="standard",
+        help="Workbook style: standard (default) or template-backed",
+    )
+    p.add_argument("--diff", type=Path, default=None, metavar="PREVIOUS_REPORT", help="Compare against a previous report")
+    p.add_argument("--summary", action="store_true", help="Print a Rich diff summary to stderr")
+    p.add_argument("--scorecard", action="store_true", help="Apply internal scorecard programs")
+    p.add_argument(
+        "--campaign",
+        choices=["security-review", "promotion-push", "archive-sweep", "showcase-publish", "maintenance-cleanup"],
+        default=None,
+        help="Build a managed campaign view",
+    )
+    p.add_argument(
+        "--writeback-target",
+        choices=["github", "notion", "all"],
+        default=None,
+        help="External system to receive writeback actions",
+    )
+    p.add_argument("--writeback-apply", action="store_true", help="Execute live writeback (not preview)")
+    p.add_argument("--github-projects", action="store_true", help="Mirror campaign actions into GitHub Projects v2")
+    p.add_argument(
+        "--campaign-sync-mode",
+        choices=["reconcile", "append-only", "close-missing"],
+        default="reconcile",
+        help="Campaign record reconciliation strategy (default: reconcile)",
+    )
+    p.add_argument("--max-actions", type=int, default=20, help="Max managed actions per campaign run (default: 20)")
+    p.add_argument("--apply-metadata", action="store_true", help="Apply description/topics from improvements file")
+    p.add_argument("--apply-readmes", action="store_true", help="Push README updates via Contents API")
+    p.add_argument("--improvements-file", type=Path, default=None, help="Path to improvements JSON file")
+    p.add_argument("--generate-manifest", action="store_true", help="Generate improvement manifest from latest report")
+    p.add_argument("--create-issues", action="store_true", help="Create GitHub issues for high-priority action items")
+    p.add_argument("--upload-badges", action="store_true", help="Upload badge JSON to GitHub Gist")
+    p.add_argument("--notion-sync", action="store_true", help="Push audit events to Notion API")
+    p.add_argument("--notion-registry", action="store_true", help="Use Notion as registry source")
+    p.add_argument(
+        "--portfolio-profile",
+        type=str,
+        default="default",
+        metavar="NAME",
+        help="Ranking overlay profile for analyst-facing outputs (default: default)",
+    )
+    p.add_argument("--collection", type=str, default=None, metavar="NAME", help="Filter outputs to named collection")
+
+
+def _build_serve_subparser(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
+    """Subcommand: `audit serve` — start the local web UI."""
+    p = subparsers.add_parser(
+        "serve",
+        help="Start local web UI (FastAPI + HTMX) for portfolio artefacts",
+        description="Serve portfolio artefacts via a local FastAPI + HTMX web UI. Requires [serve] extra.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument("--port", type=int, default=8080, help="Port to listen on (default: 8080)")
+    p.add_argument("--host", default="127.0.0.1", help="Host to bind (default: 127.0.0.1)")
+    p.add_argument(
+        "--token",
+        default=os.environ.get("GITHUB_TOKEN") or _gh_auth_token(),
+        help="GitHub personal access token",
+    )
+    p.add_argument("--output-dir", default="output", help="Directory for output files (default: output/)")
+    p.add_argument("--config", default=None, help="Path to audit-config.yaml")
+    p.add_argument("--verbose", action="store_true", help="Print detailed output")
 
 
 # ── Argument parser ──────────────────────────────────────────────────
@@ -763,6 +980,37 @@ def build_parser() -> argparse.ArgumentParser:
         default="127.0.0.1",
         help="Host for --serve (default: 127.0.0.1)",
     )
+    return parser
+
+
+def build_subcommand_parser() -> argparse.ArgumentParser:
+    """Return the subcommand-aware parser used by main().
+
+    This parser is separate from build_parser() so that existing tests that
+    call build_parser().parse_args(["testuser", ...]) continue to work
+    unchanged.  main() uses this parser exclusively when sys.argv[1] is one of
+    the known subcommands; otherwise it rewrites the legacy argv and then
+    dispatches through this parser too (see _rewrite_legacy_argv).
+    """
+    parser = argparse.ArgumentParser(
+        prog="audit",
+        description=CLI_MODE_GUIDE,
+        epilog=CLI_MODE_EXAMPLES,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    subparsers = parser.add_subparsers(
+        dest="_subcommand",
+        metavar="SUBCOMMAND",
+        title="subcommands",
+        description=(
+            "Use a subcommand for the preferred invocation form. "
+            "Legacy flat-flag invocation still works but emits a DeprecationWarning."
+        ),
+    )
+    _build_run_subparser(subparsers)
+    _build_triage_subparser(subparsers)
+    _build_report_subparser(subparsers)
+    _build_serve_subparser(subparsers)
     return parser
 
 
@@ -4664,11 +4912,165 @@ def _run_serve_mode(args: object) -> None:
     )
 
 
+# ── Subcommand inference for legacy flat invocation ───────────────────
+def _infer_subcommand_from_flags(args: argparse.Namespace) -> str:
+    """Return the effective subcommand name for a legacy flat invocation."""
+    # triage signals
+    triage_flags = (
+        "control_center", "approval_center", "triage_view",
+        "approve_governance", "approve_packet", "review_governance", "review_packet",
+        "auto_apply_approved", "reset_prefs",
+        "acknowledge_target", "acknowledge_kind",
+        "semantic_search", "ask",
+    )
+    for flag in triage_flags:
+        val = getattr(args, flag, None)
+        if val and val not in (False, "all", None, ""):
+            return "triage"
+    if getattr(args, "approval_center", False) or getattr(args, "control_center", False):
+        return "triage"
+
+    # report signals
+    report_flags = (
+        "portfolio_truth", "portfolio_context_recovery",
+        "apply_context_recovery", "generate_manifest",
+        "apply_metadata", "apply_readmes",
+        "upload_badges", "notion_sync",
+    )
+    for flag in report_flags:
+        if getattr(args, flag, False):
+            return "report"
+    if getattr(args, "campaign", None):
+        return "report"
+    if getattr(args, "writeback_target", None):
+        return "report"
+
+    return "run"
+
+
+_KNOWN_SUBCOMMANDS: frozenset[str] = frozenset({"run", "triage", "report", "serve"})
+
+
+def _emit_legacy_deprecation_warning(inferred: str) -> None:
+    """Emit the deprecation warning at most once per process."""
+    global _LEGACY_WARNING_EMITTED
+    if _LEGACY_WARNING_EMITTED:
+        return
+    _LEGACY_WARNING_EMITTED = True
+    warnings.warn(
+        f"Top-level CLI invocation is deprecated. "
+        f"Use `audit {inferred} --flag` instead. "
+        "Legacy form will be removed in a future major version.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
+
+def _rewrite_legacy_argv(argv: list[str]) -> tuple[list[str], bool]:
+    """Detect legacy flat invocation and rewrite to subcommand form.
+
+    Legacy form: audit <username> [--flags...]
+    Subcommand form: audit <subcommand> <username> [--flags...]
+
+    Returns (rewritten_argv, is_legacy).  If the invocation already uses a
+    known subcommand (or is --serve / --help), returns argv unchanged.
+
+    Only rewrites when the first positional looks like a GitHub username
+    (alphanumeric + hyphens only, no path separators or colons).  This
+    prevents false-positive rewrites when main() is called during tests
+    where sys.argv contains pytest args (file paths, test IDs, etc.).
+    """
+    if not argv:
+        return argv, False
+
+    # Skip if first arg is a known subcommand, a flag, or --help/-h
+    first = argv[0]
+    if first in _KNOWN_SUBCOMMANDS or first.startswith("-"):
+        return argv, False
+
+    # Only treat as legacy username if it looks like a GitHub username:
+    # alphanumeric and hyphens only (no path separators, colons, dots).
+    if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9-]{0,38}", first):
+        return argv, False
+
+    # first arg looks like a username — legacy invocation detected.
+    # Infer subcommand from the remaining flags (quick scan without full parse).
+    rest = argv[1:]
+
+    # triage signals
+    if any(
+        f in rest
+        for f in [
+            "--control-center", "--approval-center",
+            "--approve-governance", "--approve-packet",
+            "--review-governance", "--review-packet",
+            "--auto-apply-approved", "--reset-prefs",
+            "--semantic-search", "--ask",
+        ]
+    ) or "--acknowledge-target" in rest or "--acknowledge-kind" in rest:
+        inferred = "triage"
+    # report signals
+    elif any(
+        f in rest
+        for f in [
+            "--portfolio-truth", "--portfolio-context-recovery",
+            "--apply-context-recovery", "--generate-manifest",
+            "--apply-metadata", "--apply-readmes",
+            "--upload-badges", "--notion-sync",
+        ]
+    ) or "--campaign" in rest or "--writeback-target" in rest:
+        inferred = "report"
+    else:
+        inferred = "run"
+
+    # Rewrite: insert inferred subcommand before the username
+    return [inferred, first] + rest, True
+
+
 # ── Main entry point ──────────────────────────────────────────────────
 def main() -> None:
-    parser = build_parser()
-    args = parser.parse_args()
+    raw_argv = sys.argv[1:]
+
+    # ── Choose parser based on invocation form ───────────────────────
+    # Subcommand form:  audit run|triage|report|serve [args...]
+    # Legacy flat form: audit username [--flags...]  (deprecated)
+    # --serve / --help: handled by either parser path
+    argv, is_legacy = _rewrite_legacy_argv(raw_argv)
+    # After rewrite, argv[0] is always a known subcommand name (or a flag).
+
+    subcommand_parser = build_subcommand_parser()
+    legacy_parser = build_parser()
+
+    if argv and argv[0] in _KNOWN_SUBCOMMANDS:
+        # Subcommand form — detect the subcommand with the subcommand parser,
+        # then re-parse the full flag set through the legacy parser so that ALL
+        # flags (including advanced ones not listed in the subcommand help) are
+        # accepted.  The subcommand parser's role is subcommand detection and
+        # --help display only; the legacy parser handles full validation.
+        sc_args, _ = subcommand_parser.parse_known_args(argv)
+        detected_subcommand = sc_args._subcommand  # e.g. "run", "triage", …
+
+        # Re-parse without the subcommand token through the legacy flat parser.
+        # argv[1:] strips the subcommand name; legacy parser sees username + flags.
+        flat_argv = argv[1:]  # e.g. ["myuser", "--html"]
+        args = legacy_parser.parse_args(flat_argv)
+        setattr(args, "_subcommand", detected_subcommand)
+        parser = legacy_parser
+    else:
+        # Legacy flat form (--serve, --help, or no args) — use legacy parser.
+        # Call with no argument so it reads sys.argv itself; this keeps
+        # monkeypatched FakeParser objects in tests working unchanged.
+        args = legacy_parser.parse_args()
+        parser = legacy_parser
+        is_legacy = False  # --serve / --help / empty: not a deprecated invocation
+
     from src.approval_ledger import default_approval_reviewer
+
+    # ── Subcommand: serve ────────────────────────────────────────────
+    subcommand = getattr(args, "_subcommand", None)
+    if subcommand == "serve" or getattr(args, "serve", False):
+        _run_serve_mode(args)
+        return
 
     # Load config file and merge into args (CLI flags take precedence)
     from src.config import inspect_config, merge_config_with_args
@@ -4680,13 +5082,15 @@ def main() -> None:
     if not getattr(args, "approval_reviewer", None):
         args.approval_reviewer = default_approval_reviewer()
 
-    if getattr(args, "serve", False):
-        _run_serve_mode(args)
-        return
+    # ── Legacy flat invocation: emit deprecation warning ────────────
+    if is_legacy:
+        inferred = subcommand or "run"
+        _emit_legacy_deprecation_warning(inferred)
 
-    if args.username is None:
+    if getattr(args, "username", None) is None and subcommand != "serve":
         parser.error(
-            "the following arguments are required: username (omit only when using --serve)"
+            "the following arguments are required: username "
+            "(omit only when using `audit serve` or `--serve`)"
         )
 
     mode_state = validate_cli_mode_args(args, parser.error)
