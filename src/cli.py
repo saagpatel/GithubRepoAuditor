@@ -409,7 +409,26 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--narrative",
         action="store_true",
-        help="Generate AI portfolio narrative (requires ANTHROPIC_API_KEY)",
+        help="Generate AI portfolio narrative (requires ANTHROPIC_API_KEY or GitHub token with models: read scope)",
+    )
+    parser.add_argument(
+        "--narrative-provider",
+        choices=["anthropic", "github-models"],
+        default=None,
+        dest="narrative_provider",
+        help=(
+            "Narrative inference provider. Defaults to 'anthropic' when ANTHROPIC_API_KEY is set, "
+            "'github-models' when a GitHub token is available, otherwise skipped."
+        ),
+    )
+    parser.add_argument(
+        "--narrative-model",
+        default=None,
+        dest="narrative_model",
+        help=(
+            "Model name for narrative generation. "
+            "Defaults: claude-sonnet-4-6 (anthropic), gpt-4o-mini (github-models)."
+        ),
     )
     parser.add_argument(
         "--config",
@@ -3754,7 +3773,13 @@ def _write_report_outputs(
     if args.narrative:
         from src.narrative import generate_narrative
 
-        generate_narrative(report_data, output_dir)
+        generate_narrative(
+            report_data,
+            output_dir,
+            provider_name=args.narrative_provider,
+            model=args.narrative_model,
+            github_token=args.token,
+        )
 
     cache_info = ""
     if cache:
