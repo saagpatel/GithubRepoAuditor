@@ -177,7 +177,13 @@ The new `--approval-center` path is also read-only. It loads the latest report p
 
 **AI narrative providers.** `--narrative` works with either `--narrative-provider anthropic` (requires `ANTHROPIC_API_KEY`) or `--narrative-provider github-models` (uses your existing GitHub PAT with the `models: read` scope). The provider defaults to `anthropic` when `ANTHROPIC_API_KEY` is set, or `github-models` when only a GitHub token is available. Override the model with `--narrative-model <name>` (defaults: `claude-haiku-4-5-20251001` for anthropic; `gpt-4o-mini` for github-models).
 
-**GHAS alerts.** Pass `--ghas-alerts` to fetch open Dependabot, CodeQL, and Secret-scanning alert counts via GitHub's API. Implicitly enabled when `--vuln-check` is used. Output: `output/ghas-alerts-<user>-<date>.json`. Excel and control-center surfacing is deferred to Sprint 2 S2.4; JSON output only for now.
+**GHAS alerts.** Pass `--ghas-alerts` to fetch open Dependabot, CodeQL, and Secret-scanning alert counts via GitHub's API. Implicitly enabled when `--vuln-check` is used. Output: `output/ghas-alerts-<user>-<date>.json`. Excel and control-center surfacing is now wired (S2.4); the operator brief shows OSSF score and flags low-score repos automatically when `--ossf-scorecard` is set.
+
+**Performance flags (opt-in, default: sync/cached).** `--fetch-mode async` switches per-repo enrichment prefetch to `src/github_client_async.py` (httpx + asyncio), bounded by `--fetch-workers N` (default 10). Delivers ~9.7x speedup on large portfolios; respects `Retry-After` and warm-populates the existing response cache so subsequent sync calls hit cache. `--no-analyzer-cache` disables the per-(repo, sha, analyzer) result cache for the run; use when forcing a completely fresh pass.
+
+**Data-source flags (opt-in, defaults preserve existing behavior).** `--sbom-source github` switches `DependenciesAnalyzer` to GitHub's SBOM endpoint (`GET /repos/{owner}/{repo}/dependency-graph/sbom`, SPDX 2.3) instead of lockfile parsing; falls back to lockfile per-repo on 403/404/timeout and eliminates the need to clone for the dep pass. `--ossf-scorecard` fetches pre-computed OSSF Scorecard scores from `https://api.securityscorecards.dev/projects/github.com/{owner}/{repo}` (no auth); 404 records `{"available": false}` and output lands in `output/ossf-scorecard-<user>-<date>.json`. `OSSF_SCORECARD_BASE_URL` env var overrides the endpoint (useful for tests).
+
+**Release-gate flag.** `--reconcile-cache` re-runs all analyzers after the audit with the cache disabled and deep-compares results against the cached values (1e-6 float tolerance). Exits non-zero on divergence and writes `output/cache-reconcile-<user>-<date>.json`. Intended for CI release gates, not normal runs.
 
 Watch mode now supports `--watch-strategy adaptive|incremental|full`. `adaptive` is the default and uses the stored baseline contract plus the scheduled full-refresh interval to decide whether each watch cycle should run full or incremental.
 
@@ -199,6 +205,8 @@ pytest
 | Complexity analysis | Radon |
 | CLI output | Rich |
 | Storage | SQLite (history warehouse) |
+| Dependency scanning | Lockfile parsing + OSV.dev API; GitHub SBOM endpoint (SPDX 2.3) as alternate source via `--sbom-source github` |
+| OSSF Scorecard | Pre-computed scores from `api.securityscorecards.dev` via `--ossf-scorecard`; no auth required |
 
 ## Architecture
 

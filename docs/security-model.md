@@ -47,7 +47,31 @@ Required scope: `repo` for private repos; alerts are read-only and no mutation o
 
 Failure behavior: a 403 or 404 on any endpoint records `available: false` for that alert type and continues without raising an exception. This handles repos where GHAS is not enabled or the token lacks the right scope.
 
-Output lands in `output/ghas-alerts-<user>-<date>.json`. Excel and control-center surfacing is deferred to Sprint 2 S2.4; the JSON file is the only current consumer.
+Output lands in `output/ghas-alerts-<user>-<date>.json`. Excel and control-center surfacing is wired via S2.4.
+
+## OSSF Scorecard
+
+Pass `--ossf-scorecard` to enrich each repo with pre-computed OSSF Scorecard data.
+
+Endpoint: `GET https://api.securityscorecards.dev/projects/github.com/{owner}/{repo}` — no authentication required.
+
+Failure behavior: a 404 records `{"available": false}` and continues without raising an exception. Repos without a scorecard entry are skipped gracefully.
+
+Output lands in `output/ossf-scorecard-<user>-<date>.json`. Excel and control-center surfacing happens automatically when `--ossf-scorecard` is set (S2.4): the operator brief shows the OSSF score and flags repos with low scores.
+
+Override the endpoint with `OSSF_SCORECARD_BASE_URL` (useful for test isolation).
+
+## GitHub SBOM as Dependency Source
+
+Pass `--sbom-source github` to switch `DependenciesAnalyzer` from lockfile parsing to GitHub's dependency-graph SBOM endpoint.
+
+Endpoint: `GET /repos/{owner}/{repo}/dependency-graph/sbom` — returns an SPDX 2.3 document. Required scope: `repo` for private repos (same token used elsewhere).
+
+Failure behavior: a 403 or 404 falls back to lockfile parsing for that repo and continues without raising an exception.
+
+Advantages over lockfile parsing: catches transitive dependencies that lockfiles omit; does not require a local clone for the dep pass.
+
+Default is `--sbom-source lockfile`, which preserves existing behavior.
 
 ## Governed Controls
 

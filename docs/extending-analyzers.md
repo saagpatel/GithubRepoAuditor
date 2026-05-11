@@ -33,7 +33,7 @@ In addition to existing README quality fields, `ReadmeAnalyzer` now produces:
 - `readme_staleness_ratio` — `readme_last_touched_days / code_last_touched_days`; higher means the README is aging faster than the code
 - `readme_stale` — boolean; `true` when `readme_staleness_ratio > 5.0` AND `code_last_touched_days < 90`, i.e., the README is more than five times older than the code and the code is still being actively touched
 
-Excel and control-center surfacing for these staleness fields is deferred to Sprint 2 S2.4; they are present in JSON output today.
+Excel and control-center surfacing for these staleness fields is wired via S2.4.
 
 ### ActivityAnalyzer
 
@@ -45,7 +45,35 @@ Excel and control-center surfacing for these staleness fields is deferred to Spr
 - `latest_release_age_days` — days since the most recent release was published
 - `latest_release_is_prerelease` — boolean; whether the most recent release is marked as a pre-release
 
-Excel and control-center surfacing for these release fields is deferred to Sprint 2 S2.4; they are present in JSON output today.
+Excel and control-center surfacing for these release fields is wired via S2.4.
+
+## Analyzer Cache Contract
+
+Analyzers can opt in to per-(repo, sha, analyzer) result caching. Cached results are stored in the `analyzer_cache` SQLite table. A cache hit is fully transparent to callers — the framework substitutes the stored result without invoking the analyzer.
+
+### Opting in
+
+Implement `cache_inputs_hash()` on your analyzer class. It must return a stable string hash derived from all inputs that affect the result. Inputs that count as stable:
+
+- Lockfile bytes (content hash, not path)
+- README file content + git commit timestamps
+- Sorted directory listing + primary language string
+
+Inputs that are **not** stable (do not include): wall-clock time, run-specific IDs, mutable config values.
+
+### Current opt-ins
+
+Three analyzers currently opt in:
+
+- `DependenciesAnalyzer` — hashes lockfile bytes
+- `ReadmeAnalyzer` — hashes README content + git timestamps
+- `StructureAnalyzer` — hashes sorted directory listing + primary language
+
+### Validating correctness with `--reconcile-cache`
+
+Pass `--reconcile-cache` to re-run all analyzers after the audit with the cache disabled and deep-compare the fresh results against the cached values (1e-6 float tolerance for numeric fields). The run exits non-zero on any divergence and writes `output/cache-reconcile-<user>-<date>.json` with a full diff. This is a CI release-gate tool — not intended for normal runs.
+
+`--no-analyzer-cache` disables the cache for the entire run without the post-run comparison. Use it when you need a guaranteed-fresh pass without the overhead of reconciliation.
 
 ## Keep in mind
 

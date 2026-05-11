@@ -36,6 +36,8 @@ Goal:
 - decide what needs attention now versus what can safely wait
 - optionally add `--narrative-provider anthropic` or `--narrative-provider github-models` to generate an AI narrative summary; pair with `--narrative-model <name>` to override the default model
 - optionally add `--ghas-alerts` to pull open Dependabot, CodeQL, and Secret-scanning counts; also triggered automatically when `--vuln-check` is set
+- optionally add `--ossf-scorecard` to enrich repos with pre-computed OSSF Scorecard scores; low-score repos are flagged in the operator brief automatically
+- optionally add `--fetch-mode async --fetch-workers 10` for accelerated triage on large portfolios (~9.7x speedup); default is `--fetch-mode sync` which preserves existing behavior
 
 Visible weekly surfaces now share one compact weekly-story contract:
 - one headline
