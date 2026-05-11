@@ -5,7 +5,11 @@ from datetime import datetime, timedelta, timezone
 
 from src.baseline_context import build_baseline_context
 from src.models import AuditReport, RepoAudit, RepoMetadata
-from src.recurring_review import choose_watch_plan
+from src.recurring_review import (
+    MATERIALITY_THRESHOLDS,
+    choose_watch_plan,
+    evaluate_material_changes,
+)
 from src.warehouse import write_warehouse_snapshot
 
 
@@ -114,3 +118,53 @@ def test_choose_watch_plan_marks_full_refresh_due(tmp_path):
     assert plan.mode == "full"
     assert plan.reason == "full-refresh-due"
     assert plan.full_refresh_due is True
+
+
+def test_material_changes_skip_resolved_security_posture():
+    changes = evaluate_material_changes(
+        {"audits": []},
+        diff_data={
+            "repo_changes": [
+                {
+                    "name": "RepoA",
+                    "delta": 0.0,
+                    "lens_deltas": {},
+                    "security_change": {
+                        "old_label": "watch",
+                        "new_label": "healthy",
+                        "old_score": 0.8,
+                        "new_score": 0.9,
+                        "delta": 0.1,
+                    },
+                }
+            ]
+        },
+        thresholds=MATERIALITY_THRESHOLDS["standard"],
+    )
+
+    assert changes == []
+
+
+def test_material_changes_keep_unresolved_security_improvement():
+    changes = evaluate_material_changes(
+        {"audits": []},
+        diff_data={
+            "repo_changes": [
+                {
+                    "name": "RepoA",
+                    "delta": 0.0,
+                    "lens_deltas": {},
+                    "security_change": {
+                        "old_label": "critical",
+                        "new_label": "watch",
+                        "old_score": 0.4,
+                        "new_score": 0.7,
+                        "delta": 0.3,
+                    },
+                }
+            ]
+        },
+        thresholds=MATERIALITY_THRESHOLDS["standard"],
+    )
+
+    assert [change["change_type"] for change in changes] == ["security-change"]

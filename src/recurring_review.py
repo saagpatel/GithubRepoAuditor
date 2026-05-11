@@ -264,8 +264,11 @@ def evaluate_material_changes(
 
             security_change = item.get("security_change", {})
             if (
-                security_change.get("old_label") != security_change.get("new_label")
-                or abs(security_change.get("delta", 0.0)) >= thresholds["security"]
+                not _is_resolved_security_change(security_change)
+                and (
+                    security_change.get("old_label") != security_change.get("new_label")
+                    or abs(security_change.get("delta", 0.0)) >= thresholds["security"]
+                )
             ):
                 changes.append(
                     _change(
@@ -362,6 +365,15 @@ def evaluate_material_changes(
         seen.add(key)
         deduped.append(change)
     return deduped
+
+
+def _is_resolved_security_change(security_change: dict) -> bool:
+    """Return true when a security posture change is evidence of closure."""
+    return (
+        security_change.get("new_label") == "healthy"
+        and security_change.get("old_label") != "healthy"
+        and security_change.get("delta", 0.0) >= 0
+    )
 
 
 def _build_review_targets(report_data: dict, material_changes: list[dict], context: dict) -> list[dict]:
