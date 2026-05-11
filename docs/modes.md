@@ -34,6 +34,8 @@ Goal:
 - refresh the portfolio story
 - read the workbook in order
 - decide what needs attention now versus what can safely wait
+- optionally add `--narrative-provider anthropic` or `--narrative-provider github-models` to generate an AI narrative summary; pair with `--narrative-model <name>` to override the default model
+- optionally add `--ghas-alerts` to pull open Dependabot, CodeQL, and Secret-scanning counts; also triggered automatically when `--vuln-check` is set
 
 Visible weekly surfaces now share one compact weekly-story contract:
 - one headline

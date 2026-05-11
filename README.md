@@ -121,6 +121,7 @@ Treat campaign/writeback, GitHub Projects, Notion sync, catalog overrides, score
 - **Notion Integration** — Pushes audit signals into your Notion operating system: completeness cards, managed campaign records, and lifecycle-aware review sync
 - **History & Regression Detection** — Archives every run to SQLite, auto-diffs between runs, detects score regressions, and flags archive candidates
 - **AI Narrative** — Optional Claude-powered portfolio analysis that reads the audit data and writes a human-readable summary
+- **GHAS Alerts** — Optional fetch of open Dependabot, CodeQL, and Secret-scanning alert counts via GitHub's API; output written to `output/ghas-alerts-<user>-<date>.json`
 
 ## Quick Start
 
@@ -174,6 +175,10 @@ That same pass now also writes `weekly-command-center-<username>-<date>.json` pl
 
 The new `--approval-center` path is also read-only. It loads the latest report plus approval history, groups work into `Needs Re-Approval`, `Ready For Review`, `Approved But Manual`, and `Blocked`, and writes `approval-center-<username>-<date>.json` plus `.md`. Local approval capture stays separate from writeback apply.
 
+**AI narrative providers.** `--narrative` works with either `--narrative-provider anthropic` (requires `ANTHROPIC_API_KEY`) or `--narrative-provider github-models` (uses your existing GitHub PAT with the `models: read` scope). The provider defaults to `anthropic` when `ANTHROPIC_API_KEY` is set, or `github-models` when only a GitHub token is available. Override the model with `--narrative-model <name>` (defaults: `claude-haiku-4-5-20251001` for anthropic; `gpt-4o-mini` for github-models).
+
+**GHAS alerts.** Pass `--ghas-alerts` to fetch open Dependabot, CodeQL, and Secret-scanning alert counts via GitHub's API. Implicitly enabled when `--vuln-check` is used. Output: `output/ghas-alerts-<user>-<date>.json`. Excel and control-center surfacing is deferred to Sprint 2 S2.4; JSON output only for now.
+
 Watch mode now supports `--watch-strategy adaptive|incremental|full`. `adaptive` is the default and uses the stored baseline contract plus the scheduled full-refresh interval to decide whether each watch cycle should run full or incremental.
 
 ### Run tests
@@ -190,7 +195,7 @@ pytest
 | GitHub API | REST v3 + GraphQL (raw requests) |
 | Excel output | openpyxl + committed workbook template |
 | PDF output | fpdf2 |
-| AI narrative | Anthropic Claude API |
+| AI narrative | Anthropic Claude API or GitHub Models (OpenAI-compatible) |
 | Complexity analysis | Radon |
 | CLI output | Rich |
 | Storage | SQLite (history warehouse) |

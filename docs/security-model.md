@@ -33,6 +33,22 @@ It also adds nested provider detail:
 - `providers`
 - `recommendations`
 
+## GHAS Alert Fetch
+
+Pass `--ghas-alerts` (or use `--vuln-check`, which implicitly enables it) to fetch live open alert counts from GitHub Advanced Security endpoints.
+
+Three endpoints are queried per repo, all filtered to `state=open`:
+
+- Dependabot alerts — `GET /repos/{owner}/{repo}/dependabot/alerts`
+- Code scanning alerts — `GET /repos/{owner}/{repo}/code-scanning/alerts`
+- Secret scanning alerts — `GET /repos/{owner}/{repo}/secret-scanning/alerts`
+
+Required scope: `repo` for private repos; alerts are read-only and no mutation occurs. Public repos may surface partial data if GHAS features are not enabled.
+
+Failure behavior: a 403 or 404 on any endpoint records `available: false` for that alert type and continues without raising an exception. This handles repos where GHAS is not enabled or the token lacks the right scope.
+
+Output lands in `output/ghas-alerts-<user>-<date>.json`. Excel and control-center surfacing is deferred to Sprint 2 S2.4; the JSON file is the only current consumer.
+
 ## Governed Controls
 
 Security governance is no longer preview-only in the abstract. The tool now supports a bounded, manual, opt-in governed control family:
