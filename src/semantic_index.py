@@ -1,0 +1,433 @@
+"""Portfolio-wide semantic index for repo discovery and similarity search.
+
+Stores repo embeddings in a sqlite-vec virtual table (``repo_embeddings``) inside
+the portfolio warehouse DB.  Two embedder backends are supported:
+
+- ``voyage``  — Voyage AI ``voyage-code-3`` (512-dim, default).  Requires the
+  ``VOYAGE_API_KEY`` env var.
+- ``local``   — ``sentence-transformers/all-MiniLM-L6-v2`` (384-dim).  Requires
+  ``pip install -e ".[semantic]"``.
+
+Import-time guards ensure that missing optional deps surface a helpful message
+only when the module is *used*, not when it is merely imported.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import logging
+import os
+import sqlite3
+import time
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Protocol, runtime_checkable
+
+from src.models import RepoAudit
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Public types
+# ---------------------------------------------------------------------------
+
+VOYAGE_API_BASE_URL = os.environ.get("VOYAGE_API_BASE_URL", "https://api.voyageai.com/v1")
+VOYAGE_MODEL = "voyage-code-3"
+VOYAGE_DIM = 512
+LOCAL_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+LOCAL_DIM = 384
+
+
+@dataclass
+class SearchResult:
+    repo_name: str
+    score: float  # cosine distance (0 = identical, lower = more similar)
+    snippet: str
+
+
+@runtime_checkable
+class Embedder(Protocol):
+    """Minimal protocol for text embedders."""
+
+    name: str
+    dimension: int
+
+    def embed(self, texts: list[str]) -> list[list[float]]: ...
+
+
+# ---------------------------------------------------------------------------
+# Embedder implementations
+# ---------------------------------------------------------------------------
+
+
+class VoyageEmbedder:
+    """Voyage AI embedder using direct HTTP (no SDK)."""
+
+    name = "voyage-code-3"
+    dimension = VOYAGE_DIM
+
+    def __init__(self, api_key: str | None = None) -> None:
+        self._api_key = api_key or os.environ.get("VOYAGE_API_KEY") or ""
+        if not self._api_key:
+            raise RuntimeError(
+                "VOYAGE_API_KEY environment variable is not set. Export it or use --embedder local."
+            )
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        import requests  # already a core dep
+
+        url = f"{VOYAGE_API_BASE_URL}/embeddings"
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": VOYAGE_MODEL,
+            "input": texts,
+            "output_dimension": self.dimension,
+            "output_dtype": "float",
+        }
+        resp = requests.post(url, headers=headers, json=payload, timeout=60)
+        resp.raise_for_status()
+        data = resp.json()
+        return [item["embedding"] for item in data["data"]]
+
+
+class LocalEmbedder:
+    """sentence-transformers local fallback (optional dep)."""
+
+    name = "sentence-transformers/all-MiniLM-L6-v2"
+    dimension = LOCAL_DIM
+
+    def __init__(self) -> None:
+        try:
+            from sentence_transformers import SentenceTransformer  # type: ignore[import]
+
+            self._model = SentenceTransformer(LOCAL_MODEL)
+        except ImportError as exc:
+            raise ImportError(
+                "sentence-transformers is not installed. Run: pip install -e '.[semantic]'"
+            ) from exc
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        vecs = self._model.encode(texts, convert_to_numpy=True)
+        return [v.tolist() for v in vecs]
+
+
+# ---------------------------------------------------------------------------
+# Helper: doc construction
+# ---------------------------------------------------------------------------
+
+
+def build_repo_doc(audit: RepoAudit) -> str:
+    """Build a text document from a RepoAudit for embedding."""
+    meta = audit.metadata
+    name = meta.name
+    description = meta.description or ""
+    topics = ", ".join(meta.topics) if meta.topics else "—"
+    language = meta.language or "—"
+
+    # Collect file-like signals from structure analyzer details
+    source_dirs: list[str] = []
+    config_files: list[str] = []
+    for ar in audit.analyzer_results:
+        if ar.dimension == "structure":
+            source_dirs = ar.details.get("source_dirs", [])[:10]
+            config_files = ar.details.get("config_files", [])[:10]
+            break
+
+    all_files = source_dirs + config_files
+    files_str = ", ".join(all_files[:20]) if all_files else "—"
+
+    # README first paragraph from readme analyzer details
+    readme_snippet = ""
+    for ar in audit.analyzer_results:
+        if ar.dimension == "readme":
+            readme_snippet = ar.details.get("first_paragraph", "")
+            break
+
+    parts = [
+        name,
+        description,
+        "",
+        readme_snippet[:2000] if readme_snippet else "",
+        "",
+        f"Files: {files_str}",
+        f"Topics: {topics}",
+        f"Language: {language}",
+    ]
+    return "\n".join(parts).strip()
+
+
+# ---------------------------------------------------------------------------
+# Schema helpers
+# ---------------------------------------------------------------------------
+
+_SCHEMA_VEC = """
+CREATE VIRTUAL TABLE IF NOT EXISTS repo_embeddings USING vec0(
+    embedding FLOAT[{dim}] distance_metric=cosine
+);
+"""
+
+_SCHEMA_META = """
+CREATE TABLE IF NOT EXISTS repo_embedding_meta (
+    rowid INTEGER PRIMARY KEY,
+    repo_name TEXT UNIQUE NOT NULL,
+    doc_sha256 TEXT NOT NULL,
+    embedder_name TEXT NOT NULL,
+    pushed_at TEXT,
+    indexed_at TEXT NOT NULL
+);
+"""
+
+
+def _load_sqlite_vec(conn: sqlite3.Connection) -> None:
+    """Load the sqlite-vec extension into a connection."""
+    try:
+        import sqlite_vec  # type: ignore[import]
+    except ImportError as exc:
+        raise ImportError("sqlite-vec is not installed. Run: pip install -e '.[semantic]'") from exc
+    conn.enable_load_extension(True)
+    sqlite_vec.load(conn)
+    conn.enable_load_extension(False)
+
+
+def _ensure_schema(conn: sqlite3.Connection, dimension: int) -> None:
+    _load_sqlite_vec(conn)
+    conn.executescript(_SCHEMA_VEC.format(dim=dimension))
+    conn.executescript(_SCHEMA_META)
+    conn.commit()
+
+
+def _doc_sha256(text: str) -> str:
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# SemanticIndex
+# ---------------------------------------------------------------------------
+
+
+class SemanticIndex:
+    """Portfolio-wide semantic index backed by sqlite-vec.
+
+    Parameters
+    ----------
+    db_path:
+        Path to the warehouse SQLite database (``portfolio-warehouse.db``).
+    embedder:
+        An :class:`Embedder` instance.  Pass ``None`` to construct with
+        :meth:`from_embedder_name`.
+    """
+
+    def __init__(self, db_path: Path, embedder: Embedder) -> None:
+        self._db_path = db_path
+        self._embedder = embedder
+
+    # ------------------------------------------------------------------
+    # Factory helpers
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def from_embedder_name(
+        cls, db_path: Path, embedder_name: str = "voyage"
+    ) -> "SemanticIndex | None":
+        """Return a SemanticIndex, or None with a logged reason if unavailable."""
+        embedder: Embedder
+        if embedder_name == "voyage":
+            try:
+                embedder = VoyageEmbedder()
+            except RuntimeError as exc:
+                logger.warning("Semantic index unavailable: %s", exc)
+                return None
+        elif embedder_name == "local":
+            try:
+                embedder = LocalEmbedder()
+            except ImportError as exc:
+                logger.warning("Semantic index unavailable: %s", exc)
+                return None
+        else:
+            logger.warning("Unknown embedder '%s'. Choose 'voyage' or 'local'.", embedder_name)
+            return None
+
+        # Verify sqlite-vec is importable
+        try:
+            import sqlite_vec  # type: ignore[import]  # noqa: F401
+        except ImportError:
+            logger.warning(
+                "Semantic index unavailable: sqlite-vec not installed. "
+                "Run: pip install -e '.[semantic]'"
+            )
+            return None
+
+        return cls(db_path, embedder)
+
+    # ------------------------------------------------------------------
+    # Connection helper
+    # ------------------------------------------------------------------
+
+    def _connect(self) -> sqlite3.Connection:
+        self._db_path.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(self._db_path)
+        _ensure_schema(conn, self._embedder.dimension)
+        return conn
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def reindex(self, audits: list[RepoAudit], *, force: bool = False) -> dict[str, object]:
+        """Embed each repo's document.  Skip if doc_sha256 and embedder unchanged.
+
+        Returns
+        -------
+        dict with keys: ``embedded``, ``skipped``, ``total``, ``duration_s``.
+        """
+        conn = self._connect()
+        try:
+            return self._reindex_inner(conn, audits, force=force)
+        finally:
+            conn.close()
+
+    def _reindex_inner(
+        self, conn: sqlite3.Connection, audits: list[RepoAudit], *, force: bool
+    ) -> dict[str, object]:
+        t0 = time.perf_counter()
+        embedded = 0
+        skipped = 0
+
+        # Load existing meta for quick lookups
+        existing: dict[str, dict] = {}
+        for row in conn.execute(
+            "SELECT repo_name, doc_sha256, embedder_name FROM repo_embedding_meta"
+        ).fetchall():
+            existing[row[0]] = {"doc_sha256": row[1], "embedder_name": row[2]}
+
+        # Partition into need-embed vs skip
+        to_embed: list[tuple[RepoAudit, str, str]] = []  # (audit, doc, sha)
+        for audit in audits:
+            doc = build_repo_doc(audit)
+            sha = _doc_sha256(doc)
+            prev = existing.get(audit.metadata.name)
+            if (
+                not force
+                and prev is not None
+                and prev["doc_sha256"] == sha
+                and prev["embedder_name"] == self._embedder.name
+            ):
+                skipped += 1
+            else:
+                to_embed.append((audit, doc, sha))
+
+        # Embed in batches of 32
+        batch_size = 32
+        for i in range(0, len(to_embed), batch_size):
+            batch = to_embed[i : i + batch_size]
+            docs = [item[1] for item in batch]
+            vectors = self._embedder.embed(docs)
+
+            for (audit, doc, sha), vec in zip(batch, vectors):
+                repo_name = audit.metadata.name
+                pushed_at = (
+                    audit.metadata.pushed_at.isoformat() if audit.metadata.pushed_at else None
+                )
+                indexed_at = datetime.now(timezone.utc).isoformat()
+
+                # Get or create rowid via meta table
+                row = conn.execute(
+                    "SELECT rowid FROM repo_embedding_meta WHERE repo_name = ?",
+                    (repo_name,),
+                ).fetchone()
+
+                if row is not None:
+                    rowid = row[0]
+                    # Update meta
+                    conn.execute(
+                        """UPDATE repo_embedding_meta
+                           SET doc_sha256=?, embedder_name=?, pushed_at=?, indexed_at=?
+                           WHERE rowid=?""",
+                        (sha, self._embedder.name, pushed_at, indexed_at, rowid),
+                    )
+                    # Delete old vec row then re-insert (vec0 doesn't support UPDATE)
+                    conn.execute("DELETE FROM repo_embeddings WHERE rowid=?", (rowid,))
+                else:
+                    # Insert meta first to get rowid
+                    cur = conn.execute(
+                        """INSERT INTO repo_embedding_meta
+                           (repo_name, doc_sha256, embedder_name, pushed_at, indexed_at)
+                           VALUES (?, ?, ?, ?, ?)""",
+                        (repo_name, sha, self._embedder.name, pushed_at, indexed_at),
+                    )
+                    rowid = cur.lastrowid
+
+                # Insert embedding with the same rowid
+                vec_str = "[" + ", ".join(str(v) for v in vec) + "]"
+                conn.execute(
+                    "INSERT INTO repo_embeddings(rowid, embedding) VALUES (?, ?)",
+                    (rowid, vec_str),
+                )
+                embedded += 1
+
+        conn.commit()
+        return {
+            "embedded": embedded,
+            "skipped": skipped,
+            "total": len(audits),
+            "duration_s": round(time.perf_counter() - t0, 3),
+        }
+
+    def search(self, query: str, *, k: int = 5) -> list[SearchResult]:
+        """Top-K cosine retrieval.  Returns ranked results (ascending distance)."""
+        conn = self._connect()
+        try:
+            return self._search_inner(conn, query, k=k)
+        finally:
+            conn.close()
+
+    def _search_inner(self, conn: sqlite3.Connection, query: str, *, k: int) -> list[SearchResult]:
+        vec = self._embedder.embed([query])[0]
+        vec_str = "[" + ", ".join(str(v) for v in vec) + "]"
+
+        rows = conn.execute(
+            """
+            SELECT m.repo_name, e.distance, m.doc_sha256
+            FROM repo_embeddings e
+            JOIN repo_embedding_meta m ON e.rowid = m.rowid
+            WHERE e.embedding MATCH ?
+              AND k = ?
+            ORDER BY e.distance
+            """,
+            (vec_str, k),
+        ).fetchall()
+
+        results = []
+        for repo_name, distance, _sha in rows:
+            snippet = f"repo: {repo_name}"
+            results.append(SearchResult(repo_name=repo_name, score=distance, snippet=snippet))
+        return results
+
+
+# ---------------------------------------------------------------------------
+# CLI convenience wrappers (thin, testable callables)
+# ---------------------------------------------------------------------------
+
+
+def _run_reindex(
+    index: SemanticIndex,
+    audits: list[RepoAudit],
+    *,
+    force: bool = False,
+) -> dict[str, object]:
+    """Run reindex and return the summary dict.  Called from cli.py."""
+    return index.reindex(audits, force=force)
+
+
+def _run_search(
+    index: SemanticIndex,
+    query: str,
+    *,
+    k: int = 5,
+) -> list[SearchResult]:
+    """Run a semantic search and return ranked results.  Called from cli.py."""
+    return index.search(query, k=k)

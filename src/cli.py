@@ -669,6 +669,46 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="PATH",
         help="Path to a JSON file with generated improvements (descriptions, topics, READMEs)",
     )
+    # ── Semantic index (Arc F S3.1) ────────────────────────────────────
+    parser.add_argument(
+        "--reindex",
+        action="store_true",
+        help=(
+            "After audit completes, rebuild the portfolio semantic index. "
+            "Only re-embeds repos whose doc content changed since last index. "
+            "Requires VOYAGE_API_KEY (default) or --embedder local."
+        ),
+    )
+    parser.add_argument(
+        "--reindex-force",
+        action="store_true",
+        help="Re-embed all repos even if content unchanged (use after embedder model upgrade).",
+    )
+    parser.add_argument(
+        "--semantic-search",
+        default=None,
+        metavar="QUERY",
+        help=(
+            "Run a semantic search against the existing portfolio index and print top-5 results. "
+            "No audit is performed; the warehouse must have been indexed with --reindex first."
+        ),
+    )
+    parser.add_argument(
+        "--ask",
+        default=None,
+        metavar="QUERY",
+        help="Alias for --semantic-search.",
+    )
+    parser.add_argument(
+        "--embedder",
+        choices=["voyage", "local"],
+        default="voyage",
+        help=(
+            "Embedder backend for --reindex / --semantic-search. "
+            "'voyage' uses Voyage AI voyage-code-3 (requires VOYAGE_API_KEY). "
+            "'local' uses sentence-transformers/all-MiniLM-L6-v2 (requires [semantic] extra)."
+        ),
+    )
     return parser
 
 
@@ -3813,6 +3853,10 @@ def _write_report_outputs(
     raw_path = write_raw_metadata(report, output_dir)
     warehouse_path = write_warehouse_snapshot(report, output_dir, json_path)
 
+    # ── Semantic reindex (Arc F S3.1) ──────────────────────────────────
+    if getattr(args, "reindex", False) or getattr(args, "reindex_force", False):
+        _maybe_run_reindex(report, warehouse_path, args)
+
     if archive and write_json:
         archive_report(json_path)
     if save_fingerprint_data:
@@ -4423,6 +4467,67 @@ def _print_dry_run_summary(repos: list[RepoMetadata]) -> None:
     console.print(f"[dim]{len(repos)} repos would be audited, est {est_mb:.1f} MB[/dim]")
 
 
+# ── Semantic index helpers (Arc F S3.1) ───────────────────────────────
+
+
+def _maybe_run_reindex(report: "AuditReport", warehouse_path: Path, args: object) -> None:
+    """Run semantic reindex after audit.  Skips gracefully if deps missing."""
+    from src.semantic_index import SemanticIndex, _run_reindex
+
+    embedder_name: str = getattr(args, "embedder", "voyage")
+    force: bool = getattr(args, "reindex_force", False)
+
+    idx = SemanticIndex.from_embedder_name(warehouse_path, embedder_name)
+    if idx is None:
+        print_warning(
+            "Semantic reindex skipped — embedder unavailable. "
+            "Set VOYAGE_API_KEY or use --embedder local with [semantic] extra installed."
+        )
+        return
+
+    summary = _run_reindex(idx, report.audits, force=force)
+    print_info(
+        f"Semantic index: {summary['embedded']} embedded, "
+        f"{summary['skipped']} skipped, "
+        f"{summary['total']} total "
+        f"({summary['duration_s']:.2f}s)"
+    )
+
+
+def _run_semantic_search_mode(args: object, query: str) -> None:
+    """Run a standalone semantic search against the existing warehouse index."""
+    from src.semantic_index import SemanticIndex, _run_search
+    from src.warehouse import WAREHOUSE_FILENAME
+
+    output_dir = Path(getattr(args, "output_dir", "output"))
+    warehouse_path = output_dir / WAREHOUSE_FILENAME
+    if not warehouse_path.exists():
+        print_warning(
+            f"Warehouse not found at {warehouse_path}. "
+            "Run an audit with --reindex first to build the semantic index."
+        )
+        return
+
+    embedder_name: str = getattr(args, "embedder", "voyage")
+    idx = SemanticIndex.from_embedder_name(warehouse_path, embedder_name)
+    if idx is None:
+        print_warning(
+            "Semantic search unavailable — embedder not configured. "
+            "Set VOYAGE_API_KEY or use --embedder local."
+        )
+        return
+
+    results = _run_search(idx, query, k=5)
+    if not results:
+        print_info("No results found in semantic index. Run --reindex first.")
+        return
+
+    print_info(f'Semantic search: "{query}"\n')
+    for i, r in enumerate(results, 1):
+        print_info(f"  {i}. {r.repo_name}  (distance={r.score:.4f})")
+        print_info(f"     {r.snippet}")
+
+
 # ── Main entry point ──────────────────────────────────────────────────
 def main() -> None:
     parser = build_parser()
@@ -4490,6 +4595,12 @@ def main() -> None:
 
     if args.watch:
         _run_watch_mode(args, config_inspection)
+        return
+
+    # ── Semantic search standalone mode (no audit needed) ─────────────
+    query = getattr(args, "semantic_search", None) or getattr(args, "ask", None)
+    if query:
+        _run_semantic_search_mode(args, query)
         return
 
     _run_main_audit_cycle(args, config_inspection)

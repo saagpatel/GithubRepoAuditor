@@ -22,8 +22,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "ruff>=0.4", "mypy>=1.10", "mutmut>=2.5"]
+dev = ["pytest>=8.0", "ruff>=0.4", "mypy>=1.10", "mutmut>=2.5", "responses>=0.25"]
 config = ["pyyaml>=6.0"]
+semantic = [
+    "sqlite-vec>=0.1.0",
+    "sentence-transformers>=3.0",
+]
 
 [project.scripts]
 audit = "src.cli:main"
