@@ -1,4 +1,4 @@
-.PHONY: install install-dev doctor audit control-center demo benchmark workbook-gate workbook-signoff test lint format type-check run clean
+.PHONY: install install-dev doctor audit control-center demo benchmark workbook-gate workbook-signoff test lint format type-check run clean release-gate
 
 PYTHON := python3
 USERNAME ?= saagpatel
@@ -45,6 +45,27 @@ type-check:
 
 run:
 	audit --help
+
+release-gate:
+	@echo "=== Running release gate: mutation testing ==="
+	@echo "Requires: python3.13, mutmut 2.x installed in python3.13 environment"
+	rm -rf .mutmut-cache mutants/
+	python3.13 -m mutmut run
+	@echo ""
+	@echo "=== Mutation results ==="
+	python3.13 -c "\
+import sqlite3; \
+conn = sqlite3.connect('.mutmut-cache'); \
+rows = conn.execute('SELECT status, count(*) FROM Mutant GROUP BY status').fetchall(); \
+total = sum(r[1] for r in rows); \
+killed = next((r[1] for r in rows if r[0] == 'ok_killed'), 0); \
+survived = next((r[1] for r in rows if r[0] == 'bad_survived'), 0); \
+timeout = next((r[1] for r in rows if r[0] == 'bad_timeout'), 0); \
+denom = killed + survived; \
+rate = killed / denom if denom > 0 else 0.0; \
+print(f'Total: {total} | Killed: {killed} | Survived: {survived} | Timeout: {timeout}'); \
+print(f'Kill rate: {rate:.1%}'); \
+exit(0 if rate >= 0.85 else 1)"
 
 clean:
 	rm -rf .pytest_cache __pycache__ dist build *.egg-info

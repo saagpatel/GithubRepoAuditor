@@ -1,0 +1,112 @@
+# Release Gates
+
+This document describes the pre-release quality gates for the GithubRepoAuditor project. Gates must pass before tagging a release.
+
+## Standard Gate (all releases)
+
+```bash
+python3 -m pytest -q -p no:cacheprovider   # full suite must be green
+python3 -m ruff check src/ tests/           # no lint errors
+```
+
+## Mutation-Testing Gate (scope: auto_apply + scorer)
+
+Mutation testing is scoped to the two files that guard automated actions:
+
+| File | Why gated |
+|------|-----------|
+| `src/auto_apply.py` | Trust-bar gating — controls which repos receive automated writes |
+| `src/scorer.py` | Scoring/tier logic — drives completeness tiers and portfolio grades |
+
+### Required threshold
+
+**Kill rate ≥ 85%** per combined run (killed ÷ (killed + survived), timeouts excluded).
+
+### Running the gate
+
+```bash
+make release-gate
+```
+
+Or manually:
+
+```bash
+rm -rf .mutmut-cache mutants/
+python3.13 -m mutmut run
+```
+
+Query results directly (the `mutmut results` command crashes on Python 3.13):
+
+```bash
+python3.13 -c "
+import sqlite3
+conn = sqlite3.connect('.mutmut-cache')
+rows = conn.execute('SELECT status, count(*) FROM Mutant GROUP BY status').fetchall()
+for r in rows: print(r)
+killed = next(r[1] for r in rows if r[0] == 'ok_killed')
+survived = next((r[1] for r in rows if r[0] == 'bad_survived'), 0)
+print(f'Kill rate: {killed / (killed + survived):.1%}')
+"
+```
+
+### Setup requirements
+
+mutmut 2.x is incompatible with Python 3.14 (pony ORM `deepcopy` crash). Use Python 3.13:
+
+```bash
+python3.13 -m pip install 'mutmut>=2.0,<3.0'
+python3.13 -m pip install -e ".[dev,config]"
+```
+
+mutmut 3.x is incompatible with this project's `src.` layout (rejects module names starting with `src.`). The locked version constraint in `pyproject.toml` (`mutmut>=2.5` under `[tool.mutmut]`) documents this.
+
+### Configuration
+
+`[tool.mutmut]` in `pyproject.toml`:
+
+```toml
+[tool.mutmut]
+paths_to_mutate = "src/auto_apply.py,src/scorer.py"
+runner = "python3.13 -m pytest -q -p no:cacheprovider -x tests/test_auto_apply.py tests/test_scorer.py"
+tests_dir = "tests/"
+```
+
+### Equivalent mutants
+
+The following survivors are confirmed equivalent mutants — behavioral tests cannot distinguish them:
+
+**src/auto_apply.py**
+
+| ID | Line | Pattern | Why equivalent |
+|----|------|---------|----------------|
+| 27, 28 | 48 | Second `or "elevated"` in risk_tier | `str()` always returns a string; the outer `or` fallback is unreachable |
+| 43, 44 | 64 | Default `""` in display_name | Guarded immediately by `if not repo_name: continue` |
+| 58 | 71 | `or "XXelevatedXX"` in summarize_trust_bar | Same unreachable-fallback pattern |
+| 75, 80 | 92–93 | `or "XXXX"` in get_approved_manual_campaigns | Mutated default never equals the string being compared |
+| 106 | 132 | `or "XXXX"` in filter_trusted_repo_actions | Same pattern |
+
+**src/scorer.py**
+
+| ID | Line | Pattern | Why equivalent |
+|----|------|---------|----------------|
+| 168 | 66 | `security_offline: bool = False` | Parameter default; never mutated at call sites under test |
+| 173 | 75 | `+ FORK_ACTIVITY_WEIGHT` vs `-` | With uniform scores, redistribution direction doesn't change overall_score materially |
+| 175 | 76 | `weights["XXactivityXX"]` | activity weight is read back in the weighted sum; XXactivity key is ignored |
+| 178 | 77 | `k != "XXactivityXX"` | activity is always in weights; excluding a nonexistent key is a no-op |
+| 183, 184 | 80 | `* (w/other_total)` vs `/ (w/other_total)` | With uniform scores, proportional redistribution gives same weighted average |
+| 225, 226 | 112 | `tier = "XXabandonedXX"` / `None` | Loop always overwrites (COMPLETENESS_TIERS ends with threshold 0.0) |
+| 227 | 114 | `>= threshold` → `> threshold` | Floating-point prevents exact equality at tier boundaries in practice |
+| 230, 231 | 119 | `interest_tier = "XXmundaneXX"` / `None` | Loop always overwrites (INTEREST_TIERS ends with threshold 0.0) |
+| 236, 241, 246 | 126–130 | Default `2.0` vs `1.0` for missing dims | `== 0.0` check: neither `1.0` nor `2.0` equals `0.0` |
+| 251 | 136 | `>= 0.5` vs `> 0.5` | Score exactly 0.5 yields "functional" tier anyway (not "shipped"), so cap doesn't fire |
+| 304 | 213 | `>= 0.3` vs `> 0.3` for mid-tier boundary | Exact 0.3 shipped_ratio is rare in test scenarios |
+
+### Current kill rates (last measured: 2026-05-10)
+
+| File | Mutants | Killed | Survived | Kill Rate |
+|------|---------|--------|----------|-----------|
+| src/auto_apply.py | ~155 | ~146 | ~9 | ~94% |
+| src/scorer.py | ~200 | ~182 | ~16 | ~92% |
+| **Combined** | **354** | **328** | **25** | **92.9%** |
+
+(1 timeout excluded from denominator; 1 suspicious counted as killed)

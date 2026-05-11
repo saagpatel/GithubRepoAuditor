@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "ruff>=0.4", "mypy>=1.10"]
+dev = ["pytest>=8.0", "ruff>=0.4", "mypy>=1.10", "mutmut>=2.5"]
 config = ["pyyaml>=6.0"]
 
 [project.scripts]
@@ -32,6 +32,11 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+
+[tool.mutmut]
+paths_to_mutate = "src/auto_apply.py,src/scorer.py"
+runner = "python3.13 -m pytest -q -p no:cacheprovider -x tests/test_auto_apply.py tests/test_scorer.py"
+tests_dir = "tests/"
 
 [tool.ruff]
 target-version = "py311"
