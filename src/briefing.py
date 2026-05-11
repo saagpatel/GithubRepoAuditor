@@ -65,6 +65,7 @@ class Briefing:
     needs_attention: list[NeedsAttentionRepo] = field(default_factory=list)
     health_delta: dict[str, list[ScoreMover]] = field(default_factory=dict)  # up/down keys
     suggestions: list[Suggestion] = field(default_factory=list)
+    suppressed_by_prefs: list[str] = field(default_factory=list)  # repo names skipped due to prefs
 
 
 # ── Section builders ─────────────────────────────────────────────────────────
@@ -236,18 +237,46 @@ def _build_suggestions(
     audits: list[dict],
     provider: NarrativeProvider | None,
     model: str,
-) -> list[Suggestion]:
-    """
-    Generate one-sentence "suggested next action" for top-N repos.
+    *,
+    prefs: dict | None = None,
+) -> tuple[list[Suggestion], list[str]]:
+    """Generate one-sentence "suggested next action" for top-N repos.
+
     Uses LLM if provider is available; returns empty list on any failure.
+
+    Returns ``(suggestions, suppressed_names)`` where *suppressed_names* lists
+    repo names that were filtered out by active operator preference suppressions.
     """
+    from src.operator_prefs import is_suppressed
+
     # Pick top-N by hotspot priority or lowest-scoring actionable repos
-    top_repos = sorted(audits, key=lambda a: a.get("overall_score", 1.0))[:_SUGGESTION_TOP_N]
+    sorted_audits = sorted(audits, key=lambda a: a.get("overall_score", 1.0))
+
+    # Filter out suppressed repos/actions if prefs are provided
+    suppressed_names: list[str] = []
+    eligible: list[dict] = []
+    if prefs:
+        for audit in sorted_audits:
+            repo_name = audit.get("metadata", {}).get("name", "")
+            hotspots = audit.get("hotspots", [])
+            top_hotspot_type = hotspots[0].get("category", "") if hotspots else ""
+            # Check suppression: action_type=hotspot category, target_context=repo name or "*"
+            suppressed = (
+                is_suppressed(prefs, top_hotspot_type, repo_name) if top_hotspot_type else None
+            )
+            if suppressed is not None:
+                suppressed_names.append(repo_name)
+            else:
+                eligible.append(audit)
+    else:
+        eligible = sorted_audits
+
+    top_repos = eligible[:_SUGGESTION_TOP_N]
     if not top_repos:
-        return []
+        return [], suppressed_names
 
     if provider is None:
-        return []
+        return [], suppressed_names
 
     # Build a compact summary per repo
     summaries = []
@@ -273,10 +302,10 @@ def _build_suggestions(
         raw = provider.generate(prompt, model, max_tokens=150)
     except Exception as exc:
         logger.warning("briefing suggestion LLM call failed: %s", exc)
-        return []
+        return [], suppressed_names
 
     suggestions = _parse_suggestions_json(raw, top_repos)
-    return suggestions
+    return suggestions, suppressed_names
 
 
 def _parse_suggestions_json(raw: str, top_repos: list[dict]) -> list[Suggestion]:
@@ -319,12 +348,17 @@ def build_briefing(
     use_history: bool = True,
     provider: NarrativeProvider | None = None,
     model: str = _ANTHROPIC_BRIEFING_MODEL,
+    prefs: dict | None = None,
 ) -> Briefing:
-    """Build a structured weekly operator briefing from audit data."""
+    """Build a structured weekly operator briefing from audit data.
+
+    Pass *prefs* (loaded via ``operator_prefs.load_prefs``) to filter out
+    suggestions for actions the operator has repeatedly declined.
+    """
     shipped = _build_shipped(audits)
     needs_attention = _build_needs_attention(audits)
     health_delta = _build_health_delta(audits, use_history=use_history)
-    suggestions = _build_suggestions(audits, provider, model)
+    suggestions, suppressed_by_prefs = _build_suggestions(audits, provider, model, prefs=prefs)
 
     return Briefing(
         username=username,
@@ -333,6 +367,7 @@ def build_briefing(
         needs_attention=needs_attention,
         health_delta=health_delta,
         suggestions=suggestions,
+        suppressed_by_prefs=suppressed_by_prefs,
     )
 
 
@@ -559,6 +594,11 @@ def generate_briefing(
             file=sys.stderr,
         )
 
+    # Load operator prefs to suppress repeatedly-rejected suggestions
+    from src.operator_prefs import load_prefs, prefs_path
+
+    prefs = load_prefs(prefs_path(Path(output_dir)))
+
     briefing = build_briefing(
         audits,
         username,
@@ -566,6 +606,7 @@ def generate_briefing(
         use_history=True,
         provider=provider_obj,
         model=resolved_model,
+        prefs=prefs or None,
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)

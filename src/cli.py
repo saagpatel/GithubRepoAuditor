@@ -532,6 +532,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Filter approval-center output to one approval state (default: all)",
     )
     parser.add_argument(
+        "--reset-prefs",
+        action="store_true",
+        help="Delete output/operator_prefs.json and exit (clears all auto-detected suppression hints)",
+    )
+    parser.add_argument(
         "--approve-governance",
         action="store_true",
         help="Capture a local governance approval from the latest governed preview",
@@ -1567,6 +1572,31 @@ def _run_approval_center_mode(args, parser) -> None:
     )
     print_info(f"Approval center JSON: {approval_json}")
     print_info(f"Approval center Markdown: {approval_md}")
+
+    # ── Post-process: update suppression hints ────────────────────────────────
+    _post_process_approval_center_prefs(payload, report_output_dir)
+
+
+def _post_process_approval_center_prefs(payload: dict, output_dir: Path) -> None:
+    """Build rejection records from the approval ledger and update operator_prefs.json."""
+    from src.operator_prefs import (
+        load_rejection_events,
+        post_process_approval_session,
+    )
+
+    try:
+        rejection_records = load_rejection_events(output_dir)
+        total, newly_added = post_process_approval_session(
+            rejection_records,
+            output_dir,
+        )
+        print_info(f"Suppressions: {total} action type(s) suppressed ({newly_added} newly added).")
+    except Exception as exc:  # noqa: BLE001
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "operator_prefs post-process failed (non-fatal): %s", exc
+        )
 
 
 def _run_approval_capture_mode(args, parser) -> None:
@@ -4577,6 +4607,13 @@ def main() -> None:
     mode_state = validate_cli_mode_args(args, parser.error)
     portfolio_truth_mode = mode_state.portfolio_truth_mode
     portfolio_context_recovery_mode = mode_state.portfolio_context_recovery_mode
+
+    if getattr(args, "reset_prefs", False):
+        from src.operator_prefs import prefs_path, reset_prefs
+
+        reset_prefs(prefs_path(Path(args.output_dir)))
+        print_info("Operator prefs reset: suppression hints cleared.")
+        return
 
     if args.approval_center:
         _run_approval_center_mode(args, parser)
