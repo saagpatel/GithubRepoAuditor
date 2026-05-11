@@ -217,6 +217,12 @@ def build_parser() -> argparse.ArgumentParser:
         "Useful for reconcile gates that need fresh analyzer output.",
     )
     parser.add_argument(
+        "--reconcile-cache",
+        action="store_true",
+        help="After audit, re-run analyzers without cache and diff against cached results. "
+        "Exits non-zero on divergence. Intended for CI release gates.",
+    )
+    parser.add_argument(
         "--repos",
         nargs="+",
         default=None,
@@ -3038,6 +3044,7 @@ def _analyze_repos(
                 "falling back to per-repo sync fetch."
             )
 
+    _reconcile_diverged: bool = False
     clone_start = perf_counter()
     with clone_workspace(
         repos,
@@ -3125,12 +3132,72 @@ def _analyze_repos(
         if runtime_stats is not None:
             runtime_stats["analyzer_seconds"] = round(perf_counter() - analyze_start, 3)
 
+        # ── Cache reconcile gate ──────────────────────────────────────────────
+        _do_reconcile: bool = getattr(args, "reconcile_cache", False)
+        if _do_reconcile and _warehouse_conn is not None and audits:
+            from src.analyzer_cache import reconcile as _cache_reconcile
+            from src.analyzers import run_all_analyzers as _run_all
+
+            _repo_path_map: dict[str, object] = {
+                repo_meta.name: cloned.get(repo_meta.name) for repo_meta in repos
+            }
+            _repo_meta_map: dict[str, object] = {repo_meta.name: repo_meta for repo_meta in repos}
+            _sha_map: dict[str, str] = {
+                repo_meta.name: (repo_meta.pushed_at.isoformat() if repo_meta.pushed_at else "")
+                for repo_meta in repos
+            }
+
+            def _fresh_run(repo_path, meta, conn=None):
+                return _run_all(
+                    repo_path,
+                    meta,
+                    conn=None,
+                    commit_sha="",
+                    sbom_source=getattr(args, "sbom_source", "lockfile"),
+                )
+
+            _reconcile_report = _cache_reconcile(
+                _repo_path_map,
+                _repo_meta_map,
+                _warehouse_conn,
+                _fresh_run,
+                commit_sha_map=_sha_map,
+            )
+            _checked = _reconcile_report["checked"]
+            _matched = _reconcile_report["matched"]
+            _divergent = _reconcile_report["divergent"]
+            print_info(
+                f"Cache reconcile: {_matched}/{_checked} matched, {len(_divergent)} divergent"
+            )
+            if _divergent:
+                _reconcile_diverged = True
+                for _entry in _divergent:
+                    print_warning(
+                        f"  DIVERGE {_entry['repo']} {_entry['analyzer']}: {_entry['diff_summary']}"
+                    )
+                _output_dir_r = Path(getattr(args, "output_dir", "output"))
+                _output_dir_r.mkdir(parents=True, exist_ok=True)
+                import datetime as _dt
+                import json as _json
+
+                _stamp = _dt.date.today().isoformat()
+                _report_path = _output_dir_r / f"cache-reconcile-{args.username}-{_stamp}.json"
+                try:
+                    _report_path.write_text(
+                        _json.dumps(_reconcile_report, indent=2), encoding="utf-8"
+                    )
+                    print_warning(f"  Full divergence report: {_report_path}")
+                except Exception as _write_err:
+                    print_warning(f"Could not write reconcile report: {_write_err}")
+
     print_info("Clones cleaned up")
     if _warehouse_conn is not None:
         try:
             _warehouse_conn.close()
         except Exception:
             pass
+    if _reconcile_diverged:
+        sys.exit(1)
     return audits
 
 
