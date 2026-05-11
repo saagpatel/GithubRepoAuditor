@@ -40,16 +40,16 @@ The product now works best when you use one of four explicit modes:
 
 The flags stay the same underneath. The modes are the easiest way to understand when to use which workflow.
 
-See [docs/modes.md](/Users/d/Projects/GithubRepoAuditor/docs/modes.md) for the canonical mode guide.
+See [docs/modes.md](docs/modes.md) for the canonical mode guide.
 
 ## Recommended Default Path
 
 If you are starting fresh, use this sequence:
 
 ```bash
-audit <github-username> --doctor
-audit <github-username> --html
-audit <github-username> --control-center
+audit run <github-username> --doctor
+audit run <github-username> --html
+audit triage <github-username> --control-center
 ```
 
 Then open the workbook and read it in this order:
@@ -68,44 +68,47 @@ That is the default path the product is optimized around.
 ### First Run
 
 ```bash
-audit <github-username> --doctor
-audit <github-username> --html
-audit <github-username> --control-center
+audit run <github-username> --doctor
+audit run <github-username> --html
+audit triage <github-username> --control-center
 ```
 
 ### Weekly Review
 
 ```bash
-audit <github-username> --html
-audit <github-username> --control-center
-audit <github-username> --portfolio-truth
+audit run <github-username> --html
+audit triage <github-username> --control-center
+audit report <github-username> --portfolio-truth
 ```
 
 ### Deep Dive
 
 ```bash
-audit <github-username> --html --repos <repo-name>
-audit <github-username> --control-center
+audit run <github-username> --repos <repo-name> --html
+audit triage <github-username> --control-center
 ```
 
 ### Action Sync
 
 ```bash
-audit <github-username> --campaign security-review --writeback-target github
-audit <github-username> --campaign security-review --writeback-target all --github-projects
-audit <github-username> --approval-center
+audit report <github-username> --campaign security-review --writeback-target github
+audit report <github-username> --campaign security-review --writeback-target all --github-projects
+audit triage <github-username> --approval-center
 ```
 
 Treat campaign/writeback, GitHub Projects, Notion sync, catalog overrides, scorecards overrides, and `--excel-mode template` as advanced paths.
 
 ## Demo and Guides
 
-- Demo fixture: [fixtures/demo/sample-report.json](/Users/d/Projects/GithubRepoAuditor/fixtures/demo/sample-report.json)
-- Product modes: [docs/modes.md](/Users/d/Projects/GithubRepoAuditor/docs/modes.md)
-- Weekly operator workflow: [docs/weekly-review.md](/Users/d/Projects/GithubRepoAuditor/docs/weekly-review.md)
-- Operator troubleshooting: [docs/operator-troubleshooting.md](/Users/d/Projects/GithubRepoAuditor/docs/operator-troubleshooting.md)
-- Workbook tour: [docs/workbook-tour.md](/Users/d/Projects/GithubRepoAuditor/docs/workbook-tour.md)
-- Extending analyzers: [docs/extending-analyzers.md](/Users/d/Projects/GithubRepoAuditor/docs/extending-analyzers.md)
+- Demo fixture: [fixtures/demo/sample-report.json](fixtures/demo/sample-report.json)
+- Product modes: [docs/modes.md](docs/modes.md)
+- Web UI operator guide: [docs/audit-serve.md](docs/audit-serve.md)
+- CLI migration (flat → subcommand): [docs/audit-cli-migration.md](docs/audit-cli-migration.md)
+- Weekly operator workflow: [docs/weekly-review.md](docs/weekly-review.md)
+- Operator troubleshooting: [docs/operator-troubleshooting.md](docs/operator-troubleshooting.md)
+- Workbook tour: [docs/workbook-tour.md](docs/workbook-tour.md)
+- Extending analyzers: [docs/extending-analyzers.md](docs/extending-analyzers.md)
+- Release gates: [docs/release-gates.md](docs/release-gates.md)
 
 ## Features
 
@@ -132,55 +135,131 @@ Treat campaign/writeback, GitHub Projects, Notion sync, catalog overrides, score
 
 ### Installation
 
-```bash
-git clone https://github.com/saagpatel/GithubRepoAuditor.git
-cd GithubRepoAuditor
-python3 -m pip install -e ".[config]"
-```
-
-For contributor or local-dev work:
+The fastest paths — no git clone needed:
 
 ```bash
-python3 -m pip install -e ".[dev,config]"
+# uv (recommended)
+uv tool install githubrepoauditor
+
+# pipx
+pipx install githubrepoauditor
+
+# pip
+pip install githubrepoauditor
 ```
 
-### Run
+**No-Python path** — download the self-contained `.pyz` binary from the
+[GitHub Releases](https://github.com/saagpatel/GithubRepoAuditor/releases) page:
+
+```bash
+curl -LO https://github.com/saagpatel/GithubRepoAuditor/releases/latest/download/audit.pyz
+chmod +x audit.pyz
+./audit.pyz --help
+```
+
+For the local web UI add the `[serve]` extra:
+
+```bash
+uv tool install 'githubrepoauditor[serve]'
+# or: pip install 'githubrepoauditor[serve]'
+```
+
+### Quick start (subcommand form)
+
+```bash
+audit run <user>                       # fetch, clone, analyze, score
+audit triage <user> --control-center   # read-only operator queue
+audit report <user> --portfolio-truth  # regenerate workspace truth layer
+audit serve                            # open browser dashboard
+```
+
+The flat form (`audit <user> --html`) still works and prints a one-time deprecation
+warning. It will not be removed until a future major version bump. See
+[docs/audit-cli-migration.md](docs/audit-cli-migration.md) for the flag-family mapping.
+
+### Daily flow
+
+1. `audit serve` — start the local web UI at `http://127.0.0.1:8080/`
+2. Browse to `/` for the portfolio dashboard; `/runs/new` to trigger a fresh audit
+3. After the run completes, check `/repos/{name}` for per-repo drill-downs
+4. Run `audit triage <user> --control-center` for the full operator queue in the terminal
+
+### Common invocations
 
 ```bash
 # Doctor mode — recommended first step
-audit <github-username> --doctor
+audit run <github-username> --doctor
 
 # Weekly Review — generate the native workbook + HTML dashboard
-audit <github-username> --html
+audit run <github-username> --html
 
 # Weekly Review — daily read-only triage from the latest state
-audit <github-username> --control-center
+audit triage <github-username> --control-center
 
-# Portfolio Truth — regenerate the canonical workspace truth layer and compatibility registry/report
-audit <github-username> --portfolio-truth
+# Portfolio Truth — regenerate the canonical workspace truth layer
+audit report <github-username> --portfolio-truth
+
+# Semantic search across the portfolio index
+audit triage <github-username> --ask "Python projects with no tests"
+
+# Weekly operator briefing (requires Anthropic API key)
+audit run <github-username> --briefing
 
 # Deep Dive — targeted repo rerun merged into the latest baseline
-audit <github-username> --repos <repo-name> --html
+audit run <github-username> --repos <repo-name> --html
 
 # Action Sync — managed campaign preview / writeback
-audit <github-username> --campaign security-review --writeback-target github
+audit report <github-username> --campaign security-review --writeback-target github
 ```
 
-Normal runs now perform a lightweight automatic preflight before fetching repos. By default the run stops on blocking errors and continues on warnings. Use `--preflight-mode strict` to fail on warnings too, or `--preflight-mode off` to skip the automatic preflight.
+Normal runs perform a lightweight automatic preflight before fetching repos. By default
+the run stops on blocking errors and continues on warnings. Use `--preflight-mode strict`
+to fail on warnings too, or `--preflight-mode off` to skip the automatic preflight.
 
-The new `--control-center` path is read-only. It loads the latest report + warehouse state, groups open work into `Blocked`, `Needs Attention Now`, `Ready for Manual Action`, and `Safe to Defer`, and writes `operator-control-center-<username>-<date>.json` plus `.md`.
+`audit triage --control-center` is read-only. It loads the latest report + warehouse
+state, groups open work into `Blocked`, `Needs Attention Now`, `Ready for Manual Action`,
+and `Safe to Defer`, and writes `operator-control-center-<username>-<date>.json` plus
+`.md`.
 
-That same pass now also writes `weekly-command-center-<username>-<date>.json` plus `.md`. This digest stays workbook-first and report-only: it summarizes the shared weekly story, decision-quality posture, and live portfolio-truth/path attention without creating a second weekly authority or any new mutation path.
+`audit triage --approval-center` is also read-only. It loads the latest approval history,
+groups work into `Needs Re-Approval`, `Ready For Review`, `Approved But Manual`, and
+`Blocked`, and writes `approval-center-<username>-<date>.json` plus `.md`. Local approval
+capture stays separate from writeback apply.
 
-The new `--approval-center` path is also read-only. It loads the latest report plus approval history, groups work into `Needs Re-Approval`, `Ready For Review`, `Approved But Manual`, and `Blocked`, and writes `approval-center-<username>-<date>.json` plus `.md`. Local approval capture stays separate from writeback apply.
+Watch mode supports `--watch-strategy adaptive|incremental|full`. `adaptive` is the
+default and uses the stored baseline contract plus the scheduled full-refresh interval to
+decide whether each watch cycle should run full or incremental.
 
-Watch mode now supports `--watch-strategy adaptive|incremental|full`. `adaptive` is the default and uses the stored baseline contract plus the scheduled full-refresh interval to decide whether each watch cycle should run full or incremental.
+For a full description of all flags grouped by workflow, see
+[docs/modes.md](docs/modes.md).
 
 ### Run tests
 
 ```bash
 pytest
 ```
+
+## Development
+
+For local development, clone the repo and install with the dev + config extras:
+
+```bash
+git clone https://github.com/saagpatel/GithubRepoAuditor.git
+cd GithubRepoAuditor
+pip install -e ".[dev,serve,semantic,config]"
+```
+
+Common dev commands:
+
+```bash
+python3 -m pytest -q -p no:cacheprovider   # full test suite
+python3 -m ruff check src/ tests/          # lint
+python3 -m ruff format src/ tests/         # format
+make workbook-gate                         # workbook invariant check
+make release-gate                          # mutation testing gate
+```
+
+See [docs/release-gates.md](docs/release-gates.md) for the full gate checklist.
 
 ## Tech Stack
 
@@ -265,9 +344,9 @@ When writeback or governance-related actions are requested, preflight checks now
 
 The daily operator loop is now:
 
-- Run `audit <github-username> --doctor`
-- Run `audit <github-username>` or `audit <github-username> --watch --watch-strategy adaptive`
-- Run `audit <github-username> --control-center`
+- Run `audit run <github-username> --doctor`
+- Run `audit run <github-username>` or `audit run <github-username> --watch --watch-strategy adaptive`
+- Run `audit triage <github-username> --control-center`
 - Review the handoff fields: what changed, why it matters, what to do next, whether the queue is improving or worsening, what was tried for the top target, whether it is only quieting down or now counts as confirmed resolved, and whether recent confidence has actually been validating
 - Open the workbook and review it in this order: `Dashboard`, `Run Changes`, `Review Queue`, `Portfolio Explorer`, `Repo Detail`, `Executive Summary`
 - Clear anything in `Blocked` first
@@ -277,6 +356,7 @@ The daily operator loop is now:
 - Leave `Safe to Defer` items alone unless priorities change
 - Run `make workbook-gate` only when workbook-facing changes are in scope
 - Run `make workbook-signoff ...` after the manual Excel-open check for workbook-facing changes
+- Browse [http://127.0.0.1:8080/](http://127.0.0.1:8080/) after `audit serve` to review the dashboard
 
 Scheduled automation stays artifact-first. The weekly workflow now runs the audit, generates a control-center artifact plus a scheduled handoff summary, uploads `output/`, opens or updates one canonical GitHub issue only when blocked or urgent operator findings cross a meaningful threshold, and closes that same issue cleanly when later runs return to a quiet state. The handoff now also calls out whether the queue is getting better, worse, or staying stuck, what was tried most recently, whether that intervention actually helped, whether recovery is only quiet for now or confirmed resolved, whether recent high-confidence guidance has been validating or turning noisy, what trust policy now applies to the live recommendation (`act-now`, `act-with-review`, `verify-first`, or `monitor`), whether a soft exception or recent policy-flip drift should make the operator treat that recommendation more cautiously, and whether recent soft caution is still earning trust or has become cautious enough to recover toward a stronger policy.
 
@@ -287,7 +367,7 @@ In newer follow-through phases, that same weekly story also carries whether a re
 The fastest path for setup issues is:
 
 ```bash
-audit <github-username> --doctor
+audit run <github-username> --doctor
 ```
 
 Common fixes:

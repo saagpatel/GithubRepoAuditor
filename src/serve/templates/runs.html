@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Run History — Audit Serve{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Run History</h1>
+  <p class="meta">{{ total_count }} total runs</p>
+</div>
+
+{% if rows %}
+<table>
+  <thead>
+    <tr>
+      <th>Run ID</th>
+      <th>Username</th>
+      <th>Date</th>
+      <th>Mode</th>
+      <th>Repos</th>
+      <th>Avg Score</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in rows %}
+    <tr>
+      <td><code>{{ r.run_id[:12] }}</code></td>
+      <td>{{ r.username }}</td>
+      <td>{{ r.generated_at[:19].replace("T", " ") }}</td>
+      <td><span class="badge">{{ r.run_mode }}</span></td>
+      <td>{{ r.repos_audited }} / {{ r.total_repos }}</td>
+      <td class="score">{{ "%.1f"|format(r.average_score|float) }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="pagination">
+  {% if page > 1 %}
+  <a href="/runs?page={{ page - 1 }}" class="btn btn-sm">&larr; Prev</a>
+  {% endif %}
+  <span>Page {{ page }} of {{ total_pages }}</span>
+  {% if page < total_pages %}
+  <a href="/runs?page={{ page + 1 }}" class="btn btn-sm">Next &rarr;</a>
+  {% endif %}
+</div>
+{% else %}
+<p class="empty">No runs found. The warehouse may not exist yet.</p>
+{% endif %}
+{% endblock %}

@@ -8,7 +8,7 @@ version = "0.17.0"
 description = "Automated GitHub portfolio auditor with 12 analysis dimensions"
 readme = "README.md"
 requires-python = ">=3.11"
-license = {text = "MIT"}
+license = "MIT"
 dependencies = [
     "requests>=2.31.0",
     "python-dateutil>=2.8.0",
@@ -18,20 +18,53 @@ dependencies = [
     "rich>=13.0",
     "anthropic>=0.40.0",
     "fpdf2>=2.7.0",
+    "httpx>=0.27",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "ruff>=0.4", "mypy>=1.10"]
+dev = ["pytest>=8.0", "ruff>=0.4", "mypy>=1.10", "mutmut>=2.5", "responses>=0.25"]
 config = ["pyyaml>=6.0"]
+semantic = [
+    "sqlite-vec>=0.1.0",
+    "sentence-transformers>=3.0",
+]
+serve = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
+]
+build = [
+    "shiv>=1.0",
+    "build>=1.0",
+    "twine>=5.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/saagpatel/GithubRepoAuditor"
+Repository = "https://github.com/saagpatel/GithubRepoAuditor"
+"Bug Tracker" = "https://github.com/saagpatel/GithubRepoAuditor/issues"
 
 [project.scripts]
 audit = "src.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.setuptools.package-data]
+"src" = ["*.json", "*.yaml", "*.yml", "*.html", "*.jinja2", "*.j2"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+
+[tool.mutmut]
+paths_to_mutate = "src/auto_apply.py,src/scorer.py"
+runner = "python3.13 -m pytest -q -p no:cacheprovider -x tests/test_auto_apply.py tests/test_scorer.py"
+tests_dir = "tests/"
 
 [tool.ruff]
 target-version = "py311"

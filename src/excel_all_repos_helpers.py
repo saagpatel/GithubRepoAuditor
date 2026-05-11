@@ -27,6 +27,8 @@ ALL_REPOS_HEADERS = [
     "Days Since Push",
     "Commits",
     "Releases",
+    "Has Release",
+    "README Stale",
     "Test Files",
     "Test Framework",
     "LOC",
@@ -77,6 +79,7 @@ def build_all_repo_rows(
             for result in audit.get("analyzer_results", [])
         }
         activity = details.get("activity", {})
+        readme = details.get("readme", {})
         code_quality = details.get("code_quality", {})
         testing = details.get("testing", {})
         dependencies = details.get("dependencies", {})
@@ -112,6 +115,8 @@ def build_all_repo_rows(
                     activity.get("days_since_push", "—"),
                     activity.get("total_commits", "—"),
                     activity.get("release_count", "—"),
+                    "Yes" if activity.get("has_any_release") else "No",
+                    "Yes" if readme.get("readme_stale") else "No",
                     testing.get("test_file_count", 0),
                     testing.get("framework", "—"),
                     code_quality.get("total_loc", 0),

@@ -16,8 +16,10 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
+import warnings
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
@@ -50,6 +52,9 @@ from src.reporter import (
 from src.scorer import score_repo
 from src.terminology import ACTION_SYNC_CANONICAL_LABELS
 
+# Emitted at most once per process when legacy flat invocation is used.
+_LEGACY_WARNING_EMITTED: bool = False
+
 DEFAULT_ANALYSIS_WORKERS = 1
 MAX_ANALYSIS_WORKERS = 8
 DEFAULT_PORTFOLIO_WORKSPACE = Path.home() / "Projects"
@@ -65,22 +70,23 @@ Recommended defaults:
   - Use --control-center for read-only daily triage
   - Treat campaigns, writeback, catalog overrides, scorecards overrides, and GitHub Projects as advanced workflows"""
 
-CLI_MODE_EXAMPLES = """Examples by mode:
-  First Run:
-    audit <github-username> --doctor
-    audit <github-username> --html
-    audit <github-username> --control-center
+CLI_MODE_EXAMPLES = """Subcommands: run, triage, report, serve
+  Run `audit run --help`, `audit triage --help`, or `audit report --help` for flags.
 
-  Weekly Review:
-    audit <github-username> --html
-    audit <github-username> --control-center
+Subcommand form (preferred):
+  audit run   <github-username> --html
+  audit run   <github-username> --repos <repo-name>
+  audit triage <github-username> --control-center
+  audit triage <github-username> --approval-center
+  audit report <github-username> --portfolio-truth
+  audit report <github-username> --campaign security-review --writeback-target github
+  audit serve  [--port 8080]
 
-  Deep Dive:
-    audit <github-username> --repos <repo-name> --html
-
-  Action Sync:
-    audit <github-username> --campaign security-review --writeback-target github
-    audit <github-username> --campaign security-review --writeback-target all --github-projects"""
+Legacy flat form (deprecated, still supported):
+  audit <github-username> --doctor
+  audit <github-username> --html
+  audit <github-username> --control-center
+  audit <github-username> --campaign security-review --writeback-target all --github-projects"""
 
 
 def _date_str(dt: datetime) -> str:
@@ -107,6 +113,217 @@ def _gh_auth_token() -> str | None:
     return None
 
 
+# ── Subcommand builders ───────────────────────────────────────────────
+#
+# Each builder defines the PRIMARY (help-visible) flags for its subcommand.
+# The legacy flat parser at the top level accepts ALL flags so that existing
+# invocations (`audit username --flag`) continue to work unchanged.
+#
+# Global flags shared across all subcommands: --token, --output-dir, --config, --verbose
+
+def _add_global_flags(parser: argparse.ArgumentParser) -> None:
+    """Add flags that appear on every subcommand."""
+    parser.add_argument(
+        "username",
+        nargs="?",
+        default=None,
+        help="GitHub username to audit",
+    )
+    parser.add_argument(
+        "--token",
+        default=os.environ.get("GITHUB_TOKEN") or _gh_auth_token(),
+        help="GitHub personal access token (default: $GITHUB_TOKEN or `gh auth token`)",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default="output",
+        help="Directory for output files (default: output/)",
+    )
+    parser.add_argument(
+        "--config",
+        default=None,
+        help="Path to audit-config.yaml (default: ./audit-config.yaml if exists)",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Print detailed output",
+    )
+
+
+def _build_run_subparser(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
+    """Subcommand: `audit run` — produce a fresh audit."""
+    p = subparsers.add_parser(
+        "run",
+        help="Run a fresh audit against a GitHub user's repos",
+        description="Fetch, clone, analyze, and score all repos for the given username.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    _add_global_flags(p)
+    p.add_argument(
+        "--repos",
+        nargs="+",
+        default=None,
+        metavar="REPO",
+        help="Audit only these specific repos (targeted mode)",
+    )
+    p.add_argument("--skip-forks", action="store_true", help="Exclude forked repos")
+    p.add_argument("--skip-archived", action="store_true", help="Exclude archived repos")
+    p.add_argument("--skip-clone", action="store_true", help="Skip clone step (metadata only)")
+    p.add_argument("--incremental", action="store_true", help="Re-audit only repos changed since last run")
+    p.add_argument("--graphql", action="store_true", help="Use GraphQL API for faster bulk fetch")
+    p.add_argument("--badges", action="store_true", help="Generate Shields.io badge files")
+    p.add_argument("--html", action="store_true", help="Generate interactive HTML dashboard")
+    p.add_argument("--pdf", action="store_true", help="Generate PDF audit report")
+    p.add_argument("--narrative", action="store_true", help="Generate AI portfolio narrative")
+    p.add_argument("--briefing", action="store_true", help="Generate structured weekly operator briefing")
+    p.add_argument(
+        "--fetch-mode",
+        choices=["sync", "async"],
+        default="sync",
+        help="Per-repo enrichment fetch strategy (default: sync)",
+    )
+    p.add_argument("--analysis-workers", type=int, default=None, help="Number of repo-analysis workers")
+    p.add_argument("--no-cache", action="store_true", help="Bypass API response cache")
+    p.add_argument(
+        "--scoring-profile",
+        type=str,
+        default=None,
+        metavar="NAME",
+        help="Custom scoring profile from config/scoring-profiles/NAME.json",
+    )
+    p.add_argument("--watch", action="store_true", help="Re-run audit on interval (see --watch-interval)")
+    p.add_argument("--resume", action="store_true", help="Resume a partial audit run")
+    p.add_argument("--vuln-check", action="store_true", help="Query OSV.dev for known vulnerabilities")
+    p.add_argument("--reindex", action="store_true", help="Rebuild portfolio semantic index after audit")
+    p.add_argument(
+        "--embedder",
+        choices=["voyage", "local"],
+        default="voyage",
+        help="Embedder backend for --reindex (default: voyage)",
+    )
+
+
+def _build_triage_subparser(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
+    """Subcommand: `audit triage` — review existing run + approval workflows."""
+    p = subparsers.add_parser(
+        "triage",
+        help="Review operator state and manage approval workflows",
+        description="Inspect control-center, approval queues, acknowledgments, and semantic search.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    _add_global_flags(p)
+    p.add_argument("--control-center", action="store_true", help="Show latest operator state")
+    p.add_argument("--approval-center", action="store_true", help="Show latest approval workflow state")
+    p.add_argument(
+        "--triage-view",
+        choices=["all", "urgent", "ready", "blocked", "deferred"],
+        default="all",
+        help="Filter control-center output (default: all)",
+    )
+    p.add_argument(
+        "--approval-view",
+        choices=["all", "ready", "approved", "needs-reapproval", "blocked", "applied"],
+        default="all",
+        help="Filter approval-center output (default: all)",
+    )
+    p.add_argument(
+        "--auto-apply-approved",
+        action="store_true",
+        help="Apply approved campaign packets for repos passing the automation trust bar",
+    )
+    p.add_argument("--dry-run", action="store_true", help="Preview without making changes")
+    p.add_argument("--approve-governance", action="store_true", help="Capture a governance approval")
+    p.add_argument("--approve-packet", action="store_true", help="Capture a campaign approval")
+    p.add_argument("--review-governance", action="store_true", help="Capture a governance follow-up review")
+    p.add_argument("--review-packet", action="store_true", help="Capture a campaign follow-up review")
+    p.add_argument("--reset-prefs", action="store_true", help="Clear operator suppression hints")
+    p.add_argument("--acknowledge-target", type=str, default=None, help="Repo to acknowledge in review queue")
+    p.add_argument("--acknowledge-kind", type=str, default=None, help="Change type to acknowledge")
+    p.add_argument("--semantic-search", default=None, metavar="QUERY", help="Semantic search against portfolio index")
+    p.add_argument("--ask", default=None, metavar="QUERY", help="Alias for --semantic-search")
+
+
+def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
+    """Subcommand: `audit report` — generate exports, packets, and writebacks."""
+    p = subparsers.add_parser(
+        "report",
+        help="Generate exports, campaign packets, and writeback actions",
+        description="Portfolio truth, Excel workbooks, campaigns, writebacks, and context recovery.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    _add_global_flags(p)
+    p.add_argument("--portfolio-truth", action="store_true", help="Generate canonical portfolio truth snapshot")
+    p.add_argument("--portfolio-context-recovery", action="store_true", help="Build active/recent weak-context recovery plan")
+    p.add_argument("--apply-context-recovery", action="store_true", help="Apply eligible context recovery updates")
+    p.add_argument(
+        "--excel-mode",
+        choices=["template", "standard"],
+        default="standard",
+        help="Workbook style: standard (default) or template-backed",
+    )
+    p.add_argument("--diff", type=Path, default=None, metavar="PREVIOUS_REPORT", help="Compare against a previous report")
+    p.add_argument("--summary", action="store_true", help="Print a Rich diff summary to stderr")
+    p.add_argument("--scorecard", action="store_true", help="Apply internal scorecard programs")
+    p.add_argument(
+        "--campaign",
+        choices=["security-review", "promotion-push", "archive-sweep", "showcase-publish", "maintenance-cleanup"],
+        default=None,
+        help="Build a managed campaign view",
+    )
+    p.add_argument(
+        "--writeback-target",
+        choices=["github", "notion", "all"],
+        default=None,
+        help="External system to receive writeback actions",
+    )
+    p.add_argument("--writeback-apply", action="store_true", help="Execute live writeback (not preview)")
+    p.add_argument("--github-projects", action="store_true", help="Mirror campaign actions into GitHub Projects v2")
+    p.add_argument(
+        "--campaign-sync-mode",
+        choices=["reconcile", "append-only", "close-missing"],
+        default="reconcile",
+        help="Campaign record reconciliation strategy (default: reconcile)",
+    )
+    p.add_argument("--max-actions", type=int, default=20, help="Max managed actions per campaign run (default: 20)")
+    p.add_argument("--apply-metadata", action="store_true", help="Apply description/topics from improvements file")
+    p.add_argument("--apply-readmes", action="store_true", help="Push README updates via Contents API")
+    p.add_argument("--improvements-file", type=Path, default=None, help="Path to improvements JSON file")
+    p.add_argument("--generate-manifest", action="store_true", help="Generate improvement manifest from latest report")
+    p.add_argument("--create-issues", action="store_true", help="Create GitHub issues for high-priority action items")
+    p.add_argument("--upload-badges", action="store_true", help="Upload badge JSON to GitHub Gist")
+    p.add_argument("--notion-sync", action="store_true", help="Push audit events to Notion API")
+    p.add_argument("--notion-registry", action="store_true", help="Use Notion as registry source")
+    p.add_argument(
+        "--portfolio-profile",
+        type=str,
+        default="default",
+        metavar="NAME",
+        help="Ranking overlay profile for analyst-facing outputs (default: default)",
+    )
+    p.add_argument("--collection", type=str, default=None, metavar="NAME", help="Filter outputs to named collection")
+
+
+def _build_serve_subparser(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
+    """Subcommand: `audit serve` — start the local web UI."""
+    p = subparsers.add_parser(
+        "serve",
+        help="Start local web UI (FastAPI + HTMX) for portfolio artefacts",
+        description="Serve portfolio artefacts via a local FastAPI + HTMX web UI. Requires [serve] extra.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument("--port", type=int, default=8080, help="Port to listen on (default: 8080)")
+    p.add_argument("--host", default="127.0.0.1", help="Host to bind (default: 127.0.0.1)")
+    p.add_argument(
+        "--token",
+        default=os.environ.get("GITHUB_TOKEN") or _gh_auth_token(),
+        help="GitHub personal access token",
+    )
+    p.add_argument("--output-dir", default="output", help="Directory for output files (default: output/)")
+    p.add_argument("--config", default=None, help="Path to audit-config.yaml")
+    p.add_argument("--verbose", action="store_true", help="Print detailed output")
+
+
 # ── Argument parser ──────────────────────────────────────────────────
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -117,7 +334,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "username",
-        help="GitHub username to audit",
+        nargs="?",
+        default=None,
+        help="GitHub username to audit (omit when using --serve)",
     )
     parser.add_argument(
         "--token",
@@ -209,6 +428,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-cache",
         action="store_true",
         help="Bypass API response cache",
+    )
+    parser.add_argument(
+        "--no-analyzer-cache",
+        action="store_true",
+        help="Disable per-(repo, sha, analyzer) result cache for this run (reads and writes). "
+        "Useful for reconcile gates that need fresh analyzer output.",
+    )
+    parser.add_argument(
+        "--reconcile-cache",
+        action="store_true",
+        help="After audit, re-run analyzers without cache and diff against cached results. "
+        "Exits non-zero on divergence. Intended for CI release gates.",
     )
     parser.add_argument(
         "--repos",
@@ -326,7 +557,27 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--scorecard",
         action="store_true",
-        help="Enrich public repos with OpenSSF Scorecard data",
+        help="Apply internal scorecard programs from config/scorecards.yaml",
+    )
+    parser.add_argument(
+        "--ossf-scorecard",
+        action="store_true",
+        dest="ossf_scorecard",
+        help=(
+            "Fetch pre-computed OSSF Scorecard scores for public repos from "
+            "api.securityscorecards.dev and write output/ossf-scorecard-<user>-<date>.json"
+        ),
+    )
+    parser.add_argument(
+        "--sbom-source",
+        choices=["lockfile", "github"],
+        default="lockfile",
+        dest="sbom_source",
+        help=(
+            "Dependency count source.  'lockfile' (default) uses local manifest parsing. "
+            "'github' fetches the SPDX SBOM from GitHub's dependency graph API, "
+            "which catches transitive deps and works without a clone."
+        ),
     )
     parser.add_argument(
         "--security-offline",
@@ -341,6 +592,25 @@ def build_parser() -> argparse.ArgumentParser:
             "Number of repo-analysis workers. Defaults to 1 for reliable, visible full "
             "audits. Set GITHUB_REPO_AUDITOR_ANALYSIS_WORKERS or pass this flag to opt "
             "into parallel analysis."
+        ),
+    )
+    parser.add_argument(
+        "--fetch-mode",
+        choices=["sync", "async"],
+        default="sync",
+        help=(
+            "Per-repo enrichment fetch strategy.  'sync' (default) uses the existing "
+            "sequential requests path.  'async' enables the httpx-based parallel fetcher "
+            "which pre-fetches all enrichment endpoints concurrently before analysis."
+        ),
+    )
+    parser.add_argument(
+        "--fetch-workers",
+        type=int,
+        default=10,
+        help=(
+            "Max concurrent in-flight HTTP requests for the async enrichment fetcher "
+            "(only used when --fetch-mode async is set).  Default: 10."
         ),
     )
     parser.add_argument(
@@ -406,10 +676,59 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Generate archive candidate report for consistently low-scoring repos",
     )
-    parser.add_argument(
+    # ── Narrative / briefing (mutually exclusive) ─────────────────────────────
+    narrative_or_briefing = parser.add_mutually_exclusive_group()
+    narrative_or_briefing.add_argument(
         "--narrative",
         action="store_true",
-        help="Generate AI portfolio narrative (requires ANTHROPIC_API_KEY)",
+        help="Generate AI portfolio narrative (requires ANTHROPIC_API_KEY or GitHub token with models: read scope)",
+    )
+    narrative_or_briefing.add_argument(
+        "--briefing",
+        action="store_true",
+        help=(
+            "Generate a structured weekly operator briefing (Markdown + optional voice-readable). "
+            "Includes: shipped-this-week, needs-attention top-5, portfolio health delta, "
+            "and LLM-authored one-liner suggestions for top-3 repos."
+        ),
+    )
+    parser.add_argument(
+        "--briefing-voice",
+        action="store_true",
+        help="When used with --briefing, also write a voice-readable plain-text variant (.voice.txt).",
+    )
+    parser.add_argument(
+        "--narrative-provider",
+        choices=["anthropic", "github-models"],
+        default=None,
+        dest="narrative_provider",
+        help=(
+            "Narrative inference provider. Defaults to 'anthropic' when ANTHROPIC_API_KEY is set, "
+            "'github-models' when a GitHub token is available, otherwise skipped. "
+            "Also used by --briefing for LLM suggestions."
+        ),
+    )
+    parser.add_argument(
+        "--narrative-model",
+        default=None,
+        dest="narrative_model",
+        help=(
+            "Model name for narrative generation. "
+            "Defaults: claude-sonnet-4-6 (anthropic), gpt-4o-mini (github-models). "
+            "For --briefing, defaults to claude-haiku-4-5 / gpt-4o-mini (cheaper)."
+        ),
+    )
+    parser.add_argument(
+        "--max-llm-spend",
+        type=float,
+        default=None,
+        metavar="USD",
+        dest="max_llm_spend",
+        help=(
+            "Halt run if total LLM API spend would exceed this USD threshold. "
+            "Default disabled. Telemetry is always written to output/run-telemetry.jsonl "
+            "when --narrative or --briefing is used."
+        ),
     )
     parser.add_argument(
         "--config",
@@ -442,6 +761,11 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["all", "ready", "approved", "needs-reapproval", "blocked", "applied"],
         default="all",
         help="Filter approval-center output to one approval state (default: all)",
+    )
+    parser.add_argument(
+        "--reset-prefs",
+        action="store_true",
+        help="Delete output/operator_prefs.json and exit (clears all auto-detected suppression hints)",
     )
     parser.add_argument(
         "--approve-governance",
@@ -570,6 +894,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Query OSV.dev for known vulnerabilities in repo dependencies",
     )
     parser.add_argument(
+        "--ghas-alerts",
+        action="store_true",
+        help=(
+            "Fetch open Dependabot/CodeQL/Secret-scanning alert counts from GitHub. "
+            "Implied by --vuln-check."
+        ),
+    )
+    parser.add_argument(
         "--generate-manifest",
         action="store_true",
         help="Generate an improvement manifest from the latest audit report",
@@ -591,6 +923,94 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="PATH",
         help="Path to a JSON file with generated improvements (descriptions, topics, READMEs)",
     )
+    # ── Semantic index (Arc F S3.1) ────────────────────────────────────
+    parser.add_argument(
+        "--reindex",
+        action="store_true",
+        help=(
+            "After audit completes, rebuild the portfolio semantic index. "
+            "Only re-embeds repos whose doc content changed since last index. "
+            "Requires VOYAGE_API_KEY (default) or --embedder local."
+        ),
+    )
+    parser.add_argument(
+        "--reindex-force",
+        action="store_true",
+        help="Re-embed all repos even if content unchanged (use after embedder model upgrade).",
+    )
+    parser.add_argument(
+        "--semantic-search",
+        default=None,
+        metavar="QUERY",
+        help=(
+            "Run a semantic search against the existing portfolio index and print top-5 results. "
+            "No audit is performed; the warehouse must have been indexed with --reindex first."
+        ),
+    )
+    parser.add_argument(
+        "--ask",
+        default=None,
+        metavar="QUERY",
+        help="Alias for --semantic-search.",
+    )
+    parser.add_argument(
+        "--embedder",
+        choices=["voyage", "local"],
+        default="voyage",
+        help=(
+            "Embedder backend for --reindex / --semantic-search. "
+            "'voyage' uses Voyage AI voyage-code-3 (requires VOYAGE_API_KEY). "
+            "'local' uses sentence-transformers/all-MiniLM-L6-v2 (requires [semantic] extra)."
+        ),
+    )
+    # ── Serve mode ────────────────────────────────────────────────────────────
+    parser.add_argument(
+        "--serve",
+        action="store_true",
+        help="Start local web UI (FastAPI + HTMX) for portfolio artefacts. Requires [serve] extra.",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8080,
+        help="Port for --serve (default: 8080)",
+    )
+    parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Host for --serve (default: 127.0.0.1)",
+    )
+    return parser
+
+
+def build_subcommand_parser() -> argparse.ArgumentParser:
+    """Return the subcommand-aware parser used by main().
+
+    This parser is separate from build_parser() so that existing tests that
+    call build_parser().parse_args(["testuser", ...]) continue to work
+    unchanged.  main() uses this parser exclusively when sys.argv[1] is one of
+    the known subcommands; otherwise it rewrites the legacy argv and then
+    dispatches through this parser too (see _rewrite_legacy_argv).
+    """
+    parser = argparse.ArgumentParser(
+        prog="audit",
+        description=CLI_MODE_GUIDE,
+        epilog=CLI_MODE_EXAMPLES,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    subparsers = parser.add_subparsers(
+        dest="_subcommand",
+        metavar="SUBCOMMAND",
+        title="subcommands",
+        description=(
+            "Use a subcommand for the preferred invocation form. "
+            "Legacy flat-flag invocation still works but emits a DeprecationWarning."
+        ),
+    )
+    _build_run_subparser(subparsers)
+    _build_triage_subparser(subparsers)
+    _build_report_subparser(subparsers)
+    _build_serve_subparser(subparsers)
     return parser
 
 
@@ -755,6 +1175,7 @@ def _audit_from_dict(data: dict) -> RepoAudit:
         score_explanation=data.get("score_explanation", {}),
         portfolio_catalog=data.get("portfolio_catalog", {}),
         scorecard=data.get("scorecard", {}),
+        ossf_scorecard=data.get("ossf_scorecard", {}),
     )
 
 
@@ -1430,6 +1851,31 @@ def _run_approval_center_mode(args, parser) -> None:
     )
     print_info(f"Approval center JSON: {approval_json}")
     print_info(f"Approval center Markdown: {approval_md}")
+
+    # ── Post-process: update suppression hints ────────────────────────────────
+    _post_process_approval_center_prefs(payload, report_output_dir)
+
+
+def _post_process_approval_center_prefs(payload: dict, output_dir: Path) -> None:
+    """Build rejection records from the approval ledger and update operator_prefs.json."""
+    from src.operator_prefs import (
+        load_rejection_events,
+        post_process_approval_session,
+    )
+
+    try:
+        rejection_records = load_rejection_events(output_dir)
+        total, newly_added = post_process_approval_session(
+            rejection_records,
+            output_dir,
+        )
+        print_info(f"Suppressions: {total} action type(s) suppressed ({newly_added} newly added).")
+    except Exception as exc:  # noqa: BLE001
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "operator_prefs post-process failed (non-fatal): %s", exc
+        )
 
 
 def _run_approval_capture_mode(args, parser) -> None:
@@ -2894,10 +3340,36 @@ def _analyze_repos(
 
     audits: list[RepoAudit] = []
 
+    # Open a warehouse connection for the analyzer result cache unless disabled.
+    _no_analyzer_cache: bool = getattr(args, "no_analyzer_cache", False)
+    _warehouse_conn = None
+    if not _no_analyzer_cache:
+        import sqlite3 as _sqlite3
+
+        from src.warehouse import WAREHOUSE_FILENAME
+        from src.warehouse import _ensure_schema as _warehouse_ensure_schema
+
+        _output_dir = Path(getattr(args, "output_dir", "output"))
+        _db_path = _output_dir / WAREHOUSE_FILENAME
+        try:
+            _output_dir.mkdir(parents=True, exist_ok=True)
+            _warehouse_conn = _sqlite3.connect(str(_db_path))
+            _warehouse_ensure_schema(_warehouse_conn)
+        except Exception as _cache_err:
+            print_warning(f"Could not open warehouse for analyzer cache: {_cache_err}")
+            _warehouse_conn = None
+
     def _analyze_one(repo_meta: RepoMetadata, repo_path: Path) -> RepoAudit:
         worker_client = GitHubClient(token=client.token, cache=client.cache)
+        _commit_sha = repo_meta.pushed_at.isoformat() if repo_meta.pushed_at else ""
         results = run_all_analyzers(
-            repo_path, repo_meta, worker_client, extra_analyzers=extra_analyzers
+            repo_path,
+            repo_meta,
+            worker_client,
+            extra_analyzers=extra_analyzers,
+            conn=_warehouse_conn,
+            commit_sha=_commit_sha,
+            sbom_source=getattr(args, "sbom_source", "lockfile"),
         )
         return score_repo(
             repo_meta,
@@ -2910,6 +3382,36 @@ def _analyze_repos(
             security_offline=args.security_offline,
         )
 
+    # ── Optional async enrichment prefetch ───────────────────────────────────
+    _fetch_mode: str = getattr(args, "fetch_mode", "sync")
+    if _fetch_mode == "async" and repos:
+        from src.github_client_async import fetch_enrichment_sync as _async_prefetch
+
+        _fetch_workers: int = max(1, getattr(args, "fetch_workers", 10))
+        print_info(
+            f"Pre-fetching enrichment for {len(repos)} repos "
+            f"(async, concurrency={_fetch_workers})..."
+        )
+        _prefetch_start = perf_counter()
+        try:
+            _repo_pairs = [(r.full_name.split("/")[0], r.name) for r in repos if "/" in r.full_name]
+            _async_prefetch(
+                _repo_pairs,
+                token=client.token,
+                max_concurrency=_fetch_workers,
+                cache=client.cache,
+            )
+            _prefetch_elapsed = perf_counter() - _prefetch_start
+            print_info(f"Async enrichment prefetch complete in {_prefetch_elapsed:.1f}s.")
+            if runtime_stats is not None:
+                runtime_stats["async_prefetch_seconds"] = round(_prefetch_elapsed, 3)
+        except Exception as _prefetch_err:
+            print_warning(
+                f"Async enrichment prefetch failed ({_prefetch_err!r}); "
+                "falling back to per-repo sync fetch."
+            )
+
+    _reconcile_diverged: bool = False
     clone_start = perf_counter()
     with clone_workspace(
         repos,
@@ -2997,7 +3499,72 @@ def _analyze_repos(
         if runtime_stats is not None:
             runtime_stats["analyzer_seconds"] = round(perf_counter() - analyze_start, 3)
 
+        # ── Cache reconcile gate ──────────────────────────────────────────────
+        _do_reconcile: bool = getattr(args, "reconcile_cache", False)
+        if _do_reconcile and _warehouse_conn is not None and audits:
+            from src.analyzer_cache import reconcile as _cache_reconcile
+            from src.analyzers import run_all_analyzers as _run_all
+
+            _repo_path_map: dict[str, object] = {
+                repo_meta.name: cloned.get(repo_meta.name) for repo_meta in repos
+            }
+            _repo_meta_map: dict[str, object] = {repo_meta.name: repo_meta for repo_meta in repos}
+            _sha_map: dict[str, str] = {
+                repo_meta.name: (repo_meta.pushed_at.isoformat() if repo_meta.pushed_at else "")
+                for repo_meta in repos
+            }
+
+            def _fresh_run(repo_path, meta, conn=None):
+                return _run_all(
+                    repo_path,
+                    meta,
+                    conn=None,
+                    commit_sha="",
+                    sbom_source=getattr(args, "sbom_source", "lockfile"),
+                )
+
+            _reconcile_report = _cache_reconcile(
+                _repo_path_map,
+                _repo_meta_map,
+                _warehouse_conn,
+                _fresh_run,
+                commit_sha_map=_sha_map,
+            )
+            _checked = _reconcile_report["checked"]
+            _matched = _reconcile_report["matched"]
+            _divergent = _reconcile_report["divergent"]
+            print_info(
+                f"Cache reconcile: {_matched}/{_checked} matched, {len(_divergent)} divergent"
+            )
+            if _divergent:
+                _reconcile_diverged = True
+                for _entry in _divergent:
+                    print_warning(
+                        f"  DIVERGE {_entry['repo']} {_entry['analyzer']}: {_entry['diff_summary']}"
+                    )
+                _output_dir_r = Path(getattr(args, "output_dir", "output"))
+                _output_dir_r.mkdir(parents=True, exist_ok=True)
+                import datetime as _dt
+                import json as _json
+
+                _stamp = _dt.date.today().isoformat()
+                _report_path = _output_dir_r / f"cache-reconcile-{args.username}-{_stamp}.json"
+                try:
+                    _report_path.write_text(
+                        _json.dumps(_reconcile_report, indent=2), encoding="utf-8"
+                    )
+                    print_warning(f"  Full divergence report: {_report_path}")
+                except Exception as _write_err:
+                    print_warning(f"Could not write reconcile report: {_write_err}")
+
     print_info("Clones cleaned up")
+    if _warehouse_conn is not None:
+        try:
+            _warehouse_conn.close()
+        except Exception:
+            pass
+    if _reconcile_diverged:
+        sys.exit(1)
     return audits
 
 
@@ -3613,6 +4180,10 @@ def _write_report_outputs(
     raw_path = write_raw_metadata(report, output_dir)
     warehouse_path = write_warehouse_snapshot(report, output_dir, json_path)
 
+    # ── Semantic reindex (Arc F S3.1) ──────────────────────────────────
+    if getattr(args, "reindex", False) or getattr(args, "reindex_force", False):
+        _maybe_run_reindex(report, warehouse_path, args)
+
     if archive and write_json:
         archive_report(json_path)
     if save_fingerprint_data:
@@ -3751,10 +4322,98 @@ def _write_report_outputs(
             vuln_path.write_text(json.dumps(vulns, indent=2, default=str))
             print_info(f"Vulnerability report: {vuln_path}")
 
+    if getattr(args, "ghas_alerts", False) or getattr(args, "vuln_check", False):
+        from src.ghas_alerts import fetch_ghas_alerts, format_ghas_summary
+
+        ghas_token: str | None = getattr(args, "token", None) or None
+        ghas_data = fetch_ghas_alerts(
+            report_data.get("audits", []),
+            token=ghas_token,
+            cache=cache,
+        )
+        print_info(format_ghas_summary(ghas_data))
+        if ghas_data:
+            ghas_path = (
+                output_dir / f"ghas-alerts-{report.username}-{_date_str(report.generated_at)}.json"
+            )
+            ghas_path.write_text(json.dumps(ghas_data, indent=2, default=str))
+            print_info(f"GHAS alerts report: {ghas_path}")
+
+    if getattr(args, "ossf_scorecard", False):
+        from src.ossf_scorecard import fetch_ossf_scorecards, format_ossf_summary
+
+        ossf_data = fetch_ossf_scorecards(
+            report_data.get("audits", []),
+            cache=cache,
+        )
+        # Wire per-repo data into audit JSON
+        ossf_by_repo: dict[str, dict] = {}
+        for full_name, scorecard in ossf_data.items():
+            ossf_by_repo[full_name] = scorecard
+        for audit in report.audits:
+            fn = audit.metadata.full_name
+            if fn in ossf_by_repo:
+                audit.ossf_scorecard = ossf_by_repo[fn]
+        # Re-serialize after mutation
+        report_data = report.to_dict()
+
+        print_info(format_ossf_summary(ossf_data))
+        ossf_path = (
+            output_dir / f"ossf-scorecard-{report.username}-{_date_str(report.generated_at)}.json"
+        )
+        ossf_path.write_text(json.dumps(ossf_data, indent=2, default=str))
+        print_info(f"OSSF Scorecard report: {ossf_path}")
+
+    # ── LLM cost tracking ────────────────────────────────────────────────────
+    _uses_llm = args.narrative or getattr(args, "briefing", False)
+    _cost_tracker = None
+    if _uses_llm:
+        from src.llm_cost import BudgetExceededError, CostTracker
+
+        _cost_tracker = CostTracker(
+            budget_usd=getattr(args, "max_llm_spend", None),
+            output_path=output_dir,
+        )
+
     if args.narrative:
         from src.narrative import generate_narrative
 
-        generate_narrative(report_data, output_dir)
+        try:
+            generate_narrative(
+                report_data,
+                output_dir,
+                provider_name=args.narrative_provider,
+                model=args.narrative_model,
+                github_token=args.token,
+                cost_tracker=_cost_tracker,
+            )
+        except BudgetExceededError as exc:
+            print(f"\nERROR: {exc}", file=sys.stderr)
+            if _cost_tracker is not None:
+                _cost_tracker.write_telemetry()
+            sys.exit(1)
+
+    if getattr(args, "briefing", False):
+        from src.briefing import generate_briefing
+
+        try:
+            generate_briefing(
+                report_data,
+                output_dir,
+                provider_name=args.narrative_provider,
+                model=args.narrative_model,
+                github_token=args.token,
+                write_voice=getattr(args, "briefing_voice", False),
+                cost_tracker=_cost_tracker,
+            )
+        except BudgetExceededError as exc:
+            print(f"\nERROR: {exc}", file=sys.stderr)
+            if _cost_tracker is not None:
+                _cost_tracker.write_telemetry()
+            sys.exit(1)
+
+    if _cost_tracker is not None:
+        _cost_tracker.write_telemetry()
 
     cache_info = ""
     if cache:
@@ -4175,11 +4834,243 @@ def _print_dry_run_summary(repos: list[RepoMetadata]) -> None:
     console.print(f"[dim]{len(repos)} repos would be audited, est {est_mb:.1f} MB[/dim]")
 
 
+# ── Semantic index helpers (Arc F S3.1) ───────────────────────────────
+
+
+def _maybe_run_reindex(report: "AuditReport", warehouse_path: Path, args: object) -> None:
+    """Run semantic reindex after audit.  Skips gracefully if deps missing."""
+    from src.semantic_index import SemanticIndex, _run_reindex
+
+    embedder_name: str = getattr(args, "embedder", "voyage")
+    force: bool = getattr(args, "reindex_force", False)
+
+    idx = SemanticIndex.from_embedder_name(warehouse_path, embedder_name)
+    if idx is None:
+        print_warning(
+            "Semantic reindex skipped — embedder unavailable. "
+            "Set VOYAGE_API_KEY or use --embedder local with [semantic] extra installed."
+        )
+        return
+
+    summary = _run_reindex(idx, report.audits, force=force)
+    print_info(
+        f"Semantic index: {summary['embedded']} embedded, "
+        f"{summary['skipped']} skipped, "
+        f"{summary['total']} total "
+        f"({summary['duration_s']:.2f}s)"
+    )
+
+
+def _run_semantic_search_mode(args: object, query: str) -> None:
+    """Run a standalone semantic search against the existing warehouse index."""
+    from src.semantic_index import SemanticIndex, _run_search
+    from src.warehouse import WAREHOUSE_FILENAME
+
+    output_dir = Path(getattr(args, "output_dir", "output"))
+    warehouse_path = output_dir / WAREHOUSE_FILENAME
+    if not warehouse_path.exists():
+        print_warning(
+            f"Warehouse not found at {warehouse_path}. "
+            "Run an audit with --reindex first to build the semantic index."
+        )
+        return
+
+    embedder_name: str = getattr(args, "embedder", "voyage")
+    idx = SemanticIndex.from_embedder_name(warehouse_path, embedder_name)
+    if idx is None:
+        print_warning(
+            "Semantic search unavailable — embedder not configured. "
+            "Set VOYAGE_API_KEY or use --embedder local."
+        )
+        return
+
+    results = _run_search(idx, query, k=5)
+    if not results:
+        print_info("No results found in semantic index. Run --reindex first.")
+        return
+
+    print_info(f'Semantic search: "{query}"\n')
+    for i, r in enumerate(results, 1):
+        print_info(f"  {i}. {r.repo_name}  (distance={r.score:.4f})")
+        print_info(f"     {r.snippet}")
+
+
+# ── Serve mode ───────────────────────────────────────────────────────────────
+def _run_serve_mode(args: object) -> None:
+    """Launch the local FastAPI + HTMX web UI (requires [serve] extra)."""
+    try:
+        from src.serve.app import run_serve
+    except ImportError:
+        import sys
+
+        sys.exit("audit serve requires the [serve] extra.\nInstall with: pip install -e '.[serve]'")
+    output_dir = Path(getattr(args, "output_dir", "output"))
+    run_serve(
+        port=getattr(args, "port", 8080),
+        host=getattr(args, "host", "127.0.0.1"),
+        output_dir=output_dir,
+    )
+
+
+# ── Subcommand inference for legacy flat invocation ───────────────────
+def _infer_subcommand_from_flags(args: argparse.Namespace) -> str:
+    """Return the effective subcommand name for a legacy flat invocation."""
+    # triage signals
+    triage_flags = (
+        "control_center", "approval_center", "triage_view",
+        "approve_governance", "approve_packet", "review_governance", "review_packet",
+        "auto_apply_approved", "reset_prefs",
+        "acknowledge_target", "acknowledge_kind",
+        "semantic_search", "ask",
+    )
+    for flag in triage_flags:
+        val = getattr(args, flag, None)
+        if val and val not in (False, "all", None, ""):
+            return "triage"
+    if getattr(args, "approval_center", False) or getattr(args, "control_center", False):
+        return "triage"
+
+    # report signals
+    report_flags = (
+        "portfolio_truth", "portfolio_context_recovery",
+        "apply_context_recovery", "generate_manifest",
+        "apply_metadata", "apply_readmes",
+        "upload_badges", "notion_sync",
+    )
+    for flag in report_flags:
+        if getattr(args, flag, False):
+            return "report"
+    if getattr(args, "campaign", None):
+        return "report"
+    if getattr(args, "writeback_target", None):
+        return "report"
+
+    return "run"
+
+
+_KNOWN_SUBCOMMANDS: frozenset[str] = frozenset({"run", "triage", "report", "serve"})
+
+
+def _emit_legacy_deprecation_warning(inferred: str) -> None:
+    """Emit the deprecation warning at most once per process."""
+    global _LEGACY_WARNING_EMITTED
+    if _LEGACY_WARNING_EMITTED:
+        return
+    _LEGACY_WARNING_EMITTED = True
+    warnings.warn(
+        f"Top-level CLI invocation is deprecated. "
+        f"Use `audit {inferred} --flag` instead. "
+        "Legacy form will be removed in a future major version.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
+
+def _rewrite_legacy_argv(argv: list[str]) -> tuple[list[str], bool]:
+    """Detect legacy flat invocation and rewrite to subcommand form.
+
+    Legacy form: audit <username> [--flags...]
+    Subcommand form: audit <subcommand> <username> [--flags...]
+
+    Returns (rewritten_argv, is_legacy).  If the invocation already uses a
+    known subcommand (or is --serve / --help), returns argv unchanged.
+
+    Only rewrites when the first positional looks like a GitHub username
+    (alphanumeric + hyphens only, no path separators or colons).  This
+    prevents false-positive rewrites when main() is called during tests
+    where sys.argv contains pytest args (file paths, test IDs, etc.).
+    """
+    if not argv:
+        return argv, False
+
+    # Skip if first arg is a known subcommand, a flag, or --help/-h
+    first = argv[0]
+    if first in _KNOWN_SUBCOMMANDS or first.startswith("-"):
+        return argv, False
+
+    # Only treat as legacy username if it looks like a GitHub username:
+    # alphanumeric and hyphens only (no path separators, colons, dots).
+    if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9-]{0,38}", first):
+        return argv, False
+
+    # first arg looks like a username — legacy invocation detected.
+    # Infer subcommand from the remaining flags (quick scan without full parse).
+    rest = argv[1:]
+
+    # triage signals
+    if any(
+        f in rest
+        for f in [
+            "--control-center", "--approval-center",
+            "--approve-governance", "--approve-packet",
+            "--review-governance", "--review-packet",
+            "--auto-apply-approved", "--reset-prefs",
+            "--semantic-search", "--ask",
+        ]
+    ) or "--acknowledge-target" in rest or "--acknowledge-kind" in rest:
+        inferred = "triage"
+    # report signals
+    elif any(
+        f in rest
+        for f in [
+            "--portfolio-truth", "--portfolio-context-recovery",
+            "--apply-context-recovery", "--generate-manifest",
+            "--apply-metadata", "--apply-readmes",
+            "--upload-badges", "--notion-sync",
+        ]
+    ) or "--campaign" in rest or "--writeback-target" in rest:
+        inferred = "report"
+    else:
+        inferred = "run"
+
+    # Rewrite: insert inferred subcommand before the username
+    return [inferred, first] + rest, True
+
+
 # ── Main entry point ──────────────────────────────────────────────────
 def main() -> None:
-    parser = build_parser()
-    args = parser.parse_args()
+    raw_argv = sys.argv[1:]
+
+    # ── Choose parser based on invocation form ───────────────────────
+    # Subcommand form:  audit run|triage|report|serve [args...]
+    # Legacy flat form: audit username [--flags...]  (deprecated)
+    # --serve / --help: handled by either parser path
+    argv, is_legacy = _rewrite_legacy_argv(raw_argv)
+    # After rewrite, argv[0] is always a known subcommand name (or a flag).
+
+    subcommand_parser = build_subcommand_parser()
+    legacy_parser = build_parser()
+
+    if argv and argv[0] in _KNOWN_SUBCOMMANDS:
+        # Subcommand form — detect the subcommand with the subcommand parser,
+        # then re-parse the full flag set through the legacy parser so that ALL
+        # flags (including advanced ones not listed in the subcommand help) are
+        # accepted.  The subcommand parser's role is subcommand detection and
+        # --help display only; the legacy parser handles full validation.
+        sc_args, _ = subcommand_parser.parse_known_args(argv)
+        detected_subcommand = sc_args._subcommand  # e.g. "run", "triage", …
+
+        # Re-parse without the subcommand token through the legacy flat parser.
+        # argv[1:] strips the subcommand name; legacy parser sees username + flags.
+        flat_argv = argv[1:]  # e.g. ["myuser", "--html"]
+        args = legacy_parser.parse_args(flat_argv)
+        setattr(args, "_subcommand", detected_subcommand)
+        parser = legacy_parser
+    else:
+        # Legacy flat form (--serve, --help, or no args) — use legacy parser.
+        # Call with no argument so it reads sys.argv itself; this keeps
+        # monkeypatched FakeParser objects in tests working unchanged.
+        args = legacy_parser.parse_args()
+        parser = legacy_parser
+        is_legacy = False  # --serve / --help / empty: not a deprecated invocation
+
     from src.approval_ledger import default_approval_reviewer
+
+    # ── Subcommand: serve ────────────────────────────────────────────
+    subcommand = getattr(args, "_subcommand", None)
+    if subcommand == "serve" or getattr(args, "serve", False):
+        _run_serve_mode(args)
+        return
 
     # Load config file and merge into args (CLI flags take precedence)
     from src.config import inspect_config, merge_config_with_args
@@ -4191,9 +5082,27 @@ def main() -> None:
     if not getattr(args, "approval_reviewer", None):
         args.approval_reviewer = default_approval_reviewer()
 
+    # ── Legacy flat invocation: emit deprecation warning ────────────
+    if is_legacy:
+        inferred = subcommand or "run"
+        _emit_legacy_deprecation_warning(inferred)
+
+    if getattr(args, "username", None) is None and subcommand != "serve":
+        parser.error(
+            "the following arguments are required: username "
+            "(omit only when using `audit serve` or `--serve`)"
+        )
+
     mode_state = validate_cli_mode_args(args, parser.error)
     portfolio_truth_mode = mode_state.portfolio_truth_mode
     portfolio_context_recovery_mode = mode_state.portfolio_context_recovery_mode
+
+    if getattr(args, "reset_prefs", False):
+        from src.operator_prefs import prefs_path, reset_prefs
+
+        reset_prefs(prefs_path(Path(args.output_dir)))
+        print_info("Operator prefs reset: suppression hints cleared.")
+        return
 
     if args.approval_center:
         _run_approval_center_mode(args, parser)
@@ -4240,8 +5149,18 @@ def main() -> None:
         _run_apply_improvements_mode(args, parser)
         return
 
+    if getattr(args, "serve", False):
+        _run_serve_mode(args)
+        return
+
     if args.watch:
         _run_watch_mode(args, config_inspection)
+        return
+
+    # ── Semantic search standalone mode (no audit needed) ─────────────
+    query = getattr(args, "semantic_search", None) or getattr(args, "ask", None)
+    if query:
+        _run_semantic_search_mode(args, query)
         return
 
     _run_main_audit_cycle(args, config_inspection)

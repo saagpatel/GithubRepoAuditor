@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Approvals — Audit Serve{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Approval Queue</h1>
+  <p class="meta">{{ records|length }} record(s) loaded</p>
+</div>
+
+{% if records %}
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Type</th>
+      <th>Subject</th>
+      <th>State</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in records %}
+    <tr>
+      <td><code>{{ r.approval_id[:12] if r.approval_id else "—" }}</code></td>
+      <td>{{ r.approval_subject_type or "—" }}</td>
+      <td>{{ r.subject_key or r.scope or "—" }}</td>
+      <td>
+        <span class="badge badge-state-{{ (r.approval_state or 'unknown')|replace('-', '') }}">
+          {{ r.approval_state or "—" }}
+        </span>
+      </td>
+      <td class="action-cell">
+        <button
+          class="btn btn-sm btn-approve"
+          hx-post="/approvals/{{ r.approval_id }}/approve"
+          hx-target="closest td"
+          hx-swap="innerHTML"
+        >Approve</button>
+        <button
+          class="btn btn-sm btn-reject"
+          hx-post="/approvals/{{ r.approval_id }}/reject"
+          hx-target="closest td"
+          hx-swap="innerHTML"
+        >Reject</button>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No approval records found in the warehouse.</p>
+{% endif %}
+{% endblock %}

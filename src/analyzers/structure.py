@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 from src.analyzers.base import BaseAnalyzer
@@ -43,6 +44,32 @@ class StructureAnalyzer(BaseAnalyzer):
     name = "structure"
     weight = 0.10
 
+    def cache_inputs_hash(
+        self,
+        repo_path: Path | None,
+        metadata: RepoMetadata,
+    ) -> str | None:
+        """Hash a snapshot of the repo's top-level directory listing.
+
+        The structure analyzer only looks at top-level files/dirs (config files,
+        standard dirs, .gitignore, LICENSE), so hashing the sorted top-level
+        entries is a stable, cheap proxy for "did the structure change?".
+        """
+        if repo_path is None:
+            return None
+        try:
+            entries = sorted(p.name for p in repo_path.iterdir())
+        except OSError:
+            return None
+        h = hashlib.sha256()
+        for name in entries:
+            h.update(name.encode())
+            h.update(b"\x00")
+        # Include the primary language because LANG_DIRS lookup depends on it.
+        h.update((metadata.language or "").encode())
+        h.update(b"\x00")
+        return h.hexdigest()
+
     def analyze(
         self,
         repo_path: Path,
@@ -80,7 +107,8 @@ class StructureAnalyzer(BaseAnalyzer):
         found_configs = [f for f in CONFIG_FILES if (repo_path / f).is_file()]
         # Xcode projects are directories, not files
         xcode_projects = [
-            p.name for p in repo_path.iterdir()
+            p.name
+            for p in repo_path.iterdir()
             if p.is_dir() and p.suffix in (".xcodeproj", ".xcworkspace")
         ]
         found_configs.extend(xcode_projects)

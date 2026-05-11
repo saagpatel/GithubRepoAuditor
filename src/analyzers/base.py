@@ -22,8 +22,21 @@ class BaseAnalyzer(ABC):
         repo_path: Path,
         metadata: RepoMetadata,
         github_client: GitHubClient | None = None,
-    ) -> AnalyzerResult:
-        ...
+    ) -> AnalyzerResult: ...
+
+    def cache_inputs_hash(
+        self,
+        repo_path: Path | None,
+        metadata: RepoMetadata,
+    ) -> str | None:
+        """Return a stable hex digest over all inputs that affect this analyzer's output.
+
+        Return ``None`` to opt out of caching for this run (default — subclasses must
+        explicitly override to participate).  Returning the same hash across two calls
+        guarantees the cached result can be reused; a different hash produces a new
+        cache slot.
+        """
+        return None
 
     def _result(
         self,

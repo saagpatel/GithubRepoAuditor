@@ -20,7 +20,7 @@ def build_hidden_data_payload(
     tier_order: list[str],
 ) -> dict[str, Any]:
     repo_detail_rows, repo_dimension_rollup_rows, repo_history_rollup_rows = build_repo_detail_rows(
-        data, score_history
+        data, score_history, ghas_lookup=data.get("ghas_alerts") or None
     )
     run_change_rollup_rows, run_change_repo_rows = build_run_change_rows(data, diff_data)
     operator_queue_rows, operator_repo_rollups, material_rollups = build_workbook_rollups(data)
