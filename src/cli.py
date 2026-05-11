@@ -121,6 +121,7 @@ def _gh_auth_token() -> str | None:
 #
 # Global flags shared across all subcommands: --token, --output-dir, --config, --verbose
 
+
 def _add_global_flags(parser: argparse.ArgumentParser) -> None:
     """Add flags that appear on every subcommand."""
     parser.add_argument(
@@ -170,20 +171,26 @@ def _build_run_subparser(subparsers: argparse._SubParsersAction) -> None:  # typ
     p.add_argument("--skip-forks", action="store_true", help="Exclude forked repos")
     p.add_argument("--skip-archived", action="store_true", help="Exclude archived repos")
     p.add_argument("--skip-clone", action="store_true", help="Skip clone step (metadata only)")
-    p.add_argument("--incremental", action="store_true", help="Re-audit only repos changed since last run")
+    p.add_argument(
+        "--incremental", action="store_true", help="Re-audit only repos changed since last run"
+    )
     p.add_argument("--graphql", action="store_true", help="Use GraphQL API for faster bulk fetch")
     p.add_argument("--badges", action="store_true", help="Generate Shields.io badge files")
     p.add_argument("--html", action="store_true", help="Generate interactive HTML dashboard")
     p.add_argument("--pdf", action="store_true", help="Generate PDF audit report")
     p.add_argument("--narrative", action="store_true", help="Generate AI portfolio narrative")
-    p.add_argument("--briefing", action="store_true", help="Generate structured weekly operator briefing")
+    p.add_argument(
+        "--briefing", action="store_true", help="Generate structured weekly operator briefing"
+    )
     p.add_argument(
         "--fetch-mode",
         choices=["sync", "async"],
         default="sync",
         help="Per-repo enrichment fetch strategy (default: sync)",
     )
-    p.add_argument("--analysis-workers", type=int, default=None, help="Number of repo-analysis workers")
+    p.add_argument(
+        "--analysis-workers", type=int, default=None, help="Number of repo-analysis workers"
+    )
     p.add_argument("--no-cache", action="store_true", help="Bypass API response cache")
     p.add_argument(
         "--scoring-profile",
@@ -192,10 +199,16 @@ def _build_run_subparser(subparsers: argparse._SubParsersAction) -> None:  # typ
         metavar="NAME",
         help="Custom scoring profile from config/scoring-profiles/NAME.json",
     )
-    p.add_argument("--watch", action="store_true", help="Re-run audit on interval (see --watch-interval)")
+    p.add_argument(
+        "--watch", action="store_true", help="Re-run audit on interval (see --watch-interval)"
+    )
     p.add_argument("--resume", action="store_true", help="Resume a partial audit run")
-    p.add_argument("--vuln-check", action="store_true", help="Query OSV.dev for known vulnerabilities")
-    p.add_argument("--reindex", action="store_true", help="Rebuild portfolio semantic index after audit")
+    p.add_argument(
+        "--vuln-check", action="store_true", help="Query OSV.dev for known vulnerabilities"
+    )
+    p.add_argument(
+        "--reindex", action="store_true", help="Rebuild portfolio semantic index after audit"
+    )
     p.add_argument(
         "--embedder",
         choices=["voyage", "local"],
@@ -214,7 +227,9 @@ def _build_triage_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
     )
     _add_global_flags(p)
     p.add_argument("--control-center", action="store_true", help="Show latest operator state")
-    p.add_argument("--approval-center", action="store_true", help="Show latest approval workflow state")
+    p.add_argument(
+        "--approval-center", action="store_true", help="Show latest approval workflow state"
+    )
     p.add_argument(
         "--triage-view",
         choices=["all", "urgent", "ready", "blocked", "deferred"],
@@ -233,14 +248,27 @@ def _build_triage_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         help="Apply approved campaign packets for repos passing the automation trust bar",
     )
     p.add_argument("--dry-run", action="store_true", help="Preview without making changes")
-    p.add_argument("--approve-governance", action="store_true", help="Capture a governance approval")
+    p.add_argument(
+        "--approve-governance", action="store_true", help="Capture a governance approval"
+    )
     p.add_argument("--approve-packet", action="store_true", help="Capture a campaign approval")
-    p.add_argument("--review-governance", action="store_true", help="Capture a governance follow-up review")
-    p.add_argument("--review-packet", action="store_true", help="Capture a campaign follow-up review")
+    p.add_argument(
+        "--review-governance", action="store_true", help="Capture a governance follow-up review"
+    )
+    p.add_argument(
+        "--review-packet", action="store_true", help="Capture a campaign follow-up review"
+    )
     p.add_argument("--reset-prefs", action="store_true", help="Clear operator suppression hints")
-    p.add_argument("--acknowledge-target", type=str, default=None, help="Repo to acknowledge in review queue")
+    p.add_argument(
+        "--acknowledge-target", type=str, default=None, help="Repo to acknowledge in review queue"
+    )
     p.add_argument("--acknowledge-kind", type=str, default=None, help="Change type to acknowledge")
-    p.add_argument("--semantic-search", default=None, metavar="QUERY", help="Semantic search against portfolio index")
+    p.add_argument(
+        "--semantic-search",
+        default=None,
+        metavar="QUERY",
+        help="Semantic search against portfolio index",
+    )
     p.add_argument("--ask", default=None, metavar="QUERY", help="Alias for --semantic-search")
 
 
@@ -253,21 +281,43 @@ def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     _add_global_flags(p)
-    p.add_argument("--portfolio-truth", action="store_true", help="Generate canonical portfolio truth snapshot")
-    p.add_argument("--portfolio-context-recovery", action="store_true", help="Build active/recent weak-context recovery plan")
-    p.add_argument("--apply-context-recovery", action="store_true", help="Apply eligible context recovery updates")
+    p.add_argument(
+        "--portfolio-truth", action="store_true", help="Generate canonical portfolio truth snapshot"
+    )
+    p.add_argument(
+        "--portfolio-context-recovery",
+        action="store_true",
+        help="Build active/recent weak-context recovery plan",
+    )
+    p.add_argument(
+        "--apply-context-recovery",
+        action="store_true",
+        help="Apply eligible context recovery updates",
+    )
     p.add_argument(
         "--excel-mode",
         choices=["template", "standard"],
         default="standard",
         help="Workbook style: standard (default) or template-backed",
     )
-    p.add_argument("--diff", type=Path, default=None, metavar="PREVIOUS_REPORT", help="Compare against a previous report")
+    p.add_argument(
+        "--diff",
+        type=Path,
+        default=None,
+        metavar="PREVIOUS_REPORT",
+        help="Compare against a previous report",
+    )
     p.add_argument("--summary", action="store_true", help="Print a Rich diff summary to stderr")
     p.add_argument("--scorecard", action="store_true", help="Apply internal scorecard programs")
     p.add_argument(
         "--campaign",
-        choices=["security-review", "promotion-push", "archive-sweep", "showcase-publish", "maintenance-cleanup"],
+        choices=[
+            "security-review",
+            "promotion-push",
+            "archive-sweep",
+            "showcase-publish",
+            "maintenance-cleanup",
+        ],
         default=None,
         help="Build a managed campaign view",
     )
@@ -277,20 +327,47 @@ def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         default=None,
         help="External system to receive writeback actions",
     )
-    p.add_argument("--writeback-apply", action="store_true", help="Execute live writeback (not preview)")
-    p.add_argument("--github-projects", action="store_true", help="Mirror campaign actions into GitHub Projects v2")
+    p.add_argument(
+        "--writeback-apply", action="store_true", help="Execute live writeback (not preview)"
+    )
+    p.add_argument(
+        "--github-projects",
+        action="store_true",
+        help="Mirror campaign actions into GitHub Projects v2",
+    )
     p.add_argument(
         "--campaign-sync-mode",
         choices=["reconcile", "append-only", "close-missing"],
         default="reconcile",
         help="Campaign record reconciliation strategy (default: reconcile)",
     )
-    p.add_argument("--max-actions", type=int, default=20, help="Max managed actions per campaign run (default: 20)")
-    p.add_argument("--apply-metadata", action="store_true", help="Apply description/topics from improvements file")
-    p.add_argument("--apply-readmes", action="store_true", help="Push README updates via Contents API")
-    p.add_argument("--improvements-file", type=Path, default=None, help="Path to improvements JSON file")
-    p.add_argument("--generate-manifest", action="store_true", help="Generate improvement manifest from latest report")
-    p.add_argument("--create-issues", action="store_true", help="Create GitHub issues for high-priority action items")
+    p.add_argument(
+        "--max-actions",
+        type=int,
+        default=20,
+        help="Max managed actions per campaign run (default: 20)",
+    )
+    p.add_argument(
+        "--apply-metadata",
+        action="store_true",
+        help="Apply description/topics from improvements file",
+    )
+    p.add_argument(
+        "--apply-readmes", action="store_true", help="Push README updates via Contents API"
+    )
+    p.add_argument(
+        "--improvements-file", type=Path, default=None, help="Path to improvements JSON file"
+    )
+    p.add_argument(
+        "--generate-manifest",
+        action="store_true",
+        help="Generate improvement manifest from latest report",
+    )
+    p.add_argument(
+        "--create-issues",
+        action="store_true",
+        help="Create GitHub issues for high-priority action items",
+    )
     p.add_argument("--upload-badges", action="store_true", help="Upload badge JSON to GitHub Gist")
     p.add_argument("--notion-sync", action="store_true", help="Push audit events to Notion API")
     p.add_argument("--notion-registry", action="store_true", help="Use Notion as registry source")
@@ -301,7 +378,32 @@ def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         metavar="NAME",
         help="Ranking overlay profile for analyst-facing outputs (default: default)",
     )
-    p.add_argument("--collection", type=str, default=None, metavar="NAME", help="Filter outputs to named collection")
+    p.add_argument(
+        "--collection",
+        type=str,
+        default=None,
+        metavar="NAME",
+        help="Filter outputs to named collection",
+    )
+    # ── Draft README authoring (Arc G S5.1-5.3) ──────────────────────
+    p.add_argument(
+        "--draft-readmes",
+        action="store_true",
+        help="Draft README packets for qualifying repos via LLM",
+    )
+    p.add_argument(
+        "--draft-readmes-all",
+        action="store_true",
+        help="Apply to every qualifying repo (stale/missing/short)",
+    )
+    p.add_argument(
+        "--draft-readmes-repo",
+        action="append",
+        default=None,
+        dest="draft_readmes_repos",
+        metavar="REPO",
+        help="Explicit per-repo opt-in (repeatable)",
+    )
 
 
 def _build_serve_subparser(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
@@ -319,7 +421,9 @@ def _build_serve_subparser(subparsers: argparse._SubParsersAction) -> None:  # t
         default=os.environ.get("GITHUB_TOKEN") or _gh_auth_token(),
         help="GitHub personal access token",
     )
-    p.add_argument("--output-dir", default="output", help="Directory for output files (default: output/)")
+    p.add_argument(
+        "--output-dir", default="output", help="Directory for output files (default: output/)"
+    )
     p.add_argument("--config", default=None, help="Path to audit-config.yaml")
     p.add_argument("--verbose", action="store_true", help="Print detailed output")
 
@@ -915,6 +1019,25 @@ def build_parser() -> argparse.ArgumentParser:
         "--apply-readmes",
         action="store_true",
         help="Push README updates from an improvements file via the Contents API",
+    )
+    # ── Draft README authoring (Arc G S5.1-5.3) ──────────────────────
+    parser.add_argument(
+        "--draft-readmes",
+        action="store_true",
+        help="Draft README packets for qualifying repos via LLM",
+    )
+    parser.add_argument(
+        "--draft-readmes-all",
+        action="store_true",
+        help="Apply --draft-readmes to every qualifying repo (stale/missing/short)",
+    )
+    parser.add_argument(
+        "--draft-readmes-repo",
+        action="append",
+        default=None,
+        dest="draft_readmes_repos",
+        metavar="REPO",
+        help="Explicit per-repo opt-in for --draft-readmes (repeatable)",
     )
     parser.add_argument(
         "--improvements-file",
@@ -2087,6 +2210,168 @@ def _run_generate_manifest_mode(args, parser) -> None:
     print_info(f"Improvement manifest: {manifest_path} ({len(manifest)} repos)")
 
 
+def _run_draft_readmes_mode(args) -> None:
+    """Dispatch for --draft-readmes: generate LLM-authored README draft packets."""
+    import json
+    import sys
+
+    from src.approval_ledger import default_approval_reviewer as _default_reviewer
+    from src.draft_readmes import (
+        build_context,
+        generate_draft,
+        qualify_repos,
+        write_packets_to_ledger,
+    )
+    from src.llm_cost import BudgetExceededError, CostTracker
+    from src.narrative import _resolve_provider
+    from src.operator_prefs import (
+        is_suppressed,
+        load_prefs,
+        post_process_approval_session,
+        prefs_path,
+    )
+
+    output_dir = Path(args.output_dir)
+    opt_in_repos: list[str] = list(getattr(args, "draft_readmes_repos", None) or [])
+    all_qualifying: bool = bool(getattr(args, "draft_readmes_all", False))
+    reviewer: str = getattr(args, "approval_reviewer", None) or _default_reviewer()
+
+    if not opt_in_repos and not all_qualifying:
+        print_info(
+            "--draft-readmes requires --draft-readmes-all or at least one --draft-readmes-repo. "
+            "No repos selected."
+        )
+        return
+
+    # ── Load audit results (portfolio-truth-latest.json or warehouse) ─────────
+    audit_results: list[dict] = []
+    truth_path = output_dir / "portfolio-truth-latest.json"
+    if truth_path.exists():
+        try:
+            raw = json.loads(truth_path.read_text(encoding="utf-8"))
+            audit_results = list(raw.get("repos", raw.get("results", [])))
+        except (OSError, json.JSONDecodeError) as exc:
+            print_info(f"Warning: could not read portfolio-truth-latest.json: {exc}")
+    else:
+        print_info(
+            f"portfolio-truth-latest.json not found in {output_dir}. "
+            "Run `audit report --portfolio-truth` first to populate repo data. "
+            "Proceeding with empty repo list — only explicit --draft-readmes-repo repos will be drafted."
+        )
+
+    # ── Qualify repos ──────────────────────────────────────────────────────────
+    repo_names = qualify_repos(
+        audit_results, opt_in_repos=opt_in_repos, all_qualifying=all_qualifying
+    )
+    if not repo_names:
+        print_info("No repos qualify for --draft-readmes with current flags.")
+        return
+
+    # Build a name → dict lookup for fast access
+    repo_by_name: dict[str, dict] = {
+        str(r.get("repo_name") or r.get("name") or ""): r for r in audit_results
+    }
+    # Repos requested via --draft-readmes-repo may not exist in audit_results — create stubs
+    for name in repo_names:
+        if name not in repo_by_name:
+            repo_by_name[name] = {"repo_name": name, "name": name}
+
+    # ── Semantic index (optional — proceed without neighbors if unavailable) ────
+    semantic_index = None
+    warehouse_path = output_dir / "portfolio-warehouse.db"
+    if warehouse_path.exists():
+        try:
+            from src.semantic_index import SemanticIndex
+
+            semantic_index = SemanticIndex(output_dir)
+        except Exception as exc:  # noqa: BLE001
+            print_info(
+                f"Warning: could not load SemanticIndex: {exc} — proceeding without neighbors."
+            )
+
+    # ── LLM provider ──────────────────────────────────────────────────────────
+    provider_result = _resolve_provider(
+        getattr(args, "narrative_provider", None),
+        getattr(args, "narrative_model", None),
+        getattr(args, "token", None),
+    )
+    if provider_result is None:
+        print_info(
+            "No LLM provider available for --draft-readmes. "
+            "Set ANTHROPIC_API_KEY or GITHUB_TOKEN, or pass --narrative-provider."
+        )
+        return
+    provider, model = provider_result
+
+    # ── Cost tracker ──────────────────────────────────────────────────────────
+    cost_tracker: CostTracker | None = None
+    budget_usd = getattr(args, "max_llm_spend", None)
+    if budget_usd is not None or True:  # always track telemetry
+        cost_tracker = CostTracker(budget_usd=budget_usd, output_path=output_dir)
+
+    # ── Operator prefs ────────────────────────────────────────────────────────
+    pref_file = prefs_path(output_dir)
+    prefs = load_prefs(pref_file)
+
+    # ── Main loop ─────────────────────────────────────────────────────────────
+    packets = []
+    skipped_suppressed = 0
+    skipped_budget = 0
+    errors = 0
+
+    for repo_name in repo_names:
+        # 5.3 — suppression check
+        if is_suppressed(prefs, action_type="draft-readme", target_context=repo_name):
+            print_info(f"  skip {repo_name}: suppressed by operator prefs")
+            skipped_suppressed += 1
+            continue
+
+        repo = repo_by_name[repo_name]
+        context = build_context(repo, semantic_index=semantic_index)
+
+        try:
+            packet = generate_draft(
+                repo, context=context, provider=provider, model=model, cost_tracker=cost_tracker
+            )
+            packets.append(packet)
+            print_info(f"  drafted {repo_name} ({packet.diff_summary})")
+        except BudgetExceededError as exc:
+            print(f"\nERROR: LLM budget exceeded at {repo_name}: {exc}", file=sys.stderr)
+            skipped_budget = len(repo_names) - len(packets) - skipped_suppressed - 1
+            break
+        except Exception as exc:  # noqa: BLE001
+            print_info(f"  error drafting {repo_name}: {exc}")
+            errors += 1
+
+    # ── Persist packets ────────────────────────────────────────────────────────
+    if packets:
+        write_packets_to_ledger(packets, output_dir, reviewer)
+
+    # ── Refresh suppressions from rejection history ────────────────────────────
+    # We pass an empty list here — newly-generated drafts have no decision yet,
+    # so detect_suppressions would find zero consecutive rejections. The real
+    # suppression update happens when the operator rejects via approval_request_reject.
+    # Calling post_process_approval_session with [] is a no-op but keeps the prefs
+    # file consistent and auto-prunes stale hints if any exist.
+    if pref_file.parent.exists():
+        try:
+            post_process_approval_session([], output_dir)
+        except Exception as exc:  # noqa: BLE001
+            print_info(f"Warning: could not refresh suppression hints: {exc}")
+
+    if cost_tracker is not None:
+        cost_tracker.write_telemetry()
+
+    total_cost = cost_tracker.total_usd() if cost_tracker is not None else 0.0
+    print_info(
+        f"Drafted {len(packets)} packet(s) for {len(packets)} repo(s). "
+        f"{skipped_suppressed} skipped (prefs). "
+        f"{skipped_budget} skipped (budget). "
+        f"{errors} error(s). "
+        f"LLM cost: ${total_cost:.4f}."
+    )
+
+
 def _run_apply_improvements_mode(args, parser) -> None:
     from src.repo_improver import (
         apply_metadata_updates,
@@ -2096,29 +2381,106 @@ def _run_apply_improvements_mode(args, parser) -> None:
     )
 
     improvements_file = getattr(args, "improvements_file", None)
-    if not improvements_file:
+    apply_readmes = getattr(args, "apply_readmes", False)
+    apply_metadata = getattr(args, "apply_metadata", False)
+
+    # --apply-metadata always needs a file; --apply-readmes can read from ledger instead.
+    if apply_metadata and not improvements_file:
+        parser.error("--apply-metadata requires --improvements-file")
+    if not apply_readmes and not apply_metadata:
         parser.error("--apply-metadata / --apply-readmes requires --improvements-file")
-    improvements = load_improvements(improvements_file)
+
     cache = None if args.no_cache else ResponseCache()
     client = GitHubClient(token=args.token, cache=cache)
     output_dir = Path(args.output_dir)
     dry_run = getattr(args, "dry_run", False)
-    updates = list(improvements.values())
+
+    # Load file-based updates (may be empty if no file supplied)
+    file_updates: list[dict] = []
+    if improvements_file:
+        file_updates = list(load_improvements(improvements_file).values())
 
     all_results: list[dict] = []
-    if getattr(args, "apply_metadata", False):
-        results = apply_metadata_updates(client, args.username, updates, dry_run=dry_run)
+
+    if apply_metadata:
+        results = apply_metadata_updates(client, args.username, file_updates, dry_run=dry_run)
         all_results.extend(results)
         ok_count = sum(
             1 for r in results for a in r.get("actions", []) if a.get("ok") or a.get("dry_run")
         )
         print_info(f"Metadata updates: {ok_count} actions {'previewed' if dry_run else 'applied'}")
 
-    if getattr(args, "apply_readmes", False):
-        results = apply_readme_updates(client, args.username, updates, dry_run=dry_run)
-        all_results.extend(results)
-        ok_count = sum(1 for r in results if r.get("ok") or r.get("dry_run"))
-        print_info(f"README updates: {ok_count} repos {'previewed' if dry_run else 'pushed'}")
+    if apply_readmes:
+        # Build the merged update list:
+        #   1) file-based packets (if --improvements-file provided)
+        #   2) approved ledger packets (if any, de-duplicated by repo name)
+        readme_updates: list[dict] = list(file_updates)
+        ledger_packets_by_repo: dict[str, object] = {}
+
+        from src.draft_readmes import (
+            load_approved_drafts,
+            mark_draft_applied,
+            record_draft_apply_failure,
+        )
+
+        ledger_packets = load_approved_drafts(output_dir, getattr(args, "username", None))
+        for pkt in ledger_packets:
+            # Convert DraftReadmePacket → shape expected by apply_readme_updates
+            # apply_readme_updates expects: {name: str, readme: str}
+            # De-duplicate: file-based takes precedence (already present in readme_updates).
+            file_names = {(u.get("name") or u.get("repo", "").split("/")[-1]) for u in file_updates}
+            if pkt.repo_name not in file_names:
+                readme_updates.append({"name": pkt.repo_name, "readme": pkt.proposed_readme})
+                ledger_packets_by_repo[pkt.repo_name] = pkt
+
+        if not readme_updates:
+            print_info("README updates: 0 repos to apply (no file and no approved ledger packets).")
+        else:
+            if dry_run:
+                # Print per-repo preview lines for ledger-sourced packets so the operator
+                # can see what would be pushed.  File-based packets are also covered because
+                # apply_readme_updates returns {"dry_run": True} records when dry_run=True.
+                for pkt_repo, _pkt in ledger_packets_by_repo.items():
+                    upd = next(
+                        (
+                            u
+                            for u in readme_updates
+                            if (u.get("name") or u.get("repo", "").split("/")[-1]) == pkt_repo
+                        ),
+                        None,
+                    )
+                    if upd is not None:
+                        char_count = len(upd.get("readme", ""))
+                        print_info(
+                            f"  [dry-run] would push README to {pkt_repo}: {char_count} chars"
+                        )
+
+            results = apply_readme_updates(client, args.username, readme_updates, dry_run=dry_run)
+            all_results.extend(results)
+
+            # State transitions for ledger-sourced packets (live apply only)
+            if not dry_run:
+                for result in results:
+                    repo_name = result.get("repo", "")
+                    if repo_name not in ledger_packets_by_repo:
+                        continue
+                    pkt = ledger_packets_by_repo[repo_name]
+                    if result.get("ok"):
+                        mark_draft_applied(output_dir, pkt, apply_result=result)  # type: ignore[arg-type]
+                    else:
+                        error_msg = str(result.get("error") or "unknown error")
+                        record_draft_apply_failure(output_dir, pkt, error=error_msg)  # type: ignore[arg-type]
+
+            ok_count = sum(1 for r in results if r.get("ok") or r.get("dry_run"))
+            verb = "previewed" if dry_run else "pushed"
+            print_info(
+                f"README updates: {ok_count} repos {verb}"
+                + (
+                    f" ({len(ledger_packets_by_repo)} from ledger)"
+                    if ledger_packets_by_repo
+                    else ""
+                )
+            )
 
     report_path = generate_execution_report(all_results, output_dir)
     print_info(f"Execution report: {report_path}")
@@ -4917,11 +5279,19 @@ def _infer_subcommand_from_flags(args: argparse.Namespace) -> str:
     """Return the effective subcommand name for a legacy flat invocation."""
     # triage signals
     triage_flags = (
-        "control_center", "approval_center", "triage_view",
-        "approve_governance", "approve_packet", "review_governance", "review_packet",
-        "auto_apply_approved", "reset_prefs",
-        "acknowledge_target", "acknowledge_kind",
-        "semantic_search", "ask",
+        "control_center",
+        "approval_center",
+        "triage_view",
+        "approve_governance",
+        "approve_packet",
+        "review_governance",
+        "review_packet",
+        "auto_apply_approved",
+        "reset_prefs",
+        "acknowledge_target",
+        "acknowledge_kind",
+        "semantic_search",
+        "ask",
     )
     for flag in triage_flags:
         val = getattr(args, flag, None)
@@ -4932,10 +5302,15 @@ def _infer_subcommand_from_flags(args: argparse.Namespace) -> str:
 
     # report signals
     report_flags = (
-        "portfolio_truth", "portfolio_context_recovery",
-        "apply_context_recovery", "generate_manifest",
-        "apply_metadata", "apply_readmes",
-        "upload_badges", "notion_sync",
+        "portfolio_truth",
+        "portfolio_context_recovery",
+        "apply_context_recovery",
+        "generate_manifest",
+        "apply_metadata",
+        "apply_readmes",
+        "draft_readmes",
+        "upload_badges",
+        "notion_sync",
     )
     for flag in report_flags:
         if getattr(args, flag, False):
@@ -4998,27 +5373,44 @@ def _rewrite_legacy_argv(argv: list[str]) -> tuple[list[str], bool]:
     rest = argv[1:]
 
     # triage signals
-    if any(
-        f in rest
-        for f in [
-            "--control-center", "--approval-center",
-            "--approve-governance", "--approve-packet",
-            "--review-governance", "--review-packet",
-            "--auto-apply-approved", "--reset-prefs",
-            "--semantic-search", "--ask",
-        ]
-    ) or "--acknowledge-target" in rest or "--acknowledge-kind" in rest:
+    if (
+        any(
+            f in rest
+            for f in [
+                "--control-center",
+                "--approval-center",
+                "--approve-governance",
+                "--approve-packet",
+                "--review-governance",
+                "--review-packet",
+                "--auto-apply-approved",
+                "--reset-prefs",
+                "--semantic-search",
+                "--ask",
+            ]
+        )
+        or "--acknowledge-target" in rest
+        or "--acknowledge-kind" in rest
+    ):
         inferred = "triage"
     # report signals
-    elif any(
-        f in rest
-        for f in [
-            "--portfolio-truth", "--portfolio-context-recovery",
-            "--apply-context-recovery", "--generate-manifest",
-            "--apply-metadata", "--apply-readmes",
-            "--upload-badges", "--notion-sync",
-        ]
-    ) or "--campaign" in rest or "--writeback-target" in rest:
+    elif (
+        any(
+            f in rest
+            for f in [
+                "--portfolio-truth",
+                "--portfolio-context-recovery",
+                "--apply-context-recovery",
+                "--generate-manifest",
+                "--apply-metadata",
+                "--apply-readmes",
+                "--upload-badges",
+                "--notion-sync",
+            ]
+        )
+        or "--campaign" in rest
+        or "--writeback-target" in rest
+    ):
         inferred = "report"
     else:
         inferred = "run"
@@ -5147,6 +5539,10 @@ def main() -> None:
 
     if getattr(args, "apply_metadata", False) or getattr(args, "apply_readmes", False):
         _run_apply_improvements_mode(args, parser)
+        return
+
+    if getattr(args, "draft_readmes", False):
+        _run_draft_readmes_mode(args)
         return
 
     if getattr(args, "serve", False):
