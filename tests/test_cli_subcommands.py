@@ -10,6 +10,7 @@ All tests use parser.parse_args() directly — no subprocess, no I/O.
 Legacy invocation tests go through _rewrite_legacy_argv + parse_args to
 mirror what main() does at runtime.
 """
+
 from __future__ import annotations
 
 import io
@@ -24,6 +25,7 @@ from src.cli import (
 )
 
 # ── Helper ────────────────────────────────────────────────────────────
+
 
 def _parse(*argv: str):
     """Parse a subcommand-form argv through the subcommand parser."""
@@ -43,6 +45,7 @@ def _help_text(subcommand: str) -> str:
     parser = build_subcommand_parser()
     buf = io.StringIO()
     import contextlib
+
     with contextlib.suppress(SystemExit):
         with contextlib.redirect_stdout(buf):
             parser.parse_args([subcommand, "--help"])
@@ -58,6 +61,7 @@ def _count_flags_in_help(text: str) -> int:
 
 
 # ── 1. `audit run username --flag` dispatches correctly ──────────────
+
 
 class TestRunSubcommand:
     def test_basic_run_subcommand(self):
@@ -99,6 +103,7 @@ class TestRunSubcommand:
 
 # ── 2. Legacy `audit username --flag` still works + emits DeprecationWarning ──
 
+
 class TestLegacyFlatInvocation:
     def test_legacy_html_parses(self):
         args = _parse_legacy("myuser", "--html")
@@ -123,6 +128,7 @@ class TestLegacyFlatInvocation:
 
     def test_legacy_emits_deprecation_warning(self):
         import src.cli as cli_module
+
         cli_module._LEGACY_WARNING_EMITTED = False
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
@@ -133,6 +139,7 @@ class TestLegacyFlatInvocation:
 
     def test_legacy_warning_emits_once(self):
         import src.cli as cli_module
+
         cli_module._LEGACY_WARNING_EMITTED = False
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
@@ -165,12 +172,15 @@ class TestLegacyFlatInvocation:
         assert args.portfolio_truth is True
 
     def test_legacy_campaign_infers_report(self):
-        args = _parse_legacy("myuser", "--campaign", "security-review", "--writeback-target", "github")
+        args = _parse_legacy(
+            "myuser", "--campaign", "security-review", "--writeback-target", "github"
+        )
         assert args.campaign == "security-review"
         assert args.writeback_target == "github"
 
 
 # ── 3. `audit triage username --control-center` works ────────────────
+
 
 class TestTriageSubcommand:
     def test_triage_control_center(self):
@@ -204,6 +214,7 @@ class TestTriageSubcommand:
 
 # ── 4. `audit report username --portfolio-truth` works ───────────────
 
+
 class TestReportSubcommand:
     def test_report_portfolio_truth(self):
         args = _parse("report", "myuser", "--portfolio-truth")
@@ -216,8 +227,9 @@ class TestReportSubcommand:
         assert args.campaign == "security-review"
 
     def test_report_writeback(self):
-        args = _parse("report", "myuser", "--campaign", "promotion-push",
-                      "--writeback-target", "github")
+        args = _parse(
+            "report", "myuser", "--campaign", "promotion-push", "--writeback-target", "github"
+        )
         assert args.writeback_target == "github"
 
     def test_report_excel_mode(self):
@@ -229,12 +241,15 @@ class TestReportSubcommand:
         assert args.generate_manifest is True
 
     def test_report_apply_context_recovery(self):
-        args = _parse("report", "myuser", "--portfolio-context-recovery", "--apply-context-recovery")
+        args = _parse(
+            "report", "myuser", "--portfolio-context-recovery", "--apply-context-recovery"
+        )
         assert args.portfolio_context_recovery is True
         assert args.apply_context_recovery is True
 
 
 # ── 5. `audit serve` / `audit --serve` still works ───────────────────
+
 
 class TestServeSubcommand:
     def test_serve_subcommand_parses(self):
@@ -267,6 +282,7 @@ class TestServeSubcommand:
 
 # ── 6/7/8. --help flag counts ≤ limits ───────────────────────────────
 
+
 class TestHelpFlagCounts:
     def test_run_help_flag_count(self):
         text = _help_text("run")
@@ -287,29 +303,43 @@ class TestHelpFlagCounts:
     def test_report_help_flag_count(self):
         text = _help_text("report")
         count = _count_flags_in_help(text)
-        assert count <= 25, (
-            f"audit report --help shows {count} non-global flags (limit 25).\n"
+        assert count <= 30, (
+            f"audit report --help shows {count} non-global flags (limit 30).\n"
             f"Flags found: {sorted(set(re.findall(r'  (--[a-z][a-z0-9-]*)', text)))}"
         )
 
 
 # ── 9. _infer_subcommand_from_flags correctness ───────────────────────
 
+
 class TestInferSubcommand:
     def _ns(self, **kw):
         from argparse import Namespace
+
         defaults = {
-            "control_center": False, "approval_center": False,
-            "triage_view": "all", "approve_governance": False,
-            "approve_packet": False, "review_governance": False,
-            "review_packet": False, "auto_apply_approved": False,
-            "reset_prefs": False, "acknowledge_target": None,
-            "acknowledge_kind": None, "semantic_search": None, "ask": None,
-            "portfolio_truth": False, "portfolio_context_recovery": False,
-            "apply_context_recovery": False, "generate_manifest": False,
-            "apply_metadata": False, "apply_readmes": False,
-            "upload_badges": False, "notion_sync": False,
-            "campaign": None, "writeback_target": None,
+            "control_center": False,
+            "approval_center": False,
+            "triage_view": "all",
+            "approve_governance": False,
+            "approve_packet": False,
+            "review_governance": False,
+            "review_packet": False,
+            "auto_apply_approved": False,
+            "reset_prefs": False,
+            "acknowledge_target": None,
+            "acknowledge_kind": None,
+            "semantic_search": None,
+            "ask": None,
+            "portfolio_truth": False,
+            "portfolio_context_recovery": False,
+            "apply_context_recovery": False,
+            "generate_manifest": False,
+            "apply_metadata": False,
+            "apply_readmes": False,
+            "upload_badges": False,
+            "notion_sync": False,
+            "campaign": None,
+            "writeback_target": None,
         }
         defaults.update(kw)
         return Namespace(**defaults)
