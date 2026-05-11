@@ -13,6 +13,10 @@ from src.baseline_context import (
     compare_baseline_context,
     extract_baseline_context,
 )
+from src.operator_acknowledgments import (
+    is_change_acknowledged,
+    load_acknowledgments,
+)
 from src.warehouse import (
     load_latest_audit_runs,
     load_review_history,
@@ -46,7 +50,8 @@ def _latest_baseline_reference(run: dict | None) -> dict:
         "run_id": run.get("run_id", ""),
         "generated_at": run.get("generated_at", ""),
         "report_path": run.get("report_path", ""),
-        "baseline_signature": baseline_context.get("baseline_signature") or run.get("baseline_signature", ""),
+        "baseline_signature": baseline_context.get("baseline_signature")
+        or run.get("baseline_signature", ""),
     }
 
 
@@ -60,11 +65,15 @@ def choose_watch_plan(output_dir: Path, args, *, scoring_profile: str) -> WatchP
     latest_full = next((run for run in runs if run.get("run_mode") == "full"), None)
     latest_full_context = extract_baseline_context(latest_full)
     latest_baseline_reference = _latest_baseline_reference(latest_full)
-    latest_full_mismatches = compare_baseline_context(
-        requested_context,
-        latest_full_context,
-        include_size=False,
-    ) if latest_full_context else []
+    latest_full_mismatches = (
+        compare_baseline_context(
+            requested_context,
+            latest_full_context,
+            include_size=False,
+        )
+        if latest_full_context
+        else []
+    )
 
     if strategy == "full":
         return WatchPlan(
@@ -84,7 +93,11 @@ def choose_watch_plan(output_dir: Path, args, *, scoring_profile: str) -> WatchP
                 scoring_profile,
                 latest_trusted_baseline=latest_baseline_reference,
             )
-        fallback_reason = "filter-or-profile-changed" if latest_full and latest_full_mismatches else "incremental-needs-baseline"
+        fallback_reason = (
+            "filter-or-profile-changed"
+            if latest_full and latest_full_mismatches
+            else "incremental-needs-baseline"
+        )
         return WatchPlan(
             "full",
             fallback_reason,
@@ -111,7 +124,9 @@ def choose_watch_plan(output_dir: Path, args, *, scoring_profile: str) -> WatchP
             latest_trusted_baseline=latest_baseline_reference,
         )
 
-    checkpoint_signature = (checkpoint or {}).get("filter_signature") or (checkpoint or {}).get("baseline_signature")
+    checkpoint_signature = (checkpoint or {}).get("filter_signature") or (checkpoint or {}).get(
+        "baseline_signature"
+    )
     if checkpoint_signature and checkpoint_signature != signature:
         return WatchPlan(
             "full",
@@ -122,10 +137,9 @@ def choose_watch_plan(output_dir: Path, args, *, scoring_profile: str) -> WatchP
         )
 
     last_full_at = _parse_ts(latest_full.get("generated_at"))
-    full_refresh_due = (
-        last_full_at is None
-        or datetime.now(timezone.utc) - last_full_at >= timedelta(days=FULL_REFRESH_DAYS)
-    )
+    full_refresh_due = last_full_at is None or datetime.now(
+        timezone.utc
+    ) - last_full_at >= timedelta(days=FULL_REFRESH_DAYS)
     if full_refresh_due:
         return WatchPlan(
             "full",
@@ -162,10 +176,12 @@ def build_review_bundle(
         profile_name=portfolio_profile,
         collection_name=collection_name,
     )
+    acknowledgments = load_acknowledgments(output_dir, report_data.get("username", ""))
     material_changes = evaluate_material_changes(
         report_data,
         diff_data=diff_data,
         thresholds=thresholds,
+        acknowledgments=acknowledgments,
     )
     material_fingerprint = _fingerprint(material_changes)
     review_targets = _build_review_targets(report_data, material_changes, context)
@@ -211,11 +227,11 @@ def evaluate_material_changes(
     *,
     diff_data: dict | None,
     thresholds: dict[str, float],
+    acknowledgments: list[dict] | None = None,
 ) -> list[dict]:
     changes: list[dict] = []
     repo_index = {
-        audit.get("metadata", {}).get("name", ""): audit
-        for audit in report_data.get("audits", [])
+        audit.get("metadata", {}).get("name", ""): audit for audit in report_data.get("audits", [])
     }
 
     if diff_data:
@@ -258,17 +274,14 @@ def evaluate_material_changes(
                             f"{repo_name} shifted on {lens_name.replace('_', ' ')}",
                             f"{lens_name} changed by {lens_delta:+.3f}.",
                             "Review this lens change before reprioritizing actions.",
-                            details={"lens": lens_name, "delta": lens_delta, **item},
+                            details={**item, "lens": lens_name, "delta": lens_delta},
                         )
                     )
 
             security_change = item.get("security_change", {})
-            if (
-                not _is_resolved_security_change(security_change)
-                and (
-                    security_change.get("old_label") != security_change.get("new_label")
-                    or abs(security_change.get("delta", 0.0)) >= thresholds["security"]
-                )
+            if not _is_resolved_security_change(security_change) and (
+                security_change.get("old_label") != security_change.get("new_label")
+                or abs(security_change.get("delta", 0.0)) >= thresholds["security"]
             ):
                 changes.append(
                     _change(
@@ -284,7 +297,9 @@ def evaluate_material_changes(
 
             hotspot_change = item.get("hotspot_change", {})
             current_hotspots = repo_index.get(repo_name, {}).get("hotspots", [])
-            current_severity = max((entry.get("severity", 0.0) for entry in current_hotspots), default=0.0)
+            current_severity = max(
+                (entry.get("severity", 0.0) for entry in current_hotspots), default=0.0
+            )
             if (
                 hotspot_change.get("new_count", 0) > hotspot_change.get("old_count", 0)
                 or hotspot_change.get("old_primary") != hotspot_change.get("new_primary")
@@ -364,6 +379,10 @@ def evaluate_material_changes(
             continue
         seen.add(key)
         deduped.append(change)
+    if acknowledgments:
+        deduped = [
+            change for change in deduped if not is_change_acknowledged(change, acknowledgments)
+        ]
     return deduped
 
 
@@ -376,7 +395,9 @@ def _is_resolved_security_change(security_change: dict) -> bool:
     )
 
 
-def _build_review_targets(report_data: dict, material_changes: list[dict], context: dict) -> list[dict]:
+def _build_review_targets(
+    report_data: dict, material_changes: list[dict], context: dict
+) -> list[dict]:
     targets: list[dict] = []
     ranked = {entry["name"]: entry for entry in context["ranked_audits"]}
     seen: set[str] = set()
@@ -417,19 +438,54 @@ def _build_review_targets(report_data: dict, material_changes: list[dict], conte
 
 def _build_review_decisions(report_data: dict, material_changes: list[dict]) -> list[dict]:
     if not material_changes:
-        return [{"decision": "safe-to-defer", "reason": "No material changes crossed the current threshold."}]
+        return [
+            {
+                "decision": "safe-to-defer",
+                "reason": "No material changes crossed the current threshold.",
+            }
+        ]
 
     decisions: list[dict] = []
     if report_data.get("managed_state_drift"):
-        decisions.append({"decision": "review-campaign-drift", "reason": "Campaign drift exists and should be reviewed before more apply work."})
+        decisions.append(
+            {
+                "decision": "review-campaign-drift",
+                "reason": "Campaign drift exists and should be reviewed before more apply work.",
+            }
+        )
     if report_data.get("governance_drift"):
-        decisions.append({"decision": "review-governance-drift", "reason": "Governance drift exists and should be resolved before governed apply."})
-    if report_data.get("governance_preview", {}).get("applyable_count", 0) and not report_data.get("governance_approval"):
-        decisions.append({"decision": "approve-governance", "reason": "Governed controls are ready and not yet approved."})
-    if report_data.get("campaign_summary", {}).get("action_count", 0) and not report_data.get("writeback_results", {}).get("mode") == "apply":
-        decisions.append({"decision": "preview-campaign", "reason": "A campaign queue exists and should be reviewed before any writeback."})
+        decisions.append(
+            {
+                "decision": "review-governance-drift",
+                "reason": "Governance drift exists and should be resolved before governed apply.",
+            }
+        )
+    if report_data.get("governance_preview", {}).get("applyable_count", 0) and not report_data.get(
+        "governance_approval"
+    ):
+        decisions.append(
+            {
+                "decision": "approve-governance",
+                "reason": "Governed controls are ready and not yet approved.",
+            }
+        )
+    if (
+        report_data.get("campaign_summary", {}).get("action_count", 0)
+        and not report_data.get("writeback_results", {}).get("mode") == "apply"
+    ):
+        decisions.append(
+            {
+                "decision": "preview-campaign",
+                "reason": "A campaign queue exists and should be reviewed before any writeback.",
+            }
+        )
     if not decisions:
-        decisions.append({"decision": "inspect-top-targets", "reason": "Material changes exist but no explicit campaign or governance action is pending."})
+        decisions.append(
+            {
+                "decision": "inspect-top-targets",
+                "reason": "Material changes exist but no explicit campaign or governance action is pending.",
+            }
+        )
     return decisions
 
 

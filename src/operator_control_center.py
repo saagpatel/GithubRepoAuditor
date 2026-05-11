@@ -6,6 +6,7 @@ from pathlib import Path
 from src.baseline_context import build_watch_guidance
 from src.governance_activation import build_governance_summary
 from src.intervention_ledger import load_intervention_ledger_bundle
+from src.operator_acknowledgments import is_change_acknowledged, load_acknowledgments
 from src.operator_effectiveness import build_operator_effectiveness_bundle
 from src.recurring_review import build_review_bundle
 from src.warehouse import (
@@ -100,6 +101,7 @@ def normalize_review_state(
             _normalize_review_history_item(item) for item in data.get("review_history") or []
         ]
         data["review_summary"] = _normalize_review_summary(data.get("review_summary") or {})
+        _apply_acknowledgment_filter(data, output_dir)
         return data
     try:
         bundle = build_review_bundle(
@@ -134,7 +136,48 @@ def normalize_review_state(
     ]
     bundle["review_summary"] = _normalize_review_summary(bundle.get("review_summary") or {})
     data.update(bundle)
+    _apply_acknowledgment_filter(data, output_dir)
     return data
+
+
+def _apply_acknowledgment_filter(data: dict, output_dir: Path) -> None:
+    acknowledgments = load_acknowledgments(output_dir, data.get("username", ""))
+    if not acknowledgments:
+        return
+    raw_changes = data.get("material_changes") or []
+    filtered_changes = [
+        change for change in raw_changes if not is_change_acknowledged(change, acknowledgments)
+    ]
+    if len(filtered_changes) == len(raw_changes):
+        return
+    acknowledged_repos = {
+        change.get("repo_name")
+        for change in raw_changes
+        if is_change_acknowledged(change, acknowledgments)
+    }
+    data["material_changes"] = filtered_changes
+    data["review_targets"] = [
+        target
+        for target in data.get("review_targets") or []
+        if target.get("repo") not in acknowledged_repos
+    ]
+    if not filtered_changes and "review_summary" in data:
+        summary = dict(data["review_summary"])
+        summary["safe_to_defer"] = True
+        summary["material_change_count"] = 0
+        summary["top_change_types"] = []
+        data["review_summary"] = summary
+    elif "review_summary" in data:
+        summary = dict(data["review_summary"])
+        summary["material_change_count"] = len(filtered_changes)
+        summary["top_change_types"] = sorted(
+            {
+                change.get("change_type", "")
+                for change in filtered_changes
+                if change.get("change_type")
+            }
+        )
+        data["review_summary"] = summary
 
 
 def build_operator_snapshot(

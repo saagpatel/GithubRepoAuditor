@@ -481,6 +481,40 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional free-text note stored with the local approval record",
     )
     parser.add_argument(
+        "--acknowledge-target",
+        type=str,
+        default=None,
+        help="Repo name to acknowledge in the recurring-review queue (use with --acknowledge-kind)",
+    )
+    parser.add_argument(
+        "--acknowledge-kind",
+        type=str,
+        default=None,
+        choices=[
+            "security-change",
+            "lens-delta",
+            "tier-change",
+            "score-delta",
+            "hotspot-change",
+            "campaign-drift",
+            "governance-drift",
+            "rollback-exposure",
+        ],
+        help="Change type to acknowledge for the target repo",
+    )
+    parser.add_argument(
+        "--acknowledge-reviewer",
+        type=str,
+        default=None,
+        help="Reviewer name recorded on the acknowledgment (defaults to approval reviewer fallback)",
+    )
+    parser.add_argument(
+        "--acknowledge-note",
+        type=str,
+        default="",
+        help="Required free-text note explaining why the change has been acknowledged",
+    )
+    parser.add_argument(
         "--preflight-mode",
         choices=["auto", "off", "strict"],
         default="auto",
@@ -1356,16 +1390,14 @@ def _run_control_center_mode(args, parser) -> None:
         report_path,
         _parse_iso_dt(normalized.get("generated_at")) or datetime.now(timezone.utc),
     )
-    json_artifact, md_artifact, weekly_json, weekly_md, _payload = (
-        _write_control_center_artifacts(
-            normalized,
-            snapshot,
-            output_dir,
-            username=normalized.get("username", args.username),
-            generated_at=artifact_generated_at,
-            report_reference=str(report_path),
-            diff_dict=diff_dict,
-        )
+    json_artifact, md_artifact, weekly_json, weekly_md, _payload = _write_control_center_artifacts(
+        normalized,
+        snapshot,
+        output_dir,
+        username=normalized.get("username", args.username),
+        generated_at=artifact_generated_at,
+        report_reference=str(report_path),
+        diff_dict=diff_dict,
     )
     _print_control_center_summary(snapshot)
     print_info(f"Control center JSON: {json_artifact}")
@@ -1419,7 +1451,9 @@ def _run_approval_capture_mode(args, parser) -> None:
         list(report.operator_queue or []),
         approval_view="all",
     )
-    ledger = {str(item.get("approval_id") or ""): item for item in bundle.get("approval_ledger", [])}
+    ledger = {
+        str(item.get("approval_id") or ""): item for item in bundle.get("approval_ledger", [])
+    }
     if args.approve_governance or args.review_governance:
         approval_id = f"governance:{args.governance_scope}"
     else:
@@ -1507,6 +1541,66 @@ def _run_approval_capture_mode(args, parser) -> None:
         print_info(f"Approval follow-up receipt Markdown: {receipt_md}")
     print_info(f"Approval center JSON: {approval_json}")
     print_info(f"Approval center Markdown: {approval_md}")
+
+
+def _run_acknowledgment_capture_mode(args, parser) -> None:
+    from src.diff import diff_reports
+    from src.history import find_previous
+    from src.operator_acknowledgments import (
+        build_acknowledgment_record,
+        find_matching_change,
+        save_acknowledgment,
+    )
+    from src.recurring_review import MATERIALITY_THRESHOLDS, evaluate_material_changes
+
+    if not args.acknowledge_target:
+        parser.error("--acknowledge-target is required for acknowledgment capture")
+    if not args.acknowledge_kind:
+        parser.error("--acknowledge-kind is required for acknowledgment capture")
+    if not (args.acknowledge_note or "").strip():
+        parser.error("--acknowledge-note is required and must explain the acknowledgment")
+
+    output_dir = Path(args.output_dir)
+    report_path, report_data = _load_latest_report(output_dir)
+    if not report_path or not report_data:
+        parser.error("No existing audit report found in output directory")
+
+    diff_dict: dict | None = None
+    previous_path = find_previous(report_path.name)
+    if previous_path:
+        diff_dict = diff_reports(
+            previous_path,
+            report_path,
+            portfolio_profile=args.portfolio_profile,
+            collection_name=args.collection,
+        ).to_dict()
+
+    material_changes = evaluate_material_changes(
+        report_data,
+        diff_data=diff_dict,
+        thresholds=MATERIALITY_THRESHOLDS["standard"],
+    )
+    matched = find_matching_change(
+        repo_name=args.acknowledge_target,
+        change_kind=args.acknowledge_kind,
+        material_changes=material_changes,
+    )
+    if not matched:
+        parser.error(
+            f"No open '{args.acknowledge_kind}' change found for "
+            f"'{args.acknowledge_target}' in the latest report"
+        )
+
+    reviewer = args.acknowledge_reviewer or args.approval_reviewer
+    record = build_acknowledgment_record(matched, reviewer=reviewer, note=args.acknowledge_note)
+    saved_path = save_acknowledgment(output_dir, args.username, record)
+
+    print_info(
+        f"Acknowledged {args.acknowledge_kind} for {args.acknowledge_target} "
+        f"(change_key={record['change_key'][:12]}…, reviewer={reviewer})"
+    )
+    print_info(f"Acknowledgment store: {saved_path}")
+    print_info("Run --control-center to confirm the item is filtered from the queue.")
 
 
 def _run_doctor_mode(args, config_inspection) -> None:
@@ -2720,9 +2814,7 @@ def _analysis_worker_count(args) -> int:
     try:
         requested = int(raw_value)
     except (TypeError, ValueError):
-        print_warning(
-            "Invalid analysis worker count; using the reliable single-worker default."
-        )
+        print_warning("Invalid analysis worker count; using the reliable single-worker default.")
         return DEFAULT_ANALYSIS_WORKERS
 
     if requested < 1:
@@ -4101,6 +4193,10 @@ def main() -> None:
         or args.review_packet
     ):
         _run_approval_capture_mode(args, parser)
+        return
+
+    if getattr(args, "acknowledge_target", None) or getattr(args, "acknowledge_kind", None):
+        _run_acknowledgment_capture_mode(args, parser)
         return
 
     if getattr(args, "auto_apply_approved", False):

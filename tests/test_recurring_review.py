@@ -60,7 +60,9 @@ def _write_full_run(
         overall_score=0.7,
         completeness_tier="functional",
     )
-    report = AuditReport.from_audits("testuser", [audit], [], 1, scoring_profile="default", run_mode="full")
+    report = AuditReport.from_audits(
+        "testuser", [audit], [], 1, scoring_profile="default", run_mode="full"
+    )
     report.generated_at = generated_at or datetime.now(timezone.utc)
     if with_baseline_context:
         report.baseline_context = build_baseline_context(
@@ -143,6 +145,129 @@ def test_material_changes_skip_resolved_security_posture():
     )
 
     assert changes == []
+
+
+def test_material_changes_lens_delta_preserves_per_lens_value():
+    changes = evaluate_material_changes(
+        {"audits": []},
+        diff_data={
+            "repo_changes": [
+                {
+                    "name": "RepoA",
+                    "delta": 0.0,
+                    "lens_deltas": {"security_posture": 0.077},
+                    "security_change": {},
+                }
+            ]
+        },
+        thresholds=MATERIALITY_THRESHOLDS["standard"],
+    )
+    lens_changes = [c for c in changes if c["change_type"] == "lens-delta"]
+    assert len(lens_changes) == 1
+    assert lens_changes[0]["details"]["lens"] == "security_posture"
+    assert lens_changes[0]["details"]["delta"] == 0.077
+
+
+def test_material_changes_filter_acknowledged_security_change():
+    diff_data = {
+        "repo_changes": [
+            {
+                "name": "RepoA",
+                "delta": 0.0,
+                "lens_deltas": {},
+                "security_change": {
+                    "old_label": "critical",
+                    "new_label": "watch",
+                    "old_score": 0.4,
+                    "new_score": 0.7,
+                    "delta": 0.3,
+                },
+            }
+        ]
+    }
+    visible = evaluate_material_changes(
+        {"audits": []},
+        diff_data=diff_data,
+        thresholds=MATERIALITY_THRESHOLDS["standard"],
+    )
+    assert [change["change_type"] for change in visible] == ["security-change"]
+
+    ack = {
+        "change_key": visible[0]["change_key"],
+        "change_type": "security-change",
+        "repo_name": "RepoA",
+        "title": visible[0]["title"],
+        "signature": {"old_label": "critical", "new_label": "watch"},
+        "acknowledged_at": "2026-05-11T00:00:00+00:00",
+        "reviewer": "alice",
+        "note": "reviewed",
+    }
+
+    filtered = evaluate_material_changes(
+        {"audits": []},
+        diff_data=diff_data,
+        thresholds=MATERIALITY_THRESHOLDS["standard"],
+        acknowledgments=[ack],
+    )
+    assert filtered == []
+
+
+def test_material_changes_keep_security_regression_after_ack():
+    healthy_diff = {
+        "repo_changes": [
+            {
+                "name": "RepoA",
+                "delta": 0.0,
+                "lens_deltas": {},
+                "security_change": {
+                    "old_label": "critical",
+                    "new_label": "watch",
+                    "old_score": 0.4,
+                    "new_score": 0.7,
+                    "delta": 0.3,
+                },
+            }
+        ]
+    }
+    visible = evaluate_material_changes(
+        {"audits": []},
+        diff_data=healthy_diff,
+        thresholds=MATERIALITY_THRESHOLDS["standard"],
+    )
+    ack = {
+        "change_key": visible[0]["change_key"],
+        "change_type": "security-change",
+        "repo_name": "RepoA",
+        "title": visible[0]["title"],
+        "signature": {"old_label": "critical", "new_label": "watch"},
+        "acknowledged_at": "2026-05-11T00:00:00+00:00",
+        "reviewer": "alice",
+        "note": "reviewed",
+    }
+
+    regression_diff = {
+        "repo_changes": [
+            {
+                "name": "RepoA",
+                "delta": 0.0,
+                "lens_deltas": {},
+                "security_change": {
+                    "old_label": "watch",
+                    "new_label": "critical",
+                    "old_score": 0.7,
+                    "new_score": 0.3,
+                    "delta": -0.4,
+                },
+            }
+        ]
+    }
+    surfaced = evaluate_material_changes(
+        {"audits": []},
+        diff_data=regression_diff,
+        thresholds=MATERIALITY_THRESHOLDS["standard"],
+        acknowledgments=[ack],
+    )
+    assert [change["change_type"] for change in surfaced] == ["security-change"]
 
 
 def test_material_changes_keep_unresolved_security_improvement():
