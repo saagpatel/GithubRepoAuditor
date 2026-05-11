@@ -35,11 +35,13 @@ class GitHubClient:
         self.token = token
         self.cache = cache
         self.session = requests.Session()
-        self.session.headers.update({
-            "Accept": "application/vnd.github.v3+json",
-            "User-Agent": "github-repo-auditor/0.1",
-            "X-GitHub-Api-Version": REST_API_VERSION,
-        })
+        self.session.headers.update(
+            {
+                "Accept": "application/vnd.github.v3+json",
+                "User-Agent": "github-repo-auditor/0.1",
+                "X-GitHub-Api-Version": REST_API_VERSION,
+            }
+        )
         if token:
             self.session.headers["Authorization"] = f"token {token}"
         self._authenticated_user: str | None = None
@@ -76,8 +78,7 @@ class GitHubClient:
                 sleep_seconds,
             )
             print(
-                f"  ⏳ Rate limit low ({remaining_int} remaining). "
-                f"Sleeping {sleep_seconds}s...",
+                f"  ⏳ Rate limit low ({remaining_int} remaining). Sleeping {sleep_seconds}s...",
                 file=sys.stderr,
             )
             time.sleep(sleep_seconds)
@@ -138,7 +139,7 @@ class GitHubClient:
             self._check_rate_limit(response)
 
             if response.status_code == 202 and attempt < max_retries:
-                sleep_time = backoff * (2 ** attempt)
+                sleep_time = backoff * (2**attempt)
                 logger.info("Stats computing (202), retrying in %ds...", sleep_time)
                 time.sleep(sleep_time)
                 continue
@@ -193,7 +194,11 @@ class GitHubClient:
         payload = response.json()
         errors = payload.get("errors") or []
         if errors:
-            message = "; ".join(str(item.get("message", "GraphQL error")) for item in errors if isinstance(item, dict))
+            message = "; ".join(
+                str(item.get("message", "GraphQL error"))
+                for item in errors
+                if isinstance(item, dict)
+            )
             raise GitHubClientError(message or "GitHub GraphQL request failed")
         data = payload.get("data")
         return data if isinstance(data, dict) else {}
@@ -284,9 +289,7 @@ class GitHubClient:
             logger.warning("Failed to fetch languages for %s/%s: %s", owner, repo, exc)
             return {}
 
-    def get_releases(
-        self, owner: str, repo: str, per_page: int = 10
-    ) -> tuple[list[dict], bool]:
+    def get_releases(self, owner: str, repo: str, per_page: int = 10) -> tuple[list[dict], bool]:
         """Fetch releases for a repo.
 
         Returns a (releases, available) tuple.
@@ -303,9 +306,7 @@ class GitHubClient:
         except requests.HTTPError as exc:
             status = self._http_error_status(exc)
             if status == 404:
-                logger.debug(
-                    "Releases endpoint unavailable for %s/%s (404)", owner, repo
-                )
+                logger.debug("Releases endpoint unavailable for %s/%s (404)", owner, repo)
                 return [], False
             logger.warning("Failed to fetch releases for %s/%s: %s", owner, repo, exc)
             return [], True
@@ -324,9 +325,7 @@ class GitHubClient:
             logger.warning("Failed to fetch PRs for %s/%s: %s", owner, repo, exc)
             return []
 
-    def get_recent_commits(
-        self, owner: str, repo: str, count: int = 10
-    ) -> list[dict]:
+    def get_recent_commits(self, owner: str, repo: str, count: int = 10) -> list[dict]:
         """Fetch the most recent commits for a repo."""
         try:
             data = self._fetch_json(
@@ -453,6 +452,78 @@ class GitHubClient:
                 "http_status": status,
                 "package_count": None,
             }
+
+    def get_dependency_sbom(self, owner: str, repo: str) -> dict:
+        """Fetch SPDX SBOM from GitHub's dependency graph and parse package list.
+
+        Uses ``GET /repos/{owner}/{repo}/dependency-graph/sbom`` — a synchronous
+        endpoint that returns SPDX 2.3 JSON directly (no async polling needed).
+
+        Returns:
+            {
+                "available": True,
+                "packages": [{"name": str, "version": str, "purl": str}, ...],
+                "package_count": int,
+                "spdx_version": str,
+            }
+            or
+            {
+                "available": False,
+                "http_status": int | None,
+                "reason": str,
+            }
+
+        Failure handling:
+          - 403 / 404: dependency graph disabled or private repo without access —
+            logged at INFO (expected, not an error).
+          - Other HTTP errors: logged at WARNING, ``available=False`` returned.
+          - Network errors: logged at WARNING, ``available=False`` returned.
+        """
+        url = f"{API_BASE}/repos/{owner}/{repo}/dependency-graph/sbom"
+        try:
+            data = self._fetch_json(url)
+        except requests.HTTPError as exc:
+            status = self._http_error_status(exc)
+            if status in EXPECTED_SECURITY_ENDPOINT_UNAVAILABLE_STATUSES:
+                logger.info(
+                    "SBOM endpoint unavailable for %s/%s (%s) — dependency graph disabled or no access",
+                    owner,
+                    repo,
+                    status,
+                )
+            else:
+                logger.warning("Failed to fetch SBOM for %s/%s: %s", owner, repo, exc)
+            return {"available": False, "http_status": status, "reason": str(exc)}
+        except requests.RequestException as exc:
+            logger.warning("Network error fetching SBOM for %s/%s: %s", owner, repo, exc)
+            return {"available": False, "http_status": None, "reason": str(exc)}
+
+        payload = data if isinstance(data, dict) else {}
+        sbom = payload.get("sbom", {}) if isinstance(payload.get("sbom"), dict) else {}
+        raw_packages = sbom.get("packages", [])
+        if not isinstance(raw_packages, list):
+            raw_packages = []
+
+        packages = []
+        for pkg in raw_packages:
+            if not isinstance(pkg, dict):
+                continue
+            name: str = pkg.get("name", "")
+            version: str = pkg.get("versionInfo", "")
+            # Extract PURL from externalRefs
+            purl = ""
+            for ref in pkg.get("externalRefs", []) or []:
+                if isinstance(ref, dict) and ref.get("referenceType") == "purl":
+                    purl = ref.get("referenceLocator", "")
+                    break
+            packages.append({"name": name, "version": version, "purl": purl})
+
+        return {
+            "available": True,
+            "packages": packages,
+            "package_count": len(packages),
+            "spdx_version": sbom.get("spdxVersion", ""),
+        }
 
     def get_repo_topics(self, owner: str, repo: str) -> dict:
         """Fetch the current topic set for a repository."""
@@ -644,7 +715,9 @@ class GitHubClient:
             }
         except requests.HTTPError as exc:
             status = self._http_error_status(exc)
-            logger.warning("Failed to update issue %s for %s/%s: %s", issue_number, owner, repo, exc)
+            logger.warning(
+                "Failed to update issue %s for %s/%s: %s", issue_number, owner, repo, exc
+            )
             return {
                 "ok": False,
                 "number": issue_number,
@@ -690,7 +763,9 @@ class GitHubClient:
                 "properties": [],
             }
 
-    def update_repo_custom_property_values(self, owner: str, repo: str, properties: dict[str, str]) -> dict:
+    def update_repo_custom_property_values(
+        self, owner: str, repo: str, properties: dict[str, str]
+    ) -> dict:
         """Set org custom property values only when definitions already exist."""
         schema = self.list_org_custom_properties(owner)
         if not schema.get("available"):
@@ -720,8 +795,7 @@ class GitHubClient:
 
         payload = {
             "properties": [
-                {"property_name": name, "value": value}
-                for name, value in to_update.items()
+                {"property_name": name, "value": value} for name, value in to_update.items()
             ]
         }
         try:
@@ -812,7 +886,9 @@ class GitHubClient:
         try:
             data = self._graphql_query(query, {"login": owner, "number": int(project_number)})
         except (requests.HTTPError, GitHubClientError) as exc:
-            logger.warning("Failed to resolve GitHub Project %s #%s: %s", owner, project_number, exc)
+            logger.warning(
+                "Failed to resolve GitHub Project %s #%s: %s", owner, project_number, exc
+            )
             return {
                 "available": False,
                 "owner": owner,
@@ -820,7 +896,9 @@ class GitHubClient:
                 "fields": {},
             }
 
-        project = (data.get("user") or {}).get("projectV2") or (data.get("organization") or {}).get("projectV2")
+        project = (data.get("user") or {}).get("projectV2") or (data.get("organization") or {}).get(
+            "projectV2"
+        )
         if not isinstance(project, dict):
             return {
                 "available": False,
@@ -830,7 +908,7 @@ class GitHubClient:
             }
 
         fields: dict[str, dict] = {}
-        for item in ((project.get("fields") or {}).get("nodes") or []):
+        for item in (project.get("fields") or {}).get("nodes") or []:
             if not isinstance(item, dict):
                 continue
             name = item.get("name")
@@ -893,7 +971,7 @@ class GitHubClient:
         try:
             while True:
                 data = self._graphql_query(query, {"projectId": project_id, "after": after})
-                items = (((data.get("node") or {}).get("items") or {}).get("nodes") or [])
+                items = ((data.get("node") or {}).get("items") or {}).get("nodes") or []
                 for item in items:
                     content = (item or {}).get("content") or {}
                     if content.get("id") == issue_node_id:
@@ -907,12 +985,14 @@ class GitHubClient:
                                 "issue_url": content.get("url", ""),
                             },
                         }
-                page_info = (((data.get("node") or {}).get("items") or {}).get("pageInfo") or {})
+                page_info = ((data.get("node") or {}).get("items") or {}).get("pageInfo") or {}
                 if not page_info.get("hasNextPage"):
                     break
                 after = page_info.get("endCursor")
         except (requests.HTTPError, GitHubClientError) as exc:
-            logger.warning("Failed to inspect GitHub Project item for issue %s: %s", issue_node_id, exc)
+            logger.warning(
+                "Failed to inspect GitHub Project item for issue %s: %s", issue_node_id, exc
+            )
             return {"available": False, "item": None}
         return {"available": True, "item": None}
 
@@ -948,7 +1028,7 @@ class GitHubClient:
         try:
             while True:
                 data = self._graphql_query(query, {"projectId": project_id, "after": after})
-                items = (((data.get("node") or {}).get("items") or {}).get("nodes") or [])
+                items = ((data.get("node") or {}).get("items") or {}).get("nodes") or []
                 for item in items:
                     if (item or {}).get("id") == item_id:
                         content = (item or {}).get("content") or {}
@@ -962,7 +1042,7 @@ class GitHubClient:
                                 "issue_url": content.get("url", ""),
                             },
                         }
-                page_info = (((data.get("node") or {}).get("items") or {}).get("pageInfo") or {})
+                page_info = ((data.get("node") or {}).get("items") or {}).get("pageInfo") or {}
                 if not page_info.get("hasNextPage"):
                     break
                 after = page_info.get("endCursor")
@@ -983,15 +1063,19 @@ class GitHubClient:
         }
         """
         try:
-            data = self._graphql_query(mutation, {"projectId": project_id, "contentId": issue_node_id})
-            item = ((data.get("addProjectV2ItemById") or {}).get("item") or {})
+            data = self._graphql_query(
+                mutation, {"projectId": project_id, "contentId": issue_node_id}
+            )
+            item = (data.get("addProjectV2ItemById") or {}).get("item") or {}
             return {
                 "ok": True,
                 "status": "created",
                 "item_id": item.get("id", ""),
             }
         except (requests.HTTPError, GitHubClientError) as exc:
-            logger.warning("Failed to add issue %s to project %s: %s", issue_node_id, project_id, exc)
+            logger.warning(
+                "Failed to add issue %s to project %s: %s", issue_node_id, project_id, exc
+            )
             return {"ok": False, "status": "failed", "item_id": ""}
 
     def update_project_v2_item_field(
@@ -1054,7 +1138,9 @@ class GitHubClient:
             self._graphql_query(mutation, variables)
             return {"ok": True, "status": "updated"}
         except (requests.HTTPError, GitHubClientError) as exc:
-            logger.warning("Failed to update project field %s on item %s: %s", field_id, item_id, exc)
+            logger.warning(
+                "Failed to update project field %s on item %s: %s", field_id, item_id, exc
+            )
             return {"ok": False, "status": "failed"}
 
     def archive_project_v2_item(self, item_id: str) -> dict:
@@ -1071,7 +1157,7 @@ class GitHubClient:
         """
         try:
             data = self._graphql_query(mutation, {"itemId": item_id})
-            item = ((data.get("archiveProjectV2Item") or {}).get("item") or {})
+            item = (data.get("archiveProjectV2Item") or {}).get("item") or {}
             return {
                 "ok": True,
                 "status": "archived",

@@ -88,6 +88,7 @@ def run_with_cache(
     github_client: "GitHubClient | None",
     commit_sha: str,
     conn: sqlite3.Connection | None,
+    sbom_source: str = "lockfile",
 ) -> AnalyzerResult:
     """Run *analyzer*, using the SQLite cache when available.
 
@@ -95,6 +96,10 @@ def run_with_cache(
     - ``conn`` is None  (cache disabled for this run)
     - ``analyzer.cache_inputs_hash()`` returns None  (analyzer opts out)
     - Any cache I/O error occurs (logged, falls through to re-run)
+
+    Args:
+        sbom_source: Forwarded to DependenciesAnalyzer when it is the active
+                     analyzer.  ``"lockfile"`` (default) or ``"github"``.
     """
     from src.analyzer_cache import lookup, store
 
@@ -115,7 +120,12 @@ def run_with_cache(
         if cached is not None:
             return _result_from_dict(cached)
 
-    result = analyzer.analyze(repo_path, metadata, github_client)
+    # Pass sbom_source only to DependenciesAnalyzer to avoid breaking the
+    # BaseAnalyzer contract for all other analyzers.
+    if isinstance(analyzer, DependenciesAnalyzer):
+        result = analyzer.analyze(repo_path, metadata, github_client, sbom_source=sbom_source)
+    else:
+        result = analyzer.analyze(repo_path, metadata, github_client)
 
     if inputs_hash is not None and conn is not None:
         store(
@@ -132,6 +142,7 @@ def run_all_analyzers(
     extra_analyzers: list[BaseAnalyzer] | None = None,
     conn: sqlite3.Connection | None = None,
     commit_sha: str = "",
+    sbom_source: str = "lockfile",
 ) -> list[AnalyzerResult]:
     """Run all analyzers against a repo, catching failures gracefully.
 
@@ -145,6 +156,8 @@ def run_all_analyzers(
         commit_sha: Stable identifier for the current repo state (e.g. pushed_at ISO
             string or a git SHA).  Used as the cache key; an empty string disables
             caching even when ``conn`` is provided.
+        sbom_source: ``"lockfile"`` (default) or ``"github"`` — forwarded to
+            DependenciesAnalyzer.
     """
     results: list[AnalyzerResult] = []
     analyzers_to_run = list(ALL_ANALYZERS) + (extra_analyzers or [])
@@ -156,7 +169,13 @@ def run_all_analyzers(
     for analyzer in analyzers_to_run:
         try:
             result = run_with_cache(
-                analyzer, repo_path, metadata, github_client, commit_sha, effective_conn
+                analyzer,
+                repo_path,
+                metadata,
+                github_client,
+                commit_sha,
+                effective_conn,
+                sbom_source=sbom_source,
             )
             results.append(result)
         except Exception as exc:

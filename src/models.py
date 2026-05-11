@@ -105,6 +105,7 @@ class RepoAudit:
     score_explanation: dict = field(default_factory=dict)
     portfolio_catalog: dict = field(default_factory=dict)
     scorecard: dict = field(default_factory=dict)
+    ossf_scorecard: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
@@ -127,6 +128,7 @@ class RepoAudit:
             "score_explanation": self.score_explanation,
             "portfolio_catalog": self.portfolio_catalog,
             "scorecard": self.scorecard,
+            "ossf_scorecard": self.ossf_scorecard,
         }
 
 
@@ -263,11 +265,8 @@ class AuditReport:
 
         # Language distribution
         from collections import Counter
-        lang_dist = dict(
-            Counter(
-                a.metadata.language or "Unknown" for a in audits
-            ).most_common()
-        )
+
+        lang_dist = dict(Counter(a.metadata.language or "Unknown" for a in audits).most_common())
 
         # Summary lists (top/bottom 5)
         sorted_by_score = sorted(audits, key=lambda a: a.overall_score, reverse=True)
@@ -287,6 +286,7 @@ class AuditReport:
 
         # Portfolio grade (nuanced formula)
         from src.scorer import compute_portfolio_grade
+
         p_grade, p_health = compute_portfolio_grade(audits)
 
         # Tech stack summary
@@ -299,14 +299,20 @@ class AuditReport:
                 tech_stack[lang]["repos"] += 1
                 tech_stack[lang]["total_score"] += a.overall_score
         for data in tech_stack.values():
-            data["avg_score"] = round(data["total_score"] / data["repos"], 3) if data["repos"] else 0
+            data["avg_score"] = (
+                round(data["total_score"] / data["repos"], 3) if data["repos"] else 0
+            )
             data["proficiency"] = round(data["bytes"] * data["avg_score"])
             del data["total_score"]
         # Sort by proficiency descending
-        tech_stack = dict(sorted(tech_stack.items(), key=lambda x: x[1]["proficiency"], reverse=True))
+        tech_stack = dict(
+            sorted(tech_stack.items(), key=lambda x: x[1]["proficiency"], reverse=True)
+        )
 
         # Best work: top 5 by weighted combo
-        best = sorted(audits, key=lambda a: a.overall_score * 0.6 + a.interest_score * 0.4, reverse=True)
+        best = sorted(
+            audits, key=lambda a: a.overall_score * 0.6 + a.interest_score * 0.4, reverse=True
+        )
         best_work = [a.metadata.name for a in best[:5]]
         portfolio_lenses = build_portfolio_lens_summary(audits)
         portfolio_hotspots = build_portfolio_hotspots(audits)
@@ -349,7 +355,9 @@ class AuditReport:
             lowest_scored=lowest,
             scoring_profile=scoring_profile,
             run_mode=run_mode,
-            portfolio_baseline_size=portfolio_baseline_size if portfolio_baseline_size is not None else len(audits),
+            portfolio_baseline_size=portfolio_baseline_size
+            if portfolio_baseline_size is not None
+            else len(audits),
             baseline_signature=baseline_signature,
             baseline_context=baseline_context or {},
             schema_version=REPORT_SCHEMA_VERSION,

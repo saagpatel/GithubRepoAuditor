@@ -332,7 +332,27 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--scorecard",
         action="store_true",
-        help="Enrich public repos with OpenSSF Scorecard data",
+        help="Apply internal scorecard programs from config/scorecards.yaml",
+    )
+    parser.add_argument(
+        "--ossf-scorecard",
+        action="store_true",
+        dest="ossf_scorecard",
+        help=(
+            "Fetch pre-computed OSSF Scorecard scores for public repos from "
+            "api.securityscorecards.dev and write output/ossf-scorecard-<user>-<date>.json"
+        ),
+    )
+    parser.add_argument(
+        "--sbom-source",
+        choices=["lockfile", "github"],
+        default="lockfile",
+        dest="sbom_source",
+        help=(
+            "Dependency count source.  'lockfile' (default) uses local manifest parsing. "
+            "'github' fetches the SPDX SBOM from GitHub's dependency graph API, "
+            "which catches transitive deps and works without a clone."
+        ),
     )
     parser.add_argument(
         "--security-offline",
@@ -807,6 +827,7 @@ def _audit_from_dict(data: dict) -> RepoAudit:
         score_explanation=data.get("score_explanation", {}),
         portfolio_catalog=data.get("portfolio_catalog", {}),
         scorecard=data.get("scorecard", {}),
+        ossf_scorecard=data.get("ossf_scorecard", {}),
     )
 
 
@@ -2975,6 +2996,7 @@ def _analyze_repos(
             extra_analyzers=extra_analyzers,
             conn=_warehouse_conn,
             commit_sha=_commit_sha,
+            sbom_source=getattr(args, "sbom_source", "lockfile"),
         )
         return score_repo(
             repo_meta,
@@ -3878,6 +3900,31 @@ def _write_report_outputs(
             )
             ghas_path.write_text(json.dumps(ghas_data, indent=2, default=str))
             print_info(f"GHAS alerts report: {ghas_path}")
+
+    if getattr(args, "ossf_scorecard", False):
+        from src.ossf_scorecard import fetch_ossf_scorecards, format_ossf_summary
+
+        ossf_data = fetch_ossf_scorecards(
+            report_data.get("audits", []),
+            cache=cache,
+        )
+        # Wire per-repo data into audit JSON
+        ossf_by_repo: dict[str, dict] = {}
+        for full_name, scorecard in ossf_data.items():
+            ossf_by_repo[full_name] = scorecard
+        for audit in report.audits:
+            fn = audit.metadata.full_name
+            if fn in ossf_by_repo:
+                audit.ossf_scorecard = ossf_by_repo[fn]
+        # Re-serialize after mutation
+        report_data = report.to_dict()
+
+        print_info(format_ossf_summary(ossf_data))
+        ossf_path = (
+            output_dir / f"ossf-scorecard-{report.username}-{_date_str(report.generated_at)}.json"
+        )
+        ossf_path.write_text(json.dumps(ossf_data, indent=2, default=str))
+        print_info(f"OSSF Scorecard report: {ossf_path}")
 
     if args.narrative:
         from src.narrative import generate_narrative

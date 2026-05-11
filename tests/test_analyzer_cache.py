@@ -354,7 +354,7 @@ class TestCacheIntegration:
         call_count = 0
         original_analyze = analyzer.analyze
 
-        def counting_analyze(repo_path, metadata, github_client=None):
+        def counting_analyze(repo_path, metadata, github_client=None, **kwargs):
             nonlocal call_count
             call_count += 1
             return original_analyze(repo_path, metadata, github_client)
@@ -384,7 +384,7 @@ class TestCacheIntegration:
         call_count = 0
         original_analyze = analyzer.analyze
 
-        def counting_analyze(repo_path, metadata, github_client=None):
+        def counting_analyze(repo_path, metadata, github_client=None, **kwargs):
             nonlocal call_count
             call_count += 1
             return original_analyze(repo_path, metadata, github_client)
