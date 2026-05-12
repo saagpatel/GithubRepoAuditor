@@ -418,3 +418,250 @@ def write_packet_to_ledger(
 
     save_approval_record(output_dir, details)
     return record_id
+
+
+# ---------------------------------------------------------------------------
+# Apply path — load, dispatch, state transitions
+# ---------------------------------------------------------------------------
+
+_STALE_DAYS = 30
+
+
+def load_approved_campaign_plans(warehouse_path: Path) -> list[CampaignPlanPacket]:
+    """Read approval records where approval_subject_type='campaign-plan' AND status='approved-manual'.
+
+    Hydrates the CampaignPlanPacket dataclass from the stored fields.
+    Skips records older than 30 days.
+    """
+    from src.warehouse import load_approval_records
+
+    all_records = load_approval_records(warehouse_path, "", limit=500)
+    cutoff = datetime.now(timezone.utc).replace(microsecond=0)
+    packets: list[CampaignPlanPacket] = []
+
+    for record in all_records:
+        if record.get("approval_subject_type") != "campaign-plan":
+            continue
+        if record.get("status") != "approved-manual":
+            continue
+
+        ts_str = str(record.get("approved_at") or record.get("generated_at") or "")
+        if ts_str:
+            try:
+                ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                age_days = (cutoff - ts).days
+                if age_days > _STALE_DAYS:
+                    logger.debug(
+                        "load_approved_campaign_plans: skipping stale packet (age=%d days, goal=%.40s)",
+                        age_days,
+                        record.get("goal", ""),
+                    )
+                    continue
+            except ValueError:
+                pass  # Unparseable timestamp — keep the record
+
+        raw_actions = record.get("actions") or []
+        try:
+            actions = [
+                CampaignAction(
+                    repo_name=str(a.get("repo_name") or ""),
+                    action_type=str(a.get("action_type") or "pending_human_action"),
+                    target=str(a.get("target") or ""),
+                    rationale=str(a.get("rationale") or ""),
+                    expected_impact=a.get("expected_impact") or None,
+                )
+                for a in raw_actions
+                if isinstance(a, dict)
+            ]
+        except (TypeError, ValueError) as exc:
+            logger.warning(
+                "load_approved_campaign_plans: could not hydrate actions for goal=%.40s: %s",
+                record.get("goal", ""),
+                exc,
+            )
+            continue
+
+        try:
+            packet = CampaignPlanPacket(
+                goal=str(record.get("goal") or ""),
+                actions=actions,
+                candidate_count=int(record.get("candidate_count") or 0),
+                qualified_count=int(record.get("qualified_count") or 0),
+                llm_provider=str(record.get("llm_provider") or ""),
+                llm_model=str(record.get("llm_model") or ""),
+                llm_cost_usd=float(record.get("llm_cost_usd") or 0.0),
+                generated_at=str(record.get("generated_at") or record.get("approved_at") or ""),
+            )
+        except (TypeError, ValueError) as exc:
+            logger.warning(
+                "load_approved_campaign_plans: could not hydrate packet for goal=%.40s: %s",
+                record.get("goal", ""),
+                exc,
+            )
+            continue
+
+        if not packet.goal:
+            logger.debug("load_approved_campaign_plans: skipping packet with empty goal")
+            continue
+
+        packets.append(packet)
+
+    return packets
+
+
+def mark_campaign_applied(packet: CampaignPlanPacket, output_dir: Path) -> None:
+    """Update the ledger record state from 'approved-manual' to 'applied'."""
+    from src.warehouse import load_approval_records, save_approval_record
+
+    records = load_approval_records(output_dir, "", limit=500)
+    record_id = _packet_record_id(packet)
+
+    matching = [
+        r
+        for r in records
+        if r.get("approval_id") == record_id
+        and r.get("approval_subject_type") == "campaign-plan"
+        and r.get("status") == "approved-manual"
+    ]
+
+    if not matching:
+        logger.warning(
+            "mark_campaign_applied: no approved-manual record found for id=%s — skipping",
+            record_id,
+        )
+        return
+
+    for record in matching:
+        updated = dict(record)
+        updated["status"] = "applied"
+        updated["applied_at"] = datetime.now(timezone.utc).isoformat()
+        save_approval_record(output_dir, updated)
+
+
+def record_campaign_apply_failure(
+    packet: CampaignPlanPacket,
+    error: str,
+    output_dir: Path,
+) -> None:
+    """Append a failure event so the operator can retry.
+
+    The record stays 'approved-manual' to allow retries.
+    """
+    import uuid
+
+    from src.warehouse import save_approval_followup_event
+
+    record_id = _packet_record_id(packet)
+    event = {
+        "event_id": "cf-" + str(uuid.uuid4())[:16],
+        "approval_id": record_id,
+        "fingerprint": _goal_subject_key(packet.goal),
+        "approval_subject_type": "campaign-plan",
+        "subject_key": _goal_subject_key(packet.goal),
+        "source_run_id": "",
+        "reviewed_at": datetime.now(timezone.utc).isoformat(),
+        "reviewed_by": "system",
+        "review_note": f"apply-failure: {error}",
+        "cadence_days": 0,
+        "event_type": "apply-failure",
+        "error": error,
+    }
+    save_approval_followup_event(output_dir, event)
+
+
+def dispatch_action(
+    action: CampaignAction,
+    *,
+    client: object,
+    owner: str,
+    dry_run: bool,
+) -> tuple[bool, str]:
+    """Route a CampaignAction to its executor handler.
+
+    Returns (success, message).
+
+    Mapping:
+      archive, unarchive, update_description → apply_metadata_updates (archived/description)
+      add_topics                              → apply_metadata_updates (topics)
+      apply_readme                            → apply_readme_updates
+      add_license, add_codeowners,
+        enable_dependabot                     → (False, "handler not yet implemented")
+      pending_human_action                    → (False, "manual review required")
+    """
+    from src.repo_improver import apply_metadata_updates, apply_readme_updates
+
+    action_type = action.action_type
+
+    if action_type == "pending_human_action":
+        return False, "manual review required"
+
+    if action_type in ("add_license", "add_codeowners", "enable_dependabot"):
+        return False, "handler not yet implemented"
+
+    if dry_run:
+        return (
+            True,
+            f"[dry-run] would execute: {action_type} {action.repo_name} (target={action.target!r})",
+        )
+
+    if action_type in ("archive", "unarchive", "update_description"):
+        # Build a metadata update dict understood by apply_metadata_updates
+        update: dict = {"name": action.repo_name}
+        if action_type == "archive":
+            update["archived"] = True
+        elif action_type == "unarchive":
+            update["archived"] = False
+        elif action_type == "update_description":
+            update["description"] = action.target
+
+        results = apply_metadata_updates(client, owner, [update], dry_run=False)  # type: ignore[arg-type]
+        if results:
+            r = results[0]
+            actions_ok = [a for a in r.get("actions", []) if a.get("ok") or a.get("dry_run")]
+            if actions_ok:
+                return True, f"{action_type} applied to {action.repo_name}"
+            # No actions dispatched — likely unsupported field (e.g. archive via REST)
+            errors = [str(a.get("error", "")) for a in r.get("actions", []) if a.get("error")]
+            err_msg = "; ".join(errors) if errors else "no actions executed"
+            return False, f"{action_type} failed for {action.repo_name}: {err_msg}"
+        return (
+            False,
+            f"{action_type}: apply_metadata_updates returned no results for {action.repo_name}",
+        )
+
+    if action_type == "add_topics":
+        raw_topics = action.target
+        topics = [t.strip() for t in raw_topics.replace(",", " ").split() if t.strip()]
+        update_t: dict = {"name": action.repo_name, "topics": topics}
+        results = apply_metadata_updates(client, owner, [update_t], dry_run=False)  # type: ignore[arg-type]
+        if results:
+            r = results[0]
+            actions_ok = [a for a in r.get("actions", []) if a.get("ok") or a.get("dry_run")]
+            if actions_ok:
+                return True, f"add_topics applied to {action.repo_name}: {topics}"
+            errors = [str(a.get("error", "")) for a in r.get("actions", []) if a.get("error")]
+            err_msg = "; ".join(errors) if errors else "no actions executed"
+            return False, f"add_topics failed for {action.repo_name}: {err_msg}"
+        return (
+            False,
+            f"add_topics: apply_metadata_updates returned no results for {action.repo_name}",
+        )
+
+    if action_type == "apply_readme":
+        readme_content = action.target
+        update_r: dict = {"name": action.repo_name, "readme": readme_content}
+        results = apply_readme_updates(client, owner, [update_r], dry_run=False)  # type: ignore[arg-type]
+        if results:
+            r = results[0]
+            if r.get("ok") or r.get("dry_run"):
+                return True, f"apply_readme pushed to {action.repo_name}"
+            error = str(r.get("error") or "unknown error")
+            return False, f"apply_readme failed for {action.repo_name}: {error}"
+        return (
+            False,
+            f"apply_readme: apply_readme_updates returned no results for {action.repo_name}",
+        )
+
+    return False, f"unrecognised action_type: {action_type!r}"

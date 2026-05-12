@@ -50,7 +50,11 @@ def validate_cli_mode_args(args, error) -> CliModeState:
         args.badges = True
     if args.notion_sync:
         args.notion = True
-    if args.writeback_apply and not args.writeback_target:
+    if (
+        args.writeback_apply
+        and not args.writeback_target
+        and not getattr(args, "campaign_from_ledger", False)
+    ):
         error("--writeback-apply requires --writeback-target")
     if args.writeback_target and not args.campaign:
         error(
@@ -61,7 +65,9 @@ def validate_cli_mode_args(args, error) -> CliModeState:
             "--github-projects belongs to Action Sync mode. Add --campaign <name> before enabling GitHub Projects mirroring."
         )
     if args.github_projects and args.writeback_target not in {"github", "all"}:
-        error("--github-projects only runs inside Action Sync with --writeback-target github or all.")
+        error(
+            "--github-projects only runs inside Action Sync with --writeback-target github or all."
+        )
     if args.approve_packet and not args.campaign:
         error("--approve-packet requires --campaign")
     if args.review_packet and not args.campaign:
@@ -83,9 +89,13 @@ def validate_cli_mode_args(args, error) -> CliModeState:
             "--review-governance captures a local follow-up review. Remove --approval-center for read-only mode."
         )
     if args.approval_center and args.control_center:
-        error("--approval-center and --control-center are separate read-only views; run one at a time.")
+        error(
+            "--approval-center and --control-center are separate read-only views; run one at a time."
+        )
     if args.approve_governance and args.review_governance:
-        error("--approve-governance and --review-governance are separate local actions; run one at a time.")
+        error(
+            "--approve-governance and --review-governance are separate local actions; run one at a time."
+        )
     if args.approve_packet and args.review_packet:
         error("--approve-packet and --review-packet are separate local actions; run one at a time.")
     if args.approval_center and (

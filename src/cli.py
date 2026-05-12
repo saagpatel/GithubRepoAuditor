@@ -331,6 +331,11 @@ def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         "--writeback-apply", action="store_true", help="Execute live writeback (not preview)"
     )
     p.add_argument(
+        "--campaign-from-ledger",
+        action="store_true",
+        help="When paired with --writeback-apply, execute approved campaign-plan packets from the ledger",
+    )
+    p.add_argument(
         "--github-projects",
         action="store_true",
         help="Mirror campaign actions into GitHub Projects v2",
@@ -754,6 +759,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--writeback-apply",
         action="store_true",
         help="Execute live writeback instead of preview-only planning",
+    )
+    parser.add_argument(
+        "--campaign-from-ledger",
+        action="store_true",
+        help="When paired with --writeback-apply, execute approved campaign-plan packets from the ledger",
     )
     parser.add_argument(
         "--github-projects",
@@ -2238,6 +2248,101 @@ def _run_generate_manifest_mode(args, parser) -> None:
     manifest = generate_manifest(report_data)
     manifest_path = write_manifest(manifest, output_dir)
     print_info(f"Improvement manifest: {manifest_path} ({len(manifest)} repos)")
+
+
+def _run_campaign_from_ledger_mode(args) -> None:
+    """Dispatch for --campaign-from-ledger [--writeback-apply] [--dry-run].
+
+    Loads approved campaign-plan packets from the ledger and executes each
+    action via the existing apply executor map.  Dry-run mode prints what would
+    be executed without calling the GitHub API.
+    """
+    from src.cache import ResponseCache
+    from src.github_client import GitHubClient
+    from src.plan_campaign import (
+        dispatch_action,
+        load_approved_campaign_plans,
+        mark_campaign_applied,
+        record_campaign_apply_failure,
+    )
+
+    output_dir = Path(args.output_dir)
+    dry_run = getattr(args, "dry_run", False)
+    username = getattr(args, "username", "") or ""
+
+    cache = None if args.no_cache else ResponseCache()
+    client = GitHubClient(token=args.token, cache=cache)
+
+    packets = load_approved_campaign_plans(output_dir)
+
+    if not packets:
+        print_info("campaign-from-ledger: 0 approved packets found — nothing to apply.")
+        return
+
+    verb = "preview" if dry_run else "apply"
+    print_info(f"campaign-from-ledger: {len(packets)} approved packet(s) to {verb}.")
+
+    for packet in packets:
+        print_info(f"  packet goal: {packet.goal[:80]!r} ({len(packet.actions)} actions)")
+
+        action_results: list[tuple[bool, str]] = []
+        for action in packet.actions:
+            if dry_run:
+                # Dry-run: print preview, record as success for state purposes
+                msg = (
+                    f"would execute: {action.action_type} {action.repo_name}"
+                    f" (target={action.target!r}, rationale={action.rationale[:60]!r})"
+                )
+                print_info(f"    [dry-run] {msg}")
+                action_results.append((True, msg))
+            else:
+                ok, msg = dispatch_action(
+                    action,
+                    client=client,
+                    owner=username,
+                    dry_run=False,
+                )
+                status = "ok" if ok else "FAIL"
+                print_info(f"    [{status}] {action.action_type} {action.repo_name}: {msg}")
+                action_results.append((ok, msg))
+
+        if dry_run:
+            # Do not mutate ledger state on dry-run
+            continue
+
+        # Determine overall packet success:
+        # "applied" only when every supported action succeeded AND every
+        # unsupported/pending action is in the packet as pending_human_action.
+        # Mixed-result packets (a supported action failed) stay approved-manual
+        # with a failure event listing the failed actions.
+        supported_results = [
+            (ok, msg)
+            for (ok, msg), action in zip(action_results, packet.actions)
+            if action.action_type
+            not in ("pending_human_action", "add_license", "add_codeowners", "enable_dependabot")
+        ]
+        unsupported_results = [
+            (ok, msg)
+            for (ok, msg), action in zip(action_results, packet.actions)
+            if action.action_type in ("add_license", "add_codeowners", "enable_dependabot")
+        ]
+
+        # Unimplemented-handler actions are expected failures — don't penalise the packet
+        # as long as no genuinely-supported action failed.
+        failed_supported = [(ok, msg) for ok, msg in supported_results if not ok]
+
+        if not failed_supported:
+            mark_campaign_applied(packet, output_dir)
+            print_info(
+                f"  packet marked applied "
+                f"(supported={len(supported_results)}, skipped={len(unsupported_results)})"
+            )
+        else:
+            error_summary = "; ".join(msg for _, msg in failed_supported)
+            record_campaign_apply_failure(packet, error_summary, output_dir)
+            print_info(
+                f"  packet kept approved-manual — {len(failed_supported)} failure(s): {error_summary[:120]}"
+            )
 
 
 def _run_plan_campaign_mode(args) -> None:
@@ -5449,6 +5554,7 @@ def _infer_subcommand_from_flags(args: argparse.Namespace) -> str:
         "generate_manifest",
         "apply_metadata",
         "apply_readmes",
+        "campaign_from_ledger",
         "draft_readmes",
         "upload_badges",
         "notion_sync",
@@ -5680,6 +5786,10 @@ def main() -> None:
 
     if getattr(args, "apply_metadata", False) or getattr(args, "apply_readmes", False):
         _run_apply_improvements_mode(args, parser)
+        return
+
+    if getattr(args, "campaign_from_ledger", False):
+        _run_campaign_from_ledger_mode(args)
         return
 
     if getattr(args, "plan_campaign", None):
