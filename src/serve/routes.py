@@ -713,8 +713,11 @@ async def initiatives_suggestions(
 
     projects = truth.get("projects", [])
 
+    cache_key = f"{truth.get('generated_at', '')}|target={target if target is not None else 'auto'}"
     try:
-        suggestions, cost = generate_suggestions(projects, target_tier=target, budget_usd=0.10)
+        suggestions, cost = generate_suggestions(
+            projects, target_tier=target, budget_usd=0.10, cache_key=cache_key
+        )
     except Exception as exc:
         return templates.TemplateResponse(
             request,

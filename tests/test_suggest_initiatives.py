@@ -1,4 +1,4 @@
-"""Tests for src/suggest_initiatives.py — Arc G Sprint 8.4 + 9.1."""
+"""Tests for src/suggest_initiatives.py — Arc G Sprint 8.4 + 9.1 + 10.3 + 10.4."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from src.llm_cost import BudgetExceededError
 from src.suggest_initiatives import (
     accept_suggestion,
     build_suggest_prompt,
+    clear_suggestion_cache,
     default_deadline_for_effort,
     generate_suggestions,
     narrow_candidates,
@@ -1022,3 +1023,204 @@ class TestCLIAcceptSuggestion:
         _build_triage_subparser(subs)
         args = sp.parse_args(["triage", "testuser", "--accept-suggestion", "MyRepo"])
         assert args.accept_suggestion == "MyRepo"
+
+
+# ── 10.3 Cache tests ──────────────────────────────────────────────────────────
+
+
+class TestSuggestionCache:
+    """Tests for the in-process cache introduced in Arc G Sprint 10.3."""
+
+    def setup_method(self):
+        """Ensure cache is clean before each test."""
+        clear_suggestion_cache()
+
+    def teardown_method(self):
+        """Leave cache clean after each test."""
+        clear_suggestion_cache()
+
+    def _make_mock_provider(self, repos):
+        """Return a MockProvider with a canned response for the given repo list."""
+        candidates = narrow_candidates(repos)
+        names = [
+            c[0].get("identity", {}).get("display_name")
+            or c[0].get("metadata", {}).get("name")
+            or "unknown"
+            for c in candidates
+        ]
+        canned = json.dumps(
+            [{"repo_name": n, "rationale": "ok", "estimated_effort": "small"} for n in names]
+        )
+        return _MockProvider(canned)
+
+    def test_same_cache_key_calls_provider_once(self):
+        """Two calls with the same cache_key only invoke the provider once."""
+        repos = [_near_silver_repo("CacheRepo")]
+        mock_provider = self._make_mock_provider(repos)
+
+        with patch(
+            "src.suggest_initiatives._resolve_provider",
+            return_value=(mock_provider, "test-model"),
+        ):
+            suggestions1, cost1 = generate_suggestions(repos, budget_usd=1.0, cache_key="k1")
+            suggestions2, cost2 = generate_suggestions(repos, budget_usd=1.0, cache_key="k1")
+
+        assert mock_provider.call_count == 1
+        assert suggestions1 == suggestions2
+        assert cost1 == cost2
+
+    def test_different_cache_keys_call_provider_twice(self):
+        """Two calls with different cache_keys each invoke the provider."""
+        repos = [_near_silver_repo("Repo1"), _near_silver_repo("Repo2")]
+        mock_provider = self._make_mock_provider(repos)
+
+        with patch(
+            "src.suggest_initiatives._resolve_provider",
+            return_value=(mock_provider, "test-model"),
+        ):
+            generate_suggestions(repos, budget_usd=1.0, cache_key="key-a")
+            generate_suggestions(repos, budget_usd=1.0, cache_key="key-b")
+
+        assert mock_provider.call_count == 2
+
+    def test_no_cache_key_calls_provider_every_time(self):
+        """Without a cache_key, the provider is called on every invocation."""
+        repos = [_near_silver_repo("NoCacheRepo")]
+        mock_provider = self._make_mock_provider(repos)
+
+        with patch(
+            "src.suggest_initiatives._resolve_provider",
+            return_value=(mock_provider, "test-model"),
+        ):
+            generate_suggestions(repos, budget_usd=1.0)
+            generate_suggestions(repos, budget_usd=1.0)
+
+        assert mock_provider.call_count == 2
+
+    def test_clear_cache_causes_re_invocation(self):
+        """After clear_suggestion_cache(), the same key re-invokes the provider."""
+        repos = [_near_silver_repo("ClearRepo")]
+        mock_provider = self._make_mock_provider(repos)
+
+        with patch(
+            "src.suggest_initiatives._resolve_provider",
+            return_value=(mock_provider, "test-model"),
+        ):
+            generate_suggestions(repos, budget_usd=1.0, cache_key="ck")
+            clear_suggestion_cache()
+            generate_suggestions(repos, budget_usd=1.0, cache_key="ck")
+
+        assert mock_provider.call_count == 2
+
+    def test_cached_cost_value_is_preserved(self):
+        """Cached hit returns the same cost as the original call."""
+        repos = [_near_silver_repo("CostRepo")]
+        mock_provider = self._make_mock_provider(repos)
+
+        with patch(
+            "src.suggest_initiatives._resolve_provider",
+            return_value=(mock_provider, "test-model"),
+        ):
+            _, cost_first = generate_suggestions(repos, budget_usd=1.0, cache_key="cost-k")
+
+        with patch(
+            "src.suggest_initiatives._resolve_provider",
+            return_value=(_MockProvider("[]"), "test-model"),
+        ):
+            _, cost_second = generate_suggestions(repos, budget_usd=1.0, cache_key="cost-k")
+
+        # Provider was not called on second invocation; cost must match
+        assert cost_first == cost_second
+
+
+# ── 10.4 force_deterministic tests ───────────────────────────────────────────
+
+
+class TestForceDeterministic:
+    """Tests for the force_deterministic parameter introduced in Arc G Sprint 10.4."""
+
+    def setup_method(self):
+        clear_suggestion_cache()
+
+    def teardown_method(self):
+        clear_suggestion_cache()
+
+    def test_returns_suggestions_with_zero_cost(self):
+        """force_deterministic=True returns a non-empty list and 0.0 cost."""
+        repos = [_near_silver_repo("DetRepo")]
+        suggestions, cost = generate_suggestions(repos, force_deterministic=True)
+        assert cost == 0.0
+        assert isinstance(suggestions, list)
+
+    def test_does_not_call_provider(self):
+        """force_deterministic=True never calls the LLM provider."""
+
+        def _exploding_provider(*args, **kwargs):
+            raise AssertionError("Provider must not be called with force_deterministic=True")
+
+        repos = [_near_silver_repo("NeverCall")]
+        with patch(
+            "src.suggest_initiatives._resolve_provider",
+            side_effect=_exploding_provider,
+        ):
+            # Should NOT raise despite the exploding mock
+            suggestions, cost = generate_suggestions(repos, force_deterministic=True)
+
+        assert cost == 0.0
+        assert isinstance(suggestions, list)
+
+    def test_empty_projects_returns_empty_list(self):
+        """force_deterministic=True with no qualifying repos returns ([], 0.0)."""
+        suggestions, cost = generate_suggestions([], force_deterministic=True)
+        assert suggestions == []
+        assert cost == 0.0
+
+    def test_honors_cache_key(self):
+        """force_deterministic=True stores results in cache under cache_key."""
+        repos = [_near_silver_repo("CachedDet")]
+
+        suggestions1, cost1 = generate_suggestions(
+            repos, force_deterministic=True, cache_key="det-k"
+        )
+
+        # Second call with same key — provider would explode if called
+        def _exploding_provider(*args, **kwargs):
+            raise AssertionError("Should not be called on cache hit")
+
+        with patch(
+            "src.suggest_initiatives._resolve_provider",
+            side_effect=_exploding_provider,
+        ):
+            suggestions2, cost2 = generate_suggestions(
+                repos, force_deterministic=True, cache_key="det-k"
+            )
+
+        assert suggestions1 == suggestions2
+        assert cost2 == 0.0
+
+    def test_accept_suggestion_uses_force_deterministic(self, tmp_path):
+        """accept_suggestion without deadline uses force_deterministic path, never raises BudgetExceededError."""
+        project = _near_silver_repo("DetAccept")
+        projects = [project]
+
+        # BudgetExceededError would fire if the real cost path were taken with budget_usd=0.0.
+        # force_deterministic=True skips the cost tracker entirely.
+        # We verify by making _resolve_provider raise — if called, the test fails.
+        def _exploding_provider(*args, **kwargs):
+            raise AssertionError("accept_suggestion must not call LLM for deadline derivation")
+
+        with patch(
+            "src.suggest_initiatives._resolve_provider",
+            side_effect=_exploding_provider,
+        ):
+            initiative = accept_suggestion(
+                repo_name="DetAccept",
+                projects=projects,
+                output_dir=tmp_path,
+                # No deadline — triggers internal generate_suggestions call
+                deadline=None,
+                target_tier=2,
+            )
+
+        assert initiative.repo_name == "DetAccept"
+        assert date.fromisoformat(initiative.deadline) > date.today()

@@ -454,3 +454,90 @@ class TestRequirementSourcesHints:
         approx_idx = text.find("(approx.)")
         # The approx. hint for "proxy req" must appear near it (before the next </li>)
         assert proxy_idx < approx_idx
+
+
+# ── 10.3 Route cache tests ────────────────────────────────────────────────────
+
+
+class TestInitiativesSuggestionsRouteCache:
+    """Verify the route-level cache_key wiring introduced in Arc G Sprint 10.3."""
+
+    def test_route_passes_cache_key_with_generated_at(
+        self, output_dir: Path, client: TestClient
+    ) -> None:
+        """Route passes a cache_key kwarg that embeds portfolio-truth generated_at.
+
+        We verify the key format rather than cache hit behaviour — the cache
+        semantics are covered in TestSuggestionCache.
+        """
+        from src.suggest_initiatives import InitiativeSuggestion
+
+        truth = _make_portfolio_truth([_bronze_repo("WiredRepo")])
+        (output_dir / "portfolio-truth-latest.json").write_text(json.dumps(truth))
+
+        fake_suggestions = [
+            InitiativeSuggestion(
+                repo_name="WiredRepo",
+                current_tier=1,
+                target_tier=2,
+                missing_requirements=["run instructions"],
+                rationale="Wired",
+                estimated_effort="small",
+            )
+        ]
+
+        received_keys: list[str | None] = []
+
+        def _mock_gen(projects, target_tier=None, budget_usd=0.10, cache_key=None, **kw):
+            received_keys.append(cache_key)
+            return fake_suggestions, 0.001
+
+        with patch("src.suggest_initiatives.generate_suggestions", side_effect=_mock_gen):
+            resp = client.get("/initiatives/suggestions")
+
+        assert resp.status_code == 200
+        assert len(received_keys) == 1
+        key = received_keys[0]
+        assert key is not None, "Route must pass a cache_key"
+        # Key must embed the generated_at from portfolio-truth
+        assert "2026-01-01T00:00:00" in key
+        # Key must encode the target (auto when no ?target= param)
+        assert "auto" in key
+
+    def test_different_generated_at_produces_different_cache_keys(
+        self, output_dir: Path, client: TestClient
+    ) -> None:
+        """Different portfolio-truth generated_at values produce different cache keys."""
+        from src.suggest_initiatives import InitiativeSuggestion
+
+        fake_suggestion = InitiativeSuggestion(
+            repo_name="DiffRepo",
+            current_tier=1,
+            target_tier=2,
+            missing_requirements=["run instructions"],
+            rationale="ok",
+            estimated_effort="small",
+        )
+
+        received_keys: list[str | None] = []
+
+        def _mock_gen(projects, target_tier=None, budget_usd=0.10, cache_key=None, **kw):
+            received_keys.append(cache_key)
+            return [fake_suggestion], 0.001
+
+        truth_v1 = {"generated_at": "2026-01-01T00:00:00", "projects": [_bronze_repo("DiffRepo")]}
+        truth_v2 = {"generated_at": "2026-02-01T00:00:00", "projects": [_bronze_repo("DiffRepo")]}
+
+        with patch("src.suggest_initiatives.generate_suggestions", side_effect=_mock_gen):
+            (output_dir / "portfolio-truth-latest.json").write_text(json.dumps(truth_v1))
+            resp1 = client.get("/initiatives/suggestions")
+
+            (output_dir / "portfolio-truth-latest.json").write_text(json.dumps(truth_v2))
+            resp2 = client.get("/initiatives/suggestions")
+
+        assert resp1.status_code == 200
+        assert resp2.status_code == 200
+        assert len(received_keys) == 2
+        assert received_keys[0] != received_keys[1], (
+            "Different generated_at values must produce different cache keys"
+        )

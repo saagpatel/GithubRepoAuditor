@@ -9,6 +9,7 @@ import pytest
 
 from src.briefing import (
     Briefing,
+    InitiativeSuggestionRow,
     NeedsAttentionRepo,
     ScoreMover,
     ShippedRepo,
@@ -641,3 +642,78 @@ class TestInitiativesBriefing:
         voice = render_voice(briefing)
         assert "initiative" in voice.lower()
         assert "1" in voice
+
+
+# ── Arc G S10.1 — Briefing render smoke tests ─────────────────────────────────
+
+
+class TestSuggestedInitiativesRender:
+    """Smoke tests for the Suggested Initiatives section in render_markdown (Arc G S10.1)."""
+
+    def _make_suggestion(
+        self,
+        repo_name: str = "MyRepo",
+        current_tier: int = 1,
+        target_tier: int = 2,
+        rationale: str = "Close to Bronze.",
+        estimated_effort: str = "low",
+    ) -> InitiativeSuggestionRow:
+        return InitiativeSuggestionRow(
+            repo_name=repo_name,
+            current_tier=current_tier,
+            target_tier=target_tier,
+            rationale=rationale,
+            estimated_effort=estimated_effort,
+        )
+
+    def test_render_markdown_includes_suggestions_section_when_non_empty(self):
+        """Briefing with one suggestion renders the section header and repo name."""
+        briefing = Briefing(
+            username="alice",
+            date="2026-05-11",
+            suggested_initiatives=[
+                self._make_suggestion(repo_name="Wavelength"),
+            ],
+        )
+        md = render_markdown(briefing)
+        assert "## Suggested Initiatives" in md
+        assert "Wavelength" in md
+
+    def test_render_markdown_omits_suggestions_section_when_empty(self):
+        """Briefing with no suggestions omits the section header entirely."""
+        briefing = Briefing(
+            username="alice",
+            date="2026-05-11",
+            suggested_initiatives=[],
+        )
+        md = render_markdown(briefing)
+        assert "## Suggested Initiatives" not in md
+
+    def test_build_briefing_with_include_suggestions_populates_field(self):
+        """build_briefing(include_suggestions=True) with a mock provider populates the field."""
+        from src.suggest_initiatives import InitiativeSuggestion
+
+        fake_suggestion = InitiativeSuggestion(
+            repo_name="Wavelength",
+            current_tier=1,
+            target_tier=2,
+            rationale="Close to Bronze.",
+            estimated_effort="low",
+            missing_requirements=["readme"],
+        )
+
+        with patch(
+            "src.suggest_initiatives.generate_suggestions",
+            return_value=([fake_suggestion], 0.001),
+        ):
+            audits = [_make_audit("Wavelength")]
+            briefing = build_briefing(
+                audits,
+                "user",
+                "2026-05-11",
+                use_history=False,
+                include_suggestions=True,
+            )
+
+        assert len(briefing.suggested_initiatives) == 1
+        assert briefing.suggested_initiatives[0].repo_name == "Wavelength"
