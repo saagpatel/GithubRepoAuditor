@@ -12,9 +12,12 @@ from __future__ import annotations
 
 import json
 import logging
+import tempfile
+from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
+from typing import Any
 
 from src.narrative import _resolve_provider
 
@@ -22,15 +25,118 @@ logger = logging.getLogger(__name__)
 
 # ── In-process suggestion cache ───────────────────────────────────────────────
 
+# Maximum number of entries retained in _suggestion_cache (in-memory and on-disk).
+_CACHE_MAX_SIZE = 100
+
 # In-process cache for generate_suggestions results, keyed by caller-supplied cache_key.
 # Caller is responsible for picking a key that captures all relevant inputs
 # (e.g. portfolio-truth generated_at + target_tier).
-_suggestion_cache: dict[str, tuple[list["InitiativeSuggestion"], float]] = {}
+# OrderedDict for LRU-style eviction (insertion-order, FIFO eviction on overflow).
+_suggestion_cache: OrderedDict[str, tuple[list["InitiativeSuggestion"], float]] = OrderedDict()
+
+# Track which output_dir paths have already been loaded from disk (lazy-load guard).
+_loaded_from_disk: set[Path] = set()
 
 
-def clear_suggestion_cache() -> None:
-    """Test helper / public API: drop all cached suggestions."""
+# ── Persistent cache helpers ──────────────────────────────────────────────────
+
+
+def suggestion_cache_path(output_dir: Path) -> Path:
+    """Return the path to the persistent suggestion cache file."""
+    return output_dir / "suggestion-cache.json"
+
+
+def load_suggestion_cache(
+    path: Path,
+) -> OrderedDict[str, tuple[list["InitiativeSuggestion"], float]]:
+    """Read the versioned JSON cache file.
+
+    Missing file or malformed JSON → returns an empty OrderedDict and logs a
+    warning for the malformed-JSON case.  Hydrates :class:`InitiativeSuggestion`
+    instances from stored dicts.
+    """
+    if not path.exists():
+        return OrderedDict()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning("suggest_initiatives: could not load cache %s: %s", path, exc)
+        return OrderedDict()
+
+    if not isinstance(data, dict) or data.get("version") != 1:
+        logger.warning("suggest_initiatives: unrecognised cache schema in %s — ignoring", path)
+        return OrderedDict()
+
+    result: OrderedDict[str, tuple[list[InitiativeSuggestion], float]] = OrderedDict()
+    for entry in data.get("entries", []):
+        try:
+            key = str(entry["key"])
+            cost = float(entry["cost"])
+            suggestions = [InitiativeSuggestion.from_dict(s) for s in entry["suggestions"]]
+            result[key] = (suggestions, cost)
+        except (KeyError, TypeError, ValueError) as exc:
+            logger.warning("suggest_initiatives: skipping malformed cache entry: %s", exc)
+
+    return result
+
+
+def save_suggestion_cache(
+    path: Path,
+    cache: OrderedDict[str, tuple[list["InitiativeSuggestion"], float]],
+) -> None:
+    """Persist *cache* to *path* atomically using a tmp+rename pattern.
+
+    Only the most recent :data:`_CACHE_MAX_SIZE` entries (by insertion order) are
+    written.  Schema: ``{"version": 1, "entries": [...]}``.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Cap to most recent _CACHE_MAX_SIZE entries
+    entries_to_write = list(cache.items())[-_CACHE_MAX_SIZE:]
+
+    serialisable = {
+        "version": 1,
+        "entries": [
+            {
+                "key": key,
+                "cost": cost,
+                "suggestions": [s.to_dict() for s in suggestions],
+            }
+            for key, (suggestions, cost) in entries_to_write
+        ],
+    }
+
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=".suggestion_cache_tmp_",
+            suffix=".json",
+            delete=False,
+        ) as tmp:
+            tmp_path = Path(tmp.name)
+            json.dump(serialisable, tmp, indent=2)
+        tmp_path.replace(path)
+    except OSError as exc:
+        logger.error("suggest_initiatives: atomic cache write failed for %s: %s", path, exc)
+        raise
+
+
+def clear_suggestion_cache(path: Path | None = None) -> None:
+    """Drop all in-memory cached suggestions.
+
+    If *path* is provided and the file exists, delete it as well.  Also clears
+    the ``_loaded_from_disk`` tracking set so a subsequent call with the same
+    *output_dir* will re-load from disk (or start fresh).
+    """
     _suggestion_cache.clear()
+    _loaded_from_disk.clear()
+    if path is not None and path.exists():
+        try:
+            path.unlink()
+        except OSError as exc:
+            logger.warning("suggest_initiatives: could not delete cache %s: %s", path, exc)
 
 
 # ── Public dataclass ──────────────────────────────────────────────────────────
@@ -44,6 +150,29 @@ class InitiativeSuggestion:
     missing_requirements: list[str]
     rationale: str  # LLM-provided (or fallback message)
     estimated_effort: str  # "small" | "medium" | "large" | "unknown"
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialise to a JSON-compatible dict."""
+        return {
+            "repo_name": self.repo_name,
+            "current_tier": self.current_tier,
+            "target_tier": self.target_tier,
+            "missing_requirements": list(self.missing_requirements),
+            "rationale": self.rationale,
+            "estimated_effort": self.estimated_effort,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "InitiativeSuggestion":
+        """Hydrate from a JSON-compatible dict.  Missing keys default safely."""
+        return cls(
+            repo_name=str(data.get("repo_name", "")),
+            current_tier=int(data.get("current_tier", 0)),
+            target_tier=int(data.get("target_tier", 0)),
+            missing_requirements=list(data.get("missing_requirements", [])),
+            rationale=str(data.get("rationale", "")),
+            estimated_effort=str(data.get("estimated_effort", "unknown")),
+        )
 
 
 # ── Candidate selection ───────────────────────────────────────────────────────
@@ -394,6 +523,7 @@ def generate_suggestions(
     max_missing: int = 3,
     cache_key: str | None = None,
     force_deterministic: bool = False,
+    output_dir: Path | None = None,
 ) -> tuple[list[InitiativeSuggestion], float]:
     """Generate LLM-ranked initiative suggestions for the portfolio.
 
@@ -418,6 +548,11 @@ def generate_suggestions(
         If ``True``, skip the LLM call entirely and use the deterministic ranking
         (fewest missing requirements).  Cost is always 0.0.  Never raises.
         Useful for deadline derivation in :func:`accept_suggestion`.
+    output_dir:
+        When provided, the persistent cache at
+        ``output_dir / "suggestion-cache.json"`` is lazily loaded on the first
+        call for that directory.  New results are also written back to disk.
+        Callers that omit this parameter see no behaviour change (opt-in).
 
     Returns
     -------
@@ -428,8 +563,16 @@ def generate_suggestions(
 
     from src.llm_cost import BudgetExceededError, CostTracker
 
+    # ── Lazy disk load (first call per output_dir) ────────────────────────────
+    if output_dir is not None and output_dir not in _loaded_from_disk:
+        disk_cache = load_suggestion_cache(suggestion_cache_path(output_dir))
+        for k, v in disk_cache.items():
+            _suggestion_cache[k] = v
+        _loaded_from_disk.add(output_dir)
+
     # ── Cache lookup ──────────────────────────────────────────────────────────
     if cache_key is not None and cache_key in _suggestion_cache:
+        _suggestion_cache.move_to_end(cache_key)  # mark as recently used
         return _suggestion_cache[cache_key]
 
     # ── Deterministic fast-path (no LLM, no CostTracker) ─────────────────────
@@ -440,6 +583,12 @@ def generate_suggestions(
         suggestions = _deterministic_rank(candidates)
         if cache_key is not None:
             _suggestion_cache[cache_key] = (suggestions, 0.0)
+            _suggestion_cache.move_to_end(cache_key)
+            # Bounded eviction
+            while len(_suggestion_cache) > _CACHE_MAX_SIZE:
+                _suggestion_cache.popitem(last=False)
+            if output_dir is not None:
+                save_suggestion_cache(suggestion_cache_path(output_dir), _suggestion_cache)
         return suggestions, 0.0
 
     candidates = narrow_candidates(projects, target_tier=target_tier, max_missing=max_missing)
@@ -457,6 +606,11 @@ def generate_suggestions(
         suggestions = _deterministic_rank(candidates)
         if cache_key is not None:
             _suggestion_cache[cache_key] = (suggestions, 0.0)
+            _suggestion_cache.move_to_end(cache_key)
+            while len(_suggestion_cache) > _CACHE_MAX_SIZE:
+                _suggestion_cache.popitem(last=False)
+            if output_dir is not None:
+                save_suggestion_cache(suggestion_cache_path(output_dir), _suggestion_cache)
         return suggestions, 0.0
 
     provider, model_name = provider_result
@@ -488,4 +642,11 @@ def generate_suggestions(
     suggestions = parse_suggest_response(raw, candidates)
     if cache_key is not None:
         _suggestion_cache[cache_key] = (suggestions, actual_cost)
+        _suggestion_cache.move_to_end(cache_key)
+        # Bounded eviction — FIFO: oldest entry evicted first
+        while len(_suggestion_cache) > _CACHE_MAX_SIZE:
+            _suggestion_cache.popitem(last=False)
+        # Persist to disk if caller passed output_dir
+        if output_dir is not None:
+            save_suggestion_cache(suggestion_cache_path(output_dir), _suggestion_cache)
     return suggestions, actual_cost
