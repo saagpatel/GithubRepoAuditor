@@ -15,7 +15,7 @@ import logging
 import tempfile
 from collections import OrderedDict
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -134,6 +134,7 @@ class DismissedSuggestion:
     reason: str  # operator-provided text, default ""
     dismissed_at: str  # ISO timestamp
     dismissed_by: str  # operator_identity() from src.initiatives
+    expires_at: str | None = None  # ISO date string (YYYY-MM-DD) or None for permanent
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -141,6 +142,7 @@ class DismissedSuggestion:
             "reason": self.reason,
             "dismissed_at": self.dismissed_at,
             "dismissed_by": self.dismissed_by,
+            "expires_at": self.expires_at,
         }
 
     @classmethod
@@ -150,6 +152,37 @@ class DismissedSuggestion:
             reason=str(data.get("reason", "")),
             dismissed_at=str(data.get("dismissed_at", "")),
             dismissed_by=str(data.get("dismissed_by", "")),
+            expires_at=data.get("expires_at"),  # may be None
+        )
+
+
+@dataclass(frozen=True)
+class DismissalEvent:
+    """Audit-trail entry for a dismiss/undo/expire action."""
+
+    repo_name: str
+    event_type: str  # "dismissed" | "undone" | "expired"
+    occurred_at: str  # ISO timestamp
+    actor: str  # operator_identity() or "system" (for auto-expire)
+    reason: str = ""  # optional context
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "repo_name": self.repo_name,
+            "event_type": self.event_type,
+            "occurred_at": self.occurred_at,
+            "actor": self.actor,
+            "reason": self.reason,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "DismissalEvent":
+        return cls(
+            repo_name=str(data.get("repo_name", "")),
+            event_type=str(data.get("event_type", "")),
+            occurred_at=str(data.get("occurred_at", "")),
+            actor=str(data.get("actor", "")),
+            reason=str(data.get("reason", "")),
         )
 
 
@@ -159,7 +192,11 @@ def dismissed_path(output_dir: Path) -> Path:
 
 
 def load_dismissed(path: Path) -> list[DismissedSuggestion]:
-    """Read versioned JSON. Missing/malformed → empty list (log warning)."""
+    """Read versioned JSON. Missing/malformed → empty list (log warning).
+
+    Accepts both v1 (no expires_at, no events) and v2 (adds expires_at + events).
+    v1 items are loaded with expires_at=None.
+    """
     if not path.exists():
         return []
     try:
@@ -168,7 +205,7 @@ def load_dismissed(path: Path) -> list[DismissedSuggestion]:
         logger.warning("suggest_initiatives: could not load dismissed file %s: %s", path, exc)
         return []
 
-    if not isinstance(data, dict) or data.get("version") != 1:
+    if not isinstance(data, dict) or data.get("version") not in (1, 2):
         logger.warning("suggest_initiatives: unrecognised dismissed schema in %s — ignoring", path)
         return []
 
@@ -182,13 +219,50 @@ def load_dismissed(path: Path) -> list[DismissedSuggestion]:
     return result
 
 
+def load_dismissal_events(path: Path) -> list[DismissalEvent]:
+    """Read events array from the file. Missing key or v1 schema → []."""
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning("suggest_initiatives: could not load dismissed file %s: %s", path, exc)
+        return []
+
+    if not isinstance(data, dict) or data.get("version") not in (1, 2):
+        return []
+
+    result: list[DismissalEvent] = []
+    for entry in data.get("events", []):
+        try:
+            result.append(DismissalEvent.from_dict(entry))
+        except (KeyError, TypeError, ValueError) as exc:
+            logger.warning("suggest_initiatives: skipping malformed dismissal event: %s", exc)
+
+    return result
+
+
 def save_dismissed(path: Path, items: list[DismissedSuggestion]) -> None:
-    """Atomic tmp+rename write. Schema {"version": 1, "items": [...]}."""
+    """Atomic tmp+rename write. Always writes v2 schema (superset of v1).
+
+    Preserves existing events array; v2 schema: {"version": 2, "items": [...], "events": [...]}.
+    """
+    existing_events = load_dismissal_events(path)
+    _save_dismissed_full(path, items, existing_events)
+
+
+def _save_dismissed_full(
+    path: Path,
+    items: list[DismissedSuggestion],
+    events: list[DismissalEvent],
+) -> None:
+    """Internal: write items + events atomically. Always writes v2 schema."""
     path.parent.mkdir(parents=True, exist_ok=True)
 
     serialisable = {
-        "version": 1,
+        "version": 2,
         "items": [d.to_dict() for d in items],
+        "events": [e.to_dict() for e in events],
     }
 
     try:
@@ -208,42 +282,132 @@ def save_dismissed(path: Path, items: list[DismissedSuggestion]) -> None:
         raise
 
 
-def dismiss_suggestion_record(path: Path, repo_name: str, reason: str = "") -> DismissedSuggestion:
+def _append_event(path: Path, event: DismissalEvent) -> None:
+    """Read existing items + events, append the new event, save atomically."""
+    items = load_dismissed(path)
+    events = load_dismissal_events(path)
+    events.append(event)
+    _save_dismissed_full(path, items, events)
+
+
+def dismiss_suggestion_record(
+    path: Path,
+    repo_name: str,
+    reason: str = "",
+    expires_days: int | None = None,
+) -> DismissedSuggestion:
     """Add or replace by repo_name (idempotent). Returns the recorded entry.
 
     Validates repo_name is non-empty; raises ValueError if blank.
     On re-dismissal: dismissed_at is updated to the current timestamp.
+    If expires_days is provided AND > 0: set expires_at = (today + expires_days days).isoformat().
+    If expires_days == 0: set expires_at = today.isoformat() (will keep until next sweep, boundary check).
+    Appends a DismissalEvent of type 'dismissed' to events list.
     """
     if not repo_name.strip():
         raise ValueError("repo_name must not be blank")
 
-    from datetime import datetime, timezone
-
     from src.initiatives import operator_identity
 
+    now = datetime.now(timezone.utc)
     items = load_dismissed(path)
+    events = load_dismissal_events(path)
     # Remove any existing entry for this repo_name
     items = [d for d in items if d.repo_name != repo_name]
+
+    expires_at: str | None = None
+    if expires_days is not None:
+        expires_at = (date.today() + timedelta(days=expires_days)).isoformat()
 
     entry = DismissedSuggestion(
         repo_name=repo_name,
         reason=reason,
-        dismissed_at=datetime.now(timezone.utc).isoformat(),
+        dismissed_at=now.isoformat(),
         dismissed_by=operator_identity(),
+        expires_at=expires_at,
     )
     items.append(entry)
-    save_dismissed(path, items)
+    events.append(
+        DismissalEvent(
+            repo_name=repo_name,
+            event_type="dismissed",
+            occurred_at=now.isoformat(),
+            actor=operator_identity(),
+            reason=reason,
+        )
+    )
+    _save_dismissed_full(path, items, events)
     return entry
 
 
 def undo_dismiss(path: Path, repo_name: str) -> bool:
-    """Remove entry for repo_name. Return True if removed, False if not present."""
+    """Remove entry for repo_name. Return True if removed, False if not present.
+
+    Appends a DismissalEvent of type 'undone' when an entry is successfully removed.
+    """
+    from src.initiatives import operator_identity
+
     items = load_dismissed(path)
+    events = load_dismissal_events(path)
     new_items = [d for d in items if d.repo_name != repo_name]
     if len(new_items) == len(items):
         return False
-    save_dismissed(path, new_items)
+    events.append(
+        DismissalEvent(
+            repo_name=repo_name,
+            event_type="undone",
+            occurred_at=datetime.now(timezone.utc).isoformat(),
+            actor=operator_identity(),
+        )
+    )
+    _save_dismissed_full(path, new_items, events)
     return True
+
+
+def expire_dismissals(
+    path: Path,
+    today: date | None = None,
+) -> list[DismissedSuggestion]:
+    """Remove items whose expires_at < today.
+
+    For each expired entry, append DismissalEvent(event_type="expired", actor="system").
+    Save atomically. Return list of expired entries (so caller can log them).
+
+    Boundary semantics: expires_at == today means still active (< not <=).
+    Malformed expires_at strings are kept defensively (no crash).
+    """
+    if today is None:
+        today = date.today()
+
+    items = load_dismissed(path)
+    events = load_dismissal_events(path)
+
+    kept: list[DismissedSuggestion] = []
+    expired: list[DismissedSuggestion] = []
+
+    for item in items:
+        if item.expires_at:
+            try:
+                exp = date.fromisoformat(item.expires_at[:10])
+                if exp < today:
+                    expired.append(item)
+                    events.append(
+                        DismissalEvent(
+                            repo_name=item.repo_name,
+                            event_type="expired",
+                            occurred_at=datetime.now(timezone.utc).isoformat(),
+                            actor="system",
+                            reason="auto-expired",
+                        )
+                    )
+                    continue
+            except ValueError:
+                pass  # malformed expiry — defensively keep
+        kept.append(item)
+
+    if expired:
+        _save_dismissed_full(path, kept, events)
+    return expired
 
 
 def clear_suggestion_cache(path: Path | None = None) -> None:

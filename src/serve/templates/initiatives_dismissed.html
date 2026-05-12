@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Dismissed Suggestions{% endblock %}
+
+{% block content %}
+<style>
+  tr.undone td { background: #d4edda; color: #155724; font-weight: 600; }
+  tr.undo-error td { background: #f8d7da; color: #721c24; font-weight: 600; }
+  .undo-form button { padding: 0.25rem 0.6rem; font-size: 0.8rem; }
+</style>
+
+<div class="page-header">
+  <h1>Dismissed Suggestions</h1>
+  <p class="meta">{{ count }} repo(s) currently suppressed from LLM suggestions</p>
+</div>
+
+{% if not rows %}
+<div class="empty-state">
+  No dismissed suggestions. Use <code>audit triage --dismiss-suggestion REPO</code> or the Dismiss button on <a href="/initiatives/suggestions">/initiatives/suggestions</a>.
+</div>
+{% else %}
+<table>
+  <thead>
+    <tr>
+      <th>Repo</th>
+      <th>Dismissed at</th>
+      <th>Expires at</th>
+      <th>Reason</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    <tr id="dismissed-{{ loop.index }}">
+      <td><code>{{ row.repo_name }}</code></td>
+      <td class="meta">{{ row.dismissed_at[:10] if row.dismissed_at else '' }}</td>
+      <td class="meta">{{ row.expires_at[:10] if row.expires_at else 'permanent' }}</td>
+      <td>{{ row.reason or '—' }}</td>
+      <td>
+        <form
+          hx-post="/initiatives/dismissed/undo"
+          hx-target="#dismissed-{{ loop.index }}"
+          hx-swap="outerHTML"
+          hx-confirm="Restore {{ row.repo_name }} to the suggestion pool?"
+          class="undo-form"
+        >
+          <input type="hidden" name="repo_name" value="{{ row.repo_name }}">
+          <button type="submit" class="btn-secondary">Undo</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<p><a href="/initiatives">&larr; Initiatives</a> &middot; <a href="/initiatives/suggestions">Suggestions</a></p>
+{% endblock %}

@@ -295,16 +295,16 @@ class TestHelpFlagCounts:
     def test_triage_help_flag_count(self):
         text = _help_text("triage")
         count = _count_flags_in_help(text)
-        assert count <= 28, (
-            f"audit triage --help shows {count} non-global flags (limit 28, raised in Arc G S11.4 for --dismiss-suggestion/--reason/--undo-dismiss/--list-dismissed).\n"
+        assert count <= 31, (
+            f"audit triage --help shows {count} non-global flags (limit 31, raised in Arc G S12.1 for --dismiss-expires-days/--expire-dismissals/--dismissal-history).\n"
             f"Flags found: {sorted(set(re.findall(r'  (--[a-z][a-z0-9-]*)', text)))}"
         )
 
     def test_report_help_flag_count(self):
         text = _help_text("report")
         count = _count_flags_in_help(text)
-        assert count <= 30, (
-            f"audit report --help shows {count} non-global flags (limit 30).\n"
+        assert count <= 33, (
+            f"audit report --help shows {count} non-global flags (limit 33).\n"
             f"Flags found: {sorted(set(re.findall(r'  (--[a-z][a-z0-9-]*)', text)))}"
         )
 

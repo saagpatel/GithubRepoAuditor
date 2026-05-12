@@ -836,6 +836,63 @@ async def dismiss_suggestion_route(
     )
 
 
+@router.get("/initiatives/dismissed", response_class=HTMLResponse)
+async def initiatives_dismissed(request: Request) -> HTMLResponse:
+    """List currently dismissed suggestions with per-row Undo button (Arc G S12.2).
+
+    Filters out entries whose `expires_at` is strictly before today —
+    those rows should appear under `--dismissal-history` only.
+    """
+    from datetime import date as _date
+
+    from src.suggest_initiatives import dismissed_path, load_dismissed
+
+    output_dir = _output_dir(request)
+    items = load_dismissed(dismissed_path(output_dir))
+    today_iso = _date.today().isoformat()
+
+    rows = [
+        {
+            "repo_name": d.repo_name,
+            "reason": d.reason,
+            "dismissed_at": d.dismissed_at,
+            "dismissed_by": d.dismissed_by,
+            "expires_at": d.expires_at,
+        }
+        for d in items
+        if not d.expires_at or d.expires_at >= today_iso
+    ]
+
+    return templates.TemplateResponse(
+        request,
+        "initiatives_dismissed.html",
+        {"rows": rows, "count": len(rows)},
+    )
+
+
+@router.post("/initiatives/dismissed/undo", response_class=HTMLResponse)
+async def undo_dismiss_route(
+    request: Request,
+    repo_name: str = Form(...),
+) -> HTMLResponse:
+    """Restore a dismissed repo. HTMX swap-out the row (Arc G S12.2)."""
+    import html as _html
+
+    from src.suggest_initiatives import dismissed_path, undo_dismiss
+
+    output_dir = _output_dir(request)
+    removed = undo_dismiss(dismissed_path(output_dir), repo_name)
+
+    if removed:
+        return HTMLResponse(
+            f'<tr class="undone"><td colspan="5">✓ Restored: {_html.escape(repo_name)}</td></tr>'
+        )
+    return HTMLResponse(
+        f'<tr class="undo-error"><td colspan="5">Error: {_html.escape(repo_name)} not currently dismissed</td></tr>',
+        status_code=404,
+    )
+
+
 @router.get("/initiatives/{repo_name}/gap", response_class=HTMLResponse)
 async def initiative_gap(request: Request, repo_name: str, target: int = 0) -> HTMLResponse:
     """Return an HTMX partial listing missing requirements for *repo_name* to reach *target* tier."""

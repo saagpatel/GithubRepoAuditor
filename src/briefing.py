@@ -7,7 +7,7 @@ import logging
 import re
 import sys
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -79,6 +79,13 @@ class InitiativeSuggestionRow:
     estimated_effort: str
 
 
+@dataclass(frozen=True)
+class DismissedRepoRow:
+    repo_name: str
+    reason: str
+    expires_at: str | None = None  # ISO date or None for permanent
+
+
 @dataclass
 class Briefing:
     username: str
@@ -90,6 +97,7 @@ class Briefing:
     suppressed_by_prefs: list[str] = field(default_factory=list)  # repo names skipped due to prefs
     initiatives: list[InitiativeStatus] = field(default_factory=list)
     suggested_initiatives: list[InitiativeSuggestionRow] = field(default_factory=list)
+    dismissed_repos: list[DismissedRepoRow] = field(default_factory=list)
 
 
 # ── Section builders ─────────────────────────────────────────────────────────
@@ -498,6 +506,51 @@ def _build_suggested_initiatives(
     return rows
 
 
+def _build_dismissed_repos(
+    output_dir: Path | None,
+    today: date | None = None,
+) -> list[DismissedRepoRow]:
+    """Load dismissed-suggestions.json and return non-expired rows.
+
+    today: optional override for testing. Default = today's date.
+    Skips entries whose expires_at < today (those are expired).
+    Returns empty list if output_dir is None or file is missing.
+    """
+    if output_dir is None:
+        return []
+    from src.suggest_initiatives import dismissed_path, load_dismissed
+
+    path = dismissed_path(output_dir)
+    if not path.exists():
+        return []
+
+    today_d = today or date.today()
+    items = load_dismissed(path)
+
+    rows: list[DismissedRepoRow] = []
+    for d in items:
+        expires = d.expires_at
+        if expires:
+            try:
+                exp_d = date.fromisoformat(str(expires)[:10])
+                if exp_d < today_d:
+                    continue  # already expired; skip
+            except ValueError:
+                logger.warning(
+                    "briefing: malformed expires_at %r for %s — treating as permanent",
+                    expires,
+                    d.repo_name,
+                )
+        rows.append(
+            DismissedRepoRow(
+                repo_name=d.repo_name,
+                reason=d.reason,
+                expires_at=expires,
+            )
+        )
+    return rows
+
+
 def build_briefing(
     audits: list[dict],
     username: str,
@@ -548,6 +601,8 @@ def build_briefing(
     if include_suggestions:
         suggested_initiatives = _build_suggested_initiatives(audits)
 
+    dismissed_repos = _build_dismissed_repos(output_dir)
+
     return Briefing(
         username=username,
         date=date,
@@ -558,6 +613,7 @@ def build_briefing(
         suppressed_by_prefs=suppressed_by_prefs,
         initiatives=initiatives,
         suggested_initiatives=suggested_initiatives,
+        dismissed_repos=dismissed_repos,
     )
 
 
@@ -627,6 +683,21 @@ def render_markdown(briefing: Briefing) -> str:
                 f"- **{s.repo_name}** → Tier {s.target_tier} ({target_name}) — "
                 f"`{s.estimated_effort}` — _{s.rationale}_"
             )
+        lines.append("")
+
+    # ── Section 0c: Currently Dismissed ─────────────────────────────────────
+    if briefing.dismissed_repos:
+        if lines and lines[-1] != "":
+            lines.append("")
+        n = len(briefing.dismissed_repos)
+        lines.append("## Currently Dismissed")
+        lines.append("")
+        lines.append(f"{n} repo(s) currently suppressed from LLM suggestions:")
+        lines.append("")
+        for d in briefing.dismissed_repos:
+            reason_part = f" — _{d.reason}_" if d.reason else ""
+            expiry_part = f" (expires {d.expires_at[:10]})" if d.expires_at else ""
+            lines.append(f"- **{d.repo_name}**{reason_part}{expiry_part}")
         lines.append("")
 
     # ── Section 1: Shipped this week ──────────────────────────────────────────
@@ -714,6 +785,14 @@ def render_voice(briefing: Briefing) -> str:
     # Header
     parts.append(f"Weekly operator briefing for {briefing.username}, generated on {briefing.date}.")
     parts.append("")
+
+    # ── Dismissed suppressions ────────────────────────────────────────────────
+    if briefing.dismissed_repos:
+        n = len(briefing.dismissed_repos)
+        parts.append(
+            f"You currently have {n} dismissed {'suggestion' if n == 1 else 'suggestions'}."
+        )
+        parts.append("")
 
     # ── Section 0: Initiatives ────────────────────────────────────────────────
     if briefing.initiatives:

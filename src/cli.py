@@ -356,6 +356,24 @@ def _build_triage_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         action="store_true",
         help="List currently dismissed suggestion repos",
     )
+    # ── Auto-expire + audit trail (12.1) ─────────────────────────────────────
+    p.add_argument(
+        "--dismiss-expires-days",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Auto-expire dismissal after N days (default: permanent)",
+    )
+    p.add_argument(
+        "--expire-dismissals",
+        action="store_true",
+        help="Run cleanup: remove dismissals whose expiry date has passed",
+    )
+    p.add_argument(
+        "--dismissal-history",
+        action="store_true",
+        help="Show audit trail of dismissal events",
+    )
 
 
 def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
@@ -509,6 +527,26 @@ def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         default=50,
         dest="max_repos",
         help="Max repos to consider when planning a campaign (default: 50)",
+    )
+    # ── Tier-gap export (Arc G S12.4) ─────────────────────────────────
+    p.add_argument(
+        "--tier-gaps",
+        action="store_true",
+        help="Dump per-repo TierGap data (current tier + missing requirements + source) for external tooling",
+    )
+    p.add_argument(
+        "--tier-gaps-target",
+        type=int,
+        choices=[2, 3, 4],
+        default=None,
+        metavar="TIER",
+        help="Override target tier for gap calculation (default: current+1 per repo). Valid: 2-4.",
+    )
+    p.add_argument(
+        "--format",
+        choices=["json", "markdown"],
+        default="json",
+        help="Output format for --tier-gaps (default: json)",
     )
 
 
@@ -1180,6 +1218,25 @@ def build_parser() -> argparse.ArgumentParser:
         dest="max_repos",
         help="Max repos to consider when planning a campaign (default: 50)",
     )
+    # ── Tier-gap export (Arc G S12.4) ─────────────────────────────────────────
+    parser.add_argument(
+        "--tier-gaps",
+        action="store_true",
+        help="Dump per-repo TierGap data (current tier + missing requirements + source) for external tooling",
+    )
+    parser.add_argument(
+        "--tier-gaps-target",
+        type=int,
+        default=None,
+        metavar="TIER",
+        help="Override target tier for gap calculation (default: current+1 per repo). Valid: 2-4.",
+    )
+    parser.add_argument(
+        "--format",
+        choices=["json", "markdown"],
+        default="json",
+        help="Output format for --tier-gaps (default: json)",
+    )
     parser.add_argument(
         "--improvements-file",
         type=Path,
@@ -1331,6 +1388,24 @@ def build_parser() -> argparse.ArgumentParser:
         "--list-dismissed",
         action="store_true",
         help="List currently dismissed suggestion repos",
+    )
+    # ── Auto-expire + audit trail (12.1) — also registered here so legacy parser accepts them ──
+    parser.add_argument(
+        "--dismiss-expires-days",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Auto-expire dismissal after N days (default: permanent)",
+    )
+    parser.add_argument(
+        "--expire-dismissals",
+        action="store_true",
+        help="Run cleanup: remove dismissals whose expiry date has passed",
+    )
+    parser.add_argument(
+        "--dismissal-history",
+        action="store_true",
+        help="Show audit trail of dismissal events",
     )
     return parser
 
@@ -3115,11 +3190,17 @@ def _run_dismiss_suggestion_mode(args) -> None:
             dismissed_path(output_dir),
             repo_name=args.dismiss_suggestion,
             reason=getattr(args, "reason", "") or "",
+            expires_days=getattr(args, "dismiss_expires_days", None),
         )
     except ValueError as exc:
         print_warning(str(exc))
         sys.exit(2)
-    print_info(f"✗ Dismissed: {entry.repo_name}" + (f" — {entry.reason}" if entry.reason else ""))
+    expiry_note = f" (expires {entry.expires_at})" if entry.expires_at else ""
+    print_info(
+        f"✗ Dismissed: {entry.repo_name}"
+        + (f" — {entry.reason}" if entry.reason else "")
+        + expiry_note
+    )
 
 
 def _run_undo_dismiss_mode(args) -> None:
@@ -3151,6 +3232,120 @@ def _run_list_dismissed_mode(args) -> None:
     for d in items:
         reason = f" — {d.reason}" if d.reason else ""
         print(f"  {d.repo_name:<30} dismissed {d.dismissed_at[:10]} by {d.dismissed_by}{reason}")
+
+
+def _run_expire_dismissals_mode(args) -> None:
+    """Remove dismissals whose expiry date has passed (Arc G S12.1)."""
+    from pathlib import Path
+
+    from src.suggest_initiatives import dismissed_path, expire_dismissals
+
+    output_dir = Path(args.output_dir)
+    expired = expire_dismissals(dismissed_path(output_dir))
+    if not expired:
+        print_info("No dismissals to expire.")
+        return
+    print_info(f"Expired {len(expired)} dismissal(s):")
+    for d in expired:
+        print(f"  {d.repo_name:<30} (was set to expire {d.expires_at})")
+
+
+def _run_dismissal_history_mode(args) -> None:
+    """Show audit trail of dismissal events (Arc G S12.1)."""
+    from pathlib import Path
+
+    from src.suggest_initiatives import dismissed_path, load_dismissal_events
+
+    output_dir = Path(args.output_dir)
+    events = load_dismissal_events(dismissed_path(output_dir))
+    if not events:
+        print_info("No dismissal history.")
+        return
+    print_info(f"Dismissal History ({len(events)} event(s))")
+    for e in events:
+        reason = f" — {e.reason}" if e.reason else ""
+        print(f"  {e.occurred_at[:19]} {e.event_type:<10} {e.repo_name:<30} by {e.actor}{reason}")
+
+
+def _run_tier_gaps_export_mode(args) -> None:
+    """Dump per-repo tier-gap data as JSON or markdown (Arc G S12.4)."""
+    import json
+    from datetime import datetime, timezone
+    from pathlib import Path
+
+    from src.maturity_tiers import compute_tier, tier_gap, tier_name
+
+    output_dir = Path(args.output_dir)
+    truth_path = output_dir / "portfolio-truth-latest.json"
+    if not truth_path.exists():
+        print_warning(
+            "portfolio-truth-latest.json not found. Run `audit run --portfolio-truth` first."
+        )
+        return
+
+    try:
+        truth = json.loads(truth_path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        print_warning(f"Failed to read portfolio-truth: {exc}")
+        sys.exit(2)
+
+    projects = truth.get("projects", [])
+    target_override = getattr(args, "tier_gaps_target", None)
+    if target_override is not None and target_override not in (2, 3, 4):
+        print_warning(f"Invalid --tier-gaps-target {target_override}; must be 2, 3, or 4.")
+        sys.exit(2)
+
+    gaps: list[dict] = []
+    for project in projects:
+        name = (project.get("identity") or {}).get("display_name") or ""
+        if not name:
+            continue
+        current = compute_tier(project)
+        if current == 0 or current == 4:
+            continue  # no-git or already-Platinum: no next tier
+        target = target_override if target_override is not None else (current + 1)
+        if target <= current:
+            continue  # operator's override is below or equal to current
+        gap = tier_gap(project, target)
+        gaps.append(
+            {
+                "repo_name": name,
+                "current_tier": current,
+                "current_tier_name": tier_name(current),
+                "target_tier": target,
+                "target_tier_name": tier_name(target),
+                "missing_requirements": list(gap.missing_requirements),
+                "requirement_sources": list(gap.requirement_sources),
+            }
+        )
+
+    fmt = getattr(args, "format", "json")
+    if fmt == "markdown":
+        _print_tier_gaps_markdown(gaps)
+    else:
+        envelope = {
+            "version": 1,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "gaps": gaps,
+        }
+        print(json.dumps(envelope, indent=2))
+
+
+def _print_tier_gaps_markdown(gaps: list[dict]) -> None:
+    """Human-readable tier-gap table (Arc G S12.4)."""
+    if not gaps:
+        print_info("No tier gaps to report (all repos either at Platinum or no git).")
+        return
+    print_info(f"Tier Gaps ({len(gaps)} repo(s))")
+    print()
+    print("| REPO | CURRENT → TARGET | MISSING | SOURCE |")
+    print("|------|------------------|---------|--------|")
+    for g in gaps:
+        missing = ", ".join(g["missing_requirements"]) if g["missing_requirements"] else "—"
+        sources = ", ".join(g["requirement_sources"]) if g["requirement_sources"] else "—"
+        print(
+            f"| {g['repo_name']} | {g['current_tier_name']} → {g['target_tier_name']} | {missing} | {sources} |"
+        )
 
 
 def _run_apply_improvements_mode(args, parser) -> None:
@@ -6192,6 +6387,7 @@ def _infer_subcommand_from_flags(args: argparse.Namespace) -> str:
         "draft_readmes",
         "upload_badges",
         "notion_sync",
+        "tier_gaps",
     )
     for flag in report_flags:
         if getattr(args, flag, False):
@@ -6464,6 +6660,18 @@ def main() -> None:
         return
     if getattr(args, "list_dismissed", False):
         _run_list_dismissed_mode(args)
+        return
+    # ── Auto-expire + audit trail (12.1) ─────────────────────────────────────
+    if getattr(args, "expire_dismissals", False):
+        _run_expire_dismissals_mode(args)
+        return
+    if getattr(args, "dismissal_history", False):
+        _run_dismissal_history_mode(args)
+        return
+
+    # ── Tier-gap export (Arc G S12.4) ─────────────────────────────────────
+    if getattr(args, "tier_gaps", False):
+        _run_tier_gaps_export_mode(args)
         return
 
     if getattr(args, "serve", False):
