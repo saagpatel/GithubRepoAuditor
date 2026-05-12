@@ -404,6 +404,21 @@ def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         metavar="REPO",
         help="Explicit per-repo opt-in (repeatable)",
     )
+    # ── Campaign planner (Arc G S6.1-6.2) ────────────────────────────
+    p.add_argument(
+        "--plan-campaign",
+        default=None,
+        metavar="GOAL",
+        dest="plan_campaign",
+        help="Generate a goal-driven campaign plan via LLM (e.g. 'archive dead repos')",
+    )
+    p.add_argument(
+        "--max-repos",
+        type=int,
+        default=50,
+        dest="max_repos",
+        help="Max repos to consider when planning a campaign (default: 50)",
+    )
 
 
 def _build_serve_subparser(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
@@ -1038,6 +1053,21 @@ def build_parser() -> argparse.ArgumentParser:
         dest="draft_readmes_repos",
         metavar="REPO",
         help="Explicit per-repo opt-in for --draft-readmes (repeatable)",
+    )
+    # ── Campaign planner (Arc G S6.1-6.2) ────────────────────────────────────
+    parser.add_argument(
+        "--plan-campaign",
+        default=None,
+        metavar="GOAL",
+        dest="plan_campaign",
+        help="Generate a goal-driven campaign plan via LLM (e.g. 'archive dead repos')",
+    )
+    parser.add_argument(
+        "--max-repos",
+        type=int,
+        default=50,
+        dest="max_repos",
+        help="Max repos to consider when planning a campaign (default: 50)",
     )
     parser.add_argument(
         "--improvements-file",
@@ -2208,6 +2238,117 @@ def _run_generate_manifest_mode(args, parser) -> None:
     manifest = generate_manifest(report_data)
     manifest_path = write_manifest(manifest, output_dir)
     print_info(f"Improvement manifest: {manifest_path} ({len(manifest)} repos)")
+
+
+def _run_plan_campaign_mode(args) -> None:
+    """Dispatch for --plan-campaign: generate a goal-driven campaign plan packet."""
+    import json
+
+    from src.approval_ledger import default_approval_reviewer as _default_reviewer
+    from src.llm_cost import BudgetExceededError, CostTracker
+    from src.narrative import _resolve_provider
+    from src.operator_prefs import load_prefs, prefs_path
+    from src.plan_campaign import generate_plan, narrow_candidates, write_packet_to_ledger
+    from src.warehouse import WAREHOUSE_FILENAME
+
+    output_dir = Path(args.output_dir)
+    goal: str = str(args.plan_campaign).strip()
+    max_repos: int = int(getattr(args, "max_repos", 50) or 50)
+    reviewer: str = getattr(args, "approval_reviewer", None) or _default_reviewer()
+
+    # ── Load audit results from portfolio-truth-latest.json ───────────────────
+    truth_path = output_dir / "portfolio-truth-latest.json"
+    if not truth_path.exists():
+        print_info(
+            f"portfolio-truth-latest.json not found in {output_dir}. "
+            "Run `audit report --portfolio-truth` first to generate repo data. "
+            "--plan-campaign requires a truth snapshot to select candidates."
+        )
+        return
+
+    try:
+        raw = json.loads(truth_path.read_text(encoding="utf-8"))
+        audit_results: list[dict] = list(raw.get("repos", raw.get("results", [])))
+    except (OSError, json.JSONDecodeError) as exc:
+        print_info(f"Error reading portfolio-truth-latest.json: {exc}")
+        return
+
+    # ── Semantic index (optional — fallback to alphabetical if unavailable) ────
+    semantic_index = None
+    warehouse_path = output_dir / WAREHOUSE_FILENAME
+    if warehouse_path.exists():
+        try:
+            from src.semantic_index import SemanticIndex
+
+            semantic_index = SemanticIndex(output_dir)
+        except Exception as exc:  # noqa: BLE001
+            print_info(
+                f"Warning: could not load SemanticIndex: {exc} — using alphabetical fallback."
+            )
+
+    # ── LLM provider ──────────────────────────────────────────────────────────
+    provider_result = _resolve_provider(
+        getattr(args, "narrative_provider", None),
+        getattr(args, "narrative_model", None),
+        getattr(args, "token", None),
+    )
+    if provider_result is None:
+        print_info(
+            "No LLM provider available for --plan-campaign. "
+            "Set ANTHROPIC_API_KEY or GITHUB_TOKEN, or pass --narrative-provider."
+        )
+        return
+    provider, model = provider_result
+
+    # ── Cost tracker ──────────────────────────────────────────────────────────
+    budget_usd = getattr(args, "max_llm_spend", None)
+    cost_tracker: CostTracker = CostTracker(budget_usd=budget_usd, output_path=output_dir)
+
+    # ── Operator prefs ────────────────────────────────────────────────────────
+    pref_file = prefs_path(output_dir)
+    prefs = load_prefs(pref_file)
+
+    # ── Narrow candidates ─────────────────────────────────────────────────────
+    candidates = narrow_candidates(
+        audit_results,
+        goal=goal,
+        semantic_index=semantic_index,
+        max_repos=max_repos,
+    )
+    if not candidates:
+        print_info("No candidate repos found. Check that portfolio-truth-latest.json has data.")
+        return
+
+    # ── Generate plan ─────────────────────────────────────────────────────────
+    import sys
+
+    try:
+        packet = generate_plan(
+            candidates,
+            goal=goal,
+            provider=provider,
+            model=model,
+            cost_tracker=cost_tracker,
+            prefs=prefs,
+        )
+    except BudgetExceededError as exc:
+        print(f"\nERROR: LLM budget exceeded during campaign planning: {exc}", file=sys.stderr)
+        return
+
+    # ── Persist packet to ledger ──────────────────────────────────────────────
+    record_id = write_packet_to_ledger(packet, output_dir=output_dir, reviewer=reviewer)
+
+    cost_tracker.write_telemetry()
+
+    pending_count = sum(1 for a in packet.actions if a.action_type == "pending_human_action")
+    print_info(
+        f"Goal: {goal}. "
+        f"Considered {packet.candidate_count}. "
+        f"Qualified {packet.qualified_count}. "
+        f"{pending_count} pending human review. "
+        f"LLM cost: ${packet.llm_cost_usd:.4f}. "
+        f"Packet ID: {record_id}."
+    )
 
 
 def _run_draft_readmes_mode(args) -> None:
@@ -5539,6 +5680,10 @@ def main() -> None:
 
     if getattr(args, "apply_metadata", False) or getattr(args, "apply_readmes", False):
         _run_apply_improvements_mode(args, parser)
+        return
+
+    if getattr(args, "plan_campaign", None):
+        _run_plan_campaign_mode(args)
         return
 
     if getattr(args, "draft_readmes", False):
