@@ -20,6 +20,7 @@ from src.analyzers.interest import InterestAnalyzer
 from src.analyzers.readme import ReadmeAnalyzer
 from src.analyzers.security import SecurityAnalyzer
 from src.analyzers.structure import StructureAnalyzer
+from src.analyzers.description_analyzer import DescriptionAnalyzer
 from src.analyzers.testing import TestingAnalyzer
 from src.models import AnalyzerResult, RepoMetadata
 
@@ -41,6 +42,7 @@ ALL_ANALYZERS = [
     CommunityProfileAnalyzer(),
     InterestAnalyzer(),
     SecurityAnalyzer(),
+    DescriptionAnalyzer(),  # Arc H A1
 ]
 
 

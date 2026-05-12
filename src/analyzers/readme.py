@@ -205,6 +205,10 @@ def _git_last_touched_unix(repo_path: Path, *pathspecs: str) -> int | None:
         return None
 
 
+# Age threshold for readme_stale_by_age flag (Arc H A2)
+_README_AGE_STALENESS_THRESHOLD_DAYS: int = 180
+
+
 def _compute_readme_staleness(repo_path: Path, readme_name: str) -> dict:
     """Compute README staleness fields relative to code last-touched date.
 
@@ -243,6 +247,11 @@ def _compute_readme_staleness(repo_path: Path, readme_name: str) -> dict:
         "code_last_touched_days": code_days,
         "readme_staleness_ratio": staleness_ratio,
         "readme_stale": stale,
+        "readme_stale_by_age": (
+            readme_days > _README_AGE_STALENESS_THRESHOLD_DAYS
+            if readme_days is not None
+            else None
+        ),
     }
 
 
