@@ -270,6 +270,40 @@ def _build_triage_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         help="Semantic search against portfolio index",
     )
     p.add_argument("--ask", default=None, metavar="QUERY", help="Alias for --semantic-search")
+    # ── Initiative tracker (7A.3) ─────────────────────────────────────────
+    p.add_argument(
+        "--set-initiative",
+        default=None,
+        metavar="REPO",
+        dest="set_initiative",
+        help="Set or update a tier-upgrade initiative for REPO",
+    )
+    p.add_argument(
+        "--target-tier",
+        type=int,
+        choices=[2, 3, 4],
+        default=None,
+        dest="target_tier",
+        help="Target maturity tier (2=Silver, 3=Gold, 4=Platinum); required with --set-initiative",
+    )
+    p.add_argument(
+        "--deadline",
+        default=None,
+        metavar="YYYY-MM-DD",
+        help="Deadline for the initiative (YYYY-MM-DD); required with --set-initiative",
+    )
+    p.add_argument(
+        "--initiatives",
+        action="store_true",
+        help="List all initiatives with current status",
+    )
+    p.add_argument(
+        "--close-initiative",
+        default=None,
+        metavar="REPO",
+        dest="close_initiative",
+        help="Close the open initiative for REPO (marks as met)",
+    )
 
 
 def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
@@ -1142,6 +1176,40 @@ def build_parser() -> argparse.ArgumentParser:
         "--host",
         default="127.0.0.1",
         help="Host for --serve (default: 127.0.0.1)",
+    )
+    # ── Initiative tracker (7A.3) — also registered here so legacy parser accepts them ──
+    parser.add_argument(
+        "--set-initiative",
+        default=None,
+        metavar="REPO",
+        dest="set_initiative",
+        help="Set or update a tier-upgrade initiative for REPO",
+    )
+    parser.add_argument(
+        "--target-tier",
+        type=int,
+        choices=[2, 3, 4],
+        default=None,
+        dest="target_tier",
+        help="Target maturity tier (2=Silver, 3=Gold, 4=Platinum); required with --set-initiative",
+    )
+    parser.add_argument(
+        "--deadline",
+        default=None,
+        metavar="YYYY-MM-DD",
+        help="Deadline for the initiative (YYYY-MM-DD); required with --set-initiative",
+    )
+    parser.add_argument(
+        "--initiatives",
+        action="store_true",
+        help="List all initiatives with current status",
+    )
+    parser.add_argument(
+        "--close-initiative",
+        default=None,
+        metavar="REPO",
+        dest="close_initiative",
+        help="Close the open initiative for REPO (marks as met)",
     )
     return parser
 
@@ -2636,6 +2704,193 @@ def _run_draft_readmes_mode(args) -> None:
         f"{skipped_budget} skipped (budget). "
         f"{errors} error(s). "
         f"LLM cost: ${total_cost:.4f}."
+    )
+
+
+def _run_set_initiative_mode(args) -> None:
+    """Validate and persist a tier-upgrade initiative for a repo."""
+    import sys
+    from datetime import date
+
+    from src.initiatives import (
+        Initiative,
+        initiatives_path,
+        operator_identity,
+        upsert_initiative,
+    )
+    from src.maturity_tiers import TIER_DEFINITIONS, compute_tier
+
+    repo_name: str = args.set_initiative
+    target_tier: int | None = getattr(args, "target_tier", None)
+    deadline_str: str | None = getattr(args, "deadline", None)
+    output_dir = Path(args.output_dir)
+
+    # Validate required co-flags
+    if target_tier is None:
+        print_warning("--target-tier is required with --set-initiative (choices: 2, 3, 4)")
+        sys.exit(2)
+    if deadline_str is None:
+        print_warning("--deadline YYYY-MM-DD is required with --set-initiative")
+        sys.exit(2)
+
+    # Validate deadline format and future-ness
+    try:
+        deadline_date = date.fromisoformat(deadline_str)
+    except ValueError:
+        print_warning(f"--deadline must be YYYY-MM-DD, got: {deadline_str!r}")
+        sys.exit(2)
+    if deadline_date < date.today():
+        print_warning(f"--deadline {deadline_str} is in the past. Provide a future date.")
+        sys.exit(2)
+
+    # Load portfolio-truth to validate repo and check current tier
+    import json as _json
+
+    pt_candidates = sorted(output_dir.glob("portfolio-truth-latest.json"))
+    if not pt_candidates:
+        pt_candidates = sorted(output_dir.glob("portfolio-truth-*.json"))
+    if not pt_candidates:
+        print_warning(
+            f"Portfolio truth not found in {output_dir}. "
+            "Run `audit report --portfolio-truth` first."
+        )
+        sys.exit(2)
+
+    pt_path = Path(str(output_dir / "portfolio-truth-latest.json"))
+    if not pt_path.exists():
+        pt_path = pt_candidates[-1]
+
+    try:
+        pt_data = _json.loads(pt_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        print_warning(f"Could not read portfolio truth: {exc}")
+        sys.exit(2)
+
+    projects: list[dict] = pt_data.get("projects", [])
+    repo_dict: dict | None = None
+    for proj in projects:
+        name = proj.get("identity", {}).get("display_name", "")
+        if name.lower() == repo_name.lower():
+            repo_dict = proj
+            break
+
+    if repo_dict is None:
+        print_warning(
+            f"Repo {repo_name!r} not found in portfolio truth. "
+            "Run `audit report --portfolio-truth` first."
+        )
+        sys.exit(2)
+
+    current_tier = compute_tier(repo_dict)
+    if target_tier <= current_tier:
+        tier_name_target = TIER_DEFINITIONS[target_tier].name
+        tier_name_current = TIER_DEFINITIONS[current_tier].name if current_tier > 0 else "Untracked"
+        print_warning(
+            f"Target tier {target_tier} ({tier_name_target}) is not greater than "
+            f"current tier {current_tier} ({tier_name_current}) for {repo_name!r}."
+        )
+        sys.exit(2)
+
+    from datetime import datetime as _dt
+    from datetime import timezone as _tz
+
+    initiative = Initiative(
+        repo_name=repo_name,
+        target_tier=target_tier,
+        deadline=deadline_str,
+        set_at=_dt.now(tz=_tz.utc).isoformat(),
+        set_by=operator_identity(),
+    )
+    upsert_initiative(initiatives_path(output_dir), initiative)
+    tier_label = TIER_DEFINITIONS[target_tier].name
+    print_info(f"Initiative set: {repo_name} → Tier {target_tier} ({tier_label}) by {deadline_str}")
+
+
+def _run_list_initiatives_mode(args) -> None:
+    """Print a status table for all initiatives."""
+    import json as _json
+
+    from src.initiatives import derive_status, initiatives_path, load_initiatives
+    from src.maturity_tiers import TIER_DEFINITIONS, compute_tier, tier_name
+
+    output_dir = Path(args.output_dir)
+    path = initiatives_path(output_dir)
+    initiatives = load_initiatives(path)
+
+    # Load portfolio-truth for current-tier lookup (best-effort)
+    projects_by_name: dict[str, dict] = {}
+    pt_path = output_dir / "portfolio-truth-latest.json"
+    if pt_path.exists():
+        try:
+            pt_data = _json.loads(pt_path.read_text(encoding="utf-8"))
+            for proj in pt_data.get("projects", []):
+                name = proj.get("identity", {}).get("display_name", "")
+                if name:
+                    projects_by_name[name.lower()] = proj
+        except (OSError, ValueError):
+            pass
+
+    open_initiatives = [i for i in initiatives if i.closed_at is None]
+    closed_initiatives = [i for i in initiatives if i.closed_at is not None]
+
+    print_info("Initiative Tracker")
+    print_info("══════════════════")
+
+    if not open_initiatives:
+        print_info("No open initiatives.")
+    else:
+        header = f"{'REPO':<30} {'TARGET':<12} {'CURRENT':<12} {'DEADLINE':<12} {'STATUS'}"
+        print_info(header)
+        print_info("-" * len(header))
+        for initiative in open_initiatives:
+            repo_dict = projects_by_name.get(initiative.repo_name.lower(), {})
+            current = compute_tier(repo_dict) if repo_dict else 0
+            status = derive_status(initiative, repo_dict)
+            target_label = (
+                f"{TIER_DEFINITIONS[initiative.target_tier].name}({initiative.target_tier})"
+                if initiative.target_tier in TIER_DEFINITIONS
+                else str(initiative.target_tier)
+            )
+            current_label = f"{tier_name(current)}({current})" if current > 0 else "Untracked"
+            status_detail = status
+            if status == "at-risk":
+                from datetime import date
+
+                try:
+                    days_left = (date.fromisoformat(initiative.deadline) - date.today()).days
+                    status_detail = f"at-risk (deadline ≤ {days_left}d)"
+                except ValueError:
+                    pass
+            elif status == "on-track":
+                status_detail = "on-track"
+            row = (
+                f"{initiative.repo_name:<30} "
+                f"{target_label:<12} "
+                f"{current_label:<12} "
+                f"{initiative.deadline:<12} "
+                f"{status_detail}"
+            )
+            print_info(row)
+
+    if closed_initiatives:
+        print_info(f"\nClosed: {len(closed_initiatives)}")
+
+
+def _run_close_initiative_mode(args) -> None:
+    """Close the open initiative for a repo."""
+    import sys
+
+    from src.initiatives import close_initiative, initiatives_path
+
+    repo_name: str = args.close_initiative
+    output_dir = Path(args.output_dir)
+    closed = close_initiative(initiatives_path(output_dir), repo_name, reason="met")
+    if closed is None:
+        print_warning(f"No open initiative found for {repo_name!r}.")
+        sys.exit(2)
+    print_info(
+        f"Initiative closed: {repo_name} → Tier {closed.target_tier} "
+        f"(reason: {closed.closed_reason}, closed_at: {closed.closed_at})"
     )
 
 
@@ -5559,6 +5814,9 @@ def _infer_subcommand_from_flags(args: argparse.Namespace) -> str:
         "acknowledge_kind",
         "semantic_search",
         "ask",
+        "set_initiative",
+        "initiatives",
+        "close_initiative",
     )
     for flag in triage_flags:
         val = getattr(args, flag, None)
@@ -5819,6 +6077,17 @@ def main() -> None:
 
     if getattr(args, "draft_readmes", False):
         _run_draft_readmes_mode(args)
+        return
+
+    # ── Initiative tracker (7A.3) ──────────────────────────────────────────
+    if getattr(args, "set_initiative", None):
+        _run_set_initiative_mode(args)
+        return
+    if getattr(args, "initiatives", False):
+        _run_list_initiatives_mode(args)
+        return
+    if getattr(args, "close_initiative", None):
+        _run_close_initiative_mode(args)
         return
 
     if getattr(args, "serve", False):
