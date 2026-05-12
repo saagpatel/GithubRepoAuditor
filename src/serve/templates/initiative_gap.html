@@ -3,7 +3,12 @@
   {% if missing_requirements %}
   <ul class="gap-list">
     {% for req in missing_requirements %}
-    <li>{{ req }}</li>
+    <li>
+      {{ req }}
+      {% if loop.index0 < requirement_sources|length and requirement_sources[loop.index0] == "proxy" %}
+        <span class="approx-hint">(approx.)</span>
+      {% endif %}
+    </li>
     {% endfor %}
   </ul>
   {% else %}

@@ -659,6 +659,7 @@ async def initiatives(request: Request) -> HTMLResponse:
                 "set_by": init.set_by,
                 "status": status,
                 "missing_requirements": gap.missing_requirements if gap else [],
+                "requirement_sources": gap.requirement_sources if gap else [],
                 "progress_pct": int(100 * current / init.target_tier) if init.target_tier else 0,
             }
         )
@@ -674,6 +675,126 @@ async def initiatives(request: Request) -> HTMLResponse:
         request,
         "initiatives.html",
         {"rows": rows, "counts": counts, "closed_count": closed_count},
+    )
+
+
+@router.get("/initiatives/suggestions", response_class=HTMLResponse)
+async def initiatives_suggestions(
+    request: Request,
+    target: int | None = None,
+) -> HTMLResponse:
+    """Render LLM-ranked suggestions as a page with per-card Accept buttons.
+    `target` query param overrides per-repo next-tier targeting."""
+    from src.maturity_tiers import tier_name
+    from src.suggest_initiatives import default_deadline_for_effort, generate_suggestions
+
+    output_dir = _output_dir(request)
+    truth_path = output_dir / "portfolio-truth-latest.json"
+
+    if not truth_path.exists():
+        return templates.TemplateResponse(
+            request,
+            "initiatives_suggestions.html",
+            {
+                "suggestions": [],
+                "cost_usd": 0.0,
+                "error": "portfolio-truth-latest.json not found. Run `audit run --portfolio-truth` first.",
+            },
+        )
+
+    try:
+        truth = json.loads(truth_path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        return templates.TemplateResponse(
+            request,
+            "initiatives_suggestions.html",
+            {"suggestions": [], "cost_usd": 0.0, "error": f"Failed to read portfolio-truth: {exc}"},
+        )
+
+    projects = truth.get("projects", [])
+
+    try:
+        suggestions, cost = generate_suggestions(projects, target_tier=target, budget_usd=0.10)
+    except Exception as exc:
+        return templates.TemplateResponse(
+            request,
+            "initiatives_suggestions.html",
+            {"suggestions": [], "cost_usd": 0.0, "error": f"Failed to generate suggestions: {exc}"},
+        )
+
+    rows = [
+        {
+            "repo_name": s.repo_name,
+            "current_tier": s.current_tier,
+            "current_tier_name": tier_name(s.current_tier),
+            "target_tier": s.target_tier,
+            "target_tier_name": tier_name(s.target_tier),
+            "missing_requirements": s.missing_requirements,
+            "rationale": s.rationale,
+            "estimated_effort": s.estimated_effort,
+            "default_deadline": default_deadline_for_effort(s.estimated_effort),
+        }
+        for s in suggestions
+    ]
+
+    return templates.TemplateResponse(
+        request,
+        "initiatives_suggestions.html",
+        {"suggestions": rows, "cost_usd": cost, "error": None},
+    )
+
+
+@router.post("/initiatives/accept", response_class=HTMLResponse)
+async def accept_initiative_route(
+    request: Request,
+    repo_name: str = Form(...),
+    target_tier: int = Form(...),
+    deadline: str = Form(...),
+) -> HTMLResponse:
+    """HTMX endpoint: convert suggestion into initiative. Returns updated card partial."""
+    import html as _html
+
+    from src.suggest_initiatives import accept_suggestion
+
+    output_dir = _output_dir(request)
+    truth_path = output_dir / "portfolio-truth-latest.json"
+
+    if not truth_path.exists():
+        return HTMLResponse(
+            '<div class="suggestion-card accept-error">Error: portfolio-truth-latest.json not found</div>',
+            status_code=400,
+        )
+
+    try:
+        truth = json.loads(truth_path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        return HTMLResponse(
+            f'<div class="suggestion-card accept-error">Error: failed to read portfolio-truth: {_html.escape(str(exc))}</div>',
+            status_code=400,
+        )
+
+    projects = truth.get("projects", [])
+
+    try:
+        initiative = accept_suggestion(
+            repo_name=repo_name,
+            projects=projects,
+            output_dir=output_dir,
+            deadline=deadline,
+            target_tier=target_tier,
+        )
+    except ValueError as exc:
+        return HTMLResponse(
+            f'<div class="suggestion-card accept-error">Error: {_html.escape(str(exc))}</div>',
+            status_code=400,
+        )
+
+    return HTMLResponse(
+        f'<div class="suggestion-card accepted" data-repo="{_html.escape(initiative.repo_name)}">'
+        f"<strong>✓ Accepted:</strong> {_html.escape(initiative.repo_name)} → "
+        f"Tier {initiative.target_tier} by {_html.escape(initiative.deadline)}. "
+        f'<a href="/initiatives">View initiatives →</a>'
+        f"</div>"
     )
 
 
@@ -733,6 +854,7 @@ async def initiative_gap(request: Request, repo_name: str, target: int = 0) -> H
             "target_tier": target,
             "target_tier_name": tier_name(target),
             "missing_requirements": gap.missing_requirements,
+            "requirement_sources": gap.requirement_sources,
         },
     )
 
