@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Initiatives — Audit Serve{% endblock %}
+{% block content %}
+<style>
+  .badge-ontrack  { background: #d1e7dd; color: #0a3622; }
+  .badge-atrisk   { background: #fff3cd; color: #664d03; }
+  .badge-overdue  { background: #f8d7da; color: #58151c; }
+  .badge-met      { background: #cfe2ff; color: #084298; }
+  .progress-track {
+    background: #e9ecef;
+    border-radius: 4px;
+    height: 10px;
+    width: 120px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent, #0d6efd);
+    border-radius: 4px;
+  }
+  .gap-list { margin: 0.4rem 0 0 0; padding-left: 1.2rem; font-size: 0.85rem; color: var(--muted, #6c757d); }
+</style>
+
+<div class="page-header">
+  <h1>Initiatives</h1>
+  <p class="meta">
+    {{ counts.on_track }} on-track
+    &middot; {{ counts.at_risk }} at-risk
+    &middot; {{ counts.overdue }} overdue
+    &middot; {{ counts.met }} met
+    &middot; {{ closed_count }} closed
+  </p>
+</div>
+
+{% if not rows %}
+<p class="empty">No open initiatives. Set one with:<br>
+  <code>python3 -m src.cli --set-initiative &lt;repo&gt; --target-tier 3 --deadline 2026-12-31</code>
+</p>
+{% else %}
+<table>
+  <thead>
+    <tr>
+      <th>Repo</th>
+      <th>Current Tier</th>
+      <th>Target Tier</th>
+      <th>Progress</th>
+      <th>Deadline</th>
+      <th>Status</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    <tr>
+      <td><strong>{{ row.repo_name }}</strong></td>
+      <td><span class="badge badge-tier">{{ row.current_tier_name }}</span></td>
+      <td><span class="badge badge-tier">{{ row.target_tier_name }}</span></td>
+      <td>
+        <div class="progress-track" title="{{ row.progress_pct }}%">
+          <div class="progress-fill" style="width: {{ row.progress_pct }}%;"></div>
+        </div>
+      </td>
+      <td>{{ row.deadline or "—" }}</td>
+      <td>
+        {% set status_class = {
+          "on-track": "badge-ontrack",
+          "at-risk":  "badge-atrisk",
+          "overdue":  "badge-overdue",
+          "met":      "badge-met"
+        }.get(row.status, "") %}
+        <span class="badge {{ status_class }}">{{ row.status }}</span>
+      </td>
+      <td class="action-cell">
+        <button class="btn btn-sm btn-secondary"
+          hx-get="/initiatives/{{ row.repo_name }}/gap?target={{ row.target_tier }}"
+          hx-target="#gap-{{ loop.index }}"
+          hx-swap="innerHTML">View gap</button>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="7">
+        <div id="gap-{{ loop.index }}"></div>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

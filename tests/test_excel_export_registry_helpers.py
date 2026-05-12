@@ -38,6 +38,7 @@ def _runtime_kwargs() -> dict:
         "build_supply_chain": _noop,
         "build_security_debt": _noop,
         "build_campaigns": _noop,
+        "build_initiative_tracker": _noop,
         "build_writeback_audit": _noop,
         "build_governance_controls": _noop,
         "build_governance_audit": _noop,

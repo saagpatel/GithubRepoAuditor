@@ -460,6 +460,128 @@ def _record_intent(request: Request, approval_id: str, action: str) -> None:
         fh.write(json.dumps(entry) + "\n")
 
 
+@router.get("/initiatives", response_class=HTMLResponse)
+async def initiatives(request: Request) -> HTMLResponse:
+    """Render the open initiative tracker page."""
+    output_dir = _output_dir(request)
+
+    from src.initiatives import derive_status, initiatives_path, load_initiatives
+    from src.maturity_tiers import compute_tier, tier_gap, tier_name
+
+    inits = load_initiatives(initiatives_path(output_dir))
+
+    # Load portfolio-truth, keyed by identity.display_name
+    projects_by_name: dict[str, dict[str, Any]] = {}
+    truth_path = output_dir / "portfolio-truth-latest.json"
+    if truth_path.exists():
+        try:
+            truth = json.loads(truth_path.read_text())
+            for p in truth.get("projects", []):
+                name = (p.get("identity") or {}).get("display_name") or ""
+                if name:
+                    projects_by_name[name] = p
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    open_initiatives = [i for i in inits if i.closed_at is None]
+    closed_count = sum(1 for i in inits if i.closed_at is not None)
+
+    rows: list[dict[str, Any]] = []
+    for init in open_initiatives:
+        repo = projects_by_name.get(init.repo_name, {})
+        current = compute_tier(repo) if repo else 0
+        gap = tier_gap(repo, init.target_tier) if repo else None
+        status = derive_status(init, repo)
+        rows.append(
+            {
+                "repo_name": init.repo_name,
+                "current_tier": current,
+                "current_tier_name": tier_name(current),
+                "target_tier": init.target_tier,
+                "target_tier_name": tier_name(init.target_tier),
+                "deadline": init.deadline,
+                "set_at": init.set_at,
+                "set_by": init.set_by,
+                "status": status,
+                "missing_requirements": gap.missing_requirements if gap else [],
+                "progress_pct": int(100 * current / init.target_tier) if init.target_tier else 0,
+            }
+        )
+
+    counts = {
+        "on_track": sum(1 for r in rows if r["status"] == "on-track"),
+        "at_risk": sum(1 for r in rows if r["status"] == "at-risk"),
+        "overdue": sum(1 for r in rows if r["status"] == "overdue"),
+        "met": sum(1 for r in rows if r["status"] == "met"),
+    }
+
+    return templates.TemplateResponse(
+        request,
+        "initiatives.html",
+        {"rows": rows, "counts": counts, "closed_count": closed_count},
+    )
+
+
+@router.get("/initiatives/{repo_name}/gap", response_class=HTMLResponse)
+async def initiative_gap(request: Request, repo_name: str, target: int = 0) -> HTMLResponse:
+    """Return an HTMX partial listing missing requirements for *repo_name* to reach *target* tier."""
+    output_dir = _output_dir(request)
+
+    from src.maturity_tiers import compute_tier, tier_gap, tier_name
+
+    # Resolve target: use query-string value if provided and valid (1-4), else 0
+    if target not in (1, 2, 3, 4):
+        # Fall back to looking up the open initiative for this repo
+        try:
+            from src.initiatives import initiatives_path, load_initiatives
+
+            inits = load_initiatives(initiatives_path(output_dir))
+            for init in inits:
+                if init.repo_name == repo_name and init.closed_at is None:
+                    target = init.target_tier
+                    break
+        except Exception:
+            pass
+
+    # Load portfolio-truth
+    projects_by_name: dict[str, dict[str, Any]] = {}
+    truth_path = output_dir / "portfolio-truth-latest.json"
+    if truth_path.exists():
+        try:
+            truth = json.loads(truth_path.read_text())
+            for p in truth.get("projects", []):
+                name = (p.get("identity") or {}).get("display_name") or ""
+                if name:
+                    projects_by_name[name] = p
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    repo = projects_by_name.get(repo_name)
+    if repo is None:
+        raise HTTPException(
+            status_code=404, detail=f"Repo '{repo_name}' not found in portfolio-truth"
+        )
+
+    if target not in (1, 2, 3, 4):
+        raise HTTPException(status_code=400, detail="target must be 1-4")
+
+    gap = tier_gap(repo, target)
+    current = compute_tier(repo)
+
+    return templates.TemplateResponse(
+        request,
+        "initiative_gap.html",
+        {
+            "repo_name": repo_name,
+            "current_tier": current,
+            "current_tier_name": tier_name(current),
+            "target_tier": target,
+            "target_tier_name": tier_name(target),
+            "missing_requirements": gap.missing_requirements,
+        },
+    )
+
+
 @router.get("/runs/new", response_class=HTMLResponse)
 async def new_run_form(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(

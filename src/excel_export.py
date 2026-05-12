@@ -226,6 +226,9 @@ from src.excel_hotspot_sheet_helpers import (
 from src.excel_hotspot_sheet_helpers import (
     write_hotspot_table as _write_hotspot_table,
 )
+from src.excel_initiative_tracker_helpers import (
+    build_initiative_tracker_sheet as _build_initiative_tracker_sheet,
+)
 from src.excel_ledger_sheet_helpers import (
     HISTORICAL_INTELLIGENCE_HEADERS,
 )
@@ -1265,6 +1268,20 @@ def _build_campaigns(wb: Workbook, data: dict) -> None:
     )
 
 
+def _build_initiative_tracker(wb: Workbook, data: dict) -> None:
+    _build_initiative_tracker_sheet(
+        wb,
+        data,
+        get_or_create_sheet=_get_or_create_sheet,
+        configure_sheet_view=_configure_sheet_view,
+        set_sheet_header=_set_sheet_header,
+        style_header_row=style_header_row,
+        auto_width=auto_width,
+        wrap_alignment=WRAP,
+        subtitle_font=SUBTITLE_FONT,
+    )
+
+
 def _build_writeback_audit(wb: Workbook, data: dict) -> None:
     _build_writeback_audit_sheet(
         wb,
@@ -1778,6 +1795,7 @@ def _build_excel_workbook(
             build_supply_chain=_build_supply_chain,
             build_security_debt=_build_security_debt,
             build_campaigns=_build_campaigns,
+            build_initiative_tracker=_build_initiative_tracker,
             build_writeback_audit=_build_writeback_audit,
             build_governance_controls=_build_governance_controls,
             build_governance_audit=_build_governance_audit,

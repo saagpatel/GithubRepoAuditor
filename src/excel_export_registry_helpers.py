@@ -41,6 +41,7 @@ def build_excel_workbook_runtime(
     build_supply_chain,
     build_security_debt,
     build_campaigns,
+    build_initiative_tracker,
     build_writeback_audit,
     build_governance_controls,
     build_governance_audit,
@@ -72,8 +73,12 @@ def build_excel_workbook_runtime(
 ) -> dict[str, Any]:
     build_steps_runner = run_workbook_build_steps or default_run_workbook_build_steps
     workbook_finalizer = finalize_workbook_structure or default_finalize_workbook_structure
-    visible_sheets = set(CORE_VISIBLE_SHEETS if core_visible_sheets is None else core_visible_sheets)
-    sheet_order = list(DEFAULT_PREFERRED_SHEET_ORDER if preferred_order is None else preferred_order)
+    visible_sheets = set(
+        CORE_VISIBLE_SHEETS if core_visible_sheets is None else core_visible_sheets
+    )
+    sheet_order = list(
+        DEFAULT_PREFERRED_SHEET_ORDER if preferred_order is None else preferred_order
+    )
 
     return {
         "run_workbook_build_steps": build_steps_runner,
@@ -100,6 +105,7 @@ def build_excel_workbook_runtime(
         "build_supply_chain": build_supply_chain,
         "build_security_debt": build_security_debt,
         "build_campaigns": build_campaigns,
+        "build_initiative_tracker": build_initiative_tracker,
         "build_writeback_audit": build_writeback_audit,
         "build_governance_controls": build_governance_controls,
         "build_governance_audit": build_governance_audit,

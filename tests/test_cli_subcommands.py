@@ -295,8 +295,8 @@ class TestHelpFlagCounts:
     def test_triage_help_flag_count(self):
         text = _help_text("triage")
         count = _count_flags_in_help(text)
-        assert count <= 15, (
-            f"audit triage --help shows {count} non-global flags (limit 15).\n"
+        assert count <= 20, (
+            f"audit triage --help shows {count} non-global flags (limit 20, raised in Arc G S7A for initiative tracker flags).\n"
             f"Flags found: {sorted(set(re.findall(r'  (--[a-z][a-z0-9-]*)', text)))}"
         )
 
