@@ -123,6 +123,129 @@ def save_suggestion_cache(
         raise
 
 
+# ── Dismissed suggestions persistence ────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class DismissedSuggestion:
+    """A repo that has been dismissed from LLM-suggested initiatives."""
+
+    repo_name: str
+    reason: str  # operator-provided text, default ""
+    dismissed_at: str  # ISO timestamp
+    dismissed_by: str  # operator_identity() from src.initiatives
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "repo_name": self.repo_name,
+            "reason": self.reason,
+            "dismissed_at": self.dismissed_at,
+            "dismissed_by": self.dismissed_by,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "DismissedSuggestion":
+        return cls(
+            repo_name=str(data.get("repo_name", "")),
+            reason=str(data.get("reason", "")),
+            dismissed_at=str(data.get("dismissed_at", "")),
+            dismissed_by=str(data.get("dismissed_by", "")),
+        )
+
+
+def dismissed_path(output_dir: Path) -> Path:
+    """Return output_dir / 'dismissed-suggestions.json'."""
+    return output_dir / "dismissed-suggestions.json"
+
+
+def load_dismissed(path: Path) -> list[DismissedSuggestion]:
+    """Read versioned JSON. Missing/malformed → empty list (log warning)."""
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning("suggest_initiatives: could not load dismissed file %s: %s", path, exc)
+        return []
+
+    if not isinstance(data, dict) or data.get("version") != 1:
+        logger.warning("suggest_initiatives: unrecognised dismissed schema in %s — ignoring", path)
+        return []
+
+    result: list[DismissedSuggestion] = []
+    for entry in data.get("items", []):
+        try:
+            result.append(DismissedSuggestion.from_dict(entry))
+        except (KeyError, TypeError, ValueError) as exc:
+            logger.warning("suggest_initiatives: skipping malformed dismissed entry: %s", exc)
+
+    return result
+
+
+def save_dismissed(path: Path, items: list[DismissedSuggestion]) -> None:
+    """Atomic tmp+rename write. Schema {"version": 1, "items": [...]}."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    serialisable = {
+        "version": 1,
+        "items": [d.to_dict() for d in items],
+    }
+
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=".dismissed_suggestions_tmp_",
+            suffix=".json",
+            delete=False,
+        ) as tmp:
+            tmp_path = Path(tmp.name)
+            json.dump(serialisable, tmp, indent=2)
+        tmp_path.replace(path)
+    except OSError as exc:
+        logger.error("suggest_initiatives: atomic dismissed write failed for %s: %s", path, exc)
+        raise
+
+
+def dismiss_suggestion_record(path: Path, repo_name: str, reason: str = "") -> DismissedSuggestion:
+    """Add or replace by repo_name (idempotent). Returns the recorded entry.
+
+    Validates repo_name is non-empty; raises ValueError if blank.
+    On re-dismissal: dismissed_at is updated to the current timestamp.
+    """
+    if not repo_name.strip():
+        raise ValueError("repo_name must not be blank")
+
+    from datetime import datetime, timezone
+
+    from src.initiatives import operator_identity
+
+    items = load_dismissed(path)
+    # Remove any existing entry for this repo_name
+    items = [d for d in items if d.repo_name != repo_name]
+
+    entry = DismissedSuggestion(
+        repo_name=repo_name,
+        reason=reason,
+        dismissed_at=datetime.now(timezone.utc).isoformat(),
+        dismissed_by=operator_identity(),
+    )
+    items.append(entry)
+    save_dismissed(path, items)
+    return entry
+
+
+def undo_dismiss(path: Path, repo_name: str) -> bool:
+    """Remove entry for repo_name. Return True if removed, False if not present."""
+    items = load_dismissed(path)
+    new_items = [d for d in items if d.repo_name != repo_name]
+    if len(new_items) == len(items):
+        return False
+    save_dismissed(path, new_items)
+    return True
+
+
 def clear_suggestion_cache(path: Path | None = None) -> None:
     """Drop all in-memory cached suggestions.
 
@@ -182,6 +305,7 @@ def narrow_candidates(
     projects: list[dict],
     target_tier: int | None = None,
     max_missing: int = 3,
+    dismissed: set[str] | None = None,
 ) -> list[tuple[dict, int, "TierGap"]]:  # noqa: F821
     """Return (repo, target_tier, gap) tuples for repos close to their next tier.
 
@@ -193,12 +317,23 @@ def narrow_candidates(
     - Skip if *target_tier* > 4.
     - Skip if repo already qualifies for the target (no missing requirements).
     - Skip if ``len(missing_requirements) > max_missing`` (too far away).
+    - If *dismissed* is provided, skip repos whose ``identity.display_name``
+      is in the set.  Pass ``None`` (default) to disable filtering.
     """
     from src.maturity_tiers import TierGap, compute_tier, tier_gap
 
     candidates: list[tuple[dict, int, TierGap]] = []
 
     for repo in projects:
+        name = (
+            repo.get("identity", {}).get("display_name")
+            or repo.get("metadata", {}).get("name")
+            or repo.get("repo_name")
+            or ""
+        )
+        if dismissed is not None and name in dismissed:
+            continue
+
         current = compute_tier(repo)
         # Skip no-git repos and repos already at max tier
         if current == 0 or current >= 4:
@@ -570,6 +705,12 @@ def generate_suggestions(
             _suggestion_cache[k] = v
         _loaded_from_disk.add(output_dir)
 
+    # ── Load dismissed set when output_dir is provided ───────────────────────
+    _dismissed_set: set[str] | None = None
+    if output_dir is not None:
+        dismissed_items = load_dismissed(dismissed_path(output_dir))
+        _dismissed_set = {d.repo_name for d in dismissed_items} if dismissed_items else None
+
     # ── Cache lookup ──────────────────────────────────────────────────────────
     if cache_key is not None and cache_key in _suggestion_cache:
         _suggestion_cache.move_to_end(cache_key)  # mark as recently used
@@ -577,7 +718,9 @@ def generate_suggestions(
 
     # ── Deterministic fast-path (no LLM, no CostTracker) ─────────────────────
     if force_deterministic:
-        candidates = narrow_candidates(projects, target_tier=target_tier, max_missing=max_missing)
+        candidates = narrow_candidates(
+            projects, target_tier=target_tier, max_missing=max_missing, dismissed=_dismissed_set
+        )
         if not candidates:
             return [], 0.0
         suggestions = _deterministic_rank(candidates)
@@ -591,7 +734,9 @@ def generate_suggestions(
                 save_suggestion_cache(suggestion_cache_path(output_dir), _suggestion_cache)
         return suggestions, 0.0
 
-    candidates = narrow_candidates(projects, target_tier=target_tier, max_missing=max_missing)
+    candidates = narrow_candidates(
+        projects, target_tier=target_tier, max_missing=max_missing, dismissed=_dismissed_set
+    )
     if not candidates:
         return [], 0.0
 

@@ -805,6 +805,37 @@ async def accept_initiative_route(
     )
 
 
+@router.post("/initiatives/suggestions/dismiss", response_class=HTMLResponse)
+async def dismiss_suggestion_route(
+    request: Request,
+    repo_name: str = Form(...),
+    reason: str = Form(""),
+) -> HTMLResponse:
+    """Dismiss a suggestion. Returns HTMX partial (Arc G S11.4)."""
+    import html as _html
+
+    from src.suggest_initiatives import dismiss_suggestion_record, dismissed_path
+
+    output_dir = _output_dir(request)
+    try:
+        entry = dismiss_suggestion_record(
+            dismissed_path(output_dir), repo_name=repo_name, reason=reason
+        )
+    except ValueError as exc:
+        return HTMLResponse(
+            f'<div class="suggestion-card accept-error">Error: {_html.escape(str(exc))}</div>',
+            status_code=400,
+        )
+
+    return HTMLResponse(
+        f'<div class="suggestion-card dismissed" data-repo="{_html.escape(entry.repo_name)}">'
+        f"<strong>✗ Dismissed:</strong> {_html.escape(entry.repo_name)}"
+        + (f" — {_html.escape(entry.reason)}" if entry.reason else "")
+        + ' <a href="/initiatives/suggestions">Refresh suggestions →</a>'
+        + "</div>"
+    )
+
+
 @router.get("/initiatives/{repo_name}/gap", response_class=HTMLResponse)
 async def initiative_gap(request: Request, repo_name: str, target: int = 0) -> HTMLResponse:
     """Return an HTMX partial listing missing requirements for *repo_name* to reach *target* tier."""
