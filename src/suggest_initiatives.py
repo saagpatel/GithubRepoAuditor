@@ -28,11 +28,18 @@ logger = logging.getLogger(__name__)
 # Maximum number of entries retained in _suggestion_cache (in-memory and on-disk).
 _CACHE_MAX_SIZE = 100
 
+# Cache entries older than this many days are evicted on load (TTL enforcement).
+_CACHE_TTL_DAYS = 30
+
+# Event log cap for dismissed-suggestions audit trail; oldest trimmed first.
+_MAX_DISMISSAL_EVENTS = 1000
+
 # In-process cache for generate_suggestions results, keyed by caller-supplied cache_key.
 # Caller is responsible for picking a key that captures all relevant inputs
 # (e.g. portfolio-truth generated_at + target_tier).
 # OrderedDict for LRU-style eviction (insertion-order, FIFO eviction on overflow).
-_suggestion_cache: OrderedDict[str, tuple[list["InitiativeSuggestion"], float]] = OrderedDict()
+# Tuple: (suggestions, cost_usd, iso_timestamp)
+_suggestion_cache: OrderedDict[str, tuple[list["InitiativeSuggestion"], float, str]] = OrderedDict()
 
 # Track which output_dir paths have already been loaded from disk (lazy-load guard).
 _loaded_from_disk: set[Path] = set()
@@ -48,12 +55,19 @@ def suggestion_cache_path(output_dir: Path) -> Path:
 
 def load_suggestion_cache(
     path: Path,
-) -> OrderedDict[str, tuple[list["InitiativeSuggestion"], float]]:
+) -> OrderedDict[str, tuple[list["InitiativeSuggestion"], float, str]]:
     """Read the versioned JSON cache file.
 
     Missing file or malformed JSON → returns an empty OrderedDict and logs a
     warning for the malformed-JSON case.  Hydrates :class:`InitiativeSuggestion`
     instances from stored dicts.
+
+    Schema versions:
+    - v1: no ``timestamp`` field — entries are **dropped** on load (one-time cold-cache
+      blip); the file will be rewritten as v2 on the next save.
+    - v2: entries carry ``timestamp`` (ISO-8601).  Entries older than
+      :data:`_CACHE_TTL_DAYS` are evicted; the file is rewritten atomically only
+      if at least one entry was dropped.
     """
     if not path.exists():
         return OrderedDict()
@@ -63,46 +77,79 @@ def load_suggestion_cache(
         logger.warning("suggest_initiatives: could not load cache %s: %s", path, exc)
         return OrderedDict()
 
-    if not isinstance(data, dict) or data.get("version") != 1:
+    if not isinstance(data, dict):
         logger.warning("suggest_initiatives: unrecognised cache schema in %s — ignoring", path)
         return OrderedDict()
 
-    result: OrderedDict[str, tuple[list[InitiativeSuggestion], float]] = OrderedDict()
+    version = data.get("version")
+
+    # ── v1 legacy: no timestamps, cannot TTL-evict — drop all entries ─────────
+    if version == 1:
+        logger.info(
+            "suggest_initiatives: cache %s is v1 (no timestamps) — dropping all entries; "
+            "will be rewritten as v2 on next save",
+            path,
+        )
+        return OrderedDict()
+
+    if version != 2:
+        logger.warning("suggest_initiatives: unrecognised cache schema in %s — ignoring", path)
+        return OrderedDict()
+
+    # ── v2: parse + TTL eviction ──────────────────────────────────────────────
+    cutoff = date.today() - timedelta(days=_CACHE_TTL_DAYS)
+    result: OrderedDict[str, tuple[list[InitiativeSuggestion], float, str]] = OrderedDict()
+    dropped = 0
+
     for entry in data.get("entries", []):
         try:
             key = str(entry["key"])
             cost = float(entry["cost"])
+            ts = str(entry["timestamp"])
             suggestions = [InitiativeSuggestion.from_dict(s) for s in entry["suggestions"]]
-            result[key] = (suggestions, cost)
+            entry_date = date.fromisoformat(ts[:10])
+            if entry_date < cutoff:
+                dropped += 1
+                continue
+            result[key] = (suggestions, cost, ts)
         except (KeyError, TypeError, ValueError) as exc:
             logger.warning("suggest_initiatives: skipping malformed cache entry: %s", exc)
+
+    if dropped:
+        logger.info(
+            "suggest_initiatives: evicted %d stale cache entr%s (TTL=%d days) from %s",
+            dropped,
+            "y" if dropped == 1 else "ies",
+            _CACHE_TTL_DAYS,
+            path,
+        )
+        # Rewrite atomically with only the surviving entries
+        _write_cache_v2(path, result)
 
     return result
 
 
-def save_suggestion_cache(
+def _write_cache_v2(
     path: Path,
-    cache: OrderedDict[str, tuple[list["InitiativeSuggestion"], float]],
+    cache: OrderedDict[str, tuple[list["InitiativeSuggestion"], float, str]],
 ) -> None:
-    """Persist *cache* to *path* atomically using a tmp+rename pattern.
+    """Internal: write *cache* to *path* atomically as schema v2.
 
-    Only the most recent :data:`_CACHE_MAX_SIZE` entries (by insertion order) are
-    written.  Schema: ``{"version": 1, "entries": [...]}``.
+    Does NOT cap to ``_CACHE_MAX_SIZE``; callers are responsible for trimming
+    before calling.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Cap to most recent _CACHE_MAX_SIZE entries
-    entries_to_write = list(cache.items())[-_CACHE_MAX_SIZE:]
-
     serialisable = {
-        "version": 1,
+        "version": 2,
         "entries": [
             {
                 "key": key,
                 "cost": cost,
                 "suggestions": [s.to_dict() for s in suggestions],
+                "timestamp": ts,
             }
-            for key, (suggestions, cost) in entries_to_write
+            for key, (suggestions, cost, ts) in cache.items()
         ],
     }
 
@@ -121,6 +168,24 @@ def save_suggestion_cache(
     except OSError as exc:
         logger.error("suggest_initiatives: atomic cache write failed for %s: %s", path, exc)
         raise
+
+
+def save_suggestion_cache(
+    path: Path,
+    cache: OrderedDict[str, tuple[list["InitiativeSuggestion"], float, str]],
+) -> None:
+    """Persist *cache* to *path* atomically using a tmp+rename pattern.
+
+    Only the most recent :data:`_CACHE_MAX_SIZE` entries (by insertion order) are
+    written.  Schema: ``{"version": 2, "entries": [...]}``.  Each entry carries a
+    ``timestamp`` (ISO-8601) set at insertion time; stale entries are evicted on
+    next :func:`load_suggestion_cache` call.
+    """
+    # Cap to most recent _CACHE_MAX_SIZE entries before writing
+    trimmed: OrderedDict[str, tuple[list[InitiativeSuggestion], float, str]] = OrderedDict(
+        list(cache.items())[-_CACHE_MAX_SIZE:]
+    )
+    _write_cache_v2(path, trimmed)
 
 
 # ── Dismissed suggestions persistence ────────────────────────────────────────
@@ -256,8 +321,32 @@ def _save_dismissed_full(
     items: list[DismissedSuggestion],
     events: list[DismissalEvent],
 ) -> None:
-    """Internal: write items + events atomically. Always writes v2 schema."""
+    """Internal: write items + events atomically. Always writes v2 schema.
+
+    Enforces :data:`_MAX_DISMISSAL_EVENTS` cap: if the event list exceeds the
+    cap, the oldest events (by ``occurred_at``) are dropped and a
+    ``log_trimmed`` sentinel event is appended so the trim is itself auditable.
+    The sentinel counts toward the cap going forward.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
+
+    # ── Event log cap ─────────────────────────────────────────────────────────
+    if len(events) > _MAX_DISMISSAL_EVENTS:
+        # Sort ascending by occurred_at so we can drop from the front.
+        events_sorted = sorted(events, key=lambda e: e.occurred_at)
+        # Reserve one slot for the trim sentinel so the on-disk count stays at
+        # exactly _MAX_DISMISSAL_EVENTS (sentinel inclusive).
+        keep_count = _MAX_DISMISSAL_EVENTS - 1
+        dropped_count = len(events_sorted) - keep_count
+        events = events_sorted[-keep_count:]
+        trim_event = DismissalEvent(
+            repo_name="-",
+            event_type="log_trimmed",
+            occurred_at=datetime.now(timezone.utc).isoformat(),
+            actor="system",
+            reason=f"trimmed {dropped_count} oldest events",
+        )
+        events.append(trim_event)
 
     serialisable = {
         "version": 2,
@@ -878,7 +967,8 @@ def generate_suggestions(
     # ── Cache lookup ──────────────────────────────────────────────────────────
     if cache_key is not None and cache_key in _suggestion_cache:
         _suggestion_cache.move_to_end(cache_key)  # mark as recently used
-        return _suggestion_cache[cache_key]
+        suggestions_cached, cost_cached, _ts = _suggestion_cache[cache_key]
+        return suggestions_cached, cost_cached
 
     # ── Deterministic fast-path (no LLM, no CostTracker) ─────────────────────
     if force_deterministic:
@@ -889,7 +979,11 @@ def generate_suggestions(
             return [], 0.0
         suggestions = _deterministic_rank(candidates)
         if cache_key is not None:
-            _suggestion_cache[cache_key] = (suggestions, 0.0)
+            _suggestion_cache[cache_key] = (
+                suggestions,
+                0.0,
+                datetime.now(timezone.utc).isoformat(),
+            )
             _suggestion_cache.move_to_end(cache_key)
             # Bounded eviction
             while len(_suggestion_cache) > _CACHE_MAX_SIZE:
@@ -914,7 +1008,11 @@ def generate_suggestions(
         )
         suggestions = _deterministic_rank(candidates)
         if cache_key is not None:
-            _suggestion_cache[cache_key] = (suggestions, 0.0)
+            _suggestion_cache[cache_key] = (
+                suggestions,
+                0.0,
+                datetime.now(timezone.utc).isoformat(),
+            )
             _suggestion_cache.move_to_end(cache_key)
             while len(_suggestion_cache) > _CACHE_MAX_SIZE:
                 _suggestion_cache.popitem(last=False)
@@ -950,7 +1048,11 @@ def generate_suggestions(
     actual_cost = cost_tracker._total_usd
     suggestions = parse_suggest_response(raw, candidates)
     if cache_key is not None:
-        _suggestion_cache[cache_key] = (suggestions, actual_cost)
+        _suggestion_cache[cache_key] = (
+            suggestions,
+            actual_cost,
+            datetime.now(timezone.utc).isoformat(),
+        )
         _suggestion_cache.move_to_end(cache_key)
         # Bounded eviction — FIFO: oldest entry evicted first
         while len(_suggestion_cache) > _CACHE_MAX_SIZE:

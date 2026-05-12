@@ -947,3 +947,53 @@ class TestRenderVoiceDismissedLine:
         briefing = Briefing(username="alice", date="2026-05-12", dismissed_repos=[])
         voice = render_voice(briefing)
         assert "dismissed" not in voice
+
+
+class TestDismissedCrossLink:
+    """render_markdown cross-link footer in the Currently Dismissed section (Arc G S13.3)."""
+
+    def _dismissed_briefing(self) -> "Briefing":
+        from src.briefing import DismissedRepoRow
+
+        return Briefing(
+            username="alice",
+            date="2026-05-12",
+            dismissed_repos=[DismissedRepoRow(repo_name="SleptRepo", reason="on hold")],
+        )
+
+    def test_cross_link_paths_present_when_dismissed_non_empty(self):
+        """Both path tokens appear in the rendered markdown."""
+        md = render_markdown(self._dismissed_briefing())
+        dismissed_section = md[md.index("## Currently Dismissed") :]
+        assert "/initiatives/dismissed" in dismissed_section
+        assert "/initiatives/dismissal-history" in dismissed_section
+
+    def test_cross_link_absent_when_dismissed_empty(self):
+        """Neither path appears when dismissed_repos is empty."""
+        briefing = Briefing(username="alice", date="2026-05-12", dismissed_repos=[])
+        md = render_markdown(briefing)
+        assert "/initiatives/dismissed" not in md
+        assert "/initiatives/dismissal-history" not in md
+
+    def test_cross_link_uses_paths_not_absolute_urls(self):
+        """Cross-link must not contain http:// (reverse-proxy compatibility)."""
+        md = render_markdown(self._dismissed_briefing())
+        # Find the cross-link line specifically
+        for line in md.splitlines():
+            if "/initiatives/dismissed" in line:
+                assert "http://" not in line
+                break
+        else:
+            pytest.fail("Cross-link line not found in rendered markdown")
+
+    def test_cross_link_uses_backtick_formatting(self):
+        """Paths are wrapped in backticks for monospace rendering."""
+        md = render_markdown(self._dismissed_briefing())
+        assert "`/initiatives/dismissed`" in md
+        assert "`/initiatives/dismissal-history`" in md
+
+    def test_render_voice_no_cross_link_leak(self):
+        """render_voice must not include any cross-link path."""
+        voice = render_voice(self._dismissed_briefing())
+        assert "/initiatives/dismissed" not in voice
+        assert "/initiatives/dismissal-history" not in voice

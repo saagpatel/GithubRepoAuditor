@@ -1,4 +1,5 @@
-"""Tests for GET /initiatives/dismissed + POST /initiatives/dismissed/undo (Arc G S12.2)."""
+"""Tests for GET /initiatives/dismissed + POST /initiatives/dismissed/undo (Arc G S12.2)
+and GET /initiatives/dismissal-history (Arc G S13.1)."""
 
 from __future__ import annotations
 
@@ -38,6 +39,16 @@ def _write_dismissed(output_dir: Path, entries: list[dict]) -> None:
     """Write a dismissed-suggestions.json fixture in the versioned schema."""
     path = output_dir / "dismissed-suggestions.json"
     path.write_text(json.dumps({"version": 1, "items": entries}))
+
+
+def _write_dismissed_with_events(
+    output_dir: Path,
+    items: list[dict],
+    events: list[dict],
+) -> None:
+    """Write a v2 dismissed-suggestions.json with both items and events arrays."""
+    path = output_dir / "dismissed-suggestions.json"
+    path.write_text(json.dumps({"version": 2, "items": items, "events": events}))
 
 
 # ── GET /initiatives/dismissed ────────────────────────────────────────────────
@@ -208,3 +219,158 @@ class TestRouteOrdering:
         # not a full HTML page with nav. The dismissed page extends base.html.
         assert "Dismissed Suggestions" in resp.text
         assert "nav-links" in resp.text  # full page, not a partial fragment
+
+
+# ── GET /initiatives/dismissal-history (Arc G S13.1) ─────────────────────────
+
+
+class TestDismissalHistoryGet:
+    def test_no_events_returns_200_empty_state(self, client: TestClient) -> None:
+        """GET with no dismissed file → 200 + empty-state message."""
+        resp = client.get("/initiatives/dismissal-history")
+        assert resp.status_code == 200
+        assert "text/html" in resp.headers["content-type"]
+        assert "No dismissal events recorded" in resp.text
+
+    def test_multiple_events_sorted_newest_first(
+        self, output_dir: Path, client: TestClient
+    ) -> None:
+        """GET with events → 200, sorted newest-first (most recent occurred_at at top)."""
+        _write_dismissed_with_events(
+            output_dir,
+            items=[],
+            events=[
+                {
+                    "repo_name": "old-repo",
+                    "event_type": "dismissed",
+                    "occurred_at": "2026-04-01T10:00:00+00:00",
+                    "actor": "operator",
+                    "reason": "deprioritized",
+                },
+                {
+                    "repo_name": "new-repo",
+                    "event_type": "undone",
+                    "occurred_at": "2026-05-10T12:00:00+00:00",
+                    "actor": "operator",
+                    "reason": "",
+                },
+                {
+                    "repo_name": "mid-repo",
+                    "event_type": "expired",
+                    "occurred_at": "2026-04-20T08:00:00+00:00",
+                    "actor": "system",
+                    "reason": "auto-expire",
+                },
+            ],
+        )
+        resp = client.get("/initiatives/dismissal-history")
+        assert resp.status_code == 200
+        # All three repos appear.
+        assert "old-repo" in resp.text
+        assert "new-repo" in resp.text
+        assert "mid-repo" in resp.text
+        # Newest first: new-repo (2026-05-10) should appear before mid-repo and old-repo.
+        pos_new = resp.text.index("new-repo")
+        pos_mid = resp.text.index("mid-repo")
+        pos_old = resp.text.index("old-repo")
+        assert pos_new < pos_mid < pos_old
+
+    def test_route_not_captured_by_parametric_gap(
+        self, output_dir: Path, client: TestClient
+    ) -> None:
+        """Fixed path /initiatives/dismissal-history resolves to the history page,
+        not the parametric /initiatives/{repo_name}/gap partial."""
+        # Write an item named "dismissal-history" so it would exist if the parametric
+        # route fired.
+        _write_dismissed_with_events(
+            output_dir,
+            items=[
+                {
+                    "repo_name": "dismissal-history",
+                    "reason": "trick entry",
+                    "dismissed_at": "2026-05-01T00:00:00",
+                    "dismissed_by": "operator",
+                }
+            ],
+            events=[],
+        )
+        resp = client.get("/initiatives/dismissal-history")
+        assert resp.status_code == 200
+        # The history page extends base.html and has "Dismissal History" in the page.
+        assert "Dismissal History" in resp.text
+        # nav-links confirms this is a full page, not an HTMX gap partial.
+        assert "nav-links" in resp.text
+
+    def test_xss_reason_is_escaped(self, output_dir: Path, client: TestClient) -> None:
+        """User-controlled reason text is HTML-escaped — no raw script tags rendered."""
+        _write_dismissed_with_events(
+            output_dir,
+            items=[],
+            events=[
+                {
+                    "repo_name": "xss-repo",
+                    "event_type": "dismissed",
+                    "occurred_at": "2026-05-01T10:00:00+00:00",
+                    "actor": "operator",
+                    "reason": "<script>alert(1)</script>",
+                }
+            ],
+        )
+        resp = client.get("/initiatives/dismissal-history")
+        assert resp.status_code == 200
+        assert "<script>" not in resp.text
+        assert "&lt;script&gt;" in resp.text
+
+    def test_empty_state_copy_when_no_events(self, client: TestClient) -> None:
+        """Empty state renders the 'No dismissal events recorded.' message."""
+        resp = client.get("/initiatives/dismissal-history")
+        assert "No dismissal events recorded" in resp.text
+        # Table should NOT be present.
+        assert "<table>" not in resp.text
+
+    def test_all_event_types_render(self, output_dir: Path, client: TestClient) -> None:
+        """dismissed, undone, and expired event types all appear in the table."""
+        _write_dismissed_with_events(
+            output_dir,
+            items=[],
+            events=[
+                {
+                    "repo_name": "r1",
+                    "event_type": "dismissed",
+                    "occurred_at": "2026-05-01T10:00:00+00:00",
+                    "actor": "operator",
+                    "reason": "",
+                },
+                {
+                    "repo_name": "r2",
+                    "event_type": "undone",
+                    "occurred_at": "2026-05-02T10:00:00+00:00",
+                    "actor": "operator",
+                    "reason": "",
+                },
+                {
+                    "repo_name": "r3",
+                    "event_type": "expired",
+                    "occurred_at": "2026-05-03T10:00:00+00:00",
+                    "actor": "system",
+                    "reason": "auto-expire",
+                },
+            ],
+        )
+        resp = client.get("/initiatives/dismissal-history")
+        assert resp.status_code == 200
+        assert "dismissed" in resp.text
+        assert "undone" in resp.text
+        assert "expired" in resp.text
+
+    def test_back_link_to_dismissed_is_present(self, client: TestClient) -> None:
+        """Footer contains a back-link to /initiatives/dismissed."""
+        resp = client.get("/initiatives/dismissal-history")
+        assert resp.status_code == 200
+        assert "/initiatives/dismissed" in resp.text
+
+    def test_dismissed_page_has_link_to_history(self, client: TestClient) -> None:
+        """The /initiatives/dismissed page includes a forward-link to dismissal-history."""
+        resp = client.get("/initiatives/dismissed")
+        assert resp.status_code == 200
+        assert "/initiatives/dismissal-history" in resp.text

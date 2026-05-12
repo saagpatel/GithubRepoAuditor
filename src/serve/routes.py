@@ -893,6 +893,35 @@ async def undo_dismiss_route(
     )
 
 
+@router.get("/initiatives/dismissal-history", response_class=HTMLResponse)
+async def initiatives_dismissal_history(request: Request) -> HTMLResponse:
+    """Show chronological audit trail of dismiss/undo/expire events (Arc G S13.1)."""
+    from src.suggest_initiatives import dismissed_path, load_dismissal_events
+
+    output_dir = _output_dir(request)
+    events = load_dismissal_events(dismissed_path(output_dir))
+    # Newest first.
+    rows = sorted(
+        [
+            {
+                "repo_name": e.repo_name,
+                "event_type": e.event_type,
+                "occurred_at": e.occurred_at,
+                "actor": e.actor,
+                "reason": e.reason,
+            }
+            for e in events
+        ],
+        key=lambda r: r["occurred_at"],
+        reverse=True,
+    )
+    return templates.TemplateResponse(
+        request,
+        "initiatives_dismissal_history.html",
+        {"rows": rows, "count": len(rows)},
+    )
+
+
 @router.get("/initiatives/{repo_name}/gap", response_class=HTMLResponse)
 async def initiative_gap(request: Request, repo_name: str, target: int = 0) -> HTMLResponse:
     """Return an HTMX partial listing missing requirements for *repo_name* to reach *target* tier."""
