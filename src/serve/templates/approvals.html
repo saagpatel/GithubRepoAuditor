@@ -6,6 +6,9 @@
   <p class="meta">{{ records|length }} record(s) loaded</p>
 </div>
 
+{# Collect draft-readme-section packet_ids already shown so we group sub-records #}
+{% set seen_section_packets = namespace(ids=[]) %}
+
 {% if records %}
 <table>
   <thead>
@@ -19,6 +22,24 @@
   </thead>
   <tbody>
     {% for r in records %}
+    {# Group draft-readme-section sub-records: show one row per packet_id #}
+    {% if r.approval_subject_type == "draft-readme-section" %}
+      {% set pid = r.packet_id %}
+      {% if pid not in seen_section_packets.ids %}
+        {% set seen_section_packets.ids = seen_section_packets.ids + [pid] %}
+    <tr>
+      <td><code>{{ pid[:16] if pid else "—" }}</code></td>
+      <td>draft-readme-section</td>
+      <td>{{ r.repo_name or r.subject_key or "—" }}</td>
+      <td><span class="badge badge-pending">Sections</span></td>
+      <td class="action-cell">
+        <a class="btn btn-sm btn-secondary" href="/approvals/{{ pid }}/draft-sections">
+          Review sections
+        </a>
+      </td>
+    </tr>
+      {% endif %}
+    {% else %}
     <tr>
       <td><code>{{ r.approval_id[:12] if r.approval_id else "—" }}</code></td>
       <td>{{ r.approval_subject_type or "—" }}</td>
@@ -72,6 +93,7 @@
         <div id="plan-{{ loop.index }}" class="campaign-plan-container"></div>
       </td>
     </tr>
+    {% endif %}
     {% endif %}
     {% endfor %}
   </tbody>

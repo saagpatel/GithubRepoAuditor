@@ -35,6 +35,7 @@ def publish_portfolio_truth(
     catalog_path: Path | None = None,
     legacy_registry_path: Path | None = None,
     include_notion: bool = True,
+    release_count_by_name: dict[str, int] | None = None,
 ) -> PortfolioTruthPublishResult:
     validate_publish_targets(
         workspace_root=workspace_root,
@@ -47,6 +48,7 @@ def publish_portfolio_truth(
         catalog_path=catalog_path,
         legacy_registry_path=legacy_registry_path,
         include_notion=include_notion,
+        release_count_by_name=release_count_by_name,
     )
     validate_truth_snapshot(build_result.snapshot)
 
@@ -58,7 +60,9 @@ def publish_portfolio_truth(
     registry_markdown = render_registry_markdown(build_result.snapshot)
     report_markdown = render_portfolio_report_markdown(build_result.snapshot, latest_name)
 
-    with tempfile.NamedTemporaryFile("w", delete=False, dir=output_dir, suffix=".registry-check.md") as handle:
+    with tempfile.NamedTemporaryFile(
+        "w", delete=False, dir=output_dir, suffix=".registry-check.md"
+    ) as handle:
         temp_registry_path = Path(handle.name)
     try:
         validate_registry_markdown(registry_markdown, build_result.snapshot, temp_registry_path)
@@ -117,7 +121,9 @@ def publish_portfolio_truth(
 
 def _stage_text(target: Path, content: str) -> Path:
     target.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile("w", delete=False, dir=target.parent, suffix=f".{target.name}.tmp") as handle:
+    with tempfile.NamedTemporaryFile(
+        "w", delete=False, dir=target.parent, suffix=f".{target.name}.tmp"
+    ) as handle:
         handle.write(content)
         return Path(handle.name)
 

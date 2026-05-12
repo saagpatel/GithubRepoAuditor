@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -550,3 +551,267 @@ def record_draft_apply_failure(
         "error": error,
     }
     save_approval_followup_event(output_dir, event)
+
+
+# ── Per-section approval (Arc G Sprint 8.5) ──────────────────────────────────
+
+
+def split_readme_sections(text: str) -> list[tuple[str, str]]:
+    """Split *text* at top-level ``## `` headings into (heading, body) tuples.
+
+    Rules:
+    - Content before the first ``## `` heading is paired with heading ``"(intro)"``.
+    - Only top-level ``## `` lines (not ``### `` or deeper) split the document.
+    - ``## `` lines inside fenced code blocks (```…```) are ignored.
+    - Empty input → ``[]``.
+    - No ``## `` headings → ``[("(intro)", text)]``.
+
+    Each returned body includes everything up to (but not including) the next
+    top-level heading, preserving nested headings (``###``, etc.) verbatim.
+    """
+    if not text:
+        return []
+
+    sections: list[tuple[str, str]] = []
+    current_heading: str | None = None
+    current_lines: list[str] = []
+    in_fence: bool = False
+
+    for line in text.splitlines(keepends=True):
+        # Track code-fence state (``` only — indented fences not handled)
+        stripped = line.rstrip("\n\r")
+        if re.match(r"^```", stripped):
+            in_fence = not in_fence
+
+        if not in_fence and re.match(r"^## ", line):
+            # Flush the previous section
+            if current_heading is not None or current_lines:
+                heading = current_heading if current_heading is not None else "(intro)"
+                sections.append((heading, "".join(current_lines)))
+            current_heading = stripped[3:]  # strip leading "## "
+            current_lines = []
+        else:
+            current_lines.append(line)
+
+    # Flush the last section
+    if current_heading is not None or current_lines:
+        heading = current_heading if current_heading is not None else "(intro)"
+        body = "".join(current_lines)
+        sections.append((heading, body))
+
+    return sections
+
+
+def _section_approval_id(repo_name: str, heading: str, section_idx: int) -> str:
+    """Stable approval_id for a (repo, heading) pair."""
+    digest = hashlib.sha256(f"{repo_name}:{heading}".encode()).hexdigest()[:12]
+    return f"drs-{section_idx:02d}-{digest}"
+
+
+def _section_subject_key(repo_name: str, heading: str) -> str:
+    """Stable subject_key for a (repo, heading) pair (16 hex chars)."""
+    return hashlib.sha256(f"{repo_name}:{heading}".encode()).hexdigest()[:16]
+
+
+def _packet_id_for_repo(repo_name: str, generated_at: str) -> str:
+    """Shared packet_id across all section sub-records for one repo+run."""
+    material = f"drs-pkt:{repo_name}:{generated_at}"
+    return "drs-pkt-" + hashlib.sha256(material.encode()).hexdigest()[:16]
+
+
+def write_section_packets_to_ledger(
+    packets: list[DraftReadmePacket],
+    ledger_path: Path,
+    reviewer: str,
+) -> None:
+    """Persist per-section sub-records for each packet.
+
+    Each ``## `` heading in the proposed README becomes one
+    ``approval_subject_type="draft-readme-section"`` record with its own
+    ``approval_id`` and a shared ``packet_id`` across all sections of the
+    same repo+run.
+
+    Callers that want the old single-record behaviour should use
+    ``write_packets_to_ledger`` instead.  Both can coexist.
+    """
+    from src.warehouse import save_approval_record
+
+    output_dir = Path(ledger_path)
+
+    for packet in packets:
+        sections = split_readme_sections(packet.proposed_readme)
+        if not sections:
+            # Nothing to write — proposed README was empty
+            continue
+
+        shared_packet_id = _packet_id_for_repo(packet.repo_name, packet.generated_at)
+
+        for section_idx, (heading, body) in enumerate(sections):
+            approval_id = _section_approval_id(packet.repo_name, heading, section_idx)
+            subject_key = _section_subject_key(packet.repo_name, heading)
+
+            record: dict = {
+                # warehouse schema fields
+                "approval_id": approval_id,
+                "fingerprint": hashlib.sha256(
+                    f"{packet.repo_name}:{heading}:{body[:200]}".encode()
+                ).hexdigest()[:16],
+                "approval_subject_type": "draft-readme-section",
+                "subject_key": subject_key,
+                "source_run_id": "",
+                "approved_at": packet.generated_at,
+                "approved_by": reviewer,
+                "approval_note": f"section {section_idx}: {heading}",
+                "action_type": "draft-readme-section",
+                "target_context": packet.repo_name,
+                "decision": "",
+                "timestamp": packet.generated_at,
+                "status": "ready-for-review",
+                # section payload
+                "section_heading": heading,
+                "section_body": body,
+                "section_idx": section_idx,
+                "packet_id": shared_packet_id,
+                "state": "pending",
+                "rejected_reason": None,
+                "decided_at": None,
+                # carry-through packet metadata for the diff view
+                "repo_name": packet.repo_name,
+                "current_readme_sha": packet.current_readme_sha,
+                "diff_summary": packet.diff_summary,
+                "llm_provider": packet.llm_provider,
+                "llm_model": packet.llm_model,
+                "llm_cost_usd": packet.llm_cost_usd,
+                "generated_at": packet.generated_at,
+            }
+            save_approval_record(output_dir, record)
+
+
+def approve_section(record_id: str, output_dir: Path) -> None:
+    """Set ``state='approved'``, ``decided_at=now`` on the sub-record.
+
+    Raises ``ValueError`` if the record is not found.
+    """
+    from src.warehouse import load_approval_records, save_approval_record
+
+    records = load_approval_records(output_dir, "", limit=500)
+    matching = [
+        r
+        for r in records
+        if r.get("approval_id") == record_id
+        and r.get("approval_subject_type") == "draft-readme-section"
+    ]
+    if not matching:
+        raise ValueError(
+            f"approve_section: no draft-readme-section record found for id={record_id!r}"
+        )
+    for record in matching:
+        updated = dict(record)
+        updated["state"] = "approved"
+        updated["decided_at"] = datetime.now(timezone.utc).isoformat()
+        updated["rejected_reason"] = None
+        save_approval_record(output_dir, updated)
+
+
+def reject_section(record_id: str, output_dir: Path, reason: str = "") -> None:
+    """Set ``state='rejected'``, persist *reason*, set ``decided_at=now``.
+
+    Raises ``ValueError`` if the record is not found.
+    """
+    from src.warehouse import load_approval_records, save_approval_record
+
+    records = load_approval_records(output_dir, "", limit=500)
+    matching = [
+        r
+        for r in records
+        if r.get("approval_id") == record_id
+        and r.get("approval_subject_type") == "draft-readme-section"
+    ]
+    if not matching:
+        raise ValueError(
+            f"reject_section: no draft-readme-section record found for id={record_id!r}"
+        )
+    for record in matching:
+        updated = dict(record)
+        updated["state"] = "rejected"
+        updated["rejected_reason"] = reason or None
+        updated["decided_at"] = datetime.now(timezone.utc).isoformat()
+        save_approval_record(output_dir, updated)
+
+
+def load_approved_sectioned_packets(
+    warehouse_path: Path,
+) -> dict[str, list[dict]]:
+    """Return ``{packet_id: [section_dicts sorted by section_idx]}`` for ready packets.
+
+    A packet is included only when **all** its sections are in a terminal state
+    (``'approved'`` or ``'rejected'``).  Packets with any ``'pending'`` sections
+    are omitted.
+
+    At least one section must be ``'approved'`` for the packet to be usable;
+    callers should check ``assemble_readme_from_approved_sections`` for ``None``
+    when every section ended up rejected.
+    """
+    from src.warehouse import load_approval_records
+
+    all_records = load_approval_records(warehouse_path, "", limit=500)
+
+    # Group by packet_id
+    by_packet: dict[str, list[dict]] = {}
+    for record in all_records:
+        if record.get("approval_subject_type") != "draft-readme-section":
+            continue
+        if record.get("status") in ("applied",):
+            # Skip already-applied sections
+            continue
+        pid = record.get("packet_id") or ""
+        if not pid:
+            continue
+        by_packet.setdefault(pid, []).append(record)
+
+    # Keep only packets where every section is terminal
+    result: dict[str, list[dict]] = {}
+    terminal = {"approved", "rejected"}
+    for pid, sections in by_packet.items():
+        states = {s.get("state", "pending") for s in sections}
+        if states <= terminal:
+            result[pid] = sorted(sections, key=lambda s: int(s.get("section_idx") or 0))
+
+    return result
+
+
+def assemble_readme_from_approved_sections(sections: list[dict]) -> str | None:
+    """Concatenate approved sections into a single README in ``section_idx`` order.
+
+    Returns ``None`` if there are zero approved sections.
+    Rejected sections are skipped.
+    """
+    parts: list[str] = []
+    for section in sorted(sections, key=lambda s: int(s.get("section_idx") or 0)):
+        if section.get("state") != "approved":
+            continue
+        heading = section.get("section_heading") or ""
+        body = section.get("section_body") or ""
+        if heading and heading != "(intro)":
+            parts.append(f"## {heading}\n{body}")
+        else:
+            parts.append(body)
+    if not parts:
+        return None
+    return "".join(parts)
+
+
+def mark_section_packet_applied(packet_id: str, output_dir: Path) -> None:
+    """Set ``status='applied'`` on every section sub-record sharing *packet_id*."""
+    from src.warehouse import load_approval_records, save_approval_record
+
+    records = load_approval_records(output_dir, "", limit=500)
+    for record in records:
+        if record.get("approval_subject_type") != "draft-readme-section":
+            continue
+        if record.get("packet_id") != packet_id:
+            continue
+        updated = dict(record)
+        updated["status"] = "applied"
+        updated["applied_at"] = datetime.now(timezone.utc).isoformat()
+        save_approval_record(output_dir, updated)

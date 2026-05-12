@@ -304,6 +304,23 @@ def _build_triage_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         dest="close_initiative",
         help="Close the open initiative for REPO (marks as met)",
     )
+    # ── LLM-suggested initiatives (8.4) ───────────────────────────────────
+    p.add_argument(
+        "--suggest-initiatives",
+        nargs="?",
+        const=0,
+        type=int,
+        default=None,
+        metavar="TARGET_TIER",
+        help="LLM-rank repos closest to qualifying for TARGET_TIER (default: next tier from current)",
+    )
+    p.add_argument(
+        "--llm-budget",
+        type=float,
+        default=None,
+        metavar="USD",
+        help="Override default LLM cost ceiling (default $0.10 for --suggest-initiatives)",
+    )
 
 
 def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
@@ -510,6 +527,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--portfolio-truth",
         action="store_true",
         help="Generate the canonical portfolio truth snapshot and compatibility portfolio artifacts",
+    )
+    parser.add_argument(
+        "--portfolio-truth-include-release-count",
+        action="store_true",
+        help=(
+            "Overlay derived.release_count on each project from the latest "
+            "output/audit-report-<username>-*.json warehouse file (requires a prior audit run)"
+        ),
     )
     parser.add_argument(
         "--portfolio-context-recovery",
@@ -861,6 +886,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="When used with --briefing, also write a voice-readable plain-text variant (.voice.txt).",
     )
     parser.add_argument(
+        "--include-suggestions",
+        action="store_true",
+        default=False,
+        dest="include_suggestions",
+        help="When used with --briefing, run LLM-ranked tier-upgrade suggestions (Arc G S8.4). Off by default to keep briefings cheap.",
+    )
+    parser.add_argument(
         "--narrative-provider",
         choices=["anthropic", "github-models"],
         default=None,
@@ -1210,6 +1242,25 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="REPO",
         dest="close_initiative",
         help="Close the open initiative for REPO (marks as met)",
+    )
+    # ── LLM-suggested initiatives (8.4) — also registered here so legacy parser accepts them ──
+    parser.add_argument(
+        "--suggest-initiatives",
+        nargs="?",
+        const=0,
+        type=int,
+        default=None,
+        metavar="TARGET_TIER",
+        dest="suggest_initiatives",
+        help="LLM-rank repos closest to qualifying for TARGET_TIER (default: next tier from current)",
+    )
+    parser.add_argument(
+        "--llm-budget",
+        type=float,
+        default=None,
+        metavar="USD",
+        dest="llm_budget",
+        help="Override default LLM cost ceiling for --suggest-initiatives (default $0.10)",
     )
     return parser
 
@@ -2894,6 +2945,52 @@ def _run_close_initiative_mode(args) -> None:
     )
 
 
+def _run_suggest_initiatives_mode(args) -> None:
+    """LLM-rank repos closest to qualifying for their next maturity tier (Arc G S8.4)."""
+    import json
+    from pathlib import Path as _Path
+
+    from src.llm_cost import BudgetExceededError
+    from src.maturity_tiers import tier_name
+    from src.suggest_initiatives import generate_suggestions
+
+    truth_path = _Path(args.output_dir) / "portfolio-truth-latest.json"
+    if not truth_path.exists():
+        print_warning(
+            "portfolio-truth-latest.json not found. "
+            "Run `audit triage USERNAME --portfolio-truth` first."
+        )
+        return
+
+    truth = json.loads(truth_path.read_text())
+    projects = truth.get("projects", [])
+
+    # 0 is the const sentinel meaning "use per-repo next tier"
+    target = args.suggest_initiatives if args.suggest_initiatives else None
+    budget = args.llm_budget if args.llm_budget is not None else 0.10
+
+    try:
+        suggestions, cost = generate_suggestions(projects, target_tier=target, budget_usd=budget)
+    except BudgetExceededError as exc:
+        print(f"\nERROR: LLM budget exceeded: {exc}", file=sys.stderr)
+        return
+
+    if not suggestions:
+        print_info("No suggestions: no repos are close to qualifying for the next tier.")
+        return
+
+    print_info(f"Suggested Initiatives ({len(suggestions)} candidates, ${cost:.4f} spent)")
+    print()
+    for s in suggestions:
+        print(
+            f"  {s.repo_name:<30} {tier_name(s.current_tier)} → {tier_name(s.target_tier):<10} "
+            f"[{s.estimated_effort}]"
+        )
+        print(f"    Missing: {', '.join(s.missing_requirements)}")
+        print(f"    Rationale: {s.rationale}")
+        print()
+
+
 def _run_apply_improvements_mode(args, parser) -> None:
     from src.repo_improver import (
         apply_metadata_updates,
@@ -2940,11 +3037,43 @@ def _run_apply_improvements_mode(args, parser) -> None:
         ledger_packets_by_repo: dict[str, object] = {}
 
         from src.draft_readmes import (
+            assemble_readme_from_approved_sections,
             load_approved_drafts,
+            load_approved_sectioned_packets,
             mark_draft_applied,
+            mark_section_packet_applied,
             record_draft_apply_failure,
         )
 
+        # ── Path A: per-section sub-records (Sprint 8.5) ─────────────────────
+        sectioned_packets = load_approved_sectioned_packets(output_dir)
+        sectioned_updates_by_repo: dict[str, tuple[str, str]] = {}  # repo → (packet_id, readme)
+        for pid, sections in sectioned_packets.items():
+            repo_name_sec: str = str((sections[0].get("repo_name") or "") if sections else "")
+            if not repo_name_sec:
+                continue
+            assembled = assemble_readme_from_approved_sections(sections)
+            if assembled is None:
+                print_info(f"sectioned packet {pid} has no approved sections; skipping")
+                continue
+            pending = [s for s in sections if s.get("state", "pending") == "pending"]
+            if pending:
+                print_info(f"sectioned packet {pid} has {len(pending)} pending sections; skipping")
+                continue
+            sectioned_updates_by_repo[repo_name_sec] = (pid, assembled)
+
+        for repo_name_sec, (pid, assembled_readme) in sectioned_updates_by_repo.items():
+            file_names = {(u.get("name") or u.get("repo", "").split("/")[-1]) for u in file_updates}
+            if repo_name_sec not in file_names:
+                readme_updates.append({"name": repo_name_sec, "readme": assembled_readme})
+                if dry_run:
+                    char_count = len(assembled_readme)
+                    print_info(
+                        f"  [dry-run] would push sectioned README to {repo_name_sec}: "
+                        f"{char_count} chars"
+                    )
+
+        # ── Path B: legacy whole-packet records ───────────────────────────────
         ledger_packets = load_approved_drafts(output_dir, getattr(args, "username", None))
         for pkt in ledger_packets:
             # Convert DraftReadmePacket → shape expected by apply_readme_updates
@@ -2984,14 +3113,19 @@ def _run_apply_improvements_mode(args, parser) -> None:
             if not dry_run:
                 for result in results:
                     repo_name = result.get("repo", "")
-                    if repo_name not in ledger_packets_by_repo:
-                        continue
-                    pkt = ledger_packets_by_repo[repo_name]
-                    if result.get("ok"):
-                        mark_draft_applied(output_dir, pkt, apply_result=result)  # type: ignore[arg-type]
-                    else:
-                        error_msg = str(result.get("error") or "unknown error")
-                        record_draft_apply_failure(output_dir, pkt, error=error_msg)  # type: ignore[arg-type]
+                    # Path A: sectioned packets
+                    if repo_name in sectioned_updates_by_repo:
+                        pid, _assembled = sectioned_updates_by_repo[repo_name]
+                        if result.get("ok"):
+                            mark_section_packet_applied(pid, output_dir)
+                    # Path B: legacy whole-packet records
+                    elif repo_name in ledger_packets_by_repo:
+                        pkt = ledger_packets_by_repo[repo_name]
+                        if result.get("ok"):
+                            mark_draft_applied(output_dir, pkt, apply_result=result)  # type: ignore[arg-type]
+                        else:
+                            error_msg = str(result.get("error") or "unknown error")
+                            record_draft_apply_failure(output_dir, pkt, error=error_msg)  # type: ignore[arg-type]
 
             ok_count = sum(1 for r in results if r.get("ok") or r.get("dry_run"))
             verb = "previewed" if dry_run else "pushed"
@@ -4619,6 +4753,56 @@ def _run_auto_apply_approved_mode(args, output_dir: Path) -> None:
     print_info(f"Auto-apply complete: {total_applied} applied, {total_skipped} skipped.")
 
 
+def _load_release_count_by_name(*, output_dir: Path, username: str) -> dict[str, int] | None:
+    """Load release_count per project name from the latest audit report JSON.
+
+    Returns a dict mapping display_name -> release_count, or None if no audit
+    report is found (warning is logged).
+    """
+    import json
+    import logging
+
+    _log = logging.getLogger(__name__)
+
+    audit_files = sorted(
+        output_dir.glob(f"audit-report-{username}-*.json"),
+        key=lambda p: p.stat().st_mtime,
+    )
+    if not audit_files:
+        _log.warning(
+            "--portfolio-truth-include-release-count requires a prior audit run; "
+            "no audit-report-%s-*.json found in %s — skipping release_count overlay",
+            username,
+            output_dir,
+        )
+        return None
+
+    audit_path = audit_files[-1]
+    try:
+        with audit_path.open() as fh:
+            data = json.load(fh)
+    except Exception as exc:  # noqa: BLE001
+        _log.warning(
+            "--portfolio-truth-include-release-count: could not read %s: %s — skipping",
+            audit_path,
+            exc,
+        )
+        return None
+
+    result: dict[str, int] = {}
+    for audit in data.get("audits") or []:
+        name = (audit.get("metadata") or {}).get("name")
+        if not name:
+            continue
+        for ar in audit.get("analyzer_results") or []:
+            if ar.get("dimension") == "activity":
+                rc = (ar.get("details") or {}).get("release_count")
+                if isinstance(rc, int):
+                    result[name] = rc
+                break
+    return result
+
+
 def _run_portfolio_truth_mode(args) -> None:
     from src.portfolio_truth_publish import publish_portfolio_truth
 
@@ -4636,6 +4820,13 @@ def _run_portfolio_truth_mode(args) -> None:
     )
     legacy_registry_path = Path(args.registry) if args.registry else registry_output
 
+    release_count_by_name: dict[str, int] | None = None
+    if getattr(args, "portfolio_truth_include_release_count", False):
+        release_count_by_name = _load_release_count_by_name(
+            output_dir=output_dir,
+            username=args.username,
+        )
+
     result = publish_portfolio_truth(
         workspace_root=workspace_root,
         output_dir=output_dir,
@@ -4644,6 +4835,7 @@ def _run_portfolio_truth_mode(args) -> None:
         catalog_path=Path(args.catalog) if args.catalog else None,
         legacy_registry_path=legacy_registry_path,
         include_notion=True,
+        release_count_by_name=release_count_by_name,
     )
     print_info(f"Portfolio truth snapshot: {result.latest_path}")
     print_info(f"Portfolio truth history snapshot: {result.snapshot_path}")
@@ -5289,6 +5481,7 @@ def _write_report_outputs(
                 github_token=args.token,
                 write_voice=getattr(args, "briefing_voice", False),
                 cost_tracker=_cost_tracker,
+                include_suggestions=getattr(args, "include_suggestions", False),
             )
         except BudgetExceededError as exc:
             print(f"\nERROR: {exc}", file=sys.stderr)
@@ -6088,6 +6281,11 @@ def main() -> None:
         return
     if getattr(args, "close_initiative", None):
         _run_close_initiative_mode(args)
+        return
+
+    # ── LLM-suggested initiatives (8.4) ───────────────────────────────────
+    if getattr(args, "suggest_initiatives", None) is not None:
+        _run_suggest_initiatives_mode(args)
         return
 
     if getattr(args, "serve", False):

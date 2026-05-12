@@ -460,6 +460,161 @@ def _record_intent(request: Request, approval_id: str, action: str) -> None:
         fh.write(json.dumps(entry) + "\n")
 
 
+# ── Sprint 8.5 — per-section draft-readme routes ─────────────────────────────
+
+
+def _render_section_card(record_id: str, section: dict[str, Any]) -> str:
+    """Render a single section card as an HTML fragment for HTMX hx-swap='outerHTML'."""
+    state: str = section.get("state") or "pending"
+    heading: str = section.get("section_heading") or "(intro)"
+    body: str = section.get("section_body") or ""
+
+    if state == "approved":
+        state_badge = '<span class="badge badge-approved">&#10003; Approved</span>'
+        buttons = ""
+        card_class = "section-card section-card--approved"
+    elif state == "rejected":
+        reason = section.get("rejected_reason") or ""
+        reason_note = f" ({reason})" if reason else ""
+        state_badge = f'<span class="badge badge-rejected">&#10007; Rejected{reason_note}</span>'
+        buttons = ""
+        card_class = "section-card section-card--rejected"
+    else:
+        state_badge = '<span class="badge badge-pending">Pending</span>'
+        buttons = (
+            f'<button class="btn-approve" '
+            f'hx-post="/approvals/sections/{record_id}/approve" '
+            f'hx-target="closest .section-card" hx-swap="outerHTML">'
+            f"&#10003; Approve</button> "
+            f'<button class="btn-reject" '
+            f'hx-post="/approvals/sections/{record_id}/reject" '
+            f'hx-target="closest .section-card" hx-swap="outerHTML">'
+            f"&#10007; Reject</button>"
+        )
+        card_class = "section-card section-card--pending"
+
+    import html as _html
+
+    safe_body = _html.escape(body)
+    safe_heading = _html.escape(heading)
+
+    return (
+        f'<div class="{card_class}" id="section-card-{record_id}">'
+        f'<div class="section-card__header">'
+        f'<h3 class="section-card__heading">## {safe_heading}</h3>'
+        f"{state_badge}"
+        f"</div>"
+        f'<pre class="section-card__body">{safe_body}</pre>'
+        f'<div class="section-card__actions">{buttons}</div>'
+        f"</div>"
+    )
+
+
+@router.get("/approvals/{packet_id}/draft-sections", response_class=HTMLResponse)
+async def draft_sections(request: Request, packet_id: str) -> HTMLResponse:
+    """Render the multi-section diff view: counter + N section cards."""
+    output_dir = _output_dir(request)
+    sections: list[dict[str, Any]] = []
+    try:
+        from src.warehouse import load_approval_records
+
+        all_records = load_approval_records(output_dir, username="")
+        sections = sorted(
+            [
+                r
+                for r in all_records
+                if r.get("approval_subject_type") == "draft-readme-section"
+                and r.get("packet_id") == packet_id
+            ],
+            key=lambda r: int(r.get("section_idx") or 0),
+        )
+    except Exception:
+        pass
+
+    if not sections:
+        raise HTTPException(status_code=404, detail=f"Packet '{packet_id}' not found")
+
+    repo_name: str = str(sections[0].get("repo_name") or sections[0].get("subject_key") or "")
+    total = len(sections)
+    approved_count = sum(1 for s in sections if s.get("state") == "approved")
+    rejected_count = sum(1 for s in sections if s.get("state") == "rejected")
+    pending_count = total - approved_count - rejected_count
+
+    return templates.TemplateResponse(
+        request,
+        "draft_sections.html",
+        {
+            "packet_id": packet_id,
+            "repo_name": repo_name,
+            "sections": sections,
+            "total": total,
+            "approved_count": approved_count,
+            "rejected_count": rejected_count,
+            "pending_count": pending_count,
+        },
+    )
+
+
+@router.post("/approvals/sections/{record_id}/approve", response_class=HTMLResponse)
+async def approve_section_route(request: Request, record_id: str) -> HTMLResponse:
+    """Set section record_id to approved; return updated section card for HTMX swap."""
+    from src.draft_readmes import approve_section as _approve_section
+    from src.warehouse import load_approval_records
+
+    output_dir = _output_dir(request)
+    try:
+        _approve_section(record_id, output_dir)
+    except ValueError as exc:
+        return HTMLResponse(
+            f'<div class="section-card section-card--error">Not found: {exc}</div>',
+            status_code=404,
+        )
+
+    # Re-read to get the updated section dict
+    try:
+        all_records = load_approval_records(output_dir, username="")
+        section: dict[str, Any] = next(
+            (r for r in all_records if r.get("approval_id") == record_id),
+            {"state": "approved"},
+        )
+    except Exception:
+        section = {"state": "approved"}
+
+    return HTMLResponse(_render_section_card(record_id, section))
+
+
+@router.post("/approvals/sections/{record_id}/reject", response_class=HTMLResponse)
+async def reject_section_route(
+    request: Request,
+    record_id: str,
+    reason: str = Form(""),
+) -> HTMLResponse:
+    """Set section record_id to rejected; return updated section card for HTMX swap."""
+    from src.draft_readmes import reject_section as _reject_section
+    from src.warehouse import load_approval_records
+
+    output_dir = _output_dir(request)
+    try:
+        _reject_section(record_id, output_dir, reason=reason)
+    except ValueError as exc:
+        return HTMLResponse(
+            f'<div class="section-card section-card--error">Not found: {exc}</div>',
+            status_code=404,
+        )
+
+    # Re-read to get the updated section dict
+    try:
+        all_records = load_approval_records(output_dir, username="")
+        section: dict[str, Any] = next(
+            (r for r in all_records if r.get("approval_id") == record_id),
+            {"state": "rejected"},
+        )
+    except Exception:
+        section = {"state": "rejected"}
+
+    return HTMLResponse(_render_section_card(record_id, section))
+
+
 @router.get("/initiatives", response_class=HTMLResponse)
 async def initiatives(request: Request) -> HTMLResponse:
     """Render the open initiative tracker page."""

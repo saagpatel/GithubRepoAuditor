@@ -70,6 +70,15 @@ class InitiativeStatus:
     status: str  # "on-track" | "at-risk" | "overdue" | "met"
 
 
+@dataclass(frozen=True)
+class InitiativeSuggestionRow:
+    repo_name: str
+    current_tier: int
+    target_tier: int
+    rationale: str
+    estimated_effort: str
+
+
 @dataclass
 class Briefing:
     username: str
@@ -80,6 +89,7 @@ class Briefing:
     suggestions: list[Suggestion] = field(default_factory=list)
     suppressed_by_prefs: list[str] = field(default_factory=list)  # repo names skipped due to prefs
     initiatives: list[InitiativeStatus] = field(default_factory=list)
+    suggested_initiatives: list[InitiativeSuggestionRow] = field(default_factory=list)
 
 
 # ── Section builders ─────────────────────────────────────────────────────────
@@ -449,6 +459,45 @@ def _build_initiatives(
     return results
 
 
+def _build_suggested_initiatives(
+    audits: list[dict],
+    budget_usd: float = 0.05,
+) -> list[InitiativeSuggestionRow]:
+    """Generate LLM-ranked suggested initiatives for the briefing.
+
+    Uses a smaller budget ($0.05) than the CLI flag ($0.10) since the briefing
+    context is already rich and this is a secondary feature.
+
+    Returns an empty list if no candidates exist or no LLM provider is available
+    (deterministic fallback is still used in that case, but we only populate the
+    briefing when the LLM is available to keep the section meaningful).
+    """
+    try:
+        from src.suggest_initiatives import generate_suggestions
+    except ImportError:
+        logger.warning("briefing: suggest_initiatives module not available; skipping")
+        return []
+
+    try:
+        raw_suggestions, _cost = generate_suggestions(audits, budget_usd=budget_usd)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("briefing: error generating suggested initiatives: %s", exc)
+        return []
+
+    rows: list[InitiativeSuggestionRow] = []
+    for s in raw_suggestions:
+        rows.append(
+            InitiativeSuggestionRow(
+                repo_name=s.repo_name,
+                current_tier=s.current_tier,
+                target_tier=s.target_tier,
+                rationale=s.rationale,
+                estimated_effort=s.estimated_effort,
+            )
+        )
+    return rows
+
+
 def build_briefing(
     audits: list[dict],
     username: str,
@@ -461,6 +510,7 @@ def build_briefing(
     semantic_index: object | None = None,
     cost_tracker: CostTracker | None = None,
     output_dir: Path | None = None,
+    include_suggestions: bool = False,
 ) -> Briefing:
     """Build a structured weekly operator briefing from audit data.
 
@@ -477,6 +527,9 @@ def build_briefing(
     Pass *output_dir* to load initiative tracker data from
     ``output_dir/initiatives.json`` and include a top-level initiatives section
     in the rendered output.
+
+    Pass *include_suggestions=True* to run the LLM-suggested initiatives ranking
+    (Arc G S8.4).  Default is ``False`` to keep briefings cheap.
     """
     shipped = _build_shipped(audits)
     needs_attention = _build_needs_attention(audits)
@@ -491,6 +544,10 @@ def build_briefing(
     )
     initiatives = _build_initiatives(audits, output_dir)
 
+    suggested_initiatives: list[InitiativeSuggestionRow] = []
+    if include_suggestions:
+        suggested_initiatives = _build_suggested_initiatives(audits)
+
     return Briefing(
         username=username,
         date=date,
@@ -500,6 +557,7 @@ def build_briefing(
         suggestions=suggestions,
         suppressed_by_prefs=suppressed_by_prefs,
         initiatives=initiatives,
+        suggested_initiatives=suggested_initiatives,
     )
 
 
@@ -548,6 +606,26 @@ def render_markdown(briefing: Briefing) -> str:
             target_name = _tier_name(ini.target_tier)
             lines.append(
                 f"- **{ini.repo_name}** → {target_name} (target) — `{ini.status}` — {days_str}"
+            )
+        lines.append("")
+
+    # ── Section 0b: Suggested Initiatives ────────────────────────────────────
+    if briefing.suggested_initiatives:
+        from src.maturity_tiers import tier_name as _tier_name2
+
+        n = len(briefing.suggested_initiatives)
+        lines.append("## Suggested Initiatives")
+        lines.append("")
+        lines.append(
+            f"The portfolio has {n} {'repo' if n == 1 else 'repos'} close to qualifying "
+            "for higher tiers. Top suggestions:"
+        )
+        lines.append("")
+        for s in briefing.suggested_initiatives:
+            target_name = _tier_name2(s.target_tier)
+            lines.append(
+                f"- **{s.repo_name}** → Tier {s.target_tier} ({target_name}) — "
+                f"`{s.estimated_effort}` — _{s.rationale}_"
             )
         lines.append("")
 
@@ -735,6 +813,7 @@ def generate_briefing(
     write_voice: bool = False,
     semantic_index: object | None = None,
     cost_tracker: CostTracker | None = None,
+    include_suggestions: bool = False,
 ) -> dict:
     """
     Generate the weekly operator briefing.
@@ -799,6 +878,7 @@ def generate_briefing(
         semantic_index=semantic_index,
         cost_tracker=cost_tracker,
         output_dir=Path(output_dir),
+        include_suggestions=include_suggestions,
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)
