@@ -21,7 +21,7 @@ from src.initiatives import (
     initiatives_path,
     load_initiatives,
 )
-from src.maturity_tiers import compute_tier, tier_gap, tier_name
+from src.maturity_tiers import TierGap, compute_tier, tier_gap, tier_name
 
 logger = logging.getLogger(__name__)
 
@@ -71,12 +71,32 @@ def _days_left(deadline: str, today: date | None = None) -> str:
         return "—"
 
 
-def _missing_reqs_str(initiative: Initiative, repo: dict) -> str:
-    """Return a comma-separated list of missing requirements, or empty string."""
-    gap = tier_gap(repo, initiative.target_tier)
+def _format_missing_requirements(gap: TierGap) -> str:
+    """Join missing requirements with an optional '(approx.)' suffix per source.
+
+    Each requirement whose parallel ``requirement_sources`` entry is ``"proxy"``
+    is annotated with ' (approx.)' to signal it was inferred, not directly
+    verified.  When ``requirement_sources`` is empty (pre-Sprint-8.3 callers),
+    all requirements are treated as proxy — consistent with the legacy behaviour
+    of that code path.
+    """
     if not gap.missing_requirements:
         return "—"
-    return "; ".join(gap.missing_requirements)
+    # Fallback: treat everything as proxy when sources list is missing (legacy).
+    sources = gap.requirement_sources or ["proxy"] * len(gap.missing_requirements)
+    parts = []
+    for req, src in zip(gap.missing_requirements, sources):
+        if src == "proxy":
+            parts.append(f"{req} (approx.)")
+        else:
+            parts.append(req)
+    return "; ".join(parts)
+
+
+def _missing_reqs_str(initiative: Initiative, repo: dict) -> str:
+    """Return a semicolon-separated list of missing requirements, or '—'."""
+    gap = tier_gap(repo, initiative.target_tier)
+    return _format_missing_requirements(gap)
 
 
 def _build_rows(
