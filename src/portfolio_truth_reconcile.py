@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -29,6 +30,8 @@ from src.portfolio_truth_types import (
     RiskFields,
 )
 from src.registry_parser import _normalize
+
+logger = logging.getLogger(__name__)
 
 PRECEDENCE_MATRIX: dict[str, list[str]] = {
     "declared.owner": ["catalog_repo", "catalog_group"],
@@ -60,7 +63,87 @@ PRECEDENCE_MATRIX: dict[str, list[str]] = {
     "derived.path_override": ["normalized"],
     "derived.path_confidence": ["normalized"],
     "derived.path_rationale": ["normalized"],
+    "derived.has_tests": ["workspace"],
+    "derived.has_ci": ["workspace"],
+    "derived.readme_char_count": ["workspace"],
 }
+
+# ── Strict signal constants (mirror src/analyzers/testing.py and cicd.py) ──
+_TEST_DIRS = frozenset(("test", "tests", "__tests__", "spec", "test_suite"))
+_TEST_PATTERNS = (
+    "test_*.py",
+    "*_test.py",
+    "*Test.swift",
+    "*Tests.swift",
+    "*.test.ts",
+    "*.test.tsx",
+    "*.spec.ts",
+    "*.spec.tsx",
+    "*_test.*",
+    "*_spec.*",
+    "test_*.*",
+    "*.test.*",
+    "*.spec.*",
+)
+_README_NAMES = ("README.md", "README.MD", "README.markdown", "README.rst", "readme.md")
+
+
+def _derive_has_tests(project_path: Path | None, has_git: bool) -> bool:
+    """Return True if the project has a tests directory or test files."""
+    if not has_git or project_path is None:
+        return False
+    if not project_path.exists():
+        logger.debug("_derive_has_tests: path does not exist: %s", project_path)
+        return False
+    # Check for test directories
+    for dirname in _TEST_DIRS:
+        if (project_path / dirname).is_dir():
+            return True
+    # Check for test files via glob patterns (capped to avoid huge repos)
+    for pattern in _TEST_PATTERNS:
+        try:
+            match = next(
+                f
+                for f in project_path.rglob(pattern)
+                if f.is_file() and "node_modules" not in f.parts and ".git" not in f.parts
+            )
+            if match:
+                return True
+        except StopIteration:
+            pass
+    return False
+
+
+def _derive_has_ci(project_path: Path | None, has_git: bool) -> bool:
+    """Return True if .github/workflows/ contains any .yml or .yaml file."""
+    if not has_git or project_path is None:
+        return False
+    if not project_path.exists():
+        logger.debug("_derive_has_ci: path does not exist: %s", project_path)
+        return False
+    workflows_dir = project_path / ".github" / "workflows"
+    if not workflows_dir.is_dir():
+        return False
+    return any(f.suffix in (".yml", ".yaml") and f.is_file() for f in workflows_dir.iterdir())
+
+
+def _derive_readme_char_count(project_path: Path | None, has_git: bool) -> int:
+    """Return char count of the first README found at the project root; 0 if none."""
+    if not has_git or project_path is None:
+        return 0
+    if not project_path.exists():
+        logger.debug("_derive_readme_char_count: path does not exist: %s", project_path)
+        return 0
+    # Try well-known names first, then case-insensitive glob
+    for name in _README_NAMES:
+        candidate = project_path / name
+        if candidate.is_file():
+            return len(candidate.read_text(errors="replace"))
+    # Case-insensitive fallback
+    for candidate in project_path.iterdir():
+        if candidate.is_file() and candidate.name.lower().startswith("readme"):
+            return len(candidate.read_text(errors="replace"))
+    return 0
 
 
 @dataclass(frozen=True)
@@ -77,6 +160,7 @@ def build_portfolio_truth_snapshot(
     legacy_registry_path: Path | None = None,
     include_notion: bool = True,
     now: datetime | None = None,
+    release_count_by_name: dict[str, int] | None = None,
 ) -> PortfolioTruthBuildResult:
     now = now or datetime.now(timezone.utc)
     catalog_data = load_portfolio_catalog(catalog_path)
@@ -95,6 +179,7 @@ def build_portfolio_truth_snapshot(
             legacy_rows=legacy_rows,
             notion_context=notion_context,
             now=now,
+            release_count_by_name=release_count_by_name,
         )
         for raw_project in workspace_projects
     ]
@@ -152,6 +237,7 @@ def _build_truth_project(
     legacy_rows: dict[str, dict[str, str]],
     notion_context: dict[str, dict[str, str]],
     now: datetime,
+    release_count_by_name: dict[str, int] | None = None,
 ) -> PortfolioTruthProject:
     relative_path = raw_project["path"]
     group_entry = group_entry_for_path(relative_path, catalog_data)
@@ -334,6 +420,16 @@ def _build_truth_project(
             )
         )
 
+    # ── Strict local-filesystem signals (Sprint 8.2) ─────────────────────────
+    project_path: Path | None = raw_project.get("project_path")
+    has_git = bool(raw_project["has_git"])
+    derived_has_tests = _derive_has_tests(project_path, has_git)
+    derived_has_ci = _derive_has_ci(project_path, has_git)
+    derived_readme_char_count = _derive_readme_char_count(project_path, has_git)
+    derived_release_count: int | None = None
+    if release_count_by_name is not None:
+        derived_release_count = release_count_by_name.get(raw_project["name"])
+
     derived = DerivedFields(
         stack=raw_project["stack"],
         context_quality=context_quality,
@@ -352,6 +448,10 @@ def _build_truth_project(
         path_override=path_entry.get("path_override", ""),
         path_confidence=path_entry.get("path_confidence", "legacy"),
         path_rationale=path_entry.get("path_rationale", ""),
+        has_tests=derived_has_tests,
+        has_ci=derived_has_ci,
+        readme_char_count=derived_readme_char_count,
+        release_count=derived_release_count,
     )
     advisory = AdvisoryFields(
         notion_portfolio_call=notion.get("portfolio_call", ""),

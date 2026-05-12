@@ -512,6 +512,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Generate the canonical portfolio truth snapshot and compatibility portfolio artifacts",
     )
     parser.add_argument(
+        "--portfolio-truth-include-release-count",
+        action="store_true",
+        help=(
+            "Overlay derived.release_count on each project from the latest "
+            "output/audit-report-<username>-*.json warehouse file (requires a prior audit run)"
+        ),
+    )
+    parser.add_argument(
         "--portfolio-context-recovery",
         action="store_true",
         help="Build the active/recent weak-context recovery plan and optionally apply the safe context upgrades",
@@ -4656,6 +4664,56 @@ def _run_auto_apply_approved_mode(args, output_dir: Path) -> None:
     print_info(f"Auto-apply complete: {total_applied} applied, {total_skipped} skipped.")
 
 
+def _load_release_count_by_name(*, output_dir: Path, username: str) -> dict[str, int] | None:
+    """Load release_count per project name from the latest audit report JSON.
+
+    Returns a dict mapping display_name -> release_count, or None if no audit
+    report is found (warning is logged).
+    """
+    import json
+    import logging
+
+    _log = logging.getLogger(__name__)
+
+    audit_files = sorted(
+        output_dir.glob(f"audit-report-{username}-*.json"),
+        key=lambda p: p.stat().st_mtime,
+    )
+    if not audit_files:
+        _log.warning(
+            "--portfolio-truth-include-release-count requires a prior audit run; "
+            "no audit-report-%s-*.json found in %s — skipping release_count overlay",
+            username,
+            output_dir,
+        )
+        return None
+
+    audit_path = audit_files[-1]
+    try:
+        with audit_path.open() as fh:
+            data = json.load(fh)
+    except Exception as exc:  # noqa: BLE001
+        _log.warning(
+            "--portfolio-truth-include-release-count: could not read %s: %s — skipping",
+            audit_path,
+            exc,
+        )
+        return None
+
+    result: dict[str, int] = {}
+    for audit in data.get("audits") or []:
+        name = (audit.get("metadata") or {}).get("name")
+        if not name:
+            continue
+        for ar in audit.get("analyzer_results") or []:
+            if ar.get("dimension") == "activity":
+                rc = (ar.get("details") or {}).get("release_count")
+                if isinstance(rc, int):
+                    result[name] = rc
+                break
+    return result
+
+
 def _run_portfolio_truth_mode(args) -> None:
     from src.portfolio_truth_publish import publish_portfolio_truth
 
@@ -4673,6 +4731,13 @@ def _run_portfolio_truth_mode(args) -> None:
     )
     legacy_registry_path = Path(args.registry) if args.registry else registry_output
 
+    release_count_by_name: dict[str, int] | None = None
+    if getattr(args, "portfolio_truth_include_release_count", False):
+        release_count_by_name = _load_release_count_by_name(
+            output_dir=output_dir,
+            username=args.username,
+        )
+
     result = publish_portfolio_truth(
         workspace_root=workspace_root,
         output_dir=output_dir,
@@ -4681,6 +4746,7 @@ def _run_portfolio_truth_mode(args) -> None:
         catalog_path=Path(args.catalog) if args.catalog else None,
         legacy_registry_path=legacy_registry_path,
         include_notion=True,
+        release_count_by_name=release_count_by_name,
     )
     print_info(f"Portfolio truth snapshot: {result.latest_path}")
     print_info(f"Portfolio truth history snapshot: {result.snapshot_path}")

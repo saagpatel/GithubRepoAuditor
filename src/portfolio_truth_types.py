@@ -88,6 +88,12 @@ class DerivedFields:
     path_override: str = ""
     path_confidence: str = "legacy"
     path_rationale: str = ""
+    # Strict local-filesystem signals (Sprint 8.2)
+    has_tests: bool = False
+    has_ci: bool = False
+    readme_char_count: int = 0
+    # Opt-in: populated from prior warehouse audit via --portfolio-truth-include-release-count
+    release_count: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data = dataclasses.asdict(self)
