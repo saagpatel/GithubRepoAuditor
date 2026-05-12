@@ -305,33 +305,152 @@ async def campaign_plan(request: Request, record_id: str) -> HTMLResponse:
     # Normalise to list[dict] — the warehouse may return them as dicts already
     actions: list[dict[str, Any]] = [a if isinstance(a, dict) else {} for a in raw_actions]
     pending_count: int = sum(1 for a in actions if a.get("action_type") == "pending_human_action")
+    # 7B.4 — per-action state counts
+    approved_count: int = sum(1 for a in actions if (a.get("state") or "pending") == "approved")
+    rejected_count: int = sum(1 for a in actions if (a.get("state") or "pending") == "rejected")
+    state_pending_count: int = sum(1 for a in actions if (a.get("state") or "pending") == "pending")
 
     return templates.TemplateResponse(
         request,
         "campaign_plan.html",
         {
+            "packet_id": record_id,
             "goal": goal,
             "candidate_count": candidate_count,
             "qualified_count": qualified_count,
             "llm_cost_usd": llm_cost_usd,
             "pending_count": pending_count,
+            "approved_count": approved_count,
+            "rejected_count": rejected_count,
+            "state_pending_count": state_pending_count,
             "actions": actions,
         },
     )
 
 
 @router.post("/approvals/{approval_id}/approve", response_class=HTMLResponse)
-async def approve_action(request: Request, approval_id: str) -> HTMLResponse:
+async def approve_packet(request: Request, approval_id: str) -> HTMLResponse:
     """Record intent into session log; does NOT mutate the approval state."""
     _record_intent(request, approval_id, "approve")
     return HTMLResponse('<span class="badge badge-approved">Approved (intent recorded)</span>')
 
 
 @router.post("/approvals/{approval_id}/reject", response_class=HTMLResponse)
-async def reject_action(request: Request, approval_id: str) -> HTMLResponse:
+async def reject_packet(request: Request, approval_id: str) -> HTMLResponse:
     """Record intent into session log; does NOT mutate the approval state."""
     _record_intent(request, approval_id, "reject")
     return HTMLResponse('<span class="badge badge-rejected">Rejected (intent recorded)</span>')
+
+
+# ---------------------------------------------------------------------------
+# 7B.3 — Per-action approve / reject (HTMX partial routes)
+# ---------------------------------------------------------------------------
+
+
+def _render_action_row(packet_id: str, idx: int, action: dict[str, Any]) -> str:
+    """Render a single campaign-plan action table row as an HTML fragment."""
+    state: str = action.get("state") or "pending"
+    repo = action.get("repo_name") or ""
+    action_type = action.get("action_type") or ""
+    target = action.get("target") or "—"
+    rationale = action.get("rationale") or "—"
+
+    if state == "approved":
+        state_cell = '<span class="badge badge-approved">&#10003; Approved</span>'
+        buttons = ""
+        row_class = "campaign-plan__row--approved"
+    elif state == "rejected":
+        reason = action.get("rejected_reason") or ""
+        reason_note = f" ({reason})" if reason else ""
+        state_cell = f'<span class="badge badge-rejected">&#10007; Rejected{reason_note}</span>'
+        buttons = ""
+        row_class = "campaign-plan__row--rejected"
+    else:
+        state_cell = '<span class="badge badge-pending">Pending</span>'
+        buttons = (
+            f'<button class="btn-approve" '
+            f'hx-post="/approvals/{packet_id}/actions/{idx}/approve" '
+            f'hx-target="closest tr" hx-swap="outerHTML">&#10003; Approve</button> '
+            f'<button class="btn-reject" '
+            f'hx-post="/approvals/{packet_id}/actions/{idx}/reject" '
+            f'hx-target="closest tr" hx-swap="outerHTML">&#10007; Reject</button>'
+        )
+        row_class = "campaign-plan__row--pending"
+
+    return (
+        f'<tr class="{row_class}" id="action-row-{idx}">'
+        f"<td><code>{repo}</code></td>"
+        f'<td><span class="campaign-plan__action-type">{action_type}</span></td>'
+        f"<td>{target}</td>"
+        f'<td class="campaign-plan__rationale">{rationale}</td>'
+        f"<td>{state_cell}</td>"
+        f"<td>{buttons}</td>"
+        f"</tr>"
+    )
+
+
+@router.post("/approvals/{packet_id}/actions/{idx}/approve", response_class=HTMLResponse)
+async def approve_campaign_action(request: Request, packet_id: str, idx: int) -> HTMLResponse:
+    """Set action idx to approved; return updated row partial for HTMX swap."""
+    from src.plan_campaign import approve_action as _approve_action
+    from src.warehouse import load_approval_records
+
+    output_dir = _output_dir(request)
+    try:
+        _approve_action(packet_id, idx, output_dir)
+    except (ValueError, IndexError) as exc:
+        return HTMLResponse(
+            f'<tr><td colspan="6" class="error">Not found: {exc}</td></tr>',
+            status_code=404,
+        )
+
+    # Re-read the updated action dict from the ledger
+    try:
+        all_records = load_approval_records(output_dir, username="")
+        record = next((r for r in all_records if r.get("approval_id") == packet_id), None)
+        action_dict: dict[str, Any] = {}
+        if record:
+            raw = record.get("actions") or []
+            if 0 <= idx < len(raw):
+                action_dict = raw[idx] if isinstance(raw[idx], dict) else {}
+    except Exception:
+        action_dict = {"state": "approved"}
+
+    return HTMLResponse(_render_action_row(packet_id, idx, action_dict))
+
+
+@router.post("/approvals/{packet_id}/actions/{idx}/reject", response_class=HTMLResponse)
+async def reject_campaign_action(
+    request: Request,
+    packet_id: str,
+    idx: int,
+    reason: str = Form(""),
+) -> HTMLResponse:
+    """Set action idx to rejected; return updated row partial for HTMX swap."""
+    from src.plan_campaign import reject_action as _reject_action
+    from src.warehouse import load_approval_records
+
+    output_dir = _output_dir(request)
+    try:
+        _reject_action(packet_id, idx, output_dir, reason=reason)
+    except (ValueError, IndexError) as exc:
+        return HTMLResponse(
+            f'<tr><td colspan="6" class="error">Not found: {exc}</td></tr>',
+            status_code=404,
+        )
+
+    try:
+        all_records = load_approval_records(output_dir, username="")
+        record = next((r for r in all_records if r.get("approval_id") == packet_id), None)
+        action_dict: dict[str, Any] = {}
+        if record:
+            raw = record.get("actions") or []
+            if 0 <= idx < len(raw):
+                action_dict = raw[idx] if isinstance(raw[idx], dict) else {}
+    except Exception:
+        action_dict = {"state": "rejected"}
+
+    return HTMLResponse(_render_action_row(packet_id, idx, action_dict))
 
 
 def _record_intent(request: Request, approval_id: str, action: str) -> None:

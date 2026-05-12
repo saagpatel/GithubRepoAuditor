@@ -2287,6 +2287,15 @@ def _run_campaign_from_ledger_mode(args) -> None:
 
         action_results: list[tuple[bool, str]] = []
         for action in packet.actions:
+            # 7B.5 — only dispatch actions that have been explicitly approved;
+            # skip pending and rejected actions.
+            action_state = getattr(action, "state", "pending") or "pending"
+            if action_state != "approved":
+                skip_label = "rejected" if action_state == "rejected" else "pending"
+                print_info(f"    [skip:{skip_label}] {action.action_type} {action.repo_name}")
+                action_results.append((True, f"skipped ({skip_label})"))
+                continue
+
             if dry_run:
                 # Dry-run: print preview, record as success for state purposes
                 msg = (
@@ -2310,6 +2319,17 @@ def _run_campaign_from_ledger_mode(args) -> None:
             # Do not mutate ledger state on dry-run
             continue
 
+        # 7B.5 — only mark applied when every action is terminal (approved+applied or rejected).
+        # If any action is still pending, leave as approved-manual for the operator to revisit.
+        has_pending = any(
+            (getattr(a, "state", "pending") or "pending") == "pending" for a in packet.actions
+        )
+        if has_pending:
+            print_info(
+                "  packet kept approved-manual — some actions still pending per-action review"
+            )
+            continue
+
         # Determine overall packet success:
         # "applied" only when every supported action succeeded AND every
         # unsupported/pending action is in the packet as pending_human_action.
@@ -2320,6 +2340,7 @@ def _run_campaign_from_ledger_mode(args) -> None:
             for (ok, msg), action in zip(action_results, packet.actions)
             if action.action_type
             not in ("pending_human_action", "add_license", "add_codeowners", "enable_dependabot")
+            and (getattr(action, "state", "pending") or "pending") != "rejected"
         ]
         unsupported_results = [
             (ok, msg)
