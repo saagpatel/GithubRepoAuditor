@@ -1,6 +1,14 @@
 {% extends "base.html" %}
-{% block title %}{{ repo.name }} — Audit Serve{% endblock %}
+{% block title %}{% if repo %}{{ repo.name }}{% else %}{{ name }} — Not Found{% endif %} — Audit Serve{% endblock %}
 {% block content %}
+{% if error %}
+<div class="page-header">
+  <h1>Repo Not Found</h1>
+  <p class="meta error-text">{{ error }}</p>
+</div>
+<p>The portfolio truth snapshot doesn't contain <code>{{ name }}</code>. Run <code>audit report {{ name }} --portfolio-truth</code> to populate it.</p>
+<p><a href="/">&larr; Dashboard</a></p>
+{% else %}
 <div class="page-header">
   <h1>{{ repo.name }}</h1>
   <p class="meta">
@@ -68,4 +76,5 @@
 {% endif %}
 
 <p><a href="/">&larr; Dashboard</a></p>
+{% endif %}
 {% endblock %}

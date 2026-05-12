@@ -374,3 +374,5 @@ details[open] .draft-diff__summary::before {
 	background: var(--bg);
 	color: var(--text);
 }
+
+.error-text { color: #dc2626; }

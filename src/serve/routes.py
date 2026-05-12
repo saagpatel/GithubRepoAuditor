@@ -100,7 +100,17 @@ async def repo_detail(request: Request, name: str) -> HTMLResponse:
 
     repo = next((r for r in repos if r.get("name") == name), None)
     if repo is None:
-        raise HTTPException(status_code=404, detail=f"Repo '{name}' not found")
+        return templates.TemplateResponse(
+            request,
+            "repo.html",
+            {
+                "repo": None,
+                "name": name,
+                "history": [],
+                "error": f"Repo '{name}' not found in portfolio truth snapshot.",
+            },
+            status_code=404,
+        )
 
     # Pull last 5 run snapshots for this repo from warehouse
     history: list[dict[str, Any]] = []
