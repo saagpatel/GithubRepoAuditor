@@ -717,3 +717,233 @@ class TestSuggestedInitiativesRender:
 
         assert len(briefing.suggested_initiatives) == 1
         assert briefing.suggested_initiatives[0].repo_name == "Wavelength"
+
+
+# ── Arc G Sprint 12.3 — Currently Dismissed section ──────────────────────────
+
+
+def _write_dismissed_json(tmp_path, entries: list[dict]) -> None:
+    """Write dismissed-suggestions.json to tmp_path using the canonical versioned format."""
+    import json
+
+    from src.suggest_initiatives import dismissed_path
+
+    payload = {"version": 1, "items": entries}
+    dismissed_path(tmp_path).write_text(json.dumps(payload), encoding="utf-8")
+
+
+class TestBuildDismissedRepos:
+    """Unit tests for _build_dismissed_repos helper."""
+
+    def test_none_output_dir_returns_empty(self):
+        from src.briefing import _build_dismissed_repos
+
+        assert _build_dismissed_repos(None) == []
+
+    def test_missing_file_returns_empty(self, tmp_path):
+        from src.briefing import _build_dismissed_repos
+
+        result = _build_dismissed_repos(tmp_path)
+        assert result == []
+
+    def test_valid_dismissed_file_returns_rows(self, tmp_path):
+        from src.briefing import DismissedRepoRow, _build_dismissed_repos
+
+        _write_dismissed_json(
+            tmp_path,
+            [
+                {
+                    "repo_name": "RepoA",
+                    "reason": "Not a priority",
+                    "dismissed_at": "2026-01-01T00:00:00+00:00",
+                    "dismissed_by": "alice",
+                }
+            ],
+        )
+        rows = _build_dismissed_repos(tmp_path)
+        assert len(rows) == 1
+        assert rows[0] == DismissedRepoRow(
+            repo_name="RepoA", reason="Not a priority", expires_at=None
+        )
+
+    def test_skips_expired_entries(self, tmp_path):
+        from datetime import date
+
+        from src.briefing import _build_dismissed_repos
+
+        # expires_at is yesterday → should be filtered out
+        _write_dismissed_json(
+            tmp_path,
+            [
+                {
+                    "repo_name": "OldRepo",
+                    "reason": "expired",
+                    "dismissed_at": "2026-01-01T00:00:00+00:00",
+                    "dismissed_by": "alice",
+                    "expires_at": "2026-05-11",
+                }
+            ],
+        )
+        rows = _build_dismissed_repos(tmp_path, today=date(2026, 5, 12))
+        assert rows == []
+
+    def test_keeps_entries_expiring_today_or_later(self, tmp_path):
+        from datetime import date
+
+        from src.briefing import _build_dismissed_repos
+
+        _write_dismissed_json(
+            tmp_path,
+            [
+                {
+                    "repo_name": "FutureRepo",
+                    "reason": "future",
+                    "dismissed_at": "2026-01-01T00:00:00+00:00",
+                    "dismissed_by": "alice",
+                    "expires_at": "2026-05-12",
+                },
+                {
+                    "repo_name": "TomorrowRepo",
+                    "reason": "tomorrow",
+                    "dismissed_at": "2026-01-01T00:00:00+00:00",
+                    "dismissed_by": "alice",
+                    "expires_at": "2026-05-13",
+                },
+            ],
+        )
+        rows = _build_dismissed_repos(tmp_path, today=date(2026, 5, 12))
+        assert len(rows) == 2
+        assert rows[0].repo_name == "FutureRepo"
+        assert rows[0].expires_at == "2026-05-12"
+        assert rows[1].repo_name == "TomorrowRepo"
+
+    def test_keeps_entries_with_malformed_expiry(self, tmp_path):
+        """Malformed expires_at is preserved defensively (not filtered)."""
+        from src.briefing import DismissedRepoRow, _build_dismissed_repos
+
+        _write_dismissed_json(
+            tmp_path,
+            [
+                {
+                    "repo_name": "WeirdRepo",
+                    "reason": "bad expiry",
+                    "dismissed_at": "2026-01-01T00:00:00+00:00",
+                    "dismissed_by": "alice",
+                    "expires_at": "not-a-date",
+                }
+            ],
+        )
+        rows = _build_dismissed_repos(tmp_path)
+        assert len(rows) == 1
+        assert rows[0] == DismissedRepoRow(
+            repo_name="WeirdRepo", reason="bad expiry", expires_at="not-a-date"
+        )
+
+
+class TestBuildBriefingDismissedField:
+    """build_briefing populates dismissed_repos when output_dir is given."""
+
+    def test_output_dir_populates_dismissed_repos(self, tmp_path):
+        from src.briefing import build_briefing
+
+        _write_dismissed_json(
+            tmp_path,
+            [
+                {
+                    "repo_name": "SilencedRepo",
+                    "reason": "paused",
+                    "dismissed_at": "2026-01-01T00:00:00+00:00",
+                    "dismissed_by": "alice",
+                }
+            ],
+        )
+        audits = [_make_audit("SilencedRepo")]
+        briefing = build_briefing(
+            audits, "alice", "2026-05-12", use_history=False, output_dir=tmp_path
+        )
+        assert len(briefing.dismissed_repos) == 1
+        assert briefing.dismissed_repos[0].repo_name == "SilencedRepo"
+
+    def test_no_output_dir_dismissed_repos_empty(self):
+        from src.briefing import build_briefing
+
+        audits = [_make_audit("AnyRepo")]
+        briefing = build_briefing(audits, "alice", "2026-05-12", use_history=False)
+        assert briefing.dismissed_repos == []
+
+
+class TestRenderMarkdownDismissedSection:
+    """render_markdown emits/omits the Currently Dismissed section correctly."""
+
+    def test_non_empty_dismissed_repos_renders_section(self):
+        from src.briefing import DismissedRepoRow
+
+        briefing = Briefing(
+            username="alice",
+            date="2026-05-12",
+            dismissed_repos=[
+                DismissedRepoRow(repo_name="SilencedRepo", reason="low priority"),
+                DismissedRepoRow(repo_name="TempRepo", reason="blocked", expires_at="2026-06-01"),
+            ],
+        )
+        md = render_markdown(briefing)
+        assert "## Currently Dismissed" in md
+        assert "**SilencedRepo**" in md
+        assert "_low priority_" in md
+        assert "**TempRepo**" in md
+        assert "expires 2026-06-01" in md
+
+    def test_empty_dismissed_repos_omits_section(self):
+        briefing = Briefing(username="alice", date="2026-05-12", dismissed_repos=[])
+        md = render_markdown(briefing)
+        assert "## Currently Dismissed" not in md
+
+    def test_dismissed_count_line_correct(self):
+        from src.briefing import DismissedRepoRow
+
+        briefing = Briefing(
+            username="alice",
+            date="2026-05-12",
+            dismissed_repos=[
+                DismissedRepoRow(repo_name="R1", reason="r1"),
+                DismissedRepoRow(repo_name="R2", reason="r2"),
+            ],
+        )
+        md = render_markdown(briefing)
+        assert "2 repo(s) currently suppressed" in md
+
+    def test_no_reason_omits_reason_part(self):
+        from src.briefing import DismissedRepoRow
+
+        briefing = Briefing(
+            username="alice",
+            date="2026-05-12",
+            dismissed_repos=[DismissedRepoRow(repo_name="NoReasonRepo", reason="")],
+        )
+        md = render_markdown(briefing)
+        assert "**NoReasonRepo**" in md
+        # No " — _" when reason is empty
+        assert " — _" not in md
+
+
+class TestRenderVoiceDismissedLine:
+    """render_voice mentions dismissed count when non-empty."""
+
+    def test_non_empty_dismissed_repos_voice_line(self):
+        from src.briefing import DismissedRepoRow
+
+        briefing = Briefing(
+            username="alice",
+            date="2026-05-12",
+            dismissed_repos=[
+                DismissedRepoRow(repo_name="R1", reason="paused"),
+                DismissedRepoRow(repo_name="R2", reason=""),
+            ],
+        )
+        voice = render_voice(briefing)
+        assert "2 dismissed" in voice
+
+    def test_empty_dismissed_repos_no_voice_line(self):
+        briefing = Briefing(username="alice", date="2026-05-12", dismissed_repos=[])
+        voice = render_voice(briefing)
+        assert "dismissed" not in voice
