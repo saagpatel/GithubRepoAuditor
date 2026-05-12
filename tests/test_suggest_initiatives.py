@@ -1318,7 +1318,7 @@ class TestPersistentSuggestionCache:
 
         cache: OrderedDict = OrderedDict()
         key, suggestions, cost = self._make_cache_entry()
-        cache[key] = (suggestions, cost)
+        cache[key] = (suggestions, cost, "2026-05-12T00:00:00+00:00")
         path = suggestion_cache_path(tmp_path)
         save_suggestion_cache(path, cache)
 
@@ -1347,20 +1347,22 @@ class TestPersistentSuggestionCache:
         assert any("could not load cache" in r.message for r in caplog.records)
 
     def test_save_load_round_trip(self, tmp_path):
-        """Save + load preserves keys, suggestion content, and cost."""
+        """Save + load preserves keys, suggestion content, cost, and timestamp."""
         from collections import OrderedDict
 
         cache: OrderedDict = OrderedDict()
         key, suggestions, cost = self._make_cache_entry("my-key")
-        cache[key] = (suggestions, cost)
+        ts = "2026-05-12T00:00:00+00:00"
+        cache[key] = (suggestions, cost, ts)
         path = suggestion_cache_path(tmp_path)
         save_suggestion_cache(path, cache)
 
         loaded = load_suggestion_cache(path)
         assert "my-key" in loaded
-        loaded_suggestions, loaded_cost = loaded["my-key"]
+        loaded_suggestions, loaded_cost, loaded_ts = loaded["my-key"]
         assert loaded_cost == cost
         assert loaded_suggestions == suggestions
+        assert loaded_ts == ts
 
     def test_generate_suggestions_writes_to_disk_after_llm_call(self, tmp_path):
         """generate_suggestions with output_dir persists the result to disk."""
@@ -1379,8 +1381,9 @@ class TestPersistentSuggestionCache:
         path = suggestion_cache_path(tmp_path)
         assert path.exists()
         data = json.loads(path.read_text())
-        assert data["version"] == 1
+        assert data["version"] == 2
         assert any(e["key"] == cache_key for e in data["entries"])
+        assert all("timestamp" in e for e in data["entries"])
 
     def test_generate_suggestions_loads_from_disk_on_new_process(self, tmp_path):
         """After clear_suggestion_cache(), the same cache_key is served from disk."""
@@ -1420,7 +1423,7 @@ class TestPersistentSuggestionCache:
 
         cache: OrderedDict = OrderedDict()
         key, suggestions, cost = self._make_cache_entry()
-        cache[key] = (suggestions, cost)
+        cache[key] = (suggestions, cost, "2026-05-12T00:00:00+00:00")
         path = suggestion_cache_path(tmp_path)
         save_suggestion_cache(path, cache)
         assert path.exists()
@@ -1508,7 +1511,7 @@ class TestBoundedEviction:
         cache: OrderedDict = OrderedDict()
         for i in range(5):
             s = self._make_suggestion(f"Repo{i}")
-            cache[f"key-{i}"] = ([s], 0.0)
+            cache[f"key-{i}"] = ([s], 0.0, "2026-05-12T00:00:00+00:00")
 
         path = suggestion_cache_path(tmp_path)
         save_suggestion_cache(path, cache)
