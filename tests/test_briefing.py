@@ -480,3 +480,164 @@ class TestBriefingSemanticEnrichment:
         )
 
         assert len(briefing.suggestions) == 2
+
+
+# ── Initiative integration ────────────────────────────────────────────────────
+
+
+class TestInitiativesBriefing:
+    """Tests for the initiatives section in build_briefing / render_markdown / render_voice."""
+
+    from datetime import date as _date_cls
+    from datetime import timedelta as _td_cls
+
+    def _future(self, days: int = 30) -> str:
+        from datetime import date, timedelta
+
+        return (date.today() + timedelta(days=days)).isoformat()
+
+    def _past(self, days: int = 5) -> str:
+        from datetime import date, timedelta
+
+        return (date.today() - timedelta(days=days)).isoformat()
+
+    def _write_initiatives(self, tmp_path, initiatives):
+        from src.initiatives import initiatives_path, save_initiatives
+
+        save_initiatives(initiatives_path(tmp_path), initiatives)
+
+    def _make_initiative(
+        self,
+        repo_name: str = "Wavelength",
+        target_tier: int = 3,
+        deadline: str | None = None,
+        closed_at: str | None = None,
+    ):
+        from src.initiatives import Initiative
+
+        return Initiative(
+            repo_name=repo_name,
+            target_tier=target_tier,
+            deadline=deadline or self._future(30),
+            set_at="2026-05-12T10:00:00+00:00",
+            set_by="operator",
+            closed_at=closed_at,
+            closed_reason=None,
+        )
+
+    def test_no_output_dir_yields_empty_initiatives(self):
+        audits = [_make_audit("RepoA")]
+        briefing = build_briefing(
+            audits,
+            "user",
+            "2026-05-11",
+            use_history=False,
+            output_dir=None,
+        )
+        assert briefing.initiatives == []
+
+    def test_empty_initiatives_file_yields_empty_list(self, tmp_path):
+        # Write an empty initiatives file
+        self._write_initiatives(tmp_path, [])
+        audits = [_make_audit("RepoA")]
+        briefing = build_briefing(
+            audits,
+            "user",
+            "2026-05-11",
+            use_history=False,
+            output_dir=tmp_path,
+        )
+        assert briefing.initiatives == []
+
+    def test_one_on_track_initiative_populates_list(self, tmp_path):
+        initiative = self._make_initiative("Wavelength", target_tier=2, deadline=self._future(60))
+        self._write_initiatives(tmp_path, [initiative])
+        audits = [_make_audit("Wavelength")]
+        briefing = build_briefing(
+            audits,
+            "user",
+            "2026-05-11",
+            use_history=False,
+            output_dir=tmp_path,
+        )
+        assert len(briefing.initiatives) == 1
+        ini = briefing.initiatives[0]
+        assert ini.repo_name == "Wavelength"
+        assert ini.target_tier == 2
+        assert ini.status in ("on-track", "at-risk", "overdue", "met")
+
+    def test_closed_initiative_excluded(self, tmp_path):
+        closed = self._make_initiative("Closed-Repo", closed_at="2026-05-01T00:00:00+00:00")
+        self._write_initiatives(tmp_path, [closed])
+        audits = [_make_audit("Closed-Repo")]
+        briefing = build_briefing(
+            audits,
+            "user",
+            "2026-05-11",
+            use_history=False,
+            output_dir=tmp_path,
+        )
+        assert briefing.initiatives == []
+
+    def test_markdown_no_initiatives_section_when_empty(self, tmp_path):
+        self._write_initiatives(tmp_path, [])
+        audits = [_make_audit("RepoA")]
+        briefing = build_briefing(
+            audits, "user", "2026-05-11", use_history=False, output_dir=tmp_path
+        )
+        md = render_markdown(briefing)
+        assert "## Initiatives this week" not in md
+
+    def test_markdown_includes_section_with_one_initiative(self, tmp_path):
+        initiative = self._make_initiative("Wavelength", target_tier=2, deadline=self._future(60))
+        self._write_initiatives(tmp_path, [initiative])
+        audits = [_make_audit("Wavelength")]
+        briefing = build_briefing(
+            audits, "user", "2026-05-11", use_history=False, output_dir=tmp_path
+        )
+        md = render_markdown(briefing)
+        assert "## Initiatives this week" in md
+        assert "Wavelength" in md
+
+    def test_markdown_includes_status_counts_line(self, tmp_path):
+        initiative = self._make_initiative("Wavelength", target_tier=2, deadline=self._future(60))
+        self._write_initiatives(tmp_path, [initiative])
+        audits = [_make_audit("Wavelength")]
+        briefing = build_briefing(
+            audits, "user", "2026-05-11", use_history=False, output_dir=tmp_path
+        )
+        md = render_markdown(briefing)
+        assert "**Status counts:**" in md
+        assert "on-track" in md
+
+    def test_markdown_initiatives_section_comes_before_shipped(self, tmp_path):
+        initiative = self._make_initiative("Wavelength", target_tier=2, deadline=self._future(60))
+        self._write_initiatives(tmp_path, [initiative])
+        audits = [_make_audit("Wavelength", pushed_days_ago=1)]
+        briefing = build_briefing(
+            audits, "user", "2026-05-11", use_history=False, output_dir=tmp_path
+        )
+        md = render_markdown(briefing)
+        idx_initiatives = md.index("## Initiatives this week")
+        idx_shipped = md.index("## Shipped This Week")
+        assert idx_initiatives < idx_shipped, "Initiatives section must appear before Shipped"
+
+    def test_render_voice_no_initiatives_no_line(self, tmp_path):
+        self._write_initiatives(tmp_path, [])
+        audits = [_make_audit("RepoA")]
+        briefing = build_briefing(
+            audits, "user", "2026-05-11", use_history=False, output_dir=tmp_path
+        )
+        voice = render_voice(briefing)
+        assert "initiative" not in voice.lower() or "0 initiatives" not in voice.lower()
+
+    def test_render_voice_includes_initiative_summary(self, tmp_path):
+        initiative = self._make_initiative("Wavelength", target_tier=2, deadline=self._future(60))
+        self._write_initiatives(tmp_path, [initiative])
+        audits = [_make_audit("Wavelength")]
+        briefing = build_briefing(
+            audits, "user", "2026-05-11", use_history=False, output_dir=tmp_path
+        )
+        voice = render_voice(briefing)
+        assert "initiative" in voice.lower()
+        assert "1" in voice

@@ -61,6 +61,15 @@ class Suggestion:
     action: str
 
 
+@dataclass(frozen=True)
+class InitiativeStatus:
+    repo_name: str
+    current_tier: int
+    target_tier: int
+    deadline: str
+    status: str  # "on-track" | "at-risk" | "overdue" | "met"
+
+
 @dataclass
 class Briefing:
     username: str
@@ -70,6 +79,7 @@ class Briefing:
     health_delta: dict[str, list[ScoreMover]] = field(default_factory=dict)  # up/down keys
     suggestions: list[Suggestion] = field(default_factory=list)
     suppressed_by_prefs: list[str] = field(default_factory=list)  # repo names skipped due to prefs
+    initiatives: list[InitiativeStatus] = field(default_factory=list)
 
 
 # ── Section builders ─────────────────────────────────────────────────────────
@@ -379,6 +389,66 @@ def _parse_suggestions_json(raw: str, top_repos: list[dict]) -> list[Suggestion]
 # ── Public build entry point ─────────────────────────────────────────────────
 
 
+def _build_initiatives(
+    audits: list[dict],
+    output_dir: Path | None,
+) -> list[InitiativeStatus]:
+    """Load open initiatives and derive their current status.
+
+    Returns an empty list if *output_dir* is ``None``, the file is missing, or
+    no open initiatives exist.
+    """
+    if output_dir is None:
+        return []
+
+    from src.initiatives import (
+        derive_status,
+        initiatives_path,
+        load_initiatives,
+    )
+    from src.maturity_tiers import compute_tier
+
+    path = initiatives_path(output_dir)
+    all_initiatives = load_initiatives(path)
+    if not all_initiatives:
+        return []
+
+    # Build a name → audit dict for fast lookup
+    audit_map: dict[str, dict] = {}
+    for audit in audits:
+        name = audit.get("metadata", {}).get("name", "")
+        if name:
+            audit_map[name] = audit
+
+    results: list[InitiativeStatus] = []
+    for initiative in all_initiatives:
+        # Skip already-closed initiatives
+        if initiative.closed_at is not None:
+            continue
+        repo_audit = audit_map.get(initiative.repo_name, {})
+        # Convert audit to portfolio-truth-style dict for compute_tier
+        pt_repo: dict = {
+            "identity": {
+                "display_name": initiative.repo_name,
+                "has_git": repo_audit.get("identity", {}).get("has_git", True),
+            },
+            "derived": repo_audit.get("derived", {}),
+            "risk": repo_audit.get("risk", {}),
+        }
+        status = derive_status(initiative, pt_repo)
+        current = compute_tier(pt_repo)
+        results.append(
+            InitiativeStatus(
+                repo_name=initiative.repo_name,
+                current_tier=current,
+                target_tier=initiative.target_tier,
+                deadline=initiative.deadline,
+                status=status,
+            )
+        )
+    return results
+
+
 def build_briefing(
     audits: list[dict],
     username: str,
@@ -390,6 +460,7 @@ def build_briefing(
     prefs: dict | None = None,
     semantic_index: object | None = None,
     cost_tracker: CostTracker | None = None,
+    output_dir: Path | None = None,
 ) -> Briefing:
     """Build a structured weekly operator briefing from audit data.
 
@@ -402,6 +473,10 @@ def build_briefing(
 
     Pass *cost_tracker* (a :class:`~src.llm_cost.CostTracker` instance) to record
     LLM spend and enforce an optional budget cap.
+
+    Pass *output_dir* to load initiative tracker data from
+    ``output_dir/initiatives.json`` and include a top-level initiatives section
+    in the rendered output.
     """
     shipped = _build_shipped(audits)
     needs_attention = _build_needs_attention(audits)
@@ -414,6 +489,7 @@ def build_briefing(
         semantic_index=semantic_index,
         cost_tracker=cost_tracker,
     )
+    initiatives = _build_initiatives(audits, output_dir)
 
     return Briefing(
         username=username,
@@ -423,6 +499,7 @@ def build_briefing(
         health_delta=health_delta,
         suggestions=suggestions,
         suppressed_by_prefs=suppressed_by_prefs,
+        initiatives=initiatives,
     )
 
 
@@ -437,6 +514,42 @@ def render_markdown(briefing: Briefing) -> str:
         f"*Generated {briefing.date}*",
         "",
     ]
+
+    # ── Section 0: Initiatives this week ─────────────────────────────────────
+    if briefing.initiatives:
+        from datetime import date as _date
+
+        lines.append("## Initiatives this week")
+        lines.append("")
+        counts: dict[str, int] = {"on-track": 0, "at-risk": 0, "overdue": 0, "met": 0}
+        for ini in briefing.initiatives:
+            counts[ini.status] = counts.get(ini.status, 0) + 1
+        status_summary = (
+            f"**Status counts:** {counts['on-track']} on-track"
+            f" · {counts['at-risk']} at-risk"
+            f" · {counts['overdue']} overdue"
+        )
+        lines.append(status_summary)
+        lines.append("")
+        today = _date.today()
+        for ini in briefing.initiatives:
+            from src.maturity_tiers import tier_name as _tier_name
+
+            try:
+                deadline_date = _date.fromisoformat(ini.deadline)
+                days_left = (deadline_date - today).days
+                days_str = (
+                    f"{days_left} days until {ini.deadline}"
+                    if days_left >= 0
+                    else f"{abs(days_left)} days overdue"
+                )
+            except (ValueError, TypeError):
+                days_str = ini.deadline
+            target_name = _tier_name(ini.target_tier)
+            lines.append(
+                f"- **{ini.repo_name}** → {target_name} (target) — `{ini.status}` — {days_str}"
+            )
+        lines.append("")
 
     # ── Section 1: Shipped this week ──────────────────────────────────────────
     lines.append("## Shipped This Week")
@@ -523,6 +636,18 @@ def render_voice(briefing: Briefing) -> str:
     # Header
     parts.append(f"Weekly operator briefing for {briefing.username}, generated on {briefing.date}.")
     parts.append("")
+
+    # ── Section 0: Initiatives ────────────────────────────────────────────────
+    if briefing.initiatives:
+        n = len(briefing.initiatives)
+        on_track = sum(1 for i in briefing.initiatives if i.status == "on-track")
+        at_risk = sum(1 for i in briefing.initiatives if i.status == "at-risk")
+        overdue = sum(1 for i in briefing.initiatives if i.status == "overdue")
+        parts.append(
+            f"You have {n} {'initiative' if n == 1 else 'initiatives'} this week, "
+            f"{on_track} on-track, {at_risk} at-risk, {overdue} overdue."
+        )
+        parts.append("")
 
     # ── Section 1 ────────────────────────────────────────────────────────────
     if briefing.shipped_this_week:
@@ -673,6 +798,7 @@ def generate_briefing(
         prefs=prefs or None,
         semantic_index=semantic_index,
         cost_tracker=cost_tracker,
+        output_dir=Path(output_dir),
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)
