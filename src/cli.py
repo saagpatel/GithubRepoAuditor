@@ -321,6 +321,15 @@ def _build_triage_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         metavar="USD",
         help="Override default LLM cost ceiling (default $0.10 for --suggest-initiatives)",
     )
+    # ── Accept suggestion (9.1) ───────────────────────────────────────────
+    p.add_argument(
+        "--accept-suggestion",
+        type=str,
+        default=None,
+        metavar="REPO",
+        dest="accept_suggestion",
+        help="Convert a suggestion into an initiative (creates an initiatives.json entry)",
+    )
 
 
 def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
@@ -1261,6 +1270,15 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="USD",
         dest="llm_budget",
         help="Override default LLM cost ceiling for --suggest-initiatives (default $0.10)",
+    )
+    # ── Accept suggestion (9.1) — also registered here so legacy parser accepts it ──
+    parser.add_argument(
+        "--accept-suggestion",
+        type=str,
+        default=None,
+        metavar="REPO",
+        dest="accept_suggestion",
+        help="Convert a suggestion into an initiative (creates an initiatives.json entry)",
     )
     return parser
 
@@ -2989,6 +3007,47 @@ def _run_suggest_initiatives_mode(args) -> None:
         print(f"    Missing: {', '.join(s.missing_requirements)}")
         print(f"    Rationale: {s.rationale}")
         print()
+
+
+def _run_accept_suggestion_mode(args) -> None:
+    """Accept a suggestion: convert it into a tier-upgrade initiative (Arc G S9.1)."""
+    import json
+    import sys
+
+    from src.suggest_initiatives import accept_suggestion
+
+    output_dir = Path(args.output_dir)
+    truth_path = output_dir / "portfolio-truth-latest.json"
+    if not truth_path.exists():
+        print_warning(
+            "portfolio-truth-latest.json not found. Run `audit run --portfolio-truth` first."
+        )
+        return
+
+    try:
+        truth = json.loads(truth_path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        print_warning(f"Failed to read portfolio-truth: {exc}")
+        return
+
+    projects = truth.get("projects", [])
+
+    try:
+        initiative = accept_suggestion(
+            repo_name=args.accept_suggestion,
+            projects=projects,
+            output_dir=output_dir,
+            deadline=getattr(args, "deadline", None),
+            target_tier=getattr(args, "target_tier", None),
+        )
+    except ValueError as exc:
+        print_warning(str(exc))
+        sys.exit(2)
+
+    print_info(
+        f"Initiative accepted: {initiative.repo_name} → "
+        f"Tier {initiative.target_tier} by {initiative.deadline}"
+    )
 
 
 def _run_apply_improvements_mode(args, parser) -> None:
@@ -6286,6 +6345,11 @@ def main() -> None:
     # ── LLM-suggested initiatives (8.4) ───────────────────────────────────
     if getattr(args, "suggest_initiatives", None) is not None:
         _run_suggest_initiatives_mode(args)
+        return
+
+    # ── Accept suggestion (9.1) ───────────────────────────────────────────
+    if getattr(args, "accept_suggestion", None):
+        _run_accept_suggestion_mode(args)
         return
 
     if getattr(args, "serve", False):

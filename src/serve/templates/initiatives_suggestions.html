@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Suggested Initiatives — Audit Serve{% endblock %}
+
+{% block content %}
+<style>
+  .suggestion-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.25rem;
+  }
+  .suggestion-card h3 {
+    font-size: 1.05rem;
+    margin-bottom: 0.4rem;
+  }
+  .suggestion-card p {
+    margin-bottom: 0.6rem;
+  }
+  .accept-form {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-top: 0.75rem;
+  }
+  .accept-form label {
+    font-size: 0.875rem;
+    color: var(--muted);
+  }
+  .accept-form input[type="date"] {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+  }
+  .suggestion-card.accepted {
+    border-color: var(--approved, #198754);
+    background: #f0faf4;
+  }
+  .suggestion-card.accept-error {
+    border-color: var(--risk, #dc3545);
+    background: #fff5f5;
+    color: var(--risk, #dc3545);
+    padding: 0.75rem 1rem;
+  }
+  .badge-target { background: #cfe2ff; color: #084298; }
+</style>
+
+<div class="page-header">
+  <h1>Suggested Initiatives</h1>
+  {% if not error and suggestions %}
+  <p class="meta">{{ suggestions|length }} suggestion(s) · LLM cost ${{ "%.4f"|format(cost_usd) }}</p>
+  {% endif %}
+</div>
+
+{% if error %}
+<div class="empty-state error-text">{{ error }}</div>
+{% elif not suggestions %}
+<div class="empty-state">
+  No suggestions: all repos either already qualify for their next tier or have too many missing requirements.
+</div>
+{% else %}
+
+{% for s in suggestions %}
+<div class="suggestion-card" id="suggestion-{{ loop.index }}">
+  <h3>{{ s.repo_name }}</h3>
+  <p class="meta">
+    <span class="badge badge-tier">{{ s.current_tier_name }}</span>
+    →
+    <span class="badge badge-tier badge-target">{{ s.target_tier_name }}</span>
+    · <span class="badge">{{ s.estimated_effort }}</span>
+  </p>
+  <p>{{ s.rationale }}</p>
+  <details>
+    <summary>Missing requirements ({{ s.missing_requirements|length }})</summary>
+    <ul class="gap-list">
+      {% for req in s.missing_requirements %}<li>{{ req }}</li>{% endfor %}
+    </ul>
+  </details>
+
+  <form
+    hx-post="/initiatives/accept"
+    hx-target="#suggestion-{{ loop.index }}"
+    hx-swap="outerHTML"
+    class="accept-form"
+  >
+    <input type="hidden" name="repo_name" value="{{ s.repo_name }}">
+    <input type="hidden" name="target_tier" value="{{ s.target_tier }}">
+    <label>
+      Deadline: <input type="date" name="deadline" value="{{ s.default_deadline }}" required>
+    </label>
+    <button type="submit" class="btn btn-sm">Accept</button>
+  </form>
+</div>
+{% endfor %}
+
+{% endif %}
+{% endblock %}
