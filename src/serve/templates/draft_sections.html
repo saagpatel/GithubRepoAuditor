@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Draft Sections — {{ repo_name }}{% endblock %}
+{% block content %}
+<div class="draft-sections-container">
+  <div class="draft-sections__header">
+    <h1 class="draft-sections__title">README sections — <code>{{ repo_name }}</code></h1>
+    <p class="draft-sections__packet-id">Packet: <code>{{ packet_id }}</code></p>
+  </div>
+
+  <p class="draft-sections__counter" id="section-counts">
+    <span class="badge badge-approved">{{ approved_count }} approved</span>
+    &middot;
+    <span class="badge badge-rejected">{{ rejected_count }} rejected</span>
+    &middot;
+    <span class="badge badge-pending">{{ pending_count }} pending</span>
+    &middot;
+    {{ total }} total
+  </p>
+
+  {% if sections %}
+  <div class="draft-sections__cards">
+    {% for section in sections %}
+    {% set state = section.state if section.state else "pending" %}
+    {% set record_id = section.approval_id %}
+    <div class="section-card {% if state == 'approved' %}section-card--approved{% elif state == 'rejected' %}section-card--rejected{% else %}section-card--pending{% endif %}"
+         id="section-card-{{ record_id }}">
+      <div class="section-card__header">
+        <h3 class="section-card__heading">
+          {% if section.section_heading and section.section_heading != "(intro)" %}## {{ section.section_heading }}{% else %}(intro){% endif %}
+        </h3>
+        {% if state == "approved" %}
+          <span class="badge badge-approved">&#10003; Approved</span>
+        {% elif state == "rejected" %}
+          <span class="badge badge-rejected">&#10007; Rejected{% if section.rejected_reason %} ({{ section.rejected_reason }}){% endif %}</span>
+        {% else %}
+          <span class="badge badge-pending">Pending</span>
+        {% endif %}
+      </div>
+      <pre class="section-card__body">{{ section.section_body }}</pre>
+      <div class="section-card__actions">
+        {% if state == "pending" %}
+        <button class="btn-approve"
+          hx-post="/approvals/sections/{{ record_id }}/approve"
+          hx-target="closest .section-card"
+          hx-swap="outerHTML">&#10003; Approve</button>
+        <button class="btn-reject"
+          hx-post="/approvals/sections/{{ record_id }}/reject"
+          hx-target="closest .section-card"
+          hx-swap="outerHTML">&#10007; Reject</button>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="draft-sections__empty">No sections found for this packet.</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -2940,11 +2940,43 @@ def _run_apply_improvements_mode(args, parser) -> None:
         ledger_packets_by_repo: dict[str, object] = {}
 
         from src.draft_readmes import (
+            assemble_readme_from_approved_sections,
             load_approved_drafts,
+            load_approved_sectioned_packets,
             mark_draft_applied,
+            mark_section_packet_applied,
             record_draft_apply_failure,
         )
 
+        # ── Path A: per-section sub-records (Sprint 8.5) ─────────────────────
+        sectioned_packets = load_approved_sectioned_packets(output_dir)
+        sectioned_updates_by_repo: dict[str, tuple[str, str]] = {}  # repo → (packet_id, readme)
+        for pid, sections in sectioned_packets.items():
+            repo_name_sec: str = str((sections[0].get("repo_name") or "") if sections else "")
+            if not repo_name_sec:
+                continue
+            assembled = assemble_readme_from_approved_sections(sections)
+            if assembled is None:
+                print_info(f"sectioned packet {pid} has no approved sections; skipping")
+                continue
+            pending = [s for s in sections if s.get("state", "pending") == "pending"]
+            if pending:
+                print_info(f"sectioned packet {pid} has {len(pending)} pending sections; skipping")
+                continue
+            sectioned_updates_by_repo[repo_name_sec] = (pid, assembled)
+
+        for repo_name_sec, (pid, assembled_readme) in sectioned_updates_by_repo.items():
+            file_names = {(u.get("name") or u.get("repo", "").split("/")[-1]) for u in file_updates}
+            if repo_name_sec not in file_names:
+                readme_updates.append({"name": repo_name_sec, "readme": assembled_readme})
+                if dry_run:
+                    char_count = len(assembled_readme)
+                    print_info(
+                        f"  [dry-run] would push sectioned README to {repo_name_sec}: "
+                        f"{char_count} chars"
+                    )
+
+        # ── Path B: legacy whole-packet records ───────────────────────────────
         ledger_packets = load_approved_drafts(output_dir, getattr(args, "username", None))
         for pkt in ledger_packets:
             # Convert DraftReadmePacket → shape expected by apply_readme_updates
@@ -2984,14 +3016,19 @@ def _run_apply_improvements_mode(args, parser) -> None:
             if not dry_run:
                 for result in results:
                     repo_name = result.get("repo", "")
-                    if repo_name not in ledger_packets_by_repo:
-                        continue
-                    pkt = ledger_packets_by_repo[repo_name]
-                    if result.get("ok"):
-                        mark_draft_applied(output_dir, pkt, apply_result=result)  # type: ignore[arg-type]
-                    else:
-                        error_msg = str(result.get("error") or "unknown error")
-                        record_draft_apply_failure(output_dir, pkt, error=error_msg)  # type: ignore[arg-type]
+                    # Path A: sectioned packets
+                    if repo_name in sectioned_updates_by_repo:
+                        pid, _assembled = sectioned_updates_by_repo[repo_name]
+                        if result.get("ok"):
+                            mark_section_packet_applied(pid, output_dir)
+                    # Path B: legacy whole-packet records
+                    elif repo_name in ledger_packets_by_repo:
+                        pkt = ledger_packets_by_repo[repo_name]
+                        if result.get("ok"):
+                            mark_draft_applied(output_dir, pkt, apply_result=result)  # type: ignore[arg-type]
+                        else:
+                            error_msg = str(result.get("error") or "unknown error")
+                            record_draft_apply_failure(output_dir, pkt, error=error_msg)  # type: ignore[arg-type]
 
             ok_count = sum(1 for r in results if r.get("ok") or r.get("dry_run"))
             verb = "previewed" if dry_run else "pushed"
