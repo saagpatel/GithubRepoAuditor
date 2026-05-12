@@ -304,6 +304,23 @@ def _build_triage_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         dest="close_initiative",
         help="Close the open initiative for REPO (marks as met)",
     )
+    # ── LLM-suggested initiatives (8.4) ───────────────────────────────────
+    p.add_argument(
+        "--suggest-initiatives",
+        nargs="?",
+        const=0,
+        type=int,
+        default=None,
+        metavar="TARGET_TIER",
+        help="LLM-rank repos closest to qualifying for TARGET_TIER (default: next tier from current)",
+    )
+    p.add_argument(
+        "--llm-budget",
+        type=float,
+        default=None,
+        metavar="USD",
+        help="Override default LLM cost ceiling (default $0.10 for --suggest-initiatives)",
+    )
 
 
 def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
@@ -869,6 +886,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="When used with --briefing, also write a voice-readable plain-text variant (.voice.txt).",
     )
     parser.add_argument(
+        "--include-suggestions",
+        action="store_true",
+        default=False,
+        dest="include_suggestions",
+        help="When used with --briefing, run LLM-ranked tier-upgrade suggestions (Arc G S8.4). Off by default to keep briefings cheap.",
+    )
+    parser.add_argument(
         "--narrative-provider",
         choices=["anthropic", "github-models"],
         default=None,
@@ -1218,6 +1242,25 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="REPO",
         dest="close_initiative",
         help="Close the open initiative for REPO (marks as met)",
+    )
+    # ── LLM-suggested initiatives (8.4) — also registered here so legacy parser accepts them ──
+    parser.add_argument(
+        "--suggest-initiatives",
+        nargs="?",
+        const=0,
+        type=int,
+        default=None,
+        metavar="TARGET_TIER",
+        dest="suggest_initiatives",
+        help="LLM-rank repos closest to qualifying for TARGET_TIER (default: next tier from current)",
+    )
+    parser.add_argument(
+        "--llm-budget",
+        type=float,
+        default=None,
+        metavar="USD",
+        dest="llm_budget",
+        help="Override default LLM cost ceiling for --suggest-initiatives (default $0.10)",
     )
     return parser
 
@@ -2900,6 +2943,52 @@ def _run_close_initiative_mode(args) -> None:
         f"Initiative closed: {repo_name} → Tier {closed.target_tier} "
         f"(reason: {closed.closed_reason}, closed_at: {closed.closed_at})"
     )
+
+
+def _run_suggest_initiatives_mode(args) -> None:
+    """LLM-rank repos closest to qualifying for their next maturity tier (Arc G S8.4)."""
+    import json
+    from pathlib import Path as _Path
+
+    from src.llm_cost import BudgetExceededError
+    from src.maturity_tiers import tier_name
+    from src.suggest_initiatives import generate_suggestions
+
+    truth_path = _Path(args.output_dir) / "portfolio-truth-latest.json"
+    if not truth_path.exists():
+        print_warning(
+            "portfolio-truth-latest.json not found. "
+            "Run `audit triage USERNAME --portfolio-truth` first."
+        )
+        return
+
+    truth = json.loads(truth_path.read_text())
+    projects = truth.get("projects", [])
+
+    # 0 is the const sentinel meaning "use per-repo next tier"
+    target = args.suggest_initiatives if args.suggest_initiatives else None
+    budget = args.llm_budget if args.llm_budget is not None else 0.10
+
+    try:
+        suggestions, cost = generate_suggestions(projects, target_tier=target, budget_usd=budget)
+    except BudgetExceededError as exc:
+        print(f"\nERROR: LLM budget exceeded: {exc}", file=sys.stderr)
+        return
+
+    if not suggestions:
+        print_info("No suggestions: no repos are close to qualifying for the next tier.")
+        return
+
+    print_info(f"Suggested Initiatives ({len(suggestions)} candidates, ${cost:.4f} spent)")
+    print()
+    for s in suggestions:
+        print(
+            f"  {s.repo_name:<30} {tier_name(s.current_tier)} → {tier_name(s.target_tier):<10} "
+            f"[{s.estimated_effort}]"
+        )
+        print(f"    Missing: {', '.join(s.missing_requirements)}")
+        print(f"    Rationale: {s.rationale}")
+        print()
 
 
 def _run_apply_improvements_mode(args, parser) -> None:
@@ -5392,6 +5481,7 @@ def _write_report_outputs(
                 github_token=args.token,
                 write_voice=getattr(args, "briefing_voice", False),
                 cost_tracker=_cost_tracker,
+                include_suggestions=getattr(args, "include_suggestions", False),
             )
         except BudgetExceededError as exc:
             print(f"\nERROR: {exc}", file=sys.stderr)
@@ -6191,6 +6281,11 @@ def main() -> None:
         return
     if getattr(args, "close_initiative", None):
         _run_close_initiative_mode(args)
+        return
+
+    # ── LLM-suggested initiatives (8.4) ───────────────────────────────────
+    if getattr(args, "suggest_initiatives", None) is not None:
+        _run_suggest_initiatives_mode(args)
         return
 
     if getattr(args, "serve", False):
