@@ -716,7 +716,11 @@ async def initiatives_suggestions(
     cache_key = f"{truth.get('generated_at', '')}|target={target if target is not None else 'auto'}"
     try:
         suggestions, cost = generate_suggestions(
-            projects, target_tier=target, budget_usd=0.10, cache_key=cache_key
+            projects,
+            target_tier=target,
+            budget_usd=0.10,
+            cache_key=cache_key,
+            output_dir=output_dir,
         )
     except Exception as exc:
         return templates.TemplateResponse(
@@ -798,6 +802,37 @@ async def accept_initiative_route(
         f"Tier {initiative.target_tier} by {_html.escape(initiative.deadline)}. "
         f'<a href="/initiatives">View initiatives →</a>'
         f"</div>"
+    )
+
+
+@router.post("/initiatives/suggestions/dismiss", response_class=HTMLResponse)
+async def dismiss_suggestion_route(
+    request: Request,
+    repo_name: str = Form(...),
+    reason: str = Form(""),
+) -> HTMLResponse:
+    """Dismiss a suggestion. Returns HTMX partial (Arc G S11.4)."""
+    import html as _html
+
+    from src.suggest_initiatives import dismiss_suggestion_record, dismissed_path
+
+    output_dir = _output_dir(request)
+    try:
+        entry = dismiss_suggestion_record(
+            dismissed_path(output_dir), repo_name=repo_name, reason=reason
+        )
+    except ValueError as exc:
+        return HTMLResponse(
+            f'<div class="suggestion-card accept-error">Error: {_html.escape(str(exc))}</div>',
+            status_code=400,
+        )
+
+    return HTMLResponse(
+        f'<div class="suggestion-card dismissed" data-repo="{_html.escape(entry.repo_name)}">'
+        f"<strong>✗ Dismissed:</strong> {_html.escape(entry.repo_name)}"
+        + (f" — {_html.escape(entry.reason)}" if entry.reason else "")
+        + ' <a href="/initiatives/suggestions">Refresh suggestions →</a>'
+        + "</div>"
     )
 
 

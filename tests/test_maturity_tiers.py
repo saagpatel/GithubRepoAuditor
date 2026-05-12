@@ -615,3 +615,56 @@ def test_tier_gap_frozen_with_sources():
     tg = TierGap(1, 3, ["missing req"], ["proxy"])
     with pytest.raises((AttributeError, TypeError)):
         tg.requirement_sources = []  # type: ignore[misc]
+
+
+# ── Arc G Sprint 11.3 — TierGap JSON serialisation ───────────────────────────
+
+
+# 21. to_dict includes all four fields
+def test_tier_gap_to_dict_includes_all_fields():
+    """TierGap.to_dict() returns all four expected fields."""
+    tg = TierGap(
+        current_tier=1,
+        target_tier=3,
+        missing_requirements=["Has CI", "Has tests"],
+        requirement_sources=["strict", "proxy"],
+    )
+    d = tg.to_dict()
+    assert d["current_tier"] == 1
+    assert d["target_tier"] == 3
+    assert d["missing_requirements"] == ["Has CI", "Has tests"]
+    assert d["requirement_sources"] == ["strict", "proxy"]
+
+
+# 22. from_dict(to_dict(g)) == g — round-trip for various inputs
+@pytest.mark.parametrize(
+    "tg",
+    [
+        TierGap(current_tier=0, target_tier=2),
+        TierGap(
+            current_tier=1,
+            target_tier=2,
+            missing_requirements=["req A"],
+            requirement_sources=["strict"],
+        ),
+        TierGap(
+            current_tier=2,
+            target_tier=4,
+            missing_requirements=["req A", "req B"],
+            requirement_sources=["strict", "proxy"],
+        ),
+    ],
+    ids=["empty-sources", "all-strict", "mixed"],
+)
+def test_tier_gap_round_trip(tg: TierGap):
+    """TierGap.from_dict(tg.to_dict()) == tg for various inputs."""
+    assert TierGap.from_dict(tg.to_dict()) == tg
+
+
+# 23. from_dict with missing requirement_sources key → empty list
+def test_tier_gap_from_dict_missing_sources_defaults_to_empty():
+    """from_dict with no 'requirement_sources' key yields an empty list."""
+    d = {"current_tier": 2, "target_tier": 3, "missing_requirements": ["something"]}
+    tg = TierGap.from_dict(d)
+    assert tg.requirement_sources == []
+    assert tg.missing_requirements == ["something"]

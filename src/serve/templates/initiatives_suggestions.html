@@ -45,6 +45,29 @@
     color: var(--risk, #dc3545);
     padding: 0.75rem 1rem;
   }
+  .suggestion-card.dismissed {
+    border-color: var(--muted, #6c757d);
+    background: #f8f9fa;
+    color: var(--muted, #6c757d);
+    padding: 0.75rem 1rem;
+  }
+  .card-actions {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-top: 0.75rem;
+  }
+  .dismiss-form button {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted, #6c757d);
+    border-radius: var(--radius);
+    padding: 0.3rem 0.75rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+  }
+  .dismiss-form button:hover { background: #f8f9fa; }
   .badge-target { background: #cfe2ff; color: #084298; }
 </style>
 
@@ -80,19 +103,32 @@
     </ul>
   </details>
 
-  <form
-    hx-post="/initiatives/accept"
-    hx-target="#suggestion-{{ loop.index }}"
-    hx-swap="outerHTML"
-    class="accept-form"
-  >
-    <input type="hidden" name="repo_name" value="{{ s.repo_name }}">
-    <input type="hidden" name="target_tier" value="{{ s.target_tier }}">
-    <label>
-      Deadline: <input type="date" name="deadline" value="{{ s.default_deadline }}" required>
-    </label>
-    <button type="submit" class="btn btn-sm">Accept</button>
-  </form>
+  <div class="card-actions">
+    <form
+      hx-post="/initiatives/accept"
+      hx-target="#suggestion-{{ loop.index }}"
+      hx-swap="outerHTML"
+      class="accept-form"
+    >
+      <input type="hidden" name="repo_name" value="{{ s.repo_name }}">
+      <input type="hidden" name="target_tier" value="{{ s.target_tier }}">
+      <label>
+        Deadline: <input type="date" name="deadline" value="{{ s.default_deadline }}" required>
+      </label>
+      <button type="submit" class="btn btn-sm">Accept</button>
+    </form>
+
+    <form
+      hx-post="/initiatives/suggestions/dismiss"
+      hx-target="#suggestion-{{ loop.index }}"
+      hx-swap="outerHTML"
+      hx-confirm="Dismiss {{ s.repo_name }} from future suggestions?"
+      class="dismiss-form"
+    >
+      <input type="hidden" name="repo_name" value="{{ s.repo_name }}">
+      <button type="submit" class="btn-secondary">Dismiss</button>
+    </form>
+  </div>
 </div>
 {% endfor %}
 

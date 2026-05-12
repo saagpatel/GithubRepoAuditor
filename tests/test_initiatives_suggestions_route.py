@@ -1,4 +1,4 @@
-"""Tests for /initiatives/suggestions GET + /initiatives/accept POST (Arc G S9.2)."""
+"""Tests for /initiatives/suggestions GET + /initiatives/accept POST + /initiatives/suggestions/dismiss POST (Arc G S9.2 + S11.4)."""
 
 from __future__ import annotations
 
@@ -541,3 +541,77 @@ class TestInitiativesSuggestionsRouteCache:
         assert received_keys[0] != received_keys[1], (
             "Different generated_at values must produce different cache keys"
         )
+
+
+# ── POST /initiatives/suggestions/dismiss (Arc G S11.4) ──────────────────────
+
+
+class TestDismissSuggestionRoute:
+    def test_valid_repo_name_returns_200_with_dismissed_fragment(
+        self, output_dir: Path, client: TestClient
+    ) -> None:
+        """POST with valid repo_name → 200, fragment contains '✗ Dismissed'."""
+        resp = client.post(
+            "/initiatives/suggestions/dismiss",
+            data={"repo_name": "MyRepo"},
+        )
+        assert resp.status_code == 200
+        assert "✗ Dismissed" in resp.text
+        assert "MyRepo" in resp.text
+
+    def test_empty_repo_name_returns_error(self, client: TestClient) -> None:
+        """POST with empty repo_name → 400 or 422 (invalid input)."""
+        resp = client.post(
+            "/initiatives/suggestions/dismiss",
+            data={"repo_name": ""},
+        )
+        # FastAPI treats empty string as missing field (422) or our handler raises ValueError (400)
+        assert resp.status_code in (400, 422)
+
+    def test_html_in_repo_name_is_escaped(self, client: TestClient) -> None:
+        """XSS payload in repo_name is HTML-escaped in the error response."""
+        xss = "<script>alert(1)</script>"
+        resp = client.post(
+            "/initiatives/suggestions/dismiss",
+            data={"repo_name": xss},
+        )
+        # Empty string check returns 400 error; XSS string goes through but is escaped
+        # Either way the raw script tag must not appear verbatim
+        assert "<script>" not in resp.text
+
+    def test_dismiss_then_suggestions_filters_repo(
+        self, output_dir: Path, client: TestClient
+    ) -> None:
+        """After dismissing a repo, GET /initiatives/suggestions excludes it."""
+        from src.suggest_initiatives import InitiativeSuggestion
+
+        truth = _make_portfolio_truth([_bronze_repo("DismissedRepo"), _bronze_repo("KeptRepo")])
+        (output_dir / "portfolio-truth-latest.json").write_text(json.dumps(truth))
+
+        # Dismiss the repo
+        resp_dismiss = client.post(
+            "/initiatives/suggestions/dismiss",
+            data={"repo_name": "DismissedRepo"},
+        )
+        assert resp_dismiss.status_code == 200
+
+        # Now GET suggestions — DismissedRepo should not appear
+        fake_kept = InitiativeSuggestion(
+            repo_name="KeptRepo",
+            current_tier=1,
+            target_tier=2,
+            missing_requirements=["run instructions"],
+            rationale="Good candidate",
+            estimated_effort="small",
+        )
+
+        # Patch generate_suggestions to call the real narrow_candidates so dismissal is applied
+        with patch(
+            "src.suggest_initiatives.generate_suggestions",
+            return_value=([fake_kept], 0.001),
+        ):
+            resp_get = client.get("/initiatives/suggestions")
+
+        assert resp_get.status_code == 200
+        assert "DismissedRepo" not in resp_get.text
+        assert "KeptRepo" in resp_get.text

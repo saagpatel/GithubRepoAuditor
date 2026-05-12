@@ -12,9 +12,12 @@ from __future__ import annotations
 
 import json
 import logging
+import tempfile
+from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
+from typing import Any
 
 from src.narrative import _resolve_provider
 
@@ -22,15 +25,241 @@ logger = logging.getLogger(__name__)
 
 # ── In-process suggestion cache ───────────────────────────────────────────────
 
+# Maximum number of entries retained in _suggestion_cache (in-memory and on-disk).
+_CACHE_MAX_SIZE = 100
+
 # In-process cache for generate_suggestions results, keyed by caller-supplied cache_key.
 # Caller is responsible for picking a key that captures all relevant inputs
 # (e.g. portfolio-truth generated_at + target_tier).
-_suggestion_cache: dict[str, tuple[list["InitiativeSuggestion"], float]] = {}
+# OrderedDict for LRU-style eviction (insertion-order, FIFO eviction on overflow).
+_suggestion_cache: OrderedDict[str, tuple[list["InitiativeSuggestion"], float]] = OrderedDict()
+
+# Track which output_dir paths have already been loaded from disk (lazy-load guard).
+_loaded_from_disk: set[Path] = set()
 
 
-def clear_suggestion_cache() -> None:
-    """Test helper / public API: drop all cached suggestions."""
+# ── Persistent cache helpers ──────────────────────────────────────────────────
+
+
+def suggestion_cache_path(output_dir: Path) -> Path:
+    """Return the path to the persistent suggestion cache file."""
+    return output_dir / "suggestion-cache.json"
+
+
+def load_suggestion_cache(
+    path: Path,
+) -> OrderedDict[str, tuple[list["InitiativeSuggestion"], float]]:
+    """Read the versioned JSON cache file.
+
+    Missing file or malformed JSON → returns an empty OrderedDict and logs a
+    warning for the malformed-JSON case.  Hydrates :class:`InitiativeSuggestion`
+    instances from stored dicts.
+    """
+    if not path.exists():
+        return OrderedDict()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning("suggest_initiatives: could not load cache %s: %s", path, exc)
+        return OrderedDict()
+
+    if not isinstance(data, dict) or data.get("version") != 1:
+        logger.warning("suggest_initiatives: unrecognised cache schema in %s — ignoring", path)
+        return OrderedDict()
+
+    result: OrderedDict[str, tuple[list[InitiativeSuggestion], float]] = OrderedDict()
+    for entry in data.get("entries", []):
+        try:
+            key = str(entry["key"])
+            cost = float(entry["cost"])
+            suggestions = [InitiativeSuggestion.from_dict(s) for s in entry["suggestions"]]
+            result[key] = (suggestions, cost)
+        except (KeyError, TypeError, ValueError) as exc:
+            logger.warning("suggest_initiatives: skipping malformed cache entry: %s", exc)
+
+    return result
+
+
+def save_suggestion_cache(
+    path: Path,
+    cache: OrderedDict[str, tuple[list["InitiativeSuggestion"], float]],
+) -> None:
+    """Persist *cache* to *path* atomically using a tmp+rename pattern.
+
+    Only the most recent :data:`_CACHE_MAX_SIZE` entries (by insertion order) are
+    written.  Schema: ``{"version": 1, "entries": [...]}``.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Cap to most recent _CACHE_MAX_SIZE entries
+    entries_to_write = list(cache.items())[-_CACHE_MAX_SIZE:]
+
+    serialisable = {
+        "version": 1,
+        "entries": [
+            {
+                "key": key,
+                "cost": cost,
+                "suggestions": [s.to_dict() for s in suggestions],
+            }
+            for key, (suggestions, cost) in entries_to_write
+        ],
+    }
+
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=".suggestion_cache_tmp_",
+            suffix=".json",
+            delete=False,
+        ) as tmp:
+            tmp_path = Path(tmp.name)
+            json.dump(serialisable, tmp, indent=2)
+        tmp_path.replace(path)
+    except OSError as exc:
+        logger.error("suggest_initiatives: atomic cache write failed for %s: %s", path, exc)
+        raise
+
+
+# ── Dismissed suggestions persistence ────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class DismissedSuggestion:
+    """A repo that has been dismissed from LLM-suggested initiatives."""
+
+    repo_name: str
+    reason: str  # operator-provided text, default ""
+    dismissed_at: str  # ISO timestamp
+    dismissed_by: str  # operator_identity() from src.initiatives
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "repo_name": self.repo_name,
+            "reason": self.reason,
+            "dismissed_at": self.dismissed_at,
+            "dismissed_by": self.dismissed_by,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "DismissedSuggestion":
+        return cls(
+            repo_name=str(data.get("repo_name", "")),
+            reason=str(data.get("reason", "")),
+            dismissed_at=str(data.get("dismissed_at", "")),
+            dismissed_by=str(data.get("dismissed_by", "")),
+        )
+
+
+def dismissed_path(output_dir: Path) -> Path:
+    """Return output_dir / 'dismissed-suggestions.json'."""
+    return output_dir / "dismissed-suggestions.json"
+
+
+def load_dismissed(path: Path) -> list[DismissedSuggestion]:
+    """Read versioned JSON. Missing/malformed → empty list (log warning)."""
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning("suggest_initiatives: could not load dismissed file %s: %s", path, exc)
+        return []
+
+    if not isinstance(data, dict) or data.get("version") != 1:
+        logger.warning("suggest_initiatives: unrecognised dismissed schema in %s — ignoring", path)
+        return []
+
+    result: list[DismissedSuggestion] = []
+    for entry in data.get("items", []):
+        try:
+            result.append(DismissedSuggestion.from_dict(entry))
+        except (KeyError, TypeError, ValueError) as exc:
+            logger.warning("suggest_initiatives: skipping malformed dismissed entry: %s", exc)
+
+    return result
+
+
+def save_dismissed(path: Path, items: list[DismissedSuggestion]) -> None:
+    """Atomic tmp+rename write. Schema {"version": 1, "items": [...]}."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    serialisable = {
+        "version": 1,
+        "items": [d.to_dict() for d in items],
+    }
+
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=".dismissed_suggestions_tmp_",
+            suffix=".json",
+            delete=False,
+        ) as tmp:
+            tmp_path = Path(tmp.name)
+            json.dump(serialisable, tmp, indent=2)
+        tmp_path.replace(path)
+    except OSError as exc:
+        logger.error("suggest_initiatives: atomic dismissed write failed for %s: %s", path, exc)
+        raise
+
+
+def dismiss_suggestion_record(path: Path, repo_name: str, reason: str = "") -> DismissedSuggestion:
+    """Add or replace by repo_name (idempotent). Returns the recorded entry.
+
+    Validates repo_name is non-empty; raises ValueError if blank.
+    On re-dismissal: dismissed_at is updated to the current timestamp.
+    """
+    if not repo_name.strip():
+        raise ValueError("repo_name must not be blank")
+
+    from datetime import datetime, timezone
+
+    from src.initiatives import operator_identity
+
+    items = load_dismissed(path)
+    # Remove any existing entry for this repo_name
+    items = [d for d in items if d.repo_name != repo_name]
+
+    entry = DismissedSuggestion(
+        repo_name=repo_name,
+        reason=reason,
+        dismissed_at=datetime.now(timezone.utc).isoformat(),
+        dismissed_by=operator_identity(),
+    )
+    items.append(entry)
+    save_dismissed(path, items)
+    return entry
+
+
+def undo_dismiss(path: Path, repo_name: str) -> bool:
+    """Remove entry for repo_name. Return True if removed, False if not present."""
+    items = load_dismissed(path)
+    new_items = [d for d in items if d.repo_name != repo_name]
+    if len(new_items) == len(items):
+        return False
+    save_dismissed(path, new_items)
+    return True
+
+
+def clear_suggestion_cache(path: Path | None = None) -> None:
+    """Drop all in-memory cached suggestions.
+
+    If *path* is provided and the file exists, delete it as well.  Also clears
+    the ``_loaded_from_disk`` tracking set so a subsequent call with the same
+    *output_dir* will re-load from disk (or start fresh).
+    """
     _suggestion_cache.clear()
+    _loaded_from_disk.clear()
+    if path is not None and path.exists():
+        try:
+            path.unlink()
+        except OSError as exc:
+            logger.warning("suggest_initiatives: could not delete cache %s: %s", path, exc)
 
 
 # ── Public dataclass ──────────────────────────────────────────────────────────
@@ -45,6 +274,29 @@ class InitiativeSuggestion:
     rationale: str  # LLM-provided (or fallback message)
     estimated_effort: str  # "small" | "medium" | "large" | "unknown"
 
+    def to_dict(self) -> dict[str, Any]:
+        """Serialise to a JSON-compatible dict."""
+        return {
+            "repo_name": self.repo_name,
+            "current_tier": self.current_tier,
+            "target_tier": self.target_tier,
+            "missing_requirements": list(self.missing_requirements),
+            "rationale": self.rationale,
+            "estimated_effort": self.estimated_effort,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "InitiativeSuggestion":
+        """Hydrate from a JSON-compatible dict.  Missing keys default safely."""
+        return cls(
+            repo_name=str(data.get("repo_name", "")),
+            current_tier=int(data.get("current_tier", 0)),
+            target_tier=int(data.get("target_tier", 0)),
+            missing_requirements=list(data.get("missing_requirements", [])),
+            rationale=str(data.get("rationale", "")),
+            estimated_effort=str(data.get("estimated_effort", "unknown")),
+        )
+
 
 # ── Candidate selection ───────────────────────────────────────────────────────
 
@@ -53,6 +305,7 @@ def narrow_candidates(
     projects: list[dict],
     target_tier: int | None = None,
     max_missing: int = 3,
+    dismissed: set[str] | None = None,
 ) -> list[tuple[dict, int, "TierGap"]]:  # noqa: F821
     """Return (repo, target_tier, gap) tuples for repos close to their next tier.
 
@@ -64,12 +317,23 @@ def narrow_candidates(
     - Skip if *target_tier* > 4.
     - Skip if repo already qualifies for the target (no missing requirements).
     - Skip if ``len(missing_requirements) > max_missing`` (too far away).
+    - If *dismissed* is provided, skip repos whose ``identity.display_name``
+      is in the set.  Pass ``None`` (default) to disable filtering.
     """
     from src.maturity_tiers import TierGap, compute_tier, tier_gap
 
     candidates: list[tuple[dict, int, TierGap]] = []
 
     for repo in projects:
+        name = (
+            repo.get("identity", {}).get("display_name")
+            or repo.get("metadata", {}).get("name")
+            or repo.get("repo_name")
+            or ""
+        )
+        if dismissed is not None and name in dismissed:
+            continue
+
         current = compute_tier(repo)
         # Skip no-git repos and repos already at max tier
         if current == 0 or current >= 4:
@@ -394,6 +658,7 @@ def generate_suggestions(
     max_missing: int = 3,
     cache_key: str | None = None,
     force_deterministic: bool = False,
+    output_dir: Path | None = None,
 ) -> tuple[list[InitiativeSuggestion], float]:
     """Generate LLM-ranked initiative suggestions for the portfolio.
 
@@ -418,6 +683,11 @@ def generate_suggestions(
         If ``True``, skip the LLM call entirely and use the deterministic ranking
         (fewest missing requirements).  Cost is always 0.0.  Never raises.
         Useful for deadline derivation in :func:`accept_suggestion`.
+    output_dir:
+        When provided, the persistent cache at
+        ``output_dir / "suggestion-cache.json"`` is lazily loaded on the first
+        call for that directory.  New results are also written back to disk.
+        Callers that omit this parameter see no behaviour change (opt-in).
 
     Returns
     -------
@@ -428,21 +698,45 @@ def generate_suggestions(
 
     from src.llm_cost import BudgetExceededError, CostTracker
 
+    # ── Lazy disk load (first call per output_dir) ────────────────────────────
+    if output_dir is not None and output_dir not in _loaded_from_disk:
+        disk_cache = load_suggestion_cache(suggestion_cache_path(output_dir))
+        for k, v in disk_cache.items():
+            _suggestion_cache[k] = v
+        _loaded_from_disk.add(output_dir)
+
+    # ── Load dismissed set when output_dir is provided ───────────────────────
+    _dismissed_set: set[str] | None = None
+    if output_dir is not None:
+        dismissed_items = load_dismissed(dismissed_path(output_dir))
+        _dismissed_set = {d.repo_name for d in dismissed_items} if dismissed_items else None
+
     # ── Cache lookup ──────────────────────────────────────────────────────────
     if cache_key is not None and cache_key in _suggestion_cache:
+        _suggestion_cache.move_to_end(cache_key)  # mark as recently used
         return _suggestion_cache[cache_key]
 
     # ── Deterministic fast-path (no LLM, no CostTracker) ─────────────────────
     if force_deterministic:
-        candidates = narrow_candidates(projects, target_tier=target_tier, max_missing=max_missing)
+        candidates = narrow_candidates(
+            projects, target_tier=target_tier, max_missing=max_missing, dismissed=_dismissed_set
+        )
         if not candidates:
             return [], 0.0
         suggestions = _deterministic_rank(candidates)
         if cache_key is not None:
             _suggestion_cache[cache_key] = (suggestions, 0.0)
+            _suggestion_cache.move_to_end(cache_key)
+            # Bounded eviction
+            while len(_suggestion_cache) > _CACHE_MAX_SIZE:
+                _suggestion_cache.popitem(last=False)
+            if output_dir is not None:
+                save_suggestion_cache(suggestion_cache_path(output_dir), _suggestion_cache)
         return suggestions, 0.0
 
-    candidates = narrow_candidates(projects, target_tier=target_tier, max_missing=max_missing)
+    candidates = narrow_candidates(
+        projects, target_tier=target_tier, max_missing=max_missing, dismissed=_dismissed_set
+    )
     if not candidates:
         return [], 0.0
 
@@ -457,6 +751,11 @@ def generate_suggestions(
         suggestions = _deterministic_rank(candidates)
         if cache_key is not None:
             _suggestion_cache[cache_key] = (suggestions, 0.0)
+            _suggestion_cache.move_to_end(cache_key)
+            while len(_suggestion_cache) > _CACHE_MAX_SIZE:
+                _suggestion_cache.popitem(last=False)
+            if output_dir is not None:
+                save_suggestion_cache(suggestion_cache_path(output_dir), _suggestion_cache)
         return suggestions, 0.0
 
     provider, model_name = provider_result
@@ -488,4 +787,11 @@ def generate_suggestions(
     suggestions = parse_suggest_response(raw, candidates)
     if cache_key is not None:
         _suggestion_cache[cache_key] = (suggestions, actual_cost)
+        _suggestion_cache.move_to_end(cache_key)
+        # Bounded eviction — FIFO: oldest entry evicted first
+        while len(_suggestion_cache) > _CACHE_MAX_SIZE:
+            _suggestion_cache.popitem(last=False)
+        # Persist to disk if caller passed output_dir
+        if output_dir is not None:
+            save_suggestion_cache(suggestion_cache_path(output_dir), _suggestion_cache)
     return suggestions, actual_cost

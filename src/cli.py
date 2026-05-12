@@ -330,6 +330,32 @@ def _build_triage_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         dest="accept_suggestion",
         help="Convert a suggestion into an initiative (creates an initiatives.json entry)",
     )
+    # ── Dismiss suggestion (11.4) ─────────────────────────────────────────
+    p.add_argument(
+        "--dismiss-suggestion",
+        type=str,
+        default=None,
+        metavar="REPO",
+        help="Suppress repo from future LLM-suggested initiatives",
+    )
+    p.add_argument(
+        "--reason",
+        type=str,
+        default="",
+        help="Reason for dismissal (used with --dismiss-suggestion)",
+    )
+    p.add_argument(
+        "--undo-dismiss",
+        type=str,
+        default=None,
+        metavar="REPO",
+        help="Restore a dismissed repo to the suggestion pool",
+    )
+    p.add_argument(
+        "--list-dismissed",
+        action="store_true",
+        help="List currently dismissed suggestion repos",
+    )
 
 
 def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
@@ -1279,6 +1305,32 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="REPO",
         dest="accept_suggestion",
         help="Convert a suggestion into an initiative (creates an initiatives.json entry)",
+    )
+    # ── Dismiss suggestion (11.4) — also registered here so legacy parser accepts them ──
+    parser.add_argument(
+        "--dismiss-suggestion",
+        type=str,
+        default=None,
+        metavar="REPO",
+        help="Suppress repo from future LLM-suggested initiatives",
+    )
+    parser.add_argument(
+        "--reason",
+        type=str,
+        default="",
+        help="Reason for dismissal (used with --dismiss-suggestion)",
+    )
+    parser.add_argument(
+        "--undo-dismiss",
+        type=str,
+        default=None,
+        metavar="REPO",
+        help="Restore a dismissed repo to the suggestion pool",
+    )
+    parser.add_argument(
+        "--list-dismissed",
+        action="store_true",
+        help="List currently dismissed suggestion repos",
     )
     return parser
 
@@ -3048,6 +3100,57 @@ def _run_accept_suggestion_mode(args) -> None:
         f"Initiative accepted: {initiative.repo_name} → "
         f"Tier {initiative.target_tier} by {initiative.deadline}"
     )
+
+
+def _run_dismiss_suggestion_mode(args) -> None:
+    """Dismiss a repo from future LLM-suggested initiatives (Arc G S11.4)."""
+    import sys
+    from pathlib import Path
+
+    from src.suggest_initiatives import dismiss_suggestion_record, dismissed_path
+
+    output_dir = Path(args.output_dir)
+    try:
+        entry = dismiss_suggestion_record(
+            dismissed_path(output_dir),
+            repo_name=args.dismiss_suggestion,
+            reason=getattr(args, "reason", "") or "",
+        )
+    except ValueError as exc:
+        print_warning(str(exc))
+        sys.exit(2)
+    print_info(f"✗ Dismissed: {entry.repo_name}" + (f" — {entry.reason}" if entry.reason else ""))
+
+
+def _run_undo_dismiss_mode(args) -> None:
+    """Restore a dismissed repo to the suggestion pool (Arc G S11.4)."""
+    from pathlib import Path
+
+    from src.suggest_initiatives import dismissed_path, undo_dismiss
+
+    output_dir = Path(args.output_dir)
+    removed = undo_dismiss(dismissed_path(output_dir), args.undo_dismiss)
+    if removed:
+        print_info(f"✓ Restored: {args.undo_dismiss}")
+    else:
+        print_warning(f"{args.undo_dismiss} was not dismissed; nothing to undo")
+
+
+def _run_list_dismissed_mode(args) -> None:
+    """List all currently dismissed suggestion repos (Arc G S11.4)."""
+    from pathlib import Path
+
+    from src.suggest_initiatives import dismissed_path, load_dismissed
+
+    output_dir = Path(args.output_dir)
+    items = load_dismissed(dismissed_path(output_dir))
+    if not items:
+        print_info("No dismissed suggestions.")
+        return
+    print_info(f"Dismissed Suggestions ({len(items)})")
+    for d in items:
+        reason = f" — {d.reason}" if d.reason else ""
+        print(f"  {d.repo_name:<30} dismissed {d.dismissed_at[:10]} by {d.dismissed_by}{reason}")
 
 
 def _run_apply_improvements_mode(args, parser) -> None:
@@ -6350,6 +6453,17 @@ def main() -> None:
     # ── Accept suggestion (9.1) ───────────────────────────────────────────
     if getattr(args, "accept_suggestion", None):
         _run_accept_suggestion_mode(args)
+        return
+
+    # ── Dismiss suggestion (11.4) ─────────────────────────────────────────
+    if getattr(args, "dismiss_suggestion", None):
+        _run_dismiss_suggestion_mode(args)
+        return
+    if getattr(args, "undo_dismiss", None):
+        _run_undo_dismiss_mode(args)
+        return
+    if getattr(args, "list_dismissed", False):
+        _run_list_dismissed_mode(args)
         return
 
     if getattr(args, "serve", False):

@@ -1,4 +1,4 @@
-"""Tests for src/suggest_initiatives.py — Arc G Sprint 8.4 + 9.1 + 10.3 + 10.4."""
+"""Tests for src/suggest_initiatives.py — Arc G Sprint 8.4 + 9.1 + 10.3 + 10.4 + 11.1 + 11.2 + 11.4."""
 
 from __future__ import annotations
 
@@ -8,15 +8,26 @@ from unittest.mock import patch
 
 import pytest
 
+import src.suggest_initiatives as _si_mod
 from src.llm_cost import BudgetExceededError
 from src.suggest_initiatives import (
+    DismissedSuggestion,
+    InitiativeSuggestion,
     accept_suggestion,
     build_suggest_prompt,
     clear_suggestion_cache,
     default_deadline_for_effort,
+    dismiss_suggestion_record,
+    dismissed_path,
     generate_suggestions,
+    load_dismissed,
+    load_suggestion_cache,
     narrow_candidates,
     parse_suggest_response,
+    save_dismissed,
+    save_suggestion_cache,
+    suggestion_cache_path,
+    undo_dismiss,
 )
 
 # ── Factories ─────────────────────────────────────────────────────────────────
@@ -1224,3 +1235,624 @@ class TestForceDeterministic:
 
         assert initiative.repo_name == "DetAccept"
         assert date.fromisoformat(initiative.deadline) > date.today()
+
+
+# ── Arc G Sprint 11.1 — InitiativeSuggestion round-trip ──────────────────────
+
+
+class TestInitiativeSuggestionRoundTrip:
+    """Tests for InitiativeSuggestion.to_dict() and from_dict()."""
+
+    def _sample(self) -> InitiativeSuggestion:
+        return InitiativeSuggestion(
+            repo_name="MyRepo",
+            current_tier=1,
+            target_tier=2,
+            missing_requirements=["Has tests", "Has CI"],
+            rationale="High leverage due to active status",
+            estimated_effort="small",
+        )
+
+    def test_to_dict_returns_expected_keys(self):
+        """to_dict() returns all six expected keys with correct values."""
+        s = self._sample()
+        d = s.to_dict()
+        assert d["repo_name"] == "MyRepo"
+        assert d["current_tier"] == 1
+        assert d["target_tier"] == 2
+        assert d["missing_requirements"] == ["Has tests", "Has CI"]
+        assert d["rationale"] == "High leverage due to active status"
+        assert d["estimated_effort"] == "small"
+
+    def test_round_trip_equality(self):
+        """from_dict(to_dict(s)) == s for a fully-populated instance."""
+        s = self._sample()
+        assert InitiativeSuggestion.from_dict(s.to_dict()) == s
+
+    def test_from_dict_missing_keys_defaults_safely(self):
+        """from_dict with an empty dict returns an instance without raising."""
+        s = InitiativeSuggestion.from_dict({})
+        assert s.repo_name == ""
+        assert s.current_tier == 0
+        assert s.target_tier == 0
+        assert s.missing_requirements == []
+        assert s.rationale == ""
+        assert s.estimated_effort == "unknown"
+
+    def test_to_dict_missing_requirements_is_a_copy(self):
+        """to_dict() returns a copy of missing_requirements, not the original list."""
+        s = self._sample()
+        d = s.to_dict()
+        d["missing_requirements"].append("extra")
+        assert "extra" not in s.missing_requirements
+
+
+# ── Arc G Sprint 11.1 — Persistent cache ─────────────────────────────────────
+
+
+class TestPersistentSuggestionCache:
+    """Tests for save_suggestion_cache, load_suggestion_cache, and disk round-trips."""
+
+    def setup_method(self):
+        clear_suggestion_cache()
+
+    def teardown_method(self):
+        clear_suggestion_cache()
+
+    def _make_cache_entry(self, key: str = "k1") -> tuple[str, list[InitiativeSuggestion], float]:
+        s = InitiativeSuggestion(
+            repo_name="Repo1",
+            current_tier=1,
+            target_tier=2,
+            missing_requirements=["Has CI"],
+            rationale="good",
+            estimated_effort="small",
+        )
+        return key, [s], 0.05
+
+    def test_save_writes_file_no_tmp_leftover(self, tmp_path):
+        """save_suggestion_cache writes the final file; no .tmp file is left behind."""
+        from collections import OrderedDict
+
+        cache: OrderedDict = OrderedDict()
+        key, suggestions, cost = self._make_cache_entry()
+        cache[key] = (suggestions, cost)
+        path = suggestion_cache_path(tmp_path)
+        save_suggestion_cache(path, cache)
+
+        assert path.exists()
+        # No leftover tmp files
+        tmp_files = list(tmp_path.glob(".suggestion_cache_tmp_*.json"))
+        assert tmp_files == []
+
+    def test_load_missing_file_returns_empty_ordered_dict(self, tmp_path):
+        """load_suggestion_cache on a non-existent file returns an empty OrderedDict."""
+        from collections import OrderedDict
+
+        result = load_suggestion_cache(tmp_path / "no-such-file.json")
+        assert result == OrderedDict()
+
+    def test_load_malformed_json_returns_empty_ordered_dict(self, tmp_path, caplog):
+        """load_suggestion_cache on malformed JSON returns empty OrderedDict and logs warning."""
+        import logging
+        from collections import OrderedDict
+
+        bad = tmp_path / "suggestion-cache.json"
+        bad.write_text("not valid json{{{", encoding="utf-8")
+        with caplog.at_level(logging.WARNING, logger="src.suggest_initiatives"):
+            result = load_suggestion_cache(bad)
+        assert result == OrderedDict()
+        assert any("could not load cache" in r.message for r in caplog.records)
+
+    def test_save_load_round_trip(self, tmp_path):
+        """Save + load preserves keys, suggestion content, and cost."""
+        from collections import OrderedDict
+
+        cache: OrderedDict = OrderedDict()
+        key, suggestions, cost = self._make_cache_entry("my-key")
+        cache[key] = (suggestions, cost)
+        path = suggestion_cache_path(tmp_path)
+        save_suggestion_cache(path, cache)
+
+        loaded = load_suggestion_cache(path)
+        assert "my-key" in loaded
+        loaded_suggestions, loaded_cost = loaded["my-key"]
+        assert loaded_cost == cost
+        assert loaded_suggestions == suggestions
+
+    def test_generate_suggestions_writes_to_disk_after_llm_call(self, tmp_path):
+        """generate_suggestions with output_dir persists the result to disk."""
+        repos = [_near_silver_repo("DiskWriteRepo")]
+        cache_key = "disk-write-test"
+
+        with patch(
+            "src.suggest_initiatives._resolve_provider",
+            return_value=(None, None),
+        ):
+            # No provider → deterministic fallback; still writes to disk when output_dir set
+            generate_suggestions(
+                repos, cache_key=cache_key, output_dir=tmp_path, force_deterministic=True
+            )
+
+        path = suggestion_cache_path(tmp_path)
+        assert path.exists()
+        data = json.loads(path.read_text())
+        assert data["version"] == 1
+        assert any(e["key"] == cache_key for e in data["entries"])
+
+    def test_generate_suggestions_loads_from_disk_on_new_process(self, tmp_path):
+        """After clear_suggestion_cache(), the same cache_key is served from disk."""
+        repos = [_near_silver_repo("DiskLoadRepo")]
+        cache_key = "disk-load-test"
+
+        # First call — populates disk cache
+        with patch(
+            "src.suggest_initiatives._resolve_provider",
+            return_value=(None, None),
+        ):
+            suggestions1, cost1 = generate_suggestions(
+                repos, cache_key=cache_key, output_dir=tmp_path, force_deterministic=True
+            )
+
+        # Simulate a new process: clear in-memory cache and loaded-from-disk set
+        clear_suggestion_cache()
+
+        # Second call — should reload from disk without calling the LLM
+        def _exploding_provider(*args, **kwargs):
+            raise AssertionError("LLM must not be called on cache hit from disk")
+
+        with patch(
+            "src.suggest_initiatives._resolve_provider",
+            side_effect=_exploding_provider,
+        ):
+            suggestions2, cost2 = generate_suggestions(
+                repos, cache_key=cache_key, output_dir=tmp_path, force_deterministic=True
+            )
+
+        assert suggestions1 == suggestions2
+        assert cost2 == cost1
+
+    def test_clear_suggestion_cache_with_path_deletes_file(self, tmp_path):
+        """clear_suggestion_cache(path) removes the cache file from disk."""
+        from collections import OrderedDict
+
+        cache: OrderedDict = OrderedDict()
+        key, suggestions, cost = self._make_cache_entry()
+        cache[key] = (suggestions, cost)
+        path = suggestion_cache_path(tmp_path)
+        save_suggestion_cache(path, cache)
+        assert path.exists()
+
+        clear_suggestion_cache(path)
+        assert not path.exists()
+
+
+# ── Arc G Sprint 11.2 — Bounded eviction ─────────────────────────────────────
+
+
+class TestBoundedEviction:
+    """Tests for OrderedDict eviction when _suggestion_cache exceeds _CACHE_MAX_SIZE."""
+
+    def setup_method(self):
+        clear_suggestion_cache()
+
+    def teardown_method(self):
+        clear_suggestion_cache()
+
+    def _make_suggestion(self, name: str) -> InitiativeSuggestion:
+        return InitiativeSuggestion(
+            repo_name=name,
+            current_tier=1,
+            target_tier=2,
+            missing_requirements=["req"],
+            rationale="r",
+            estimated_effort="small",
+        )
+
+    def _fill_cache_to(self, n: int, monkeypatch) -> None:
+        """Insert exactly n entries into the in-memory cache via generate_suggestions."""
+        monkeypatch.setattr(_si_mod, "_CACHE_MAX_SIZE", 100)
+        repos_base = [_near_silver_repo(f"Repo{i}") for i in range(n)]
+        for i, repo in enumerate(repos_base):
+            generate_suggestions([repo], cache_key=f"fill-key-{i}", force_deterministic=True)
+
+    def test_insert_101st_entry_evicts_oldest(self, monkeypatch):
+        """Cache holding 100 entries: inserting 101st evicts the first entry."""
+        monkeypatch.setattr(_si_mod, "_CACHE_MAX_SIZE", 100)
+        self._fill_cache_to(100, monkeypatch)
+        assert len(_si_mod._suggestion_cache) == 100
+        first_key = next(iter(_si_mod._suggestion_cache))
+
+        # Insert the 101st entry
+        generate_suggestions(
+            [_near_silver_repo("Evict101")], cache_key="evict-101-key", force_deterministic=True
+        )
+
+        assert len(_si_mod._suggestion_cache) == 100
+        assert first_key not in _si_mod._suggestion_cache
+        assert "evict-101-key" in _si_mod._suggestion_cache
+
+    def test_recently_accessed_entry_not_evicted(self, monkeypatch):
+        """Entry-0 accessed after fill avoids eviction when entry-1 is the oldest."""
+        monkeypatch.setattr(_si_mod, "_CACHE_MAX_SIZE", 5)
+
+        # Fill to exactly 5 entries: keys fill-key-0 .. fill-key-4
+        for i in range(5):
+            generate_suggestions(
+                [_near_silver_repo(f"R{i}")], cache_key=f"fill-key-{i}", force_deterministic=True
+            )
+        assert len(_si_mod._suggestion_cache) == 5
+
+        # Access fill-key-0 — moves it to MRU position
+        generate_suggestions(
+            [_near_silver_repo("R0")], cache_key="fill-key-0", force_deterministic=True
+        )
+
+        # Insert a 6th entry — should evict fill-key-1 (now oldest), NOT fill-key-0
+        generate_suggestions(
+            [_near_silver_repo("R6")], cache_key="fill-key-6", force_deterministic=True
+        )
+
+        assert len(_si_mod._suggestion_cache) == 5
+        assert "fill-key-0" in _si_mod._suggestion_cache, "fill-key-0 should not be evicted"
+        assert "fill-key-1" not in _si_mod._suggestion_cache, "fill-key-1 should be evicted"
+
+    def test_disk_serialization_caps_at_cache_max_size(self, tmp_path, monkeypatch):
+        """save_suggestion_cache writes at most _CACHE_MAX_SIZE entries even if cache is larger."""
+        from collections import OrderedDict
+
+        monkeypatch.setattr(_si_mod, "_CACHE_MAX_SIZE", 3)
+        # Build a cache with 5 entries manually (bypass generate_suggestions limit)
+        cache: OrderedDict = OrderedDict()
+        for i in range(5):
+            s = self._make_suggestion(f"Repo{i}")
+            cache[f"key-{i}"] = ([s], 0.0)
+
+        path = suggestion_cache_path(tmp_path)
+        save_suggestion_cache(path, cache)
+
+        data = json.loads(path.read_text())
+        # Should contain only the last 3 (most recent) entries
+        assert len(data["entries"]) == 3
+        written_keys = {e["key"] for e in data["entries"]}
+        # Last 3 keys are key-2, key-3, key-4
+        assert written_keys == {"key-2", "key-3", "key-4"}
+
+
+# ── Arc G Sprint 11.4 — DismissedSuggestion + persistence ────────────────────
+
+
+def _make_dismissed(
+    repo_name: str = "FooRepo",
+    reason: str = "too noisy",
+    dismissed_at: str = "2026-01-01T00:00:00+00:00",
+    dismissed_by: str = "testuser",
+) -> DismissedSuggestion:
+    return DismissedSuggestion(
+        repo_name=repo_name,
+        reason=reason,
+        dismissed_at=dismissed_at,
+        dismissed_by=dismissed_by,
+    )
+
+
+class TestDismissedSuggestionDataclass:
+    def test_to_dict_returns_expected_keys(self):
+        """to_dict() returns all four expected keys."""
+        d = _make_dismissed()
+        result = d.to_dict()
+        assert set(result.keys()) == {"repo_name", "reason", "dismissed_at", "dismissed_by"}
+        assert result["repo_name"] == "FooRepo"
+        assert result["reason"] == "too noisy"
+
+    def test_round_trip_equality(self):
+        """from_dict(to_dict(d)) == d."""
+        d = _make_dismissed()
+        assert DismissedSuggestion.from_dict(d.to_dict()) == d
+
+    def test_from_dict_missing_keys_defaults_safely(self):
+        """from_dict with missing keys falls back to empty strings."""
+        d = DismissedSuggestion.from_dict({})
+        assert d.repo_name == ""
+        assert d.reason == ""
+        assert d.dismissed_at == ""
+        assert d.dismissed_by == ""
+
+
+class TestDismissedPersistence:
+    def test_save_writes_atomically_no_tmp_leftover(self, tmp_path):
+        """save_dismissed writes the final file; no .tmp file is left behind."""
+        items = [_make_dismissed()]
+        path = dismissed_path(tmp_path)
+        save_dismissed(path, items)
+
+        assert path.exists()
+        tmp_files = list(tmp_path.glob(".dismissed_suggestions_tmp_*.json"))
+        assert tmp_files == []
+
+    def test_load_missing_file_returns_empty_list(self, tmp_path):
+        """load_dismissed on a non-existent file returns []."""
+        result = load_dismissed(dismissed_path(tmp_path))
+        assert result == []
+
+    def test_load_malformed_json_returns_empty_list(self, tmp_path, caplog):
+        """load_dismissed on malformed JSON returns [] and logs a warning."""
+        import logging
+
+        path = dismissed_path(tmp_path)
+        path.write_text("not json{{{{", encoding="utf-8")
+        with caplog.at_level(logging.WARNING, logger="src.suggest_initiatives"):
+            result = load_dismissed(path)
+        assert result == []
+        assert any("could not load dismissed" in r.message for r in caplog.records)
+
+    def test_round_trip_preserves_all_fields(self, tmp_path):
+        """save_dismissed + load_dismissed round-trip preserves all fields."""
+        original = [
+            _make_dismissed("RepoA", "reason A", "2026-01-01T00:00:00+00:00", "alice"),
+            _make_dismissed("RepoB", "", "2026-02-01T00:00:00+00:00", "bob"),
+        ]
+        path = dismissed_path(tmp_path)
+        save_dismissed(path, original)
+        loaded = load_dismissed(path)
+        assert loaded == original
+
+
+class TestDismissSuggestionRecord:
+    def test_new_repo_appended_and_file_written(self, tmp_path):
+        """dismiss_suggestion_record appends a new entry and writes the file."""
+        path = dismissed_path(tmp_path)
+        entry = dismiss_suggestion_record(path, repo_name="NewRepo", reason="too slow")
+        assert entry.repo_name == "NewRepo"
+        assert entry.reason == "too slow"
+        assert path.exists()
+        items = load_dismissed(path)
+        assert len(items) == 1
+        assert items[0].repo_name == "NewRepo"
+
+    def test_existing_repo_replaced_idempotent(self, tmp_path):
+        """Re-dismissing same repo replaces the old entry (dismissed_at is updated)."""
+        path = dismissed_path(tmp_path)
+        first = dismiss_suggestion_record(path, repo_name="RepoX", reason="first")
+        second = dismiss_suggestion_record(path, repo_name="RepoX", reason="second")
+
+        items = load_dismissed(path)
+        # Only one entry — not duplicated
+        assert len(items) == 1
+        assert items[0].reason == "second"
+        # dismissed_at is refreshed (string comparison OK — both are ISO timestamps)
+        assert second.dismissed_at >= first.dismissed_at
+
+    def test_empty_repo_name_raises_value_error(self, tmp_path):
+        """Empty repo_name raises ValueError."""
+        path = dismissed_path(tmp_path)
+        with pytest.raises(ValueError, match="repo_name"):
+            dismiss_suggestion_record(path, repo_name="")
+
+    def test_blank_whitespace_repo_name_raises_value_error(self, tmp_path):
+        """Whitespace-only repo_name raises ValueError."""
+        path = dismissed_path(tmp_path)
+        with pytest.raises(ValueError, match="repo_name"):
+            dismiss_suggestion_record(path, repo_name="   ")
+
+
+class TestUndoDismiss:
+    def test_existing_entry_removed_returns_true(self, tmp_path):
+        """undo_dismiss removes existing entry and returns True."""
+        path = dismissed_path(tmp_path)
+        dismiss_suggestion_record(path, repo_name="ToRemove")
+        result = undo_dismiss(path, "ToRemove")
+        assert result is True
+        items = load_dismissed(path)
+        assert all(d.repo_name != "ToRemove" for d in items)
+
+    def test_non_existent_entry_returns_false(self, tmp_path):
+        """undo_dismiss on unknown repo returns False; file unchanged."""
+        path = dismissed_path(tmp_path)
+        result = undo_dismiss(path, "NeverDismissed")
+        assert result is False
+
+
+class TestNarrowCandidatesDismissed:
+    """Test the dismissed= parameter of narrow_candidates."""
+
+    def _bronze_repo(self, name: str) -> dict:
+        return {
+            "identity": {"display_name": name, "has_git": True},
+            "derived": {
+                "last_meaningful_activity_at": "2025-12-01",
+                "context_files": ["README.md"],
+                "context_quality": "boilerplate",
+                "run_instructions_present": False,
+                "activity_status": "active",
+            },
+            "risk": {"doctor_gap": True, "risk_tier": "elevated", "risk_factors": []},
+        }
+
+    def test_dismissed_repo_skipped(self):
+        """Repos in the dismissed set are excluded even when they would qualify."""
+        repos = [self._bronze_repo("FooRepo"), self._bronze_repo("BarRepo")]
+        result = narrow_candidates(repos, dismissed={"FooRepo"})
+        names = [r[0].get("identity", {}).get("display_name") for r in result]
+        assert "FooRepo" not in names
+        assert "BarRepo" in names
+
+    def test_dismissed_none_no_filtering(self):
+        """dismissed=None (default) applies no filtering."""
+        repos = [self._bronze_repo("Alpha"), self._bronze_repo("Beta")]
+        with_none = narrow_candidates(repos, dismissed=None)
+        without_param = narrow_candidates(repos)
+        assert len(with_none) == len(without_param)
+
+    def test_dismissed_empty_set_no_filtering(self):
+        """dismissed=set() applies no filtering."""
+        repos = [self._bronze_repo("Alpha")]
+        result_empty = narrow_candidates(repos, dismissed=set())
+        result_none = narrow_candidates(repos, dismissed=None)
+        assert len(result_empty) == len(result_none)
+
+
+class TestGenerateSuggestionsDismissIntegration:
+    """Integration tests: generate_suggestions loads dismissed file when output_dir set."""
+
+    def _bronze_repo(self, name: str) -> dict:
+        return {
+            "identity": {"display_name": name, "has_git": True},
+            "derived": {
+                "last_meaningful_activity_at": "2025-12-01",
+                "context_files": ["README.md"],
+                "context_quality": "boilerplate",
+                "run_instructions_present": False,
+                "activity_status": "active",
+            },
+            "risk": {"doctor_gap": True, "risk_tier": "elevated", "risk_factors": []},
+        }
+
+    def setup_method(self):
+        clear_suggestion_cache()
+
+    def teardown_method(self):
+        clear_suggestion_cache()
+
+    def test_dismissed_repos_absent_from_results(self, tmp_path):
+        """Dismissed repos do not appear in suggestions when output_dir is provided."""
+        repos = [self._bronze_repo("DismissMe"), self._bronze_repo("KeepMe")]
+        dismiss_suggestion_record(dismissed_path(tmp_path), repo_name="DismissMe")
+
+        suggestions, _ = generate_suggestions(repos, force_deterministic=True, output_dir=tmp_path)
+        names = [s.repo_name for s in suggestions]
+        assert "DismissMe" not in names
+        # KeepMe should still appear (if it qualifies)
+        assert "KeepMe" in names
+
+    def test_no_dismissed_file_no_filtering(self, tmp_path):
+        """Missing dismissed file does not cause errors; all qualifying repos returned."""
+        repos = [self._bronze_repo("Repo1"), self._bronze_repo("Repo2")]
+        # No dismissed-suggestions.json written
+        suggestions, _ = generate_suggestions(repos, force_deterministic=True, output_dir=tmp_path)
+        names = [s.repo_name for s in suggestions]
+        assert "Repo1" in names or "Repo2" in names  # at least one qualifies
+
+    def test_no_output_dir_no_dismissed_filtering(self):
+        """Without output_dir, dismissed file is not consulted."""
+        repos = [self._bronze_repo("AnyRepo")]
+        # Should not raise even if no output_dir
+        suggestions, _ = generate_suggestions(repos, force_deterministic=True)
+        # No assertion on names — just ensure it runs cleanly
+        assert isinstance(suggestions, list)
+
+
+# ── Arc G Sprint 11.4 — CLI dismiss tests ────────────────────────────────────
+
+
+class TestCLIDismissSuggestion:
+    def test_dismiss_suggestion_writes_file_and_prints_confirmation(self, tmp_path, capsys):
+        """--dismiss-suggestion FooRepo writes dismissed file, stdout has confirmation."""
+        import argparse
+
+        from src.cli import _run_dismiss_suggestion_mode
+
+        args = argparse.Namespace(
+            output_dir=str(tmp_path),
+            dismiss_suggestion="FooRepo",
+            reason="too noisy",
+        )
+        _run_dismiss_suggestion_mode(args)
+        captured = capsys.readouterr()
+        assert "FooRepo" in (captured.out + captured.err)
+        assert "Dismissed" in (captured.out + captured.err)
+        # File written
+        items = load_dismissed(dismissed_path(tmp_path))
+        assert any(d.repo_name == "FooRepo" for d in items)
+
+    def test_dismiss_empty_repo_name_exits_2(self, tmp_path, capsys):
+        """--dismiss-suggestion '' exits with code 2."""
+        import argparse
+
+        from src.cli import _run_dismiss_suggestion_mode
+
+        args = argparse.Namespace(
+            output_dir=str(tmp_path),
+            dismiss_suggestion="",
+            reason="",
+        )
+        with pytest.raises(SystemExit) as exc_info:
+            _run_dismiss_suggestion_mode(args)
+        assert exc_info.value.code == 2
+
+    def test_undo_dismiss_removes_and_prints_confirmation(self, tmp_path, capsys):
+        """--undo-dismiss FooRepo after dismissal removes entry and prints confirmation."""
+        import argparse
+
+        from src.cli import _run_undo_dismiss_mode
+
+        # Pre-dismiss
+        dismiss_suggestion_record(dismissed_path(tmp_path), repo_name="FooRepo")
+
+        args = argparse.Namespace(output_dir=str(tmp_path), undo_dismiss="FooRepo")
+        _run_undo_dismiss_mode(args)
+        captured = capsys.readouterr()
+        assert "FooRepo" in (captured.out + captured.err)
+        assert "Restored" in (captured.out + captured.err)
+        # Entry removed
+        items = load_dismissed(dismissed_path(tmp_path))
+        assert all(d.repo_name != "FooRepo" for d in items)
+
+    def test_undo_dismiss_unknown_repo_prints_warning_exit_0(self, tmp_path, capsys):
+        """--undo-dismiss UnknownRepo prints a warning but exits 0."""
+        import argparse
+
+        from src.cli import _run_undo_dismiss_mode
+
+        args = argparse.Namespace(output_dir=str(tmp_path), undo_dismiss="UnknownRepo")
+        _run_undo_dismiss_mode(args)  # must not raise
+        captured = capsys.readouterr()
+        assert "UnknownRepo" in (captured.out + captured.err)
+
+    def test_list_dismissed_empty_file(self, tmp_path, capsys):
+        """--list-dismissed with no dismissed entries prints 'No dismissed suggestions.'."""
+        import argparse
+
+        from src.cli import _run_list_dismissed_mode
+
+        args = argparse.Namespace(output_dir=str(tmp_path))
+        _run_list_dismissed_mode(args)
+        captured = capsys.readouterr()
+        assert "No dismissed suggestions" in (captured.out + captured.err)
+
+    def test_list_dismissed_with_entries_prints_each(self, tmp_path, capsys):
+        """--list-dismissed with entries prints each repo on its own line."""
+        import argparse
+
+        from src.cli import _run_list_dismissed_mode
+
+        dismiss_suggestion_record(dismissed_path(tmp_path), repo_name="RepoA", reason="r1")
+        dismiss_suggestion_record(dismissed_path(tmp_path), repo_name="RepoB", reason="r2")
+
+        args = argparse.Namespace(output_dir=str(tmp_path))
+        _run_list_dismissed_mode(args)
+        captured = capsys.readouterr()
+        output = captured.out + captured.err
+        assert "RepoA" in output
+        assert "RepoB" in output
+
+    def test_parser_dismiss_suggestion_flags_registered(self):
+        """--dismiss-suggestion, --reason, --undo-dismiss, --list-dismissed all registered."""
+        from src.cli import build_subcommand_parser
+
+        parser = build_subcommand_parser()
+        args = parser.parse_args(
+            [
+                "triage",
+                "saagpatel",
+                "--dismiss-suggestion",
+                "MyRepo",
+                "--reason",
+                "not relevant",
+                "--undo-dismiss",
+                "OtherRepo",
+            ]
+        )
+        assert args.dismiss_suggestion == "MyRepo"
+        assert args.reason == "not relevant"
+        assert args.undo_dismiss == "OtherRepo"

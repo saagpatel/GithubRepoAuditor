@@ -44,7 +44,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
-from typing import Literal
+from typing import Any, Literal
 
 # ── Dataclasses ─────────────────────────────────────────────────────────────
 
@@ -62,6 +62,26 @@ class TierGap:
     target_tier: int
     missing_requirements: list[str] = field(default_factory=list)
     requirement_sources: list[Literal["strict", "proxy"]] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialise to a JSON-compatible dict."""
+        return {
+            "current_tier": self.current_tier,
+            "target_tier": self.target_tier,
+            "missing_requirements": list(self.missing_requirements),
+            "requirement_sources": list(self.requirement_sources),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "TierGap":
+        """Hydrate from a JSON-compatible dict.  Missing keys default safely."""
+        sources = data.get("requirement_sources") or []
+        return cls(
+            current_tier=int(data.get("current_tier", 0)),
+            target_tier=int(data.get("target_tier", 0)),
+            missing_requirements=list(data.get("missing_requirements", [])),
+            requirement_sources=[str(s) for s in sources],
+        )
 
 
 # ── Tier definitions ─────────────────────────────────────────────────────────
