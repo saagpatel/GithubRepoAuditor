@@ -37,6 +37,14 @@
           hx-swap="innerHTML"
         >View diff</button>
         {% endif %}
+        {% if r.approval_subject_type == "campaign-plan" %}
+        <button
+          class="btn btn-sm btn-secondary"
+          hx-get="/approvals/{{ r.approval_id }}/campaign-plan"
+          hx-target="#plan-{{ loop.index }}"
+          hx-swap="innerHTML"
+        >View plan</button>
+        {% endif %}
         <button
           class="btn btn-sm btn-approve"
           hx-post="/approvals/{{ r.approval_id }}/approve"
@@ -55,6 +63,13 @@
     <tr>
       <td colspan="5">
         <div id="diff-{{ loop.index }}" class="draft-diff-container"></div>
+      </td>
+    </tr>
+    {% endif %}
+    {% if r.approval_subject_type == "campaign-plan" %}
+    <tr>
+      <td colspan="5">
+        <div id="plan-{{ loop.index }}" class="campaign-plan-container"></div>
       </td>
     </tr>
     {% endif %}

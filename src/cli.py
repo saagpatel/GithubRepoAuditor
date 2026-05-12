@@ -331,6 +331,11 @@ def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         "--writeback-apply", action="store_true", help="Execute live writeback (not preview)"
     )
     p.add_argument(
+        "--campaign-from-ledger",
+        action="store_true",
+        help="When paired with --writeback-apply, execute approved campaign-plan packets from the ledger",
+    )
+    p.add_argument(
         "--github-projects",
         action="store_true",
         help="Mirror campaign actions into GitHub Projects v2",
@@ -403,6 +408,21 @@ def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         dest="draft_readmes_repos",
         metavar="REPO",
         help="Explicit per-repo opt-in (repeatable)",
+    )
+    # ── Campaign planner (Arc G S6.1-6.2) ────────────────────────────
+    p.add_argument(
+        "--plan-campaign",
+        default=None,
+        metavar="GOAL",
+        dest="plan_campaign",
+        help="Generate a goal-driven campaign plan via LLM (e.g. 'archive dead repos')",
+    )
+    p.add_argument(
+        "--max-repos",
+        type=int,
+        default=50,
+        dest="max_repos",
+        help="Max repos to consider when planning a campaign (default: 50)",
     )
 
 
@@ -741,6 +761,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Execute live writeback instead of preview-only planning",
     )
     parser.add_argument(
+        "--campaign-from-ledger",
+        action="store_true",
+        help="When paired with --writeback-apply, execute approved campaign-plan packets from the ledger",
+    )
+    parser.add_argument(
         "--github-projects",
         action="store_true",
         help="Mirror managed GitHub campaign actions into a configured GitHub Projects v2 board",
@@ -1038,6 +1063,21 @@ def build_parser() -> argparse.ArgumentParser:
         dest="draft_readmes_repos",
         metavar="REPO",
         help="Explicit per-repo opt-in for --draft-readmes (repeatable)",
+    )
+    # ── Campaign planner (Arc G S6.1-6.2) ────────────────────────────────────
+    parser.add_argument(
+        "--plan-campaign",
+        default=None,
+        metavar="GOAL",
+        dest="plan_campaign",
+        help="Generate a goal-driven campaign plan via LLM (e.g. 'archive dead repos')",
+    )
+    parser.add_argument(
+        "--max-repos",
+        type=int,
+        default=50,
+        dest="max_repos",
+        help="Max repos to consider when planning a campaign (default: 50)",
     )
     parser.add_argument(
         "--improvements-file",
@@ -2208,6 +2248,212 @@ def _run_generate_manifest_mode(args, parser) -> None:
     manifest = generate_manifest(report_data)
     manifest_path = write_manifest(manifest, output_dir)
     print_info(f"Improvement manifest: {manifest_path} ({len(manifest)} repos)")
+
+
+def _run_campaign_from_ledger_mode(args) -> None:
+    """Dispatch for --campaign-from-ledger [--writeback-apply] [--dry-run].
+
+    Loads approved campaign-plan packets from the ledger and executes each
+    action via the existing apply executor map.  Dry-run mode prints what would
+    be executed without calling the GitHub API.
+    """
+    from src.cache import ResponseCache
+    from src.github_client import GitHubClient
+    from src.plan_campaign import (
+        dispatch_action,
+        load_approved_campaign_plans,
+        mark_campaign_applied,
+        record_campaign_apply_failure,
+    )
+
+    output_dir = Path(args.output_dir)
+    dry_run = getattr(args, "dry_run", False)
+    username = getattr(args, "username", "") or ""
+
+    cache = None if args.no_cache else ResponseCache()
+    client = GitHubClient(token=args.token, cache=cache)
+
+    packets = load_approved_campaign_plans(output_dir)
+
+    if not packets:
+        print_info("campaign-from-ledger: 0 approved packets found — nothing to apply.")
+        return
+
+    verb = "preview" if dry_run else "apply"
+    print_info(f"campaign-from-ledger: {len(packets)} approved packet(s) to {verb}.")
+
+    for packet in packets:
+        print_info(f"  packet goal: {packet.goal[:80]!r} ({len(packet.actions)} actions)")
+
+        action_results: list[tuple[bool, str]] = []
+        for action in packet.actions:
+            if dry_run:
+                # Dry-run: print preview, record as success for state purposes
+                msg = (
+                    f"would execute: {action.action_type} {action.repo_name}"
+                    f" (target={action.target!r}, rationale={action.rationale[:60]!r})"
+                )
+                print_info(f"    [dry-run] {msg}")
+                action_results.append((True, msg))
+            else:
+                ok, msg = dispatch_action(
+                    action,
+                    client=client,
+                    owner=username,
+                    dry_run=False,
+                )
+                status = "ok" if ok else "FAIL"
+                print_info(f"    [{status}] {action.action_type} {action.repo_name}: {msg}")
+                action_results.append((ok, msg))
+
+        if dry_run:
+            # Do not mutate ledger state on dry-run
+            continue
+
+        # Determine overall packet success:
+        # "applied" only when every supported action succeeded AND every
+        # unsupported/pending action is in the packet as pending_human_action.
+        # Mixed-result packets (a supported action failed) stay approved-manual
+        # with a failure event listing the failed actions.
+        supported_results = [
+            (ok, msg)
+            for (ok, msg), action in zip(action_results, packet.actions)
+            if action.action_type
+            not in ("pending_human_action", "add_license", "add_codeowners", "enable_dependabot")
+        ]
+        unsupported_results = [
+            (ok, msg)
+            for (ok, msg), action in zip(action_results, packet.actions)
+            if action.action_type in ("add_license", "add_codeowners", "enable_dependabot")
+        ]
+
+        # Unimplemented-handler actions are expected failures — don't penalise the packet
+        # as long as no genuinely-supported action failed.
+        failed_supported = [(ok, msg) for ok, msg in supported_results if not ok]
+
+        if not failed_supported:
+            mark_campaign_applied(packet, output_dir)
+            print_info(
+                f"  packet marked applied "
+                f"(supported={len(supported_results)}, skipped={len(unsupported_results)})"
+            )
+        else:
+            error_summary = "; ".join(msg for _, msg in failed_supported)
+            record_campaign_apply_failure(packet, error_summary, output_dir)
+            print_info(
+                f"  packet kept approved-manual — {len(failed_supported)} failure(s): {error_summary[:120]}"
+            )
+
+
+def _run_plan_campaign_mode(args) -> None:
+    """Dispatch for --plan-campaign: generate a goal-driven campaign plan packet."""
+    import json
+
+    from src.approval_ledger import default_approval_reviewer as _default_reviewer
+    from src.llm_cost import BudgetExceededError, CostTracker
+    from src.narrative import _resolve_provider
+    from src.operator_prefs import load_prefs, prefs_path
+    from src.plan_campaign import generate_plan, narrow_candidates, write_packet_to_ledger
+    from src.warehouse import WAREHOUSE_FILENAME
+
+    output_dir = Path(args.output_dir)
+    goal: str = str(args.plan_campaign).strip()
+    max_repos: int = int(getattr(args, "max_repos", 50) or 50)
+    reviewer: str = getattr(args, "approval_reviewer", None) or _default_reviewer()
+
+    # ── Load audit results from portfolio-truth-latest.json ───────────────────
+    truth_path = output_dir / "portfolio-truth-latest.json"
+    if not truth_path.exists():
+        print_info(
+            f"portfolio-truth-latest.json not found in {output_dir}. "
+            "Run `audit report --portfolio-truth` first to generate repo data. "
+            "--plan-campaign requires a truth snapshot to select candidates."
+        )
+        return
+
+    try:
+        raw = json.loads(truth_path.read_text(encoding="utf-8"))
+        audit_results: list[dict] = list(raw.get("repos", raw.get("results", [])))
+    except (OSError, json.JSONDecodeError) as exc:
+        print_info(f"Error reading portfolio-truth-latest.json: {exc}")
+        return
+
+    # ── Semantic index (optional — fallback to alphabetical if unavailable) ────
+    semantic_index = None
+    warehouse_path = output_dir / WAREHOUSE_FILENAME
+    if warehouse_path.exists():
+        try:
+            from src.semantic_index import SemanticIndex
+
+            semantic_index = SemanticIndex(output_dir)
+        except Exception as exc:  # noqa: BLE001
+            print_info(
+                f"Warning: could not load SemanticIndex: {exc} — using alphabetical fallback."
+            )
+
+    # ── LLM provider ──────────────────────────────────────────────────────────
+    provider_result = _resolve_provider(
+        getattr(args, "narrative_provider", None),
+        getattr(args, "narrative_model", None),
+        getattr(args, "token", None),
+    )
+    if provider_result is None:
+        print_info(
+            "No LLM provider available for --plan-campaign. "
+            "Set ANTHROPIC_API_KEY or GITHUB_TOKEN, or pass --narrative-provider."
+        )
+        return
+    provider, model = provider_result
+
+    # ── Cost tracker ──────────────────────────────────────────────────────────
+    budget_usd = getattr(args, "max_llm_spend", None)
+    cost_tracker: CostTracker = CostTracker(budget_usd=budget_usd, output_path=output_dir)
+
+    # ── Operator prefs ────────────────────────────────────────────────────────
+    pref_file = prefs_path(output_dir)
+    prefs = load_prefs(pref_file)
+
+    # ── Narrow candidates ─────────────────────────────────────────────────────
+    candidates = narrow_candidates(
+        audit_results,
+        goal=goal,
+        semantic_index=semantic_index,
+        max_repos=max_repos,
+    )
+    if not candidates:
+        print_info("No candidate repos found. Check that portfolio-truth-latest.json has data.")
+        return
+
+    # ── Generate plan ─────────────────────────────────────────────────────────
+    import sys
+
+    try:
+        packet = generate_plan(
+            candidates,
+            goal=goal,
+            provider=provider,
+            model=model,
+            cost_tracker=cost_tracker,
+            prefs=prefs,
+        )
+    except BudgetExceededError as exc:
+        print(f"\nERROR: LLM budget exceeded during campaign planning: {exc}", file=sys.stderr)
+        return
+
+    # ── Persist packet to ledger ──────────────────────────────────────────────
+    record_id = write_packet_to_ledger(packet, output_dir=output_dir, reviewer=reviewer)
+
+    cost_tracker.write_telemetry()
+
+    pending_count = sum(1 for a in packet.actions if a.action_type == "pending_human_action")
+    print_info(
+        f"Goal: {goal}. "
+        f"Considered {packet.candidate_count}. "
+        f"Qualified {packet.qualified_count}. "
+        f"{pending_count} pending human review. "
+        f"LLM cost: ${packet.llm_cost_usd:.4f}. "
+        f"Packet ID: {record_id}."
+    )
 
 
 def _run_draft_readmes_mode(args) -> None:
@@ -5308,6 +5554,7 @@ def _infer_subcommand_from_flags(args: argparse.Namespace) -> str:
         "generate_manifest",
         "apply_metadata",
         "apply_readmes",
+        "campaign_from_ledger",
         "draft_readmes",
         "upload_badges",
         "notion_sync",
@@ -5539,6 +5786,14 @@ def main() -> None:
 
     if getattr(args, "apply_metadata", False) or getattr(args, "apply_readmes", False):
         _run_apply_improvements_mode(args, parser)
+        return
+
+    if getattr(args, "campaign_from_ledger", False):
+        _run_campaign_from_ledger_mode(args)
+        return
+
+    if getattr(args, "plan_campaign", None):
+        _run_plan_campaign_mode(args)
         return
 
     if getattr(args, "draft_readmes", False):
