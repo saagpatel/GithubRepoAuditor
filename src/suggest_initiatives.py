@@ -13,6 +13,8 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
+from datetime import date, timedelta
+from pathlib import Path
 
 from src.narrative import _resolve_provider
 
@@ -248,6 +250,126 @@ def _deterministic_rank(
         )
 
     return results
+
+
+# ── Deadline helpers ─────────────────────────────────────────────────────────
+
+_EFFORT_DAYS: dict[str, int] = {"small": 14, "medium": 30, "large": 60}
+_DEFAULT_DEADLINE_DAYS = 30  # for "unknown" or any other value
+
+
+def default_deadline_for_effort(effort: str, today: date | None = None) -> str:
+    """Map estimated_effort string to a deadline in YYYY-MM-DD form.
+
+    small  → today + 14 days
+    medium → today + 30 days
+    large  → today + 60 days
+    unknown/anything else → today + 30 days
+    """
+    if today is None:
+        today = date.today()
+    days = (
+        _EFFORT_DAYS.get(effort.lower(), _DEFAULT_DEADLINE_DAYS)
+        if effort
+        else _DEFAULT_DEADLINE_DAYS
+    )
+    return (today + timedelta(days=days)).isoformat()
+
+
+def accept_suggestion(
+    repo_name: str,
+    projects: list[dict],
+    output_dir: Path,
+    deadline: str | None = None,
+    target_tier: int | None = None,
+) -> "Initiative":  # noqa: F821
+    """Convert a suggestion into an initiative.
+
+    This is the single backend entry point for both CLI and web routes.
+
+    Steps
+    -----
+    1. Find project in ``projects`` by ``identity.display_name == repo_name``.
+    2. Validate current tier (must be 1-3).
+    3. Derive or validate ``target_tier``.
+    4. Derive ``deadline`` from suggestion effort when not supplied.
+    5. Validate ``deadline`` is a future YYYY-MM-DD string.
+    6. Build, persist, and return the :class:`Initiative`.
+    """
+    from datetime import datetime, timezone
+
+    from src.initiatives import Initiative, initiatives_path, operator_identity, upsert_initiative
+    from src.maturity_tiers import compute_tier
+
+    # 1. Find project
+    project: dict | None = None
+    for p in projects:
+        if p.get("identity", {}).get("display_name") == repo_name:
+            project = p
+            break
+    if project is None:
+        raise ValueError(f"repo '{repo_name}' not found in portfolio truth")
+
+    # 2. Validate current tier
+    current = compute_tier(project)
+    if current == 0:
+        raise ValueError(f"repo '{repo_name}' has no git (current_tier=0); cannot set initiative")
+    if current >= 4:
+        raise ValueError(f"repo '{repo_name}' is already at Platinum (tier 4)")
+
+    # 3. Derive / validate target_tier
+    if target_tier is None:
+        target = current + 1
+    else:
+        if target_tier <= current:
+            raise ValueError(
+                f"target_tier {target_tier} must be greater than current tier {current}"
+            )
+        if target_tier not in {2, 3, 4}:
+            raise ValueError(f"target_tier must be 2, 3, or 4; got {target_tier}")
+        target = target_tier
+
+    # 4. Derive deadline when not supplied
+    if deadline is None:
+        effort = "medium"  # default
+        try:
+            suggestions, _ = generate_suggestions(projects, target_tier=target, budget_usd=0.0)
+            for s in suggestions:
+                if s.repo_name == repo_name:
+                    effort = s.estimated_effort
+                    break
+        except Exception:  # noqa: BLE001 — never let deadline derivation crash accept
+            pass
+        deadline = default_deadline_for_effort(effort)
+
+    # 5. Validate deadline format
+    try:
+        deadline_date = date.fromisoformat(deadline)
+    except ValueError:
+        raise ValueError(f"deadline must be YYYY-MM-DD, got: {deadline!r}")
+
+    # 6. Validate deadline is not in the past
+    if deadline_date < date.today():
+        raise ValueError(
+            f"deadline {deadline} must be in the future (today is {date.today().isoformat()})"
+        )
+
+    # 7. Build initiative
+    initiative = Initiative(
+        repo_name=repo_name,
+        target_tier=target,
+        deadline=deadline,
+        set_at=datetime.now(timezone.utc).isoformat(),
+        set_by=operator_identity(),
+        closed_at=None,
+        closed_reason=None,
+    )
+
+    # 8. Persist
+    upsert_initiative(initiatives_path(output_dir), initiative)
+
+    # 9. Return
+    return initiative
 
 
 # ── Top-level entrypoint ──────────────────────────────────────────────────────

@@ -1,15 +1,18 @@
-"""Tests for src/suggest_initiatives.py — Arc G Sprint 8.4."""
+"""Tests for src/suggest_initiatives.py — Arc G Sprint 8.4 + 9.1."""
 
 from __future__ import annotations
 
 import json
+from datetime import date
 from unittest.mock import patch
 
 import pytest
 
 from src.llm_cost import BudgetExceededError
 from src.suggest_initiatives import (
+    accept_suggestion,
     build_suggest_prompt,
+    default_deadline_for_effort,
     generate_suggestions,
     narrow_candidates,
     parse_suggest_response,
@@ -651,3 +654,371 @@ class TestBriefingSuggestedInitiatives:
         briefing = Briefing(username="user", date="2026-05-11")
         md = render_markdown(briefing)
         assert "## Suggested Initiatives" not in md
+
+
+# ── default_deadline_for_effort ───────────────────────────────────────────────
+
+
+class TestDefaultDeadlineForEffort:
+    def test_small_is_14_days(self):
+        today = date(2026, 1, 1)
+        result = default_deadline_for_effort("small", today=today)
+        assert result == "2026-01-15"
+
+    def test_medium_is_30_days(self):
+        today = date(2026, 1, 1)
+        result = default_deadline_for_effort("medium", today=today)
+        assert result == "2026-01-31"
+
+    def test_large_is_60_days(self):
+        today = date(2026, 1, 1)
+        result = default_deadline_for_effort("large", today=today)
+        assert result == "2026-03-02"
+
+    def test_unknown_is_30_days(self):
+        today = date(2026, 1, 1)
+        result = default_deadline_for_effort("unknown", today=today)
+        assert result == "2026-01-31"
+
+    def test_empty_string_is_30_days(self):
+        today = date(2026, 1, 1)
+        result = default_deadline_for_effort("", today=today)
+        assert result == "2026-01-31"
+
+    def test_case_insensitive_small(self):
+        today = date(2026, 1, 1)
+        result = default_deadline_for_effort("SMALL", today=today)
+        assert result == "2026-01-15"
+
+    def test_explicit_today_small(self):
+        result = default_deadline_for_effort("small", today=date(2026, 1, 1))
+        assert result == "2026-01-15"
+
+    def test_returns_iso_format_string(self):
+        """Result must be a valid YYYY-MM-DD string."""
+        result = default_deadline_for_effort("medium")
+        assert len(result) == 10
+        # Must parse without error
+        parsed = date.fromisoformat(result)
+        assert parsed > date.today()
+
+
+# ── accept_suggestion ─────────────────────────────────────────────────────────
+
+
+def _silver_repo_for_accept(name: str = "Wavelength") -> dict:
+    """Repo at Silver (tier 2) — can be accepted for Gold (tier 3)."""
+    return {
+        "identity": {"display_name": name, "has_git": True},
+        "derived": {
+            "has_readme": True,
+            "has_license": True,
+            "has_ci": True,
+            "readme_char_count": 600,
+            "release_count": 1,
+            "has_tests": True,
+            "days_since_push": 10,
+            "activity_status": "active",
+            "context_quality": "good",
+            "run_instructions_present": True,
+        },
+        "risk": {"risk_factors": [], "doctor_gap": False},
+    }
+
+
+def _git_repo_for_accept(name: str = "BronzeRepo") -> dict:
+    """Repo at Bronze (tier 1) — can be accepted for Silver (tier 2)."""
+    return _near_silver_repo(name)
+
+
+class TestAcceptSuggestion:
+    def test_happy_path_explicit_deadline_and_tier(self, tmp_path):
+        """With explicit deadline + target_tier, initiative is built and returned."""
+        project = _near_silver_repo("Wavelength")
+        projects = [project]
+
+        with patch("src.suggest_initiatives._resolve_provider", return_value=None):
+            initiative = accept_suggestion(
+                repo_name="Wavelength",
+                projects=projects,
+                output_dir=tmp_path,
+                deadline="2026-12-31",
+                target_tier=2,
+            )
+
+        assert initiative.repo_name == "Wavelength"
+        assert initiative.target_tier == 2
+        assert initiative.deadline == "2026-12-31"
+        assert initiative.closed_at is None
+
+        # Verify it was persisted
+        initiatives_file = tmp_path / "initiatives.json"
+        assert initiatives_file.exists()
+        data = json.loads(initiatives_file.read_text())
+        names = [i["repo_name"] for i in data["initiatives"]]
+        assert "Wavelength" in names
+
+    def test_defaults_derived_when_no_deadline_or_tier(self, tmp_path):
+        """When deadline and target_tier omitted, defaults are derived."""
+        project = _near_silver_repo("AutoRepo")
+        projects = [project]
+
+        with patch("src.suggest_initiatives._resolve_provider", return_value=None):
+            initiative = accept_suggestion(
+                repo_name="AutoRepo",
+                projects=projects,
+                output_dir=tmp_path,
+            )
+
+        # target = current + 1 (Bronze=1 → Silver=2)
+        from src.maturity_tiers import compute_tier
+
+        current = compute_tier(project)
+        assert initiative.target_tier == current + 1
+        # deadline must be a future date
+        assert date.fromisoformat(initiative.deadline) > date.today()
+
+    def test_re_accept_overwrites_prior_initiative(self, tmp_path):
+        """Re-accepting the same repo overwrites the existing initiative (idempotent)."""
+        project = _near_silver_repo("DupRepo")
+        projects = [project]
+
+        with patch("src.suggest_initiatives._resolve_provider", return_value=None):
+            accept_suggestion(
+                repo_name="DupRepo",
+                projects=projects,
+                output_dir=tmp_path,
+                deadline="2026-12-31",
+            )
+            second = accept_suggestion(
+                repo_name="DupRepo",
+                projects=projects,
+                output_dir=tmp_path,
+                deadline="2027-01-15",
+            )
+
+        assert second.deadline == "2027-01-15"
+        data = json.loads((tmp_path / "initiatives.json").read_text())
+        matching = [i for i in data["initiatives"] if i["repo_name"] == "DupRepo"]
+        assert len(matching) == 1
+        assert matching[0]["deadline"] == "2027-01-15"
+
+    def test_override_target_tier_via_re_accept(self, tmp_path):
+        """Re-accepting with a different target_tier updates the entry."""
+        project = _near_silver_repo("TierSwap")
+        projects = [project]
+
+        with patch("src.suggest_initiatives._resolve_provider", return_value=None):
+            accept_suggestion(
+                repo_name="TierSwap",
+                projects=projects,
+                output_dir=tmp_path,
+                deadline="2026-12-31",
+                target_tier=2,
+            )
+            # Re-accept with target_tier=3 if current allows it
+            from src.maturity_tiers import compute_tier
+
+            current = compute_tier(project)
+            if current < 3:
+                second = accept_suggestion(
+                    repo_name="TierSwap",
+                    projects=projects,
+                    output_dir=tmp_path,
+                    deadline="2026-12-31",
+                    target_tier=3,
+                )
+                assert second.target_tier == 3
+
+    def test_repo_not_found_raises_value_error(self, tmp_path):
+        """Repo not in projects raises ValueError with 'not found in portfolio truth'."""
+        with pytest.raises(ValueError, match="not found in portfolio truth"):
+            accept_suggestion(
+                repo_name="NonExistent",
+                projects=[_near_silver_repo("OtherRepo")],
+                output_dir=tmp_path,
+                deadline="2026-12-31",
+            )
+
+    def test_no_git_repo_raises_value_error(self, tmp_path):
+        """Repo with compute_tier==0 raises ValueError mentioning 'no git'."""
+        no_git = _make_pt_repo("NoGit", has_git=False)
+        with pytest.raises(ValueError, match="no git"):
+            accept_suggestion(
+                repo_name="NoGit",
+                projects=[no_git],
+                output_dir=tmp_path,
+                deadline="2026-12-31",
+            )
+
+    def test_platinum_repo_raises_value_error(self, tmp_path):
+        """Repo at tier 4 raises ValueError mentioning 'already at Platinum'."""
+        from src.maturity_tiers import compute_tier
+
+        repo = _platinum_repo("MaxedOut")
+        tier = compute_tier(repo)
+        if tier < 4:
+            pytest.skip("Platinum factory did not reach tier 4 in this environment")
+        with pytest.raises(ValueError, match="already at Platinum"):
+            accept_suggestion(
+                repo_name="MaxedOut",
+                projects=[repo],
+                output_dir=tmp_path,
+                deadline="2026-12-31",
+            )
+
+    def test_target_tier_not_greater_than_current_raises(self, tmp_path):
+        """target_tier <= current_tier raises ValueError mentioning 'must be greater than'."""
+        project = _near_silver_repo("LowTarget")
+        from src.maturity_tiers import compute_tier
+
+        current = compute_tier(project)
+        with pytest.raises(ValueError, match="must be greater than"):
+            accept_suggestion(
+                repo_name="LowTarget",
+                projects=[project],
+                output_dir=tmp_path,
+                deadline="2026-12-31",
+                target_tier=current,
+            )
+
+    def test_target_tier_5_invalid_raises(self, tmp_path):
+        """target_tier=5 raises ValueError mentioning valid range (2, 3, or 4)."""
+        project = _near_silver_repo("TierFive")
+        with pytest.raises(ValueError, match="2, 3, or 4"):
+            accept_suggestion(
+                repo_name="TierFive",
+                projects=[project],
+                output_dir=tmp_path,
+                deadline="2026-12-31",
+                target_tier=5,
+            )
+
+    def test_past_deadline_raises_value_error(self, tmp_path):
+        """Deadline in the past raises ValueError mentioning 'must be in the future'."""
+        project = _near_silver_repo("PastDeadline")
+        with pytest.raises(ValueError, match="must be in the future"):
+            accept_suggestion(
+                repo_name="PastDeadline",
+                projects=[project],
+                output_dir=tmp_path,
+                deadline="2020-01-01",
+            )
+
+    def test_malformed_deadline_raises_value_error(self, tmp_path):
+        """Malformed deadline raises ValueError mentioning 'YYYY-MM-DD'."""
+        project = _near_silver_repo("BadDate")
+        with pytest.raises(ValueError, match="YYYY-MM-DD"):
+            accept_suggestion(
+                repo_name="BadDate",
+                projects=[project],
+                output_dir=tmp_path,
+                deadline="not-a-date",
+            )
+
+
+# ── CLI accept-suggestion tests ───────────────────────────────────────────────
+
+
+class TestCLIAcceptSuggestion:
+    def _write_truth(self, tmp_path, projects: list[dict]) -> None:
+        (tmp_path / "portfolio-truth-latest.json").write_text(json.dumps({"projects": projects}))
+
+    def test_no_portfolio_truth_prints_warning(self, tmp_path, capsys):
+        """Missing portfolio-truth-latest.json → warning printed, exit 0."""
+        import argparse
+
+        from src.cli import _run_accept_suggestion_mode
+
+        args = argparse.Namespace(
+            output_dir=str(tmp_path),
+            accept_suggestion="Wavelength",
+            deadline=None,
+            target_tier=None,
+        )
+        _run_accept_suggestion_mode(args)
+        captured = capsys.readouterr()
+        assert "portfolio-truth-latest.json not found" in (captured.out + captured.err)
+
+    def test_valid_repo_creates_initiative(self, tmp_path, capsys):
+        """Valid repo in truth → initiative written, stdout has confirmation."""
+        import argparse
+
+        project = _near_silver_repo("Wavelength")
+        self._write_truth(tmp_path, [project])
+
+        args = argparse.Namespace(
+            output_dir=str(tmp_path),
+            accept_suggestion="Wavelength",
+            deadline="2026-12-31",
+            target_tier=2,
+        )
+
+        with patch("src.suggest_initiatives._resolve_provider", return_value=None):
+            from src.cli import _run_accept_suggestion_mode
+
+            _run_accept_suggestion_mode(args)
+
+        captured = capsys.readouterr()
+        assert "Initiative accepted" in (captured.out + captured.err)
+        assert "Wavelength" in (captured.out + captured.err)
+
+        initiatives_file = tmp_path / "initiatives.json"
+        assert initiatives_file.exists()
+
+    def test_repo_not_in_truth_exits_2(self, tmp_path, capsys):
+        """Repo not in portfolio-truth → error printed, sys.exit(2)."""
+        import argparse
+
+        self._write_truth(tmp_path, [_near_silver_repo("OtherRepo")])
+
+        args = argparse.Namespace(
+            output_dir=str(tmp_path),
+            accept_suggestion="NonExistentRepo",
+            deadline="2026-12-31",
+            target_tier=None,
+        )
+
+        with patch("src.suggest_initiatives._resolve_provider", return_value=None):
+            from src.cli import _run_accept_suggestion_mode
+
+            with pytest.raises(SystemExit) as exc_info:
+                _run_accept_suggestion_mode(args)
+
+        assert exc_info.value.code == 2
+
+    def test_deadline_and_target_tier_overrides_applied(self, tmp_path, capsys):
+        """--deadline and --target-tier override defaults when provided."""
+        import argparse
+
+        project = _near_silver_repo("OverrideRepo")
+        self._write_truth(tmp_path, [project])
+
+        args = argparse.Namespace(
+            output_dir=str(tmp_path),
+            accept_suggestion="OverrideRepo",
+            deadline="2026-12-31",
+            target_tier=2,
+        )
+
+        with patch("src.suggest_initiatives._resolve_provider", return_value=None):
+            from src.cli import _run_accept_suggestion_mode
+
+            _run_accept_suggestion_mode(args)
+
+        data = json.loads((tmp_path / "initiatives.json").read_text())
+        entry = next(i for i in data["initiatives"] if i["repo_name"] == "OverrideRepo")
+        assert entry["deadline"] == "2026-12-31"
+        assert entry["target_tier"] == 2
+
+    def test_parser_accept_suggestion_flag_registered(self):
+        """--accept-suggestion REPO is registered in _build_triage_subparser."""
+        import argparse
+
+        from src.cli import _build_triage_subparser
+
+        sp = argparse.ArgumentParser()
+        subs = sp.add_subparsers(dest="subcommand")
+        _build_triage_subparser(subs)
+        args = sp.parse_args(["triage", "testuser", "--accept-suggestion", "MyRepo"])
+        assert args.accept_suggestion == "MyRepo"
