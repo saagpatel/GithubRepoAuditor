@@ -99,11 +99,10 @@ class TestInitiativesDismissedGet:
         assert "permanent" in resp.text
 
     def test_expires_at_date_shown_when_set(self, output_dir: Path, client: TestClient) -> None:
-        """GET row: expires_at in JSON fixture but DismissedSuggestion.from_dict doesn't load it yet.
+        """GET row: expires_at loaded from JSON and rendered by the template (Arc G S12.1).
 
-        Sprint 12.1 will add the expires_at field to the dataclass. The route uses
-        getattr(d, "expires_at", None) defensively, so the template renders 'permanent'
-        for all rows until that sprint lands. This test documents the current behaviour.
+        Sprint 12.1 added expires_at to DismissedSuggestion; the template renders the
+        date when set, or 'permanent' when None.
         """
         _write_dismissed(
             output_dir,
@@ -120,8 +119,8 @@ class TestInitiativesDismissedGet:
         resp = client.get("/initiatives/dismissed")
         assert resp.status_code == 200
         assert "expiring-repo" in resp.text
-        # Until Sprint 12.1 lands, expires_at is not on the dataclass → shows "permanent"
-        assert "permanent" in resp.text
+        # expires_at is now on the dataclass → template renders the date, not "permanent"
+        assert "2026-08-01" in resp.text
 
 
 # ── POST /initiatives/dismissed/undo ─────────────────────────────────────────

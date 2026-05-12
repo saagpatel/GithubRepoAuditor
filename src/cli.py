@@ -356,6 +356,24 @@ def _build_triage_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         action="store_true",
         help="List currently dismissed suggestion repos",
     )
+    # ── Auto-expire + audit trail (12.1) ─────────────────────────────────────
+    p.add_argument(
+        "--dismiss-expires-days",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Auto-expire dismissal after N days (default: permanent)",
+    )
+    p.add_argument(
+        "--expire-dismissals",
+        action="store_true",
+        help="Run cleanup: remove dismissals whose expiry date has passed",
+    )
+    p.add_argument(
+        "--dismissal-history",
+        action="store_true",
+        help="Show audit trail of dismissal events",
+    )
 
 
 def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
@@ -1369,6 +1387,24 @@ def build_parser() -> argparse.ArgumentParser:
         "--list-dismissed",
         action="store_true",
         help="List currently dismissed suggestion repos",
+    )
+    # ── Auto-expire + audit trail (12.1) — also registered here so legacy parser accepts them ──
+    parser.add_argument(
+        "--dismiss-expires-days",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Auto-expire dismissal after N days (default: permanent)",
+    )
+    parser.add_argument(
+        "--expire-dismissals",
+        action="store_true",
+        help="Run cleanup: remove dismissals whose expiry date has passed",
+    )
+    parser.add_argument(
+        "--dismissal-history",
+        action="store_true",
+        help="Show audit trail of dismissal events",
     )
     return parser
 
@@ -3153,11 +3189,17 @@ def _run_dismiss_suggestion_mode(args) -> None:
             dismissed_path(output_dir),
             repo_name=args.dismiss_suggestion,
             reason=getattr(args, "reason", "") or "",
+            expires_days=getattr(args, "dismiss_expires_days", None),
         )
     except ValueError as exc:
         print_warning(str(exc))
         sys.exit(2)
-    print_info(f"✗ Dismissed: {entry.repo_name}" + (f" — {entry.reason}" if entry.reason else ""))
+    expiry_note = f" (expires {entry.expires_at})" if entry.expires_at else ""
+    print_info(
+        f"✗ Dismissed: {entry.repo_name}"
+        + (f" — {entry.reason}" if entry.reason else "")
+        + expiry_note
+    )
 
 
 def _run_undo_dismiss_mode(args) -> None:
@@ -3189,6 +3231,39 @@ def _run_list_dismissed_mode(args) -> None:
     for d in items:
         reason = f" — {d.reason}" if d.reason else ""
         print(f"  {d.repo_name:<30} dismissed {d.dismissed_at[:10]} by {d.dismissed_by}{reason}")
+
+
+def _run_expire_dismissals_mode(args) -> None:
+    """Remove dismissals whose expiry date has passed (Arc G S12.1)."""
+    from pathlib import Path
+
+    from src.suggest_initiatives import dismissed_path, expire_dismissals
+
+    output_dir = Path(args.output_dir)
+    expired = expire_dismissals(dismissed_path(output_dir))
+    if not expired:
+        print_info("No dismissals to expire.")
+        return
+    print_info(f"Expired {len(expired)} dismissal(s):")
+    for d in expired:
+        print(f"  {d.repo_name:<30} (was set to expire {d.expires_at})")
+
+
+def _run_dismissal_history_mode(args) -> None:
+    """Show audit trail of dismissal events (Arc G S12.1)."""
+    from pathlib import Path
+
+    from src.suggest_initiatives import dismissed_path, load_dismissal_events
+
+    output_dir = Path(args.output_dir)
+    events = load_dismissal_events(dismissed_path(output_dir))
+    if not events:
+        print_info("No dismissal history.")
+        return
+    print_info(f"Dismissal History ({len(events)} event(s))")
+    for e in events:
+        reason = f" — {e.reason}" if e.reason else ""
+        print(f"  {e.occurred_at[:19]} {e.event_type:<10} {e.repo_name:<30} by {e.actor}{reason}")
 
 
 def _run_tier_gaps_export_mode(args) -> None:
@@ -6584,6 +6659,13 @@ def main() -> None:
         return
     if getattr(args, "list_dismissed", False):
         _run_list_dismissed_mode(args)
+        return
+    # ── Auto-expire + audit trail (12.1) ─────────────────────────────────────
+    if getattr(args, "expire_dismissals", False):
+        _run_expire_dismissals_mode(args)
+        return
+    if getattr(args, "dismissal_history", False):
+        _run_dismissal_history_mode(args)
         return
 
     # ── Tier-gap export (Arc G S12.4) ─────────────────────────────────────

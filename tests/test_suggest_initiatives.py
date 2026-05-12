@@ -1,4 +1,4 @@
-"""Tests for src/suggest_initiatives.py — Arc G Sprint 8.4 + 9.1 + 10.3 + 10.4 + 11.1 + 11.2 + 11.4."""
+"""Tests for src/suggest_initiatives.py — Arc G Sprint 8.4 + 9.1 + 10.3 + 10.4 + 11.1 + 11.2 + 11.4 + 12.1."""
 
 from __future__ import annotations
 
@@ -19,7 +19,9 @@ from src.suggest_initiatives import (
     default_deadline_for_effort,
     dismiss_suggestion_record,
     dismissed_path,
+    expire_dismissals,
     generate_suggestions,
+    load_dismissal_events,
     load_dismissed,
     load_suggestion_cache,
     narrow_candidates,
@@ -1538,12 +1540,19 @@ def _make_dismissed(
 
 class TestDismissedSuggestionDataclass:
     def test_to_dict_returns_expected_keys(self):
-        """to_dict() returns all four expected keys."""
+        """to_dict() returns all five expected keys (including expires_at)."""
         d = _make_dismissed()
         result = d.to_dict()
-        assert set(result.keys()) == {"repo_name", "reason", "dismissed_at", "dismissed_by"}
+        assert set(result.keys()) == {
+            "repo_name",
+            "reason",
+            "dismissed_at",
+            "dismissed_by",
+            "expires_at",
+        }
         assert result["repo_name"] == "FooRepo"
         assert result["reason"] == "too noisy"
+        assert result["expires_at"] is None
 
     def test_round_trip_equality(self):
         """from_dict(to_dict(d)) == d."""
@@ -1856,3 +1865,385 @@ class TestCLIDismissSuggestion:
         assert args.dismiss_suggestion == "MyRepo"
         assert args.reason == "not relevant"
         assert args.undo_dismiss == "OtherRepo"
+
+
+# ── Arc G S12.1: auto-expire dismissals + persistent audit trail ───────────────
+
+
+class TestDismissalEventDataclass:
+    """DismissalEvent dataclass — round-trip and defaults."""
+
+    def test_to_dict_returns_expected_keys(self):
+        """to_dict() returns all five expected keys."""
+        from src.suggest_initiatives import DismissalEvent
+
+        e = DismissalEvent(
+            repo_name="FooRepo",
+            event_type="dismissed",
+            occurred_at="2026-01-01T00:00:00+00:00",
+            actor="testuser",
+            reason="too noisy",
+        )
+        result = e.to_dict()
+        assert set(result.keys()) == {"repo_name", "event_type", "occurred_at", "actor", "reason"}
+        assert result["event_type"] == "dismissed"
+        assert result["actor"] == "testuser"
+
+    def test_round_trip_equality(self):
+        """from_dict(to_dict(e)) == e."""
+        from src.suggest_initiatives import DismissalEvent
+
+        e = DismissalEvent(
+            repo_name="FooRepo",
+            event_type="undone",
+            occurred_at="2026-01-01T00:00:00+00:00",
+            actor="system",
+            reason="auto-expired",
+        )
+        assert DismissalEvent.from_dict(e.to_dict()) == e
+
+    def test_from_dict_missing_keys_defaults_safely(self):
+        """from_dict with missing keys falls back to empty strings."""
+        from src.suggest_initiatives import DismissalEvent
+
+        e = DismissalEvent.from_dict({})
+        assert e.repo_name == ""
+        assert e.event_type == ""
+        assert e.occurred_at == ""
+        assert e.actor == ""
+        assert e.reason == ""
+
+    def test_reason_defaults_to_empty_string(self):
+        """reason field has a default of '' so it is optional."""
+        from src.suggest_initiatives import DismissalEvent
+
+        e = DismissalEvent(
+            repo_name="R",
+            event_type="dismissed",
+            occurred_at="now",
+            actor="me",
+        )
+        assert e.reason == ""
+
+
+class TestSchemaMigration:
+    """load_dismissed / load_dismissal_events backward-compat for v1 vs v2."""
+
+    def test_load_dismissed_v1_file_populates_expires_at_none(self, tmp_path):
+        """v1 file (no expires_at, no events) items have expires_at=None, no error."""
+        p = tmp_path / "dismissed-suggestions.json"
+        p.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "items": [
+                        {
+                            "repo_name": "OldRepo",
+                            "reason": "legacy",
+                            "dismissed_at": "2025-01-01T00:00:00+00:00",
+                            "dismissed_by": "alice",
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        items = load_dismissed(p)
+        assert len(items) == 1
+        assert items[0].repo_name == "OldRepo"
+        assert items[0].expires_at is None
+
+    def test_load_dismissal_events_v1_file_returns_empty(self, tmp_path):
+        """v1 file (no events key) load_dismissal_events returns []."""
+        p = tmp_path / "dismissed-suggestions.json"
+        p.write_text(
+            json.dumps({"version": 1, "items": []}),
+            encoding="utf-8",
+        )
+        events = load_dismissal_events(p)
+        assert events == []
+
+    def test_load_dismissed_v2_file_with_expires_at(self, tmp_path):
+        """v2 file items with populated expires_at are loaded correctly."""
+        p = tmp_path / "dismissed-suggestions.json"
+        p.write_text(
+            json.dumps(
+                {
+                    "version": 2,
+                    "items": [
+                        {
+                            "repo_name": "NewRepo",
+                            "reason": "exp",
+                            "dismissed_at": "2026-01-01T00:00:00+00:00",
+                            "dismissed_by": "bob",
+                            "expires_at": "2099-12-31",
+                        }
+                    ],
+                    "events": [],
+                }
+            ),
+            encoding="utf-8",
+        )
+        items = load_dismissed(p)
+        assert len(items) == 1
+        assert items[0].expires_at == "2099-12-31"
+
+    def test_save_dismissed_writes_v2_schema(self, tmp_path):
+        """save_dismissed always writes v2 schema (version=2 + items + events keys)."""
+        p = tmp_path / "dismissed-suggestions.json"
+        save_dismissed(p, [_make_dismissed()])
+        data = json.loads(p.read_text(encoding="utf-8"))
+        assert data["version"] == 2
+        assert "items" in data
+        assert "events" in data
+
+
+class TestDismissSuggestionRecordExpiry:
+    """dismiss_suggestion_record — expires_days parameter."""
+
+    def test_expires_days_30_sets_correct_expires_at(self, tmp_path):
+        """expires_days=30 sets expires_at 30 days from today in YYYY-MM-DD format."""
+        from datetime import timedelta
+
+        entry = dismiss_suggestion_record(
+            dismissed_path(tmp_path), repo_name="RepoA", expires_days=30
+        )
+        expected = (date.today() + timedelta(days=30)).isoformat()
+        assert entry.expires_at == expected
+
+    def test_expires_days_none_gives_permanent(self, tmp_path):
+        """expires_days=None gives expires_at=None (permanent dismissal)."""
+        entry = dismiss_suggestion_record(
+            dismissed_path(tmp_path), repo_name="RepoB", expires_days=None
+        )
+        assert entry.expires_at is None
+
+    def test_expires_days_0_sets_today(self, tmp_path):
+        """expires_days=0 sets expires_at to today's date."""
+        entry = dismiss_suggestion_record(
+            dismissed_path(tmp_path), repo_name="RepoC", expires_days=0
+        )
+        assert entry.expires_at == date.today().isoformat()
+
+    def test_dismiss_records_dismissed_event(self, tmp_path):
+        """dismiss_suggestion_record appends a 'dismissed' DismissalEvent."""
+        dismiss_suggestion_record(
+            dismissed_path(tmp_path), repo_name="RepoD", reason="testing", expires_days=7
+        )
+        events = load_dismissal_events(dismissed_path(tmp_path))
+        assert len(events) == 1
+        assert events[0].event_type == "dismissed"
+        assert events[0].repo_name == "RepoD"
+        assert events[0].reason == "testing"
+
+
+class TestUndoDismissAuditTrail:
+    """undo_dismiss — audit trail events."""
+
+    def test_undo_records_undone_event(self, tmp_path):
+        """undo_dismiss appends an 'undone' event when entry is removed."""
+        dismiss_suggestion_record(dismissed_path(tmp_path), repo_name="RepoE")
+        undo_dismiss(dismissed_path(tmp_path), "RepoE")
+        events = load_dismissal_events(dismissed_path(tmp_path))
+        undone = [e for e in events if e.event_type == "undone"]
+        assert len(undone) == 1
+        assert undone[0].repo_name == "RepoE"
+
+    def test_undo_nonexistent_does_not_record_event(self, tmp_path):
+        """undo_dismiss on absent repo_name does not append any event."""
+        undo_dismiss(dismissed_path(tmp_path), "NotThere")
+        events = load_dismissal_events(dismissed_path(tmp_path))
+        assert events == []
+
+
+class TestExpireDismissals:
+    """expire_dismissals — core logic."""
+
+    def test_empty_items_returns_empty(self, tmp_path):
+        """expire_dismissals on file with no items returns []."""
+        save_dismissed(dismissed_path(tmp_path), [])
+        result = expire_dismissals(dismissed_path(tmp_path))
+        assert result == []
+
+    def test_all_permanent_items_returns_empty(self, tmp_path):
+        """Items with expires_at=None are never expired."""
+        dismiss_suggestion_record(dismissed_path(tmp_path), repo_name="Perm", expires_days=None)
+        result = expire_dismissals(dismissed_path(tmp_path), today=date(2099, 1, 1))
+        assert result == []
+
+    def test_past_expiry_removed_future_kept(self, tmp_path):
+        """One past-expiry + one future-expiry: past removed, future kept."""
+        from datetime import timedelta
+
+        today = date(2026, 6, 1)
+        p = dismissed_path(tmp_path)
+
+        # Dismiss both with expires_days=0 then manually patch the JSON
+        dismiss_suggestion_record(p, repo_name="PastRepo", expires_days=0)
+        dismiss_suggestion_record(p, repo_name="FutureRepo", expires_days=0)
+        data = json.loads(p.read_text(encoding="utf-8"))
+        for item in data["items"]:
+            if item["repo_name"] == "PastRepo":
+                item["expires_at"] = (today - timedelta(days=1)).isoformat()
+            else:
+                item["expires_at"] = (today + timedelta(days=1)).isoformat()
+        p.write_text(json.dumps(data), encoding="utf-8")
+
+        expired = expire_dismissals(p, today=today)
+        assert len(expired) == 1
+        assert expired[0].repo_name == "PastRepo"
+
+        remaining = load_dismissed(p)
+        assert len(remaining) == 1
+        assert remaining[0].repo_name == "FutureRepo"
+
+    def test_expires_at_today_is_kept(self, tmp_path):
+        """expires_at == today is kept (boundary: < today, not <=)."""
+        today = date(2026, 6, 1)
+        p = dismissed_path(tmp_path)
+        dismiss_suggestion_record(p, repo_name="TodayRepo", expires_days=0)
+        data = json.loads(p.read_text(encoding="utf-8"))
+        data["items"][0]["expires_at"] = today.isoformat()
+        p.write_text(json.dumps(data), encoding="utf-8")
+
+        expired = expire_dismissals(p, today=today)
+        assert expired == []
+        remaining = load_dismissed(p)
+        assert len(remaining) == 1
+
+    def test_expired_item_records_system_event(self, tmp_path):
+        """expire_dismissals records DismissalEvent(event_type='expired', actor='system')."""
+        from datetime import timedelta
+
+        today = date(2026, 6, 1)
+        p = dismissed_path(tmp_path)
+        dismiss_suggestion_record(p, repo_name="ExpiredRepo", expires_days=0)
+        data = json.loads(p.read_text(encoding="utf-8"))
+        data["items"][0]["expires_at"] = (today - timedelta(days=1)).isoformat()
+        p.write_text(json.dumps(data), encoding="utf-8")
+
+        expire_dismissals(p, today=today)
+        events = load_dismissal_events(p)
+        expired_events = [e for e in events if e.event_type == "expired"]
+        assert len(expired_events) == 1
+        assert expired_events[0].actor == "system"
+        assert expired_events[0].repo_name == "ExpiredRepo"
+
+    def test_malformed_expires_at_kept_defensively(self, tmp_path):
+        """Malformed expires_at string kept with no crash."""
+        p = dismissed_path(tmp_path)
+        dismiss_suggestion_record(p, repo_name="BadRepo")
+        data = json.loads(p.read_text(encoding="utf-8"))
+        data["items"][0]["expires_at"] = "not-a-date"
+        p.write_text(json.dumps(data), encoding="utf-8")
+
+        expired = expire_dismissals(p, today=date(2099, 1, 1))
+        assert expired == []
+        remaining = load_dismissed(p)
+        assert any(d.repo_name == "BadRepo" for d in remaining)
+
+
+class TestCLIAutoExpire:
+    """CLI integration tests for --dismiss-expires-days, --expire-dismissals, --dismissal-history."""
+
+    def test_dismiss_with_expires_days_sets_expiry(self, tmp_path):
+        """--dismiss-suggestion FooRepo --dismiss-expires-days 14 writes expires_at 14 days out."""
+        import argparse
+        from datetime import timedelta
+
+        from src.cli import _run_dismiss_suggestion_mode
+
+        args = argparse.Namespace(
+            output_dir=str(tmp_path),
+            dismiss_suggestion="FooRepo",
+            reason="",
+            dismiss_expires_days=14,
+        )
+        _run_dismiss_suggestion_mode(args)
+        items = load_dismissed(dismissed_path(tmp_path))
+        assert len(items) == 1
+        expected = (date.today() + timedelta(days=14)).isoformat()
+        assert items[0].expires_at == expected
+
+    def test_expire_dismissals_no_expired(self, tmp_path, capsys):
+        """--expire-dismissals with nothing expired prints 'No dismissals to expire.'"""
+        import argparse
+
+        from src.cli import _run_expire_dismissals_mode
+
+        args = argparse.Namespace(output_dir=str(tmp_path))
+        _run_expire_dismissals_mode(args)
+        captured = capsys.readouterr()
+        assert "No dismissals to expire" in (captured.out + captured.err)
+
+    def test_expire_dismissals_removes_expired_entry(self, tmp_path, capsys):
+        """--expire-dismissals with 1 expired entry prints count + repo name."""
+        import argparse
+        from datetime import timedelta
+
+        from src.cli import _run_expire_dismissals_mode
+
+        dismiss_suggestion_record(dismissed_path(tmp_path), repo_name="ExpRepo", expires_days=0)
+        p = dismissed_path(tmp_path)
+        data = json.loads(p.read_text(encoding="utf-8"))
+        data["items"][0]["expires_at"] = (date.today() - timedelta(days=1)).isoformat()
+        p.write_text(json.dumps(data), encoding="utf-8")
+
+        args = argparse.Namespace(output_dir=str(tmp_path))
+        _run_expire_dismissals_mode(args)
+        captured = capsys.readouterr()
+        output = captured.out + captured.err
+        assert "Expired 1" in output
+        assert "ExpRepo" in output
+
+    def test_dismissal_history_empty(self, tmp_path, capsys):
+        """--dismissal-history with no events prints 'No dismissal history.'"""
+        import argparse
+
+        from src.cli import _run_dismissal_history_mode
+
+        args = argparse.Namespace(output_dir=str(tmp_path))
+        _run_dismissal_history_mode(args)
+        captured = capsys.readouterr()
+        assert "No dismissal history" in (captured.out + captured.err)
+
+    def test_dismissal_history_with_events_prints_each(self, tmp_path, capsys):
+        """--dismissal-history with events prints each event's repo + type."""
+        import argparse
+
+        from src.cli import _run_dismissal_history_mode
+
+        dismiss_suggestion_record(dismissed_path(tmp_path), repo_name="RepoX", reason="noisy")
+        dismiss_suggestion_record(dismissed_path(tmp_path), repo_name="RepoY")
+        undo_dismiss(dismissed_path(tmp_path), "RepoY")
+
+        args = argparse.Namespace(output_dir=str(tmp_path))
+        _run_dismissal_history_mode(args)
+        captured = capsys.readouterr()
+        output = captured.out + captured.err
+        assert "RepoX" in output
+        assert "RepoY" in output
+        assert "dismissed" in output
+        assert "undone" in output
+
+    def test_parser_new_flags_registered(self):
+        """--dismiss-expires-days, --expire-dismissals, --dismissal-history all registered."""
+        from src.cli import build_subcommand_parser
+
+        parser = build_subcommand_parser()
+        args = parser.parse_args(
+            [
+                "triage",
+                "saagpatel",
+                "--dismiss-suggestion",
+                "MyRepo",
+                "--dismiss-expires-days",
+                "30",
+                "--expire-dismissals",
+                "--dismissal-history",
+            ]
+        )
+        assert args.dismiss_suggestion == "MyRepo"
+        assert args.dismiss_expires_days == 30
+        assert args.expire_dismissals is True
+        assert args.dismissal_history is True
