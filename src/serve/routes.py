@@ -272,6 +272,54 @@ async def draft_diff(request: Request, record_id: str) -> HTMLResponse:
     )
 
 
+@router.get("/approvals/{record_id}/campaign-plan", response_class=HTMLResponse)
+async def campaign_plan(request: Request, record_id: str) -> HTMLResponse:
+    """Return an HTMX partial showing goal + per-action table for a campaign-plan packet."""
+    output_dir = _output_dir(request)
+    record: dict[str, Any] | None = None
+    try:
+        from src.warehouse import load_approval_records
+
+        all_records = load_approval_records(output_dir, username="")
+        record = next(
+            (r for r in all_records if r.get("approval_id") == record_id),
+            None,
+        )
+    except Exception:
+        pass
+
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"Record '{record_id}' not found")
+
+    if record.get("approval_subject_type") != "campaign-plan":
+        raise HTTPException(
+            status_code=404,
+            detail=f"Record '{record_id}' is not a campaign-plan packet",
+        )
+
+    goal: str = record.get("goal") or record.get("target_context") or ""
+    candidate_count: int = int(record.get("candidate_count") or 0)
+    qualified_count: int = int(record.get("qualified_count") or 0)
+    llm_cost_usd: float = float(record.get("llm_cost_usd") or 0.0)
+    raw_actions: list[Any] = record.get("actions") or []
+    # Normalise to list[dict] — the warehouse may return them as dicts already
+    actions: list[dict[str, Any]] = [a if isinstance(a, dict) else {} for a in raw_actions]
+    pending_count: int = sum(1 for a in actions if a.get("action_type") == "pending_human_action")
+
+    return templates.TemplateResponse(
+        request,
+        "campaign_plan.html",
+        {
+            "goal": goal,
+            "candidate_count": candidate_count,
+            "qualified_count": qualified_count,
+            "llm_cost_usd": llm_cost_usd,
+            "pending_count": pending_count,
+            "actions": actions,
+        },
+    )
+
+
 @router.post("/approvals/{approval_id}/approve", response_class=HTMLResponse)
 async def approve_action(request: Request, approval_id: str) -> HTMLResponse:
     """Record intent into session log; does NOT mutate the approval state."""

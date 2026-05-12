@@ -517,3 +517,124 @@ class TestCLIServeFlag:
         args = parser.parse_args(["dummyuser", "--serve"])
         assert args.port == 8080
         assert args.host == "127.0.0.1"
+
+
+# ---------------------------------------------------------------------------
+# Campaign-plan packet display (Arc G S6.3)
+# ---------------------------------------------------------------------------
+
+
+def _seed_campaign_plan_record(output_dir: Path) -> str:
+    """Insert one campaign-plan approval record into the warehouse DB.
+
+    Returns the record_id.
+    """
+    from src.warehouse import save_approval_record
+
+    record_id = "cp-aabbccdd00000001"
+    save_approval_record(
+        output_dir,
+        {
+            "approval_id": record_id,
+            "fingerprint": "fp-cp-001",
+            "approval_subject_type": "campaign-plan",
+            "subject_key": "a1b2c3d4e5f60011",
+            "source_run_id": "",
+            "approved_at": "2026-05-11T00:00:00",
+            "approved_by": "test",
+            "approval_note": "2 actions for goal: add CI to all repos",
+            "action_type": "campaign-plan",
+            "target_context": "add CI to all repos",
+            "goal": "add CI to all repos",
+            "candidate_count": 10,
+            "qualified_count": 2,
+            "llm_provider": "test",
+            "llm_model": "test-model",
+            "llm_cost_usd": 0.0042,
+            "generated_at": "2026-05-11T00:00:00",
+            "actions": [
+                {
+                    "repo_name": "my-repo",
+                    "action_type": "add_ci",
+                    "target": ".github/workflows/ci.yml",
+                    "rationale": "No CI pipeline found.",
+                    "expected_impact": "Automated tests on PR.",
+                },
+                {
+                    "repo_name": "another-repo",
+                    "action_type": "pending_human_action",
+                    "target": "",
+                    "rationale": "Complex monorepo — needs manual review.",
+                    "expected_impact": None,
+                },
+            ],
+        },
+    )
+    return record_id
+
+
+class TestCampaignPlanApprovals:
+    """Tests for campaign-plan packet display in /approvals (Arc G S6.3)."""
+
+    def test_approvals_lists_campaign_plan_record(self, output_dir: Path) -> None:
+        """GET /approvals with a campaign-plan record → 200, record visible."""
+        record_id = _seed_campaign_plan_record(output_dir)
+        app = create_app(output_dir=output_dir)
+        c = TestClient(app, raise_server_exceptions=True)
+        resp = c.get("/approvals")
+        assert resp.status_code == 200
+        assert record_id[:12] in resp.text or "campaign-plan" in resp.text
+
+    def test_campaign_plan_partial_returns_200_with_goal(self, output_dir: Path) -> None:
+        """GET /approvals/{id}/campaign-plan → 200, contains goal text and action row."""
+        record_id = _seed_campaign_plan_record(output_dir)
+        app = create_app(output_dir=output_dir)
+        c = TestClient(app, raise_server_exceptions=True)
+        resp = c.get(f"/approvals/{record_id}/campaign-plan")
+        assert resp.status_code == 200
+        assert "add CI to all repos" in resp.text
+        assert "my-repo" in resp.text
+
+    def test_campaign_plan_non_campaign_plan_returns_404(self, output_dir: Path) -> None:
+        """A draft-readme record requested via /campaign-plan → 404."""
+        _id1, _id2 = _seed_draft_readme_records(output_dir)
+        app = create_app(output_dir=output_dir)
+        c = TestClient(app, raise_server_exceptions=True)
+        resp = c.get(f"/approvals/{_id1}/campaign-plan")
+        assert resp.status_code == 404
+
+    def test_campaign_plan_nonexistent_record_returns_404(self, output_dir: Path) -> None:
+        """GET /approvals/nonexistent/campaign-plan → 404."""
+        app = create_app(output_dir=output_dir)
+        c = TestClient(app, raise_server_exceptions=True)
+        resp = c.get("/approvals/nonexistent-campaign-id/campaign-plan")
+        assert resp.status_code == 404
+
+    def test_campaign_plan_partial_has_no_html_or_body_tags(self, output_dir: Path) -> None:
+        """The partial must be HTMX-injectable: no <html> or <body> wrapper."""
+        record_id = _seed_campaign_plan_record(output_dir)
+        app = create_app(output_dir=output_dir)
+        c = TestClient(app, raise_server_exceptions=True)
+        resp = c.get(f"/approvals/{record_id}/campaign-plan")
+        assert resp.status_code == 200
+        body = resp.text.lower()
+        assert "<html" not in body
+        assert "<body" not in body
+
+    def test_campaign_plan_pending_rows_have_de_emphasis_class(self, output_dir: Path) -> None:
+        """Pending-human-action rows render with the de-emphasis CSS class."""
+        record_id = _seed_campaign_plan_record(output_dir)
+        app = create_app(output_dir=output_dir)
+        c = TestClient(app, raise_server_exceptions=True)
+        resp = c.get(f"/approvals/{record_id}/campaign-plan")
+        assert resp.status_code == 200
+        assert "campaign-plan__row--pending" in resp.text
+
+    def test_campaign_plan_partial_shows_llm_cost_4dp(self, output_dir: Path) -> None:
+        """Partial includes the LLM cost formatted to 4 decimal places."""
+        record_id = _seed_campaign_plan_record(output_dir)
+        app = create_app(output_dir=output_dir)
+        c = TestClient(app, raise_server_exceptions=True)
+        resp = c.get(f"/approvals/{record_id}/campaign-plan")
+        assert resp.status_code == 200
+        assert "$0.0042" in resp.text

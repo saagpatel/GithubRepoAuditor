@@ -1,0 +1,34 @@
+<div class="campaign-plan-container">
+  <div class="campaign-plan__header">
+    <p class="campaign-plan__goal">{{ goal }}</p>
+  </div>
+  <p class="campaign-plan__summary">
+    Considered {{ candidate_count }}. Qualified {{ qualified_count }}.
+    Pending human review {{ pending_count }}.
+    LLM cost ${{ "%.4f"|format(llm_cost_usd) }}.
+  </p>
+  {% if actions %}
+  <table class="campaign-plan__table">
+    <thead>
+      <tr>
+        <th>Repo</th>
+        <th>Action</th>
+        <th>Target</th>
+        <th>Rationale</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for action in actions %}
+      <tr class="{% if action.action_type == 'pending_human_action' %}campaign-plan__row--pending{% endif %}">
+        <td><code>{{ action.repo_name }}</code></td>
+        <td><span class="campaign-plan__action-type">{{ action.action_type }}</span></td>
+        <td>{{ action.target or "—" }}</td>
+        <td class="campaign-plan__rationale">{{ action.rationale or "—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="campaign-plan__empty">No actions in this packet.</p>
+  {% endif %}
+</div>
