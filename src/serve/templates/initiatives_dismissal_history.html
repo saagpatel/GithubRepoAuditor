@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Dismissal History{% endblock %}
+
+{% block content %}
+<style>
+  .event-badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 3px;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  .event-dismissed { background: #e9ecef; color: #495057; }
+  .event-undone    { background: #d4edda; color: #155724; }
+  .event-expired   { background: #fff3cd; color: #856404; }
+</style>
+
+<div class="page-header">
+  <h1>Dismissal History</h1>
+  <p class="meta">{{ count }} event{{ 's' if count != 1 else '' }} recorded</p>
+</div>
+
+{% if not rows %}
+<div class="empty-state">
+  No dismissal events recorded.
+</div>
+{% else %}
+<table>
+  <thead>
+    <tr>
+      <th>Repo</th>
+      <th>Event</th>
+      <th>Occurred at</th>
+      <th>Actor</th>
+      <th>Reason</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    <tr>
+      <td><code>{{ row.repo_name }}</code></td>
+      <td>
+        <span class="event-badge event-{{ row.event_type }}">{{ row.event_type }}</span>
+      </td>
+      <td class="meta">{{ row.occurred_at[:19] if row.occurred_at else '' }}</td>
+      <td class="meta">{{ row.actor or '—' }}</td>
+      <td>{{ row.reason or '—' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<p>
+  <a href="/initiatives/dismissed">&larr; Dismissed Suggestions</a>
+  &middot;
+  <a href="/initiatives/suggestions">Suggestions</a>
+</p>
+{% endblock %}
