@@ -1,7 +1,9 @@
 # src/analyzers/description_analyzer.py
 from __future__ import annotations
+
 import hashlib
 from pathlib import Path
+
 from src.analyzers.base import BaseAnalyzer
 from src.models import AnalyzerResult, RepoMetadata
 
