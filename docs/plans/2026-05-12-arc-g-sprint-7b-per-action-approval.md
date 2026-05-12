@@ -78,3 +78,36 @@ Estimated effort: 1.5-2 days. ~25 new tests.
 3. **Boot test discipline.** Smoke-test one new POST endpoint via curl before committing.
 4. **No new dependencies.** HTMX-only UI swap. No JS framework.
 5. **Cwd hygiene.** After worktree operations, prepend `cd /Users/d/Projects/GithubRepoAuditor &&` to bash commands.
+
+---
+
+## Closeout — 2026-05-12
+
+**Status:** SHIPPED. Sonnet subagent (`a65b23a2`) implemented 7B.1-7B.6 on isolated worktree at base SHA `8cbb5f1`. Cherry-picked as `ca832e2` onto `feat/arc-g-sprint-7b-per-action-approval`. Tests `1561 → 1586` (+25). Ruff clean.
+
+**Inventory final:**
+
+| # | Item | Status |
+|---|---|---|
+| 7B.1 | `CampaignAction` schema gains `state` / `rejected_reason` / `decided_at` (defaults, backward-compat) | ✅ |
+| 7B.2 | `approve_action(packet_id, idx, output_dir)` / `reject_action(packet_id, idx, output_dir, reason)` in `src/plan_campaign.py` | ✅ |
+| 7B.3 | Routes `POST /approvals/{packet_id}/actions/{idx}/approve` and `.../reject` returning HTMX row fragments via `_render_action_row()` helper | ✅ |
+| 7B.4 | `campaign_plan.html` per-action buttons + counter header + approved/rejected row styling | ✅ |
+| 7B.5 | Apply path in `src/cli.py` skips non-approved actions, leaves packet `approved-manual` until all terminal | ✅ |
+| 7B.6 | `tests/test_per_action_approval.py` — 25 tests (write functions, route happy/404/out-of-range, backward-compat, apply gate) | ✅ |
+
+**Boot test:** `POST /approvals/nonexistent/actions/0/approve` → `404` ✅ on local server.
+
+**Notes / deviations:**
+
+- Existing `approve_action`/`reject_action` route stubs (packet-level intent log) were renamed `approve_packet`/`reject_packet` to free up the names. Behavior unchanged; existing tests still pass.
+- The `pending → approved → rejected` re-flip is idempotent (tests cover it). Useful when an operator changes their mind without re-running the LLM.
+- Counter header is rendered server-side at GET time (not OOB-swapped on row updates). Operator must refresh the `/approvals/{id}/campaign-plan` partial to see updated counts. Could be made live via `hx-swap-oob` in a follow-up — captured here, not blocking ship.
+
+**Lessons:**
+
+- Subagents respect "no auto-merge" when given an explicit base-SHA + "DO NOT auto-merge" instruction. The S6.3 pattern (auto-merge) doesn't repeat here.
+- Locked worktrees that can't be removed via `git worktree remove -f -f` from inside main require the agent process to exit first. The directory removal succeeded, but the dangling branch reference was left behind — harmless, prune-on-push.
+- `frozen=True` dataclasses can accept new default-valued fields safely — pre-existing callers that pass positional args keep working.
+
+**Next:** Sprint 7A (tiered maturity + initiative tracker) starts immediately after merge.
