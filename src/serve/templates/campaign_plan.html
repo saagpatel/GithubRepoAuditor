@@ -7,6 +7,13 @@
     Pending human review {{ pending_count }}.
     LLM cost ${{ "%.4f"|format(llm_cost_usd) }}.
   </p>
+  <p class="campaign-plan__action-counts" id="action-counts">
+    <span class="badge badge-approved">{{ approved_count }} approved</span>
+    &middot;
+    <span class="badge badge-rejected">{{ rejected_count }} rejected</span>
+    &middot;
+    <span class="badge badge-pending">{{ state_pending_count }} pending</span>
+  </p>
   {% if actions %}
   <table class="campaign-plan__table">
     <thead>
@@ -15,15 +22,41 @@
         <th>Action</th>
         <th>Target</th>
         <th>Rationale</th>
+        <th>State</th>
+        <th>Decision</th>
       </tr>
     </thead>
     <tbody>
       {% for action in actions %}
-      <tr class="{% if action.action_type == 'pending_human_action' %}campaign-plan__row--pending{% endif %}">
+      {% set action_state = action.state if action.state else "pending" %}
+      {% set row_idx = loop.index0 %}
+      <tr class="{% if action_state == 'approved' %}campaign-plan__row--approved{% elif action_state == 'rejected' %}campaign-plan__row--rejected{% else %}campaign-plan__row--pending{% endif %}"
+          id="action-row-{{ row_idx }}">
         <td><code>{{ action.repo_name }}</code></td>
         <td><span class="campaign-plan__action-type">{{ action.action_type }}</span></td>
         <td>{{ action.target or "—" }}</td>
         <td class="campaign-plan__rationale">{{ action.rationale or "—" }}</td>
+        <td>
+          {% if action_state == "approved" %}
+            <span class="badge badge-approved">&#10003; Approved</span>
+          {% elif action_state == "rejected" %}
+            <span class="badge badge-rejected">&#10007; Rejected{% if action.rejected_reason %} ({{ action.rejected_reason }}){% endif %}</span>
+          {% else %}
+            <span class="badge badge-pending">Pending</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if action_state == "pending" %}
+            <button class="btn-approve"
+              hx-post="/approvals/{{ packet_id }}/actions/{{ row_idx }}/approve"
+              hx-target="closest tr"
+              hx-swap="outerHTML">&#10003; Approve</button>
+            <button class="btn-reject"
+              hx-post="/approvals/{{ packet_id }}/actions/{{ row_idx }}/reject"
+              hx-target="closest tr"
+              hx-swap="outerHTML">&#10007; Reject</button>
+          {% endif %}
+        </td>
       </tr>
       {% endfor %}
     </tbody>

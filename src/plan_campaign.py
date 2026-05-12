@@ -54,6 +54,10 @@ class CampaignAction:
     target: str
     rationale: str
     expected_impact: str | None = None
+    # Per-action approval state (7B.1) — default "pending" for backwards compat
+    state: str = "pending"
+    rejected_reason: str | None = None
+    decided_at: str | None = None
 
 
 @dataclass(frozen=True)
@@ -471,6 +475,10 @@ def load_approved_campaign_plans(warehouse_path: Path) -> list[CampaignPlanPacke
                     target=str(a.get("target") or ""),
                     rationale=str(a.get("rationale") or ""),
                     expected_impact=a.get("expected_impact") or None,
+                    # 7B.1: hydrate per-action state; default "pending" for pre-7B packets
+                    state=str(a.get("state") or "pending"),
+                    rejected_reason=a.get("rejected_reason") or None,
+                    decided_at=a.get("decided_at") or None,
                 )
                 for a in raw_actions
                 if isinstance(a, dict)
@@ -537,6 +545,82 @@ def mark_campaign_applied(packet: CampaignPlanPacket, output_dir: Path) -> None:
         updated = dict(record)
         updated["status"] = "applied"
         updated["applied_at"] = datetime.now(timezone.utc).isoformat()
+        save_approval_record(output_dir, updated)
+
+
+# ---------------------------------------------------------------------------
+# 7B.2 — Per-action approve / reject
+# ---------------------------------------------------------------------------
+
+
+def approve_action(packet_id: str, action_idx: int, output_dir: Path) -> None:
+    """Set state='approved', decided_at=now on actions[action_idx] of packet packet_id.
+
+    Raises ValueError if the packet is not found.
+    Raises IndexError if action_idx is out of range.
+    """
+    from src.warehouse import load_approval_records, save_approval_record
+
+    records = load_approval_records(output_dir, "", limit=500)
+    matching = [
+        r
+        for r in records
+        if r.get("approval_id") == packet_id and r.get("approval_subject_type") == "campaign-plan"
+    ]
+
+    if not matching:
+        raise ValueError(f"approve_action: no campaign-plan record found for id={packet_id!r}")
+
+    for record in matching:
+        actions: list[dict] = list(record.get("actions") or [])
+        if action_idx < 0 or action_idx >= len(actions):
+            raise IndexError(
+                f"approve_action: action_idx={action_idx} out of range "
+                f"for packet {packet_id!r} (len={len(actions)})"
+            )
+        updated_actions = [dict(a) for a in actions]
+        updated_actions[action_idx]["state"] = "approved"
+        updated_actions[action_idx]["decided_at"] = datetime.now(timezone.utc).isoformat()
+        # Clear any prior rejection reason
+        updated_actions[action_idx]["rejected_reason"] = None
+
+        updated = dict(record)
+        updated["actions"] = updated_actions
+        save_approval_record(output_dir, updated)
+
+
+def reject_action(packet_id: str, action_idx: int, output_dir: Path, reason: str = "") -> None:
+    """Set state='rejected', rejected_reason=reason, decided_at=now on actions[action_idx].
+
+    Raises ValueError if the packet is not found.
+    Raises IndexError if action_idx is out of range.
+    """
+    from src.warehouse import load_approval_records, save_approval_record
+
+    records = load_approval_records(output_dir, "", limit=500)
+    matching = [
+        r
+        for r in records
+        if r.get("approval_id") == packet_id and r.get("approval_subject_type") == "campaign-plan"
+    ]
+
+    if not matching:
+        raise ValueError(f"reject_action: no campaign-plan record found for id={packet_id!r}")
+
+    for record in matching:
+        actions: list[dict] = list(record.get("actions") or [])
+        if action_idx < 0 or action_idx >= len(actions):
+            raise IndexError(
+                f"reject_action: action_idx={action_idx} out of range "
+                f"for packet {packet_id!r} (len={len(actions)})"
+            )
+        updated_actions = [dict(a) for a in actions]
+        updated_actions[action_idx]["state"] = "rejected"
+        updated_actions[action_idx]["rejected_reason"] = reason or None
+        updated_actions[action_idx]["decided_at"] = datetime.now(timezone.utc).isoformat()
+
+        updated = dict(record)
+        updated["actions"] = updated_actions
         save_approval_record(output_dir, updated)
 
 
