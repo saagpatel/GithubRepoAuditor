@@ -20,6 +20,19 @@ from src.narrative import _resolve_provider
 
 logger = logging.getLogger(__name__)
 
+# ── In-process suggestion cache ───────────────────────────────────────────────
+
+# In-process cache for generate_suggestions results, keyed by caller-supplied cache_key.
+# Caller is responsible for picking a key that captures all relevant inputs
+# (e.g. portfolio-truth generated_at + target_tier).
+_suggestion_cache: dict[str, tuple[list["InitiativeSuggestion"], float]] = {}
+
+
+def clear_suggestion_cache() -> None:
+    """Test helper / public API: drop all cached suggestions."""
+    _suggestion_cache.clear()
+
+
 # ── Public dataclass ──────────────────────────────────────────────────────────
 
 
@@ -332,14 +345,13 @@ def accept_suggestion(
     # 4. Derive deadline when not supplied
     if deadline is None:
         effort = "medium"  # default
-        try:
-            suggestions, _ = generate_suggestions(projects, target_tier=target, budget_usd=0.0)
-            for s in suggestions:
-                if s.repo_name == repo_name:
-                    effort = s.estimated_effort
-                    break
-        except Exception:  # noqa: BLE001 — never let deadline derivation crash accept
-            pass
+        suggestions, _ = generate_suggestions(
+            projects, target_tier=target, force_deterministic=True
+        )
+        for s in suggestions:
+            if s.repo_name == repo_name:
+                effort = s.estimated_effort
+                break
         deadline = default_deadline_for_effort(effort)
 
     # 5. Validate deadline format
@@ -380,6 +392,8 @@ def generate_suggestions(
     target_tier: int | None = None,
     budget_usd: float = 0.10,
     max_missing: int = 3,
+    cache_key: str | None = None,
+    force_deterministic: bool = False,
 ) -> tuple[list[InitiativeSuggestion], float]:
     """Generate LLM-ranked initiative suggestions for the portfolio.
 
@@ -394,6 +408,16 @@ def generate_suggestions(
         Hard cap on LLM spend.  Default $0.10.
     max_missing:
         Maximum number of missing requirements to include a repo as a candidate.
+    cache_key:
+        If provided, results are cached in-process under this key.  Subsequent
+        calls with the same key skip the LLM entirely.  Caller is responsible for
+        choosing a key that captures all relevant inputs (e.g.
+        ``f"{generated_at}|target={target_tier}"``).  Pass ``None`` (default) to
+        disable caching.
+    force_deterministic:
+        If ``True``, skip the LLM call entirely and use the deterministic ranking
+        (fewest missing requirements).  Cost is always 0.0.  Never raises.
+        Useful for deadline derivation in :func:`accept_suggestion`.
 
     Returns
     -------
@@ -403,6 +427,20 @@ def generate_suggestions(
     import os
 
     from src.llm_cost import BudgetExceededError, CostTracker
+
+    # ── Cache lookup ──────────────────────────────────────────────────────────
+    if cache_key is not None and cache_key in _suggestion_cache:
+        return _suggestion_cache[cache_key]
+
+    # ── Deterministic fast-path (no LLM, no CostTracker) ─────────────────────
+    if force_deterministic:
+        candidates = narrow_candidates(projects, target_tier=target_tier, max_missing=max_missing)
+        if not candidates:
+            return [], 0.0
+        suggestions = _deterministic_rank(candidates)
+        if cache_key is not None:
+            _suggestion_cache[cache_key] = (suggestions, 0.0)
+        return suggestions, 0.0
 
     candidates = narrow_candidates(projects, target_tier=target_tier, max_missing=max_missing)
     if not candidates:
@@ -416,7 +454,10 @@ def generate_suggestions(
         logger.warning(
             "suggest_initiatives: no LLM provider available; using deterministic fallback"
         )
-        return _deterministic_rank(candidates), 0.0
+        suggestions = _deterministic_rank(candidates)
+        if cache_key is not None:
+            _suggestion_cache[cache_key] = (suggestions, 0.0)
+        return suggestions, 0.0
 
     provider, model_name = provider_result
     prompt = build_suggest_prompt(candidates)
@@ -445,4 +486,6 @@ def generate_suggestions(
 
     actual_cost = cost_tracker._total_usd
     suggestions = parse_suggest_response(raw, candidates)
+    if cache_key is not None:
+        _suggestion_cache[cache_key] = (suggestions, actual_cost)
     return suggestions, actual_cost
