@@ -699,6 +699,10 @@ def render_markdown(briefing: Briefing) -> str:
             expiry_part = f" (expires {d.expires_at[:10]})" if d.expires_at else ""
             lines.append(f"- **{d.repo_name}**{reason_part}{expiry_part}")
         lines.append("")
+        lines.append(
+            "_Manage: `/initiatives/dismissed` · History: `/initiatives/dismissal-history`_"
+        )
+        lines.append("")
 
     # ── Section 1: Shipped this week ──────────────────────────────────────────
     lines.append("## Shipped This Week")
