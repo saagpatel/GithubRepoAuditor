@@ -838,11 +838,18 @@ async def dismiss_suggestion_route(
 
 @router.get("/initiatives/dismissed", response_class=HTMLResponse)
 async def initiatives_dismissed(request: Request) -> HTMLResponse:
-    """List currently dismissed suggestions with per-row Undo button (Arc G S12.2)."""
+    """List currently dismissed suggestions with per-row Undo button (Arc G S12.2).
+
+    Filters out entries whose `expires_at` is strictly before today —
+    those rows should appear under `--dismissal-history` only.
+    """
+    from datetime import date as _date
+
     from src.suggest_initiatives import dismissed_path, load_dismissed
 
     output_dir = _output_dir(request)
     items = load_dismissed(dismissed_path(output_dir))
+    today_iso = _date.today().isoformat()
 
     rows = [
         {
@@ -850,9 +857,10 @@ async def initiatives_dismissed(request: Request) -> HTMLResponse:
             "reason": d.reason,
             "dismissed_at": d.dismissed_at,
             "dismissed_by": d.dismissed_by,
-            "expires_at": getattr(d, "expires_at", None),  # Sprint 12.1 will add this; defensive
+            "expires_at": d.expires_at,
         }
         for d in items
+        if not d.expires_at or d.expires_at >= today_iso
     ]
 
     return templates.TemplateResponse(

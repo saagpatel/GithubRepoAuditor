@@ -537,6 +537,7 @@ def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
     p.add_argument(
         "--tier-gaps-target",
         type=int,
+        choices=[2, 3, 4],
         default=None,
         metavar="TIER",
         help="Override target tier for gap calculation (default: current+1 per repo). Valid: 2-4.",

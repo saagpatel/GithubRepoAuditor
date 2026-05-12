@@ -515,10 +515,6 @@ def _build_dismissed_repos(
     today: optional override for testing. Default = today's date.
     Skips entries whose expires_at < today (those are expired).
     Returns empty list if output_dir is None or file is missing.
-
-    DismissedSuggestion has no expires_at field; we read it from the raw JSON
-    items dict alongside the parsed objects so optional per-entry expiry is
-    preserved without changing the upstream dataclass.
     """
     if output_dir is None:
         return []
@@ -529,33 +525,22 @@ def _build_dismissed_repos(
         return []
 
     today_d = today or date.today()
-
-    # Load structured objects (validates schema + skips malformed entries)
     items = load_dismissed(path)
-
-    # Also parse raw JSON to retrieve optional expires_at per entry
-    try:
-        raw_data = json.loads(path.read_text(encoding="utf-8"))
-        raw_items: list[dict] = raw_data.get("items", []) if isinstance(raw_data, dict) else []
-    except (OSError, json.JSONDecodeError):
-        raw_items = []
-
-    # Build a repo_name → expires_at lookup from raw entries
-    expires_map: dict[str, str | None] = {}
-    for raw in raw_items:
-        if isinstance(raw, dict) and "repo_name" in raw:
-            expires_map[str(raw["repo_name"])] = raw.get("expires_at") or None
 
     rows: list[DismissedRepoRow] = []
     for d in items:
-        expires: str | None = expires_map.get(d.repo_name)
+        expires = d.expires_at
         if expires:
             try:
                 exp_d = date.fromisoformat(str(expires)[:10])
                 if exp_d < today_d:
                     continue  # already expired; skip
             except ValueError:
-                pass  # malformed expiry — keep the row
+                logger.warning(
+                    "briefing: malformed expires_at %r for %s — treating as permanent",
+                    expires,
+                    d.repo_name,
+                )
         rows.append(
             DismissedRepoRow(
                 repo_name=d.repo_name,
