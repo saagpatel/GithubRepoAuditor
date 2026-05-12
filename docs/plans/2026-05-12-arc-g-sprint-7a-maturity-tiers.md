@@ -140,3 +140,62 @@ Atomic tmp+rename writes, same pattern as `src/operator_prefs.py` (S3.3).
 | When an initiative passes its deadline without meeting target tier, auto-mark `overdue` (visible flag) or auto-close with `reason=overdue`? | **Auto-mark `overdue` only; require explicit close.** | Forces the operator to decide: extend deadline, abandon, or admit the work is done. |
 | Should Bronze (T1) be the implicit default for every repo, or do we require an initiative to "be in T1"? | **T1 is implicit; T1 has no initiatives.** Initiatives only target T2+. | Bronze means "exists and works enough"; you don't commit to staying Bronze. |
 | Where does the operator identity (`set_by`) come from? | `$USER` env var, fallback to `"operator"`. | Same pattern as approval-ledger reviewer (Arc D). |
+
+---
+
+## Closeout — 2026-05-12
+
+**Status:** SHIPPED. Three Sonnet subagents on isolated worktrees, sequential→parallel pattern:
+
+| Agent | Items | Worktree commit | Cherry-picked as | New tests |
+|---|---|---|---|---|
+| Agent 1 (foundation) | 7A.1 + 7A.2 + 7A.3 | `b362b7f` | `16e5537` | +57 |
+| Agent 2 (Excel + briefing) | 7A.4 + 7A.5 | `1433fdf` | `00b8c49` | +21 |
+| Agent 3 (web UI) | 7A.6 | `a3b9b04` | `ddc98bc` | +13 |
+
+**Test count:** 1586 → 1677 (+91 across Sprint 7A; +25 in Sprint 7B before it). Ruff clean.
+
+**Inventory final:**
+
+| # | Item | Status | Notes |
+|---|---|---|---|
+| 7A.1 | `src/maturity_tiers.py` — `TierCriteria`/`TierGap` dataclasses, `compute_tier`, `tier_gap`, `tier_name`, `TIER_DEFINITIONS` | ✅ | Returns 0 for no-git repos, 1-4 for Bronze→Platinum |
+| 7A.2 | `src/initiatives.py` — `Initiative` dataclass, atomic JSON persistence (`{"version": 1, ...}`), `derive_status` | ✅ | Pattern mirrors `src/operator_prefs.py` |
+| 7A.3 | CLI: `audit triage --set-initiative REPO --target-tier N --deadline YYYY-MM-DD`, `--initiatives`, `--close-initiative REPO` | ✅ | Validates target > current tier |
+| 7A.4 | Excel "Initiative Tracker" sheet via `src/excel_initiative_tracker_helpers.py` | ✅ | On-track / at-risk / overdue / met swimlanes |
+| 7A.5 | Briefing top section "Initiatives this week" with status counts + per-initiative one-liner | ✅ | Additive — existing sections unchanged |
+| 7A.6 | Web UI `/initiatives` page + `/initiatives/{repo_name}/gap?target=N` HTMX partial | ✅ | Nav link added between Approvals and New Run |
+| 7A.7 | Tests + closeout | ✅ | Final |
+
+**Tier criteria degraded for v1** (portfolio-truth doesn't carry strict signals — proxies in module docstring + UI labels):
+
+| Strict criterion | Proxy used | Where |
+|---|---|---|
+| README ≥ 200 chars | `context_quality != "boilerplate"` | Silver+ |
+| Has tests | `run_instructions_present == True` | Silver+ |
+| Has CI workflow | `run_instructions_present AND risk.doctor_gap == False` | Silver+ |
+| Shipped release | `context_quality in ("strong","operating","shipped")` | Gold+ |
+| README staleness ≤ 5x | `activity_status != "stale"` | Gold+ |
+| ≥ 2 releases / 365d | `activity_status == "active" AND Gold-level context_quality` | Platinum |
+
+Sprint 8 (or a future maturity-tier expansion) could thread the strict signals from the raw audit JSON into portfolio-truth, then tighten these checks.
+
+**Boot tests:**
+
+- `python3 -m src triage saagpatel --initiatives` → exits cleanly, prints empty table (no `initiatives.json` yet). ✅
+- `GET /` → 200; `GET /initiatives` → 200; `GET /approvals` → 200; `GET /initiatives/Nonexistent/gap?target=3` → 404. ✅
+
+**Notes / deviations:**
+
+- Agent 1's `compute_tier` returns `0` (not `1`) for repos without `identity.has_git`. The plan called for "Bronze = exists and works enough"; treating no-git repos as "Untracked" is a strict improvement. `tier_name(0) == "Untracked"`.
+- Agent 2's Excel helper integrates cleanly into the existing registry-builder pattern (no shortcuts needed).
+- Agent 3 added a small inline `<style>` block in `initiatives.html` for status-badge colors (the existing CSS didn't carry the four states we needed). Considered adding to `audit.css` directly — opted for inline to keep the diff tight.
+- One known gotcha hit again this sprint: cwd silently shifted into Agent 3's worktree after worktree creation. Recovered by prepending `cd /Users/d/Projects/GithubRepoAuditor &&` to subsequent bash calls. Documented in plan constraints; happened anyway.
+
+**Lessons:**
+
+- The sequential-then-parallel pattern (Agent 1 → Agents 2+3) worked cleanly when Agent 1's API was documented up-front. No conflicts, no surprises.
+- Background subagents return notifications without prompting — the lead can keep working on other tasks instead of polling.
+- Defaulting `tier_name(0) == "Untracked"` instead of forcing Bronze on no-git repos surfaces operator data hygiene problems (e.g. a project record without a git directory).
+
+**Next:** Sprint 7A + 7B both ship in the same release. PR opens after this commit.
