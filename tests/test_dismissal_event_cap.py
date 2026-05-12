@@ -56,13 +56,13 @@ class TestEventCapUnderLimit:
 
 class TestEventCapOverLimit:
     def test_over_limit_trim_applied(self, tmp_path):
-        """Writing 1005 events results in 1000 kept + 1 log_trimmed = 1001 total."""
+        """Writing 1005 events trims to exactly _MAX_DISMISSAL_EVENTS (sentinel inclusive)."""
         events = _make_events(1005)
         _save_dismissed_full(dismissed_path(tmp_path), [], events)
 
         loaded = load_dismissal_events(dismissed_path(tmp_path))
-        # 1000 survivors + 1 log_trimmed sentinel
-        assert len(loaded) == _MAX_DISMISSAL_EVENTS + 1
+        # 999 survivors + 1 log_trimmed sentinel = 1000
+        assert len(loaded) == _MAX_DISMISSAL_EVENTS
 
     def test_trim_drops_oldest(self, tmp_path):
         """After trim, the retained events are the newest ones (highest occurred_at)."""
@@ -72,14 +72,15 @@ class TestEventCapOverLimit:
         loaded = load_dismissal_events(dismissed_path(tmp_path))
         # Remove the log_trimmed sentinel for comparison
         non_trim = [e for e in loaded if e.event_type != "log_trimmed"]
-        # The 5 oldest events (offset 0..4) should have been dropped
+        # We reserve 1 slot for the sentinel, so we keep _MAX_DISMISSAL_EVENTS - 1 = 999
+        # of the newest events. From 1005 events, the 6 oldest (offset 0..5) are dropped.
         remaining_repos = {e.repo_name for e in non_trim}
-        for i in range(5):
+        for i in range(6):
             assert f"Repo{i:04d}" not in remaining_repos, (
                 f"Repo{i:04d} should have been dropped but was retained"
             )
-        # The 1000 newest (offset 5..1004) should all be present
-        for i in range(5, 1005):
+        # The 999 newest (offset 6..1004) should all be present
+        for i in range(6, 1005):
             assert f"Repo{i:04d}" in remaining_repos
 
     def test_log_trimmed_event_fields(self, tmp_path):
@@ -95,17 +96,22 @@ class TestEventCapOverLimit:
         assert sentinel.event_type == "log_trimmed"
         assert sentinel.repo_name == "-"
         assert sentinel.reason != ""
-        assert "2" in sentinel.reason  # "trimmed 2 oldest events"
+        # 1002 events, keep_count=999, dropped=3
+        assert "3" in sentinel.reason
 
     def test_trim_reason_mentions_dropped_count(self, tmp_path):
-        """log_trimmed reason reports the exact number of dropped events."""
-        dropped = 7
-        events = _make_events(_MAX_DISMISSAL_EVENTS + dropped)
+        """log_trimmed reason reports the exact number of dropped events.
+
+        The trim reserves 1 slot for the sentinel itself, so dropping N events
+        beyond the cap actually drops (N + 1) — the cap is sentinel-inclusive.
+        """
+        events = _make_events(_MAX_DISMISSAL_EVENTS + 7)
         _save_dismissed_full(dismissed_path(tmp_path), [], events)
 
         loaded = load_dismissal_events(dismissed_path(tmp_path))
         sentinel = next(e for e in loaded if e.event_type == "log_trimmed")
-        assert str(dropped) in sentinel.reason
+        # 1007 events, keep_count=999, dropped=8
+        assert "8" in sentinel.reason
 
     def test_items_preserved_through_trim(self, tmp_path):
         """DismissedSuggestion items are unaffected by event log trimming."""

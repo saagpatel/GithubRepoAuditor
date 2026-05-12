@@ -1,0 +1,53 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - link "audit serve" [ref=e3] [cursor=pointer]:
+      - /url: /
+    - list [ref=e4]:
+      - listitem [ref=e5]:
+        - link "Dashboard" [ref=e6] [cursor=pointer]:
+          - /url: /
+      - listitem [ref=e7]:
+        - link "Runs" [ref=e8] [cursor=pointer]:
+          - /url: /runs
+      - listitem [ref=e9]:
+        - link "Approvals" [ref=e10] [cursor=pointer]:
+          - /url: /approvals
+      - listitem [ref=e11]:
+        - link "Initiatives" [ref=e12] [cursor=pointer]:
+          - /url: /initiatives
+      - listitem [ref=e13]:
+        - link "Suggestions" [ref=e14] [cursor=pointer]:
+          - /url: /initiatives/suggestions
+      - listitem [ref=e15]:
+        - link "Dismissed" [ref=e16] [cursor=pointer]:
+          - /url: /initiatives/dismissed
+      - listitem [ref=e17]:
+        - link "New Run" [ref=e18] [cursor=pointer]:
+          - /url: /runs/new
+  - main [ref=e19]:
+    - generic [ref=e20]:
+      - heading "Dismissed Suggestions" [level=1] [ref=e21]
+      - paragraph [ref=e22]: 1 repo(s) currently suppressed from LLM suggestions
+    - table [ref=e23]:
+      - rowgroup [ref=e24]:
+        - row "Repo Dismissed at Expires at Reason Actions" [ref=e25]:
+          - columnheader "Repo" [ref=e26]
+          - columnheader "Dismissed at" [ref=e27]
+          - columnheader "Expires at" [ref=e28]
+          - columnheader "Reason" [ref=e29]
+          - columnheader "Actions" [ref=e30]
+      - rowgroup [ref=e31]:
+        - row "Demo 2026-05-12 permanent test Undo" [ref=e32]:
+          - cell "Demo" [ref=e33]:
+            - code [ref=e34]: Demo
+          - cell "2026-05-12" [ref=e35]
+          - cell "permanent" [ref=e36]
+          - cell "test" [ref=e37]
+          - cell "Undo" [ref=e38]:
+            - button "Undo" [ref=e40]
+    - paragraph [ref=e41]:
+      - link "← Initiatives" [ref=e42] [cursor=pointer]:
+        - /url: /initiatives
+      - text: ·
+      - link "Suggestions" [ref=e43] [cursor=pointer]:
+        - /url: /initiatives/suggestions

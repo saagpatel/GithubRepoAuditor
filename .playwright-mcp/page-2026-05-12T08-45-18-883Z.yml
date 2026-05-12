@@ -1,0 +1,33 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - link "audit serve" [ref=e3] [cursor=pointer]:
+      - /url: /
+    - list [ref=e4]:
+      - listitem [ref=e5]:
+        - link "Dashboard" [ref=e6] [cursor=pointer]:
+          - /url: /
+      - listitem [ref=e7]:
+        - link "Runs" [ref=e8] [cursor=pointer]:
+          - /url: /runs
+      - listitem [ref=e9]:
+        - link "Approvals" [ref=e10] [cursor=pointer]:
+          - /url: /approvals
+      - listitem [ref=e11]:
+        - link "Initiatives" [ref=e12] [cursor=pointer]:
+          - /url: /initiatives
+      - listitem [ref=e13]:
+        - link "Suggestions" [ref=e14] [cursor=pointer]:
+          - /url: /initiatives/suggestions
+      - listitem [ref=e15]:
+        - link "Dismissed" [ref=e16] [cursor=pointer]:
+          - /url: /initiatives/dismissed
+      - listitem [ref=e17]:
+        - link "New Run" [ref=e18] [cursor=pointer]:
+          - /url: /runs/new
+  - main [ref=e19]:
+    - generic [ref=e20]:
+      - heading "Initiatives" [level=1] [ref=e21]
+      - paragraph [ref=e22]: 0 on-track · 0 at-risk · 0 overdue · 0 met · 0 closed
+    - paragraph [ref=e23]:
+      - text: "No open initiatives. Set one with:"
+      - code [ref=e24]: python3 -m src.cli --set-initiative <repo> --target-tier 3 --deadline 2026-12-31

@@ -10,9 +10,11 @@
     font-size: 0.8rem;
     font-weight: 600;
   }
-  .event-dismissed { background: #e9ecef; color: #495057; }
-  .event-undone    { background: #d4edda; color: #155724; }
-  .event-expired   { background: #fff3cd; color: #856404; }
+  .event-dismissed   { background: #e9ecef; color: #495057; }
+  .event-undone      { background: #d4edda; color: #155724; }
+  .event-expired     { background: #fff3cd; color: #856404; }
+  .event-log_trimmed { background: #f8d7da; color: #721c24; }
+  .event-unknown     { background: #e9ecef; color: #495057; }
 </style>
 
 <div class="page-header">
@@ -39,8 +41,10 @@
     {% for row in rows %}
     <tr>
       <td><code>{{ row.repo_name }}</code></td>
+      {% set _allowed = ['dismissed', 'undone', 'expired', 'log_trimmed'] %}
+      {% set _badge_class = 'event-' ~ row.event_type if row.event_type in _allowed else 'event-unknown' %}
       <td>
-        <span class="event-badge event-{{ row.event_type }}">{{ row.event_type }}</span>
+        <span class="event-badge {{ _badge_class }}">{{ row.event_type }}</span>
       </td>
       <td class="meta">{{ row.occurred_at[:19] if row.occurred_at else '' }}</td>
       <td class="meta">{{ row.actor or '—' }}</td>

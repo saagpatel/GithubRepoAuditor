@@ -334,10 +334,11 @@ def _save_dismissed_full(
     if len(events) > _MAX_DISMISSAL_EVENTS:
         # Sort ascending by occurred_at so we can drop from the front.
         events_sorted = sorted(events, key=lambda e: e.occurred_at)
-        dropped_count = len(events_sorted) - _MAX_DISMISSAL_EVENTS
-        # Keep only the newest _MAX_DISMISSAL_EVENTS events.
-        events = events_sorted[dropped_count:]
-        # Append a sentinel that records the trim.
+        # Reserve one slot for the trim sentinel so the on-disk count stays at
+        # exactly _MAX_DISMISSAL_EVENTS (sentinel inclusive).
+        keep_count = _MAX_DISMISSAL_EVENTS - 1
+        dropped_count = len(events_sorted) - keep_count
+        events = events_sorted[-keep_count:]
         trim_event = DismissalEvent(
             repo_name="-",
             event_type="log_trimmed",
