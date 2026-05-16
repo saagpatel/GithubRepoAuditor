@@ -115,10 +115,20 @@ Context recovery batch 7 follow-up:
 - Context triage now flags 78 repos.
 - The refreshed recovery plan is `output/context-recovery-plan-2026-05-16T112551Z.md`: 44 targets remain, with 15 eligible, 29 skipped, and 0 excluded.
 
+Context recovery batch 8 follow-up:
+
+- Applied the next bounded recovery batch to 5 eligible projects: `app`, `Calibrate`, `Chromafield`, `Conductor`, and `DeepTank`.
+- Corrected nested-path handling for `app`, `Conductor`, and `DeepTank`; their display names map to `Misc:NoGoPRJs/app`, `VanityPRJs/Conductor`, and `Fun:GamePrjs/DeepTank`.
+- Tightened generated context for `app`, `Conductor`, and `DeepTank`; `app` now reflects the scaffold-stop status from `STATUS.md` instead of describing itself as active implementation work.
+- Opened and merged recovery-only follow-up PRs for batch 8 side branches: `app` PR #4, `Calibrate` PR #4, `Chromafield` PR #5, `Conductor` PR #4, and `DeepTank` PR #13.
+- Refreshed portfolio truth after batch 8: context distribution is now 48 `boilerplate`, 36 `minimum-viable`, 11 `none`, 15 `full`, and 21 `standard`.
+- Context triage now flags 76 repos.
+- The refreshed recovery plan is `output/context-recovery-plan-2026-05-16T193257Z.md`: 39 targets remain, with 10 eligible, 29 skipped, and 0 excluded.
+
 Current gate:
 
 - Arc H tooling is merged and locally usable.
-- The live portfolio still needs context recovery in batches. Continue from the eligible active repos in `output/context-recovery-plan-2026-05-16T112551Z.md`, not the skipped dirty-worktree or ambiguous-primary-context rows.
+- The live portfolio still needs context recovery in batches. Continue from the eligible active repos in `output/context-recovery-plan-2026-05-16T193257Z.md`, not the skipped dirty-worktree or ambiguous-primary-context rows.
 - Tier recalibration should stay report-only until the operator reviews whether the Bronze/Silver bunching reflects real maturity or threshold drift.
 
 ## 2026-05-09 Refresh
