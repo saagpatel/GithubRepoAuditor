@@ -104,10 +104,21 @@ Context recovery batch 6 follow-up:
 - The refreshed recovery plan is `output/context-recovery-plan-2026-05-16T111848Z.md`: 49 targets remain, with 20 eligible, 29 skipped, and 0 excluded.
 - `ResumeEvolver` still has a pre-existing local-only `main` commit (`fix: stabilize local verification tooling`); the batch 6 recovery PR was based on `origin/main` and only included `AGENTS.md`.
 
+Context recovery batch 7 follow-up:
+
+- Applied the next bounded recovery batch to 5 eligible projects: `SignalDecay`, `stockpulse`, `Terroir`, `thought-trails`, and `TradeOffAtlas`.
+- Tightened fallback-generated summaries for `SignalDecay`, `stockpulse`, and `thought-trails` so the recovered context names the actual product purpose instead of only saying the project is active locally or a create-next-app scaffold.
+- Opened and merged recovery-only follow-up PRs for remote-backed batch 7 side branches: `SignalDecay` PR #4, `Terroir` PR #11, `thought-trails` PR #3, and `TradeOffAtlas` PR #4.
+- `stockpulse` has no configured GitHub remote, so its recovery block is committed locally on `codex/docs/context-recovery-batch-7` only.
+- `Terroir` has local App Store prep history diverged from `origin/main`; the remote context PR is merged, and its docs-only recovery commit was cherry-picked onto local `main` to keep workspace scans aligned without rewriting local history.
+- Refreshed portfolio truth after batch 7: context distribution is now 50 `boilerplate`, 32 `minimum-viable`, 14 `none`, 15 `full`, and 20 `standard`.
+- Context triage now flags 78 repos.
+- The refreshed recovery plan is `output/context-recovery-plan-2026-05-16T112551Z.md`: 44 targets remain, with 15 eligible, 29 skipped, and 0 excluded.
+
 Current gate:
 
 - Arc H tooling is merged and locally usable.
-- The live portfolio still needs context recovery in batches. Continue from the eligible active repos in `output/context-recovery-plan-2026-05-16T111848Z.md`, not the skipped dirty-worktree or ambiguous-primary-context rows.
+- The live portfolio still needs context recovery in batches. Continue from the eligible active repos in `output/context-recovery-plan-2026-05-16T112551Z.md`, not the skipped dirty-worktree or ambiguous-primary-context rows.
 - Tier recalibration should stay report-only until the operator reviews whether the Bronze/Silver bunching reflects real maturity or threshold drift.
 
 ## 2026-05-09 Refresh
