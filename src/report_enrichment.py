@@ -965,7 +965,9 @@ def build_weekly_review_pack(
     for item in operator_queue[:attention_limit]:
         mapped = _mapping(item)
         top_attention.append(_build_operator_focus_item(mapped, review_summary))
-    grouped_focus_items = {bucket: [] for bucket in OPERATOR_FOCUS_DISPLAY_ORDER}
+    grouped_focus_items: dict[str, list[dict[str, Any]]] = {
+        bucket: [] for bucket in OPERATOR_FOCUS_DISPLAY_ORDER
+    }
     for item in operator_queue:
         enriched = _build_operator_focus_item(_mapping(item), review_summary)
         focus_key = _operator_focus_bucket_key(item)

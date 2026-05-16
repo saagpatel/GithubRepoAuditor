@@ -22,7 +22,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "ruff>=0.4", "mypy>=1.10", "mutmut>=2.5", "responses>=0.25"]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.4",
+    "mypy>=1.10",
+    "mutmut>=2.5",
+    "responses>=0.25",
+    "types-PyYAML>=6.0",
+]
 config = ["pyyaml>=6.0"]
 semantic = [
     "sqlite-vec>=0.1.0",

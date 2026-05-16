@@ -16,6 +16,7 @@ from src.analyzers.code_quality import CodeQualityAnalyzer
 from src.analyzers.community_profile import CommunityProfileAnalyzer
 from src.analyzers.completeness import BuildReadinessAnalyzer, DocumentationAnalyzer
 from src.analyzers.dependencies import DependenciesAnalyzer
+from src.analyzers.description_analyzer import DescriptionAnalyzer
 from src.analyzers.interest import InterestAnalyzer
 from src.analyzers.readme import ReadmeAnalyzer
 from src.analyzers.security import SecurityAnalyzer
@@ -41,6 +42,7 @@ ALL_ANALYZERS = [
     CommunityProfileAnalyzer(),
     InterestAnalyzer(),
     SecurityAnalyzer(),
+    DescriptionAnalyzer(),  # Arc H A1
 ]
 
 

@@ -303,8 +303,8 @@ class TestHelpFlagCounts:
     def test_report_help_flag_count(self):
         text = _help_text("report")
         count = _count_flags_in_help(text)
-        assert count <= 33, (
-            f"audit report --help shows {count} non-global flags (limit 33).\n"
+        assert count <= 35, (
+            f"audit report --help shows {count} non-global flags (limit 35, raised in Arc H for --tier-recalibration-report/--context-triage).\n"
             f"Flags found: {sorted(set(re.findall(r'  (--[a-z][a-z0-9-]*)', text)))}"
         )
 

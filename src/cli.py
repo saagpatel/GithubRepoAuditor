@@ -399,6 +399,16 @@ def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         help="Apply eligible context recovery updates",
     )
     p.add_argument(
+        "--tier-recalibration-report",
+        action="store_true",
+        help="Generate tier distribution report and flag bunching",
+    )
+    p.add_argument(
+        "--context-triage",
+        action="store_true",
+        help="Run context quality triage across the portfolio",
+    )
+    p.add_argument(
         "--excel-mode",
         choices=["template", "standard"],
         default="standard",
@@ -5282,6 +5292,99 @@ def _run_portfolio_context_recovery_mode(args) -> None:
     print_info(f"Portfolio audit compatibility output: {truth_result.portfolio_report_output}")
 
 
+def _run_tier_recalibration_report_mode(args) -> None:
+    """Generate tier distribution report and flag bunching (Arc H A4)."""
+    import json
+    from datetime import date, datetime, timezone
+
+    from src.tier_recalibration import tier_distribution_report
+
+    output_dir = Path(args.output_dir)
+    truth_path = output_dir / "portfolio-truth-latest.json"
+    if not truth_path.exists():
+        print_warning(
+            "portfolio-truth-latest.json not found. Run `audit run --portfolio-truth` first."
+        )
+        return
+
+    try:
+        truth = json.loads(truth_path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        print_warning(f"Failed to read portfolio-truth: {exc}")
+        sys.exit(2)
+
+    projects = truth.get("projects", [])
+    report = tier_distribution_report(projects)
+    out_path = output_dir / f"tier-recalibration-{date.today()}.json"
+    envelope = {
+        "version": 1,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        **report,
+    }
+    out_path.write_text(json.dumps(envelope, indent=2))
+    print_info(f"Tier recalibration report written to {out_path}")
+    if report["bunching_detected"]:
+        print_warning(
+            "Bunching detected: at least one tier holds >60% of repos. "
+            "Consider adjusting tier thresholds."
+        )
+    else:
+        print_info("No bunching detected — tier distribution looks healthy.")
+
+
+def _run_context_triage_mode(args) -> None:
+    """Run context quality triage across the portfolio (Arc H B1)."""
+    import json
+    from datetime import date, datetime, timezone
+
+    from src.catalog_validator import validate_catalog
+    from src.portfolio_context_triage import run_triage
+
+    output_dir = Path(args.output_dir)
+    truth_path = output_dir / "portfolio-truth-latest.json"
+    if not truth_path.exists():
+        print_warning(
+            "portfolio-truth-latest.json not found. Run `audit run --portfolio-truth` first."
+        )
+        return
+
+    try:
+        truth = json.loads(truth_path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        print_warning(f"Failed to read portfolio-truth: {exc}")
+        sys.exit(2)
+
+    projects = truth.get("projects", [])
+    catalog_path = (
+        Path(args.catalog)
+        if getattr(args, "catalog", None)
+        else Path("config/portfolio-catalog.yaml")
+    )
+    repo_names = [
+        (p.get("identity") or {}).get("display_name") or p.get("name", "") for p in projects
+    ]
+    catalog_scores = validate_catalog(catalog_path, repo_names) if catalog_path.exists() else {}
+
+    enriched: list[dict] = []
+    for project in projects:
+        name = (project.get("identity") or {}).get("display_name") or project.get("name", "")
+        row = dict(project)
+        row["catalog_completeness"] = catalog_scores.get(name, 0.0)
+        enriched.append(row)
+
+    entries = run_triage(enriched)
+    out = [e.to_dict() for e in entries]
+    out_path = output_dir / f"context-triage-{date.today()}.json"
+    envelope = {
+        "version": 1,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "total_flagged": len(out),
+        "triage": out,
+    }
+    out_path.write_text(json.dumps(envelope, indent=2))
+    print_info(f"Context triage written to {out_path} — {len(out)} repos flagged")
+
+
 def _apply_governance_view_filter(report: AuditReport, governance_view: str) -> None:
     if not isinstance(report.governance_preview, dict):
         report.governance_preview = {}
@@ -6388,6 +6491,8 @@ def _infer_subcommand_from_flags(args: argparse.Namespace) -> str:
         "upload_badges",
         "notion_sync",
         "tier_gaps",
+        "tier_recalibration_report",
+        "context_triage",
     )
     for flag in report_flags:
         if getattr(args, flag, False):
@@ -6672,6 +6777,15 @@ def main() -> None:
     # ── Tier-gap export (Arc G S12.4) ─────────────────────────────────────
     if getattr(args, "tier_gaps", False):
         _run_tier_gaps_export_mode(args)
+        return
+
+    # ── Context quality tools (Arc H) ──────────────────────────────────────
+    if getattr(args, "tier_recalibration_report", False):
+        _run_tier_recalibration_report_mode(args)
+        return
+
+    if getattr(args, "context_triage", False):
+        _run_context_triage_mode(args)
         return
 
     if getattr(args, "serve", False):

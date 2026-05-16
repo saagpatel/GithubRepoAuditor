@@ -491,11 +491,11 @@ def evaluate_intent_alignment(
 
 
 def build_portfolio_catalog_summary(audits: list[Any], *, catalog_path: str = "") -> dict[str, Any]:
-    lifecycle = Counter()
-    criticality = Counter()
-    cadence = Counter()
-    disposition = Counter()
-    owners = Counter()
+    lifecycle: Counter[str] = Counter()
+    criticality: Counter[str] = Counter()
+    cadence: Counter[str] = Counter()
+    disposition: Counter[str] = Counter()
+    owners: Counter[str] = Counter()
     explicit_count = 0
 
     for audit in audits:
@@ -545,13 +545,15 @@ def build_portfolio_catalog_summary(audits: list[Any], *, catalog_path: str = ""
 
 
 def build_intent_alignment_summary(audits: list[Any]) -> dict[str, Any]:
-    counts = Counter()
+    counts: Counter[str] = Counter()
     for audit in audits:
         entry = (
             getattr(audit, "portfolio_catalog", None)
             if hasattr(audit, "portfolio_catalog")
             else (audit or {}).get("portfolio_catalog", {})
         )
+        if not isinstance(entry, dict):
+            entry = {}
         counts[_safe_text(entry.get("intent_alignment")) or "missing-contract"] += 1
 
     summary = (
