@@ -77,10 +77,18 @@ Context recovery batch 3 follow-up:
 - Context triage now flags 96 repos.
 - The refreshed recovery plan is `output/context-recovery-plan-2026-05-16T101550Z.md`: 64 targets remain, with 35 eligible, 29 skipped, and 0 excluded.
 
+Context recovery batch 4 follow-up:
+
+- Opened recovery-only follow-up PRs for batch 3 side branches: `DNSWatcher` PR #2 and `HowMoneyMoves` PR #13.
+- Applied the next bounded recovery batch to 5 eligible projects: `IncidentReview`, `ink`, `Interruption Resume Studio`, `ITServiceHealth`, and `JobMarketHeatmap`.
+- Refreshed portfolio truth after batch 4: context distribution is now 64 `boilerplate`, 29 `minimum-viable`, 15 `none`, 13 `full`, and 10 `standard`.
+- Context triage now flags 92 repos.
+- The refreshed recovery plan is `output/context-recovery-plan-2026-05-16T102351Z.md`: 59 targets remain, with 30 eligible, 29 skipped, and 0 excluded.
+
 Current gate:
 
 - Arc H tooling is merged and locally usable.
-- The live portfolio still needs context recovery in batches. Continue from the eligible active repos in `output/context-recovery-plan-2026-05-16T101550Z.md`, not the skipped dirty-worktree or ambiguous-primary-context rows.
+- The live portfolio still needs context recovery in batches. Continue from the eligible active repos in `output/context-recovery-plan-2026-05-16T102351Z.md`, not the skipped dirty-worktree or ambiguous-primary-context rows.
 - Tier recalibration should stay report-only until the operator reviews whether the Bronze/Silver bunching reflects real maturity or threshold drift.
 
 ## 2026-05-09 Refresh
