@@ -108,6 +108,7 @@ class RepoAudit:
     ossf_scorecard: dict = field(default_factory=dict)
 
     def _context_quality_score(self) -> float:
+        from src.catalog_validator import score_catalog_entry
         from src.context_quality import compute_context_quality_score
 
         by_dim = {r.dimension: r for r in self.analyzer_results}
@@ -121,9 +122,7 @@ class RepoAudit:
             if "readme" in by_dim
             else None
         )
-        # catalog_completeness is not available from analyzer_results; passed as None here.
-        # The context-triage CLI enriches it separately via catalog_validator.
-        catalog_comp = None
+        catalog_comp = score_catalog_entry(self.portfolio_catalog)
         completeness_score = (
             (by_dim["completeness"].score / by_dim["completeness"].max_score)
             if "completeness" in by_dim and by_dim["completeness"].max_score

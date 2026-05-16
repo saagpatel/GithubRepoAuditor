@@ -1,7 +1,7 @@
 # Arc H: Context Quality Recovery — Design Spec
 
-**Date:** 2026-05-12  
-**Status:** Approved  
+**Date:** 2026-05-12
+**Status:** Approved
 **Approach:** C — Parallel streams (tooling + operational)
 
 ---
@@ -66,7 +66,7 @@ Current check is presence/absence. New check: days since last commit touching th
 
 `config/portfolio-catalog.yaml` entries are sparse. Validate each entry against required fields and score completeness.
 
-**Required fields (4 minimum):** `name`, `description`, `primary_language`, `status`  
+**Required fields (4 minimum):** `name`, `description`, `primary_language`, `status`
 **Optional scored fields:** `tags`, `tech_stack`, `demo_url`, `notes`
 
 **Output field:** `catalog_completeness: float` (0.0–1.0) per repo.
@@ -206,8 +206,8 @@ If Stream B surfaces a failure mode not covered by Stream A tooling, fix it befo
 | H.3 | B | Triage run (B1); recovery workflow wired end-to-end (B2) |
 | H.4 | B + A | Validate outputs (B3); fix any Stream A gaps surfaced by B; merge gate check |
 
-**Estimated duration:** 4 sprints (~2 weeks)  
-**New dependencies:** None  
+**Estimated duration:** 4 sprints (~2 weeks)
+**New dependencies:** None
 **Breaking changes:** None — all new fields additive
 
 ---

@@ -3,6 +3,7 @@
 import pytest
 
 from src.context_quality import compute_context_quality_score
+from src.models import AnalyzerResult, RepoAudit, RepoMetadata
 
 
 def test_perfect_repo_scores_one():
@@ -64,3 +65,30 @@ def test_score_clamped_to_zero_one():
         completeness_score=1.0,
     )
     assert 0.0 <= score <= 1.0
+
+
+def test_repo_audit_context_quality_uses_portfolio_catalog(sample_metadata: RepoMetadata):
+    audit = RepoAudit(
+        metadata=sample_metadata,
+        analyzer_results=[
+            AnalyzerResult(
+                "description",
+                1.0,
+                1.0,
+                [],
+                {"description_confidence": 1.0},
+            ),
+            AnalyzerResult("readme", 1.0, 1.0, [], {"readme_stale_by_age": False}),
+            AnalyzerResult("completeness", 1.0, 1.0, []),
+        ],
+        overall_score=1.0,
+        completeness_tier="shipped",
+        portfolio_catalog={
+            "owner": "d",
+            "lifecycle_state": "active",
+            "review_cadence": "weekly",
+            "intended_disposition": "maintain",
+        },
+    )
+
+    assert audit.to_dict()["context_quality_score"] == 1.0

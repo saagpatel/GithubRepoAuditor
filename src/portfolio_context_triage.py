@@ -44,7 +44,7 @@ def assess_repo_failure_modes(repo: dict[str, Any]) -> list[FailureMode]:
     if catalog_score < _CATALOG_COMPLETENESS_WARN_BELOW:
         modes.append(FailureMode.CATALOG)
 
-    context_quality = repo.get("context_quality", "full")
+    context_quality = _repo_context_quality(repo)
     if context_quality in _WEAK_CONTEXT_QUALITIES:
         modes.append(FailureMode.CONTEXT)
 
@@ -56,6 +56,7 @@ class TriageEntry:
     repo_name: str
     failure_modes: list[FailureMode]
     severity: str  # "critical" | "moderate" | "low"
+    context_quality_score: float | None = None
 
     @classmethod
     def from_repo(cls, repo: dict[str, Any]) -> "TriageEntry":
@@ -67,9 +68,10 @@ class TriageEntry:
         else:
             severity = "low"
         return cls(
-            repo_name=repo.get("name", "unknown"),
+            repo_name=_repo_name(repo),
             failure_modes=modes,
             severity=severity,
+            context_quality_score=repo.get("context_quality_score"),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -77,7 +79,18 @@ class TriageEntry:
             "repo": self.repo_name,
             "failure_modes": [m.value for m in self.failure_modes],
             "severity": self.severity,
+            "context_quality_score": self.context_quality_score,
         }
+
+
+def _repo_name(repo: dict[str, Any]) -> str:
+    identity = repo.get("identity") if isinstance(repo.get("identity"), dict) else {}
+    return identity.get("display_name") or repo.get("name") or "unknown"
+
+
+def _repo_context_quality(repo: dict[str, Any]) -> str:
+    derived = repo.get("derived") if isinstance(repo.get("derived"), dict) else {}
+    return repo.get("context_quality") or derived.get("context_quality") or "full"
 
 
 def run_triage(repos: list[dict[str, Any]]) -> list[TriageEntry]:

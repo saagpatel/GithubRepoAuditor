@@ -52,6 +52,16 @@ def test_weak_context_quality_flagged():
     assert FailureMode.CONTEXT in modes
 
 
+def test_nested_portfolio_truth_context_quality_flagged():
+    modes = assess_repo_failure_modes(
+        {
+            "identity": {"display_name": "RepoA"},
+            "derived": {"context_quality": "boilerplate"},
+        }
+    )
+    assert FailureMode.CONTEXT in modes
+
+
 def test_severity_critical_when_multiple_failure_modes():
     entry = _entry(
         description_confidence=0.2,
@@ -93,3 +103,4 @@ def test_run_triage_to_dict_is_json_serializable():
     parsed = json.loads(serialized)
     assert len(parsed["triage"]) == 2  # healthy repo excluded
     assert all("severity" in e for e in parsed["triage"])
+    assert all("context_quality_score" in e for e in parsed["triage"])
