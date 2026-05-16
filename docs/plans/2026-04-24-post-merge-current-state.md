@@ -85,10 +85,18 @@ Context recovery batch 4 follow-up:
 - Context triage now flags 92 repos.
 - The refreshed recovery plan is `output/context-recovery-plan-2026-05-16T102351Z.md`: 59 targets remain, with 30 eligible, 29 skipped, and 0 excluded.
 
+Context recovery batch 5 follow-up:
+
+- Applied the next bounded recovery batch to 5 eligible projects: `LifeCadenceLedger`, `NetworkDecoder`, `NetworkMapper`, `PageDiffBookmark`, and `Phantom Frequencies`.
+- Tightened fallback-generated summaries for `NetworkDecoder`, `PageDiffBookmark`, and `Phantom Frequencies` so the recovered context names the actual product purpose instead of only saying the project is active locally.
+- Refreshed portfolio truth after batch 5: context distribution is now 59 `boilerplate`, 30 `minimum-viable`, 15 `none`, 14 `full`, and 13 `standard`.
+- Context triage now flags 87 repos.
+- The refreshed recovery plan is `output/context-recovery-plan-2026-05-16T111023Z.md`: 54 targets remain, with 25 eligible, 29 skipped, and 0 excluded.
+
 Current gate:
 
 - Arc H tooling is merged and locally usable.
-- The live portfolio still needs context recovery in batches. Continue from the eligible active repos in `output/context-recovery-plan-2026-05-16T102351Z.md`, not the skipped dirty-worktree or ambiguous-primary-context rows.
+- The live portfolio still needs context recovery in batches. Continue from the eligible active repos in `output/context-recovery-plan-2026-05-16T111023Z.md`, not the skipped dirty-worktree or ambiguous-primary-context rows.
 - Tier recalibration should stay report-only until the operator reviews whether the Bronze/Silver bunching reflects real maturity or threshold drift.
 
 ## 2026-05-09 Refresh
