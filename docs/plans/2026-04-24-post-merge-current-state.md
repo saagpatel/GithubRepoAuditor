@@ -12,6 +12,52 @@ PR #120, PR #121, and PR #122 are merged into `main`.
 
 No P1/P2/P3 review findings from the April repair list remain open.
 
+## 2026-05-16 Arc H Post-Merge Refresh
+
+PR #176 is merged into `main`, and local `main` is aligned with `origin/main`.
+
+Arc H added context-quality tooling:
+
+- description confidence analyzer
+- README age-based staleness signal
+- catalog completeness validator
+- tier recalibration report
+- portfolio context triage output
+- composite `context_quality_score`
+
+Post-merge verification and refresh commands run:
+
+```bash
+python3 -m src report saagpatel --portfolio-truth --registry-output output/project-registry.md --portfolio-report-output output/PORTFOLIO-AUDIT-REPORT.md
+python3 -m src report saagpatel --context-triage
+python3 -m src report saagpatel --tier-recalibration-report
+python3 -m src report saagpatel --portfolio-context-recovery --context-recovery-limit 5
+python3 -m pytest tests/test_cli_subcommands.py tests/test_context_quality.py tests/test_portfolio_context_triage.py tests/test_catalog_validator.py -q -p no:cacheprovider
+ruff check src/cli.py tests/test_cli_subcommands.py
+```
+
+Observed results:
+
+- Portfolio truth regenerated for 131 projects.
+- New truth warning remains display-name ambiguity: `IncidentWorkbench`, `OrbitForge`, and `StatusPage` require path-qualified registry labels.
+- Context quality distribution is still weak: 79 `boilerplate`, 20 `minimum-viable`, 18 `none`, 11 `full`, and 3 `standard`.
+- Path confidence is still the dominant portfolio risk: 108 projects are under an `investigate` override.
+- Context triage flagged 107 repos: 42 moderate and 65 low. No critical rows were produced by the current scoring rules.
+- Triage failure modes were concentrated in weak context quality (97 rows) and catalog completeness gaps (52 rows).
+- Tier recalibration report found bunching: 51 Bronze, 79 Silver, 0 Gold, and 0 Platinum; Silver holds 60.3% of repos.
+- Context recovery planning froze a 78-project target cohort: 50 eligible, 28 skipped by safety rules, 0 excluded.
+- No context recovery writes were applied.
+
+Incidental follow-up fixed during this refresh:
+
+- The Arc H report flags were present in subcommand help but missing from the legacy parser used for execution. `--context-triage` and `--tier-recalibration-report` are now registered in both paths, with regression coverage in `tests/test_cli_subcommands.py`.
+
+Current gate:
+
+- Arc H tooling is merged and locally usable.
+- The live portfolio still needs context recovery in batches. Start with the eligible active repos at the top of `output/context-recovery-plan-2026-05-16T091316Z.md`, not the skipped dirty-worktree or ambiguous-primary-context rows.
+- Tier recalibration should stay report-only until the operator reviews whether the Bronze/Silver bunching reflects real maturity or threshold drift.
+
 ## 2026-05-09 Refresh
 
 A bounded current-state refresh was run after returning to the project:

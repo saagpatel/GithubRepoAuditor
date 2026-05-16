@@ -630,6 +630,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Apply eligible context recovery updates after building the recovery plan",
     )
     parser.add_argument(
+        "--tier-recalibration-report",
+        action="store_true",
+        help="Generate tier distribution report and flag bunching",
+    )
+    parser.add_argument(
+        "--context-triage",
+        action="store_true",
+        help="Run context quality triage across the portfolio",
+    )
+    parser.add_argument(
         "--context-recovery-limit",
         type=int,
         default=None,
