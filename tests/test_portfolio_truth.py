@@ -497,6 +497,147 @@ def test_context_recovery_apply_writes_primary_context_and_catalog_seed(
     assert "FreshRecover:" in portfolio_catalog.read_text()
 
 
+def test_context_recovery_preserves_fenced_run_commands(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    target_repo = portfolio_workspace / "FenceRecover"
+    target_repo.mkdir()
+    _write(target_repo / "README.md", "# FenceRecover\n\nFenceRecover is a small active repo.\n")
+    _write(
+        target_repo / "CLAUDE.md",
+        """# FenceRecover
+
+## How To Run
+
+```bash
+# Install dependencies
+npm install
+npm run dev
+```
+""",
+    )
+    _write(target_repo / "package.json", '{"dependencies":{"vite":"6.0.0","react":"19.0.0"}}')
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=datetime.fromtimestamp(1_700_000_100, tz=timezone.utc),
+    )
+    plan = build_context_recovery_plan(result.snapshot, workspace_root=portfolio_workspace)
+    apply_context_recovery_plan(
+        result.snapshot,
+        plan,
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+    )
+
+    context_text = (target_repo / "CLAUDE.md").read_text()
+    managed_block = context_text.split("<!-- portfolio-context:start -->", 1)[1]
+    assert "# Install dependencies" in managed_block
+    assert "npm run dev" in managed_block
+    assert managed_block.count("```") >= 2
+    assert _classify_context_quality(target_repo, ["CLAUDE.md"]) == "minimum-viable"
+
+
+def test_context_recovery_ignores_development_conventions_for_run_commands(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    target_repo = portfolio_workspace / "ConventionsRecover"
+    target_repo.mkdir()
+    _write(target_repo / "README.md", "# ConventionsRecover\n\nConventionsRecover is active.\n")
+    _write(
+        target_repo / "CLAUDE.md",
+        """# ConventionsRecover
+
+## Development Conventions
+
+- File naming: kebab-case for files.
+- Conventional commits only.
+""",
+    )
+    _write(target_repo / "package.json", '{"dependencies":{"vite":"6.0.0","react":"19.0.0"}}')
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=datetime.fromtimestamp(1_700_000_100, tz=timezone.utc),
+    )
+    plan = build_context_recovery_plan(result.snapshot, workspace_root=portfolio_workspace)
+    apply_context_recovery_plan(
+        result.snapshot,
+        plan,
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+    )
+
+    context_text = (target_repo / "CLAUDE.md").read_text()
+    managed_block = context_text.split("<!-- portfolio-context:start -->", 1)[1]
+    how_to_run = managed_block.split("## How To Run", 1)[1].split("## Known Risks", 1)[0]
+    assert "npm run dev" in how_to_run
+    assert "File naming" not in how_to_run
+    assert _classify_context_quality(target_repo, ["CLAUDE.md"]) == "minimum-viable"
+
+
+def test_context_recovery_skips_pointer_preamble_for_project_summary(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    target_repo = portfolio_workspace / "PointerRecover"
+    target_repo.mkdir()
+    _write(target_repo / "CLAUDE.md", "@AGENTS.md\n")
+    _write(
+        target_repo / "README.md",
+        """# PointerRecover
+
+## Product shape
+
+PointerRecover is a local workflow app for validating recovered project summaries.
+
+## Local setup
+
+Run `npm run dev` after installing dependencies.
+
+## Intentional limits
+
+This fixture only models pointer preambles.
+""",
+    )
+    _write(target_repo / "package.json", '{"dependencies":{"vite":"6.0.0","react":"19.0.0"}}')
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=datetime.fromtimestamp(1_700_000_100, tz=timezone.utc),
+    )
+    plan = build_context_recovery_plan(result.snapshot, workspace_root=portfolio_workspace)
+    apply_context_recovery_plan(
+        result.snapshot,
+        plan,
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+    )
+
+    context_text = (target_repo / "CLAUDE.md").read_text()
+    managed_block = context_text.split("<!-- portfolio-context:start -->", 1)[1]
+    project_summary = managed_block.split("## What This Project Is", 1)[1].split(
+        "## Current State", 1
+    )[0]
+    assert "@AGENTS.md" not in project_summary
+    assert "workflow app" in project_summary
+    assert _classify_context_quality(target_repo, ["CLAUDE.md"]) == "minimum-viable"
+
+
 def test_cli_portfolio_truth_respects_path_overrides(
     portfolio_workspace: Path,
     portfolio_catalog: Path,

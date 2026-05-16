@@ -342,11 +342,12 @@ def _build_context_sections(project: PortfolioTruthProject, project_path: Path) 
         primary_sections.get("project summary"),
         primary_sections.get("overview"),
         primary_sections.get("purpose"),
-        primary_sections.get("__preamble__"),
+        _usable_summary(primary_sections.get("__preamble__", "")),
         readme_sections.get("project summary"),
         readme_sections.get("overview"),
+        readme_sections.get("product shape"),
         readme_sections.get("product goal"),
-        readme_sections.get("__preamble__"),
+        _usable_summary(readme_sections.get("__preamble__", "")),
         project.declared.purpose,
         f"{project.identity.display_name} is an active local project in the /Users/d/Projects portfolio.",
     )
@@ -378,7 +379,6 @@ def _build_context_sections(project: PortfolioTruthProject, project_path: Path) 
         primary_sections.get("local development"),
         primary_sections.get("commands"),
         primary_sections.get("usage"),
-        primary_sections.get("development conventions"),
         readme_sections.get("how to run"),
         readme_sections.get("quick start"),
         readme_sections.get("local setup"),
@@ -432,8 +432,13 @@ def _split_markdown_sections(text: str) -> dict[str, str]:
 
     sections: dict[str, list[str]] = {"__preamble__": []}
     current = "__preamble__"
+    in_fenced_code = False
     for line in text.splitlines():
-        match = re.match(r"^\s{0,3}#{1,6}\s+(.+?)\s*$", line)
+        if re.match(r"^\s{0,3}```", line):
+            in_fenced_code = not in_fenced_code
+            sections.setdefault(current, []).append(line)
+            continue
+        match = None if in_fenced_code else re.match(r"^\s{0,3}#{1,6}\s+(.+?)\s*$", line)
         if match:
             current = _normalize_heading(match.group(1))
             sections.setdefault(current, [])
@@ -495,6 +500,15 @@ def _first_nonempty(*values: str) -> str:
         if value and str(value).strip():
             return str(value).strip()
     return ""
+
+
+def _usable_summary(value: str) -> str:
+    import re
+
+    stripped = value.strip()
+    if re.fullmatch(r"@[-A-Za-z0-9_./ ]+\.md", stripped):
+        return ""
+    return stripped
 
 
 def _strip_managed_context_block(text: str) -> str:

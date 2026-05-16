@@ -52,10 +52,27 @@ Incidental follow-up fixed during this refresh:
 
 - The Arc H report flags were present in subcommand help but missing from the legacy parser used for execution. `--context-triage` and `--tier-recalibration-report` are now registered in both paths, with regression coverage in `tests/test_cli_subcommands.py`.
 
+Context recovery batch 1 follow-up:
+
+- Applied the first bounded recovery batch to 5 eligible projects: `AIFortuneTeller`, `AIWorkFlow`, `APIReverse`, `ApplyKit`, and `ArguMap`.
+- Added parser hardening so fenced command blocks with shell comments are preserved and counted correctly, `Development Conventions` is not treated as a runnable command section, and one-line pointer preambles such as `@AGENTS.md` are not copied as project summaries when README product context is available.
+- Removed the managed block from the two originally dirty skipped repos touched during correction (`AssistSupport` and `AssistSupport-security-alerts`); their pre-existing unrelated dirty files remain untouched.
+- Refreshed portfolio truth after the fix: context distribution is now 76 `boilerplate`, 20 `minimum-viable`, 18 `none`, 13 `full`, and 4 `standard`.
+- Context triage now flags 105 repos, down from 107 before the batch.
+- The refreshed recovery plan is `output/context-recovery-plan-2026-05-16T093430Z.md`: 74 targets remain, with 45 eligible, 29 skipped, and 0 excluded.
+
+Context recovery batch 2 follow-up:
+
+- Applied the next bounded recovery batch to 5 eligible projects: `BrowserHistoryVisualizer`, `ConvictionMapper`, `DecisionStressTest`, `Devil's Advocate`, and `DevToolsTranslator`.
+- Re-applied the batch after the pointer-preamble hardening so `DecisionStressTest` uses README product context instead of a bare `@AGENTS.md` pointer as its recovered project summary.
+- Refreshed portfolio truth after batch 2: context distribution is now 72 `boilerplate`, 24 `minimum-viable`, 17 `none`, 13 `full`, and 5 `standard`.
+- Context triage now flags 100 repos.
+- The refreshed recovery plan is `output/context-recovery-plan-2026-05-16T095726Z.md`: 69 targets remain, with 40 eligible, 29 skipped, and 0 excluded.
+
 Current gate:
 
 - Arc H tooling is merged and locally usable.
-- The live portfolio still needs context recovery in batches. Start with the eligible active repos at the top of `output/context-recovery-plan-2026-05-16T091316Z.md`, not the skipped dirty-worktree or ambiguous-primary-context rows.
+- The live portfolio still needs context recovery in batches. Continue from the eligible active repos in `output/context-recovery-plan-2026-05-16T095726Z.md`, not the skipped dirty-worktree or ambiguous-primary-context rows.
 - Tier recalibration should stay report-only until the operator reviews whether the Bronze/Silver bunching reflects real maturity or threshold drift.
 
 ## 2026-05-09 Refresh
