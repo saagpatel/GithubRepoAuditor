@@ -243,8 +243,13 @@ def _split_markdown_sections(text: str) -> dict[str, str]:
     sections: dict[str, list[str]] = {}
     current = "__preamble__"
     sections[current] = []
+    in_fenced_code = False
     for line in text.splitlines():
-        match = re.match(r"^\s{0,3}#{1,6}\s+(.+?)\s*$", line)
+        if re.match(r"^\s{0,3}```", line):
+            in_fenced_code = not in_fenced_code
+            sections.setdefault(current, []).append(line)
+            continue
+        match = None if in_fenced_code else re.match(r"^\s{0,3}#{1,6}\s+(.+?)\s*$", line)
         if match:
             current = _normalize_heading(match.group(1))
             sections.setdefault(current, [])
