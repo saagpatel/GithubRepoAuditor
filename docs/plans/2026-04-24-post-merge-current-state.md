@@ -125,10 +125,20 @@ Context recovery batch 8 follow-up:
 - Context triage now flags 76 repos.
 - The refreshed recovery plan is `output/context-recovery-plan-2026-05-16T193257Z.md`: 39 targets remain, with 10 eligible, 29 skipped, and 0 excluded.
 
+Context recovery batch 9 follow-up:
+
+- Applied the next bounded recovery batch to 5 eligible projects: `GhostRoutes`, `Liminal`, `PomGambler`, `Redact`, and `RoomTone`.
+- Tightened generated context for `PomGambler` so the recovered summary uses the README's AuraFlow/Pomodoro prediction-market product framing instead of a generic local-project sentence.
+- Opened and merged recovery-only follow-up PRs for batch 9 side branches: `GhostRoutes` PR #5, `Liminal` PR #5, `PomGambler-prod` PR #8, `Redact` PR #4, and `RoomTone` PR #4.
+- `Liminal` has a pre-existing local `chore/add-system-card` branch; the remote context PR was based on `origin/main`, and its docs-only recovery commit was cherry-picked onto the local branch so workspace scans include both the system card and recovered context without dragging unrelated work into the PR.
+- Refreshed portfolio truth after batch 9: context distribution is now 43 `boilerplate`, 37 `minimum-viable`, 11 `none`, 16 `full`, and 24 `standard`.
+- Context triage now flags 71 repos.
+- The refreshed recovery plan is `output/context-recovery-plan-2026-05-16T193933Z.md`: 34 targets remain, with 5 eligible, 29 skipped, and 0 excluded.
+
 Current gate:
 
 - Arc H tooling is merged and locally usable.
-- The live portfolio still needs context recovery in batches. Continue from the eligible active repos in `output/context-recovery-plan-2026-05-16T193257Z.md`, not the skipped dirty-worktree or ambiguous-primary-context rows.
+- The live portfolio still needs context recovery in batches. Continue from the eligible active repos in `output/context-recovery-plan-2026-05-16T193933Z.md`, not the skipped dirty-worktree or ambiguous-primary-context rows.
 - Tier recalibration should stay report-only until the operator reviews whether the Bronze/Silver bunching reflects real maturity or threshold drift.
 
 ## 2026-05-09 Refresh
