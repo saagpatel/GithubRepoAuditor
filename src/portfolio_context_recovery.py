@@ -455,8 +455,9 @@ def _normalize_heading(value: str) -> str:
 
 def _stack_fallback(project: PortfolioTruthProject, project_path: Path) -> str:
     lines = []
-    if project.derived.stack:
-        lines.append(f"- Primary stack: {', '.join(project.derived.stack)}")
+    known_stack = [item for item in project.derived.stack if item.lower() != "unknown"]
+    if known_stack:
+        lines.append(f"- Primary stack: {', '.join(known_stack)}")
     package_json = project_path / "package.json"
     if package_json.is_file():
         lines.append("- JavaScript package manager: npm-compatible workflow")

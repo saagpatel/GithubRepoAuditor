@@ -638,6 +638,38 @@ This fixture only models pointer preambles.
     assert _classify_context_quality(target_repo, ["CLAUDE.md"]) == "minimum-viable"
 
 
+def test_context_recovery_does_not_use_unknown_as_stack(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    target_repo = portfolio_workspace / "UnknownStackRecover"
+    target_repo.mkdir()
+    _write(target_repo / "README.md", "# UnknownStackRecover\n\nUnknownStackRecover is active.\n")
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=datetime.fromtimestamp(1_700_000_100, tz=timezone.utc),
+    )
+    plan = build_context_recovery_plan(result.snapshot, workspace_root=portfolio_workspace)
+    apply_context_recovery_plan(
+        result.snapshot,
+        plan,
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+    )
+
+    context_text = (target_repo / "AGENTS.md").read_text()
+    managed_block = context_text.split("<!-- portfolio-context:start -->", 1)[1]
+    stack = managed_block.split("## Stack", 1)[1].split("## How To Run", 1)[0]
+    assert "Unknown" not in stack
+    assert "deeper explicit handoff" in stack
+    assert _classify_context_quality(target_repo, ["AGENTS.md"]) == "minimum-viable"
+
+
 def test_cli_portfolio_truth_respects_path_overrides(
     portfolio_workspace: Path,
     portfolio_catalog: Path,
