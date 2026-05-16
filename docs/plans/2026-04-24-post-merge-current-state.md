@@ -135,10 +135,20 @@ Context recovery batch 9 follow-up:
 - Context triage now flags 71 repos.
 - The refreshed recovery plan is `output/context-recovery-plan-2026-05-16T193933Z.md`: 34 targets remain, with 5 eligible, 29 skipped, and 0 excluded.
 
+Context recovery batch 10 follow-up:
+
+- Applied the final eligible bounded recovery batch to 5 projects: `Seismoscope`, `SnippetLibrary`, `TerraSynth`, `Wavelength`, and `knowledgecore`.
+- Tightened generated context for `SnippetLibrary`, `TerraSynth`, and `knowledgecore` so the recovered summaries and risks reflect the README product/architecture instead of generic local-project language.
+- Opened and merged recovery-only follow-up PRs for batch 10 side branches: `seismoscope` PR #5, `SnippetLibrary` PR #6, `TerraSynth` PR #3, `Wavelength` PR #5, and `knowledgecore` PR #105.
+- `TerraSynth` uses `master` as its default branch; the recovery PR targeted `master`.
+- Refreshed portfolio truth after batch 10: context distribution is now 40 `boilerplate`, 42 `minimum-viable`, 9 `none`, 16 `full`, and 24 `standard`.
+- Context triage now flags 68 repos.
+- The refreshed recovery plan is `output/context-recovery-plan-2026-05-16T194600Z.md`: 29 targets remain, with 0 eligible, 29 skipped, and 0 excluded.
+
 Current gate:
 
 - Arc H tooling is merged and locally usable.
-- The live portfolio still needs context recovery in batches. Continue from the eligible active repos in `output/context-recovery-plan-2026-05-16T193933Z.md`, not the skipped dirty-worktree or ambiguous-primary-context rows.
+- Automated context recovery has exhausted the eligible cohort. The remaining live portfolio recovery targets are skipped by local safety rules in `output/context-recovery-plan-2026-05-16T194600Z.md`, primarily dirty worktrees or ambiguous primary context.
 - Tier recalibration should stay report-only until the operator reviews whether the Bronze/Silver bunching reflects real maturity or threshold drift.
 
 ## 2026-05-09 Refresh
