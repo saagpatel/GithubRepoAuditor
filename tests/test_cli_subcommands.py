@@ -279,6 +279,12 @@ class TestServeSubcommand:
         assert args.serve is True
         assert args.port == 9876
 
+    def test_legacy_parser_accepts_arc_h_report_flags(self):
+        parser = build_parser()
+        args = parser.parse_args(["saagpatel", "--context-triage", "--tier-recalibration-report"])
+        assert args.context_triage is True
+        assert args.tier_recalibration_report is True
+
 
 # ── 6/7/8. --help flag counts ≤ limits ───────────────────────────────
 
