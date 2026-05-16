@@ -93,10 +93,21 @@ Context recovery batch 5 follow-up:
 - Context triage now flags 87 repos.
 - The refreshed recovery plan is `output/context-recovery-plan-2026-05-16T111023Z.md`: 54 targets remain, with 25 eligible, 29 skipped, and 0 excluded.
 
+Context recovery batch 6 follow-up:
+
+- Opened and merged recovery-only follow-up PRs for batch 5 side branches: `LifeCadenceLedger` PR #5, `NetworkDecoder` PR #14, `NetworkMapper` PR #4, `PageDiffBookmark` PR #3, and `PhantomFrequencies` PR #4.
+- Applied the next bounded recovery batch to 5 eligible projects: `Pulse Orbit`, `RedditSentimentAnalyzer`, `ResumeEvolver`, `ReturnRadar`, and `ScreenshottoDataSelect`.
+- Tightened fallback-generated summaries for `RedditSentimentAnalyzer`, `ResumeEvolver`, and `ScreenshottoDataSelect` so the recovered context names the actual product purpose instead of only saying the project is active locally.
+- Opened and merged recovery-only follow-up PRs for batch 6 side branches: `Pulse-Orbit` PR #11, `RedditSentimentAnalyzer` PR #13, `ResumeEvolver` PR #4, `ReturnRadar` PR #2, and `ScreenshottoDataSelect` PR #14.
+- Refreshed portfolio truth after batch 6: context distribution is now 54 `boilerplate`, 31 `minimum-viable`, 15 `none`, 14 `full`, and 17 `standard`.
+- Context triage now flags 82 repos.
+- The refreshed recovery plan is `output/context-recovery-plan-2026-05-16T111848Z.md`: 49 targets remain, with 20 eligible, 29 skipped, and 0 excluded.
+- `ResumeEvolver` still has a pre-existing local-only `main` commit (`fix: stabilize local verification tooling`); the batch 6 recovery PR was based on `origin/main` and only included `AGENTS.md`.
+
 Current gate:
 
 - Arc H tooling is merged and locally usable.
-- The live portfolio still needs context recovery in batches. Continue from the eligible active repos in `output/context-recovery-plan-2026-05-16T111023Z.md`, not the skipped dirty-worktree or ambiguous-primary-context rows.
+- The live portfolio still needs context recovery in batches. Continue from the eligible active repos in `output/context-recovery-plan-2026-05-16T111848Z.md`, not the skipped dirty-worktree or ambiguous-primary-context rows.
 - Tier recalibration should stay report-only until the operator reviews whether the Bronze/Silver bunching reflects real maturity or threshold drift.
 
 ## 2026-05-09 Refresh
