@@ -5,6 +5,7 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from src.notion_registry import load_notion_project_context
 from src.portfolio_catalog import group_entry_for_path
@@ -415,10 +416,11 @@ def _extract_github_full_name(remote_url: str) -> str:
         cleaned = cleaned[:-4]
     if cleaned.startswith("git@github.com:"):
         cleaned = cleaned.split("git@github.com:", 1)[1]
-    elif "github.com/" in cleaned:
-        cleaned = cleaned.split("github.com/", 1)[1]
     else:
-        return ""
+        parsed = urlparse(cleaned)
+        if parsed.hostname != "github.com":
+            return ""
+        cleaned = parsed.path.lstrip("/")
     parts = [part for part in cleaned.split("/") if part]
     if len(parts) < 2:
         return ""

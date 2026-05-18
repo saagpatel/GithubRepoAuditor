@@ -17,7 +17,7 @@ from src.portfolio_context_recovery import (
 from src.portfolio_truth_publish import publish_portfolio_truth
 from src.portfolio_truth_reconcile import build_portfolio_truth_snapshot
 from src.portfolio_truth_render import render_registry_markdown
-from src.portfolio_truth_sources import _classify_context_quality
+from src.portfolio_truth_sources import _classify_context_quality, _extract_github_full_name
 from src.registry_parser import parse_registry
 
 
@@ -32,6 +32,12 @@ def _set_mtime(path: Path, timestamp: float) -> None:
     import os
 
     os.utime(path, (timestamp, timestamp))
+
+
+def test_extract_github_full_name_uses_exact_github_host() -> None:
+    assert _extract_github_full_name("https://github.com/octo/repo.git") == "octo/repo"
+    assert _extract_github_full_name("git@github.com:octo/repo.git") == "octo/repo"
+    assert _extract_github_full_name("https://evil.example/github.com/octo/repo.git") == ""
 
 
 @pytest.fixture

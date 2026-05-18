@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import threading
 import time
+from urllib.parse import urlparse
 
 import httpx
 import pytest
@@ -89,7 +90,11 @@ class TestHappyPath:
         transport = httpx.MockTransport(handler)
         fetch_enrichment_sync([("alice", "repo")], _transport=transport)
 
-        paths = [u.split("api.github.com")[1] for u in called_urls if "api.github.com" in u]
+        paths = [
+            parsed.path
+            for u in called_urls
+            if (parsed := urlparse(u)).hostname == "api.github.com"
+        ]
         assert any("/repos/alice/repo/community/profile" in p for p in paths)
         assert any("/repos/alice/repo/languages" in p for p in paths)
         assert any("/repos/alice/repo/releases" in p for p in paths)

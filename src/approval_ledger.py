@@ -124,7 +124,7 @@ def _campaign_fingerprint(packet: dict[str, Any]) -> str:
         "action_ids": sorted(str(item.get("action_id") or "") for item in (packet.get("actions") or [])),
         "top_repos": sorted(str(item) for item in (packet.get("top_repos") or [])),
     }
-    return hashlib.sha1(json.dumps(material, sort_keys=True).encode("utf-8")).hexdigest()
+    return hashlib.sha256(json.dumps(material, sort_keys=True).encode("utf-8")).hexdigest()
 
 
 def _automation_eligible_action_count(packet: dict[str, Any]) -> int:
@@ -704,7 +704,7 @@ def build_approval_followup_record(
     cadence_days: int = DEFAULT_FOLLOW_UP_CADENCE_DAYS,
 ) -> dict[str, Any]:
     reviewed_at = datetime.now(timezone.utc).isoformat()
-    event_id = hashlib.sha1(
+    event_id = hashlib.sha256(
         "|".join(
             [
                 str(ledger_record.get("approval_id") or ""),

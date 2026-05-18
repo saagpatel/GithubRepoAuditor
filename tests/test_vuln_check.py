@@ -112,10 +112,8 @@ class TestCheckVulnerabilities:
 
         assert captured_body
         queries = captured_body[0]["queries"]
-        ecosystems = [q["package"]["ecosystem"] for q in queries]
-        assert "npm" in ecosystems
-        assert "PyPI" in ecosystems
-        assert "crates.io" in ecosystems
+        ecosystems = {q["package"]["ecosystem"] for q in queries}
+        assert {"npm", "PyPI", "crates.io"}.issubset(ecosystems)
 
     def test_api_error_returns_empty(self, capsys) -> None:
         audit = _make_audit("repo", [("requests", "2.0", "pypi")])

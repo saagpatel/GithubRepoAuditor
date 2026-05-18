@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from urllib.parse import parse_qs, urlparse
 
 from src.badge_export import (
     _endpoint_badge_url,
@@ -83,8 +84,11 @@ class TestStaticBadgeUrl:
 
     def test_endpoint_url(self):
         url = _endpoint_badge_url("https://example.com/badge.json")
-        assert url.startswith("https://img.shields.io/endpoint?url=")
-        assert "example.com" in url
+        parsed = urlparse(url)
+        assert parsed.scheme == "https"
+        assert parsed.netloc == "img.shields.io"
+        assert parsed.path == "/endpoint"
+        assert parse_qs(parsed.query)["url"] == ["https://example.com/badge.json"]
 
 
 class TestExportBadges:
