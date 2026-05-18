@@ -138,7 +138,16 @@ Treat campaign/writeback, GitHub Projects, Notion sync, catalog overrides, score
 
 ### Installation
 
-The package is published as GitHub release artifacts today. PyPI/package-index publishing is not active yet, so registry commands like `pip install github-repo-auditor` are not the recommended public path. See [docs/distribution.md](docs/distribution.md) for the current distribution policy.
+The package is published on PyPI and through GitHub Releases. For normal CLI use,
+install it as an isolated tool:
+
+```bash
+# uv (recommended)
+uv tool install github-repo-auditor
+
+# pipx
+pipx install github-repo-auditor
+```
 
 Fastest no-clone path:
 
@@ -148,13 +157,10 @@ chmod +x audit.pyz
 ./audit.pyz --help
 ```
 
-Install from the public GitHub source:
+Install from the public GitHub source when you want the latest unreleased code:
 
 ```bash
-# uv (recommended)
 uv tool install 'git+https://github.com/saagpatel/GithubRepoAuditor.git'
-
-# pipx
 pipx install 'git+https://github.com/saagpatel/GithubRepoAuditor.git'
 
 # local editable clone
@@ -165,11 +171,12 @@ pip install -e ".[config]"
 
 The self-contained `.pyz` binary is also available from the
 [GitHub Releases](https://github.com/saagpatel/GithubRepoAuditor/releases) page.
+See [docs/distribution.md](docs/distribution.md) for the release and publishing policy.
 
 For the local web UI, install the `[serve]` extra from source:
 
 ```bash
-uv tool install 'git+https://github.com/saagpatel/GithubRepoAuditor.git#egg=github-repo-auditor[serve]'
+pip install "github-repo-auditor[serve]"
 # or from a clone: pip install -e ".[serve]"
 ```
 

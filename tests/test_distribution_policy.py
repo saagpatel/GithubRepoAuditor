@@ -35,8 +35,10 @@ def test_distribution_docs_name_supported_public_channel() -> None:
     release_gates = (ROOT / "docs" / "release-gates.md").read_text()
     workflows_readme = (ROOT / ".github" / "workflows" / "README.md").read_text()
 
-    assert "GitHub Releases remain the supported public" in distribution_doc
-    assert "PyPI publishing is not active yet" in distribution_doc
+    assert "distributed through PyPI and GitHub Releases" in distribution_doc
+    assert "PyPI publishing is active" in distribution_doc
+    assert "uv tool install github-repo-auditor" in readme
+    assert "pipx install github-repo-auditor" in readme
     assert "docs/distribution.md" in readme
     assert "scripts/release.sh --publish-pypi" in release_gates
     assert "pypi.yml" in workflows_readme
