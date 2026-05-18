@@ -1,0 +1,17 @@
+<div class="gap-detail">
+  <strong>{{ repo_name }}</strong>: {{ current_tier_name }} → {{ target_tier_name }}
+  {% if missing_requirements %}
+  <ul class="gap-list">
+    {% for req in missing_requirements %}
+    <li>
+      {{ req }}
+      {% if loop.index0 < requirement_sources|length and requirement_sources[loop.index0] == "proxy" %}
+        <span class="approx-hint">(approx.)</span>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <span style="color: var(--approved, #198754); margin-left: 0.5em;">✓ All requirements met</span>
+  {% endif %}
+</div>

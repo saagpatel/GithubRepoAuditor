@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Audit Serve{% endblock %}</title>
+  <link rel="stylesheet" href="/static/audit.css">
+  <link rel="icon" href="data:,">
+  <script src="https://unpkg.com/htmx.org@2.0.4" crossorigin="anonymous"></script>
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="nav-brand">audit serve</a>
+    <ul class="nav-links">
+      <li><a href="/">Dashboard</a></li>
+      <li><a href="/runs">Runs</a></li>
+      <li><a href="/approvals">Approvals</a></li>
+      <li><a href="/initiatives">Initiatives</a></li>
+      <li><a href="/initiatives/suggestions">Suggestions</a></li>
+      <li><a href="/initiatives/dismissed">Dismissed</a></li>
+      <li><a href="/runs/new">New Run</a></li>
+    </ul>
+  </nav>
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

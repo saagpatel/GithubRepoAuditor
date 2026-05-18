@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write  # required for softprops/action-gh-release
+
+jobs:
+  build-and-release:
+    name: Build dist artifacts and create GitHub Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history so pip can detect installed version
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build tools
+        run: pip install build twine shiv
+
+      - name: Build wheel and sdist
+        run: python -m build
+
+      - name: Twine check
+        run: python -m twine check dist/*
+
+      - name: Install package for shiv bundling
+        run: pip install -e ".[config]"
+
+      - name: Build shiv binary
+        run: |
+          shiv -c audit -o dist/audit.pyz . --python "/usr/bin/env python3"
+          chmod +x dist/audit.pyz
+
+      - name: List dist artifacts
+        run: ls -lh dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.whl
+            dist/*.tar.gz
+            dist/audit.pyz
+          generate_release_notes: true

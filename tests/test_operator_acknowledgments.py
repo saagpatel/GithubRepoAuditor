@@ -1,0 +1,291 @@
+from __future__ import annotations
+
+import json
+
+from src.operator_acknowledgments import (
+    acknowledgments_path,
+    build_acknowledgment_record,
+    directional_signature,
+    find_matching_change,
+    find_sibling_changes,
+    is_change_acknowledged,
+    load_acknowledgments,
+    save_acknowledgment,
+)
+
+
+def _make_change(
+    *,
+    change_type: str = "security-change",
+    repo_name: str = "RepoA",
+    title: str = "RepoA security posture changed",
+    details: dict | None = None,
+) -> dict:
+    return {
+        "change_key": f"key-{change_type}-{repo_name}",
+        "change_type": change_type,
+        "repo_name": repo_name,
+        "severity": 0.5,
+        "title": title,
+        "summary": "summary",
+        "recommended_next_step": "next",
+        "details": details or {},
+    }
+
+
+def test_load_acknowledgments_missing_file_returns_empty(tmp_path):
+    assert load_acknowledgments(tmp_path, "alice") == []
+
+
+def test_save_acknowledgment_round_trip(tmp_path):
+    ack = build_acknowledgment_record(
+        _make_change(details={"old_label": "watch", "new_label": "healthy"}),
+        reviewer="alice",
+        note="reviewed",
+    )
+
+    path = save_acknowledgment(tmp_path, "alice", ack)
+
+    assert path == acknowledgments_path(tmp_path, "alice")
+    payload = json.loads(path.read_text())
+    assert payload["version"] == 1
+    assert payload["username"] == "alice"
+    assert payload["acknowledgments"] == [ack]
+    assert load_acknowledgments(tmp_path, "alice") == [ack]
+
+
+def test_save_acknowledgment_replaces_existing_change_key(tmp_path):
+    change = _make_change(details={"old_label": "watch", "new_label": "healthy"})
+    first = build_acknowledgment_record(change, reviewer="alice", note="first")
+    second = build_acknowledgment_record(change, reviewer="bob", note="updated")
+
+    save_acknowledgment(tmp_path, "alice", first)
+    save_acknowledgment(tmp_path, "alice", second)
+
+    stored = load_acknowledgments(tmp_path, "alice")
+    assert len(stored) == 1
+    assert stored[0]["reviewer"] == "bob"
+    assert stored[0]["note"] == "updated"
+
+
+def test_directional_signature_security_change_uses_labels():
+    change = _make_change(details={"old_label": "watch", "new_label": "healthy"})
+    assert directional_signature(change) == {
+        "old_label": "watch",
+        "new_label": "healthy",
+    }
+
+
+def test_directional_signature_lens_delta_uses_lens_and_sign():
+    change = _make_change(
+        change_type="lens-delta",
+        details={"lens": "security_posture", "delta": 0.077},
+    )
+    assert directional_signature(change) == {
+        "lens": "security_posture",
+        "delta_sign": 1,
+    }
+
+
+def test_directional_signature_lens_delta_falls_back_to_lens_deltas_map():
+    change = _make_change(
+        change_type="lens-delta",
+        details={
+            "lens": "security_posture",
+            "delta": 0.0,
+            "lens_deltas": {"security_posture": 0.077, "momentum": 0.0},
+        },
+    )
+    assert directional_signature(change) == {
+        "lens": "security_posture",
+        "delta_sign": 1,
+    }
+
+
+def test_directional_signature_unknown_type_returns_details_fingerprint():
+    change = _make_change(change_type="campaign-drift", details={"foo": "bar"})
+    sig = directional_signature(change)
+    assert set(sig.keys()) == {"details_fingerprint"}
+    assert isinstance(sig["details_fingerprint"], str)
+    assert len(sig["details_fingerprint"]) == 16
+
+
+def test_directional_signature_unknown_type_fingerprint_changes_with_details():
+    a = _make_change(change_type="hotspot-change", details={"new_primary": "x", "new_count": 1})
+    b = _make_change(change_type="hotspot-change", details={"new_primary": "y", "new_count": 1})
+    assert directional_signature(a) != directional_signature(b)
+
+
+def test_is_change_acknowledged_rejects_hotspot_with_changed_details():
+    original = _make_change(
+        change_type="hotspot-change",
+        details={"new_primary": "src/a.py", "new_count": 1, "old_count": 0},
+    )
+    ack = build_acknowledgment_record(original, reviewer="alice", note="reviewed")
+
+    new_hotspot = _make_change(
+        change_type="hotspot-change",
+        details={"new_primary": "src/b.py", "new_count": 2, "old_count": 0},
+    )
+
+    assert is_change_acknowledged(new_hotspot, [ack]) is False
+
+
+def test_is_change_acknowledged_matches_hotspot_with_identical_details():
+    original = _make_change(
+        change_type="hotspot-change",
+        details={"new_primary": "src/a.py", "new_count": 1, "old_count": 0},
+    )
+    ack = build_acknowledgment_record(original, reviewer="alice", note="reviewed")
+
+    repeat = _make_change(
+        change_type="hotspot-change",
+        details={"new_primary": "src/a.py", "new_count": 1, "old_count": 0},
+    )
+
+    assert is_change_acknowledged(repeat, [ack]) is True
+
+
+def test_is_change_acknowledged_matches_same_signature():
+    change = _make_change(details={"old_label": "watch", "new_label": "healthy"})
+    ack = build_acknowledgment_record(change, reviewer="alice", note="reviewed")
+
+    assert is_change_acknowledged(change, [ack]) is True
+
+
+def test_is_change_acknowledged_rejects_regression_in_opposite_direction():
+    healthy_change = _make_change(details={"old_label": "watch", "new_label": "healthy"})
+    ack = build_acknowledgment_record(healthy_change, reviewer="alice", note="reviewed")
+
+    regression = _make_change(details={"old_label": "healthy", "new_label": "watch"})
+
+    assert is_change_acknowledged(regression, [ack]) is False
+
+
+def test_is_change_acknowledged_rejects_lens_delta_with_opposite_sign():
+    improvement = _make_change(
+        change_type="lens-delta",
+        details={"lens": "security_posture", "delta": 0.077},
+    )
+    ack = build_acknowledgment_record(improvement, reviewer="alice", note="reviewed")
+
+    regression = _make_change(
+        change_type="lens-delta",
+        details={"lens": "security_posture", "delta": -0.077},
+    )
+
+    assert is_change_acknowledged(regression, [ack]) is False
+
+
+def test_is_change_acknowledged_rejects_unrelated_change():
+    change = _make_change()
+    other = _make_change(repo_name="RepoB")
+    ack = build_acknowledgment_record(change, reviewer="alice", note="reviewed")
+
+    assert is_change_acknowledged(other, [ack]) is False
+
+
+def test_is_change_acknowledged_handles_empty_acknowledgments():
+    change = _make_change()
+    assert is_change_acknowledged(change, []) is False
+    assert is_change_acknowledged(change, None) is False  # type: ignore[arg-type]
+
+
+def test_find_matching_change_returns_first_match():
+    target = _make_change(details={"old_label": "watch", "new_label": "healthy"})
+    other = _make_change(repo_name="RepoB")
+
+    found = find_matching_change(
+        repo_name="RepoA",
+        change_kind="security-change",
+        material_changes=[other, target],
+    )
+
+    assert found is target
+
+
+def test_find_matching_change_returns_none_when_missing():
+    found = find_matching_change(
+        repo_name="RepoZ",
+        change_kind="security-change",
+        material_changes=[_make_change()],
+    )
+    assert found is None
+
+
+def test_find_sibling_changes_security_change_finds_security_lens_delta():
+    primary = _make_change(
+        change_type="security-change",
+        details={"old_label": "watch", "new_label": "critical"},
+    )
+    sibling = _make_change(
+        change_type="lens-delta",
+        title="RepoA shifted on security posture",
+        details={"lens": "security_posture", "delta": -0.1},
+    )
+    unrelated = _make_change(
+        change_type="lens-delta",
+        title="RepoA shifted on momentum",
+        details={"lens": "momentum", "delta": -0.1},
+    )
+
+    siblings = find_sibling_changes(primary, [primary, sibling, unrelated])
+
+    assert siblings == [sibling]
+
+
+def test_find_sibling_changes_security_lens_delta_finds_security_change():
+    primary = _make_change(
+        change_type="lens-delta",
+        title="RepoA shifted on security posture",
+        details={"lens": "security_posture", "delta": -0.1},
+    )
+    sibling = _make_change(
+        change_type="security-change",
+        details={"old_label": "watch", "new_label": "critical"},
+    )
+
+    siblings = find_sibling_changes(primary, [primary, sibling])
+
+    assert siblings == [sibling]
+
+
+def test_find_sibling_changes_non_security_lens_delta_has_no_security_sibling():
+    primary = _make_change(
+        change_type="lens-delta",
+        title="RepoA shifted on momentum",
+        details={"lens": "momentum", "delta": -0.1},
+    )
+    other = _make_change(
+        change_type="security-change",
+        details={"old_label": "watch", "new_label": "critical"},
+    )
+
+    siblings = find_sibling_changes(primary, [primary, other])
+
+    assert siblings == []
+
+
+def test_find_sibling_changes_different_repo_is_not_a_sibling():
+    primary = _make_change(
+        change_type="security-change",
+        details={"old_label": "watch", "new_label": "critical"},
+    )
+    other_repo = _make_change(
+        change_type="lens-delta",
+        repo_name="RepoB",
+        title="RepoB shifted on security posture",
+        details={"lens": "security_posture", "delta": -0.1},
+    )
+
+    siblings = find_sibling_changes(primary, [primary, other_repo])
+
+    assert siblings == []
+
+
+def test_find_sibling_changes_returns_empty_when_no_repo():
+    primary = _make_change(repo_name="")
+
+    siblings = find_sibling_changes(primary, [primary])
+
+    assert siblings == []

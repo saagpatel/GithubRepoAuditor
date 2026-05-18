@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Approvals — Audit Serve{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Approval Queue</h1>
+  <p class="meta">{{ records|length }} record(s) loaded</p>
+</div>
+
+{# Collect draft-readme-section packet_ids already shown so we group sub-records #}
+{% set seen_section_packets = namespace(ids=[]) %}
+
+{% if records %}
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Type</th>
+      <th>Subject</th>
+      <th>State</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in records %}
+    {# Group draft-readme-section sub-records: show one row per packet_id #}
+    {% if r.approval_subject_type == "draft-readme-section" %}
+      {% set pid = r.packet_id %}
+      {% if pid not in seen_section_packets.ids %}
+        {% set seen_section_packets.ids = seen_section_packets.ids + [pid] %}
+    <tr>
+      <td><code>{{ pid[:16] if pid else "—" }}</code></td>
+      <td>draft-readme-section</td>
+      <td>{{ r.repo_name or r.subject_key or "—" }}</td>
+      <td><span class="badge badge-pending">Sections</span></td>
+      <td class="action-cell">
+        <a class="btn btn-sm btn-secondary" href="/approvals/{{ pid }}/draft-sections">
+          Review sections
+        </a>
+      </td>
+    </tr>
+      {% endif %}
+    {% else %}
+    <tr>
+      <td><code>{{ r.approval_id[:12] if r.approval_id else "—" }}</code></td>
+      <td>{{ r.approval_subject_type or "—" }}</td>
+      <td>{{ r.subject_key or r.scope or "—" }}</td>
+      <td>
+        <span class="badge badge-state-{{ (r.approval_state or 'unknown')|replace('-', '') }}">
+          {{ r.approval_state or "—" }}
+        </span>
+      </td>
+      <td class="action-cell">
+        {% if r.approval_subject_type == "draft-readme" %}
+        <button
+          class="btn btn-sm btn-secondary"
+          hx-get="/approvals/{{ r.approval_id }}/draft-diff"
+          hx-target="#diff-{{ loop.index }}"
+          hx-swap="innerHTML"
+        >View diff</button>
+        {% endif %}
+        {% if r.approval_subject_type == "campaign-plan" %}
+        <button
+          class="btn btn-sm btn-secondary"
+          hx-get="/approvals/{{ r.approval_id }}/campaign-plan"
+          hx-target="#plan-{{ loop.index }}"
+          hx-swap="innerHTML"
+        >View plan</button>
+        {% endif %}
+        <button
+          class="btn btn-sm btn-approve"
+          hx-post="/approvals/{{ r.approval_id }}/approve"
+          hx-target="closest td"
+          hx-swap="innerHTML"
+        >Approve</button>
+        <button
+          class="btn btn-sm btn-reject"
+          hx-post="/approvals/{{ r.approval_id }}/reject"
+          hx-target="closest td"
+          hx-swap="innerHTML"
+        >Reject</button>
+      </td>
+    </tr>
+    {% if r.approval_subject_type == "draft-readme" %}
+    <tr>
+      <td colspan="5">
+        <div id="diff-{{ loop.index }}" class="draft-diff-container"></div>
+      </td>
+    </tr>
+    {% endif %}
+    {% if r.approval_subject_type == "campaign-plan" %}
+    <tr>
+      <td colspan="5">
+        <div id="plan-{{ loop.index }}" class="campaign-plan-container"></div>
+      </td>
+    </tr>
+    {% endif %}
+    {% endif %}
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No approval records found in the warehouse.</p>
+{% endif %}
+{% endblock %}

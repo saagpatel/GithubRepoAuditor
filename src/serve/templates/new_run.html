@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}New Run — Audit Serve{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Start New Audit Run</h1>
+</div>
+
+<form
+  hx-post="/runs/new"
+  hx-target="#run-result"
+  hx-swap="innerHTML"
+  class="run-form"
+>
+  <div class="form-group">
+    <label for="username">GitHub Username</label>
+    <input
+      type="text"
+      id="username"
+      name="username"
+      placeholder="e.g. torvalds"
+      required
+      class="form-input"
+    >
+  </div>
+
+  <div class="form-group">
+    <label>Flags (select any)</label>
+    <div class="flag-grid">
+      {% for flag in safe_flags %}
+      <label class="flag-label">
+        <input type="checkbox" name="flag_{{ flag }}" value="{{ flag }}"> --{{ flag }}
+      </label>
+      {% endfor %}
+    </div>
+    <input type="hidden" name="flags" id="flags-hidden">
+  </div>
+
+  <button type="submit" class="btn" onclick="collectFlags(event)">Start Run</button>
+</form>
+
+<div id="run-result"></div>
+
+<div id="stream-panel" style="display:none">
+  <h2>Live Output</h2>
+  <pre id="stream-output" class="stream-box"></pre>
+</div>
+
+<script>
+function collectFlags(e) {
+  const checks = document.querySelectorAll('input[type=checkbox]:checked');
+  const vals = Array.from(checks).map(c => '--' + c.value).join(' ');
+  document.getElementById('flags-hidden').value = vals;
+}
+
+document.body.addEventListener('htmx:afterRequest', function(evt) {
+  const detail = evt.detail;
+  if (detail.requestConfig && detail.requestConfig.path === '/runs/new' && detail.successful) {
+    try {
+      const data = JSON.parse(detail.xhr.responseText);
+      if (data.run_id) {
+        startStream(data.run_id);
+      }
+    } catch(e) { /* not JSON — template response on validation error */ }
+  }
+});
+
+function startStream(runId) {
+  const panel = document.getElementById('stream-panel');
+  const box = document.getElementById('stream-output');
+  panel.style.display = '';
+  box.textContent = '';
+
+  const es = new EventSource('/runs/new/stream/' + runId);
+  es.onmessage = function(e) {
+    box.textContent += e.data + '\n';
+    box.scrollTop = box.scrollHeight;
+    if (e.data.startsWith('[DONE')) {
+      es.close();
+    }
+  };
+  es.onerror = function() { es.close(); };
+}
+</script>
+{% endblock %}

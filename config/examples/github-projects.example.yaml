@@ -1,0 +1,16 @@
+# Example GitHub Projects v2 mirror config for managed campaign actions.
+# Use the exact GitHub Project field names that already exist on your board.
+
+owner: "your-org-or-user"
+project_number: 7
+fields:
+  campaign: "Campaign"
+  priority: "Priority"
+  lane: "Lane"
+  owner: "Owner"
+  operator_focus: "Operator Focus"
+  confidence: "Confidence"
+  revalidation: "Revalidation"
+  follow_through: "Follow Through"
+  checkpoint_timing: "Checkpoint Timing"
+  repo: "Repository"

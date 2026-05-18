@@ -1,0 +1,17 @@
+<details class="draft-diff" open>
+  <summary class="draft-diff__summary">
+    README diff for <strong>{{ repo_name }}</strong>
+    {% if diff_summary %}<span class="draft-diff__meta"> — {{ diff_summary }}</span>{% endif %}
+    {% if current_readme_sha %}<span class="draft-diff__meta"> (base SHA: <code>{{ current_readme_sha[:12] }}</code>)</span>{% endif %}
+  </summary>
+  <div class="draft-diff__grid">
+    <div class="draft-diff__col">
+      <div class="draft-diff__col-header">Current</div>
+      <pre class="draft-diff__pre">{% if current_readme_sha %}(current README not stored in packet — SHA: {{ current_readme_sha }}){% else %}(no current README){% endif %}</pre>
+    </div>
+    <div class="draft-diff__col">
+      <div class="draft-diff__col-header">Proposed</div>
+      <pre class="draft-diff__pre">{{ proposed_readme }}</pre>
+    </div>
+  </div>
+</details>

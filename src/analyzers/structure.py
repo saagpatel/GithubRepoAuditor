@@ -1,0 +1,161 @@
+from __future__ import annotations
+
+import hashlib
+from pathlib import Path
+
+from src.analyzers.base import BaseAnalyzer
+from src.models import AnalyzerResult, RepoMetadata
+
+CONFIG_FILES = {
+    "package.json",
+    "Cargo.toml",
+    "pyproject.toml",
+    "setup.py",
+    "setup.cfg",
+    "go.mod",
+    "Gemfile",
+    "pom.xml",
+    "build.gradle",
+    "CMakeLists.txt",
+    "Makefile",
+    "mix.exs",
+    "deno.json",
+    "composer.json",
+    "Package.swift",
+}
+
+# Language -> expected source directories
+LANG_DIRS: dict[str | None, list[str]] = {
+    "Python": ["src", "lib", "app"],
+    "JavaScript": ["src", "lib", "app", "pages", "components"],
+    "TypeScript": ["src", "lib", "app", "pages", "components"],
+    "Rust": ["src"],
+    "Go": ["cmd", "pkg", "internal"],
+    "Java": ["src"],
+    "Swift": ["Sources", "src"],
+    "C#": ["src"],
+    "Ruby": ["lib", "app"],
+    "Kotlin": ["src"],
+    None: ["src", "lib", "app"],
+}
+
+
+class StructureAnalyzer(BaseAnalyzer):
+    name = "structure"
+    weight = 0.10
+
+    def cache_inputs_hash(
+        self,
+        repo_path: Path | None,
+        metadata: RepoMetadata,
+    ) -> str | None:
+        """Hash a snapshot of the repo's top-level directory listing.
+
+        The structure analyzer only looks at top-level files/dirs (config files,
+        standard dirs, .gitignore, LICENSE), so hashing the sorted top-level
+        entries is a stable, cheap proxy for "did the structure change?".
+        """
+        if repo_path is None:
+            return None
+        try:
+            entries = sorted(p.name for p in repo_path.iterdir())
+        except OSError:
+            return None
+        h = hashlib.sha256()
+        for name in entries:
+            h.update(name.encode())
+            h.update(b"\x00")
+        # Include the primary language because LANG_DIRS lookup depends on it.
+        h.update((metadata.language or "").encode())
+        h.update(b"\x00")
+        return h.hexdigest()
+
+    def analyze(
+        self,
+        repo_path: Path,
+        metadata: RepoMetadata,
+        github_client: object | None = None,
+    ) -> AnalyzerResult:
+        score = 0.0
+        findings: list[str] = []
+        details: dict = {}
+
+        # .gitignore
+        if (repo_path / ".gitignore").is_file():
+            score += 0.2
+            findings.append("Has .gitignore")
+        else:
+            findings.append("No .gitignore")
+
+        # Language-standard directory structure
+        expected_dirs = LANG_DIRS.get(metadata.language, LANG_DIRS[None])
+        found_dirs = [d for d in expected_dirs if (repo_path / d).is_dir()]
+        # Swift/Xcode: also check for {AppName}/ dirs containing .swift files
+        if not found_dirs and metadata.language == "Swift":
+            for child in repo_path.iterdir():
+                if child.is_dir() and any(child.glob("*.swift")):
+                    found_dirs.append(child.name)
+                    break
+        if found_dirs:
+            score += 0.3
+            findings.append(f"Has standard dirs: {', '.join(found_dirs)}")
+            details["source_dirs"] = found_dirs
+        else:
+            findings.append("No standard source directory structure")
+
+        # Config file (includes *.xcodeproj directories for Swift/Xcode)
+        found_configs = [f for f in CONFIG_FILES if (repo_path / f).is_file()]
+        # Xcode projects are directories, not files
+        xcode_projects = [
+            p.name
+            for p in repo_path.iterdir()
+            if p.is_dir() and p.suffix in (".xcodeproj", ".xcworkspace")
+        ]
+        found_configs.extend(xcode_projects)
+        if found_configs:
+            score += 0.3
+            findings.append(f"Has config: {', '.join(found_configs)}")
+            details["config_files"] = found_configs
+        else:
+            findings.append("No project config file")
+
+        # LICENSE
+        license_found = any(
+            (repo_path / name).is_file()
+            for name in ("LICENSE", "LICENSE.md", "LICENSE.txt", "LICENCE", "COPYING")
+        )
+        if license_found:
+            score += 0.1
+            findings.append("Has LICENSE")
+        else:
+            findings.append("No LICENSE file")
+
+        # Directory depth >1
+        max_depth = _max_dir_depth(repo_path)
+        details["max_depth"] = max_depth
+        if max_depth > 1:
+            score += 0.1
+            findings.append(f"Directory depth: {max_depth}")
+        else:
+            findings.append("Flat directory structure")
+
+        return self._result(score, findings, details)
+
+
+def _max_dir_depth(root: Path, max_scan: int = 200) -> int:
+    """Walk directory tree and return max depth, capped at max_scan entries."""
+    max_depth = 0
+    count = 0
+    root_depth = len(root.parts)
+
+    for path in root.rglob("*"):
+        if path.name.startswith("."):
+            continue
+        if path.is_dir():
+            depth = len(path.parts) - root_depth
+            max_depth = max(max_depth, depth)
+            count += 1
+            if count >= max_scan:
+                break
+
+    return max_depth

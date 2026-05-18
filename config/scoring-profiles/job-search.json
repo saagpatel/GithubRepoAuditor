@@ -1,0 +1,12 @@
+{
+	"readme": 0.2,
+	"structure": 0.08,
+	"code_quality": 0.12,
+	"testing": 0.25,
+	"cicd": 0.15,
+	"dependencies": 0.05,
+	"activity": 0.05,
+	"documentation": 0.03,
+	"build_readiness": 0.05,
+	"community_profile": 0.02
+}

@@ -1,0 +1,256 @@
+levels:
+  - key: missing-basics
+    label: Missing Basics
+    threshold: 0.0
+  - key: foundation
+    label: Foundation
+    threshold: 0.35
+  - key: operating
+    label: Operating
+    threshold: 0.60
+  - key: strong
+    label: Strong
+    threshold: 0.80
+  - key: leading
+    label: Leading
+    threshold: 0.92
+
+programs:
+  default:
+    label: Default
+    description: Balanced scorecard for actively maintained repos.
+    target_maturity: operating
+    rules:
+      - key: readme
+        label: README
+        check: dimension_at_least
+        dimension: readme
+        threshold: 0.60
+        partial_threshold: 0.45
+        weight: 1.0
+      - key: structure
+        label: Structure
+        check: dimension_at_least
+        dimension: structure
+        threshold: 0.60
+        partial_threshold: 0.45
+        weight: 1.0
+      - key: testing
+        label: Testing
+        check: dimension_at_least
+        dimension: testing
+        threshold: 0.55
+        partial_threshold: 0.40
+        weight: 1.0
+      - key: ci
+        label: CI
+        check: dimension_at_least
+        dimension: cicd
+        threshold: 0.55
+        partial_threshold: 0.40
+        weight: 1.0
+      - key: dependencies
+        label: Dependencies
+        check: dimension_at_least
+        dimension: dependencies
+        threshold: 0.55
+        partial_threshold: 0.40
+        weight: 1.0
+      - key: build-readiness
+        label: Build Readiness
+        check: dimension_at_least
+        dimension: build_readiness
+        threshold: 0.50
+        partial_threshold: 0.35
+        weight: 1.0
+      - key: fresh-activity
+        label: Fresh Activity
+        check: activity_days_at_most
+        threshold: 365
+        partial_threshold: 540
+        weight: 1.0
+      - key: security-posture
+        label: Security Posture
+        check: security_posture_at_least
+        threshold: 0.55
+        partial_threshold: 0.40
+        weight: 1.0
+
+  maintain:
+    label: Maintain
+    description: Bar for repos expected to stay healthy and sustainable over time.
+    target_maturity: strong
+    rules:
+      - key: testing
+        label: Testing
+        check: dimension_at_least
+        dimension: testing
+        threshold: 0.65
+        partial_threshold: 0.50
+        weight: 1.0
+      - key: ci
+        label: CI
+        check: dimension_at_least
+        dimension: cicd
+        threshold: 0.65
+        partial_threshold: 0.50
+        weight: 1.0
+      - key: dependencies
+        label: Dependencies
+        check: dimension_at_least
+        dimension: dependencies
+        threshold: 0.60
+        partial_threshold: 0.45
+        weight: 1.0
+      - key: security-posture
+        label: Security Posture
+        check: security_posture_at_least
+        threshold: 0.65
+        partial_threshold: 0.50
+        weight: 1.0
+      - key: community
+        label: Community Profile
+        check: dimension_at_least
+        dimension: community_profile
+        threshold: 0.50
+        partial_threshold: 0.35
+        weight: 1.0
+      - key: fresh-activity
+        label: Fresh Activity
+        check: activity_days_at_most
+        threshold: 180
+        partial_threshold: 365
+        weight: 1.0
+      - key: no-tests-flag
+        label: No Missing Test Flag
+        check: flag_absent
+        flag: no-tests
+        weight: 1.0
+      - key: no-ci-flag
+        label: No Missing CI Flag
+        check: flag_absent
+        flag: no-ci
+        weight: 1.0
+
+  finish:
+    label: Finish
+    description: Bar for repos that are meant to reach a finishable operating state soon.
+    target_maturity: operating
+    rules:
+      - key: tier
+        label: Working Tier
+        check: tier_at_least
+        tier: wip
+        weight: 1.0
+      - key: readme
+        label: README
+        check: dimension_at_least
+        dimension: readme
+        threshold: 0.50
+        partial_threshold: 0.35
+        weight: 1.0
+      - key: build-readiness
+        label: Build Readiness
+        check: dimension_at_least
+        dimension: build_readiness
+        threshold: 0.60
+        partial_threshold: 0.45
+        weight: 1.0
+      - key: testing
+        label: Testing
+        check: dimension_at_least
+        dimension: testing
+        threshold: 0.45
+        partial_threshold: 0.30
+        weight: 1.0
+      - key: ci
+        label: CI
+        check: dimension_at_least
+        dimension: cicd
+        threshold: 0.40
+        partial_threshold: 0.25
+        weight: 1.0
+      - key: ship-readiness
+        label: Ship Readiness
+        check: lens_at_least
+        lens: ship_readiness
+        threshold: 0.55
+        partial_threshold: 0.40
+        weight: 1.0
+      - key: fresh-activity
+        label: Fresh Activity
+        check: activity_days_at_most
+        threshold: 180
+        partial_threshold: 365
+        weight: 1.0
+
+  experiment:
+    label: Experiment
+    description: Lightweight bar for repos intentionally kept exploratory.
+    target_maturity: foundation
+    rules:
+      - key: readme
+        label: README
+        check: dimension_at_least
+        dimension: readme
+        threshold: 0.35
+        partial_threshold: 0.20
+        weight: 1.0
+      - key: structure
+        label: Structure
+        check: dimension_at_least
+        dimension: structure
+        threshold: 0.50
+        partial_threshold: 0.35
+        weight: 1.0
+      - key: interest
+        label: Interest
+        check: audit_field_at_least
+        field: interest_score
+        threshold: 0.35
+        partial_threshold: 0.20
+        weight: 1.0
+      - key: fresh-activity
+        label: Fresh Activity
+        check: activity_days_at_most
+        threshold: 365
+        partial_threshold: 540
+        weight: 1.0
+
+  archive:
+    label: Archive
+    description: Hygiene bar for repos intentionally retiring into archive posture.
+    target_maturity: foundation
+    rules:
+      - key: disposition
+        label: Archive Disposition
+        check: catalog_field_in
+        catalog_field: intended_disposition
+        values: [archive]
+        weight: 1.0
+      - key: readme
+        label: README
+        check: dimension_at_least
+        dimension: readme
+        threshold: 0.25
+        partial_threshold: 0.15
+        weight: 1.0
+      - key: security-posture
+        label: Security Posture
+        check: security_posture_at_least
+        threshold: 0.40
+        partial_threshold: 0.25
+        weight: 1.0
+      - key: community
+        label: Community Profile
+        check: dimension_at_least
+        dimension: community_profile
+        threshold: 0.20
+        partial_threshold: 0.10
+        weight: 1.0
+      - key: archived-posture
+        label: Archived Posture
+        check: catalog_field_in
+        catalog_field: archive_ready
+        values: [yes]
+        weight: 1.0

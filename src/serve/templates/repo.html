@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}{% if repo %}{{ repo.name }}{% else %}{{ name }} — Not Found{% endif %} — Audit Serve{% endblock %}
+{% block content %}
+{% if error %}
+<div class="page-header">
+  <h1>Repo Not Found</h1>
+  <p class="meta error-text">{{ error }}</p>
+</div>
+<p>The portfolio truth snapshot doesn't contain <code>{{ name }}</code>. Run <code>audit report {{ name }} --portfolio-truth</code> to populate it.</p>
+<p><a href="/">&larr; Dashboard</a></p>
+{% else %}
+<div class="page-header">
+  <h1>{{ repo.name }}</h1>
+  <p class="meta">
+    {% if repo.language %}<span class="badge">{{ repo.language }}</span>{% endif %}
+    {% if repo.tier %}<span class="badge badge-tier">Tier {{ repo.tier }}</span>{% endif %}
+  </p>
+</div>
+
+<div class="grid-2">
+  <section>
+    <h2>Scores</h2>
+    <table>
+      <tbody>
+        <tr><td>Total Score</td><td class="score">{{ "%.1f"|format(repo.total_score|default(repo.score)|float) }}</td></tr>
+        <tr><td>Risk Score</td><td class="score score-risk">{{ "%.1f"|format(repo.risk_score|default(repo.risk)|float) }}</td></tr>
+        <tr><td>Completeness</td><td class="score">{{ "%.1f"|format(repo.completeness_score|default(repo.completeness)|float) }}</td></tr>
+        {% if repo.interest_score is defined %}
+        <tr><td>Interest Score</td><td class="score">{{ "%.1f"|format(repo.interest_score|float) }}</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Run History (last 5)</h2>
+    {% if history %}
+    <table>
+      <thead>
+        <tr><th>Run</th><th>Date</th><th>Score</th></tr>
+      </thead>
+      <tbody>
+        {% for h in history %}
+        <tr>
+          <td><code>{{ h.run_id[:8] }}</code></td>
+          <td>{{ h.generated_at[:10] }}</td>
+          <td class="score">{{ "%.1f"|format(h.total_score|float) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">No warehouse history found for this repo.</p>
+    {% endif %}
+  </section>
+</div>
+
+{% if dimension_scores %}
+<section>
+  <h2>Dimension Scores</h2>
+  <table>
+    <thead>
+      <tr><th>Dimension</th><th>Score</th><th>Weight</th></tr>
+    </thead>
+    <tbody>
+      {% for d in dimension_scores %}
+      <tr>
+        <td>{{ d.dimension }}</td>
+        <td class="score">{{ "%.1f"|format(d.score|float) }}</td>
+        <td>{{ d.weight }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+<p><a href="/">&larr; Dashboard</a></p>
+{% endif %}
+{% endblock %}
