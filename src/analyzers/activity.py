@@ -138,6 +138,7 @@ class ActivityAnalyzer(BaseAnalyzer):
                             try:
                                 dates.append(datetime.fromisoformat(pub.replace("Z", "+00:00")))
                             except (ValueError, TypeError):
+                                # Ignore malformed release timestamps when estimating cadence.
                                 pass
                     if len(dates) >= 2:
                         dates.sort()

@@ -109,6 +109,7 @@ def _gh_auth_token() -> str | None:
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
     except (FileNotFoundError, subprocess.TimeoutExpired):
+        # Missing or slow gh CLI auth falls back to unauthenticated/public mode.
         pass
     return None
 
@@ -3044,6 +3045,7 @@ def _run_list_initiatives_mode(args) -> None:
                 if name:
                     projects_by_name[name.lower()] = proj
         except (OSError, ValueError):
+            # Initiative listing can proceed without portfolio-truth tier context.
             pass
 
     open_initiatives = [i for i in initiatives if i.closed_at is None]
@@ -3076,6 +3078,7 @@ def _run_list_initiatives_mode(args) -> None:
                     days_left = (date.fromisoformat(initiative.deadline) - date.today()).days
                     status_detail = f"at-risk (deadline ≤ {days_left}d)"
                 except ValueError:
+                    # Malformed deadlines keep the generic at-risk label.
                     pass
             elif status == "on-track":
                 status_detail = "on-track"
@@ -3598,6 +3601,7 @@ def _run_main_audit_cycle(args, config_inspection) -> None:
                     resumed_audits.append(_audit_from_dict(audit_dict))
                     resumed_names.add(audit_dict.get("metadata", {}).get("name", ""))
                 except Exception:
+                    # Skip corrupt resume entries and continue with the rest.
                     pass
             if resumed_audits:
                 print_info(f"Resumed {len(resumed_audits)} previously completed repo(s)")
@@ -4968,6 +4972,7 @@ def _analyze_repos(
         try:
             _warehouse_conn.close()
         except Exception:
+            # Warehouse close failures are non-actionable during final cleanup.
             pass
     if _reconcile_diverged:
         sys.exit(1)

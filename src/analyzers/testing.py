@@ -103,6 +103,7 @@ def _detect_test_framework(repo_path: Path) -> str | None:
             if "cypress" in all_deps:
                 return "cypress"
         except (json.JSONDecodeError, OSError):
+            # Unreadable package metadata simply means no JS test runner was detected.
             pass
 
     # Python — check pyproject.toml for pytest
@@ -115,6 +116,7 @@ def _detect_test_framework(repo_path: Path) -> str | None:
             if "unittest" in content:
                 return "unittest"
         except OSError:
+            # Unreadable project metadata simply means no Python test runner was detected.
             pass
 
     # Python — check for pytest in requirements
@@ -126,6 +128,7 @@ def _detect_test_framework(repo_path: Path) -> str | None:
                 if "pytest" in content:
                     return "pytest"
             except OSError:
+                # Unreadable requirements files are ignored during best-effort detection.
                 pass
 
     # Rust — check Cargo.toml for dev-dependencies
@@ -136,6 +139,7 @@ def _detect_test_framework(repo_path: Path) -> str | None:
             if "[dev-dependencies]" in content:
                 return "cargo-test"
         except OSError:
+            # Unreadable Cargo metadata simply means no Rust test runner was detected.
             pass
 
     # Go — test files convention

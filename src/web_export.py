@@ -124,6 +124,7 @@ def export_html_dashboard(
                 "top_elevated": _te[:5],
             }
         except Exception:
+            # Risk posture is optional enrichment for the HTML export.
             pass
 
     html = _render_html(

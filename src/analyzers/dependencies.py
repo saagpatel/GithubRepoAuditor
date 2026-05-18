@@ -63,6 +63,7 @@ class DependenciesAnalyzer(BaseAnalyzer):
                     pieces.append(fname.encode())
                     pieces.append(fpath.read_bytes())
                 except OSError:
+                    # Ignore unreadable dependency files in the cache fingerprint.
                     pass
         if not pieces:
             return None
@@ -192,6 +193,7 @@ def _count_dependencies(repo_path: Path, manifests: list[str]) -> int | None:
             dev_deps = len(pkg.get("devDependencies", {}))
             return deps + dev_deps
         except (json.JSONDecodeError, OSError):
+            # Unparseable package metadata falls through to other manifest types.
             pass
 
     if "requirements.txt" in manifests:
@@ -205,6 +207,7 @@ def _count_dependencies(repo_path: Path, manifests: list[str]) -> int | None:
                 and not line.strip().startswith("-")
             )
         except OSError:
+            # Unreadable requirements files fall through to other manifest types.
             pass
 
     if "Cargo.toml" in manifests:
@@ -223,6 +226,7 @@ def _count_dependencies(repo_path: Path, manifests: list[str]) -> int | None:
                     count += 1
             return count
         except OSError:
+            # Unreadable Cargo manifests fall through to other manifest types.
             pass
 
     if "go.mod" in manifests:
@@ -240,6 +244,7 @@ def _count_dependencies(repo_path: Path, manifests: list[str]) -> int | None:
                     count += 1
             return count
         except OSError:
+            # Unreadable Go modules fall through to other manifest types.
             pass
 
     if "pyproject.toml" in manifests:
@@ -258,6 +263,7 @@ def _count_dependencies(repo_path: Path, manifests: list[str]) -> int | None:
                     count += 1
             return count if count > 0 else None
         except OSError:
+            # Unreadable pyproject metadata means no dependency count is available.
             pass
 
     return None

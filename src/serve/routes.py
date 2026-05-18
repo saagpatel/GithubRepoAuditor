@@ -136,6 +136,7 @@ async def repo_detail(request: Request, name: str) -> HTMLResponse:
             ).fetchall()
             history = [dict(r) for r in rows]
         except sqlite3.Error:
+            # Optional warehouse history should not block the repo detail page.
             pass
         finally:
             conn.close()
@@ -158,6 +159,7 @@ async def repo_detail(request: Request, name: str) -> HTMLResponse:
             ).fetchall()
             dimension_scores = [dict(r) for r in rows2]
         except sqlite3.Error:
+            # Optional dimension breakdown should not block the repo detail page.
             pass
         finally:
             conn2.close()
@@ -197,6 +199,7 @@ async def runs_list(request: Request, page: int = 1) -> HTMLResponse:
             ).fetchall()
             rows = [dict(r) for r in raw]
         except sqlite3.Error:
+            # Runs can render as an empty list when the optional warehouse is unreadable.
             pass
         finally:
             conn.close()
@@ -224,6 +227,7 @@ async def approvals(request: Request) -> HTMLResponse:
         # username is inferred from output_dir contents — use empty string as sentinel
         records = load_approval_records(output_dir, username="")
     except Exception:
+        # Approval center is best-effort; the page can render with no records.
         pass
 
     return templates.TemplateResponse(
@@ -249,6 +253,7 @@ async def draft_diff(request: Request, record_id: str) -> HTMLResponse:
             None,
         )
     except Exception:
+        # Missing/unreadable approval records are handled by the 404 below.
         pass
 
     if record is None:
@@ -291,6 +296,7 @@ async def campaign_plan(request: Request, record_id: str) -> HTMLResponse:
             None,
         )
     except Exception:
+        # Missing/unreadable campaign records are handled by the 404 below.
         pass
 
     if record is None:
@@ -538,6 +544,7 @@ async def draft_sections(request: Request, packet_id: str) -> HTMLResponse:
             key=lambda r: int(r.get("section_idx") or 0),
         )
     except Exception:
+        # Missing/unreadable section records are handled by the 404 below.
         pass
 
     if not sections:
@@ -645,6 +652,7 @@ async def initiatives(request: Request) -> HTMLResponse:
                 if name:
                     projects_by_name[name] = p
         except (json.JSONDecodeError, OSError):
+            # Initiative list can render without truth-derived tier context.
             pass
 
     open_initiatives = [i for i in inits if i.closed_at is None]
@@ -946,6 +954,7 @@ async def initiative_gap(request: Request, repo_name: str, target: int = 0) -> H
                     target = init.target_tier
                     break
         except Exception:
+            # Query parameter target remains authoritative if initiative lookup fails.
             pass
 
     # Load portfolio-truth
@@ -959,6 +968,7 @@ async def initiative_gap(request: Request, repo_name: str, target: int = 0) -> H
                 if name:
                     projects_by_name[name] = p
         except (json.JSONDecodeError, OSError):
+            # The route raises a 404 below when truth data cannot be loaded.
             pass
 
     repo = projects_by_name.get(repo_name)

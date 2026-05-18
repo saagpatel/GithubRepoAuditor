@@ -89,6 +89,7 @@ def _has_build_scripts(repo_path: Path) -> bool:
             if "build" in scripts or "test" in scripts:
                 return True
         except (json.JSONDecodeError, OSError):
+            # Malformed or unreadable package metadata means no script signal is detected.
             pass
 
     # Makefile

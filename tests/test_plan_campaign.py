@@ -417,8 +417,10 @@ class TestCLIDispatch:
 
                     main()
                 except SystemExit:
+                    # The test only verifies dispatch; CLI exits are expected here.
                     pass
                 except Exception:  # noqa: BLE001
+                    # The test only verifies dispatch; mocked CLI setup may stop early.
                     pass
         mock_dispatch.assert_called_once()
 
@@ -450,8 +452,10 @@ class TestCLIDispatch:
 
                         main()
                     except SystemExit:
+                        # The test only verifies warning dispatch; CLI exits are expected here.
                         pass
                     except Exception:  # noqa: BLE001
+                        # The test only verifies warning dispatch; mocked setup may stop early.
                         pass
                 mock_warn.assert_called_once()
 
@@ -483,8 +487,10 @@ class TestCLIDispatch:
 
                     main()
                 except SystemExit:
+                    # The test only verifies dispatch; CLI exits are expected here.
                     pass
                 except Exception:  # noqa: BLE001
+                    # The test only verifies dispatch; mocked CLI setup may stop early.
                     pass
         mock_dispatch.assert_called_once()
 
@@ -513,8 +519,10 @@ class TestCLIDispatch:
 
                         main()
                     except SystemExit:
+                        # The test only verifies clean handling; CLI exits are expected here.
                         pass
                     except Exception:  # noqa: BLE001
+                        # The test captures output rather than failing on setup noise.
                         pass
 
 

@@ -52,6 +52,7 @@ def _git_askpass_env(token: str | None) -> Generator[dict[str, str] | None, None
         try:
             script_path.unlink()
         except OSError:
+            # Temporary askpass cleanup is best-effort.
             pass
 
 
