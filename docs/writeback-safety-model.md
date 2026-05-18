@@ -156,7 +156,19 @@ This layer does not widen authority:
 - it never auto-runs `--writeback-apply`
 - campaign approvals are limited to approval-eligible packets; access/config blockers remain blocked rather than approvable
 
-For the current operator checklist before capturing any campaign approval, see `docs/plans/2026-05-09-manual-approval-packet-workflow.md`.
+Before capturing any campaign approval, confirm:
+
+- the campaign name matches the packet being reviewed
+- the approval center shows the packet as `ready-for-review`
+- the preview action count, repo count, and top repos match expectations
+- there is no unexpected drift, access blocker, or rollback blocker
+- the writeback target is deliberate and bounded
+- known optional setup gaps are understood
+- the approval note names the exact packet and says no live apply is authorized
+
+After local approval, rerun the read-only approval center and dry-run gates. Only
+consider live apply when the dry run shows exactly the expected eligible actions and no
+new blockers. The live command still requires a separate explicit operator decision.
 
 Follow-up freshness is additive:
 

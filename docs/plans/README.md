@@ -1,14 +1,17 @@
-# Historical Planning Notes
+# Historical Planning Notes Archive
 
-This folder keeps older roadmap, sprint, handoff, and closeout notes for project history.
-They may reference local operator paths, archived branches, or past workflow decisions.
+Detailed historical roadmap, sprint, handoff, and closeout notes were removed from the
+public documentation tree after the repository became public.
 
-For current public usage, start with:
+Those notes were useful while the project was private, but many referenced local operator
+paths, archived branches, or past workflow decisions. Keeping them as top-level public
+docs made the repo harder for new readers to understand.
 
-- [README.md](../../README.md)
-- [docs/modes.md](../modes.md)
-- [docs/weekly-review.md](../weekly-review.md)
-- [docs/release-gates.md](../release-gates.md)
+For current context, read:
 
-Treat code, tests, and current product docs as authoritative when they disagree with an
-older plan.
+- [Project history](../project-history.md)
+- [Product modes](../modes.md)
+- [Weekly review workflow](../weekly-review.md)
+- [Release gates](../release-gates.md)
+
+The current product docs, code, tests, and GitHub releases are authoritative.

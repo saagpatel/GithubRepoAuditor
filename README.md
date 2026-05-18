@@ -110,7 +110,7 @@ Treat campaign/writeback, GitHub Projects, Notion sync, catalog overrides, score
 - Workbook tour: [docs/workbook-tour.md](docs/workbook-tour.md)
 - Extending analyzers: [docs/extending-analyzers.md](docs/extending-analyzers.md)
 - Release gates: [docs/release-gates.md](docs/release-gates.md)
-- Historical implementation notes: [docs/plans/](docs/plans/) records prior roadmap and closeout context. Treat current product docs and code as authoritative.
+- Project history: [docs/project-history.md](docs/project-history.md)
 
 ## Features
 

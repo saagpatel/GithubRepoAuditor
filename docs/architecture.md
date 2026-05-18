@@ -487,9 +487,9 @@ docs/
   architecture.md
   doctor-release-standard.md     — doctor/release-check standard for strategic repos
   modes.md
+  project-history.md
   weekly-review.md
   writeback-safety-model.md
-  plans/
 
 output/
   *.json
