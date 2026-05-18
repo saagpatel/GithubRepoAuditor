@@ -2653,8 +2653,6 @@ def _run_campaign_from_ledger_mode(args) -> None:
 
 def _run_plan_campaign_mode(args) -> None:
     """Dispatch for --plan-campaign: generate a goal-driven campaign plan packet."""
-    import json
-
     from src.approval_ledger import default_approval_reviewer as _default_reviewer
     from src.llm_cost import BudgetExceededError, CostTracker
     from src.narrative import _resolve_provider
@@ -2764,7 +2762,6 @@ def _run_plan_campaign_mode(args) -> None:
 
 def _run_draft_readmes_mode(args) -> None:
     """Dispatch for --draft-readmes: generate LLM-authored README draft packets."""
-    import json
     import sys
 
     from src.approval_ledger import default_approval_reviewer as _default_reviewer
@@ -3115,7 +3112,6 @@ def _run_close_initiative_mode(args) -> None:
 
 def _run_suggest_initiatives_mode(args) -> None:
     """LLM-rank repos closest to qualifying for their next maturity tier (Arc G S8.4)."""
-    import json
     from pathlib import Path as _Path
 
     from src.llm_cost import BudgetExceededError
@@ -3161,7 +3157,6 @@ def _run_suggest_initiatives_mode(args) -> None:
 
 def _run_accept_suggestion_mode(args) -> None:
     """Accept a suggestion: convert it into a tier-upgrade initiative (Arc G S9.1)."""
-    import json
     import sys
 
     from src.suggest_initiatives import accept_suggestion
@@ -3292,7 +3287,6 @@ def _run_dismissal_history_mode(args) -> None:
 
 def _run_tier_gaps_export_mode(args) -> None:
     """Dump per-repo tier-gap data as JSON or markdown (Arc G S12.4)."""
-    import json
     from datetime import datetime, timezone
     from pathlib import Path
 
@@ -5017,8 +5011,6 @@ def _apply_requested_reconciliation(report: AuditReport, args, audits: list[Repo
 
 def _run_auto_apply_approved_mode(args, output_dir: Path) -> None:
     """Apply approved campaign packets for repos that pass the automation trust bar."""
-    import json
-
     from src.approval_ledger import load_approval_ledger_bundle
     from src.auto_apply import (
         build_trust_bar_index,
@@ -5152,7 +5144,6 @@ def _load_release_count_by_name(*, output_dir: Path, username: str) -> dict[str,
     Returns a dict mapping display_name -> release_count, or None if no audit
     report is found (warning is logged).
     """
-    import json
     import logging
 
     _log = logging.getLogger(__name__)
@@ -5320,7 +5311,6 @@ def _run_portfolio_context_recovery_mode(args) -> None:
 
 def _run_tier_recalibration_report_mode(args) -> None:
     """Generate tier distribution report and flag bunching (Arc H A4)."""
-    import json
     from datetime import date, datetime, timezone
 
     from src.tier_recalibration import tier_distribution_report
@@ -5360,7 +5350,6 @@ def _run_tier_recalibration_report_mode(args) -> None:
 
 def _run_context_triage_mode(args) -> None:
     """Run context quality triage across the portfolio (Arc H B1)."""
-    import json
     from datetime import date, datetime, timezone
 
     from src.catalog_validator import validate_catalog

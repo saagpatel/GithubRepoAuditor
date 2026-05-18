@@ -17,12 +17,12 @@ import io
 import re
 import warnings
 
-from src.cli import (
-    _infer_subcommand_from_flags,
-    _rewrite_legacy_argv,
-    build_parser,
-    build_subcommand_parser,
-)
+import src.cli as cli_module
+
+_infer_subcommand_from_flags = cli_module._infer_subcommand_from_flags
+_rewrite_legacy_argv = cli_module._rewrite_legacy_argv
+build_parser = cli_module.build_parser
+build_subcommand_parser = cli_module.build_subcommand_parser
 
 # ── Helper ────────────────────────────────────────────────────────────
 
@@ -127,8 +127,6 @@ class TestLegacyFlatInvocation:
         assert is_legacy is False
 
     def test_legacy_emits_deprecation_warning(self):
-        import src.cli as cli_module
-
         cli_module._LEGACY_WARNING_EMITTED = False
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
@@ -138,8 +136,6 @@ class TestLegacyFlatInvocation:
         cli_module._LEGACY_WARNING_EMITTED = False
 
     def test_legacy_warning_emits_once(self):
-        import src.cli as cli_module
-
         cli_module._LEGACY_WARNING_EMITTED = False
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")

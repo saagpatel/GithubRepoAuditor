@@ -81,7 +81,7 @@ def narrow_candidates(
     audit_results: list[dict],
     *,
     goal: str,
-    semantic_index: "SemanticIndex | None",
+    semantic_index: SemanticIndex | None,
     max_repos: int = 50,
 ) -> list[dict]:
     """Return up to *max_repos* repos most relevant to *goal*.
@@ -188,9 +188,9 @@ def generate_action_for_repo(
     repo: dict,
     *,
     goal: str,
-    provider: "NarrativeProvider",
+    provider: NarrativeProvider,
     model: str,
-    cost_tracker: "CostTracker | None" = None,
+    cost_tracker: CostTracker | None = None,
 ) -> CampaignAction | None:
     """Call the LLM, parse the response. Return None if the repo doesn't qualify.
 
@@ -289,9 +289,9 @@ def generate_plan(
     candidates: list[dict],
     *,
     goal: str,
-    provider: "NarrativeProvider",
+    provider: NarrativeProvider,
     model: str,
-    cost_tracker: "CostTracker | None" = None,
+    cost_tracker: CostTracker | None = None,
     prefs: dict | None = None,
 ) -> CampaignPlanPacket:
     """Walk *candidates*, build actions, return a :class:`CampaignPlanPacket`.

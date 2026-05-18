@@ -430,8 +430,6 @@ def _read_markdown_sections(path: Path) -> dict[str, str]:
 
 
 def _split_markdown_sections(text: str) -> dict[str, str]:
-    import re
-
     sections: dict[str, list[str]] = {"__preamble__": []}
     current = "__preamble__"
     in_fenced_code = False
@@ -450,8 +448,6 @@ def _split_markdown_sections(text: str) -> dict[str, str]:
 
 
 def _normalize_heading(value: str) -> str:
-    import re
-
     return re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
 
 
@@ -590,8 +586,6 @@ def _first_nonempty(*values: str) -> str:
 
 
 def _usable_summary(value: str) -> str:
-    import re
-
     stripped = value.strip()
     if re.fullmatch(r"@[-A-Za-z0-9_./ ]+\.md", stripped):
         return ""

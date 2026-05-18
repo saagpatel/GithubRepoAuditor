@@ -531,10 +531,6 @@ from src.excel_timeline_helpers import (
     extend_score_history_with_current as _extend_score_history_with_current,
 )
 from src.excel_timeline_helpers import review_status_counts as _review_status_counts
-from src.excel_workbook_helpers import CORE_VISIBLE_SHEETS as CORE_VISIBLE_SHEETS
-from src.excel_workbook_helpers import (
-    DEFAULT_PREFERRED_SHEET_ORDER as DEFAULT_PREFERRED_SHEET_ORDER,
-)
 from src.excel_workbook_helpers import add_table as _add_table
 from src.excel_workbook_helpers import clear_worksheet as _clear_worksheet
 from src.excel_workbook_helpers import configure_sheet_view as _configure_sheet_view

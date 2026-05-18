@@ -6,11 +6,10 @@ import src.operator_control_center as operator_control_center
 import src.operator_follow_through as operator_follow_through
 import src.operator_resolution_trend as operator_resolution_trend
 import src.operator_snapshot_packaging as operator_snapshot_packaging
-from src.operator_control_center import (
-    build_operator_snapshot,
-    normalize_review_state,
-    render_control_center_markdown,
-)
+
+build_operator_snapshot = operator_control_center.build_operator_snapshot
+normalize_review_state = operator_control_center.normalize_review_state
+render_control_center_markdown = operator_control_center.render_control_center_markdown
 
 
 def _make_report(**overrides) -> dict:
