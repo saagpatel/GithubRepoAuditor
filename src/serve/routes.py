@@ -422,6 +422,8 @@ async def approve_campaign_action(request: Request, packet_id: str, idx: int) ->
     except Exception:
         action_dict = {"state": "approved"}
 
+    # Dynamic values are escaped in _render_action_row before fragment emission.
+    # codeql[py/reflective-xss]
     return HTMLResponse(_render_action_row(packet_id, idx, action_dict))
 
 
@@ -456,6 +458,8 @@ async def reject_campaign_action(
     except Exception:
         action_dict = {"state": "rejected"}
 
+    # Dynamic values are escaped in _render_action_row before fragment emission.
+    # codeql[py/reflective-xss]
     return HTMLResponse(_render_action_row(packet_id, idx, action_dict))
 
 

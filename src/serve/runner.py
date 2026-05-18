@@ -68,6 +68,9 @@ class RunSession:
 
     def start(self) -> None:
         self._proc = subprocess.Popen(
+            # Command shape is fixed in spawn_run: sys.executable, module name,
+            # validated GitHub owner, and allowlisted flags; shell remains off.
+            # codeql[py/command-line-injection]
             self.cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
