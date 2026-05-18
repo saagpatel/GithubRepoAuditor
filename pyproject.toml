@@ -9,6 +9,24 @@ description = "Automated GitHub portfolio auditor with 12 analysis dimensions"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
+authors = [{ name = "Saag Patel" }]
+keywords = [
+    "github",
+    "portfolio",
+    "audit",
+    "repository-analysis",
+    "developer-tools",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Utilities",
+]
 dependencies = [
     "requests>=2.31.0",
     "python-dateutil>=2.8.0",
@@ -51,6 +69,8 @@ build = [
 Homepage = "https://github.com/saagpatel/GithubRepoAuditor"
 Repository = "https://github.com/saagpatel/GithubRepoAuditor"
 "Bug Tracker" = "https://github.com/saagpatel/GithubRepoAuditor/issues"
+Changelog = "https://github.com/saagpatel/GithubRepoAuditor/blob/main/CHANGELOG.md"
+Documentation = "https://github.com/saagpatel/GithubRepoAuditor#readme"
 
 [project.scripts]
 audit = "src.cli:main"

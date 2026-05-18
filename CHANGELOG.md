@@ -7,6 +7,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [Unreleased]
 
+### Changed
+- Made PyPI publishing explicitly opt-in while keeping GitHub Releases as the supported public distribution path.
+- Added PyPI-ready package metadata and public distribution status documentation.
+
 ## [0.19.0] - 2026-05-11
 ### Added
 - `audit serve` local web UI (FastAPI + HTMX): portfolio dashboard, per-repo drill-down, run history, approval queue, and SSE-streamed `audit run` trigger. Requires `pip install -e '.[serve]'` (Arc F S4.1).

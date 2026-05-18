@@ -1,4 +1,4 @@
-.PHONY: install install-dev doctor audit control-center demo benchmark workbook-gate workbook-signoff test lint format type-check run clean release-gate build shiv dist-check release
+.PHONY: install install-dev doctor audit control-center demo benchmark workbook-gate workbook-signoff test lint format type-check run clean release-gate build shiv dist-check release publish-pypi
 
 PYTHON := python3
 USERNAME ?= saagpatel
@@ -89,6 +89,10 @@ shiv:
 	shiv -c audit -o dist/audit.pyz . --python "/usr/bin/env python3"
 	@echo "=== dist/audit.pyz ready. Test: ./dist/audit.pyz --help ==="
 
-release: build dist-check
-	@echo "=== Uploading to PyPI via scripts/release.sh ==="
-	bash scripts/release.sh
+release: build dist-check shiv
+	@echo "=== Release artifacts are ready in dist/ ==="
+	@echo "Tag a v* release to publish GitHub Release assets. Use make publish-pypi only after PyPI trusted publishing or credentials are configured."
+
+publish-pypi:
+	@echo "=== Publishing wheel + sdist to PyPI via scripts/release.sh ==="
+	bash scripts/release.sh --publish-pypi
