@@ -16,6 +16,21 @@ Steps:
 
 No secrets are required for CI.
 
+## `codeql.yml` — Code Scanning
+
+Runs CodeQL analysis for Python on pushes and pull requests to `main`, plus a
+weekly scheduled scan. This uses advanced setup so the workflow is visible and
+reviewable in the repository.
+
+Steps:
+1. Check out the repository.
+2. Initialize CodeQL for Python with the security-extended and security-and-quality
+   query suites.
+3. Upload results to GitHub code scanning.
+
+No secrets are required. The workflow grants `security-events: write` only so the
+CodeQL action can upload SARIF results to GitHub code scanning.
+
 ## `pypi.yml` — Manual PyPI Publish
 
 Runs manually via `workflow_dispatch` after PyPI Trusted Publishing has been
