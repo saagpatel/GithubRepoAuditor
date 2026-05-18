@@ -21,6 +21,19 @@ operator for developers with many projects.
   public documentation tree so current docs remain focused on product usage and
   maintainable architecture.
 
+## Recent Maintenance
+
+- The Security Review workflow remains manual and review-led. Recent security
+  maintenance used small pull requests to add or repair repository security controls,
+  then refreshed read-only GitHub alert evidence before choosing the next batch.
+- The latest CodeQL setup batch added JavaScript/TypeScript analysis to
+  `LegalDocsReview`, `IncidentReview`, and `IncidentManagement`. All three default
+  branches passed CodeQL after merge and had no open code-scanning alerts in the live
+  GitHub alert check.
+- `LegalDocsReview` also needed a lockfile refresh because its existing package
+  manifest and lockfile were out of sync, which blocked the repo's frozen-lockfile CI
+  checks before the CodeQL setup could merge safely.
+
 ## Current Documentation Source
 
 Use these files for current behavior:
