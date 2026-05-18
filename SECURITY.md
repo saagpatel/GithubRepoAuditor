@@ -22,4 +22,4 @@ We aim to acknowledge reports within 48 hours and resolve confirmed vulnerabilit
 - **GitHub token handling**: tokens are passed via env var, never logged or stored on disk
 - **Notion API token**: same handling as above
 - **Subprocess git clone**: uses authenticated URLs that are cleaned from env after use
-- **Output files**: reports written to local  directory only
+- **Output files**: reports are written to the local `output/` directory only

@@ -153,19 +153,20 @@ All three must pass before tagging:
   and non-PEP 440 tag suffixes can break the release build.
 - Public hardening releases should use patch versions (`v0.1.x`). Feature releases
   should move the minor version (`v0.2.0`, `v0.3.0`, and so on).
-- PyPI upload is explicit opt-in and not part of the current public install story.
-  `scripts/release.sh` builds and checks artifacts by default; it uploads only when
-  run as `scripts/release.sh --publish-pypi` with valid credentials. CI only checks
-  and uploads to GitHub Releases.
-- After PyPI Trusted Publishing is configured, prefer the manual `Publish to PyPI`
-  workflow over local token-based uploads. It builds the release tag in one job and
-  publishes from a separate `pypi` environment job with `id-token: write`.
+- PyPI publishing is active through the manual `Publish to PyPI` workflow. Keep
+  GitHub Releases and PyPI on the same tag for each public release.
+- `scripts/release.sh` builds and checks artifacts by default.
+  `scripts/release.sh --publish-pypi` remains an explicit local fallback only;
+  prefer Trusted Publishing over token-based local uploads.
+- The manual `Publish to PyPI` workflow builds the release tag in one job and
+  publishes from a separate protected `pypi` environment job with
+  `id-token: write`.
 - The `[serve]` extra is not bundled in the shiv binary by default. Users who need the
-  web UI should install from the GitHub source with the `[serve]` extra or use a local
-  editable clone.
+  web UI should install `github-repo-auditor[serve]` from PyPI or use a local editable
+  clone.
 
-See [distribution.md](distribution.md) for the public distribution policy and the
-remaining PyPI activation checklist.
+See [distribution.md](distribution.md) for the public distribution policy and release
+checklist.
 
 ## Web UI Gate (scope: audit serve)
 

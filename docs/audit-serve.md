@@ -14,10 +14,16 @@ The web UI dependencies are in the `[serve]` extra and are not installed by defa
 # editable / dev install
 pip install -e '.[serve]'
 
-# or via uv tool from the public GitHub source
+# from PyPI
+pip install 'github-repo-auditor[serve]'
+
+# or via pipx from PyPI
+pipx install 'github-repo-auditor[serve]'
+
+# or via uv tool from the public GitHub source for unreleased code
 uv tool install 'git+https://github.com/saagpatel/GithubRepoAuditor.git#egg=github-repo-auditor[serve]'
 
-# or via pipx from the public GitHub source
+# or via pipx from the public GitHub source for unreleased code
 pipx install 'git+https://github.com/saagpatel/GithubRepoAuditor.git#egg=github-repo-auditor[serve]'
 ```
 

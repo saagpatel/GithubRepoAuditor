@@ -5,7 +5,7 @@ Thank you for your interest in contributing. This guide covers how to set up a l
 ## Prerequisites
 
 - **Python 3.11 or later** — the codebase uses `match` statements, `X | Y` union syntax, and other 3.11+ features.
-- **A GitHub Personal Access Token** — required to audit private repos and avoid rate limits. Create one at <https://github.com/settings/tokens> with `repo` and `read:org` scopes.
+- **A GitHub Personal Access Token** — optional for public-only audits, but useful for private repos, organization metadata, and higher rate limits. Create one at <https://github.com/settings/tokens> with the narrowest scopes needed for the audit you plan to run.
 - **Git** — standard installation, used for shallow cloning during audits.
 
 ## Local Setup
@@ -18,15 +18,15 @@ cd GithubRepoAuditor
 # Install all runtime + dev dependencies
 make install-dev
 
-# Copy the environment template and fill in your token
+# Copy the environment template if you need authenticated audit runs
 cp .env.example .env
-# Edit .env — at minimum set GITHUB_TOKEN=<your token>
+# Edit .env and set GITHUB_TOKEN=<your token>
 ```
 
 If you do not use `make`, the equivalent pip command is:
 
 ```bash
-python3 -m pip install -r requirements.txt pytest ruff mypy
+python3 -m pip install -e ".[dev,config]"
 ```
 
 ## Running Tests
@@ -171,4 +171,4 @@ Before opening a PR, verify:
 
 ## Questions
 
-Open an issue or start a discussion on GitHub. Please include the output of `python3 -m src.cli --help` and your Python version (`python3 --version`) when reporting bugs.
+Open an issue on GitHub. Please include the output of `audit --help` and your Python version (`python3 --version`) when reporting bugs.
