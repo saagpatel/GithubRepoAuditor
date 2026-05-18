@@ -12,7 +12,7 @@ def test_docs_reflect_phase_93_approval_workflow_language() -> None:
             Path("docs/weekly-review.md").read_text(),
             Path("docs/writeback-safety-model.md").read_text(),
             Path("docs/operator-troubleshooting.md").read_text(),
-            Path("docs/plans/2026-04-13-roadmap-phases-93-97.md").read_text(),
+            Path("docs/project-history.md").read_text(),
         ]
     )
 

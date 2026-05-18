@@ -9,9 +9,9 @@ def test_docs_reflect_bounded_automation_guidance_language() -> None:
     weekly = Path("docs/weekly-review.md").read_text()
     safety = Path("docs/writeback-safety-model.md").read_text()
     troubleshooting = Path("docs/operator-troubleshooting.md").read_text()
-    roadmap = Path("docs/plans/2026-04-12-roadmap-phases-88-92.md").read_text()
+    history = Path("docs/project-history.md").read_text()
 
-    combined = "\n".join([architecture, modes, weekly, safety, troubleshooting, roadmap])
+    combined = "\n".join([architecture, modes, weekly, safety, troubleshooting, history])
 
     assert "Automation Guidance" in combined
     assert "preview-safe" in combined
