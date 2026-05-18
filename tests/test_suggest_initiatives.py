@@ -12,6 +12,7 @@ import src.suggest_initiatives as _si_mod
 from src.llm_cost import BudgetExceededError
 
 DismissedSuggestion = _si_mod.DismissedSuggestion
+DismissalEvent = _si_mod.DismissalEvent
 InitiativeSuggestion = _si_mod.InitiativeSuggestion
 accept_suggestion = _si_mod.accept_suggestion
 build_suggest_prompt = _si_mod.build_suggest_prompt
@@ -1877,8 +1878,6 @@ class TestDismissalEventDataclass:
 
     def test_to_dict_returns_expected_keys(self):
         """to_dict() returns all five expected keys."""
-        from src.suggest_initiatives import DismissalEvent
-
         e = DismissalEvent(
             repo_name="FooRepo",
             event_type="dismissed",
@@ -1893,8 +1892,6 @@ class TestDismissalEventDataclass:
 
     def test_round_trip_equality(self):
         """from_dict(to_dict(e)) == e."""
-        from src.suggest_initiatives import DismissalEvent
-
         e = DismissalEvent(
             repo_name="FooRepo",
             event_type="undone",
@@ -1906,8 +1903,6 @@ class TestDismissalEventDataclass:
 
     def test_from_dict_missing_keys_defaults_safely(self):
         """from_dict with missing keys falls back to empty strings."""
-        from src.suggest_initiatives import DismissalEvent
-
         e = DismissalEvent.from_dict({})
         assert e.repo_name == ""
         assert e.event_type == ""
@@ -1917,8 +1912,6 @@ class TestDismissalEventDataclass:
 
     def test_reason_defaults_to_empty_string(self):
         """reason field has a default of '' so it is optional."""
-        from src.suggest_initiatives import DismissalEvent
-
         e = DismissalEvent(
             repo_name="R",
             event_type="dismissed",
