@@ -17,7 +17,7 @@ An analyzer should inspect one aspect of a repo and return:
 
 ## Practical workflow
 
-1. Add the analyzer under [/Users/d/Projects/GithubRepoAuditor/src/analyzers](/Users/d/Projects/GithubRepoAuditor/src/analyzers).
+1. Add the analyzer under `src/analyzers/`.
 2. Make sure it fits the existing result shape used by scoring and report writers.
 3. Add tests for both the analyzer output and any score/report behavior it changes.
 4. Re-run `pytest` and `make workbook-gate` if workbook-facing summaries change.

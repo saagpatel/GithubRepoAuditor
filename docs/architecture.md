@@ -14,7 +14,7 @@ The weekly packaging seam now has an explicit structured contract, `weekly_story
 
 Phase 107 adds one more bounded read model on top of that same weekly seam: `weekly_command_center_digest_v1` in `src/weekly_command_center.py`. The digest is derived from `weekly_story_v1`, the latest operator summary, and the current portfolio-truth snapshot. It is explicitly report-only and workbook-first. Its job is to give a future weekly loop one canonical digest artifact without creating a second weekly authority or widening automation power.
 
-The portfolio layer now has its own explicit truth contract too. `--portfolio-truth` builds a versioned machine-readable snapshot for the broader `/Users/d/Projects` workspace and treats the legacy markdown registry/report files as derived compatibility surfaces rather than as canonical inputs.
+The portfolio layer now has its own explicit truth contract too. `--portfolio-truth` builds a versioned machine-readable snapshot for the configured local projects workspace and treats the legacy markdown registry/report files as derived compatibility surfaces rather than as canonical inputs.
 
 Phase 104 extends that contract with a minimum-context recovery layer. The truth snapshot now distinguishes `none`, `boilerplate`, `minimum-viable`, `standard`, and `full`, and the workspace recovery workflow writes context only into one primary repo-local file (`CLAUDE.md` first, otherwise `AGENTS.md`) instead of inventing a second mutable database for portfolio context.
 
