@@ -53,7 +53,7 @@ from src.scorer import score_repo
 from src.terminology import ACTION_SYNC_CANONICAL_LABELS
 
 # Emitted at most once per process when legacy flat invocation is used.
-_LEGACY_WARNING_EMITTED: bool = False
+_LEGACY_WARNING_EVENTS: set[str] = set()
 
 DEFAULT_ANALYSIS_WORKERS = 1
 MAX_ANALYSIS_WORKERS = 8
@@ -6533,10 +6533,9 @@ _KNOWN_SUBCOMMANDS: frozenset[str] = frozenset({"run", "triage", "report", "serv
 
 def _emit_legacy_deprecation_warning(inferred: str) -> None:
     """Emit the deprecation warning at most once per process."""
-    global _LEGACY_WARNING_EMITTED
-    if _LEGACY_WARNING_EMITTED:
+    if "legacy-cli" in _LEGACY_WARNING_EVENTS:
         return
-    _LEGACY_WARNING_EMITTED = True
+    _LEGACY_WARNING_EVENTS.add("legacy-cli")
     warnings.warn(
         f"Top-level CLI invocation is deprecated. "
         f"Use `audit {inferred} --flag` instead. "

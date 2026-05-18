@@ -40,7 +40,6 @@ class CommunityProfileAnalyzer(BaseAnalyzer):
         metadata: RepoMetadata,
         github_client: GitHubClient | None = None,
     ) -> AnalyzerResult:
-        score = 0.0
         findings: list[str] = []
         details: dict = {}
 

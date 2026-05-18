@@ -55,6 +55,6 @@ def test_installed_package_version_resolvable() -> None:
         pytest.skip(
             "github-repo-auditor not installed in this environment — skipping runtime version check."
         )
-
-    assert ver, "importlib.metadata.version() returned an empty string."
-    assert isinstance(ver, str), f"Expected str, got {type(ver)}"
+    else:
+        assert ver, "importlib.metadata.version() returned an empty string."
+        assert isinstance(ver, str), f"Expected str, got {type(ver)}"

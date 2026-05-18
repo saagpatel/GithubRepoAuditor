@@ -312,11 +312,8 @@ def _check_silver(repo: dict) -> list[str]:
 def _check_gold(repo: dict) -> list[str]:
     """Return list of unmet Gold requirements (beyond Silver)."""
     derived = repo.get("derived") or {}
-    risk = repo.get("risk") or {}
     if not isinstance(derived, dict):
         derived = {}
-    if not isinstance(risk, dict):
-        risk = {}
 
     missing: list[str] = []
 
@@ -418,11 +415,8 @@ def _check_gold_with_sources(
 ) -> tuple[list[str], list[Literal["strict", "proxy"]]]:
     """Like _check_gold but also returns parallel source annotations."""
     derived = repo.get("derived") or {}
-    risk = repo.get("risk") or {}
     if not isinstance(derived, dict):
         derived = {}
-    if not isinstance(risk, dict):
-        risk = {}
 
     missing: list[str] = []
     sources: list[Literal["strict", "proxy"]] = []

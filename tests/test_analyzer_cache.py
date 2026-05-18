@@ -364,10 +364,11 @@ class TestCacheIntegration:
         # First run — should call analyze() and populate cache.
         r1 = run_with_cache(analyzer, repo, meta, None, sha, conn)
         assert call_count == 1
+        first_run_count = call_count
 
         # Second run — should hit cache and NOT call analyze() again.
         r2 = run_with_cache(analyzer, repo, meta, None, sha, conn)
-        assert call_count == 1  # still 1!
+        assert call_count == first_run_count
 
         assert r1.dimension == r2.dimension
         assert r1.score == r2.score

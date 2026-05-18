@@ -156,7 +156,6 @@ def process_repo(target: RepoTarget, headers: dict, dry_run: bool) -> tuple[str,
             return name, "skipped (license exists)"
 
         if dry_run:
-            license_text = build_mit_license(target.created_year)
             year_range = str(target.created_year) if target.created_year == CURRENT_YEAR else f"{target.created_year}-{CURRENT_YEAR}"
             return name, f"dry-run (would add LICENSE, copyright {year_range})"
 

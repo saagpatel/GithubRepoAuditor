@@ -696,6 +696,8 @@ class TestDispatchAction:
             ]
             ok, msg = dispatch_action(action, client=mock_client, owner="user", dry_run=False)
 
+        assert ok is True
+        assert msg == "archive applied to my-repo"
         mock_apply.assert_called_once()
         call_kwargs = mock_apply.call_args
         # First positional arg is client, second is owner, third is updates list
@@ -715,6 +717,8 @@ class TestDispatchAction:
             ]
             ok, msg = dispatch_action(action, client=mock_client, owner="user", dry_run=False)
 
+        assert ok is True
+        assert msg == "add_topics applied to test-repo: ['python', 'cli', 'tool']"
         mock_apply.assert_called_once()
         call_kwargs = mock_apply.call_args
         updates = call_kwargs[0][2]
