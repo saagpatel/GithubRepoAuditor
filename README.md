@@ -1,6 +1,7 @@
 # GitHub Repo Auditor
 
 [![CI](https://github.com/saagpatel/GithubRepoAuditor/actions/workflows/ci.yml/badge.svg)](https://github.com/saagpatel/GithubRepoAuditor/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/saagpatel/GithubRepoAuditor/actions/workflows/codeql.yml/badge.svg)](https://github.com/saagpatel/GithubRepoAuditor/actions/workflows/codeql.yml)
 [![PyPI](https://img.shields.io/pypi/v/github-repo-auditor.svg)](https://pypi.org/project/github-repo-auditor/)
 [![Python](https://img.shields.io/pypi/pyversions/github-repo-auditor.svg)](https://pypi.org/project/github-repo-auditor/)
 [![Release](https://img.shields.io/github/v/release/saagpatel/GithubRepoAuditor?display_name=tag)](https://github.com/saagpatel/GithubRepoAuditor/releases/latest)
