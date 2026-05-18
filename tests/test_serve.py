@@ -573,6 +573,30 @@ class TestHtmxFragmentEscaping:
         assert "&lt;h1&gt;bad&lt;/h1&gt;" in html
         assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
 
+    def test_campaign_action_error_hides_exception_details(self, client: TestClient) -> None:
+        with patch(
+            "src.plan_campaign.approve_action",
+            side_effect=ValueError("internal stack trace /tmp/private.py:99"),
+        ):
+            resp = client.post("/approvals/packet-1/actions/0/approve")
+
+        assert resp.status_code == 404
+        assert "Not found." in resp.text
+        assert "internal stack trace" not in resp.text
+        assert "/tmp/private.py" not in resp.text
+
+    def test_section_error_hides_exception_details(self, client: TestClient) -> None:
+        with patch(
+            "src.draft_readmes.approve_section",
+            side_effect=ValueError("internal stack trace /tmp/private.py:99"),
+        ):
+            resp = client.post("/approvals/sections/section-1/approve")
+
+        assert resp.status_code == 404
+        assert "Not found." in resp.text
+        assert "internal stack trace" not in resp.text
+        assert "/tmp/private.py" not in resp.text
+
 
 # ---------------------------------------------------------------------------
 # CLI wiring smoke test (no server start)

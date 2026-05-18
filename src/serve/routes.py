@@ -404,9 +404,9 @@ async def approve_campaign_action(request: Request, packet_id: str, idx: int) ->
     output_dir = _output_dir(request)
     try:
         _approve_action(packet_id, idx, output_dir)
-    except (ValueError, IndexError) as exc:
+    except (ValueError, IndexError):
         return HTMLResponse(
-            f'<tr><td colspan="6" class="error">Not found: {_escape(exc)}</td></tr>',
+            '<tr><td colspan="6" class="error">Not found.</td></tr>',
             status_code=404,
         )
 
@@ -441,9 +441,9 @@ async def reject_campaign_action(
     output_dir = _output_dir(request)
     try:
         _reject_action(packet_id, idx, output_dir, reason=reason)
-    except (ValueError, IndexError) as exc:
+    except (ValueError, IndexError):
         return HTMLResponse(
-            f'<tr><td colspan="6" class="error">Not found: {_escape(exc)}</td></tr>',
+            '<tr><td colspan="6" class="error">Not found.</td></tr>',
             status_code=404,
         )
 
@@ -573,9 +573,9 @@ async def approve_section_route(request: Request, record_id: str) -> HTMLRespons
     output_dir = _output_dir(request)
     try:
         _approve_section(record_id, output_dir)
-    except ValueError as exc:
+    except ValueError:
         return HTMLResponse(
-            f'<div class="section-card section-card--error">Not found: {_escape(exc)}</div>',
+            '<div class="section-card section-card--error">Not found.</div>',
             status_code=404,
         )
 
@@ -605,9 +605,9 @@ async def reject_section_route(
     output_dir = _output_dir(request)
     try:
         _reject_section(record_id, output_dir, reason=reason)
-    except ValueError as exc:
+    except ValueError:
         return HTMLResponse(
-            f'<div class="section-card section-card--error">Not found: {_escape(exc)}</div>',
+            '<div class="section-card section-card--error">Not found.</div>',
             status_code=404,
         )
 
@@ -781,9 +781,9 @@ async def accept_initiative_route(
 
     try:
         truth = json.loads(truth_path.read_text())
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, json.JSONDecodeError):
         return HTMLResponse(
-            f'<div class="suggestion-card accept-error">Error: failed to read portfolio-truth: {_escape(exc)}</div>',
+            '<div class="suggestion-card accept-error">Error: failed to read portfolio truth.</div>',
             status_code=400,
         )
 
@@ -797,9 +797,9 @@ async def accept_initiative_route(
             deadline=deadline,
             target_tier=target_tier,
         )
-    except ValueError as exc:
+    except ValueError:
         return HTMLResponse(
-            f'<div class="suggestion-card accept-error">Error: {_escape(exc)}</div>',
+            '<div class="suggestion-card accept-error">Error: unable to accept initiative.</div>',
             status_code=400,
         )
 
@@ -826,9 +826,9 @@ async def dismiss_suggestion_route(
         entry = dismiss_suggestion_record(
             dismissed_path(output_dir), repo_name=repo_name, reason=reason
         )
-    except ValueError as exc:
+    except ValueError:
         return HTMLResponse(
-            f'<div class="suggestion-card accept-error">Error: {_escape(exc)}</div>',
+            '<div class="suggestion-card accept-error">Error: unable to dismiss suggestion.</div>',
             status_code=400,
         )
 

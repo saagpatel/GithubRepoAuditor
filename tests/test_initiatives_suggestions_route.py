@@ -319,8 +319,10 @@ class TestInitiativesAcceptPost:
         matching = [i for i in data["initiatives"] if i["repo_name"] == "IdempotentRepo"]
         assert len(matching) == 1  # upserted, not duplicated
 
-    def test_xss_repo_name_is_escaped_in_error(self, output_dir: Path, client: TestClient) -> None:
-        """XSS payload in repo_name is HTML-escaped in error response."""
+    def test_xss_repo_name_is_not_echoed_in_error(
+        self, output_dir: Path, client: TestClient
+    ) -> None:
+        """XSS payload in repo_name is not reflected in the error response."""
         truth = _make_portfolio_truth([_bronze_repo("SafeRepo")])
         (output_dir / "portfolio-truth-latest.json").write_text(json.dumps(truth))
 
@@ -335,10 +337,9 @@ class TestInitiativesAcceptPost:
         )
 
         assert resp.status_code == 400
-        # Raw script tag must NOT appear verbatim
         assert "<script>" not in resp.text
-        # Escaped form should be present
-        assert "&lt;script&gt;" in resp.text
+        assert "&lt;script&gt;" not in resp.text
+        assert "unable to accept initiative" in resp.text
 
 
 # ── Nav link ─────────────────────────────────────────────────────────────────
