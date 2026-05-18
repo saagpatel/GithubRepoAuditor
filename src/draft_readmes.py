@@ -56,8 +56,6 @@ def _readme_is_trivially_short(repo: dict) -> bool:
     if not readme_text:
         return False
     # Strip markdown badges (![...](...)  or  [![...](...)...)) and heading lines
-    import re
-
     stripped = re.sub(r"!\[.*?\]\(.*?\)", "", readme_text)
     stripped = re.sub(r"^#{1,6}\s.*$", "", stripped, flags=re.MULTILINE)
     stripped = stripped.strip()

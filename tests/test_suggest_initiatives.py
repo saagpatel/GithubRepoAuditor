@@ -10,27 +10,26 @@ import pytest
 
 import src.suggest_initiatives as _si_mod
 from src.llm_cost import BudgetExceededError
-from src.suggest_initiatives import (
-    DismissedSuggestion,
-    InitiativeSuggestion,
-    accept_suggestion,
-    build_suggest_prompt,
-    clear_suggestion_cache,
-    default_deadline_for_effort,
-    dismiss_suggestion_record,
-    dismissed_path,
-    expire_dismissals,
-    generate_suggestions,
-    load_dismissal_events,
-    load_dismissed,
-    load_suggestion_cache,
-    narrow_candidates,
-    parse_suggest_response,
-    save_dismissed,
-    save_suggestion_cache,
-    suggestion_cache_path,
-    undo_dismiss,
-)
+
+DismissedSuggestion = _si_mod.DismissedSuggestion
+InitiativeSuggestion = _si_mod.InitiativeSuggestion
+accept_suggestion = _si_mod.accept_suggestion
+build_suggest_prompt = _si_mod.build_suggest_prompt
+clear_suggestion_cache = _si_mod.clear_suggestion_cache
+default_deadline_for_effort = _si_mod.default_deadline_for_effort
+dismiss_suggestion_record = _si_mod.dismiss_suggestion_record
+dismissed_path = _si_mod.dismissed_path
+expire_dismissals = _si_mod.expire_dismissals
+generate_suggestions = _si_mod.generate_suggestions
+load_dismissal_events = _si_mod.load_dismissal_events
+load_dismissed = _si_mod.load_dismissed
+load_suggestion_cache = _si_mod.load_suggestion_cache
+narrow_candidates = _si_mod.narrow_candidates
+parse_suggest_response = _si_mod.parse_suggest_response
+save_dismissed = _si_mod.save_dismissed
+save_suggestion_cache = _si_mod.save_suggestion_cache
+suggestion_cache_path = _si_mod.suggestion_cache_path
+undo_dismiss = _si_mod.undo_dismiss
 
 # ── Factories ─────────────────────────────────────────────────────────────────
 

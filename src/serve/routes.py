@@ -889,8 +889,6 @@ async def undo_dismiss_route(
     repo_name: str = Form(...),
 ) -> HTMLResponse:
     """Restore a dismissed repo. HTMX swap-out the row (Arc G S12.2)."""
-    import html as _html
-
     from src.suggest_initiatives import dismissed_path, undo_dismiss
 
     output_dir = _output_dir(request)
