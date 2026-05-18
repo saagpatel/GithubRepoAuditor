@@ -8,6 +8,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ## [Unreleased]
 
 ### Changed
+- Added a manual PyPI Trusted Publishing workflow that builds a release tag and
+  publishes from a protected `pypi` environment after PyPI is configured.
 - Made PyPI publishing explicitly opt-in while keeping GitHub Releases as the supported public distribution path.
 - Added PyPI-ready package metadata and public distribution status documentation.
 

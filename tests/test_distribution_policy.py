@@ -33,8 +33,23 @@ def test_distribution_docs_name_supported_public_channel() -> None:
     distribution_doc = (ROOT / "docs" / "distribution.md").read_text()
     readme = (ROOT / "README.md").read_text()
     release_gates = (ROOT / "docs" / "release-gates.md").read_text()
+    workflows_readme = (ROOT / ".github" / "workflows" / "README.md").read_text()
 
     assert "GitHub Releases remain the supported public" in distribution_doc
     assert "PyPI publishing is not active yet" in distribution_doc
     assert "docs/distribution.md" in readme
     assert "scripts/release.sh --publish-pypi" in release_gates
+    assert "pypi.yml" in workflows_readme
+    assert "id-token: write" in workflows_readme
+
+
+def test_pypi_workflow_is_manual_trusted_publishing_only() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "pypi.yml").read_text()
+
+    assert "workflow_dispatch:" in workflow
+    assert "push:" not in workflow
+    assert "environment: pypi" in workflow
+    assert "id-token: write" in workflow
+    assert "pypa/gh-action-pypi-publish@release/v1" in workflow
+    assert "actions/upload-artifact" in workflow
+    assert "actions/download-artifact" in workflow
