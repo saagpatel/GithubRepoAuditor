@@ -334,7 +334,7 @@ class TestDraftReadmeApprovals:
     """Tests for draft-readme packet display and diff partial (Arc G S5.4)."""
 
     def test_approvals_lists_both_draft_readme_records(self, output_dir: Path) -> None:
-        id1, id2 = _seed_draft_readme_records(output_dir)
+        _seed_draft_readme_records(output_dir)
         app = create_app(output_dir=output_dir)
         c = TestClient(app, raise_server_exceptions=True)
         resp = c.get("/approvals")

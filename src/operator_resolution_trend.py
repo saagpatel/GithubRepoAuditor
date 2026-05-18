@@ -19316,9 +19316,6 @@ def _class_trust_momentum_for_target(
     if class_normalization_status == "applied" and momentum_status in {"reversing", "unstable"}:
         softened_reason = "Recent class evidence is changing direction, so earlier class normalization is being softened back to candidate."
         reverted_policy = target.get("pre_class_normalization_trust_policy", trust_policy)
-        reverted_reason = target.get(
-            "pre_class_normalization_trust_policy_reason", trust_policy_reason
-        )
         if trust_policy == "act-with-review" and reverted_policy == "verify-first":
             trust_policy = reverted_policy
             trust_policy_reason = softened_reason

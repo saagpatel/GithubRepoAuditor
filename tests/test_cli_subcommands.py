@@ -127,16 +127,16 @@ class TestLegacyFlatInvocation:
         assert is_legacy is False
 
     def test_legacy_emits_deprecation_warning(self):
-        cli_module._LEGACY_WARNING_EMITTED = False
+        cli_module._LEGACY_WARNING_EVENTS.clear()
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             cli_module._emit_legacy_deprecation_warning("run")
         assert any(issubclass(w.category, DeprecationWarning) for w in caught)
         assert any("audit run" in str(w.message) for w in caught)
-        cli_module._LEGACY_WARNING_EMITTED = False
+        cli_module._LEGACY_WARNING_EVENTS.clear()
 
     def test_legacy_warning_emits_once(self):
-        cli_module._LEGACY_WARNING_EMITTED = False
+        cli_module._LEGACY_WARNING_EVENTS.clear()
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             cli_module._emit_legacy_deprecation_warning("run")
@@ -144,7 +144,7 @@ class TestLegacyFlatInvocation:
             cli_module._emit_legacy_deprecation_warning("triage")
         deprecations = [w for w in caught if issubclass(w.category, DeprecationWarning)]
         assert len(deprecations) == 1
-        cli_module._LEGACY_WARNING_EMITTED = False
+        cli_module._LEGACY_WARNING_EVENTS.clear()
 
     def test_legacy_skip_forks(self):
         args = _parse_legacy("myuser", "--skip-forks")

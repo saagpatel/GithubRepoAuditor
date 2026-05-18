@@ -22,7 +22,8 @@ class BaseAnalyzer(ABC):
         repo_path: Path,
         metadata: RepoMetadata,
         github_client: GitHubClient | None = None,
-    ) -> AnalyzerResult: ...
+    ) -> AnalyzerResult:
+        raise NotImplementedError
 
     def cache_inputs_hash(
         self,

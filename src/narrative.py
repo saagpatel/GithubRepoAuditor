@@ -25,7 +25,8 @@ DEFAULT_GITHUB_MODELS_MODEL = "gpt-4o-mini"
 
 
 class NarrativeProvider(Protocol):
-    def generate(self, prompt: str, model: str, max_tokens: int) -> str: ...
+    def generate(self, prompt: str, model: str, max_tokens: int) -> str:
+        raise NotImplementedError
 
 
 # ── Anthropic provider ───────────────────────────────────────────────────────

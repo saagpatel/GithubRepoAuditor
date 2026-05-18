@@ -62,7 +62,8 @@ class Embedder(Protocol):
     name: str
     dimension: int
 
-    def embed(self, texts: list[str]) -> list[list[float]]: ...
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        raise NotImplementedError
 
 
 # ---------------------------------------------------------------------------
