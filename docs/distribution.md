@@ -32,16 +32,21 @@ The repository is prepared for a future PyPI release:
 - `make dist-check` runs `twine check`
 - `scripts/release.sh` builds and checks artifacts by default
 - `scripts/release.sh --publish-pypi` is the only script path that uploads to PyPI
+- `.github/workflows/pypi.yml` is a manual Trusted Publishing workflow for a
+  release tag, using the `pypi` environment and short-lived OIDC credentials
 
 ## Activation Checklist
 
 Before the first PyPI release:
 
 1. Recheck that the `github-repo-auditor` PyPI name is still available.
-2. Create the PyPI project through a first upload or configure Trusted Publishing.
-3. Prefer PyPI Trusted Publishing from GitHub Actions over long-lived API tokens.
+2. Configure PyPI Trusted Publishing for owner `saagpatel`, repository
+   `GithubRepoAuditor`, workflow `pypi.yml`, and environment `pypi`.
+3. Protect the GitHub `pypi` environment so publishing requires intentional
+   approval.
 4. Run the standard and distribution gates from [release-gates.md](release-gates.md).
-5. Publish the same version that is tagged on GitHub.
+5. Open **Actions -> Publish to PyPI -> Run workflow** and enter the release tag,
+   for example `v0.1.1`.
 6. Smoke-test `pipx install github-repo-auditor` or `uv tool install github-repo-auditor`.
 
 Until that checklist is complete, GitHub Releases remain the supported public

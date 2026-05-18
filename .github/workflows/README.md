@@ -16,6 +16,23 @@ Steps:
 
 No secrets are required for CI.
 
+## `pypi.yml` — Manual PyPI Publish
+
+Runs manually via `workflow_dispatch` after PyPI Trusted Publishing has been
+configured for this repository. It does not run on normal pushes or tags.
+
+Steps:
+1. Validate that the requested ref is a `v*` release tag.
+2. Build the wheel and source distribution from that tag.
+3. Run `twine check`.
+4. Upload the checked distributions as a workflow artifact.
+5. Publish from the protected `pypi` environment using PyPI Trusted Publishing.
+
+No PyPI token secret is required. The publish job uses GitHub OIDC with
+`id-token: write`, which must match the PyPI Trusted Publisher configuration:
+owner `saagpatel`, repository `GithubRepoAuditor`, workflow `pypi.yml`, and
+environment `pypi`.
+
 ## `audit.yml` — Manual Automated Audit
 
 Runs manually via `workflow_dispatch`. The automatic weekly schedule is disabled while the repository remains private to avoid recurring GitHub Actions billing.

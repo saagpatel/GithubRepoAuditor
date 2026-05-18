@@ -157,6 +157,9 @@ All three must pass before tagging:
   `scripts/release.sh` builds and checks artifacts by default; it uploads only when
   run as `scripts/release.sh --publish-pypi` with valid credentials. CI only checks
   and uploads to GitHub Releases.
+- After PyPI Trusted Publishing is configured, prefer the manual `Publish to PyPI`
+  workflow over local token-based uploads. It builds the release tag in one job and
+  publishes from a separate `pypi` environment job with `id-token: write`.
 - The `[serve]` extra is not bundled in the shiv binary by default. Users who need the
   web UI should install from the GitHub source with the `[serve]` extra or use a local
   editable clone.
