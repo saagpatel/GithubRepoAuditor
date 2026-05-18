@@ -39,7 +39,12 @@ def test_distribution_docs_name_supported_public_channel() -> None:
     assert "PyPI publishing is active" in distribution_doc
     assert "uv tool install github-repo-auditor" in readme
     assert "pipx install github-repo-auditor" in readme
+    assert "github.com/saagpatel/GithubRepoAuditor/actions/workflows/ci.yml/badge.svg" in readme
+    assert "img.shields.io/pypi/v/github-repo-auditor.svg" in readme
     assert "docs/distribution.md" in readme
+    assert "PyPI publishing is active through the manual" in release_gates
+    assert "not part of the current public install story" not in release_gates
+    assert "remaining PyPI activation checklist" not in release_gates
     assert "scripts/release.sh --publish-pypi" in release_gates
     assert "pypi.yml" in workflows_readme
     assert "id-token: write" in workflows_readme

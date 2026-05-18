@@ -35,7 +35,9 @@ environment `pypi`.
 
 ## `audit.yml` — Manual Automated Audit
 
-Runs manually via `workflow_dispatch`. The automatic weekly schedule is disabled while the repository remains private to avoid recurring GitHub Actions billing.
+Runs manually via `workflow_dispatch`. No automatic weekly schedule is enabled; this
+keeps public CI usage intentional and avoids opening or updating scheduled handoff
+issues unless an operator starts the workflow.
 
 Steps:
 1. Install the package with config support.

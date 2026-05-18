@@ -1,6 +1,10 @@
 # GitHub Repo Auditor
 
-[![Python](https://img.shields.io/badge/Python-%233776ab?style=flat-square&logo=python)](#) [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](#) [![Tests](https://img.shields.io/badge/tests-covered-brightgreen?style=flat-square)](#)
+[![CI](https://github.com/saagpatel/GithubRepoAuditor/actions/workflows/ci.yml/badge.svg)](https://github.com/saagpatel/GithubRepoAuditor/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/github-repo-auditor.svg)](https://pypi.org/project/github-repo-auditor/)
+[![Python](https://img.shields.io/pypi/pyversions/github-repo-auditor.svg)](https://pypi.org/project/github-repo-auditor/)
+[![Release](https://img.shields.io/github/v/release/saagpatel/GithubRepoAuditor?display_name=tag)](https://github.com/saagpatel/GithubRepoAuditor/releases/latest)
+[![License](https://img.shields.io/github/license/saagpatel/GithubRepoAuditor.svg)](LICENSE)
 
 > Know the truth about every project you've ever started — because `git log` across 100 repos doesn't tell you which ones are worth finishing.
 
@@ -112,6 +116,8 @@ Treat campaign/writeback, GitHub Projects, Notion sync, catalog overrides, score
 - Release gates: [docs/release-gates.md](docs/release-gates.md)
 - Distribution status: [docs/distribution.md](docs/distribution.md)
 - Project history: [docs/project-history.md](docs/project-history.md)
+- Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Security policy: [SECURITY.md](SECURITY.md)
 
 ## Features
 

@@ -8,6 +8,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ## [Unreleased]
 
 ### Changed
+- Replaced placeholder README badges with live CI, PyPI, release, Python, and
+  license badges for the public repository.
+- Refreshed public contributor, security, release-gate, and workflow docs now
+  that PyPI publishing is active.
 - Updated public install documentation now that `github-repo-auditor` is live on
   PyPI.
 - Added a manual PyPI Trusted Publishing workflow that builds a release tag and
