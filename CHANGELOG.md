@@ -8,6 +8,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ## [Unreleased]
 
 ### Changed
+- Hardened the local web UI runner and HTMX fragments against CodeQL-reported
+  command-injection and reflected-XSS paths.
 - Added a CodeQL code-scanning workflow and documented the public security
   coverage.
 - Replaced placeholder README badges with live CI, PyPI, release, Python, and

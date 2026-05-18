@@ -20,7 +20,7 @@ pytest.importorskip("jinja2", reason="[serve] extra not installed")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from src.serve.app import create_app  # noqa: E402
-from src.serve.runner import SAFE_FLAG_NAMES, validate_flags  # noqa: E402
+from src.serve.runner import SAFE_FLAG_NAMES, validate_flags, validate_username  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -248,6 +248,20 @@ class TestNewRunRoute:
 
     def test_post_missing_username_returns_422(self, client: TestClient) -> None:
         resp = client.post("/runs/new", data={"flags": ""})
+        assert resp.status_code == 422
+
+    def test_post_rejects_shell_metacharacters_in_username(self, client: TestClient) -> None:
+        resp = client.post(
+            "/runs/new",
+            data={"username": "octo; touch /tmp/audit-test", "flags": "--portfolio-truth"},
+        )
+        assert resp.status_code == 422
+
+    def test_post_rejects_username_starting_with_dash(self, client: TestClient) -> None:
+        resp = client.post(
+            "/runs/new",
+            data={"username": "-evil", "flags": "--portfolio-truth"},
+        )
         assert resp.status_code == 422
 
 
@@ -492,6 +506,72 @@ class TestValidateFlags:
     def test_safe_flag_names_populated(self) -> None:
         assert "portfolio-truth" in SAFE_FLAG_NAMES
         assert "control-center" in SAFE_FLAG_NAMES
+
+
+class TestValidateUsername:
+    def test_valid_username_allowed(self) -> None:
+        assert validate_username("octocat") == "octocat"
+
+    def test_valid_org_with_hyphen_allowed(self) -> None:
+        assert validate_username("octo-org") == "octo-org"
+
+    def test_surrounding_whitespace_stripped(self) -> None:
+        assert validate_username(" octocat ") == "octocat"
+
+    def test_shell_metacharacter_rejected(self) -> None:
+        with pytest.raises(ValueError, match="valid GitHub owner"):
+            validate_username("octo;touch")
+
+    def test_leading_hyphen_rejected(self) -> None:
+        with pytest.raises(ValueError, match="valid GitHub owner"):
+            validate_username("-octo")
+
+    def test_trailing_hyphen_rejected(self) -> None:
+        with pytest.raises(ValueError, match="valid GitHub owner"):
+            validate_username("octo-")
+
+    def test_consecutive_hyphens_rejected(self) -> None:
+        with pytest.raises(ValueError, match="consecutive hyphens"):
+            validate_username("octo--org")
+
+
+class TestHtmxFragmentEscaping:
+    def test_campaign_action_values_are_escaped(self) -> None:
+        from src.serve.routes import _render_action_row
+
+        html = _render_action_row(
+            'packet"><script>alert(1)</script>',
+            0,
+            {
+                "repo_name": "<img src=x onerror=alert(1)>",
+                "action_type": "<b>write</b>",
+                "target": "<script>alert(1)</script>",
+                "rationale": "needs <strong>escaping</strong>",
+            },
+        )
+
+        assert "<script>" not in html
+        assert "<img" not in html
+        assert "&lt;script&gt;" in html
+        assert "&lt;strong&gt;escaping&lt;/strong&gt;" in html
+
+    def test_section_card_values_are_escaped(self) -> None:
+        from src.serve.routes import _render_section_card
+
+        html = _render_section_card(
+            'section"><script>alert(1)</script>',
+            {
+                "section_heading": "<h1>bad</h1>",
+                "section_body": "<script>alert(1)</script>",
+                "rejected_reason": "<img src=x onerror=alert(1)>",
+                "state": "rejected",
+            },
+        )
+
+        assert "<script>" not in html
+        assert "<img" not in html
+        assert "&lt;h1&gt;bad&lt;/h1&gt;" in html
+        assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
 
 
 # ---------------------------------------------------------------------------

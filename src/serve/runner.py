@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
+import sys
 import threading
 import uuid
 from collections import deque
@@ -29,6 +31,10 @@ SAFE_FLAG_NAMES: frozenset[str] = frozenset(
 
 # Shell metacharacters that must never appear in flag values
 _SHELL_METACHAR = set(";|&$`\\<>!")
+
+# GitHub usernames and organization names are limited to alphanumerics plus
+# single hyphens, cannot start/end with a hyphen, and max out at 39 chars.
+_GITHUB_OWNER_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$")
 
 # Max lines kept per run
 _MAX_LINES = 200
@@ -121,11 +127,22 @@ def validate_flags(flags: dict[str, str | bool]) -> list[str]:
     return args
 
 
+def validate_username(username: str) -> str:
+    """Return a safe GitHub username/org name for subprocess arguments."""
+    candidate = username.strip()
+    if not _GITHUB_OWNER_RE.fullmatch(candidate):
+        raise ValueError("Username must be a valid GitHub owner name")
+    if "--" in candidate:
+        raise ValueError("Username must not contain consecutive hyphens")
+    return candidate
+
+
 def spawn_run(username: str, flags: dict[str, str | bool], output_dir: Path) -> str:
     """Validate flags, spawn audit subprocess, register session.  Returns run_id."""
+    safe_username = validate_username(username)
     flag_args = validate_flags(flags)
     run_id = uuid.uuid4().hex
-    cmd = ["python", "-m", "src.cli", username, *flag_args]
+    cmd = [sys.executable, "-m", "src.cli", safe_username, *flag_args]
     session = RunSession(run_id=run_id, cmd=cmd)
     with _registry_lock:
         _registry[run_id] = session

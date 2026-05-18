@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import html as _html
 import json
 import sqlite3
 import time
@@ -26,6 +27,10 @@ templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 
 def _output_dir(request: Request) -> Path:
     return request.app.state.output_dir
+
+
+def _escape(value: object) -> str:
+    return _html.escape(str(value), quote=True)
 
 
 def _load_portfolio_truth(output_dir: Path) -> dict[str, Any]:
@@ -350,17 +355,18 @@ async def reject_packet(request: Request, approval_id: str) -> HTMLResponse:
 def _render_action_row(packet_id: str, idx: int, action: dict[str, Any]) -> str:
     """Render a single campaign-plan action table row as an HTML fragment."""
     state: str = action.get("state") or "pending"
-    repo = action.get("repo_name") or ""
-    action_type = action.get("action_type") or ""
-    target = action.get("target") or "—"
-    rationale = action.get("rationale") or "—"
+    repo = _escape(action.get("repo_name") or "")
+    action_type = _escape(action.get("action_type") or "")
+    target = _escape(action.get("target") or "—")
+    rationale = _escape(action.get("rationale") or "—")
+    safe_packet_id = _escape(packet_id)
 
     if state == "approved":
         state_cell = '<span class="badge badge-approved">&#10003; Approved</span>'
         buttons = ""
         row_class = "campaign-plan__row--approved"
     elif state == "rejected":
-        reason = action.get("rejected_reason") or ""
+        reason = _escape(action.get("rejected_reason") or "")
         reason_note = f" ({reason})" if reason else ""
         state_cell = f'<span class="badge badge-rejected">&#10007; Rejected{reason_note}</span>'
         buttons = ""
@@ -369,10 +375,10 @@ def _render_action_row(packet_id: str, idx: int, action: dict[str, Any]) -> str:
         state_cell = '<span class="badge badge-pending">Pending</span>'
         buttons = (
             f'<button class="btn-approve" '
-            f'hx-post="/approvals/{packet_id}/actions/{idx}/approve" '
+            f'hx-post="/approvals/{safe_packet_id}/actions/{idx}/approve" '
             f'hx-target="closest tr" hx-swap="outerHTML">&#10003; Approve</button> '
             f'<button class="btn-reject" '
-            f'hx-post="/approvals/{packet_id}/actions/{idx}/reject" '
+            f'hx-post="/approvals/{safe_packet_id}/actions/{idx}/reject" '
             f'hx-target="closest tr" hx-swap="outerHTML">&#10007; Reject</button>'
         )
         row_class = "campaign-plan__row--pending"
@@ -400,7 +406,7 @@ async def approve_campaign_action(request: Request, packet_id: str, idx: int) ->
         _approve_action(packet_id, idx, output_dir)
     except (ValueError, IndexError) as exc:
         return HTMLResponse(
-            f'<tr><td colspan="6" class="error">Not found: {exc}</td></tr>',
+            f'<tr><td colspan="6" class="error">Not found: {_escape(exc)}</td></tr>',
             status_code=404,
         )
 
@@ -435,7 +441,7 @@ async def reject_campaign_action(
         _reject_action(packet_id, idx, output_dir, reason=reason)
     except (ValueError, IndexError) as exc:
         return HTMLResponse(
-            f'<tr><td colspan="6" class="error">Not found: {exc}</td></tr>',
+            f'<tr><td colspan="6" class="error">Not found: {_escape(exc)}</td></tr>',
             status_code=404,
         )
 
@@ -468,13 +474,14 @@ def _render_section_card(record_id: str, section: dict[str, Any]) -> str:
     state: str = section.get("state") or "pending"
     heading: str = section.get("section_heading") or "(intro)"
     body: str = section.get("section_body") or ""
+    safe_record_id = _escape(record_id)
 
     if state == "approved":
         state_badge = '<span class="badge badge-approved">&#10003; Approved</span>'
         buttons = ""
         card_class = "section-card section-card--approved"
     elif state == "rejected":
-        reason = section.get("rejected_reason") or ""
+        reason = _escape(section.get("rejected_reason") or "")
         reason_note = f" ({reason})" if reason else ""
         state_badge = f'<span class="badge badge-rejected">&#10007; Rejected{reason_note}</span>'
         buttons = ""
@@ -483,23 +490,21 @@ def _render_section_card(record_id: str, section: dict[str, Any]) -> str:
         state_badge = '<span class="badge badge-pending">Pending</span>'
         buttons = (
             f'<button class="btn-approve" '
-            f'hx-post="/approvals/sections/{record_id}/approve" '
+            f'hx-post="/approvals/sections/{safe_record_id}/approve" '
             f'hx-target="closest .section-card" hx-swap="outerHTML">'
             f"&#10003; Approve</button> "
             f'<button class="btn-reject" '
-            f'hx-post="/approvals/sections/{record_id}/reject" '
+            f'hx-post="/approvals/sections/{safe_record_id}/reject" '
             f'hx-target="closest .section-card" hx-swap="outerHTML">'
             f"&#10007; Reject</button>"
         )
         card_class = "section-card section-card--pending"
 
-    import html as _html
-
-    safe_body = _html.escape(body)
-    safe_heading = _html.escape(heading)
+    safe_body = _escape(body)
+    safe_heading = _escape(heading)
 
     return (
-        f'<div class="{card_class}" id="section-card-{record_id}">'
+        f'<div class="{card_class}" id="section-card-{safe_record_id}">'
         f'<div class="section-card__header">'
         f'<h3 class="section-card__heading">## {safe_heading}</h3>'
         f"{state_badge}"
@@ -566,7 +571,7 @@ async def approve_section_route(request: Request, record_id: str) -> HTMLRespons
         _approve_section(record_id, output_dir)
     except ValueError as exc:
         return HTMLResponse(
-            f'<div class="section-card section-card--error">Not found: {exc}</div>',
+            f'<div class="section-card section-card--error">Not found: {_escape(exc)}</div>',
             status_code=404,
         )
 
@@ -598,7 +603,7 @@ async def reject_section_route(
         _reject_section(record_id, output_dir, reason=reason)
     except ValueError as exc:
         return HTMLResponse(
-            f'<div class="section-card section-card--error">Not found: {exc}</div>',
+            f'<div class="section-card section-card--error">Not found: {_escape(exc)}</div>',
             status_code=404,
         )
 
@@ -759,8 +764,6 @@ async def accept_initiative_route(
     deadline: str = Form(...),
 ) -> HTMLResponse:
     """HTMX endpoint: convert suggestion into initiative. Returns updated card partial."""
-    import html as _html
-
     from src.suggest_initiatives import accept_suggestion
 
     output_dir = _output_dir(request)
@@ -776,7 +779,7 @@ async def accept_initiative_route(
         truth = json.loads(truth_path.read_text())
     except (OSError, json.JSONDecodeError) as exc:
         return HTMLResponse(
-            f'<div class="suggestion-card accept-error">Error: failed to read portfolio-truth: {_html.escape(str(exc))}</div>',
+            f'<div class="suggestion-card accept-error">Error: failed to read portfolio-truth: {_escape(exc)}</div>',
             status_code=400,
         )
 
@@ -792,14 +795,14 @@ async def accept_initiative_route(
         )
     except ValueError as exc:
         return HTMLResponse(
-            f'<div class="suggestion-card accept-error">Error: {_html.escape(str(exc))}</div>',
+            f'<div class="suggestion-card accept-error">Error: {_escape(exc)}</div>',
             status_code=400,
         )
 
     return HTMLResponse(
-        f'<div class="suggestion-card accepted" data-repo="{_html.escape(initiative.repo_name)}">'
-        f"<strong>✓ Accepted:</strong> {_html.escape(initiative.repo_name)} → "
-        f"Tier {initiative.target_tier} by {_html.escape(initiative.deadline)}. "
+        f'<div class="suggestion-card accepted" data-repo="{_escape(initiative.repo_name)}">'
+        f"<strong>✓ Accepted:</strong> {_escape(initiative.repo_name)} → "
+        f"Tier {initiative.target_tier} by {_escape(initiative.deadline)}. "
         f'<a href="/initiatives">View initiatives →</a>'
         f"</div>"
     )
@@ -812,8 +815,6 @@ async def dismiss_suggestion_route(
     reason: str = Form(""),
 ) -> HTMLResponse:
     """Dismiss a suggestion. Returns HTMX partial (Arc G S11.4)."""
-    import html as _html
-
     from src.suggest_initiatives import dismiss_suggestion_record, dismissed_path
 
     output_dir = _output_dir(request)
@@ -823,14 +824,14 @@ async def dismiss_suggestion_route(
         )
     except ValueError as exc:
         return HTMLResponse(
-            f'<div class="suggestion-card accept-error">Error: {_html.escape(str(exc))}</div>',
+            f'<div class="suggestion-card accept-error">Error: {_escape(exc)}</div>',
             status_code=400,
         )
 
     return HTMLResponse(
-        f'<div class="suggestion-card dismissed" data-repo="{_html.escape(entry.repo_name)}">'
-        f"<strong>✗ Dismissed:</strong> {_html.escape(entry.repo_name)}"
-        + (f" — {_html.escape(entry.reason)}" if entry.reason else "")
+        f'<div class="suggestion-card dismissed" data-repo="{_escape(entry.repo_name)}">'
+        f"<strong>✗ Dismissed:</strong> {_escape(entry.repo_name)}"
+        + (f" — {_escape(entry.reason)}" if entry.reason else "")
         + ' <a href="/initiatives/suggestions">Refresh suggestions →</a>'
         + "</div>"
     )
@@ -1012,7 +1013,10 @@ async def new_run_post(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     output_dir = _output_dir(request)
-    run_id = spawn_run(username=username, flags=flag_dict, output_dir=output_dir)
+    try:
+        run_id = spawn_run(username=username, flags=flag_dict, output_dir=output_dir)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return {"run_id": run_id}
 
 
