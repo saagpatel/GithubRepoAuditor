@@ -8,6 +8,16 @@ GithubRepoAuditor now treats security posture as a merged intelligence model ins
 - **GitHub-native**: dependency graph/SBOM availability, code scanning status, secret scanning status, open alert counts
 - **Scorecard**: optional public-repo enrichment from OpenSSF Scorecard
 
+## Repository Security Coverage
+
+This public repository runs CodeQL code scanning through
+`.github/workflows/codeql.yml`. The workflow analyzes Python on pushes and pull
+requests to `main`, plus a weekly scheduled scan, and uploads results to GitHub code
+scanning with `security-events: write`.
+
+Dependabot alerting is enabled for the repository, and dependency plus GitHub Actions
+updates are configured in `.github/dependabot.yml`.
+
 ## Availability Rules
 
 - `unavailable` means the provider could not be observed because of permissions, feature availability, or endpoint access.

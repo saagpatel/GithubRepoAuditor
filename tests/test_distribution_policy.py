@@ -60,3 +60,20 @@ def test_pypi_workflow_is_manual_trusted_publishing_only() -> None:
     assert "pypa/gh-action-pypi-publish@release/v1" in workflow
     assert "actions/upload-artifact" in workflow
     assert "actions/download-artifact" in workflow
+
+
+def test_public_repo_has_code_scanning_workflow_documented() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "codeql.yml").read_text()
+    workflows_readme = (ROOT / ".github" / "workflows" / "README.md").read_text()
+    security_model = (ROOT / "docs" / "security-model.md").read_text()
+
+    assert "github/codeql-action/init@v4" in workflow
+    assert "github/codeql-action/analyze@v4" in workflow
+    assert "security-events: write" in workflow
+    assert "pull_request:" in workflow
+    assert "schedule:" in workflow
+    assert 'language: ["python"]' in workflow
+    assert "security-extended,security-and-quality" in workflow
+    assert "`codeql.yml` — Code Scanning" in workflows_readme
+    assert ".github/workflows/codeql.yml" in security_model
+    assert "Dependabot alerting is enabled" in security_model
