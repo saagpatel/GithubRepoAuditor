@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import importlib
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
@@ -266,20 +267,12 @@ class AuditReport:
     ) -> AuditReport:
         """Construct an AuditReport with all derived statistics."""
         now = datetime.now(tz=__import__("datetime").timezone.utc)
-        from src.implementation_hotspots import (
-            build_implementation_hotspots_summary,
-            build_portfolio_implementation_hotspots,
-        )
-        from src.portfolio_intelligence import (
-            DEFAULT_PROFILES,
-            REPORT_SCHEMA_VERSION,
-            build_default_collections,
-            build_portfolio_hotspots,
-            build_portfolio_lens_summary,
-            build_portfolio_security_governance_preview,
-            build_portfolio_security_posture,
-            build_scenario_summary,
-        )
+        # AuditReport assembly needs portfolio/scoring modules that depend on these core
+        # dataclasses.  Import them dynamically at call time so the model layer stays
+        # import-light and does not form static import cycles.
+        implementation_hotspots = importlib.import_module("src.implementation_hotspots")
+        portfolio_intelligence = importlib.import_module("src.portfolio_intelligence")
+        scorer = importlib.import_module("src.scorer")
 
         # Tier distribution
         tier_dist: dict[str, int] = {}
@@ -311,9 +304,7 @@ class AuditReport:
         most_neglected = [a.metadata.name for a in sorted_by_activity[-5:]]
 
         # Portfolio grade (nuanced formula)
-        from src.scorer import compute_portfolio_grade
-
-        p_grade, p_health = compute_portfolio_grade(audits)
+        p_grade, p_health = scorer.compute_portfolio_grade(audits)
 
         # Tech stack summary
         tech_stack: dict[str, dict] = {}
@@ -340,14 +331,20 @@ class AuditReport:
             audits, key=lambda a: a.overall_score * 0.6 + a.interest_score * 0.4, reverse=True
         )
         best_work = [a.metadata.name for a in best[:5]]
-        portfolio_lenses = build_portfolio_lens_summary(audits)
-        portfolio_hotspots = build_portfolio_hotspots(audits)
-        implementation_hotspots = build_portfolio_implementation_hotspots(audits)
-        implementation_hotspots_summary = build_implementation_hotspots_summary(audits)
-        portfolio_security = build_portfolio_security_posture(audits)
-        security_governance_preview = build_portfolio_security_governance_preview(audits)
-        collections = build_default_collections(audits)
-        scenario_summary = build_scenario_summary(audits)
+        portfolio_lenses = portfolio_intelligence.build_portfolio_lens_summary(audits)
+        portfolio_hotspots = portfolio_intelligence.build_portfolio_hotspots(audits)
+        portfolio_implementation_hotspots = (
+            implementation_hotspots.build_portfolio_implementation_hotspots(audits)
+        )
+        implementation_hotspots_summary = (
+            implementation_hotspots.build_implementation_hotspots_summary(audits)
+        )
+        portfolio_security = portfolio_intelligence.build_portfolio_security_posture(audits)
+        security_governance_preview = (
+            portfolio_intelligence.build_portfolio_security_governance_preview(audits)
+        )
+        collections = portfolio_intelligence.build_default_collections(audits)
+        scenario_summary = portfolio_intelligence.build_scenario_summary(audits)
         action_backlog = sorted(
             [
                 {
@@ -386,10 +383,10 @@ class AuditReport:
             else len(audits),
             baseline_signature=baseline_signature,
             baseline_context=baseline_context or {},
-            schema_version=REPORT_SCHEMA_VERSION,
+            schema_version=portfolio_intelligence.REPORT_SCHEMA_VERSION,
             lenses=portfolio_lenses,
             hotspots=portfolio_hotspots,
-            implementation_hotspots=implementation_hotspots,
+            implementation_hotspots=portfolio_implementation_hotspots,
             implementation_hotspots_summary=implementation_hotspots_summary,
             portfolio_outcomes_summary={},
             operator_effectiveness_summary={},
@@ -415,7 +412,7 @@ class AuditReport:
             security_posture=portfolio_security,
             security_governance_preview=security_governance_preview,
             collections=collections,
-            profiles=DEFAULT_PROFILES,
+            profiles=portfolio_intelligence.DEFAULT_PROFILES,
             scenario_summary=scenario_summary,
             action_backlog=action_backlog,
             campaign_summary={},
