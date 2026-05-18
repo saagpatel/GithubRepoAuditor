@@ -110,6 +110,7 @@ Treat campaign/writeback, GitHub Projects, Notion sync, catalog overrides, score
 - Workbook tour: [docs/workbook-tour.md](docs/workbook-tour.md)
 - Extending analyzers: [docs/extending-analyzers.md](docs/extending-analyzers.md)
 - Release gates: [docs/release-gates.md](docs/release-gates.md)
+- Distribution status: [docs/distribution.md](docs/distribution.md)
 - Project history: [docs/project-history.md](docs/project-history.md)
 
 ## Features
@@ -137,7 +138,7 @@ Treat campaign/writeback, GitHub Projects, Notion sync, catalog overrides, score
 
 ### Installation
 
-The package is published as GitHub release artifacts today. PyPI/package-index publishing is not active yet, so registry commands like `pip install github-repo-auditor` are not the recommended public path.
+The package is published as GitHub release artifacts today. PyPI/package-index publishing is not active yet, so registry commands like `pip install github-repo-auditor` are not the recommended public path. See [docs/distribution.md](docs/distribution.md) for the current distribution policy.
 
 Fastest no-clone path:
 

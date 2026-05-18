@@ -23,4 +23,5 @@ What actually happened. Include the full traceback if applicable.
 ## Environment
 - OS: [e.g. macOS 15, Ubuntu 24.04]
 - Python version: [e.g. 3.11.8]
-- Commit: [run edb00ee chore: add Makefile, pyproject.toml, CONTRIBUTING, CHANGELOG, docs]
+- Install method: [audit.pyz, uv tool, pipx, local clone]
+- Version or commit: [run `audit --version` if available, or `git rev-parse --short HEAD` from a clone]

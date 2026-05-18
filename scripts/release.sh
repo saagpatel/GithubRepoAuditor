@@ -1,23 +1,32 @@
 #!/usr/bin/env bash
-# scripts/release.sh — PyPI publish workflow for github-repo-auditor
+# scripts/release.sh — distribution artifact workflow for github-repo-auditor
 #
 # Prerequisites:
 #   pip install build twine shiv   (or: pip install ".[build]")
 #
-# Required env vars (one of):
+# Required env vars for --publish-pypi (one of):
 #   TWINE_API_TOKEN        — PyPI API token (preferred)
 #   TWINE_USERNAME + TWINE_PASSWORD  — legacy username/password
 #
 # Usage:
-#   bash scripts/release.sh           # build + check + upload to PyPI
-#   bash scripts/release.sh --dry-run # build + check only, skip upload
+#   bash scripts/release.sh                # build + check only
+#   bash scripts/release.sh --publish-pypi # build + check + upload to PyPI
+#   bash scripts/release.sh --dry-run      # compatibility alias for build + check only
 #
 set -euo pipefail
 
-DRY_RUN=false
+PUBLISH_PYPI=false
+SKIP_CLEAN=false
 for arg in "$@"; do
     case "$arg" in
-        --dry-run) DRY_RUN=true ;;
+        --publish-pypi) PUBLISH_PYPI=true ;;
+        --dry-run) PUBLISH_PYPI=false ;;
+        --skip-clean) SKIP_CLEAN=true ;;
+        *)
+            echo "Unknown argument: $arg"
+            echo "Usage: bash scripts/release.sh [--publish-pypi] [--dry-run] [--skip-clean]"
+            exit 2
+            ;;
     esac
 done
 
@@ -30,9 +39,20 @@ echo "Project root: $PROJECT_ROOT"
 echo ""
 
 # 1. Clean previous artifacts
-echo "[1/4] Cleaning dist/"
-rm -rf dist/ build/ src/*.egg-info
-echo "      Done."
+echo "[1/4] Cleaning build artifacts..."
+if [ "$SKIP_CLEAN" = "true" ]; then
+    echo "      Skipped."
+else
+    python3 - <<'PY'
+from pathlib import Path
+import shutil
+
+for path in [Path("dist"), Path("build"), *Path("src").glob("*.egg-info")]:
+    if path.exists():
+        shutil.rmtree(path)
+PY
+    echo "      Done."
+fi
 
 # 2. Build wheel + sdist
 echo "[2/4] Building wheel + sdist..."
@@ -45,11 +65,11 @@ echo "[3/4] Running twine check..."
 python3 -m twine check dist/*
 echo "      All checks passed."
 
-# 4. Upload (unless --dry-run)
-if [ "$DRY_RUN" = "true" ]; then
-    echo "[4/4] --dry-run set — skipping upload."
+# 4. Upload only when explicitly requested.
+if [ "$PUBLISH_PYPI" != "true" ]; then
+    echo "[4/4] PyPI publish not requested — skipping upload."
     echo ""
-    echo "=== Dry run complete. Artifacts in dist/ ==="
+    echo "=== Distribution check complete. Artifacts in dist/ ==="
     exit 0
 fi
 
@@ -70,9 +90,3 @@ fi
 
 echo ""
 echo "=== Upload complete! ==="
-echo ""
-echo "Next steps:"
-echo "  1. Tag this release:   git tag v$(python3 -c "import importlib.metadata; print(importlib.metadata.version('github-repo-auditor'))" 2>/dev/null || grep '^version' pyproject.toml | head -1 | cut -d'"' -f2)"
-echo "  2. Push the tag:       git push origin --tags"
-echo "  3. Create GitHub Release and attach dist/audit.pyz (if built)"
-echo ""
