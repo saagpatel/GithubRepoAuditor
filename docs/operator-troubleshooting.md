@@ -1,6 +1,6 @@
 # Operator Troubleshooting
 
-Use this guide when the workflow is failing or a required artifact is missing. For the normal weekly loop, use [weekly-review.md](/Users/d/Projects/GithubRepoAuditor/docs/weekly-review.md). For the high-level product map, use [modes.md](/Users/d/Projects/GithubRepoAuditor/docs/modes.md).
+Use this guide when the workflow is failing or a required artifact is missing. For the normal weekly loop, use [weekly-review.md](weekly-review.md). For the high-level product map, use [modes.md](modes.md).
 
 Start here first:
 

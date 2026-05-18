@@ -111,7 +111,7 @@ The following survivors are confirmed equivalent mutants — behavioral tests ca
 
 (1 timeout excluded from denominator; 1 suspicious counted as killed)
 
-## Distribution Gate (scope: PyPI + shiv binary)
+## Distribution Gate (scope: GitHub Release assets)
 
 Run before any public release tag. Requires the `[build]` extra:
 
@@ -146,12 +146,18 @@ All three must pass before tagging:
 
 ### Notes
 
-- The GitHub Actions `release.yml` workflow runs these same steps on every `v*` tag
+- The GitHub Actions `release.yml` workflow runs these same steps on every PEP 440-compatible `v*` tag
   and uploads all three artifacts to the GitHub Release.
-- TWINE upload to PyPI is manual-only (run `scripts/release.sh`); CI only checks and
-  uploads to GitHub Releases.
+- Use tags like `v0.1.0` or `v0.1.1`. Avoid suffix tags such as
+  `v0.1.0-public-baseline`; package version derivation comes from `setuptools-scm`
+  and non-PEP 440 tag suffixes can break the release build.
+- Public hardening releases should use patch versions (`v0.1.x`). Feature releases
+  should move the minor version (`v0.2.0`, `v0.3.0`, and so on).
+- TWINE upload to PyPI is manual-only and not part of the current public install
+  story; CI only checks and uploads to GitHub Releases.
 - The `[serve]` extra is not bundled in the shiv binary by default. Users who need the
-  web UI should install via `uv tool install 'githubrepoauditor[serve]'`.
+  web UI should install from the GitHub source with the `[serve]` extra or use a local
+  editable clone.
 
 ## Web UI Gate (scope: audit serve)
 

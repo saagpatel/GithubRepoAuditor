@@ -2,9 +2,11 @@
 
 ## `ci.yml` — Continuous Integration
 
-Runs on code-bearing pushes and pull requests to `main`. Documentation-only changes are ignored to avoid spending private Actions minutes on non-code updates. Superseded runs are canceled automatically.
+Runs on all pushes and pull requests to `main`. Superseded runs are canceled
+automatically.
 
-While this repository remains private during the GitHub Actions billing mitigation period, CI runs the canonical Python 3.11 lane only. Restore the broader Python version matrix after either making the repository public or explicitly accepting the private-runner cost.
+CI runs the canonical Python 3.11 lane. This includes documentation-only pull requests
+because branch protection requires the `test (3.11)` check before merge.
 
 Steps:
 1. Install dependencies via `pip install -e ".[dev]"`

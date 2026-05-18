@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Phase 104 introduced one explicit minimum-context contract for repos in `/Users/d/Projects`.
+Phase 104 introduced one explicit minimum-context contract for repos in the configured local projects workspace.
 
 The goal is not to turn every repo into a full documentation portal. The goal is to make the
 important repos resumable without rediscovery while keeping the truth snapshot derived from

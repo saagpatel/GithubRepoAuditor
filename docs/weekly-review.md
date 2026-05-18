@@ -1,6 +1,6 @@
 # Weekly Review
 
-Use this guide for the normal ongoing operator loop. If you need the broader product map first, start with [modes.md](/Users/d/Projects/GithubRepoAuditor/docs/modes.md). If something is broken, jump to [operator-troubleshooting.md](/Users/d/Projects/GithubRepoAuditor/docs/operator-troubleshooting.md).
+Use this guide for the normal ongoing operator loop. If you need the broader product map first, start with [modes.md](modes.md). If something is broken, jump to [operator-troubleshooting.md](operator-troubleshooting.md).
 
 ## Weekly cadence
 

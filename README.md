@@ -23,7 +23,7 @@ Today it:
 - scores repos on dual axes, classifies them into useful tiers, and surfaces quick wins
 - generates aligned JSON, Markdown, HTML, workbook, review-pack, and control-center outputs from the same audit facts
 - writes a report-only weekly command-center digest beside the control-center artifact so paused automation can consume one bounded summary instead of stale notes
-- generates a canonical workspace-level portfolio truth snapshot for `/Users/d/Projects` and derives the shared registry/report compatibility artifacts from it
+- generates a canonical workspace-level portfolio truth snapshot for a local projects folder and derives the shared registry/report compatibility artifacts from it
 - preserves historical state in SQLite so the operator loop can show change, regression, recovery, and follow-through
 - keeps the workbook and `--control-center` as the main day-to-day operating surfaces
 
@@ -100,6 +100,7 @@ Treat campaign/writeback, GitHub Projects, Notion sync, catalog overrides, score
 
 ## Demo and Guides
 
+- Safe demo path: run `make demo` after a local clone to generate sample artifacts from the committed fixture without a GitHub token.
 - Demo fixture: [fixtures/demo/sample-report.json](fixtures/demo/sample-report.json)
 - Product modes: [docs/modes.md](docs/modes.md)
 - Web UI operator guide: [docs/audit-serve.md](docs/audit-serve.md)
@@ -109,6 +110,7 @@ Treat campaign/writeback, GitHub Projects, Notion sync, catalog overrides, score
 - Workbook tour: [docs/workbook-tour.md](docs/workbook-tour.md)
 - Extending analyzers: [docs/extending-analyzers.md](docs/extending-analyzers.md)
 - Release gates: [docs/release-gates.md](docs/release-gates.md)
+- Historical implementation notes: [docs/plans/](docs/plans/) records prior roadmap and closeout context. Treat current product docs and code as authoritative.
 
 ## Features
 
@@ -135,21 +137,9 @@ Treat campaign/writeback, GitHub Projects, Notion sync, catalog overrides, score
 
 ### Installation
 
-The fastest paths — no git clone needed:
+The package is published as GitHub release artifacts today. PyPI/package-index publishing is not active yet, so registry commands like `pip install github-repo-auditor` are not the recommended public path.
 
-```bash
-# uv (recommended)
-uv tool install githubrepoauditor
-
-# pipx
-pipx install githubrepoauditor
-
-# pip
-pip install githubrepoauditor
-```
-
-**No-Python path** — download the self-contained `.pyz` binary from the
-[GitHub Releases](https://github.com/saagpatel/GithubRepoAuditor/releases) page:
+Fastest no-clone path:
 
 ```bash
 curl -LO https://github.com/saagpatel/GithubRepoAuditor/releases/latest/download/audit.pyz
@@ -157,12 +147,46 @@ chmod +x audit.pyz
 ./audit.pyz --help
 ```
 
-For the local web UI add the `[serve]` extra:
+Install from the public GitHub source:
 
 ```bash
-uv tool install 'githubrepoauditor[serve]'
-# or: pip install 'githubrepoauditor[serve]'
+# uv (recommended)
+uv tool install 'git+https://github.com/saagpatel/GithubRepoAuditor.git'
+
+# pipx
+pipx install 'git+https://github.com/saagpatel/GithubRepoAuditor.git'
+
+# local editable clone
+git clone https://github.com/saagpatel/GithubRepoAuditor.git
+cd GithubRepoAuditor
+pip install -e ".[config]"
 ```
+
+The self-contained `.pyz` binary is also available from the
+[GitHub Releases](https://github.com/saagpatel/GithubRepoAuditor/releases) page.
+
+For the local web UI, install the `[serve]` extra from source:
+
+```bash
+uv tool install 'git+https://github.com/saagpatel/GithubRepoAuditor.git#egg=github-repo-auditor[serve]'
+# or from a clone: pip install -e ".[serve]"
+```
+
+### Try the safe demo
+
+The demo uses committed fixture data and writes only to `output/demo/`.
+
+```bash
+git clone https://github.com/saagpatel/GithubRepoAuditor.git
+cd GithubRepoAuditor
+pip install -e ".[config]"
+make demo
+```
+
+Expected outputs include `output/demo/demo-report.json`,
+`output/demo/demo-workbook.xlsx`, `output/demo/dashboard-*.html`,
+`output/demo/operator-control-center-demo.json`, and
+`output/demo/operator-control-center-demo.md`.
 
 ### Quick start (subcommand form)
 
@@ -284,7 +308,7 @@ Before normal runs start, the CLI now performs a shared preflight that checks co
 
 For day-to-day operations, `--control-center` is now the clean read-only entrypoint. It reuses the latest report, review state, campaign history, governance drift, and setup health to build one shared operator queue without running a new audit or mutating any external system.
 
-The portfolio truth layer now has its own dedicated generation path. `--portfolio-truth` scans the broader workspace, produces `output/portfolio-truth-latest.json` plus dated historical truth snapshots, and regenerates `/Users/d/Projects/project-registry.md` and `/Users/d/Projects/PORTFOLIO-AUDIT-REPORT.md` as compatibility outputs from that same truth contract instead of treating either markdown file as canonical.
+The portfolio truth layer now has its own dedicated generation path. `--portfolio-truth` scans the configured local projects workspace, produces `output/portfolio-truth-latest.json` plus dated historical truth snapshots, and regenerates the configured project-registry and portfolio-audit Markdown compatibility outputs from that same truth contract instead of treating either markdown file as canonical.
 
 Phase 104 added a second standalone workspace mode: `--portfolio-context-recovery`. That mode freezes the active/recent weak-context cohort from the live truth snapshot, writes dry-run recovery plan artifacts into `output/`, skips dirty or temporary repos automatically, and can apply bounded minimum-context upgrades plus repo-level catalog seeds before regenerating the truth snapshot and compatibility outputs.
 

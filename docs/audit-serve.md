@@ -14,11 +14,11 @@ The web UI dependencies are in the `[serve]` extra and are not installed by defa
 # editable / dev install
 pip install -e '.[serve]'
 
-# or via uv tool
-uv tool install 'githubrepoauditor[serve]'
+# or via uv tool from the public GitHub source
+uv tool install 'git+https://github.com/saagpatel/GithubRepoAuditor.git#egg=github-repo-auditor[serve]'
 
-# or via pipx
-pipx install 'githubrepoauditor[serve]'
+# or via pipx from the public GitHub source
+pipx install 'git+https://github.com/saagpatel/GithubRepoAuditor.git#egg=github-repo-auditor[serve]'
 ```
 
 If you try to run `audit serve` without the extra installed, the CLI will exit with a

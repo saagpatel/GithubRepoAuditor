@@ -13,6 +13,16 @@ for the full mapping.
 
 Use this mode when you are setting the system up or coming back after a long gap.
 
+If you only want to see the product surfaces before auditing a real account, run the
+safe fixture demo first:
+
+```bash
+make demo
+```
+
+That writes sample JSON, workbook, HTML, and control-center artifacts to
+`output/demo/` without a GitHub token.
+
 Recommended path:
 
 ```bash
@@ -204,6 +214,7 @@ Each section should answer the same three questions quickly:
 ## Default guidance
 
 - `audit run <user> --doctor` is the recommended first step.
+- A GitHub token is optional for public-only audits, but recommended for private repos, higher rate limits, and any mutation/writeback path.
 - `--excel-mode standard` is the default and recommended workbook path.
 - `audit triage <user> --control-center` is the read-only daily operator entrypoint.
 - `template` workbook mode, scorecards config, catalog config, campaigns, writeback, GitHub Projects, and Notion sync are advanced workflows.
