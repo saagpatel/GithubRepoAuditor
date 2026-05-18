@@ -102,6 +102,7 @@ def _parse_pip_deps(path: Path) -> list[tuple[str, str, str]]:
             if match:
                 deps.append((match.group(1), match.group(2), "pypi"))
     except OSError:
+        # Missing or unreadable requirements files have no parseable dependencies.
         pass
     return deps
 
@@ -123,6 +124,7 @@ def _parse_cargo_deps(path: Path) -> list[tuple[str, str, str]]:
                 if match:
                     deps.append((match.group(1), match.group(2), "crates"))
     except OSError:
+        # Missing or unreadable Cargo manifests have no parseable dependencies.
         pass
     return deps
 
@@ -144,6 +146,7 @@ def _parse_pyproject_deps(path: Path) -> list[tuple[str, str, str]]:
                 if match:
                     deps.append((match.group(1), match.group(3), "pypi"))
     except OSError:
+        # Missing or unreadable pyproject files have no parseable dependencies.
         pass
     return deps
 

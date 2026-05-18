@@ -16,6 +16,7 @@ def _check_readme(repo_path: Path) -> tuple[str, list[str]]:
             try:
                 content = readme.read_text(errors="replace")
             except OSError:
+                # Unreadable README candidates are treated as absent.
                 pass
             break
 

@@ -111,6 +111,7 @@ def _derive_has_tests(project_path: Path | None, has_git: bool) -> bool:
             if match:
                 return True
         except StopIteration:
+            # No matching files for this pattern; try the next pattern.
             pass
     return False
 

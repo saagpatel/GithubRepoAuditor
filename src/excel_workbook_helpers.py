@@ -102,6 +102,7 @@ def set_defined_name(wb: Workbook, name: str, attr_text: str) -> None:
     try:
         del wb.defined_names[name]
     except KeyError:
+        # The defined name may not exist yet.
         pass
     wb.defined_names.add(DefinedName(name, attr_text=attr_text))
 

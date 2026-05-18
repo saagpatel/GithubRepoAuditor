@@ -27,6 +27,7 @@ def create_audit_issues(
                 skipped.append(repo_name)
                 continue
         except Exception:
+            # If issue listing fails, continue and let create_issue surface any hard error.
             pass
         actions = qw.get("actions", [])
         title = f"[Audit] {repo_name}: {actions[0] if actions else 'Improve audit score'}"

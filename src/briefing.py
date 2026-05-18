@@ -388,6 +388,7 @@ def _parse_suggestions_json(raw: str, top_repos: list[dict]) -> list[Suggestion]
                 result.append(Suggestion(name=name, action=action))
             return result
     except (json.JSONDecodeError, IndexError, TypeError):
+        # Fall back to regex extraction when the model response is not valid JSON.
         pass
 
     # Regex fallback: extract quoted strings

@@ -322,8 +322,10 @@ class TestCLIFlagDispatch:
             try:
                 main()
             except SystemExit:
+                # The test only verifies dispatch; CLI exits are expected here.
                 pass
             except Exception:
+                # The test only verifies dispatch; mocked CLI setup may stop early.
                 pass
         assert mock_dispatch.called
 
@@ -383,8 +385,10 @@ class TestCLIFlagDispatch:
 
                         main()
                     except SystemExit:
+                        # The test only verifies legacy routing; CLI exits are expected here.
                         pass
                     except Exception:
+                        # The test only verifies legacy routing; mocked setup may stop early.
                         pass
                 # Either a DeprecationWarning was emitted or _run_draft_readmes_mode was called
                 # (both indicate the flag was routed correctly)
