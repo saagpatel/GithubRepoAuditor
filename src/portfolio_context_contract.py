@@ -143,11 +143,32 @@ def analyze_project_context(
     if primary_exists:
         primary_text = _read_small_text(project_path / primary_context_file)
 
-    sections = _split_markdown_sections(primary_text)
+    # README fallback: a project's real docs often live in README.md, which is never chosen
+    # as the primary context file. When the primary file lacks a required section, also look
+    # in the top-level README so well-documented repos are not scored blind. An explicit
+    # readme_text argument overrides the on-disk read (used in tests).
+    if not readme_text:
+        readme_path = project_path / "README.md"
+        if readme_path.is_file():
+            readme_text = _read_small_text(readme_path)
+    has_readme = bool(readme_text.strip())
+
+    primary_sections = _split_markdown_sections(primary_text)
+    readme_sections = _split_markdown_sections(readme_text) if has_readme else {}
     section_presence = {
-        field: _section_has_meaningful_content(sections, aliases)
+        field: (
+            _section_has_meaningful_content(primary_sections, aliases)
+            or _section_has_meaningful_content(readme_sections, aliases)
+        )
         for field, aliases in CONTEXT_SECTION_ALIASES.items()
     }
+    # Lead-paragraph fallback: a project summary conventionally lives as the prose under the
+    # title, not under an "## Overview" heading. If no summary heading matched, accept a
+    # non-trivial lead paragraph from the primary file or the README.
+    if not section_presence["project_summary"]:
+        section_presence["project_summary"] = _has_lead_summary(primary_text) or _has_lead_summary(
+            readme_text
+        )
     missing_fields = [
         DERIVED_KEY_TO_LABEL[REQUIRED_FIELD_TO_DERIVED_KEY[field]]
         for field, present in section_presence.items()
@@ -159,7 +180,7 @@ def analyze_project_context(
         if Path(item).name in SUPPORTING_CONTEXT_FILES and Path(item).name != primary_context_file
     )
 
-    if not primary_exists:
+    if not primary_exists and not has_readme:
         context_quality = "none"
     elif missing_fields:
         context_quality = "boilerplate"
@@ -277,3 +298,26 @@ def _is_nontrivial_text(text: str) -> bool:
         return False
     words = re.findall(r"[A-Za-z0-9][A-Za-z0-9+./:_-]*", compact)
     return len(words) >= 4 and len(compact) >= 24
+
+
+def _lead_paragraph_text(text: str) -> str:
+    """Prose between the H1 title and the first level-2+ heading — a doc's lead/intro.
+
+    Strips the title line and badge/image/link markdown so a wall of badges does not read as a
+    summary. Project summaries conventionally live here rather than under an "## Overview".
+    """
+    lead_lines: list[str] = []
+    for line in text.splitlines():
+        if re.match(r"^#{2,}\s", line):  # first '## ...' (or deeper) heading ends the lead
+            break
+        if re.match(r"^#\s", line):  # the H1 title line itself
+            continue
+        lead_lines.append(line)
+    lead = "\n".join(lead_lines)
+    lead = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", lead)  # drop images/badges
+    lead = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", lead)  # keep link text, drop URLs
+    return lead
+
+
+def _has_lead_summary(text: str) -> bool:
+    return _is_nontrivial_text(_lead_paragraph_text(text))
