@@ -70,6 +70,11 @@ in this order:
   (`consistent` / `drifted` / `unverifiable`), the evidence basis (`verified-by-reading-code` or
   `unverifiable-because-<reason>`), and — for `drifted` claims — what you changed (file + a one-line
   before→after gist).
+- **Contradictions for manual review** — if you find real drift in a file you are NOT allowed to
+  edit (anything outside `README.md` / `CLAUDE.md` / `AGENTS.md` / `DOC-RECONCILIATION.md` / `docs/`,
+  e.g. `IMPLEMENTATION-ROADMAP.md`, `HANDOFF.md`, `STATUS.md`), do NOT edit that file. List it here
+  with `path:line`, what is wrong, and the one-line fix a human should make. (Omit this section if
+  there are none.)
 - **Footer** — a full **date + time stamp** (run `date "+%Y-%m-%d %H:%M:%S %Z"` and use its output),
   the branch name, and the HEAD sha you reconciled against (`git rev-parse HEAD`).
 
