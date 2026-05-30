@@ -58,12 +58,22 @@ def _doc_only(changed: list[str]) -> list[str]:
 
 
 def _extract_summary(stdout: str) -> str:
-    """Pull the final assistant text out of `claude --output-format json` output."""
+    """Pull the final assistant text out of `claude --output-format json` output.
+
+    The CLI returns either a single result object or a JSON array of message
+    objects (the final one carries ``result``). Be tolerant of both and never raise.
+    """
     try:
         data = json.loads(stdout)
     except Exception:
         return ""
-    return (data.get("result") or data.get("text") or "")[-800:].strip()
+    candidates = data if isinstance(data, list) else [data]
+    for item in reversed(candidates):
+        if isinstance(item, dict):
+            text = item.get("result") or item.get("text")
+            if isinstance(text, str) and text.strip():
+                return text[-800:].strip()
+    return ""
 
 
 def _git(repo: Path, *args: str) -> subprocess.CompletedProcess:
@@ -152,14 +162,15 @@ def run_one(t: dict, prompt: str, settings: str, model: str, timeout: int) -> di
         _git(repo, "checkout", orig)
         return {**res, "status": "error", "reason": f"timeout after {timeout}s"}
 
-    summary = _extract_summary(proc.stdout)
     after = {
         b.strip(" *") for b in _git(repo, "branch", "--format=%(refname:short)").stdout.splitlines()
     }
     new_branches = sorted(after - before)
 
-    # Restore the repo to where we found it before inspecting/cleaning up.
+    # Restore the repo FIRST — before any parsing that could fail — so a later
+    # error can never strand the repo on the reconciliation branch.
     _git(repo, "checkout", orig)
+    summary = _extract_summary(proc.stdout)
 
     if not new_branches:
         return {
