@@ -293,17 +293,6 @@ def _classify_context_quality(project_path: Path, context_files: list[str]) -> s
     return analyze_project_context(project_path, context_files).context_quality
 
 
-# Utility: reads context file text, respecting size and allowlist limits.
-# Called indirectly via context analysis pipeline.
-def read_context_text(project_path: Path, relative_file: str) -> str:
-    path = project_path / relative_file
-    if not path.is_file() or path.stat().st_size > MAX_CONTEXT_BYTES:
-        return ""
-    if path.name not in TEXT_ALLOWLIST:
-        return ""
-    return path.read_text(errors="replace")
-
-
 # Utility: returns True if context quality is "boilerplate".
 # Called indirectly via context analysis pipeline.
 def detect_boilerplate_context(project_path: Path, context_files: list[str]) -> bool:
