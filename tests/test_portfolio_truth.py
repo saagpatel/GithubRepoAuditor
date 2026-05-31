@@ -38,6 +38,47 @@ def _set_mtime(path: Path, timestamp: float) -> None:
     os.utime(path, (timestamp, timestamp))
 
 
+def _security_test_project(
+    name: str,
+    *,
+    critical: int,
+    high: int,
+    available: bool = True,
+    tier: str = "elevated",
+):
+    """Minimal PortfolioTruthProject for exercising security render helpers directly."""
+    from src.portfolio_truth_types import (
+        DeclaredFields,
+        DerivedFields,
+        IdentityFields,
+        PortfolioTruthProject,
+        RiskFields,
+        SecurityFields,
+    )
+
+    return PortfolioTruthProject(
+        identity=IdentityFields(
+            project_key=name,
+            display_name=name,
+            path=name,
+            top_level_dir=name,
+            group_key="g",
+            group_label="G",
+            section_marker="Standalone Projects",
+            section_label="Standalone",
+            has_git=True,
+        ),
+        declared=DeclaredFields(),
+        derived=DerivedFields(),
+        risk=RiskFields(risk_tier=tier),
+        security=SecurityFields(
+            alerts_available=available,
+            dependabot_critical=critical,
+            dependabot_high=high,
+        ),
+    )
+
+
 def test_extract_github_full_name_uses_exact_github_host() -> None:
     assert _extract_github_full_name("https://github.com/octo/repo.git") == "octo/repo"
     assert _extract_github_full_name("git@github.com:octo/repo.git") == "octo/repo"
@@ -583,6 +624,38 @@ def test_portfolio_report_security_posture_scanned_clear(
     markdown = render_portfolio_report_markdown(result.snapshot, "output/x.json")
     assert "All 1 scanned repos are clear of open high/critical Dependabot alerts." in markdown
     validate_portfolio_report_markdown(markdown)
+
+    # Same guard governs the registry: a scanned repo with only medium alerts gets no
+    # per-repo flag, but it still counts as scanned in the summary table.
+    registry_md = render_registry_markdown(result.snapshot)
+    assert "[security:" not in registry_md
+    assert "| Repos scanned for security alerts | 1 |" in registry_md
+    assert "| Repos with open high/critical alerts | 0 |" in registry_md
+
+
+def test_security_attention_items_caps_at_five_and_sorts_critical_first() -> None:
+    from src.portfolio_truth_render import (
+        MAX_SECURITY_ATTENTION_ITEMS,
+        _security_attention_items,
+    )
+
+    projects = [
+        _security_test_project("low-high", critical=0, high=1),
+        _security_test_project("mid-crit", critical=2, high=0),
+        _security_test_project("top-crit", critical=5, high=0),
+        _security_test_project("clean", critical=0, high=0),  # excluded: nothing open
+        _security_test_project("unscanned", critical=9, high=9, available=False),  # excluded
+        _security_test_project("a-high", critical=0, high=3),
+        _security_test_project("b-high", critical=0, high=3),
+        _security_test_project("c-crit", critical=1, high=0),
+    ]
+    items = _security_attention_items(projects)
+
+    # clean + unscanned drop out; six remain but the list is capped.
+    assert len(items) == MAX_SECURITY_ATTENTION_ITEMS
+    names = [project.identity.display_name for project in items]
+    # critical desc, then high desc, then name asc — and the capped tail (low-high) falls off.
+    assert names == ["top-crit", "mid-crit", "c-crit", "a-high", "b-high"]
 
 
 def test_portfolio_report_security_posture_not_run(
