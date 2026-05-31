@@ -300,6 +300,17 @@ def _build_security_fields(ghas_entry: dict[str, Any] | None) -> SecurityFields:
     )
 
 
+def _select_security_entry(
+    lookup: dict[str, dict], repo_full_name: str | None, display_name: str
+) -> dict | None:
+    """Join a project to its GHAS overlay entry. The overlay is keyed by GitHub repo
+    name, but the local dir display_name often differs (e.g. "Signal & Noise" vs
+    "signal-noise"), so match on the repo name from repo_full_name first and fall back
+    to display_name only when repo_full_name is absent or unmatched."""
+    repo_name = (repo_full_name or "").rsplit("/", 1)[-1]
+    return lookup.get(repo_name) or lookup.get(display_name)
+
+
 def _build_truth_project(
     raw_project: dict[str, Any],
     *,
@@ -420,7 +431,11 @@ def _build_truth_project(
         "detail": "derived",
     }
 
-    security_entry = (security_alerts_by_name or {}).get(raw_project["name"])
+    security_entry = _select_security_entry(
+        security_alerts_by_name or {},
+        raw_project.get("repo_full_name"),
+        raw_project["name"],
+    )
     security = _build_security_fields(security_entry)
 
     # Only Dependabot high/critical counts drive the risk tier today. Code-scanning

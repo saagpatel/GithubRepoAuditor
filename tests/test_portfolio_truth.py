@@ -316,6 +316,38 @@ def test_security_overlay_absent_leaves_repos_unscanned(
         assert project.risk.security_risk is False
 
 
+def test_select_security_entry_joins_by_repo_name_when_display_differs() -> None:
+    # GHAS is keyed by repo name ("signal-noise"); the local dir is "Signal & Noise".
+    from src.portfolio_truth_reconcile import _select_security_entry
+
+    entry = {"dependabot": {"high": 9, "available": True}}
+    lookup = {"signal-noise": entry}
+    assert _select_security_entry(lookup, "saagpatel/signal-noise", "Signal & Noise") is entry
+
+
+def test_select_security_entry_falls_back_to_display_name() -> None:
+    from src.portfolio_truth_reconcile import _select_security_entry
+
+    entry = {"dependabot": {"high": 1, "available": True}}
+    # No repo_full_name (local-only repo) → must fall back to display_name.
+    assert _select_security_entry({"Alpha": entry}, None, "Alpha") is entry
+
+
+def test_select_security_entry_prefers_repo_name_over_display() -> None:
+    from src.portfolio_truth_reconcile import _select_security_entry
+
+    by_repo = {"dependabot": {"high": 2, "available": True}}
+    by_display = {"dependabot": {"high": 5, "available": True}}
+    lookup = {"the-repo": by_repo, "DisplayName": by_display}
+    assert _select_security_entry(lookup, "owner/the-repo", "DisplayName") is by_repo
+
+
+def test_select_security_entry_returns_none_when_unmatched() -> None:
+    from src.portfolio_truth_reconcile import _select_security_entry
+
+    assert _select_security_entry({"other": {}}, "owner/missing", "AlsoMissing") is None
+
+
 def test_truth_snapshot_matches_repo_contracts_by_full_name(
     portfolio_workspace: Path,
     legacy_registry: Path,
