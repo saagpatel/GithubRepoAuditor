@@ -2,7 +2,8 @@
 """Headless batch runner for the `/doc-truth-up` documentation-reconciliation pass.
 
 Reads the triage list (``output/doc-truth-up-targets.json``), and for each selected
-repo runs Claude Code headlessly (``claude -p``) with:
+repo runs Claude Code headlessly (``claude -p``) — across a bounded thread pool
+(``--concurrency``, default 8) since repos are fully independent — with:
 
 - the canonical ``docs/commands/doc-truth-up.md`` prompt (frontmatter stripped),
 - the hard edit-scope guard hook wired in via ``--settings`` (``doc_truth_up_guard.py``),
@@ -24,16 +25,19 @@ Usage:
     python scripts/doc_truth_up_batch.py                     # dry-run plan, tier 1
     python scripts/doc_truth_up_batch.py --repo SignalDecay --execute   # pilot one repo
     python scripts/doc_truth_up_batch.py --tier 1 --execute            # full tier-1 batch
-    python scripts/doc_truth_up_batch.py --tier all --limit 5 --execute
+    python scripts/doc_truth_up_batch.py --tier 2 --limit 6 --execute  # parallel tier-2 smoke
+    python scripts/doc_truth_up_batch.py --tier 2 --concurrency 8 --execute  # full tier-2
 """
 
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import json
 import os
 import subprocess
 import tempfile
+import threading
 from datetime import datetime
 from pathlib import Path
 
@@ -130,6 +134,16 @@ def select_targets(args: argparse.Namespace) -> list[dict]:
         targets = [t for t in targets if t["project_key"] == args.repo]
     elif args.tier != "all":
         targets = [t for t in targets if t["tier"] == int(args.tier)]
+    # Drift-priority order: repos carrying audit-detected drift run first (drifted
+    # flag, then audit disagreement count), so a small --limit smoke front-loads
+    # the repos most likely to produce real reconciliations. NOTE: a tier built as
+    # "clean in audit" (e.g. tier 2) carries no per-repo signal — every key ties
+    # and this is a stable no-op, preserving the triage file's order. Python's
+    # sort is stable, so that order is the tiebreak in every case.
+    targets.sort(
+        key=lambda t: (bool(t.get("drifted")), t.get("disagreement_count", 0)),
+        reverse=True,
+    )
     if args.limit:
         targets = targets[: args.limit]
     return targets
@@ -230,6 +244,58 @@ def run_one(
     }
 
 
+def run_batch(
+    targets: list[dict],
+    prompt: str,
+    settings: str,
+    model: str,
+    timeout: int,
+    done_branch: str,
+    concurrency: int,
+    runner=run_one,
+) -> list[dict]:
+    """Run ``runner`` across ``targets`` with a bounded thread pool.
+
+    Each ``run_one`` is fully self-contained per repo — it only ever touches its
+    own ``abs_path`` (own ``.git`` index, own reconciliation branch), so no two
+    workers can ever contend on the same repo. Threads block on the ``claude -p``
+    subprocess (a blocking syscall that releases the GIL), so the orchestrator is
+    never the bottleneck and concurrency is set purely by ``max_workers``.
+
+    Results are gathered as each repo finishes (order-independent — every result
+    carries its own ``project_key``). Output is serialized through a lock for
+    legible interleaving. A repo whose runner raises is isolated into an ``error``
+    result rather than sinking the rest of the unattended batch.
+    """
+    total = len(targets)
+    results: list[dict] = []
+    lock = threading.Lock()
+    done = 0
+
+    def work(t: dict) -> dict:
+        return runner(t, prompt, settings, model, timeout, done_branch)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, concurrency)) as pool:
+        futures = {pool.submit(work, t): t for t in targets}
+        for fut in concurrent.futures.as_completed(futures):
+            t = futures[fut]
+            try:
+                r = fut.result()
+            except Exception as exc:  # one repo's crash must not sink the batch
+                r = {
+                    "project_key": t.get("project_key", "?"),
+                    "abs_path": t.get("abs_path"),
+                    "status": "error",
+                    "reason": f"runner raised: {exc!r}",
+                }
+            with lock:
+                done += 1
+                tail = f" ({r.get('reason')})" if r.get("reason") else ""
+                print(f"[{done}/{total}] {r['project_key']} → {r['status']}{tail}", flush=True)
+                results.append(r)
+    return results
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Headless /doc-truth-up batch runner.")
     ap.add_argument("--targets", default=str(DEFAULT_TARGETS))
@@ -237,7 +303,13 @@ def main() -> None:
     ap.add_argument("--repo", default="", help="Run a single repo by project_key (pilot).")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--model", default="sonnet")
-    ap.add_argument("--timeout", type=int, default=900, help="Per-repo timeout (seconds).")
+    ap.add_argument("--timeout", type=int, default=1200, help="Per-repo timeout (seconds).")
+    ap.add_argument(
+        "--concurrency",
+        type=int,
+        default=8,
+        help="Parallel claude -p sessions (1 = sequential). Repos are independent.",
+    )
     ap.add_argument(
         "--execute", action="store_true", help="Actually invoke Claude (default: dry-run)."
     )
@@ -247,7 +319,7 @@ def main() -> None:
     date = datetime.now().strftime("%Y-%m-%d")
     print(
         f"doc-truth-up batch · {len(targets)} repo(s) · tier={args.tier} · model={args.model}"
-        f" · {'EXECUTE' if args.execute else 'DRY-RUN'}"
+        f" · concurrency={args.concurrency} · {'EXECUTE' if args.execute else 'DRY-RUN'}"
     )
 
     if not args.execute:
@@ -264,13 +336,16 @@ def main() -> None:
     prompt = _prompt_body()
     settings, guard_tmp = _settings_file()
     done_branch = f"docs/truth-up-{date}"
-    results = []
     try:
-        for i, t in enumerate(targets, 1):
-            print(f"[{i}/{len(targets)}] {t['project_key']} …", flush=True)
-            r = run_one(t, prompt, settings, args.model, args.timeout, done_branch)
-            print(f"    → {r['status']}" + (f" ({r.get('reason')})" if r.get("reason") else ""))
-            results.append(r)
+        results = run_batch(
+            targets,
+            prompt,
+            settings,
+            args.model,
+            args.timeout,
+            done_branch,
+            args.concurrency,
+        )
     finally:
         os.unlink(settings)
         os.unlink(guard_tmp)
