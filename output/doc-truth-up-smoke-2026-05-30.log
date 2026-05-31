@@ -1,0 +1,13 @@
+doc-truth-up batch · 8 repo(s) · tier=2 · model=sonnet · concurrency=8 · EXECUTE
+[1/8] AssistSupport-security-alerts → skipped (not a git repo)
+[2/8] AssistSupport → skipped (uncommitted tracked changes)
+[3/8] ArguMap → ran
+[4/8] APIReverse → ran
+[5/8] Calibrate → ran
+[6/8] BrowserHistoryVisualizer → ran
+[7/8] Chromafield → ran
+[8/8] AIFortuneTeller → ran
+
+Done. {'skipped': 2, 'ran': 6}
+Results: /Users/d/Projects/GithubRepoAuditor/output/doc-truth-up-run-2026-05-30.json
+Review each repo's docs/truth-up-* branch, then merge or delete. Nothing was pushed.
