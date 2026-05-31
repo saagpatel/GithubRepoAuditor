@@ -5,6 +5,54 @@ from datetime import timezone
 
 from src.portfolio_truth_types import PortfolioTruthProject, PortfolioTruthSnapshot
 
+# Mirrors the weekly digest's MAX_SECURITY_ATTENTION_ITEMS — the portfolio report and
+# the digest cap the per-repo security callout list at the same depth so the two
+# human-facing surfaces stay consistent.
+MAX_SECURITY_ATTENTION_ITEMS = 5
+
+
+def _security_overview(projects: list[PortfolioTruthProject]) -> dict[str, int]:
+    """Aggregate the opt-in security overlay across scanned repos. ``scanned_count`` is
+    repos with alerts_available=True (the overlay ran for them); a scanned repo with zero
+    open alerts is genuinely clear, distinct from an unscanned one — so consumers don't
+    mislabel an unscanned repo as secure."""
+    scanned = repos_with_open = total_critical = total_high = 0
+    for project in projects:
+        security = project.security
+        if not security.alerts_available:
+            continue
+        scanned += 1
+        total_critical += security.dependabot_critical
+        total_high += security.dependabot_high
+        if security.open_high_critical > 0:
+            repos_with_open += 1
+    return {
+        "scanned_count": scanned,
+        "repos_with_open_high_critical": repos_with_open,
+        "total_open_critical": total_critical,
+        "total_open_high": total_high,
+    }
+
+
+def _security_attention_items(
+    projects: list[PortfolioTruthProject],
+) -> list[PortfolioTruthProject]:
+    """Scanned repos carrying open high/critical Dependabot alerts, critical-first then
+    high then name, capped — mirrors the weekly digest's security attention list."""
+    flagged = [
+        project
+        for project in projects
+        if project.security.alerts_available and project.security.open_high_critical > 0
+    ]
+    flagged.sort(
+        key=lambda project: (
+            -project.security.dependabot_critical,
+            -project.security.dependabot_high,
+            project.identity.display_name.lower(),
+        )
+    )
+    return flagged[:MAX_SECURITY_ATTENTION_ITEMS]
+
 
 def render_registry_markdown(snapshot: PortfolioTruthSnapshot) -> str:
     generated_date = snapshot.generated_at.astimezone(timezone.utc).strftime("%Y-%m-%d")
@@ -57,6 +105,7 @@ def render_portfolio_report_markdown(
         if project.derived.path_override
     )
     risk_tier_counts = Counter(project.risk.risk_tier for project in snapshot.projects)
+    security_overview = _security_overview(snapshot.projects)
     lines = [
         "# Portfolio Audit Report",
         "",
@@ -72,8 +121,9 @@ def render_portfolio_report_markdown(
         "3. [Canonical Portfolio Truth Table](#canonical-portfolio-truth-table)",
         "4. [Coverage Summary](#coverage-summary)",
         "5. [Breakdown by Portfolio Signals](#breakdown-by-portfolio-signals)",
-        "6. [Accuracy Findings](#accuracy-findings)",
-        "7. [Recommended Next Sync Steps](#recommended-next-sync-steps)",
+        "6. [Security Posture](#security-posture)",
+        "7. [Accuracy Findings](#accuracy-findings)",
+        "8. [Recommended Next Sync Steps](#recommended-next-sync-steps)",
         "",
         "---",
         "",
@@ -119,6 +169,7 @@ def render_portfolio_report_markdown(
             f"- Operating path distribution: maintain `{operating_path_counts.get('maintain', 0)}`, finish `{operating_path_counts.get('finish', 0)}`, archive `{operating_path_counts.get('archive', 0)}`, experiment `{operating_path_counts.get('experiment', 0)}`, unspecified `{operating_path_counts.get('unspecified', 0)}`",
             f"- Investigate overrides currently surfaced: `{override_counts.get('investigate', 0)}`",
             f"- Risk posture: elevated `{risk_tier_counts.get('elevated', 0)}`, moderate `{risk_tier_counts.get('moderate', 0)}`, baseline `{risk_tier_counts.get('baseline', 0)}`, deferred `{risk_tier_counts.get('deferred', 0)}`",
+            f"- Security posture: scanned `{security_overview['scanned_count']}`, with open high/critical Dependabot alerts `{security_overview['repos_with_open_high_critical']}` (critical `{security_overview['total_open_critical']}`, high `{security_overview['total_open_high']}`)",
             f"- Catalog warnings carried into the snapshot: `{len(snapshot.warnings)}`",
             "",
             "## Breakdown by Portfolio Signals",
@@ -149,6 +200,27 @@ def render_portfolio_report_markdown(
             f"investigate override `{sum(1 for item in projects if item.derived.path_override == 'investigate')}`"
         )
         lines.append("")
+
+    lines.extend(["## Security Posture", ""])
+    attention = _security_attention_items(snapshot.projects)
+    scanned_count = security_overview["scanned_count"]
+    if attention:
+        for project in attention:
+            lines.append(
+                f"- **{project.identity.display_name}** [{project.risk.risk_tier}]: "
+                f"{project.security.dependabot_critical} critical, "
+                f"{project.security.dependabot_high} high open Dependabot alerts"
+            )
+    elif scanned_count > 0:
+        lines.append(
+            f"- All {scanned_count} scanned repos are clear of open high/critical Dependabot alerts."
+        )
+    else:
+        lines.append(
+            "- Security overlay not run for this snapshot "
+            "(re-run with `--portfolio-truth-include-security`)."
+        )
+    lines.append("")
 
     lines.extend(
         [
@@ -284,6 +356,19 @@ def _default_section_note(marker: str, projects: list[PortfolioTruthProject]) ->
     return ""
 
 
+def _security_note_flag(project: PortfolioTruthProject) -> str:
+    """Pipe-free per-repo security marker for the registry Notes column. Fires only for
+    scanned repos carrying open high/critical Dependabot alerts. Pipe-free by design so
+    the registry table still round-trips through parse_registry without shifting columns."""
+    security = project.security
+    if not security.alerts_available or security.open_high_critical == 0:
+        return ""
+    return (
+        f"[security: {security.dependabot_critical} critical / "
+        f"{security.dependabot_high} high open Dependabot alerts]"
+    )
+
+
 def _note_text(project: PortfolioTruthProject) -> str:
     note_parts = []
     if project.declared.purpose:
@@ -292,13 +377,18 @@ def _note_text(project: PortfolioTruthProject) -> str:
         note_parts.append(project.declared.notes)
     if not note_parts and project.warnings:
         note_parts.append(project.warnings[0])
-    return " ".join(note_parts) or "—"
+    base = " ".join(note_parts)
+    flag = _security_note_flag(project)
+    if flag:
+        return f"{flag} {base}".rstrip() if base else flag
+    return base or "—"
 
 
 def _render_summary_section(projects: list[PortfolioTruthProject]) -> list[str]:
     total = len(projects)
     status_counts = Counter(project.derived.registry_status for project in projects)
     context_counts = Counter(project.derived.context_quality for project in projects)
+    security = _security_overview(projects)
     return [
         "## Portfolio Summary",
         "",
@@ -314,6 +404,10 @@ def _render_summary_section(projects: list[PortfolioTruthProject]) -> list[str]:
         f"| Projects with minimum-viable context | {context_counts.get('minimum-viable', 0)} |",
         f"| Projects with boilerplate only | {context_counts.get('boilerplate', 0)} |",
         f"| Projects with no context | {context_counts.get('none', 0)} |",
+        f"| Repos scanned for security alerts | {security['scanned_count']} |",
+        f"| Repos with open high/critical alerts | {security['repos_with_open_high_critical']} |",
+        f"| Open critical Dependabot alerts | {security['total_open_critical']} |",
+        f"| Open high Dependabot alerts | {security['total_open_high']} |",
     ]
 
 

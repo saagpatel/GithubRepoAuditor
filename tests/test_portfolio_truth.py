@@ -16,8 +16,12 @@ from src.portfolio_context_recovery import (
 )
 from src.portfolio_truth_publish import publish_portfolio_truth
 from src.portfolio_truth_reconcile import build_portfolio_truth_snapshot
-from src.portfolio_truth_render import render_registry_markdown
+from src.portfolio_truth_render import (
+    render_portfolio_report_markdown,
+    render_registry_markdown,
+)
 from src.portfolio_truth_sources import _classify_context_quality, _extract_github_full_name
+from src.portfolio_truth_validate import validate_portfolio_report_markdown
 from src.registry_parser import parse_registry
 
 
@@ -467,6 +471,135 @@ def test_rendered_registry_round_trips_through_parser(
     assert parsed["Alpha"] in {"active", "recent", "parked", "archived"}
     assert "## Portfolio Summary" in markdown
     assert "## Cowork Task Notes" in markdown
+
+
+def test_registry_render_surfaces_security_and_round_trips(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+    tmp_path: Path,
+) -> None:
+    security = {
+        "Alpha": {
+            "dependabot": {"critical": 2, "high": 1, "medium": 0, "low": 0, "available": True},
+            "code_scanning": {"available": True},
+            "secret_scanning": {"open": 0, "available": True},
+        }
+    }
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        security_alerts_by_name=security,
+    )
+    markdown = render_registry_markdown(result.snapshot)
+
+    # Per-repo Notes flag fires for the scanned repo carrying open high/critical alerts.
+    assert "[security: 2 critical / 1 high open Dependabot alerts]" in markdown
+    # Aggregate rows land in the Portfolio Summary table.
+    assert "| Repos scanned for security alerts | 1 |" in markdown
+    assert "| Repos with open high/critical alerts | 1 |" in markdown
+    assert "| Open critical Dependabot alerts | 2 |" in markdown
+    assert "| Open high Dependabot alerts | 1 |" in markdown
+
+    # The security flag is pipe-free + digit summary rows, so the parser round-trip is
+    # unchanged: same project row count, no inflation from the new content.
+    registry_path = tmp_path / "generated-registry.md"
+    registry_path.write_text(markdown)
+    parsed = parse_registry(registry_path)
+    assert len(parsed) == len(result.snapshot.projects)
+
+
+def test_registry_render_omits_security_flag_when_unscanned(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+    )
+    markdown = render_registry_markdown(result.snapshot)
+    assert "[security:" not in markdown
+    # Summary rows stay present, all zero, documenting that the overlay was not run.
+    assert "| Repos scanned for security alerts | 0 |" in markdown
+    assert "| Repos with open high/critical alerts | 0 |" in markdown
+
+
+def test_portfolio_report_security_posture_lists_open_alerts(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    security = {
+        "Alpha": {
+            "dependabot": {"critical": 1, "high": 2, "medium": 0, "low": 0, "available": True},
+            "code_scanning": {"available": True},
+            "secret_scanning": {"open": 0, "available": True},
+        }
+    }
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        security_alerts_by_name=security,
+    )
+    markdown = render_portfolio_report_markdown(result.snapshot, "output/x.json")
+
+    assert "## Security Posture" in markdown
+    assert "[Security Posture](#security-posture)" in markdown
+    assert "- **Alpha** [elevated]: 1 critical, 2 high open Dependabot alerts" in markdown
+    assert (
+        "- Security posture: scanned `1`, with open high/critical Dependabot alerts `1`" in markdown
+    )
+    # The new section keeps the report validator green.
+    validate_portfolio_report_markdown(markdown)
+
+
+def test_portfolio_report_security_posture_scanned_clear(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    # Scanned with zero open high/critical reads as "all clear", distinct from "not run".
+    security = {
+        "Alpha": {
+            "dependabot": {"critical": 0, "high": 0, "medium": 3, "low": 0, "available": True},
+            "code_scanning": {"available": True},
+            "secret_scanning": {"open": 0, "available": True},
+        }
+    }
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        security_alerts_by_name=security,
+    )
+    markdown = render_portfolio_report_markdown(result.snapshot, "output/x.json")
+    assert "All 1 scanned repos are clear of open high/critical Dependabot alerts." in markdown
+    validate_portfolio_report_markdown(markdown)
+
+
+def test_portfolio_report_security_posture_not_run(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+    )
+    markdown = render_portfolio_report_markdown(result.snapshot, "output/x.json")
+    assert "Security overlay not run for this snapshot" in markdown
+    assert "- Security posture: scanned `0`," in markdown
+    validate_portfolio_report_markdown(markdown)
 
 
 def test_duplicate_display_names_are_disambiguated_in_registry(tmp_path: Path) -> None:
