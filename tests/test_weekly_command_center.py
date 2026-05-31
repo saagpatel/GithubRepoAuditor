@@ -131,3 +131,122 @@ def test_build_weekly_command_center_digest_surfaces_truth_and_guardrails() -> N
     assert "## Risk Posture" in rendered_md
     assert "GithubRepoAuditor" in rendered_md
     assert "JobCommandCenter" in rendered_md
+
+
+def _sec(available: bool, critical: int = 0, high: int = 0) -> dict:
+    return {
+        "alerts_available": available,
+        "dependabot_critical": critical,
+        "dependabot_high": high,
+        "dependabot_medium": 0,
+        "dependabot_low": 0,
+        "code_scanning_critical": 0,
+        "code_scanning_high": 0,
+        "secret_scanning_open": 0,
+    }
+
+
+def _security_project(name: str, tier: str, security: dict, factors: list | None = None) -> dict:
+    return {
+        "identity": {"display_name": name},
+        "declared": {"operating_path": "maintain"},
+        "derived": {
+            "registry_status": "active",
+            "activity_status": "active",
+            "path_override": "",
+            "path_confidence": "high",
+            "context_quality": "standard",
+        },
+        "risk": {
+            "risk_tier": tier,
+            "risk_factors": factors or [],
+            "risk_summary": f"{name} risk.",
+            "doctor_gap": False,
+            "context_risk": False,
+            "path_risk": False,
+            "security_risk": bool(
+                security.get("dependabot_high") or security.get("dependabot_critical")
+            ),
+        },
+        "security": security,
+    }
+
+
+def _digest_for(portfolio_truth: dict) -> dict:
+    report_data = {
+        "username": "testuser",
+        "generated_at": "2026-04-14T12:00:00+00:00",
+        "operator_summary": {"decision_quality_v1": {}},
+        "audits": [],
+    }
+    snapshot = {"operator_summary": report_data["operator_summary"], "operator_queue": []}
+    return build_weekly_command_center_digest(
+        report_data,
+        snapshot,
+        portfolio_truth=portfolio_truth,
+        generated_at="2026-04-14T12:00:00+00:00",
+    )
+
+
+def test_security_posture_surfaces_open_alerts_critical_first() -> None:
+    portfolio_truth = {
+        "projects": [
+            _security_project(
+                "CriticalRepo",
+                "elevated",
+                _sec(True, critical=2, high=1),
+                ["active-high-severity-alerts"],
+            ),
+            _security_project(
+                "HighRepo",
+                "moderate",
+                _sec(True, critical=0, high=3),
+                ["active-high-severity-alerts"],
+            ),
+            _security_project("CleanRepo", "baseline", _sec(True, 0, 0)),
+            _security_project("UnscannedRepo", "baseline", _sec(False, 0, 0)),
+        ]
+    }
+    digest = _digest_for(portfolio_truth)
+    posture = digest["security_posture"]
+
+    # Only repos with alerts_available are scanned; UnscannedRepo is excluded.
+    assert posture["scanned_count"] == 3
+    assert posture["repos_with_open_high_critical"] == 2
+    assert posture["total_open_critical"] == 2
+    assert posture["total_open_high"] == 4
+
+    top = posture["top_alerts"]
+    assert [item["repo"] for item in top] == ["CriticalRepo", "HighRepo"]
+    assert top[0]["dependabot_critical"] == 2
+
+    rendered = render_weekly_command_center_markdown(digest)
+    assert "## Security Posture" in rendered
+    assert "CriticalRepo" in rendered
+    assert "2 critical, 1 high" in rendered
+
+
+def test_security_posture_reports_clean_when_scanned_and_no_open_alerts() -> None:
+    portfolio_truth = {
+        "projects": [
+            _security_project("CleanA", "baseline", _sec(True, 0, 0)),
+            _security_project("CleanB", "baseline", _sec(True, 0, 0)),
+        ]
+    }
+    digest = _digest_for(portfolio_truth)
+    assert digest["security_posture"]["scanned_count"] == 2
+    assert digest["security_posture"]["top_alerts"] == []
+
+    rendered = render_weekly_command_center_markdown(digest)
+    assert "All 2 scanned repos are clear" in rendered
+
+
+def test_security_posture_reports_not_run_when_no_overlay() -> None:
+    # The existing fixture has no security blocks → overlay was not run.
+    digest = _digest_for(_make_portfolio_truth())
+    assert digest["security_posture"]["scanned_count"] == 0
+    assert digest["security_posture"]["top_alerts"] == []
+
+    rendered = render_weekly_command_center_markdown(digest)
+    assert "## Security Posture" in rendered
+    assert "Security overlay not run" in rendered

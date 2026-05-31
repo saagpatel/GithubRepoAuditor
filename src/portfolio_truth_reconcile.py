@@ -28,6 +28,7 @@ from src.portfolio_truth_types import (
     PortfolioTruthProject,
     PortfolioTruthSnapshot,
     RiskFields,
+    SecurityFields,
 )
 from src.registry_parser import _normalize
 
@@ -180,6 +181,7 @@ def build_portfolio_truth_snapshot(
     include_notion: bool = True,
     now: datetime | None = None,
     release_count_by_name: dict[str, int] | None = None,
+    security_alerts_by_name: dict[str, dict] | None = None,
 ) -> PortfolioTruthBuildResult:
     now = now or datetime.now(timezone.utc)
     catalog_data = load_portfolio_catalog(catalog_path)
@@ -199,6 +201,7 @@ def build_portfolio_truth_snapshot(
             notion_context=notion_context,
             now=now,
             release_count_by_name=release_count_by_name,
+            security_alerts_by_name=security_alerts_by_name,
         )
         for raw_project in workspace_projects
     ]
@@ -259,19 +262,42 @@ def _unresolved_duplicate_display_names(projects: list[PortfolioTruthProject]) -
     return sorted(
         name
         for name, members in grouped.items()
-        if len(members) > 1
-        and any(not _has_path_catalog_contract(project) for project in members)
+        if len(members) > 1 and any(not _has_path_catalog_contract(project) for project in members)
     )
 
 
 def _has_path_catalog_contract(project: PortfolioTruthProject) -> bool:
     for source in project.provenance.values():
-        if (
-            source.get("source") == "catalog_repo"
-            and source.get("detail") == project.identity.path
-        ):
+        if source.get("source") == "catalog_repo" and source.get("detail") == project.identity.path:
             return True
     return False
+
+
+def _build_security_fields(ghas_entry: dict[str, Any] | None) -> SecurityFields:
+    """Map a per-repo GHAS alert entry (from output/ghas-alerts-<username>-*.json)
+    into SecurityFields. A missing/None entry yields all-zero counts with
+    alerts_available=False (the repo was not scanned) — distinct from a clean scan,
+    and keeps the security overlay strictly opt-in (no entry → no security signal)."""
+    if not ghas_entry:
+        return SecurityFields()
+    dependabot = ghas_entry.get("dependabot") or {}
+    code_scanning = ghas_entry.get("code_scanning") or {}
+    secret_scanning = ghas_entry.get("secret_scanning") or {}
+
+    def _count(source: dict[str, Any], key: str) -> int:
+        value = source.get(key)
+        return value if isinstance(value, int) and value >= 0 else 0
+
+    return SecurityFields(
+        alerts_available=bool(dependabot.get("available", False)),
+        dependabot_critical=_count(dependabot, "critical"),
+        dependabot_high=_count(dependabot, "high"),
+        dependabot_medium=_count(dependabot, "medium"),
+        dependabot_low=_count(dependabot, "low"),
+        code_scanning_critical=_count(code_scanning, "critical"),
+        code_scanning_high=_count(code_scanning, "high"),
+        secret_scanning_open=_count(secret_scanning, "open"),
+    )
 
 
 def _build_truth_project(
@@ -282,6 +308,7 @@ def _build_truth_project(
     notion_context: dict[str, dict[str, str]],
     now: datetime,
     release_count_by_name: dict[str, int] | None = None,
+    security_alerts_by_name: dict[str, dict] | None = None,
 ) -> PortfolioTruthProject:
     relative_path = raw_project["path"]
     group_entry = group_entry_for_path(relative_path, catalog_data)
@@ -393,6 +420,12 @@ def _build_truth_project(
         "detail": "derived",
     }
 
+    security_entry = (security_alerts_by_name or {}).get(raw_project["name"])
+    security = _build_security_fields(security_entry)
+
+    # Only Dependabot high/critical counts drive the risk tier today. Code-scanning
+    # and secret-scanning counts are captured in SecurityFields for visibility but do
+    # not yet feed the active-high-severity-alerts factor (Dependabot-only scope).
     risk_entry = build_risk_entry(
         display_name=raw_project["name"],
         operating_path=path_entry.get("operating_path", ""),
@@ -405,6 +438,8 @@ def _build_truth_project(
         doctor_standard=declared_values["doctor_standard"],
         known_risks_present=bool(raw_project["known_risks_present"]),
         run_instructions_present=bool(raw_project["run_instructions_present"]),
+        security_high_alerts=security.dependabot_high,
+        security_critical_alerts=security.dependabot_critical,
     )
 
     declared = DeclaredFields(
@@ -516,6 +551,7 @@ def _build_truth_project(
         doctor_gap=risk_entry["doctor_gap"],
         context_risk=risk_entry["context_risk"],
         path_risk=risk_entry["path_risk"],
+        security_risk=risk_entry["security_risk"],
     )
     provenance["risk.risk_tier"] = {"source": "derived", "detail": risk_entry["risk_tier"]}
     provenance["risk.doctor_gap"] = {
@@ -527,6 +563,7 @@ def _build_truth_project(
         declared=declared,
         derived=derived,
         risk=risk,
+        security=security,
         advisory=advisory,
         provenance=provenance,
         warnings=warnings,

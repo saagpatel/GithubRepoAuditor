@@ -12,6 +12,7 @@ AUTHORITY_CAP = "bounded-automation"
 MAX_PATH_ATTENTION_ITEMS = 5
 MAX_REPO_BRIEFINGS = 3
 MAX_RISK_ATTENTION_ITEMS = 5
+MAX_SECURITY_ATTENTION_ITEMS = 5
 
 
 def _safe_text(value: Any) -> str:
@@ -94,6 +95,10 @@ def build_weekly_command_center_digest(
             "risk_tier_counts": truth_summary.get("risk_tier_counts", {}),
             "top_elevated": _build_risk_attention_items(truth),
         },
+        "security_posture": {
+            **_build_security_summary(truth),
+            "top_alerts": _build_security_attention_items(truth),
+        },
         "section_digest": _build_section_digest(weekly_story),
         "top_repo_briefings": [
             {
@@ -119,6 +124,7 @@ def render_weekly_command_center_markdown(digest: dict[str, Any]) -> str:
     portfolio_truth = _mapping(digest.get("portfolio_truth"))
     risk_posture = _mapping(digest.get("risk_posture"))
     tier_counts = _mapping(risk_posture.get("risk_tier_counts"))
+    security_posture = _mapping(digest.get("security_posture"))
     lines = [
         f"# Weekly Command Center: {_safe_text(digest.get('username')) or 'unknown'}",
         "",
@@ -133,6 +139,7 @@ def render_weekly_command_center_markdown(digest: dict[str, Any]) -> str:
         f"- Operating Paths: {_safe_text(digest.get('operating_paths_summary')) or 'No operating-path summary is recorded yet.'}",
         f"- Portfolio Truth: {portfolio_truth.get('project_count', 0)} projects, {portfolio_truth.get('active_project_count', 0)} active, {portfolio_truth.get('investigate_override_count', 0)} with investigate override, {portfolio_truth.get('low_confidence_path_count', 0)} low-confidence paths",
         f"- Risk Posture: {risk_posture.get('elevated_count', 0)} elevated, {tier_counts.get('moderate', 0)} moderate, {tier_counts.get('baseline', 0)} baseline",
+        f"- Security Posture: {security_posture.get('scanned_count', 0)} scanned, {security_posture.get('repos_with_open_high_critical', 0)} with open high/critical Dependabot alerts ({security_posture.get('total_open_critical', 0)} critical, {security_posture.get('total_open_high', 0)} high)",
         "",
         "## Path Attention",
     ]
@@ -153,6 +160,26 @@ def render_weekly_command_center_markdown(digest: dict[str, Any]) -> str:
     else:
         for item in risk_items:
             lines.append(f"- **{item['repo']}** [{item['risk_tier']}]: {item['risk_summary']}")
+
+    lines.extend(["", "## Security Posture"])
+    security_items = list(security_posture.get("top_alerts") or [])
+    scanned_count = int(security_posture.get("scanned_count", 0) or 0)
+    if security_items:
+        for item in security_items:
+            lines.append(
+                f"- **{item['repo']}** [{item['risk_tier']}]: "
+                f"{item['dependabot_critical']} critical, {item['dependabot_high']} high "
+                "open Dependabot alerts"
+            )
+    elif scanned_count > 0:
+        lines.append(
+            f"- All {scanned_count} scanned repos are clear of open high/critical Dependabot alerts."
+        )
+    else:
+        lines.append(
+            "- Security overlay not run for this snapshot "
+            "(re-run with `--portfolio-truth-include-security`)."
+        )
 
     lines.extend(["", "## Weekly Sections"])
     for section in list(digest.get("section_digest") or []):
@@ -301,6 +328,64 @@ def _build_risk_attention_items(portfolio_truth: dict[str, Any]) -> list[dict[st
     for item in items:
         del item["_sort_key"]
     return items[:MAX_RISK_ATTENTION_ITEMS]
+
+
+def _build_security_summary(portfolio_truth: dict[str, Any]) -> dict[str, Any]:
+    """Aggregate the opt-in security overlay across scanned repos. scanned_count is
+    repos with alerts_available=True (the security overlay ran for them); a scanned
+    repo with zero open alerts is genuinely clear, distinct from an unscanned one."""
+    projects = list(portfolio_truth.get("projects") or [])
+    scanned = 0
+    repos_with_open = 0
+    total_critical = 0
+    total_high = 0
+    for project in projects:
+        security = _mapping(project.get("security"))
+        if not security.get("alerts_available"):
+            continue
+        scanned += 1
+        critical = int(security.get("dependabot_critical") or 0)
+        high = int(security.get("dependabot_high") or 0)
+        total_critical += critical
+        total_high += high
+        if critical > 0 or high > 0:
+            repos_with_open += 1
+    return {
+        "scanned_count": scanned,
+        "repos_with_open_high_critical": repos_with_open,
+        "total_open_critical": total_critical,
+        "total_open_high": total_high,
+    }
+
+
+def _build_security_attention_items(portfolio_truth: dict[str, Any]) -> list[dict[str, Any]]:
+    """Top scanned repos carrying open high/critical Dependabot alerts, critical-first."""
+    projects = list(portfolio_truth.get("projects") or [])
+    items: list[dict[str, Any]] = []
+    for project in projects:
+        security = _mapping(project.get("security"))
+        if not security.get("alerts_available"):
+            continue
+        critical = int(security.get("dependabot_critical") or 0)
+        high = int(security.get("dependabot_high") or 0)
+        if critical <= 0 and high <= 0:
+            continue
+        identity = _mapping(project.get("identity"))
+        risk = _mapping(project.get("risk"))
+        repo = _safe_text(identity.get("display_name"))
+        items.append(
+            {
+                "repo": repo,
+                "dependabot_critical": critical,
+                "dependabot_high": high,
+                "risk_tier": _safe_text(risk.get("risk_tier")) or "baseline",
+                "_sort_key": (-critical, -high, repo),
+            }
+        )
+    items.sort(key=lambda x: x["_sort_key"])
+    for item in items:
+        del item["_sort_key"]
+    return items[:MAX_SECURITY_ATTENTION_ITEMS]
 
 
 def _build_section_digest(weekly_story: dict[str, Any]) -> list[dict[str, Any]]:

@@ -36,6 +36,7 @@ def publish_portfolio_truth(
     legacy_registry_path: Path | None = None,
     include_notion: bool = True,
     release_count_by_name: dict[str, int] | None = None,
+    security_alerts_by_name: dict[str, dict] | None = None,
 ) -> PortfolioTruthPublishResult:
     validate_publish_targets(
         workspace_root=workspace_root,
@@ -49,6 +50,7 @@ def publish_portfolio_truth(
         legacy_registry_path=legacy_registry_path,
         include_notion=include_notion,
         release_count_by_name=release_count_by_name,
+        security_alerts_by_name=security_alerts_by_name,
     )
     validate_truth_snapshot(build_result.snapshot)
 
