@@ -49,11 +49,6 @@ class BurndownReport:
 # ── Severity ordering for ranking ──────────────────────────────────────────
 _SEVERITY_RANK: dict[str, int] = {"critical": 0, "high": 1}
 
-_SEVERITY_HIGHEST: dict[str, str] = {
-    "critical": "critical",
-    "high": "high",
-}
-
 
 def _advisory_key(detail: dict) -> str | tuple:
     """Stable group key for deduplicating the same advisory across repos."""
