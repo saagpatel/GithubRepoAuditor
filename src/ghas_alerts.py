@@ -17,6 +17,7 @@ Code-scanning severity bucketing:
   warning    → warning
   note       → note
 """
+
 from __future__ import annotations
 
 import json
@@ -86,6 +87,7 @@ def _paginate(
             next_url = next_link
         else:
             import re
+
             link_header = resp.headers.get("Link", "")
             match = re.search(r'<([^>]+)>;\s*rel="next"', link_header)
             if match:
@@ -103,11 +105,13 @@ def _make_session(token: str | None, session: requests.Session | None) -> reques
     from urllib3.util import Retry
 
     s = requests.Session()
-    s.headers.update({
-        "Accept": "application/vnd.github.v3+json",
-        "User-Agent": "github-repo-auditor/0.1",
-        "X-GitHub-Api-Version": "2026-03-10",
-    })
+    s.headers.update(
+        {
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "github-repo-auditor/0.1",
+            "X-GitHub-Api-Version": "2026-03-10",
+        }
+    )
     if token:
         s.headers["Authorization"] = f"token {token}"
 
@@ -132,36 +136,65 @@ def _fetch_dependabot_counts(
     session: requests.Session,
     owner: str,
     repo: str,
-) -> dict:
-    """Fetch open Dependabot alert counts grouped by severity."""
+) -> tuple[dict, list[dict]]:
+    """Fetch open Dependabot alert counts grouped by severity, plus per-alert detail.
+
+    Returns a 2-tuple:
+      counts  — {"critical": N, "high": N, "medium": N, "low": N, "available": bool}
+      details — list of dicts, one per open alert, with keys:
+                  package, ecosystem, scope, severity, ghsa_id,
+                  first_patched_version, manifest_path
+    The details list is empty when the endpoint is unavailable.
+    """
     base: dict = {"critical": 0, "high": 0, "medium": 0, "low": 0, "available": False}
+    details: list[dict] = []
     url = f"{GITHUB_API_BASE_URL}/repos/{owner}/{repo}/dependabot/alerts"
     try:
         alerts = _paginate(session, url, {"state": "open", "per_page": "100"})
         for alert in alerts:
+            advisory = alert.get("security_advisory") or {}
+            vulnerability = alert.get("security_vulnerability") or {}
+            dependency = alert.get("dependency") or {}
+            package = dependency.get("package") or {}
+
             severity = (
-                alert.get("security_advisory", {}).get("severity", "")
-                or alert.get("security_vulnerability", {}).get("severity", "")
-                or ""
+                advisory.get("severity", "") or vulnerability.get("severity", "") or ""
             ).lower()
             if severity in base:
                 base[severity] += 1
+
+            # Collect per-alert detail (all fields defensive with .get)
+            first_patched: str | None = None
+            first_patched_obj = vulnerability.get("first_patched_version")
+            if isinstance(first_patched_obj, dict):
+                first_patched = first_patched_obj.get("identifier")
+
+            details.append(
+                {
+                    "package": package.get("name"),
+                    "ecosystem": package.get("ecosystem"),
+                    "scope": dependency.get("scope"),
+                    "severity": severity or None,
+                    "ghsa_id": advisory.get("ghsa_id"),
+                    "first_patched_version": first_patched,
+                    "manifest_path": dependency.get("manifest_path"),
+                }
+            )
+
         base["available"] = True
-        return base
+        return base, details
     except requests.HTTPError as exc:
         status = exc.response.status_code if exc.response is not None else None
         if status in _EXPECTED_UNAVAILABLE_STATUSES:
-            logger.debug(
-                "Dependabot alerts unavailable for %s/%s (HTTP %s)", owner, repo, status
-            )
+            logger.debug("Dependabot alerts unavailable for %s/%s (HTTP %s)", owner, repo, status)
         else:
-            logger.warning(
-                "Failed to fetch Dependabot alerts for %s/%s: %s", owner, repo, exc
-            )
-        return base
+            logger.warning("Failed to fetch Dependabot alerts for %s/%s: %s", owner, repo, exc)
+        return base, details
     except Exception as exc:
-        logger.warning("Unexpected error fetching Dependabot alerts for %s/%s: %s", owner, repo, exc)
-        return base
+        logger.warning(
+            "Unexpected error fetching Dependabot alerts for %s/%s: %s", owner, repo, exc
+        )
+        return base, details
 
 
 def _fetch_code_scanning_counts(
@@ -180,9 +213,7 @@ def _fetch_code_scanning_counts(
         for alert in alerts:
             rule = alert.get("rule", {}) if isinstance(alert, dict) else {}
             raw_severity = (
-                rule.get("security_severity_level")
-                or rule.get("severity")
-                or ""
+                rule.get("security_severity_level") or rule.get("severity") or ""
             ).lower()
             bucket = _CODE_SCANNING_BUCKET.get(raw_severity)
             if bucket and bucket in base:
@@ -196,9 +227,7 @@ def _fetch_code_scanning_counts(
                 "Code scanning alerts unavailable for %s/%s (HTTP %s)", owner, repo, status
             )
         else:
-            logger.warning(
-                "Failed to fetch code scanning alerts for %s/%s: %s", owner, repo, exc
-            )
+            logger.warning("Failed to fetch code scanning alerts for %s/%s: %s", owner, repo, exc)
         return base
     except Exception as exc:
         logger.warning(
@@ -227,9 +256,7 @@ def _fetch_secret_scanning_counts(
                 "Secret scanning alerts unavailable for %s/%s (HTTP %s)", owner, repo, status
             )
         else:
-            logger.warning(
-                "Failed to fetch secret scanning alerts for %s/%s: %s", owner, repo, exc
-            )
+            logger.warning("Failed to fetch secret scanning alerts for %s/%s: %s", owner, repo, exc)
         return base
     except Exception as exc:
         logger.warning(
@@ -249,9 +276,25 @@ def fetch_ghas_alerts(
 
     Returns {repo_name: {
         "dependabot": {"critical": N, "high": N, "medium": N, "low": N, "available": bool},
+        "dependabot_details": [
+            {
+                "package": str | None,
+                "ecosystem": str | None,
+                "scope": str | None,          # "runtime" | "development" | None
+                "severity": str | None,
+                "ghsa_id": str | None,
+                "first_patched_version": str | None,  # None → not fixable
+                "manifest_path": str | None,
+            },
+            ...
+        ],
         "code_scanning": {"critical": N, "high": N, "warning": N, "note": N, "available": bool},
         "secret_scanning": {"open": N, "available": bool},
     }}
+
+    The "dependabot" counts dict shape is stable and unchanged — downstream
+    callers that read dependabot.critical/high/medium/low/available are
+    unaffected by the new "dependabot_details" sibling key.
 
     Repos with no GitHub token are skipped (all categories get available=False).
     403/404/410 responses indicate GHAS is not enabled for that repo — recorded
@@ -283,8 +326,10 @@ def fetch_ghas_alerts(
                 results[repo_name] = json.loads(cached)  # type: ignore[arg-type]
                 continue
 
+        dep_counts, dep_details = _fetch_dependabot_counts(s, owner, repo)
         repo_result: dict = {
-            "dependabot": _fetch_dependabot_counts(s, owner, repo),
+            "dependabot": dep_counts,
+            "dependabot_details": dep_details,
             "code_scanning": _fetch_code_scanning_counts(s, owner, repo),
             "secret_scanning": _fetch_secret_scanning_counts(s, owner, repo),
         }
