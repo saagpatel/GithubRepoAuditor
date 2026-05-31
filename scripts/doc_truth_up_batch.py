@@ -92,26 +92,40 @@ def _prompt_body() -> str:
     return text.strip()
 
 
-def _settings_file() -> str:
-    """Write a temp settings JSON wiring the guard as a PreToolUse hook."""
+def _settings_file() -> tuple[str, str]:
+    """Write a temp settings JSON wiring the guard as a PreToolUse hook.
+
+    The guard is COPIED to a stable temp path first, so the hook never depends on
+    which branch the auditor repo happens to have checked out. (If it referenced
+    the in-repo path and that repo's HEAD switched to a branch lacking the script,
+    the missing-file hook would exit non-zero and Claude Code would block *every*
+    tool call — silently turning all downstream runs into no-ops.)
+    Returns (settings_path, guard_tmp_path); the caller unlinks both.
+    """
+    gfd, guard_tmp = tempfile.mkstemp(prefix="doc-truth-up-guard-", suffix=".py")
+    with os.fdopen(gfd, "w") as fh:
+        fh.write(GUARD.read_text())
     settings = {
         "hooks": {
             "PreToolUse": [
                 {
                     "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
-                    "hooks": [{"type": "command", "command": f"python3 {GUARD}"}],
+                    "hooks": [{"type": "command", "command": f"python3 {guard_tmp}"}],
                 }
             ]
         }
     }
-    fd, path = tempfile.mkstemp(prefix="doc-truth-up-settings-", suffix=".json")
-    with os.fdopen(fd, "w") as fh:
+    sfd, spath = tempfile.mkstemp(prefix="doc-truth-up-settings-", suffix=".json")
+    with os.fdopen(sfd, "w") as fh:
         json.dump(settings, fh)
-    return path
+    return spath, guard_tmp
 
 
 def select_targets(args: argparse.Namespace) -> list[dict]:
     targets = json.loads(Path(args.targets).read_text())
+    # Never run the batch on the auditor repo itself — manipulating its HEAD while
+    # an interactive session works in it strands the operator's checkout.
+    targets = [t for t in targets if Path(t["abs_path"]).resolve() != REPO_ROOT]
     if args.repo:
         targets = [t for t in targets if t["project_key"] == args.repo]
     elif args.tier != "all":
@@ -121,11 +135,16 @@ def select_targets(args: argparse.Namespace) -> list[dict]:
     return targets
 
 
-def run_one(t: dict, prompt: str, settings: str, model: str, timeout: int) -> dict:
+def run_one(
+    t: dict, prompt: str, settings: str, model: str, timeout: int, done_branch: str
+) -> dict:
     repo = Path(t["abs_path"])
     res = {"project_key": t["project_key"], "abs_path": str(repo)}
     if not (repo / ".git").is_dir():
         return {**res, "status": "skipped", "reason": "not a git repo"}
+    # Resume-safe: a repo that already carries today's reconciliation branch is done.
+    if _git(repo, "rev-parse", "--verify", "--quiet", f"refs/heads/{done_branch}").returncode == 0:
+        return {**res, "status": "already_done", "branch": done_branch}
     porcelain = _git(repo, "status", "--porcelain").stdout.splitlines()
     if any(not line.startswith("??") for line in porcelain):
         return {**res, "status": "skipped", "reason": "uncommitted tracked changes"}
@@ -242,16 +261,19 @@ def main() -> None:
         print("\n(dry-run — pass --execute to run; --repo <key> to pilot one)")
         return
 
-    prompt, settings = _prompt_body(), _settings_file()
+    prompt = _prompt_body()
+    settings, guard_tmp = _settings_file()
+    done_branch = f"docs/truth-up-{date}"
     results = []
     try:
         for i, t in enumerate(targets, 1):
             print(f"[{i}/{len(targets)}] {t['project_key']} …", flush=True)
-            r = run_one(t, prompt, settings, args.model, args.timeout)
+            r = run_one(t, prompt, settings, args.model, args.timeout, done_branch)
             print(f"    → {r['status']}" + (f" ({r.get('reason')})" if r.get("reason") else ""))
             results.append(r)
     finally:
         os.unlink(settings)
+        os.unlink(guard_tmp)
 
     out = Path(REPO_ROOT) / "output" / f"doc-truth-up-run-{date}.json"
     out.write_text(json.dumps(results, indent=2))
