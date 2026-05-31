@@ -621,6 +621,15 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--portfolio-truth-include-security",
+        action="store_true",
+        help=(
+            "Overlay the security.* GHAS alert counts on each project from the latest "
+            "output/ghas-alerts-<username>-*.json file, feeding the active-high-severity-alerts "
+            "risk factor (requires a prior `audit report --ghas-alerts` run)"
+        ),
+    )
+    parser.add_argument(
         "--portfolio-context-recovery",
         action="store_true",
         help="Build the active/recent weak-context recovery plan and optionally apply the safe context upgrades",
@@ -5187,6 +5196,52 @@ def _load_release_count_by_name(*, output_dir: Path, username: str) -> dict[str,
     return result
 
 
+def _load_security_alerts_by_name(*, output_dir: Path, username: str) -> dict[str, dict] | None:
+    """Load per-repo GHAS alert counts from the latest output/ghas-alerts-<username>-*.json.
+
+    The file is already keyed by display name in the shape SecurityFields expects
+    ({name: {"dependabot": {...}, "code_scanning": {...}, "secret_scanning": {...}}}),
+    so the overlay needs no transformation. Returns None (with a warning) if no GHAS
+    report is found — the security overlay is then skipped, leaving counts at zero.
+    """
+    import logging
+
+    _log = logging.getLogger(__name__)
+
+    ghas_files = sorted(
+        output_dir.glob(f"ghas-alerts-{username}-*.json"),
+        key=lambda p: p.stat().st_mtime,
+    )
+    if not ghas_files:
+        _log.warning(
+            "--portfolio-truth-include-security requires a prior `audit report --ghas-alerts` "
+            "run; no ghas-alerts-%s-*.json found in %s — skipping security overlay",
+            username,
+            output_dir,
+        )
+        return None
+
+    ghas_path = ghas_files[-1]
+    try:
+        with ghas_path.open() as fh:
+            data = json.load(fh)
+    except Exception as exc:  # noqa: BLE001
+        _log.warning(
+            "--portfolio-truth-include-security: could not read %s: %s — skipping",
+            ghas_path,
+            exc,
+        )
+        return None
+
+    if not isinstance(data, dict):
+        _log.warning(
+            "--portfolio-truth-include-security: %s is not a name-keyed object — skipping",
+            ghas_path,
+        )
+        return None
+    return {name: entry for name, entry in data.items() if isinstance(entry, dict)}
+
+
 def _run_portfolio_truth_mode(args) -> None:
     from src.portfolio_truth_publish import publish_portfolio_truth
 
@@ -5211,6 +5266,13 @@ def _run_portfolio_truth_mode(args) -> None:
             username=args.username,
         )
 
+    security_alerts_by_name: dict[str, dict] | None = None
+    if getattr(args, "portfolio_truth_include_security", False):
+        security_alerts_by_name = _load_security_alerts_by_name(
+            output_dir=output_dir,
+            username=args.username,
+        )
+
     result = publish_portfolio_truth(
         workspace_root=workspace_root,
         output_dir=output_dir,
@@ -5220,6 +5282,7 @@ def _run_portfolio_truth_mode(args) -> None:
         legacy_registry_path=legacy_registry_path,
         include_notion=True,
         release_count_by_name=release_count_by_name,
+        security_alerts_by_name=security_alerts_by_name,
     )
     print_info(f"Portfolio truth snapshot: {result.latest_path}")
     print_info(f"Portfolio truth history snapshot: {result.snapshot_path}")
@@ -5381,7 +5444,9 @@ def _run_context_triage_mode(args) -> None:
         project_key = identity.get("project_key") or ""
         name = identity.get("display_name") or project.get("name", "")
         repo_keys.extend(key for key in (project_key, name) if key)
-    catalog_scores = validate_catalog(catalog_path, sorted(set(repo_keys))) if catalog_path.exists() else {}
+    catalog_scores = (
+        validate_catalog(catalog_path, sorted(set(repo_keys))) if catalog_path.exists() else {}
+    )
 
     enriched: list[dict] = []
     for project in projects:

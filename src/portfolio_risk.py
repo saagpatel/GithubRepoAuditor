@@ -27,6 +27,7 @@ _FACTOR_LABELS: dict[str, str] = {
     "missing-doctor-standard": "doctor standard not declared",
     "no-run-instructions": "run instructions missing",
     "undocumented-risks": "known risks not documented",
+    "active-high-severity-alerts": "open high/critical security alerts",
 }
 
 _DEFERRED_ARCHIVED = {
@@ -36,6 +37,7 @@ _DEFERRED_ARCHIVED = {
     "doctor_gap": False,
     "context_risk": False,
     "path_risk": False,
+    "security_risk": False,
 }
 
 _DEFERRED_STALE = {
@@ -45,6 +47,7 @@ _DEFERRED_STALE = {
     "doctor_gap": False,
     "context_risk": False,
     "path_risk": False,
+    "security_risk": False,
 }
 
 
@@ -61,6 +64,8 @@ def build_risk_entry(
     doctor_standard: str,
     known_risks_present: bool,
     run_instructions_present: bool,
+    security_high_alerts: int = 0,
+    security_critical_alerts: int = 0,
 ) -> dict[str, Any]:
     # Short-circuit deferred: archived or archive-path
     if registry_status == "archived" or operating_path == "archive":
@@ -91,9 +96,20 @@ def build_risk_entry(
     if criticality in {"high", "critical"} and not known_risks_present:
         factors.append("undocumented-risks")
 
+    # Active repo carrying open high- or critical-severity Dependabot alerts.
+    # High alerts contribute one normal factor toward the 3+ elevation threshold;
+    # an open critical alert force-elevates on its own (see is_elevated below) — a
+    # lone unpatched critical CVE cannot hide in an otherwise-clean repo.
+    active = activity_status in ACTIVE_STATUSES
+    if active and (security_high_alerts > 0 or security_critical_alerts > 0):
+        factors.append("active-high-severity-alerts")
+
     # Derive tier
-    is_elevated = len(factors) >= 3 or (
-        "weak-context-active" in factors and "investigate-override" in factors
+    security_forces_elevated = active and security_critical_alerts > 0
+    is_elevated = (
+        len(factors) >= 3
+        or ("weak-context-active" in factors and "investigate-override" in factors)
+        or security_forces_elevated
     )
     if is_elevated:
         risk_tier = "elevated"
@@ -106,6 +122,7 @@ def build_risk_entry(
     doctor_gap = "missing-doctor-standard" in factors
     context_risk = "weak-context-active" in factors
     path_risk = "investigate-override" in factors or "missing-operating-path" in factors
+    security_risk = "active-high-severity-alerts" in factors
 
     # Build summary
     if not factors:
@@ -121,6 +138,7 @@ def build_risk_entry(
         "doctor_gap": doctor_gap,
         "context_risk": context_risk,
         "path_risk": path_risk,
+        "security_risk": security_risk,
     }
 
 

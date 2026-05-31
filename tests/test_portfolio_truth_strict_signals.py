@@ -237,3 +237,64 @@ def test_release_count_absent_for_missing_project(tmp_path: Path) -> None:
     assert result is not None
     assert "UnknownRepo" not in result
     assert result.get("KnownRepo") == 5
+
+
+def _make_ghas_json(tmp_path: Path, *, username: str, entries: dict) -> Path:
+    """Write a minimal output/ghas-alerts-<username>-<date>.json fixture."""
+    path = tmp_path / f"ghas-alerts-{username}-2026-05-31.json"
+    path.write_text(json.dumps(entries, indent=2))
+    return path
+
+
+def test_security_alerts_loaded_from_ghas_json(tmp_path: Path) -> None:
+    """--portfolio-truth-include-security with a valid GHAS JSON → name-keyed dict."""
+    from src.cli import _load_security_alerts_by_name
+
+    _make_ghas_json(
+        tmp_path,
+        username="saagpatel",
+        entries={
+            "MyRepo": {
+                "dependabot": {"critical": 1, "high": 2, "available": True},
+                "code_scanning": {"critical": 0, "high": 0, "available": True},
+                "secret_scanning": {"open": 0, "available": True},
+            }
+        },
+    )
+    result = _load_security_alerts_by_name(output_dir=tmp_path, username="saagpatel")
+    assert result is not None
+    assert result["MyRepo"]["dependabot"]["critical"] == 1
+
+
+def test_security_alerts_no_ghas_json_returns_none(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """--portfolio-truth-include-security with no GHAS JSON → None, warning logged."""
+    from src.cli import _load_security_alerts_by_name
+
+    with caplog.at_level(logging.WARNING):
+        result = _load_security_alerts_by_name(output_dir=tmp_path, username="saagpatel")
+
+    assert result is None
+    assert any("audit report --ghas-alerts" in record.message for record in caplog.records)
+
+
+def test_security_alerts_picks_latest_by_mtime(tmp_path: Path) -> None:
+    """When multiple GHAS files exist, the most recently modified one wins."""
+    from src.cli import _load_security_alerts_by_name
+
+    older = tmp_path / "ghas-alerts-saagpatel-2026-05-01.json"
+    older.write_text(json.dumps({"MyRepo": {"dependabot": {"high": 9, "available": True}}}))
+    import os
+
+    os.utime(older, (1_690_000_000, 1_690_000_000))
+    newer = _make_ghas_json(
+        tmp_path,
+        username="saagpatel",
+        entries={"MyRepo": {"dependabot": {"high": 1, "available": True}}},
+    )
+    os.utime(newer, (1_700_000_000, 1_700_000_000))
+
+    result = _load_security_alerts_by_name(output_dir=tmp_path, username="saagpatel")
+    assert result is not None
+    assert result["MyRepo"]["dependabot"]["high"] == 1
