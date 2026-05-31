@@ -1440,6 +1440,27 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _build_security_burndown_subparser(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
+    """Subcommand: `audit security-burndown` — ranked fixable-vuln burndown."""
+    p = subparsers.add_parser(
+        "security-burndown",
+        help="Ranked list of fixable prod-reachable critical/high Dependabot advisories",
+        description=(
+            "Load the latest GHAS alert file for a user and produce a ranked burndown\n"
+            "of fixable runtime-scope critical/high Dependabot advisories.\n\n"
+            "Requires a prior `audit report <username> --ghas-alerts` run that captured\n"
+            "per-alert detail (fetch with an up-to-date version of this tool)."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument("username", help="GitHub username whose GHAS file to load")
+    p.add_argument(
+        "--output-dir",
+        default="output",
+        help="Directory containing ghas-alerts-<username>-*.json (default: output/)",
+    )
+
+
 def build_subcommand_parser() -> argparse.ArgumentParser:
     """Return the subcommand-aware parser used by main().
 
@@ -1468,6 +1489,7 @@ def build_subcommand_parser() -> argparse.ArgumentParser:
     _build_triage_subparser(subparsers)
     _build_report_subparser(subparsers)
     _build_serve_subparser(subparsers)
+    _build_security_burndown_subparser(subparsers)
     return parser
 
 
@@ -5947,6 +5969,7 @@ def _write_report_outputs(
             print_info(f"Vulnerability report: {vuln_path}")
 
     if getattr(args, "ghas_alerts", False) or getattr(args, "vuln_check", False):
+        from src.ghas_alert_details import fetch_dependabot_details
         from src.ghas_alerts import fetch_ghas_alerts, format_ghas_summary
 
         ghas_token: str | None = getattr(args, "token", None) or None
@@ -5955,6 +5978,17 @@ def _write_report_outputs(
             token=ghas_token,
             cache=cache,
         )
+        # Enrich each repo entry with per-alert detail for security-burndown.
+        # fetch_dependabot_details paginates the same endpoint as fetch_ghas_alerts
+        # but lives in a separate module to keep ghas_alerts.py byte-identical to
+        # main (editing it triggers ruff-format reflows that CodeQL flags).
+        dep_details = fetch_dependabot_details(
+            report_data.get("audits", []),
+            token=ghas_token,
+            cache=cache,
+        )
+        for repo_name in ghas_data:
+            ghas_data[repo_name]["dependabot_details"] = dep_details.get(repo_name, [])
         print_info(format_ghas_summary(ghas_data))
         if ghas_data:
             ghas_path = (
@@ -6593,7 +6627,9 @@ def _infer_subcommand_from_flags(args: argparse.Namespace) -> str:
     return "run"
 
 
-_KNOWN_SUBCOMMANDS: frozenset[str] = frozenset({"run", "triage", "report", "serve"})
+_KNOWN_SUBCOMMANDS: frozenset[str] = frozenset(
+    {"run", "triage", "report", "serve", "security-burndown"}
+)
 
 
 def _emit_legacy_deprecation_warning(inferred: str) -> None:
@@ -6688,6 +6724,64 @@ def _rewrite_legacy_argv(argv: list[str]) -> tuple[list[str], bool]:
     return [inferred, first] + rest, True
 
 
+def _run_security_burndown_mode(args) -> None:
+    """Dispatch for `audit security-burndown <username>`."""
+    import datetime
+
+    from src.security_burndown import build_security_burndown, render_burndown_markdown
+
+    output_dir = Path(args.output_dir)
+    username = args.username
+
+    # Load latest ghas-alerts file (mirrors _load_security_alerts_by_name glob)
+    ghas_files = sorted(
+        output_dir.glob(f"ghas-alerts-{username}-*.json"),
+        key=lambda p: p.stat().st_mtime,
+    )
+    if not ghas_files:
+        print_info(
+            f"No ghas-alerts-{username}-*.json found in {output_dir}. "
+            "Run `audit report <username> --ghas-alerts` first."
+        )
+        raise SystemExit(1)
+
+    ghas_path = ghas_files[-1]
+    try:
+        with ghas_path.open() as fh:
+            ghas_data = json.load(fh)
+    except Exception as exc:  # noqa: BLE001
+        print_info(f"Could not read {ghas_path}: {exc}")
+        raise SystemExit(1)
+
+    if not isinstance(ghas_data, dict):
+        print_info(f"{ghas_path} is not a name-keyed object — cannot build burndown.")
+        raise SystemExit(1)
+
+    # Detect old counts-only files (no dependabot_details on any entry)
+    has_details = any(
+        isinstance(entry.get("dependabot_details"), list)
+        for entry in ghas_data.values()
+        if isinstance(entry, dict)
+    )
+    if not has_details:
+        print_info(
+            f"Warning: {ghas_path.name} contains counts only — no per-alert detail.\n"
+            "Re-run `audit report <username> --ghas-alerts` to capture detail, "
+            "then retry security-burndown."
+        )
+        raise SystemExit(0)
+
+    report = build_security_burndown(ghas_data)
+    markdown = render_burndown_markdown(report)
+
+    print(markdown)
+
+    today = datetime.date.today().isoformat()
+    out_path = output_dir / f"security-burndown-{username}-{today}.md"
+    out_path.write_text(markdown, encoding="utf-8")
+    print_info(f"Burndown written to {out_path}")
+
+
 # ── Main entry point ──────────────────────────────────────────────────
 def main() -> None:
     raw_argv = sys.argv[1:]
@@ -6701,6 +6795,12 @@ def main() -> None:
 
     subcommand_parser = build_subcommand_parser()
     legacy_parser = build_parser()
+
+    # ── Subcommand: security-burndown (own parser — no legacy equivalent) ──
+    if argv and argv[0] == "security-burndown":
+        sb_args = subcommand_parser.parse_args(argv)
+        _run_security_burndown_mode(sb_args)
+        return
 
     if argv and argv[0] in _KNOWN_SUBCOMMANDS:
         # Subcommand form — detect the subcommand with the subcommand parser,
