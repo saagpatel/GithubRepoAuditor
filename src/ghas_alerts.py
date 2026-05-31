@@ -139,11 +139,10 @@ def _fetch_dependabot_counts(
 ) -> tuple[dict, list[dict]]:
     """Fetch open Dependabot alert counts grouped by severity, plus per-alert detail.
 
-    Returns a 2-tuple:
+    Returns a 2-tuple of (counts, details):
       counts  — {"critical": N, "high": N, "medium": N, "low": N, "available": bool}
-      details — list of dicts, one per open alert, with keys:
-                  package, ecosystem, scope, severity, ghsa_id,
-                  first_patched_version, manifest_path
+      details — one dict per open alert with keys: package, ecosystem, scope,
+                severity, ghsa_id, first_patched_version, manifest_path.
     The details list is empty when the endpoint is unavailable.
     """
     base: dict = {"critical": 0, "high": 0, "medium": 0, "low": 0, "available": False}
@@ -163,7 +162,6 @@ def _fetch_dependabot_counts(
             if severity in base:
                 base[severity] += 1
 
-            # Collect per-alert detail (all fields defensive with .get)
             first_patched: str | None = None
             first_patched_obj = vulnerability.get("first_patched_version")
             if isinstance(first_patched_obj, dict):
@@ -180,19 +178,23 @@ def _fetch_dependabot_counts(
                     "manifest_path": dependency.get("manifest_path"),
                 }
             )
-
         base["available"] = True
         return base, details
     except requests.HTTPError as exc:
         status = exc.response.status_code if exc.response is not None else None
         if status in _EXPECTED_UNAVAILABLE_STATUSES:
-            logger.debug("Dependabot alerts unavailable for %s/%s (HTTP %s)", owner, repo, status)
+            logger.debug("Dependabot alerts unavailable for %s/%s", owner, repo)
         else:
-            logger.warning("Failed to fetch Dependabot alerts for %s/%s: %s", owner, repo, exc)
+            logger.warning(
+                "Failed to fetch Dependabot alerts for %s/%s (%s)", owner, repo, type(exc).__name__
+            )
         return base, details
     except Exception as exc:
         logger.warning(
-            "Unexpected error fetching Dependabot alerts for %s/%s: %s", owner, repo, exc
+            "Unexpected error fetching Dependabot alerts for %s/%s (%s)",
+            owner,
+            repo,
+            type(exc).__name__,
         )
         return base, details
 
@@ -223,15 +225,21 @@ def _fetch_code_scanning_counts(
     except requests.HTTPError as exc:
         status = exc.response.status_code if exc.response is not None else None
         if status in _EXPECTED_UNAVAILABLE_STATUSES:
-            logger.debug(
-                "Code scanning alerts unavailable for %s/%s (HTTP %s)", owner, repo, status
-            )
+            logger.debug("Code scanning alerts unavailable for %s/%s", owner, repo)
         else:
-            logger.warning("Failed to fetch code scanning alerts for %s/%s: %s", owner, repo, exc)
+            logger.warning(
+                "Failed to fetch code scanning alerts for %s/%s (%s)",
+                owner,
+                repo,
+                type(exc).__name__,
+            )
         return base
     except Exception as exc:
         logger.warning(
-            "Unexpected error fetching code scanning alerts for %s/%s: %s", owner, repo, exc
+            "Unexpected error fetching code scanning alerts for %s/%s (%s)",
+            owner,
+            repo,
+            type(exc).__name__,
         )
         return base
 
@@ -252,15 +260,21 @@ def _fetch_secret_scanning_counts(
     except requests.HTTPError as exc:
         status = exc.response.status_code if exc.response is not None else None
         if status in _EXPECTED_UNAVAILABLE_STATUSES:
-            logger.debug(
-                "Secret scanning alerts unavailable for %s/%s (HTTP %s)", owner, repo, status
-            )
+            logger.debug("Secret scanning alerts unavailable for %s/%s", owner, repo)
         else:
-            logger.warning("Failed to fetch secret scanning alerts for %s/%s: %s", owner, repo, exc)
+            logger.warning(
+                "Failed to fetch secret scanning alerts for %s/%s (%s)",
+                owner,
+                repo,
+                type(exc).__name__,
+            )
         return base
     except Exception as exc:
         logger.warning(
-            "Unexpected error fetching secret scanning alerts for %s/%s: %s", owner, repo, exc
+            "Unexpected error fetching secret scanning alerts for %s/%s (%s)",
+            owner,
+            repo,
+            type(exc).__name__,
         )
         return base
 
@@ -276,25 +290,14 @@ def fetch_ghas_alerts(
 
     Returns {repo_name: {
         "dependabot": {"critical": N, "high": N, "medium": N, "low": N, "available": bool},
-        "dependabot_details": [
-            {
-                "package": str | None,
-                "ecosystem": str | None,
-                "scope": str | None,          # "runtime" | "development" | None
-                "severity": str | None,
-                "ghsa_id": str | None,
-                "first_patched_version": str | None,  # None → not fixable
-                "manifest_path": str | None,
-            },
-            ...
-        ],
+        "dependabot_details": [ {package, ecosystem, scope, severity, ghsa_id,
+                                 first_patched_version, manifest_path}, ... ],
         "code_scanning": {"critical": N, "high": N, "warning": N, "note": N, "available": bool},
         "secret_scanning": {"open": N, "available": bool},
     }}
 
-    The "dependabot" counts dict shape is stable and unchanged — downstream
-    callers that read dependabot.critical/high/medium/low/available are
-    unaffected by the new "dependabot_details" sibling key.
+    The "dependabot" counts dict shape is unchanged; "dependabot_details" is a new
+    sibling key, so downstream count consumers are unaffected.
 
     Repos with no GitHub token are skipped (all categories get available=False).
     403/404/410 responses indicate GHAS is not enabled for that repo — recorded
