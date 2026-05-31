@@ -1,4 +1,4 @@
-"""Tests for security_burndown module and ghas_alerts detail capture."""
+"""Tests for security_burndown module and ghas_alert_details detail capture."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import requests
 
-from src.ghas_alerts import _fetch_dependabot_counts, fetch_ghas_alerts
+from src.ghas_alert_details import fetch_dependabot_details
 from src.security_burndown import (
     BurndownEntry,
     BurndownReport,
@@ -33,7 +33,7 @@ def _make_dep_alert(
     first_patched: str = "4.17.21",
     manifest_path: str = "package.json",
 ) -> dict:
-    """Build a minimal GitHub Dependabot alert API dict."""
+    """Build a minimal GitHub Dependabot alert API dict (raw API shape)."""
     return {
         "security_advisory": {
             "ghsa_id": ghsa_id,
@@ -72,11 +72,11 @@ def _mock_session_dep(alerts: list) -> MagicMock:
 
 
 # ---------------------------------------------------------------------------
-# Part 1 — detail extraction from _fetch_dependabot_counts
+# Part 1 — fetch_dependabot_details: extraction + defensiveness + error path
 # ---------------------------------------------------------------------------
 
 
-class TestFetchDependabotDetail:
+class TestFetchDependabotDetails:
     def test_all_fields_extracted(self) -> None:
         session = _mock_session_dep(
             [
@@ -91,9 +91,9 @@ class TestFetchDependabotDetail:
                 )
             ]
         )
-        counts, details = _fetch_dependabot_counts(session, "octocat", "my-repo")
-
-        assert counts == {"critical": 0, "high": 1, "medium": 0, "low": 0, "available": True}
+        result = fetch_dependabot_details([_make_audit("my-repo")], token="tok", session=session)
+        assert "my-repo" in result
+        details = result["my-repo"]
         assert len(details) == 1
         d = details[0]
         assert d["package"] == "axios"
@@ -105,97 +105,110 @@ class TestFetchDependabotDetail:
         assert d["manifest_path"] == "frontend/package.json"
 
     def test_missing_fields_return_none_not_keyerror(self) -> None:
-        """Completely bare alert dict — no KeyError, all fields None/empty."""
+        """Completely bare alert dict — no KeyError, all detail fields are None."""
         session = _mock_session_dep([{}])
-        counts, details = _fetch_dependabot_counts(session, "octocat", "bare-repo")
-
-        assert details[0]["package"] is None
-        assert details[0]["ecosystem"] is None
-        assert details[0]["scope"] is None
-        assert details[0]["ghsa_id"] is None
-        assert details[0]["first_patched_version"] is None
-        assert details[0]["severity"] is None
+        result = fetch_dependabot_details([_make_audit("bare-repo")], token="tok", session=session)
+        d = result["bare-repo"][0]
+        assert d["package"] is None
+        assert d["ecosystem"] is None
+        assert d["scope"] is None
+        assert d["ghsa_id"] is None
+        assert d["first_patched_version"] is None
+        assert d["severity"] is None
 
     def test_no_first_patched_version_gives_none(self) -> None:
-        """Alert with no first_patched_version → detail.first_patched_version is None."""
+        """Alert without first_patched_version → detail.first_patched_version is None."""
         alert = _make_dep_alert()
-        # Remove first_patched_version from the vulnerability sub-object
         del alert["security_vulnerability"]["first_patched_version"]
         session = _mock_session_dep([alert])
-        _, details = _fetch_dependabot_counts(session, "octocat", "repo")
-        assert details[0]["first_patched_version"] is None
-
-    def test_unavailable_endpoint_returns_empty_details(self) -> None:
-        """403 → counts unavailable=False, details=[]."""
-        session = MagicMock(spec=requests.Session)
-        resp = MagicMock(spec=requests.Response)
-        resp.status_code = 403
-        exc = requests.HTTPError(response=resp)
-        resp.raise_for_status.side_effect = exc
-        session.get.side_effect = exc
-        counts, details = _fetch_dependabot_counts(session, "octocat", "private")
-        assert counts["available"] is False
-        assert details == []
+        result = fetch_dependabot_details([_make_audit("repo")], token="tok", session=session)
+        assert result["repo"][0]["first_patched_version"] is None
 
     def test_severity_fallback_to_vulnerability_field(self) -> None:
-        """When security_advisory.severity is absent, falls back to security_vulnerability.severity."""
+        """When security_advisory.severity absent, falls back to security_vulnerability.severity."""
         alert = {
-            "security_advisory": {},  # no severity here
+            "security_advisory": {},
             "security_vulnerability": {"severity": "medium", "first_patched_version": None},
             "dependency": {"package": {"name": "pkg", "ecosystem": "pip"}, "scope": "runtime"},
         }
         session = _mock_session_dep([alert])
-        counts, details = _fetch_dependabot_counts(session, "o", "r")
-        assert counts["medium"] == 1
-        assert details[0]["severity"] == "medium"
+        result = fetch_dependabot_details([_make_audit("repo")], token="tok", session=session)
+        assert result["repo"][0]["severity"] == "medium"
 
+    def test_http_error_expected_status_returns_empty_list_no_crash(self) -> None:
+        """403/404/410 → repo gets empty list, no exception raised."""
+        session = MagicMock(spec=requests.Session)
+        resp = MagicMock(spec=requests.Response)
+        resp.status_code = 403
+        exc = requests.HTTPError(response=resp)
+        session.get.side_effect = exc
+        result = fetch_dependabot_details([_make_audit("private")], token="tok", session=session)
+        assert result["private"] == []
 
-# ---------------------------------------------------------------------------
-# Non-breaking: dependabot counts shape unchanged when detail capture added
-# ---------------------------------------------------------------------------
+    def test_http_error_unexpected_status_returns_empty_list_no_crash(self) -> None:
+        """500 → repo gets empty list, no exception raised."""
+        session = MagicMock(spec=requests.Session)
+        resp = MagicMock(spec=requests.Response)
+        resp.status_code = 500
+        exc = requests.HTTPError(response=resp)
+        session.get.side_effect = exc
+        result = fetch_dependabot_details([_make_audit("flaky")], token="tok", session=session)
+        assert result["flaky"] == []
 
+    def test_generic_exception_returns_empty_list_no_crash(self) -> None:
+        """Any unexpected exception → repo gets empty list, no exception propagated."""
+        session = MagicMock(spec=requests.Session)
+        session.get.side_effect = RuntimeError("network exploded")
+        result = fetch_dependabot_details([_make_audit("broken")], token="tok", session=session)
+        assert result["broken"] == []
 
-class TestCountsShapeUnchanged:
-    def test_dependabot_counts_dict_shape_identical(self) -> None:
-        """The 'dependabot' counts dict must still have exactly the original 5 keys."""
-        alerts = [
-            _make_dep_alert(severity="critical"),
-            _make_dep_alert(severity="high"),
-            _make_dep_alert(severity="medium"),
-            _make_dep_alert(severity="low"),
-        ]
-        session = _mock_session_dep(alerts)
-        result = fetch_ghas_alerts([_make_audit("repo")], token="tok", session=session)
-        dep = result["repo"]["dependabot"]
-        assert set(dep.keys()) == {"critical", "high", "medium", "low", "available"}
-        assert dep["critical"] == 1
-        assert dep["high"] == 1
-        assert dep["medium"] == 1
-        assert dep["low"] == 1
-        assert dep["available"] is True
+    def test_no_token_returns_empty_dict(self) -> None:
+        result = fetch_dependabot_details([_make_audit("repo")], token=None)
+        assert result == {}
 
-    def test_dependabot_details_is_sibling_not_nested(self) -> None:
-        """dependabot_details is a sibling key, not inside the counts dict."""
-        session = _mock_session_dep([_make_dep_alert()])
-        result = fetch_ghas_alerts([_make_audit("repo")], token="tok", session=session)
-        # Sibling at repo level
-        assert "dependabot_details" in result["repo"]
-        # NOT nested inside counts
-        assert "dependabot_details" not in result["repo"]["dependabot"]
+    def test_multiple_repos_partial_failure_continues(self) -> None:
+        """A failure on one repo does not prevent other repos from being fetched."""
+        call_count = {"n": 0}
 
-    def test_build_security_fields_ignores_details_key(self) -> None:
-        """_build_security_fields must handle entries that contain dependabot_details."""
-        from src.portfolio_truth_reconcile import _build_security_fields
+        def _get(url: str, params=None, timeout=None):
+            call_count["n"] += 1
+            if "bad-repo" in url:
+                raise RuntimeError("forced failure")
+            resp = MagicMock(spec=requests.Response)
+            resp.status_code = 200
+            resp.raise_for_status = MagicMock()
+            resp.links = {}
+            resp.headers = {}
+            resp.json.return_value = [_make_dep_alert(package="pkg")]
+            return resp
 
-        entry = {
-            "dependabot": {"critical": 3, "high": 1, "medium": 0, "low": 0, "available": True},
-            "dependabot_details": [{"package": "x", "severity": "critical"}],
-            "code_scanning": {"critical": 0, "high": 0, "warning": 0, "note": 0, "available": True},
-            "secret_scanning": {"open": 0, "available": True},
-        }
-        sf = _build_security_fields(entry)
-        assert sf.dependabot_critical == 3
-        assert sf.dependabot_high == 1
+        session = MagicMock(spec=requests.Session)
+        session.get.side_effect = _get
+        audits = [_make_audit("good-repo"), _make_audit("bad-repo")]
+        result = fetch_dependabot_details(audits, token="tok", session=session)
+        assert result["good-repo"][0]["package"] == "pkg"
+        assert result["bad-repo"] == []
+
+    def test_error_handlers_log_no_interpolated_values(self) -> None:
+        """Verify the module source has no format args in the except-handler log calls."""
+        import inspect
+
+        from src import ghas_alert_details
+
+        source = inspect.getsource(ghas_alert_details)
+        # Find the except blocks — they should only contain logger calls with
+        # a plain string literal and no % or .format() interpolation.
+        import re
+
+        # Extract all logger.* call lines that appear after an 'except' keyword
+        except_logger_calls = re.findall(
+            r"except[^:]+:.*?logger\.[a-z]+\(([^)]+)\)", source, re.DOTALL
+        )
+        for call_args in except_logger_calls:
+            # No %-formatting with a second argument
+            assert "%" not in call_args, f"Found %-format in except logger: {call_args!r}"
+            # No .format() chaining
+            assert ".format(" not in call_args, f"Found .format() in except logger: {call_args!r}"
 
 
 # ---------------------------------------------------------------------------

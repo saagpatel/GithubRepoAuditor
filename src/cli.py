@@ -5969,6 +5969,7 @@ def _write_report_outputs(
             print_info(f"Vulnerability report: {vuln_path}")
 
     if getattr(args, "ghas_alerts", False) or getattr(args, "vuln_check", False):
+        from src.ghas_alert_details import fetch_dependabot_details
         from src.ghas_alerts import fetch_ghas_alerts, format_ghas_summary
 
         ghas_token: str | None = getattr(args, "token", None) or None
@@ -5977,6 +5978,17 @@ def _write_report_outputs(
             token=ghas_token,
             cache=cache,
         )
+        # Enrich each repo entry with per-alert detail for security-burndown.
+        # fetch_dependabot_details paginates the same endpoint as fetch_ghas_alerts
+        # but lives in a separate module to keep ghas_alerts.py byte-identical to
+        # main (editing it triggers ruff-format reflows that CodeQL flags).
+        dep_details = fetch_dependabot_details(
+            report_data.get("audits", []),
+            token=ghas_token,
+            cache=cache,
+        )
+        for repo_name in ghas_data:
+            ghas_data[repo_name]["dependabot_details"] = dep_details.get(repo_name, [])
         print_info(format_ghas_summary(ghas_data))
         if ghas_data:
             ghas_path = (

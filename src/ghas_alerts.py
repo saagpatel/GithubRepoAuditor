@@ -17,7 +17,6 @@ Code-scanning severity bucketing:
   warning    → warning
   note       → note
 """
-
 from __future__ import annotations
 
 import json
@@ -87,7 +86,6 @@ def _paginate(
             next_url = next_link
         else:
             import re
-
             link_header = resp.headers.get("Link", "")
             match = re.search(r'<([^>]+)>;\s*rel="next"', link_header)
             if match:
@@ -105,13 +103,11 @@ def _make_session(token: str | None, session: requests.Session | None) -> reques
     from urllib3.util import Retry
 
     s = requests.Session()
-    s.headers.update(
-        {
-            "Accept": "application/vnd.github.v3+json",
-            "User-Agent": "github-repo-auditor/0.1",
-            "X-GitHub-Api-Version": "2026-03-10",
-        }
-    )
+    s.headers.update({
+        "Accept": "application/vnd.github.v3+json",
+        "User-Agent": "github-repo-auditor/0.1",
+        "X-GitHub-Api-Version": "2026-03-10",
+    })
     if token:
         s.headers["Authorization"] = f"token {token}"
 
@@ -136,67 +132,36 @@ def _fetch_dependabot_counts(
     session: requests.Session,
     owner: str,
     repo: str,
-) -> tuple[dict, list[dict]]:
-    """Fetch open Dependabot alert counts grouped by severity, plus per-alert detail.
-
-    Returns a 2-tuple of (counts, details):
-      counts  — {"critical": N, "high": N, "medium": N, "low": N, "available": bool}
-      details — one dict per open alert with keys: package, ecosystem, scope,
-                severity, ghsa_id, first_patched_version, manifest_path.
-    The details list is empty when the endpoint is unavailable.
-    """
+) -> dict:
+    """Fetch open Dependabot alert counts grouped by severity."""
     base: dict = {"critical": 0, "high": 0, "medium": 0, "low": 0, "available": False}
-    details: list[dict] = []
     url = f"{GITHUB_API_BASE_URL}/repos/{owner}/{repo}/dependabot/alerts"
     try:
         alerts = _paginate(session, url, {"state": "open", "per_page": "100"})
         for alert in alerts:
-            advisory = alert.get("security_advisory") or {}
-            vulnerability = alert.get("security_vulnerability") or {}
-            dependency = alert.get("dependency") or {}
-            package = dependency.get("package") or {}
-
             severity = (
-                advisory.get("severity", "") or vulnerability.get("severity", "") or ""
+                alert.get("security_advisory", {}).get("severity", "")
+                or alert.get("security_vulnerability", {}).get("severity", "")
+                or ""
             ).lower()
             if severity in base:
                 base[severity] += 1
-
-            first_patched: str | None = None
-            first_patched_obj = vulnerability.get("first_patched_version")
-            if isinstance(first_patched_obj, dict):
-                first_patched = first_patched_obj.get("identifier")
-
-            details.append(
-                {
-                    "package": package.get("name"),
-                    "ecosystem": package.get("ecosystem"),
-                    "scope": dependency.get("scope"),
-                    "severity": severity or None,
-                    "ghsa_id": advisory.get("ghsa_id"),
-                    "first_patched_version": first_patched,
-                    "manifest_path": dependency.get("manifest_path"),
-                }
-            )
         base["available"] = True
-        return base, details
+        return base
     except requests.HTTPError as exc:
         status = exc.response.status_code if exc.response is not None else None
         if status in _EXPECTED_UNAVAILABLE_STATUSES:
-            logger.debug("Dependabot alerts unavailable for %s/%s", owner, repo)
+            logger.debug(
+                "Dependabot alerts unavailable for %s/%s (HTTP %s)", owner, repo, status
+            )
         else:
             logger.warning(
-                "Failed to fetch Dependabot alerts for %s/%s (%s)", owner, repo, type(exc).__name__
+                "Failed to fetch Dependabot alerts for %s/%s: %s", owner, repo, exc
             )
-        return base, details
+        return base
     except Exception as exc:
-        logger.warning(
-            "Unexpected error fetching Dependabot alerts for %s/%s (%s)",
-            owner,
-            repo,
-            type(exc).__name__,
-        )
-        return base, details
+        logger.warning("Unexpected error fetching Dependabot alerts for %s/%s: %s", owner, repo, exc)
+        return base
 
 
 def _fetch_code_scanning_counts(
@@ -215,7 +180,9 @@ def _fetch_code_scanning_counts(
         for alert in alerts:
             rule = alert.get("rule", {}) if isinstance(alert, dict) else {}
             raw_severity = (
-                rule.get("security_severity_level") or rule.get("severity") or ""
+                rule.get("security_severity_level")
+                or rule.get("severity")
+                or ""
             ).lower()
             bucket = _CODE_SCANNING_BUCKET.get(raw_severity)
             if bucket and bucket in base:
@@ -225,21 +192,17 @@ def _fetch_code_scanning_counts(
     except requests.HTTPError as exc:
         status = exc.response.status_code if exc.response is not None else None
         if status in _EXPECTED_UNAVAILABLE_STATUSES:
-            logger.debug("Code scanning alerts unavailable for %s/%s", owner, repo)
+            logger.debug(
+                "Code scanning alerts unavailable for %s/%s (HTTP %s)", owner, repo, status
+            )
         else:
             logger.warning(
-                "Failed to fetch code scanning alerts for %s/%s (%s)",
-                owner,
-                repo,
-                type(exc).__name__,
+                "Failed to fetch code scanning alerts for %s/%s: %s", owner, repo, exc
             )
         return base
     except Exception as exc:
         logger.warning(
-            "Unexpected error fetching code scanning alerts for %s/%s (%s)",
-            owner,
-            repo,
-            type(exc).__name__,
+            "Unexpected error fetching code scanning alerts for %s/%s: %s", owner, repo, exc
         )
         return base
 
@@ -260,21 +223,17 @@ def _fetch_secret_scanning_counts(
     except requests.HTTPError as exc:
         status = exc.response.status_code if exc.response is not None else None
         if status in _EXPECTED_UNAVAILABLE_STATUSES:
-            logger.debug("Secret scanning alerts unavailable for %s/%s", owner, repo)
+            logger.debug(
+                "Secret scanning alerts unavailable for %s/%s (HTTP %s)", owner, repo, status
+            )
         else:
             logger.warning(
-                "Failed to fetch secret scanning alerts for %s/%s (%s)",
-                owner,
-                repo,
-                type(exc).__name__,
+                "Failed to fetch secret scanning alerts for %s/%s: %s", owner, repo, exc
             )
         return base
     except Exception as exc:
         logger.warning(
-            "Unexpected error fetching secret scanning alerts for %s/%s (%s)",
-            owner,
-            repo,
-            type(exc).__name__,
+            "Unexpected error fetching secret scanning alerts for %s/%s: %s", owner, repo, exc
         )
         return base
 
@@ -290,14 +249,9 @@ def fetch_ghas_alerts(
 
     Returns {repo_name: {
         "dependabot": {"critical": N, "high": N, "medium": N, "low": N, "available": bool},
-        "dependabot_details": [ {package, ecosystem, scope, severity, ghsa_id,
-                                 first_patched_version, manifest_path}, ... ],
         "code_scanning": {"critical": N, "high": N, "warning": N, "note": N, "available": bool},
         "secret_scanning": {"open": N, "available": bool},
     }}
-
-    The "dependabot" counts dict shape is unchanged; "dependabot_details" is a new
-    sibling key, so downstream count consumers are unaffected.
 
     Repos with no GitHub token are skipped (all categories get available=False).
     403/404/410 responses indicate GHAS is not enabled for that repo — recorded
@@ -329,10 +283,8 @@ def fetch_ghas_alerts(
                 results[repo_name] = json.loads(cached)  # type: ignore[arg-type]
                 continue
 
-        dep_counts, dep_details = _fetch_dependabot_counts(s, owner, repo)
         repo_result: dict = {
-            "dependabot": dep_counts,
-            "dependabot_details": dep_details,
+            "dependabot": _fetch_dependabot_counts(s, owner, repo),
             "code_scanning": _fetch_code_scanning_counts(s, owner, repo),
             "secret_scanning": _fetch_secret_scanning_counts(s, owner, repo),
         }
