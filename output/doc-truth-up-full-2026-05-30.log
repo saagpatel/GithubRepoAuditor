@@ -1,0 +1,85 @@
+doc-truth-up batch · 80 repo(s) · tier=2 · model=sonnet · concurrency=8 · EXECUTE
+[1/80] AssistSupport-security-alerts → skipped (not a git repo)
+[2/80] AIFortuneTeller → already_done
+[3/80] ArguMap → already_done
+[4/80] APIReverse → already_done
+[5/80] BrowserHistoryVisualizer → already_done
+[6/80] Calibrate → already_done
+[7/80] Chromafield → already_done
+[8/80] Codec → skipped (uncommitted tracked changes)
+[9/80] AssistSupport → skipped (uncommitted tracked changes)
+[10/80] Fun:GamePrjs/DeepTank → skipped (uncommitted tracked changes)
+[11/80] Fun:GamePrjs/ CryptForge → skipped (uncommitted tracked changes)
+[12/80] Fun:GamePrjs/DesktopPEt → skipped (uncommitted tracked changes)
+[13/80] Fun:GamePrjs/EarthPulse → skipped (uncommitted tracked changes)
+[14/80] FunGamePrjs/OrbitForge → skipped (uncommitted tracked changes)
+[15/80] GPT_RAG → skipped (uncommitted tracked changes)
+[16/80] EvolutionSandbox → ran
+[17/80] Devil's Advocate → ran
+[18/80] ITPRJsViaClaude/IncidentWorkbench → skipped (uncommitted tracked changes)
+[19/80] ITPRJsViaClaude/KBFreshnessDetector → skipped (uncommitted tracked changes)
+[20/80] ITPRJsViaClaude/PersonalKBDrafter → skipped (uncommitted tracked changes)
+[21/80] Fun:GamePrjs/DesktopTerrarium/desktop_terrarium → ran
+[22/80] ITPRJsViaClaude/SmartClipboard → skipped (uncommitted tracked changes)
+[23/80] ConvictionMapper → ran
+[24/80] ITPRJsViaClaude/TicketDashboard → skipped (uncommitted tracked changes)
+[25/80] ITPRJsViaClaude/TicketHandoff → skipped (uncommitted tracked changes)
+[26/80] IncidentMgmt → skipped (uncommitted tracked changes)
+[27/80] IncidentReview → skipped (uncommitted tracked changes)
+[28/80] GlassLayer → ran
+[29/80] JSMTicketAnalyticsExport → skipped (uncommitted tracked changes)
+[30/80] Fun:GamePrjs/PomGambler → ran
+[31/80] Fun:GamePrjs/OrbitForge → ran
+[32/80] ComplianceKit → ran
+[33/80] HowMoneyMoves → ran
+[34/80] LifeCadenceLedger → ran
+[35/80] MoneyPRJsViaGPT/AIGCCore → skipped (uncommitted tracked changes)
+[36/80] MoneyPRJsViaGPT/SignalFlow → skipped (uncommitted tracked changes)
+[37/80] ITPRJsViaClaude/SnippetLibrary → ran
+[38/80] MCPAudit → ran
+[39/80] Premise → skipped (uncommitted tracked changes)
+[40/80] JobMarketHeatmap → ran
+[41/80] ITPRJsViaClaude/ScreenshotAnnotate → ran
+[42/80] Interruption Resume Studio → ran
+[43/80] Misc:NoGoPRJs/app → ran
+[44/80] Liminal → ran
+[45/80] NetworkDecoder → ran
+[46/80] NeuralNetwork → ran
+[47/80] ScreenshottoDataSelect → ran
+[48/80] Pulse Orbit → ran
+[49/80] RedditSentimentAnalyzer → ran
+[50/80] ResumeEvolver → ran
+[51/80] ReturnRadar → ran
+[52/80] RoomTone → ran
+[53/80] TradeOffAtlas → ran
+[54/80] VanityPRJs/Relay → skipped (uncommitted tracked changes)
+[55/80] Sovereign → ran
+[56/80] VanityPRJs/Chronomap → ran
+[57/80] Seismoscope → ran
+[58/80] Signal & Noise → ran
+[59/80] VanityPRJs/Conductor → ran
+[60/80] evals → skipped (not a git repo)
+[61/80] VanityPRJs/Echolocate → ran
+[62/80] da-scaffold → ran
+[63/80] Terroir → ran
+[64/80] mcpforge-hosted-ts-smoke → skipped (not a git repo)
+[65/80] mcpforge-openai-full-smoke-gate → skipped (not a git repo)
+[66/80] mcpforge-openai-remote-openapi-readiness → skipped (not a git repo)
+[67/80] mcpforge-openapi-auth-smoke-fixture → skipped (not a git repo)
+[68/80] mcpforge-ts-hardening → skipped (not a git repo)
+[69/80] mcpforge-v03-builder → skipped (not a git repo)
+[70/80] resume-evolver-tmp-1776063720 → skipped (uncommitted tracked changes)
+[71/80] VanityPRJs/TerraSynth → ran
+[72/80] bridge-db → ran
+[73/80] visual-album-studio → skipped (uncommitted tracked changes)
+[74/80] cross-system-smoke → ran
+[75/80] ink → ran
+[76/80] Wavelength → ran
+[77/80] knowledgecore → ran
+[78/80] stockpulse → ran
+[79/80] thought-trails → ran
+[80/80] mcpforge → ran
+
+Done. {'skipped': 31, 'already_done': 6, 'ran': 43}
+Results: /Users/d/Projects/GithubRepoAuditor/output/doc-truth-up-run-2026-05-30.json
+Review each repo's docs/truth-up-* branch, then merge or delete. Nothing was pushed.

@@ -1,0 +1,778 @@
+[
+  {
+    "project_key": "AssistSupport-security-alerts",
+    "abs_path": "/Users/d/Projects/AssistSupport-security-alerts",
+    "status": "skipped",
+    "reason": "not a git repo"
+  },
+  {
+    "project_key": "AIFortuneTeller",
+    "abs_path": "/Users/d/Projects/AIFortuneTeller",
+    "status": "already_done",
+    "branch": "docs/truth-up-2026-05-30"
+  },
+  {
+    "project_key": "ArguMap",
+    "abs_path": "/Users/d/Projects/ArguMap",
+    "status": "already_done",
+    "branch": "docs/truth-up-2026-05-30"
+  },
+  {
+    "project_key": "APIReverse",
+    "abs_path": "/Users/d/Projects/APIReverse",
+    "status": "already_done",
+    "branch": "docs/truth-up-2026-05-30"
+  },
+  {
+    "project_key": "BrowserHistoryVisualizer",
+    "abs_path": "/Users/d/Projects/BrowserHistoryVisualizer",
+    "status": "already_done",
+    "branch": "docs/truth-up-2026-05-30"
+  },
+  {
+    "project_key": "Calibrate",
+    "abs_path": "/Users/d/Projects/Calibrate",
+    "status": "already_done",
+    "branch": "docs/truth-up-2026-05-30"
+  },
+  {
+    "project_key": "Chromafield",
+    "abs_path": "/Users/d/Projects/Chromafield",
+    "status": "already_done",
+    "branch": "docs/truth-up-2026-05-30"
+  },
+  {
+    "project_key": "Codec",
+    "abs_path": "/Users/d/Projects/Codec",
+    "status": "skipped",
+    "reason": "uncommitted tracked changes"
+  },
+  {
+    "project_key": "AssistSupport",
+    "abs_path": "/Users/d/Projects/AssistSupport",
+    "status": "skipped",
+    "reason": "uncommitted tracked changes"
+  },
+  {
+    "project_key": "Fun:GamePrjs/DeepTank",
+    "abs_path": "/Users/d/Projects/Fun:GamePrjs/DeepTank",
+    "status": "skipped",
+    "reason": "uncommitted tracked changes"
+  },
+  {
+    "project_key": "Fun:GamePrjs/ CryptForge",
+    "abs_path": "/Users/d/Projects/Fun:GamePrjs/ CryptForge",
+    "status": "skipped",
+    "reason": "uncommitted tracked changes"
+  },
+  {
+    "project_key": "Fun:GamePrjs/DesktopPEt",
+    "abs_path": "/Users/d/Projects/Fun:GamePrjs/DesktopPEt",
+    "status": "skipped",
+    "reason": "uncommitted tracked changes"
+  },
+  {
+    "project_key": "Fun:GamePrjs/EarthPulse",
+    "abs_path": "/Users/d/Projects/Fun:GamePrjs/EarthPulse",
+    "status": "skipped",
+    "reason": "uncommitted tracked changes"
+  },
+  {
+    "project_key": "FunGamePrjs/OrbitForge",
+    "abs_path": "/Users/d/Projects/FunGamePrjs/OrbitForge",
+    "status": "skipped",
+    "reason": "uncommitted tracked changes"
+  },
+  {
+    "project_key": "GPT_RAG",
+    "abs_path": "/Users/d/Projects/GPT_RAG",
+    "status": "skipped",
+    "reason": "uncommitted tracked changes"
+  },
+  {
+    "project_key": "EvolutionSandbox",
+    "abs_path": "/Users/d/Projects/EvolutionSandbox",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "AGENTS.md",
+      "DOC-RECONCILIATION.md",
+      "docs/PORTFOLIO-DISPOSITION.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "2:35:26 PDT\n\nCLAIM STATUS\n  What it is      consistent\n  Current state   drifted-fixed\n  Stack           consistent\n  How to run      consistent\n  Known risks     drifted-fixed\n  Next move       drifted-fixed\n\nCOUNTS   consistent: 3  |  drifted-fixed: 3  |  unverifiable: 0\n\nFILES CHANGED\n  AGENTS.md\n  docs/PORTFOLIO-DISPOSITION.md\n  DOC-RECONCILIATION.md (new)\n\nNOTABLE DRIFTS\n  AGENTS.md: project status was \"active\" \u2014 code+disposition says \"Release Frozen\"\n  AGENTS.md: known-risk entry and next-move were stale relative to the handoff\n    doc (docs/PORTFOLIO-DISPOSITION.md) already committed in this same repo\n  docs/PORTFOLIO-DISPOSITION.md: unblock item 5 had an open \"localStorage or\n    IndexedDB?\" question \u2014 already answered in docs/architecture.md\n\nNON-DOC FILES IN GIT STATUS   none\n```"
+  },
+  {
+    "project_key": "Devil's Advocate",
+    "abs_path": "/Users/d/Projects/Devil's Advocate",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "CLAUDE.md",
+      "DOC-RECONCILIATION.md",
+      "README.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "ifiable\n\nCOUNTS\n  consistent:      3\n  drifted-fixed:   2 (stack + current-state, 5 individual corrections)\n  unverifiable:    1\n\nDOC FILES CHANGED\n  README.md               \u2014 Next.js 14 \u2192 15 (1 line)\n  CLAUDE.md               \u2014 Next.js 14\u219215, model claude-sonnet-4-20250514\u2192claude-sonnet-4-6,\n                            Zustand/ReactQuery\u2192\"installed but not in use\", Phase 0\u2192all complete,\n                            Vercel AI SDK streamText\u2192Anthropic SDK stream() [main + portfolio-context]\n  DOC-RECONCILIATION.md   \u2014 created (new)\n\nHUMAN-REVIEW ITEMS (in IMPLEMENTATION-ROADMAP.md \u2014 not edited)\n  :29-78  File structure lists src/lib/ai/stream.ts \u2014 never created; helpers are in client.ts\n  :228    npx create-next-app@14 \u2192 project actually runs Next.js 15\n\nNON-DOC FILES IN git status: none\n```"
+  },
+  {
+    "project_key": "ITPRJsViaClaude/IncidentWorkbench",
+    "abs_path": "/Users/d/Projects/ITPRJsViaClaude/IncidentWorkbench",
+    "status": "skipped",
+    "reason": "uncommitted tracked changes"
+  },
+  {
+    "project_key": "ITPRJsViaClaude/KBFreshnessDetector",
+    "abs_path": "/Users/d/Projects/ITPRJsViaClaude/KBFreshnessDetector",
+    "status": "skipped",
+    "reason": "uncommitted tracked changes"
+  },
+  {
+    "project_key": "ITPRJsViaClaude/PersonalKBDrafter",
+    "abs_path": "/Users/d/Projects/ITPRJsViaClaude/PersonalKBDrafter",
+    "status": "skipped",
+    "reason": "uncommitted tracked changes"
+  },
+  {
+    "project_key": "Fun:GamePrjs/DesktopTerrarium/desktop_terrarium",
+    "abs_path": "/Users/d/Projects/Fun:GamePrjs/DesktopTerrarium/desktop_terrarium",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "DOC-RECONCILIATION.md",
+      "docs/FIRST-BOOT-AND-NESTED-LAYOUT.md"
+    ],
+    "orig_branch": "master",
+    "claude_summary": "1\n\nDOC FILES CHANGED\n  docs/FIRST-BOOT-AND-NESTED-LAYOUT.md\n  DOC-RECONCILIATION.md  (created)\n\nHUMAN-EYE ITEMS\n  README.md:27-28 \u2014 install shows `cd DesktopTerrarium` (GitHub default)\n    but portfolio layout uses `desktop_terrarium/`; low-risk docs\u2194docs\n    inconsistency, code can't arbitrate\n\nNON-DOC FILES IN git status\n  none (AGENTS.md / .artifacts / .perf-results were already untracked \u2014 not touched)\n```\n\nThe two fixes: the `docs/FIRST-BOOT-AND-NESTED-LAYOUT.md` Section 5 paragraph that invented `stable-core` and `experimental-weather` Bevy features (Cargo.toml has no `[features]` block at all, only `bevy = { features = [\"wayland\"] }`) was replaced with an accurate description; and the Section 8 \"last commit\" row was updated from the stale `b2fc2ca` sha to the actual HEAD `4def9cb`."
+  },
+  {
+    "project_key": "ITPRJsViaClaude/SmartClipboard",
+    "abs_path": "/Users/d/Projects/ITPRJsViaClaude/SmartClipboard",
+    "status": "skipped",
+    "reason": "uncommitted tracked changes"
+  },
+  {
+    "project_key": "ConvictionMapper",
+    "abs_path": "/Users/d/Projects/ConvictionMapper",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "CLAUDE.md",
+      "DOC-RECONCILIATION.md",
+      "README.md",
+      "docs/PORTFOLIO-DISPOSITION.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "it is         consistent\n  Current state      drifted-fixed\n  Stack              drifted-fixed\n  How to run         consistent\n  Known risks        consistent\n  Next move          drifted-fixed\n\nCOUNTS   consistent: 3 | drifted-fixed: 3 | unverifiable: 0\n\nDOC FILES CHANGED\n  CLAUDE.md                        \u2014 stack versions + current phase (both sections)\n  README.md                        \u2014 license \"Unlicensed\" \u2192 \"MIT \u2014 see LICENSE\"\n  docs/PORTFOLIO-DISPOSITION.md    \u2014 stale origin/main tip SHA updated\n  DOC-RECONCILIATION.md            \u2014 created (this report)\n\nCODE\u2194DOC CONTRADICTIONS FOR HUMAN EYE\n  IMPLEMENTATION-ROADMAP.md ~L413\u2013426: \"Deferred to V2\" section marks prediction\n  tracking as future work \u2014 it shipped on main. Low-urgency annotation.\n\nNON-DOC FILES IN GIT STATUS   none\n```"
+  },
+  {
+    "project_key": "ITPRJsViaClaude/TicketDashboard",
+    "abs_path": "/Users/d/Projects/ITPRJsViaClaude/TicketDashboard",
+    "status": "skipped",
+    "reason": "uncommitted tracked changes"
+  },
+  {
+    "project_key": "ITPRJsViaClaude/TicketHandoff",
+    "abs_path": "/Users/d/Projects/ITPRJsViaClaude/TicketHandoff",
+    "status": "skipped",
+    "reason": "uncommitted tracked changes"
+  },
+  {
+    "project_key": "IncidentMgmt",
+    "abs_path": "/Users/d/Projects/IncidentMgmt",
+    "status": "skipped",
+    "reason": "uncommitted tracked changes"
+  },
+  {
+    "project_key": "IncidentReview",
+    "abs_path": "/Users/d/Projects/IncidentReview",
+    "status": "skipped",
+    "reason": "uncommitted tracked changes"
+  },
+  {
+    "project_key": "GlassLayer",
+    "abs_path": "/Users/d/Projects/GlassLayer",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "CLAUDE.md",
+      "DOC-RECONCILIATION.md",
+      "README.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": ")\n  how-to-run      consistent\n  known-risks     drifted-fixed   (stale v2 \"Do NOT\" items removed from CLAUDE.md)\n  next-move       unverifiable\n\nCOUNTS\n  consistent: 1   drifted-fixed: 4   unverifiable: 1\n\nDOC FILES CHANGED\n  README.md              \u2014 added Multiple profiles, Color themes, Auto-launch bullets\n  CLAUDE.md              \u2014 current phase, 2 stack entries, stale Do NOT items (\u00d72 sections)\n  DOC-RECONCILIATION.md  \u2014 created\n\nHUMAN-REVIEW CONTRADICTIONS (IMPLEMENTATION-ROADMAP.md \u2014 not editable)\n  Phase 2 task 10: bundle id is com.glasslayer.app, not com.saagarjha.glasslayer\n  Phase 0/1/2 checklists: all [ ] unchecked but all phases are shipped\n  Dependencies section: lists tauri-plugin-sql + tauri-plugin-fs; actual deps are rusqlite + notify\n\nNON-DOC FILES IN git status: none\n```"
+  },
+  {
+    "project_key": "JSMTicketAnalyticsExport",
+    "abs_path": "/Users/d/Projects/JSMTicketAnalyticsExport",
+    "status": "skipped",
+    "reason": "uncommitted tracked changes"
+  },
+  {
+    "project_key": "Fun:GamePrjs/PomGambler",
+    "abs_path": "/Users/d/Projects/Fun:GamePrjs/PomGambler",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "DOC-RECONCILIATION.md",
+      "docs/PORTFOLIO-DISPOSITION.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "356fe673` \u00b7 **2026-05-30 22:35:28 PDT**\n\n| Claim | Status |\n|---|---|\n| What it is | consistent |\n| Current state | consistent |\n| Stack | consistent |\n| How to run | consistent |\n| Known risks | consistent |\n| Next move | consistent |\n\n**Counts:** 5 consistent \u00b7 1 drifted-fixed \u00b7 0 unverifiable\n\n**Doc files changed:**\n- `docs/PORTFOLIO-DISPOSITION.md` \u2014 stale HEAD sha in \"Last known reference\" table updated (`f3cbb8d` \u2192 `6f961db`)\n- `DOC-RECONCILIATION.md` \u2014 created (this pass's audit record)\n\n**Contradictions worth a human's eye:**\n- `CHANGELOG.md:9` \u2014 body says `Initial release` but CLOSEOUT.md documents ~8 shipped features; needs real entries\n- `Makefile:3\u201319` \u2014 all targets delegate to `npm run *` but there's no `package.json`; would fail if run\n\n**Non-doc files in `git status`:** none"
+  },
+  {
+    "project_key": "Fun:GamePrjs/OrbitForge",
+    "abs_path": "/Users/d/Projects/Fun:GamePrjs/OrbitForge",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "DOC-RECONCILIATION.md",
+      "docs/LOCAL-CHECKOUT-DISPOSITION.md"
+    ],
+    "orig_branch": "master",
+    "claude_summary": "refs)\n  next-move       unverifiable   (UI polish status can't be read from code)\n\ncounts:  consistent 4 / drifted-fixed 1 / unverifiable 1\n\ndoc files changed:\n  docs/LOCAL-CHECKOUT-DISPOSITION.md  (stale branch codex/chore/bootstrap-codex-os \u2192\n                                       master; stale SHA 07ef263 \u2192 8f7d64a)\n  DOC-RECONCILIATION.md               (new \u2014 full audit record)\n\ncontradictions for human review (files outside editable scope):\n  CONTRIBUTING.md:12  \u2014 absolute path /Users/d/Projects/OrbitForge/.gitignore is wrong;\n                        canonical path is Fun:GamePrjs/OrbitForge (colon in parent dir)\n  CONTRIBUTING.md:32  \u2014 same wrong absolute path for package.json reference\n\nnon-doc files in git status:  none (AGENTS.md and .perf-results/ are pre-existing untracked)\n```"
+  },
+  {
+    "project_key": "ComplianceKit",
+    "abs_path": "/Users/d/Projects/ComplianceKit",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "CLAUDE.md",
+      "DOC-RECONCILIATION.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "verComponentClient/createRouteHandlerClient \u2192 createServerClient\n                       from @supabase/ssr (matches actual lib/supabase/ code)\n  DOC-RECONCILIATION.md \u2014 created (findings + contradictions for manual review)\n\nCODE\u2194DOC CONTRADICTIONS FOR HUMAN REVIEW\n  RESUMPTION-PROMPT.md:13-24 \u2014 claims Phase 0 complete + Phase 1 current; reality: no\n    app/(auth)/, no app/(dashboard)/, no supabase/seed.sql \u2014 Phase 0 is ~50% done\n  RESUMPTION-PROMPT.md:54 \u2014 \"Sonnet 4.5\" vs CLAUDE.md \"claude-sonnet-4-6\"\n  IMPLEMENTATION-ROADMAP.md:130 \u2014 \"Sonnet 4.5\" vs CLAUDE.md \"claude-sonnet-4-6\"\n  CLAUDE.md:85-92 \u2014 portfolio-context block (auto-managed) still shows all Phase 0 items\n    unchecked; needs a portfolio-system regeneration to pick up the 3 completed items\n\nNON-DOC FILES IN git status: none\n```"
+  },
+  {
+    "project_key": "HowMoneyMoves",
+    "abs_path": "/Users/d/Projects/HowMoneyMoves",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "CLAUDE.md",
+      "DOC-RECONCILIATION.md",
+      "README.md"
+    ],
+    "orig_branch": "chore/add-system-card",
+    "claude_summary": "n      consistent\n  known-risks     consistent\n  next-move       drifted-fixed (Fedwire Securities claim removed from features)\n\nCOUNTS  consistent:4  drifted-fixed:2  unverifiable:0\n\nDOC FILES CHANGED\n  README.md       \u2014 removed false Zustand claim (Architecture); removed\n                    unsubstantiated \"Fedwire Securities service for\n                    government bonds\" from Features bullet\n  CLAUDE.md       \u2014 React 18\u219219, TypeScript 5\u21925.9, Vite 5\u21928\n                    (both occurrences: main section + Portfolio Context block)\n  DOC-RECONCILIATION.md \u2014 created (this audit record)\n\nHUMAN REVIEW NEEDED\n  IMPLEMENTATION-ROADMAP.md:401  says \"No analytics\" but @vercel/analytics\n  is installed and shipped \u2014 update to reflect Vercel Analytics is live\n\nNON-DOC FILES IN GIT STATUS  none\n```"
+  },
+  {
+    "project_key": "LifeCadenceLedger",
+    "abs_path": "/Users/d/Projects/LifeCadenceLedger",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "CLAUDE.md",
+      "DOC-RECONCILIATION.md",
+      "README.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "drifted-fixed\n  how-to-run      consistent\n  known-risks     consistent\n  next-move       consistent\n\nCOUNTS\n  consistent: 3 | drifted-fixed: 3 | unverifiable: 0\n\nDOC FILES CHANGED\n  README.md          \u2014 badge, description paragraph, Planned\u2192shipped Features list\n  CLAUDE.md          \u2014 React 18\u219219, Tailwind 3.x\u21924.x, Phase 0\u2192v1.0 complete (\u00d72 each)\n  DOC-RECONCILIATION.md \u2014 created\n\nCONTRADICTIONS FOR HUMAN REVIEW (files outside editable set)\n  IMPLEMENTATION-ROADMAP.md:18-56  \u2014 file tree shows migrations/ at root; actual path is database/migrations/\n  IMPLEMENTATION-ROADMAP.md:167    \u2014 nanoid listed as dep; code uses crypto.randomUUID(), nanoid not installed\n  CHANGELOG.md:7                   \u2014 [Unreleased] should be [1.0.0] \u2014 app is shipped at v1.0.0\n\nNON-DOC FILES IN git status: none\n```"
+  },
+  {
+    "project_key": "MoneyPRJsViaGPT/AIGCCore",
+    "abs_path": "/Users/d/Projects/MoneyPRJsViaGPT/AIGCCore",
+    "status": "skipped",
+    "reason": "uncommitted tracked changes"
+  },
+  {
+    "project_key": "MoneyPRJsViaGPT/SignalFlow",
+    "abs_path": "/Users/d/Projects/MoneyPRJsViaGPT/SignalFlow",
+    "status": "skipped",
+    "reason": "uncommitted tracked changes"
+  },
+  {
+    "project_key": "ITPRJsViaClaude/SnippetLibrary",
+    "abs_path": "/Users/d/Projects/ITPRJsViaClaude/SnippetLibrary",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "DOC-RECONCILIATION.md",
+      "README.md",
+      "docs/PORTFOLIO-DISPOSITION.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "consistent  (3 sub-claims drifted, fixed)\n  stack                consistent\n  how-to-run           drifted \u2192 fixed  (xcodeproj \u2192 Package.swift; macOS 13 \u2192 14)\n  known-risks          consistent\n  next-move            unverifiable  (forward-looking options)\n\ncounts:  consistent 3 / drifted-fixed 4 / unverifiable 1\n\nfiles changed:\n  README.md\n  docs/PORTFOLIO-DISPOSITION.md\n  DOC-RECONCILIATION.md  (created)\n\nhuman-eye items:\n  README \"accessibility permissions\" is accurate but omits that Input Monitoring\n  is ALSO required (two separate System Settings grants). Not wrong, just incomplete.\n  Consider: \"Grant accessibility and Input Monitoring permissions when prompted.\"\n\n  docs/PORTFOLIO-DISPOSITION.md stale SHA was in an editable docs/ file \u2014 fixed.\n\nnon-doc files in git status: none\n```"
+  },
+  {
+    "project_key": "MCPAudit",
+    "abs_path": "/Users/d/Projects/MCPAudit",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "CLAUDE.md",
+      "DOC-RECONCILIATION.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "26-05-30 22:40:01 PDT\n\nCLAIM STATUS\n  what-it-is      consistent\n  current-state   drifted-fixed\n  stack           consistent\n  how-to-run      consistent\n  known-risks     drifted (not fixed \u2014 SECURITY.md outside editable set)\n  next-move       consistent\n\nCOUNTS: consistent 4 / drifted-fixed 1 / drifted-flagged 1 / unverifiable 0\n\nDOC FILES CHANGED\n  CLAUDE.md          \u2014 \"Stable 1.0.0 maintenance\" \u2192 \"Stable 1.5.5 maintenance\" (2 occurrences)\n  DOC-RECONCILIATION.md \u2014 created\n\nNEEDS HUMAN EYE\n  SECURITY.md:66-70  \u2014 Supported versions table only lists 1.0.x as \"Yes\";\n                        actual current stable is 1.5.5. Fix: replace table to show\n                        1.5.x | Yes / 1.0.x\u20131.4.x | Security fixes only / pre-releases | No / < 1.0 | No\n\nNON-DOC FILES IN git status: none\n```"
+  },
+  {
+    "project_key": "Premise",
+    "abs_path": "/Users/d/Projects/Premise",
+    "status": "skipped",
+    "reason": "uncommitted tracked changes"
+  },
+  {
+    "project_key": "JobMarketHeatmap",
+    "abs_path": "/Users/d/Projects/JobMarketHeatmap",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "CLAUDE.md",
+      "DOC-RECONCILIATION.md",
+      "README.md"
+    ],
+    "orig_branch": "feat/full-build",
+    "claude_summary": "stack            drifted-fixed\n  how-to-run       drifted-fixed\n  known-risks      unverifiable (credential encryption requires runtime)\n  next-move        consistent\n\nCOUNTS  consistent: 2 | drifted-fixed: 3 | unverifiable: 1\n\nDOC FILES CHANGED\n  CLAUDE.md             \u2014 phase status + 4 stack version corrections (\u00d72 sections)\n  README.md             \u2014 pip install path: ./src-python \u2192 sidecar/requirements.txt\n  DOC-RECONCILIATION.md \u2014 created (this record)\n\nNON-DOC FILES IN git status: none\n\nCONTRADICTIONS FOR HUMAN REVIEW (IMPLEMENTATION-ROADMAP.md \u2014 not editable)\n  :29   file tree shows frontend/ root but actual source lives at src/\n  :46   \"Typed axios wrapper\" \u2014 axios not in deps; code uses native fetch()\n  :330  dep list includes axios@1.7 (absent) and vis-data@7 (actual: v8.0.3)\n```"
+  },
+  {
+    "project_key": "ITPRJsViaClaude/ScreenshotAnnotate",
+    "abs_path": "/Users/d/Projects/ITPRJsViaClaude/ScreenshotAnnotate",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "DOC-RECONCILIATION.md",
+      "README.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "\"Tailwind CSS 4\" \u2192 CSS custom properties \u2014 no tailwind.config.*, not in package.json\n  stack/State:    \"Zustand 5\" \u2192 React useState \u2014 zustand not in package.json\n  stack/Canvas:   \"HTML5 Canvas 2D API\" \u2192 SVG overlay \u2014 AnnotationCanvas.tsx:52 is SVGSVGElement, no canvas/Path2D\n  stack/Tests:    \"Testing Library\" removed \u2014 not in devDependencies\n  features:       \"4 annotation tools\" \u2192 5 \u2014 Redact tool in types/index.ts:3 + Toolbar.tsx:84-90\n  features/OCR:   \"searchable history\" \u2192 PII detection \u2014 useOCR.ts exports only detectPii; history search is ticket-id/date only\n  features:       Upload wizard, PII redaction, templates, settings panel all unmentioned in README\n  architecture:   \"layered HTML5 Canvas\" / \"Path2D objects\" \u2192 SVG primitives over <img>\n\nNON-DOC FILES in git status: none\n```"
+  },
+  {
+    "project_key": "Interruption Resume Studio",
+    "abs_path": "/Users/d/Projects/Interruption Resume Studio",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "CLAUDE.md",
+      "DOC-RECONCILIATION.md",
+      "README.md",
+      "docs/PORTFOLIO-DISPOSITION.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "o-run      drifted-fixed  (shortcut only; run commands were correct)\n  known-risks     consistent\n  next-move       unverifiable   (forward-looking advice)\n\nCOUNTS  consistent=4  drifted-fixed=2  unverifiable=1\n\nDOC FILES CHANGED\n  README.md                       \u2014 Cmd+Shift+I \u2192 Cmd+Shift+Space (\u00d72)\n  CLAUDE.md                       \u2014 Phase 0 claim \u2192 v1.0.0 shipped (\u00d72 locations)\n  docs/PORTFOLIO-DISPOSITION.md   \u2014 same shortcut fix + phase reference\n  DOC-RECONCILIATION.md           \u2014 created (full audit record)\n\nCODE\u2194DOC CONTRADICTIONS (manual fix needed, non-editable files)\n  IMPLEMENTATION-ROADMAP.md:12   \u2014 diagram shows [tauri-plugin-sql] but code uses sqlx\n  IMPLEMENTATION-ROADMAP.md:258  \u2014 Task 2 says add tauri-plugin-sql; sqlx was used instead\n\nNON-DOC FILES IN git status: none\n```"
+  },
+  {
+    "project_key": "Misc:NoGoPRJs/app",
+    "abs_path": "/Users/d/Projects/Misc:NoGoPRJs/app",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "DOC-RECONCILIATION.md",
+      "README.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "mmary:\n\n---\n\n```\nrepo:        app (saagpatel/app)\nbranch:      docs/truth-up-2026-05-30\nHEAD:        de4c3ca  (reconciled against)\ncommitted:   6787982\ntimestamp:   2026-05-30 22:41:54 PDT\n\nCLAIMS\n  what it is     DRIFTED \u2192 fixed\n  current state  DRIFTED \u2192 fixed\n  stack          consistent\n  how to run     consistent\n  known risks    consistent\n  next move      consistent\n\nCOUNTS\n  consistent:    4\n  drifted-fixed: 2  (same README.md, two edits)\n  unverifiable:  0\n\nDOC FILES CHANGED\n  README.md          \u2014 WIP badge \u2192 Scaffold Stop; bottom callout updated\n  DOC-RECONCILIATION.md \u2014 created (new)\n\nHUMAN-REVIEW CONTRADICTIONS\n  STATUS.md:109 \u2014 \"Last commit on main | 5bbe04f\" is stale;\n                   HEAD is de4c3ca (4 doc-only commits since scaffold)\n\nNON-DOC FILES IN GIT STATUS\n  none\n```"
+  },
+  {
+    "project_key": "Liminal",
+    "abs_path": "/Users/d/Projects/Liminal",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "CLAUDE.md",
+      "DOC-RECONCILIATION.md",
+      "README.md"
+    ],
+    "orig_branch": "chore/add-system-card",
+    "claude_summary": "to move, pinch to adjust speed\" (no gyro/tilt anywhere in codebase; `PlayerController` uses UIPanGestureRecognizer)\n- `README.md` Architecture paragraph \u2014 SCNProgram claim (SpaceLoader never touches shaders), CADisplayLink claim (it's `SCNSceneRendererDelegate`), and simd_float4x4 claim (it's `[String: Float]` via `setValue(_:forKey:)`) all corrected\n\n**Code\u2194doc contradictions worth a human's eye (in non-editable files):**\n- `IMPLEMENTATION-ROADMAP.md` File Structure: lists 3 test files; 11 exist \u2014 add the 8 missing rule-test files\n- `IMPLEMENTATION-ROADMAP.md` phase checklists: all `- [ ]` unchecked despite feature-complete status \u2014 check or banner\n- `Liminal/Core/ShaderUniformBus.swift:6`: stale `/// Stub \u2014 real implementation in Phase 1.` comment\n\n**Non-doc files in git status:** none."
+  },
+  {
+    "project_key": "NetworkDecoder",
+    "abs_path": "/Users/d/Projects/NetworkDecoder",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "CLAUDE.md",
+      "DOC-RECONCILIATION.md",
+      "README.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "2026-05-30 22:43:50 PDT\n\nCLAIM STATUS\n  what-it-is       consistent\n  current-state    drifted \u2192 fixed\n  stack            drifted \u2192 fixed\n  how-to-run       consistent\n  known-risks      consistent\n  next-move        unverifiable\n\nCOUNTS  consistent: 3 | drifted-fixed: 2 | unverifiable: 1\n\nDOC FILES CHANGED\n  README.md              \u2014 badge WIP\u2192v1.0.0; status blurb corrected\n  CLAUDE.md              \u2014 React/Zustand/Tailwind/Vite versions; QUIC removed (\u00d72 sections)\n  DOC-RECONCILIATION.md  \u2014 created (this record)\n\nHUMAN-EYE ITEMS (files outside editable set)\n  IMPLEMENTATION-ROADMAP.md  \u2014 store/ vs stores/, camelCase vs kebab filenames, pnet_datalink\n  docs/PORTFOLIO-DISPOSITION.md  \u2014 lines 65/179/223-226 still describe the stale WIP badge as open\n\nNON-DOC FILES IN git status:  none\n```"
+  },
+  {
+    "project_key": "NeuralNetwork",
+    "abs_path": "/Users/d/Projects/NeuralNetwork",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "CLAUDE.md",
+      "DOC-RECONCILIATION.md",
+      "README.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "rifted-fixed\n  how-to-run     drifted-fixed\n  known-risks    consistent\n  next-move      consistent\n\ncounts:  4 consistent \u00b7 2 drifted-fixed \u00b7 0 unverifiable\n\ndoc files changed:\n  README.md          \u2014 Next.js 14\u219215 (badge + 2 tables); npm as pnpm alternative\n  CLAUDE.md          \u2014 Next.js 14+\u219215+, React 18+\u219219+ (\u00d72 each); fixed 3 wrong architecture paths\n  DOC-RECONCILIATION.md \u2014 created\n\nhuman-review items (non-editable files):\n  IMPLEMENTATION-ROADMAP.md:334 \u2014 \"no analytics\" contradicts @vercel/analytics in layout.tsx\n  IMPLEMENTATION-ROADMAP.md:470 \u2014 Vercel URL mismatch: roadmap says .../neural-network-playground, actual is .../neural-network-playground-delta\n  IMPLEMENTATION-ROADMAP.md:431 \u2014 \"60MB download\" for CIFAR-10; code/README both say 30 MB\n\nnon-doc files in git status: none\n```"
+  },
+  {
+    "project_key": "ScreenshottoDataSelect",
+    "abs_path": "/Users/d/Projects/ScreenshottoDataSelect",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "CLAUDE.md",
+      "DOC-RECONCILIATION.md",
+      "README.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "nt\n  Stack           drifted-fixed\n  How to run      consistent\n  Architecture    drifted-fixed\n  Known risks     consistent\n\nCOUNTS: consistent 4 / drifted-fixed 2 / unverifiable 0\n\nDOC FILES CHANGED\n  CLAUDE.md         \u2014 3 edits: service-worker dir name, extraction.ts path, SDK version \u00d72\n  README.md         \u2014 1 edit: architecture paragraph (cropping happens in SW/offscreen, not content script)\n  DOC-RECONCILIATION.md \u2014 created\n\nCONTRADICTIONS FOR HUMAN REVIEW (IMPLEMENTATION-ROADMAP.md \u2014 not editable)\n  :549  Haiku pricing \"$0.25/$1.25\" doesn't match cost.ts \"$0.80/$4.00\"\n  :288  \"Deferred v2+\" still lists DOM-first extraction \u2014 shipped in Phase 3\n  :99   StorageSchema missing 4 Phase 3 keys (domFirst, inputTokens, outputTokens, extraction.current)\n\nNON-DOC FILES IN git status: none\n```"
+  },
+  {
+    "project_key": "Pulse Orbit",
+    "abs_path": "/Users/d/Projects/Pulse Orbit",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "CLAUDE.md",
+      "DOC-RECONCILIATION.md",
+      "README.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "ION-ROADMAP.md, not edited):\n  :268  \"Out of scope: Auto-launch\" \u2014 autostart plugin is wired in and toggled in Settings\n  :270  \"Deferred v2: per-process network via libproc\" \u2014 live via proc_pid_rusage, shown in UI\n  :271  \"Deferred v2: GPU via IOKit Metal\" \u2014 live via IOAccelerator, shown in CPU tab\n  :272  \"Deferred v2: configurable polling\" \u2014 live in Settings tab\n  :236-239  Stale crate versions (sysinfo 0.30\u21920.33, rusqlite 0.31\u21920.32, r2d2_sqlite 0.24\u21920.25,\n            nix 0.27\u21920.29)\n  :64-67  Migration SQL files listed don't exist; migrations are embedded in db/mod.rs\n  :45     useProcesses.ts listed but doesn't exist; processes live in use-metrics.ts\n  :31-47  File structure uses PascalCase (CpuView.tsx); actual files are kebab-case (cpu-view.tsx)\n\nNON-DOC FILES IN git status: none\n```"
+  },
+  {
+    "project_key": "RedditSentimentAnalyzer",
+    "abs_path": "/Users/d/Projects/RedditSentimentAnalyzer",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "CLAUDE.md",
+      "DOC-RECONCILIATION.md",
+      "README.md",
+      "docs/PORTFOLIO-DISPOSITION.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "(app.main \u2192 backend.main; app.daemon \u2192 backend.ingestion.ingest_daemon)\n  known-risks      consistent\n  next-move        unverifiable    (advisory, forward-looking)\n\nCounts: consistent=2 / drifted-fixed=3 / unverifiable=1\n\nDoc files changed:\n  README.md\n  CLAUDE.md\n  docs/PORTFOLIO-DISPOSITION.md\n  DOC-RECONCILIATION.md  (created)\n\nCode\u2194doc contradictions worth human review:\n  Makefile:3   install: pip install -r requirements.txt \u2014 no requirements.txt; project uses uv/pyproject.toml\n  Makefile:7   lint: ruff check src/ tests/ \u2014 no src/ dir; code is in backend/\n  Makefile:11  run: python -m src \u2014 wrong; should be uvicorn backend.main:app\n  docs/PORTFOLIO-DISPOSITION.md \u2014 launchd/ and nginx/ claimed on origin/main at 87c359e; git diff confirms absent\n\nNon-doc files in git status: none\n```"
+  },
+  {
+    "project_key": "ResumeEvolver",
+    "abs_path": "/Users/d/Projects/ResumeEvolver",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "AGENTS.md",
+      "DOC-RECONCILIATION.md",
+      "README.md"
+    ],
+    "orig_branch": "codex/docs/context-recovery-batch-6",
+    "claude_summary": "timestamp:   2026-05-30 22:47:13 PDT\n\nclaim status:\n  what-it-is      consistent\n  current-state   consistent\n  stack           drifted-fixed\n  how-to-run      consistent\n  known-risks     drifted-fixed\n  next-move       consistent\n\ncounts:  consistent 4 / drifted-fixed 2 / unverifiable 1\n\ndoc files changed:\n  README.md          \u2014 added \"Evidence capture runs from `/inbox`.\"\n  AGENTS.md          \u2014 portfolio-context: \"npm-compatible workflow\" \u2192 \"pnpm\"\n  DOC-RECONCILIATION.md \u2014 created (this report)\n\ncontradictions worth a human's eye:\n  README.md:15 \u2014 `cp .env.example .env.local` setup step unverifiable:\n                 file not findable via Glob and Read returned permission error;\n                 human should confirm with `git ls-files .env.example`\n\nnon-doc files in git status: none\n```"
+  },
+  {
+    "project_key": "ReturnRadar",
+    "abs_path": "/Users/d/Projects/ReturnRadar",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "CLAUDE.md",
+      "DOC-RECONCILIATION.md",
+      "README.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "architecture     drifted-fixed\n  next-move        consistent\n\nCOUNTS\n  consistent: 4   drifted-fixed: 2   unverifiable: 0\n\nDOC FILES CHANGED\n  README.md              \u2014 Architecture section: 5 factual errors corrected\n  CLAUDE.md              \u2014 Key Decisions table (2 rows), Current Phase/State (2 places), Do NOT bullet\n  DOC-RECONCILIATION.md  \u2014 new; full audit record\n\nHUMAN EYE NEEDED (non-editable files)\n  IMPLEMENTATION-ROADMAP.md:308-313 \u2014 Scope Boundaries still list warranty tracking and\n    receipt parsing as \"Out of scope (v1)\" / \"Deferred to v2\"; both shipped\n  IMPLEMENTATION-ROADMAP.md:278-288 \u2014 Dependencies section has date-fns@3, react-router-dom@6,\n    tailwindcss@3, individual @radix-ui packages; actual: 4.x, 7.x, 4.x, radix-ui monorepo\n\nNON-DOC FILES in git status: none\n```"
+  },
+  {
+    "project_key": "RoomTone",
+    "abs_path": "/Users/d/Projects/RoomTone",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "CLAUDE.md",
+      "DOC-RECONCILIATION.md",
+      "docs/PORTFOLIO-DISPOSITION.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "CHANGED:\n  CLAUDE.md\n  docs/PORTFOLIO-DISPOSITION.md\n  DOC-RECONCILIATION.md  (new)\n\nHUMAN-EYE ITEMS:\n  1. CLAUDE.md \"Current Phase: Phase 0\" \u2192 all phases done per source tree;\n     fixed in both the top-level and Portfolio Context sections.\n  2. docs/PORTFOLIO-DISPOSITION.md falsely claimed microphone capture;\n     zero microphone references exist anywhere in source; ROADMAP explicitly\n     bans NSMicrophoneUsageDescription. Fixed in three locations in the doc.\n  3. [CODE \u2014 cannot edit] project.yml:38 bundle ID typo: \"com.romtone.app\"\n     (missing first 'o'). PORTFOLIO-DISPOSITION.md records \"com.roomtone.app\".\n     Human must reconcile against the actual App Store Connect record before\n     submission \u2014 wrong bundle ID will block the binary upload.\n\nNON-DOC FILES IN git status: none\n```"
+  },
+  {
+    "project_key": "TradeOffAtlas",
+    "abs_path": "/Users/d/Projects/TradeOffAtlas",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "CLAUDE.md",
+      "DOC-RECONCILIATION.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "COUNTS\n  consistent: 3 | drifted-fixed: 2 | unverifiable: 1\n\nDOC FILES CHANGED\n  CLAUDE.md                   (4 version strings \u00d7 2 locations; current-phase claim \u00d7 2 locations)\n  DOC-RECONCILIATION.md       (created)\n\nCODE\u2194DOC CONTRADICTIONS (IMPLEMENTATION-ROADMAP.md \u2014 not editable, flag for human)\n  :351  PDF/CSV export marked \"Deferred v2+\" \u2014 fully shipped in src/lib/export.ts\n  :353  Keyboard shortcuts marked \"Deferred v2+\" \u2014 fully shipped in use-keyboard-shortcuts.ts\n  :357  Windows/Linux listed as out of scope \u2014 README + PORTFOLIO-DISPOSITION say cross-platform\n  file structure shows tailwind.config.js \u2014 Tailwind 4 has no such file (uses @tailwindcss/vite)\n  file structure shows decisionStore.ts \u2014 actual files are kebab-case (decision-store.ts)\n\nNON-DOC FILES IN GIT STATUS: none\n```"
+  },
+  {
+    "project_key": "VanityPRJs/Relay",
+    "abs_path": "/Users/d/Projects/VanityPRJs/Relay",
+    "status": "skipped",
+    "reason": "uncommitted tracked changes"
+  },
+  {
+    "project_key": "Sovereign",
+    "abs_path": "/Users/d/Projects/Sovereign",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "CLAUDE.md",
+      "DOC-RECONCILIATION.md",
+      "README.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "6+ \u2014 npm install/dev/test \u2192 pnpm install/dev/test (pnpm-lock.yaml is authoritative)\n  CLAUDE.md:7,63 \u2014 Next.js: 14.x \u2192 15.x (both occurrences)\n  CLAUDE.md:25,58 \u2014 \"Phase 0: Foundation\" \u2192 \"v1 Complete (all 4 phases shipped)\"\n  CLAUDE.md:36  \u2014 \"Self-hosted nginx / No Vercel dependency\"\n                  \u2192 \"Vercel (static export) / vercel.json + @vercel/analytics in place\"\n\ncontradictions in non-editable files (human action needed):\n  IMPLEMENTATION-ROADMAP.md  \u2014 \"No telemetry, no analytics, no user tracking\" is false;\n                                @vercel/analytics renders in layout.tsx\n  CHANGELOG.md               \u2014 shows only \"Initial release\"; v1 shipped with 115 tests +\n                                Playwright E2E + Vercel analytics + a11y audit\n\nnon-doc files in git status: none\n```"
+  },
+  {
+    "project_key": "VanityPRJs/Chronomap",
+    "abs_path": "/Users/d/Projects/VanityPRJs/Chronomap",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "AGENTS.md",
+      "DOC-RECONCILIATION.md",
+      "README.md",
+      "docs/PORTFOLIO-DISPOSITION.md"
+    ],
+    "orig_branch": "master",
+    "claude_summary": "stent\n  known-risks      consistent\n  next-move        unverifiable\n\ncounts: consistent=3 / drifted-fixed=2 / unverifiable=1\n\ndoc files changed:\n  README.md\n  AGENTS.md\n  docs/PORTFOLIO-DISPOSITION.md\n  DOC-RECONCILIATION.md  (new)\n\ndrift fixed:\n  - README.md:17, AGENTS.md:23 \u2014 \"SQLite via Tauri SQL plugin\" \u2192 \"SQLite via bundled rusqlite\"\n    (Cargo.toml has rusqlite 0.36 bundled; no tauri-plugin-sql anywhere)\n  - docs/PORTFOLIO-DISPOSITION.md:151 \u2014 \"Tests/CI present: Yes\" \u2192 \"No \u2014 test suite removed;\n    no CI workflow files in .github/\"\n\nmanual-review (non-editable files):\n  - CONTRIBUTING.md:4 \u2014 \"Run existing tests\" misleads; no test suite exists\n  - Makefile \u2014 `test` and `lint` targets invoke pnpm scripts that don't exist in package.json\n\nunexpected non-doc files in git status: none\n```"
+  },
+  {
+    "project_key": "Seismoscope",
+    "abs_path": "/Users/d/Projects/Seismoscope",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "CLAUDE.md",
+      "DOC-RECONCILIATION.md",
+      "README.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "-move (\u00d72 for Portfolio Context)\n  README.md              \u2014 installation command + architecture paragraph\n  DOC-RECONCILIATION.md  \u2014 new, records this pass\n\nCODE\u2194DOC CONTRADICTIONS (for human review \u2014 IMPLEMENTATION-ROADMAP.md not editable)\n  ROADMAP: all Phase 0\u20133 checklists still unchecked (all phases are actually complete)\n  ROADMAP: RibbonState.swift path wrong (Metal/ \u2192 Models/)\n  ROADMAP: StabilityDetector.swift listed but implemented inline in AccelerometerPipeline.swift\n  ROADMAP: SeismicClassifier.swift listed but never implemented (deferred/dropped from v1)\n  ROADMAP: USGSCorrelatorTests.swift listed but only SeismoscopeTests.swift exists (2 RibbonState tests)\n  ROADMAP: \"Xcode 15.2+ / Swift 5.9\" requirement \u2014 should be Xcode 16+ / Swift 6.0\n\nNON-DOC FILES in git status: none\n```"
+  },
+  {
+    "project_key": "Signal & Noise",
+    "abs_path": "/Users/d/Projects/Signal & Noise",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "AGENTS.md",
+      "CLAUDE.md",
+      "DOC-RECONCILIATION.md",
+      "README.md",
+      "docs/PORTFOLIO-DISPOSITION.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "d broken `npm run start` from static-export command\n- `CLAUDE.md` \u2014 updated Analytics row from \"None (v1)\" to @vercel/analytics active\n- `AGENTS.md` \u2014 narrowed blanket analytics prohibition to reflect active @vercel/analytics\n- `docs/PORTFOLIO-DISPOSITION.md` \u2014 updated stale \"none currently\" analytics note\n\n**Contradictions for human review (non-editable files):**\n- `IMPLEMENTATION-ROADMAP.md` ~line 573: testing docs say `node --experimental-strip-types`; code uses Vitest\n- `IMPLEMENTATION-ROADMAP.md` ~lines 57, 560: \"No analytics (v1)\" hard constraints; analytics is live\n- `CHANGELOG.md`: only `[Unreleased]` entry despite `package.json` v1.0.0 being shipped\n- `public/og/` missing entirely: chapter metadata references 7 OG image PNGs that don't exist\n\n**Non-doc files in git status:** none."
+  },
+  {
+    "project_key": "VanityPRJs/Conductor",
+    "abs_path": "/Users/d/Projects/VanityPRJs/Conductor",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "AGENTS.md",
+      "DOC-RECONCILIATION.md",
+      "README.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "drifted-fixed   (SwiftData missing from both tables)\n  how-to-run     consistent\n  known-risks    drifted-fixed   (3 wrong type names in arch paragraph)\n  next-move      consistent\n\nCOUNTS  consistent 3 / drifted-fixed 3 / unverifiable 0\n\nDOC FILES CHANGED\n  README.md\n  AGENTS.md\n  DOC-RECONCILIATION.md  (new)\n\nCODE\u2194DOC CONTRADICTIONS WORTH A HUMAN'S EYE\n  Makefile:1-12 \u2014 swift build/test/run targets won't work; no Package.swift\n    exists. Fix: replace with xcodebuild equivalents or delete the Makefile.\n  README.md arch \u2014 SessionDiscovery called \"actor\" (it's an enum with statics)\n  README.md arch \u2014 PhysicsEngine \u2192 actual class is ForceSimulation\n  README.md arch \u2014 SelectionStore \u2192 selection state lives in AppState\n    (all three fixed in this pass)\n\nNON-DOC FILES IN git status  none\n```"
+  },
+  {
+    "project_key": "evals",
+    "abs_path": "/Users/d/Projects/evals",
+    "status": "skipped",
+    "reason": "not a git repo"
+  },
+  {
+    "project_key": "VanityPRJs/Echolocate",
+    "abs_path": "/Users/d/Projects/VanityPRJs/Echolocate",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "AGENTS.md",
+      "DOC-RECONCILIATION.md",
+      "README.md"
+    ],
+    "orig_branch": "master",
+    "claude_summary": "status:\n  what-it-is        consistent\n  current-state     consistent\n  stack             consistent\n  how-to-run        consistent\n  known-risks       consistent\n  next-move         consistent\n\ncounts:  consistent=5  drifted-fixed=1  unverifiable=0\n\ndoc files changed:\n  README.md            \u2014 PCAP export \u2192 Session export (line 13)\n  AGENTS.md            \u2014 PCAP export \u2192 JSON session export (line 9) [was untracked, now committed]\n  DOC-RECONCILIATION.md \u2014 created\n\ncode\u2194doc contradictions worth a human's eye:\n  README.md:13 / AGENTS.md:9 \u2014 both claimed \"PCAP export\"; code (export.rs) does JSON\n  serialization of devices+alerts via serde_json, no pcap crate in Cargo.toml.\n  Fixed in this pass.\n\nnon-doc files in git status:  none (artifacts/ and test-results/ remain untracked as expected)\n```"
+  },
+  {
+    "project_key": "da-scaffold",
+    "abs_path": "/Users/d/Projects/da-scaffold",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "CLAUDE.md",
+      "DOC-RECONCILIATION.md",
+      "README.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "onsistent\n  how-to-run       drifted-fixed\n  known-risks      consistent\n  next-move        unverifiable\n\nCOUNTS\n  consistent: 4 | drifted-fixed: 1 | unverifiable: 1\n\nDOC FILES CHANGED\n  README.md       \u2014 app/page.tsx \u2192 src/app/page.tsx (line 19)\n  CLAUDE.md       \u2014 app/page.tsx \u2192 src/app/page.tsx (line 27); was untracked, now committed\n  DOC-RECONCILIATION.md \u2014 created (new)\n\nHUMAN-EYE ITEMS\n  None. All drift was in editable doc files.\n\nNON-DOC FILES IN GIT STATUS\n  None.\n```\n\n---\n\nOne drift fixed: both README and CLAUDE.md told readers to edit `app/page.tsx`, but this project was scaffolded with the `src/` directory layout so the real path is `src/app/page.tsx`. CLAUDE.md was also untracked (never committed) \u2014 it's now in the repo on this branch. Everything else matched the code exactly."
+  },
+  {
+    "project_key": "Terroir",
+    "abs_path": "/Users/d/Projects/Terroir",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "CLAUDE.md",
+      "DOC-RECONCILIATION.md",
+      "docs/PORTFOLIO-DISPOSITION.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "drifted-fixed\n  stack            drifted-fixed\n  how-to-run       consistent\n  known-risks      drifted-fixed\n  next-move        drifted-fixed (same edit as current-state)\n\nCOUNTS\n  consistent: 2  |  drifted-fixed: 3  |  unverifiable: 1 (enrichment backend)\n\nDOC FILES CHANGED\n  CLAUDE.md\n  docs/PORTFOLIO-DISPOSITION.md\n  DOC-RECONCILIATION.md  (created)\n\nHUMAN-EYE ITEMS (IMPLEMENTATION-ROADMAP.md \u2014 not editable)\n  :98   data-pipeline/README.md listed in file-structure diagram but file doesn't exist\n  :75   globe_base.png \u2192 should be globe_base.jpg (actual resource extension)\n  :475  LZ4 risk note says \"use lz4.frame\"; code uses lz4.block on both sides \u2014 note is misleading\n  :368  flatbuffers==23.5.26 pin is stale; actual pinned version is 25.12.19\n\nNON-DOC FILES IN git status\n  none\n```"
+  },
+  {
+    "project_key": "mcpforge-hosted-ts-smoke",
+    "abs_path": "/Users/d/Projects/mcpforge-hosted-ts-smoke",
+    "status": "skipped",
+    "reason": "not a git repo"
+  },
+  {
+    "project_key": "mcpforge-openai-full-smoke-gate",
+    "abs_path": "/Users/d/Projects/mcpforge-openai-full-smoke-gate",
+    "status": "skipped",
+    "reason": "not a git repo"
+  },
+  {
+    "project_key": "mcpforge-openai-remote-openapi-readiness",
+    "abs_path": "/Users/d/Projects/mcpforge-openai-remote-openapi-readiness",
+    "status": "skipped",
+    "reason": "not a git repo"
+  },
+  {
+    "project_key": "mcpforge-openapi-auth-smoke-fixture",
+    "abs_path": "/Users/d/Projects/mcpforge-openapi-auth-smoke-fixture",
+    "status": "skipped",
+    "reason": "not a git repo"
+  },
+  {
+    "project_key": "mcpforge-ts-hardening",
+    "abs_path": "/Users/d/Projects/mcpforge-ts-hardening",
+    "status": "skipped",
+    "reason": "not a git repo"
+  },
+  {
+    "project_key": "mcpforge-v03-builder",
+    "abs_path": "/Users/d/Projects/mcpforge-v03-builder",
+    "status": "skipped",
+    "reason": "not a git repo"
+  },
+  {
+    "project_key": "resume-evolver-tmp-1776063720",
+    "abs_path": "/Users/d/Projects/resume-evolver-tmp-1776063720",
+    "status": "skipped",
+    "reason": "uncommitted tracked changes"
+  },
+  {
+    "project_key": "VanityPRJs/TerraSynth",
+    "abs_path": "/Users/d/Projects/VanityPRJs/TerraSynth",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "AGENTS.md",
+      "DOC-RECONCILIATION.md",
+      "docs/ARCHIVE-POSTURE.md"
+    ],
+    "orig_branch": "master",
+    "claude_summary": "consistent\n  known-risks     consistent\n  next-move       drifted \u2192 fixed\n\nCOUNTS  consistent: 4  |  drifted-fixed: 2  |  unverifiable: 2\n  (unverifiable: \"5\u201320\u00d7 faster\" perf claim, \"60fps\" runtime target \u2014 no benchmark code)\n\nDOC FILES CHANGED\n  AGENTS.md                 \u2014 added wind-down note to Current State; replaced stale\n                              \"resume next active task\" Next Recommended Move with\n                              archived-disposition redirect to ARCHIVE-POSTURE.md\n  docs/ARCHIVE-POSTURE.md   \u2014 updated stale \"last commit on master\" SHA\n                              (1a2f559 \u2192 d585660)\n  DOC-RECONCILIATION.md     \u2014 new reconciliation record (this pass)\n\nHUMAN-ATTENTION ITEMS\n  None. All drifted content was in editable files.\n\nNON-DOC FILES IN git status: none\n```"
+  },
+  {
+    "project_key": "bridge-db",
+    "abs_path": "/Users/d/Projects/bridge-db",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "DOC-RECONCILIATION.md",
+      "docs/PORTFOLIO-DISPOSITION.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "doc files changed:\n  - docs/PORTFOLIO-DISPOSITION.md  (1-line fix: stale PR #20 dep-refresh reference \u2192 2026-05-30)\n  - DOC-RECONCILIATION.md          (created)\n\ncode\u2194doc contradictions for human eye:\n  - pyproject.toml:4 \u2014 description omits `notion_os` and `personal_ops` callers;\n    models.py:6 confirms both are first-class CallerIDs. One-line fix documented\n    in DOC-RECONCILIATION.md.\n\nnon-doc files in git status: none\n```\n\nEverything checks out: 23 tools (grep-confirmed), 148 tests (146 functions + 3-way parametrize), schema v4, all CLI flags present, steady maintenance claims accurate. The only real drift was the stale \"PR #20 was the last refresh\" note in the portfolio disposition doc \u2014 fixed. The `pyproject.toml` description is the one lingering mismatch worth a manual one-liner."
+  },
+  {
+    "project_key": "visual-album-studio",
+    "abs_path": "/Users/d/Projects/visual-album-studio",
+    "status": "skipped",
+    "reason": "uncommitted tracked changes"
+  },
+  {
+    "project_key": "cross-system-smoke",
+    "abs_path": "/Users/d/Projects/cross-system-smoke",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "DOC-RECONCILIATION.md",
+      "docs/PORTFOLIO-DISPOSITION.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "026-05-30 22:56:14 PDT\n\nCLAIM STATUS\n  what-it-is       consistent\n  current-state    drifted-fixed\n  stack            consistent\n  how-to-run       consistent\n  known-risks      consistent\n  next-move        consistent (code); drifted in ROADMAP.md (not editable \u2192 flagged)\n\nCOUNTS\n  consistent:     5\n  drifted-fixed:  1  (docs/PORTFOLIO-DISPOSITION.md)\n  unverifiable:   0\n\nDOC FILES CHANGED\n  docs/PORTFOLIO-DISPOSITION.md  (2 edits: tip sha 97a867f\u2192d0160f6; cadence list prepended with 4 new commits)\n  DOC-RECONCILIATION.md          (created)\n\nCONTRADICTIONS FOR HUMAN REVIEW\n  ROADMAP.md:45 \u2014 \"Add JSON output files next to every historical run summary\" is listed\n  as Possible Future Work but is already implemented. One-line fix: move or delete bullet.\n\nNON-DOC FILES IN git status: none\n```"
+  },
+  {
+    "project_key": "ink",
+    "abs_path": "/Users/d/Projects/ink",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "CLAUDE.md",
+      "DOC-RECONCILIATION.md",
+      "README.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "consistent\n  next-move:        drifted-fixed\n\nCOUNTS: consistent 3 / drifted-fixed 3 / unverifiable 0\n\nDOC FILES CHANGED\n  CLAUDE.md \u2014 React 18\u219219, TypeScript 5.8, Tailwind CDN\u2192v4/npm, Phase 0\u2192v1.0 (two occurrences each), Next Recommended Move updated to Release Frozen\n  README.md \u2014 \"Five annotation types\" expanded to reflect custom types; added Stats dashboard and Workspace search to Features list\n  DOC-RECONCILIATION.md \u2014 created (new)\n\nHUMAN REVIEW NEEDED\n  IMPLEMENTATION-ROADMAP.md \u2014 Deferred section still lists stats dashboard, search, and custom types as unbuilt; all three shipped in Phase 4. Needs a Phase 4 section.\n  CHANGELOG.md:9 \u2014 Only \"Initial release\" under [Unreleased]; v1.0 shipped with ~5 significant commits. Needs a [1.0.0] entry.\n\nNON-DOC FILES IN GIT STATUS: none\n```"
+  },
+  {
+    "project_key": "Wavelength",
+    "abs_path": "/Users/d/Projects/Wavelength",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "CLAUDE.md",
+      "DOC-RECONCILIATION.md",
+      "README.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "B version, satellite package, current phase \u2014 4 edits)\n  DOC-RECONCILIATION.md   (created)\n\ncontradictions for human review (IMPLEMENTATION-ROADMAP.md \u2014 not editable):\n  - AppDelegate.swift listed in file tree but does not exist\n  - Migration002_fcc_index.swift \u2192 actual file is Migration002_Onboarding.swift\n  - FCCDatabaseTests.swift planned but missing; DatabaseManagerTests.swift exists instead\n  - itu_regions.json listed in Resources but not bundled\n  - FMStationService described as live FCC API + 30-day cache; actual uses bundled fm_stations.sqlite\n  - SensingEngine.swift listed but does not exist; sensors are wired directly in WavelengthApp\n  - SwiftyTLE / SOCRATES URL in Dependencies and API Contracts tables need updating to SatelliteKit / gp.php\n\nnon-doc files in git status: none\n```"
+  },
+  {
+    "project_key": "knowledgecore",
+    "abs_path": "/Users/d/Projects/knowledgecore",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "DOC-RECONCILIATION.md",
+      "README.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "e \u2014 no toolchain file)\n  how-to-run     consistent\n  known-risks    drifted-fixed\n  next-move      consistent\n\nCOUNTS: consistent=5  drifted-fixed=1  unverifiable=0\n\nDOC FILES CHANGED\n  README.md                \u2014 escrow feature bullet corrected\n  DOC-RECONCILIATION.md    \u2014 new, full evidence trail\n\nDRIFT FIXED\n  README.md:16  \"pluggable escrow backends: AWS KMS, Azure, GCP, HSM, or local\"\n  \u2192  \"AWS KMS backend (real SDK); Azure, GCP, and HSM adapters use local\n      filesystem emulation only (no cloud SDK)\"\n  Evidence: no Azure/GCP/HSM SDK deps in kc_core/Cargo.toml; all three\n  providers return error at runtime unless KC_RECOVERY_ESCROW_*_EMULATE_DIR\n  is set (recovery_escrow_azure.rs:77-88, recovery_escrow_gcp.rs:53-54,\n  recovery_escrow_hsm.rs:50).\n\nNON-DOC FILES IN GIT STATUS: none\n```"
+  },
+  {
+    "project_key": "stockpulse",
+    "abs_path": "/Users/d/Projects/stockpulse",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "AGENTS.md",
+      "DOC-RECONCILIATION.md",
+      "README.md"
+    ],
+    "orig_branch": "codex/docs/context-recovery-batch-7",
+    "claude_summary": "a332a5c50548a553a4cc671cd6182f24\ntimestamp: 2026-05-30 22:58:07 PDT\n\nCLAIMS:\n  what-it-is       DRIFTED-FIXED\n  current-state    consistent\n  stack            DRIFTED-FIXED (AGENTS.md) / manual-needed (STATUS.md)\n  how-to-run       DRIFTED-FIXED (AGENTS.md)\n  known-risks      consistent\n  next-move        consistent\n\nCOUNTS: consistent=3 / drifted-fixed=3 / unverifiable=0\n\nDOC FILES CHANGED:\n  README.md         \u2014 replaced create-next-app boilerplate with project-accurate content\n  AGENTS.md         \u2014 Next.js 15\u219216 (line 14); pnpm seed\u2192pnpm db:seed (line 27)\n  DOC-RECONCILIATION.md \u2014 created (new)\n\nMANUAL REVIEW NEEDED:\n  STATUS.md:8 \u2014 \"Next.js 15 stock-watching dashboard\" should be \"Next.js 16\"\n  (file is outside the allowed edit set; one-word change)\n\nNON-DOC FILES IN git status: none\n```"
+  },
+  {
+    "project_key": "thought-trails",
+    "abs_path": "/Users/d/Projects/thought-trails",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "CLAUDE.md",
+      "DOC-RECONCILIATION.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "removed bullet \"Replay mode timing is fixed-interval; no variable-speed\n    playback\"   [use-replay.ts implements 0.5\u00d7/1\u00d7/2\u00d7/4\u00d7 \u2014 ReplaySpeed type\n    at line 5, cycleSpeed function at line 74]\n\nHUMAN-REVIEW CONTRADICTIONS (files not editable by this pass)\n  IMPLEMENTATION-ROADMAP.md ~265: \"Out of scope (v1)\" lists multi-model\n    comparison, graph search, session history \u2014 all three shipped in Phases 3\u20134\n  IMPLEMENTATION-ROADMAP.md ~273: \"Deferred to v2\" lists collapsible subtrees\n    + multi-model comparison \u2014 both shipped\n  IMPLEMENTATION-ROADMAP.md: roadmap ends at Phase 2; Phases 3\u20134 + hardening\n    are absent\n  CHANGELOG.md:7: \"[Unreleased] \u2014 Initial release\" only; no [1.0.0] entry\n    despite package.json v1.0.0 and feature-complete status\n\nNON-DOC FILES IN GIT STATUS:  none\n```"
+  },
+  {
+    "project_key": "mcpforge",
+    "abs_path": "/Users/d/Projects/mcpforge",
+    "status": "ran",
+    "branch": "docs/truth-up-2026-05-30",
+    "changed_files": [
+      "CLAUDE.md",
+      "DOC-RECONCILIATION.md",
+      "docs/PORTFOLIO-DISPOSITION.md",
+      "docs/ROADMAP-v0.3.md"
+    ],
+    "orig_branch": "main",
+    "claude_summary": "mplemented in v0.3 (generator_ts.py)\n  :337  \"mcpforge update\" listed Deferred v1.1 \u2014 implemented (updater.py, cli.py:716)\n  File is self-labeled \"Historical roadmap\"; fixes are additive notes, not rewrites.\n\nNON-DOC FILES IN git status: none\n```\n\n**What changed:** Six surgical fixes across three docs \u2014 FastMCP version bumped `3.1.x \u2192 3.2.x` (3 locations in `CLAUDE.md`), stale `0.2.0 release readiness` phase language replaced with accurate `v0.3.0 + provider expansion` state, `ROADMAP-v0.3.md` release-gate header marked completed, and two errors in `PORTFOLIO-DISPOSITION.md` corrected (`mcpforge describe` \u2192 `mcpforge inspect`; `Python 3.11+` \u2192 `3.12+`). **Next:** a human should add three short `(implemented in v0.3)` notes to `IMPLEMENTATION-ROADMAP.md`'s \"Out of scope / Deferred\" section."
+  }
+]
