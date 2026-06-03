@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -79,6 +80,23 @@ PROJECT_MARKERS = frozenset(
         "tests",
     }
 )
+# Directory-name substrings (case-insensitive) marking deliberate non-projects.
+# A match skips the directory AND its subtree during discovery, so neither the
+# container nor anything nested under it reaches the catalog-completeness gate.
+#   nogoprjs     -> operator-flagged "no-go" projects, never pursued
+#   smoke-export -> generated AuraForge signed-smoke-export bundles (no real repo)
+IGNORE_PROJECT_DIR_TOKENS = frozenset({"nogoprjs", "smoke-export"})
+# Transient / generated working directories matched by regex on the dir name —
+# e.g. a `<repo>-tmp-<timestamp>` clone left behind by a tooling run.
+IGNORE_PROJECT_DIR_PATTERNS: tuple[re.Pattern[str], ...] = (re.compile(r"-tmp-\d+$"),)
+
+
+def _is_ignored_project_dir(name: str) -> bool:
+    """True if a directory name is a transient/non-project artifact to skip."""
+    lowered = name.lower()
+    if any(token in lowered for token in IGNORE_PROJECT_DIR_TOKENS):
+        return True
+    return any(pattern.search(name) for pattern in IGNORE_PROJECT_DIR_PATTERNS)
 
 
 def discover_workspace_projects(
@@ -92,6 +110,8 @@ def discover_workspace_projects(
 
     for child in sorted(workspace_root.iterdir(), key=lambda item: item.name.lower()):
         if child.name.startswith(".") or not child.is_dir() or child.is_symlink():
+            continue
+        if _is_ignored_project_dir(child.name):
             continue
         if _is_project_dir(child):
             discovered.append(
@@ -161,6 +181,8 @@ def _discover_nested_projects(
     discovered: list[dict[str, Any]] = []
     for child in sorted(root.iterdir(), key=lambda item: item.name.lower()):
         if child.name.startswith(".") or not child.is_dir() or child.is_symlink():
+            continue
+        if _is_ignored_project_dir(child.name):
             continue
         if _is_project_dir(child):
             discovered.append(

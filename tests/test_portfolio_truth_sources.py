@@ -8,7 +8,13 @@ so they don't inflate the project count and pollute catalog-completeness.
 
 from __future__ import annotations
 
-from src.portfolio_truth_sources import _dedupe_checkouts_by_origin
+from datetime import datetime, timezone
+
+from src.portfolio_truth_sources import (
+    _dedupe_checkouts_by_origin,
+    _is_ignored_project_dir,
+    discover_workspace_projects,
+)
 
 
 def _p(name: str, repo_full_name: str = "", path: str | None = None) -> dict:
@@ -76,3 +82,49 @@ def test_result_is_sorted_by_name_case_insensitively() -> None:
     ]
     result = _dedupe_checkouts_by_origin(discovered)
     assert [p["name"] for p in result] == ["Alpha", "mike", "zeta"]
+
+
+# --- discovery ignore-list: transient / non-project directories ---
+# NoGoPRJs (operator-flagged never-pursued), `*-smoke-export` (generated
+# AuraForge bundles), and `*-tmp-<ts>` clones are scratch artifacts, not real
+# projects. Discovery must skip them (and their subtrees) so they never reach
+# the catalog-completeness gate.
+
+
+def test_ignore_predicate_matches_transient_dirs() -> None:
+    assert _is_ignored_project_dir("Misc:NoGoPRJs")  # colon form, as on disk
+    assert _is_ignored_project_dir("NoGoPRJs")
+    assert _is_ignored_project_dir("auraforge-signed-smoke-export")
+    assert _is_ignored_project_dir("resume-evolver-tmp-1776063720")
+
+
+def test_ignore_predicate_keeps_real_projects() -> None:
+    # guard against over-broad matching: legit names that merely resemble a rule
+    for name in (
+        "GithubRepoAuditor",
+        "ApplyKit-public",
+        "cost-tracker",
+        "resume-evolver",  # the real repo, sans -tmp-<ts> suffix
+        "smoke-test-runner",  # "smoke" but not "smoke-export"
+        "tmp-tools",  # "tmp" but not the -tmp-<digits> clone pattern
+    ):
+        assert not _is_ignored_project_dir(name), name
+
+
+def test_discovery_skips_ignored_subtrees(tmp_path) -> None:
+    def _project(*parts: str) -> None:
+        d = tmp_path.joinpath(*parts)
+        d.mkdir(parents=True)
+        (d / "README.md").write_text("# fixture")
+
+    _project("LegitProject")  # real top-level project -> kept
+    _project("NoGoPRJs", "app")  # nested under ignored container -> skipped
+    _project("auraforge-signed-smoke-export", "foo-plan")  # ignored bundle -> skipped
+    _project("resume-evolver-tmp-1776063720")  # top-level tmp clone -> skipped
+
+    result = discover_workspace_projects(
+        tmp_path,
+        catalog_data={},
+        now=datetime(2026, 6, 2, tzinfo=timezone.utc),
+    )
+    assert {p["name"] for p in result} == {"LegitProject"}
