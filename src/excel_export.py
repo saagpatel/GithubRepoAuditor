@@ -611,6 +611,7 @@ def _build_dashboard(
     score_history: dict[str, list[float]] | None = None,
     *,
     excel_mode: str = "standard",
+    risk_lookup: dict[str, str] | None = None,
 ) -> None:
     _build_dashboard_workbook_sheet(
         wb,
@@ -618,6 +619,7 @@ def _build_dashboard(
         diff_data,
         score_history,
         excel_mode=excel_mode,
+        risk_lookup=risk_lookup,
         get_or_create_sheet=_get_or_create_sheet,
         clear_worksheet=_clear_worksheet,
         configure_sheet_view=_configure_sheet_view,
