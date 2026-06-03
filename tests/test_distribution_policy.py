@@ -57,7 +57,9 @@ def test_pypi_workflow_is_manual_trusted_publishing_only() -> None:
     assert "push:" not in workflow
     assert "environment: pypi" in workflow
     assert "id-token: write" in workflow
-    assert "pypa/gh-action-pypi-publish@release/v1" in workflow
+    # SHA-pinned to the v1 trusted-publishing release line
+    assert "pypa/gh-action-pypi-publish@" in workflow
+    assert "# v1" in workflow
     assert "actions/upload-artifact" in workflow
     assert "actions/download-artifact" in workflow
 
@@ -67,8 +69,10 @@ def test_public_repo_has_code_scanning_workflow_documented() -> None:
     workflows_readme = (ROOT / ".github" / "workflows" / "README.md").read_text()
     security_model = (ROOT / "docs" / "security-model.md").read_text()
 
-    assert "github/codeql-action/init@v4" in workflow
-    assert "github/codeql-action/analyze@v4" in workflow
+    # CodeQL actions SHA-pinned to the v4 line
+    assert "github/codeql-action/init@" in workflow
+    assert "github/codeql-action/analyze@" in workflow
+    assert "# v4" in workflow
     assert "security-events: write" in workflow
     assert "pull_request:" in workflow
     assert "schedule:" in workflow
