@@ -154,8 +154,14 @@ def _metadata(audit: Any) -> dict[str, Any]:
     return metadata
 
 
-def _extract_risk_posture(output_dir: Path | None) -> dict[str, Any]:
-    """Load portfolio-truth-latest.json and extract risk tier summary. Returns {} if unavailable."""
+def build_risk_lookup(output_dir: Path | None) -> dict[str, dict[str, str]]:
+    """Canonical per-repo risk reader: display_name -> {risk_tier, risk_summary}.
+
+    Single source of truth for risk data loaded from portfolio-truth-latest.json.
+    Render surfaces that need a per-repo risk tier consume this directly, and
+    _extract_risk_posture derives its aggregate counts from it. Returns {} when the
+    truth snapshot is missing, unreadable, or has no named projects.
+    """
     if not output_dir:
         return {}
     truth_path = output_dir / "portfolio-truth-latest.json"
@@ -165,21 +171,31 @@ def _extract_risk_posture(output_dir: Path | None) -> dict[str, Any]:
         truth = json.loads(truth_path.read_text())
     except Exception:
         return {}
-    projects = truth.get("projects") or []
+    lookup: dict[str, dict[str, str]] = {}
+    for project in truth.get("projects") or []:
+        name = str((project.get("identity") or {}).get("display_name") or "")
+        if not name:
+            continue
+        risk = project.get("risk") or {}
+        lookup[name] = {
+            "risk_tier": str(risk.get("risk_tier") or "baseline"),
+            "risk_summary": str(risk.get("risk_summary") or ""),
+        }
+    return lookup
+
+
+def _extract_risk_posture(output_dir: Path | None) -> dict[str, Any]:
+    """Aggregate risk tier summary, derived from build_risk_lookup. Returns {} if unavailable."""
+    lookup = build_risk_lookup(output_dir)
+    if not lookup:
+        return {}
     tier_counts: dict[str, int] = {}
     top_elevated: list[dict[str, Any]] = []
-    for project in projects:
-        risk = project.get("risk") or {}
-        tier = str(risk.get("risk_tier") or "baseline")
+    for name, entry in lookup.items():
+        tier = entry["risk_tier"]
         tier_counts[tier] = tier_counts.get(tier, 0) + 1
         if tier == "elevated":
-            identity = project.get("identity") or {}
-            top_elevated.append(
-                {
-                    "repo": str(identity.get("display_name") or ""),
-                    "risk_summary": str(risk.get("risk_summary") or ""),
-                }
-            )
+            top_elevated.append({"repo": name, "risk_summary": entry["risk_summary"]})
     return {
         "elevated_count": tier_counts.get("elevated", 0),
         "moderate_count": tier_counts.get("moderate", 0),

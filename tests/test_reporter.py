@@ -21,14 +21,25 @@ from src.reporter import (
 
 def _make_report() -> AuditReport:
     meta = RepoMetadata(
-        name="test-repo", full_name="user/test-repo", description="A test",
-        language="Python", languages={"Python": 5000}, private=False, fork=False,
-        archived=False, created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        name="test-repo",
+        full_name="user/test-repo",
+        description="A test",
+        language="Python",
+        languages={"Python": 5000},
+        private=False,
+        fork=False,
+        archived=False,
+        created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
         updated_at=datetime(2026, 3, 1, tzinfo=timezone.utc),
         pushed_at=datetime(2026, 3, 20, tzinfo=timezone.utc),
-        default_branch="main", stars=3, forks=1, open_issues=0,
-        size_kb=1024, html_url="https://github.com/user/test-repo",
-        clone_url="", topics=["python"],
+        default_branch="main",
+        stars=3,
+        forks=1,
+        open_issues=0,
+        size_kb=1024,
+        html_url="https://github.com/user/test-repo",
+        clone_url="",
+        topics=["python"],
     )
     audit = RepoAudit(
         metadata=meta,
@@ -112,12 +123,48 @@ class TestMarkdownReport:
         assert "Where To Start" in content
         assert "src/core.py" in content
 
+    def test_renders_risk_posture_when_truth_present(self, tmp_path):
+        report = _make_report()
+        (tmp_path / "portfolio-truth-latest.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": "0.5.0",
+                    "projects": [
+                        {
+                            "identity": {"display_name": "test-repo"},
+                            "risk": {
+                                "risk_tier": "elevated",
+                                "risk_summary": "Weak context, no run instructions.",
+                            },
+                        }
+                    ],
+                }
+            )
+        )
+        path = write_markdown_report(report, tmp_path)
+        content = path.read_text()
+        # Aggregate section
+        assert "### Risk Posture" in content
+        assert "Elevated: 1" in content
+        # Per-repo tier rendered in the repo details block
+        assert "Risk Tier" in content
+        assert "elevated" in content
+        assert "Weak context, no run instructions." in content
+
+    def test_no_risk_posture_section_when_truth_absent(self, tmp_path):
+        report = _make_report()
+        path = write_markdown_report(report, tmp_path)
+        content = path.read_text()
+        assert "### Risk Posture" not in content
+
     def test_includes_compare_summary_when_diff_passed(self, tmp_path):
         report = _make_report()
         diff_data = {
             "average_score_delta": 0.04,
             "lens_deltas": {"ship_readiness": 0.1},
-            "repo_changes": [{"name": "test-repo", "delta": 0.1, "old_tier": "wip", "new_tier": "functional"}],
+            "repo_changes": [
+                {"name": "test-repo", "delta": 0.1, "old_tier": "wip", "new_tier": "functional"}
+            ],
         }
         path = write_markdown_report(report, tmp_path, diff_data=diff_data)
         content = path.read_text()
@@ -201,7 +248,10 @@ class TestMarkdownReport:
         content = path.read_text()
 
         assert "GitHub Projects: configured (octo-org #7, 1 items)" in content
-        assert "| test-repo | ghra-call-security-review | [Repo Auditor] Security Review | 3 field(s) | 0 |" in content
+        assert (
+            "| test-repo | ghra-call-security-review | [Repo Auditor] Security Review | 3 field(s) | 0 |"
+            in content
+        )
 
     def test_weekly_pack_includes_action_sync_readiness(self, tmp_path):
         report = _make_report()
@@ -302,7 +352,10 @@ class TestMarkdownReport:
         assert "recommended target all" in content
         assert "Security Review should win ties because recent outcomes are proven." in content
         assert "test-repo is improving after intervention" in content
-        assert "Preview Security Review next; that is the strongest safe automation step right now." in content
+        assert (
+            "Preview Security Review next; that is the strongest safe automation step right now."
+            in content
+        )
 
     def test_includes_preflight_diagnostics_when_present(self, tmp_path):
         report = _make_report()
@@ -352,7 +405,9 @@ class TestMarkdownReport:
             ],
             "next_action_confidence_score": 0.95,
             "next_action_confidence_label": "high",
-            "next_action_confidence_reasons": ["The next step is tied directly to the current top target."],
+            "next_action_confidence_reasons": [
+                "The next step is tied directly to the current top target."
+            ],
             "primary_target_trust_policy": "act-now",
             "primary_target_trust_policy_reason": "Blocked work with tuned high confidence should be cleared before new work.",
             "next_action_trust_policy": "act-now",
@@ -920,19 +975,29 @@ class TestMarkdownReport:
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Churn Summary" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Freshness Summary" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Reset Summary" in content
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Refresh Recovery Summary" in content
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Restore Refresh Recovery Summary" in content
+        )
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Summary" in content
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Persistence Summary" in content
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Persistence Summary" in content
+        )
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Churn Summary" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness Summary" in content
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery Summary" in content
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery Summary"
+            in content
+        )
         assert "Reacquisition Durability:" in content
         assert "Reacquisition Confidence:" in content
         assert "Reacquisition Softening Decay:" in content
         assert "Reacquisition Confidence Retirement:" in content
         assert "Revalidation Recovery:" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Summary" in content
-        assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence Summary" in content
+        assert (
+            "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence Summary"
+            in content
+        )
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Summary" in content
         assert "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Summary" in content
         assert "Reset Re-entry Rebuild Persistence Summary" in content
@@ -983,15 +1048,22 @@ class TestRawMetadata:
 
     def test_writes_governance_summary_when_present(self, tmp_path):
         report = _make_report()
-        report.governance_summary = {"status": "ready", "headline": "Governed controls are ready for manual review."}
+        report.governance_summary = {
+            "status": "ready",
+            "headline": "Governed controls are ready for manual review.",
+        }
         path = write_raw_metadata(report, tmp_path)
         data = json.loads(path.read_text())
         assert data["governance_summary"]["status"] == "ready"
 
     def test_writes_portfolio_catalog_summaries_when_present(self, tmp_path):
         report = _make_report()
-        report.portfolio_catalog_summary = {"summary": "1/1 repos have an explicit catalog contract."}
-        report.intent_alignment_summary = {"summary": "1 aligned, 0 needing review, and 0 missing a contract."}
+        report.portfolio_catalog_summary = {
+            "summary": "1/1 repos have an explicit catalog contract."
+        }
+        report.intent_alignment_summary = {
+            "summary": "1 aligned, 0 needing review, and 0 missing a contract."
+        }
         report.audits[0].portfolio_catalog = {
             "has_explicit_entry": True,
             "owner": "d",
@@ -1007,13 +1079,21 @@ class TestRawMetadata:
         }
         path = write_raw_metadata(report, tmp_path)
         data = json.loads(path.read_text())
-        assert data["portfolio_catalog_summary"]["summary"] == "1/1 repos have an explicit catalog contract."
-        assert data["intent_alignment_summary"]["summary"] == "1 aligned, 0 needing review, and 0 missing a contract."
+        assert (
+            data["portfolio_catalog_summary"]["summary"]
+            == "1/1 repos have an explicit catalog contract."
+        )
+        assert (
+            data["intent_alignment_summary"]["summary"]
+            == "1 aligned, 0 needing review, and 0 missing a contract."
+        )
         assert data["audits"][0]["portfolio_catalog"]["intent_alignment"] == "aligned"
 
     def test_writes_scorecard_summaries_when_present(self, tmp_path):
         report = _make_report()
-        report.scorecards_summary = {"summary": "0 repos are on track, 1 is below target, and 0 are missing a valid program."}
+        report.scorecards_summary = {
+            "summary": "0 repos are on track, 1 is below target, and 0 are missing a valid program."
+        }
         report.scorecard_programs = {"maintain": {"label": "Maintain", "rule_count": 8}}
         report.audits[0].scorecard = {
             "program": "maintain",
@@ -1052,7 +1132,10 @@ class TestRawMetadata:
         path = write_raw_metadata(report, tmp_path)
         data = json.loads(path.read_text())
         assert data["portfolio_outcomes_summary"]["summary"] == "Managed action closure is at 50%."
-        assert data["operator_effectiveness_summary"]["summary"] == "recommendation validation is at 75%."
+        assert (
+            data["operator_effectiveness_summary"]["summary"]
+            == "recommendation validation is at 75%."
+        )
         assert data["high_pressure_queue_history"][0]["high_pressure_count"] == 1
 
 
@@ -1095,7 +1178,9 @@ class TestPortfolioCatalogMarkdown:
                 "catalog_line": report.audits[0].portfolio_catalog["catalog_line"],
                 "operating_path_line": "Operating Path: Maintain (high confidence) — Stable path is Maintain from intended disposition.",
                 "intent_alignment": "aligned",
-                "intent_alignment_reason": report.audits[0].portfolio_catalog["intent_alignment_reason"],
+                "intent_alignment_reason": report.audits[0].portfolio_catalog[
+                    "intent_alignment_reason"
+                ],
             }
         ]
 

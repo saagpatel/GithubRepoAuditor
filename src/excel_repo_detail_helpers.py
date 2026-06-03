@@ -572,5 +572,18 @@ def build_repo_detail_sheet(
             "left",
         )
 
+    # Risk Posture section (column 79 in Data_RepoDetail, from portfolio truth)
+    ws["A43"] = "Risk Posture"
+    ws["A43"].font = section_font
+    ws.cell(row=44, column=1, value="Risk Tier").font = subheader_font
+    style_data_cell(
+        ws.cell(
+            row=44,
+            column=2,
+            value=repo_detail_lookup_formula(79, "—", allow_blank=True),
+        ),
+        "left",
+    )
+
     nav_row = populate_repo_detail_handoff_section(ws, style_data_cell, subheader_font)
-    auto_width(ws, 8, nav_row)
+    auto_width(ws, 8, max(nav_row, 44))

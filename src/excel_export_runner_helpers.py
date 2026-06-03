@@ -74,7 +74,11 @@ def build_excel_workbook(
 ) -> None:
     run_workbook_build_steps(
         [
-            (build_dashboard, (wb, data, diff_data, score_history), {"excel_mode": excel_mode}),
+            (
+                build_dashboard,
+                (wb, data, diff_data, score_history),
+                {"excel_mode": excel_mode, "risk_lookup": risk_lookup},
+            ),
             (build_all_repos, (wb, data, score_history), {"risk_lookup": risk_lookup}),
             (
                 build_portfolio_explorer,
@@ -145,7 +149,11 @@ def build_excel_workbook(
             (build_dependency_graph, (wb, data), {}),
             (build_score_explainer, (wb,), {}),
             (build_action_items, (wb, data), {}),
-            (build_hidden_data_sheets, (wb, data, trend_data, score_history, diff_data), {}),
+            (
+                build_hidden_data_sheets,
+                (wb, data, trend_data, score_history, diff_data),
+                {"risk_lookup": risk_lookup},
+            ),
             (
                 build_navigation,
                 (wb, data),

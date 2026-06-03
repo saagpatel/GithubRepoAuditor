@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from src.report_enrichment import (
     build_queue_pressure_summary,
     build_top_recommendation_summary,
@@ -597,6 +599,31 @@ class TestExportHtmlDashboard:
         assert "<!DOCTYPE html>" in content
         assert "<style>" in content
         assert "<script>" in content
+
+    def test_per_repo_risk_tier_rendered_from_truth(self, tmp_path):
+        (tmp_path / "portfolio-truth-latest.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": "0.5.0",
+                    "projects": [
+                        {
+                            "identity": {"display_name": "RepoB"},
+                            "risk": {"risk_tier": "elevated", "risk_summary": "Weak context."},
+                        }
+                    ],
+                }
+            )
+        )
+        result = export_html_dashboard(_make_report(), tmp_path)
+        content = result["html_path"].read_text()
+        assert "<th>Risk</th>" in content
+        assert "elevated" in content
+
+    def test_no_risk_column_data_when_truth_absent(self, tmp_path):
+        # Header column still renders, but no repo carries a tier value.
+        result = export_html_dashboard(_make_report(), tmp_path)
+        content = result["html_path"].read_text()
+        assert "elevated" not in content
         assert 'id="dashboard-data"' in content
         assert 'type="application/json"' in content
         assert "const DATA = JSON.parse" in content
