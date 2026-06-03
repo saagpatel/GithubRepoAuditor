@@ -48,6 +48,7 @@ from src.report_enrichment import (
     build_operator_focus_line,
     build_queue_pressure_summary,
     build_repo_briefing,
+    build_risk_lookup,
     build_run_change_counts,
     build_run_change_summary,
     build_score_explanation,
@@ -98,34 +99,27 @@ def export_html_dashboard(
     collection: str | None = None,
 ) -> dict:
     """Generate interactive HTML dashboard. Returns {html_path}."""
-    _risk_posture: dict = {}
-    _truth_path = output_dir / "portfolio-truth-latest.json"
-    if _truth_path.is_file():
-        try:
-            _truth_data = json.loads(_truth_path.read_text())
-            _projects = _truth_data.get("projects") or []
-            _tc: dict[str, int] = {}
-            _te: list[dict] = []
-            for _p in _projects:
-                _t = str((_p.get("risk") or {}).get("risk_tier") or "baseline")
-                _tc[_t] = _tc.get(_t, 0) + 1
-                if _t == "elevated":
-                    _te.append(
-                        {
-                            "repo": str((_p.get("identity") or {}).get("display_name") or ""),
-                            "risk_summary": str((_p.get("risk") or {}).get("risk_summary") or ""),
-                        }
-                    )
-            _risk_posture = {
-                "elevated_count": _tc.get("elevated", 0),
-                "moderate_count": _tc.get("moderate", 0),
-                "baseline_count": _tc.get("baseline", 0),
-                "deferred_count": _tc.get("deferred", 0),
-                "top_elevated": _te[:5],
-            }
-        except Exception:
-            # Risk posture is optional enrichment for the HTML export.
-            pass
+    # build_risk_lookup is the single source of truth for per-repo risk data; the
+    # aggregate posture is derived from it so the HTML export does not re-parse the
+    # truth snapshot itself.
+    _risk_lookup = build_risk_lookup(output_dir)
+    _tier_counts: dict[str, int] = {}
+    _top_elevated: list[dict] = []
+    for _name, _entry in _risk_lookup.items():
+        _tier_counts[_entry["risk_tier"]] = _tier_counts.get(_entry["risk_tier"], 0) + 1
+        if _entry["risk_tier"] == "elevated":
+            _top_elevated.append({"repo": _name, "risk_summary": _entry["risk_summary"]})
+    _risk_posture: dict = (
+        {
+            "elevated_count": _tier_counts.get("elevated", 0),
+            "moderate_count": _tier_counts.get("moderate", 0),
+            "baseline_count": _tier_counts.get("baseline", 0),
+            "deferred_count": _tier_counts.get("deferred", 0),
+            "top_elevated": _top_elevated[:5],
+        }
+        if _risk_lookup
+        else {}
+    )
 
     html = _render_html(
         report_data,
@@ -135,6 +129,7 @@ def export_html_dashboard(
         portfolio_profile=portfolio_profile,
         collection=collection,
         risk_posture=_risk_posture,
+        risk_lookup=_risk_lookup,
     )
     output_dir.mkdir(parents=True, exist_ok=True)
     date = report_data.get("generated_at", "")[:10] or datetime.now(timezone.utc).strftime(
@@ -155,6 +150,7 @@ def _render_html(
     portfolio_profile: str = "default",
     collection: str | None = None,
     risk_posture: dict | None = None,
+    risk_lookup: dict[str, dict[str, str]] | None = None,
 ) -> str:
     """Build the complete HTML string."""
     username = report_data.get("username", "unknown")
@@ -225,7 +221,7 @@ def _render_html(
         '<canvas id="scatter" width="800" height="500"></canvas>',
         '<div id="tooltip" class="tooltip"></div>',
         "</div>",
-        _repo_table(analyst_context, score_history),
+        _repo_table(analyst_context, score_history, risk_lookup),
         _repo_drilldown_section(report_data, diff_data),
         _portfolio_trends_section(trend_data or []),
         _run_changes_section(report_data, diff_data),
@@ -915,7 +911,11 @@ def _security_overview_section(report_data: dict) -> str:
 
 
 # ── Repo table (sorted by score, with sparklines) ─────────────────────
-def _repo_table(analyst_context: dict, score_history: dict[str, list[float]] | None = None) -> str:
+def _repo_table(
+    analyst_context: dict,
+    score_history: dict[str, list[float]] | None = None,
+    risk_lookup: dict[str, dict[str, str]] | None = None,
+) -> str:
     rows = []
     for entry in analyst_context["ranked_audits"]:
         a = entry["audit"]
@@ -959,8 +959,21 @@ def _repo_table(analyst_context: dict, score_history: dict[str, list[float]] | N
             "anchor", f"repo-{escape(name.lower(), quote=True)}"
         )
         link = f'<a href="#{escape(repo_anchor, quote=True)}">{safe_name}</a>'
+        risk_tier = (risk_lookup or {}).get(name, {}).get("risk_tier", "")
+        risk_color = {
+            "elevated": "#dc2626",
+            "moderate": "#d97706",
+            "baseline": "#16a34a",
+            "deferred": "#6b7280",
+        }.get(risk_tier, "#6b7280")
+        risk_cell = (
+            f'<td style="color:{risk_color};font-weight:bold">{escape(risk_tier)}</td>'
+            if risk_tier
+            else "<td>—</td>"
+        )
         rows.append(
             f'<tr data-tier="{escape(tier, quote=True)}" '
+            f'data-risk="{escape(risk_tier, quote=True)}" '
             f'data-grade="{escape(grade, quote=True)}" '
             f'data-name="{escape(name, quote=True)}" '
             f'data-collections="{escape(collections.lower(), quote=True)}" '
@@ -972,6 +985,7 @@ def _repo_table(analyst_context: dict, score_history: dict[str, list[float]] | N
             f'<td class="num">{score:.3f}</td>'
             f'<td class="num">{interest:.3f}</td>'
             f'<td style="color:{tc};font-weight:bold">{safe_tier}</td>'
+            f"{risk_cell}"
             f"<td>{safe_lang}</td>"
             f"<td>{safe_collections or '—'}</td>"
             f'<td class="sparkline">{escape(spark)}</td>'
@@ -1019,7 +1033,7 @@ def _repo_table(analyst_context: dict, score_history: dict[str, list[float]] | N
       <table id="repo-table">
         <thead><tr>
           <th>Repo</th><th>Profile</th><th>Grade</th><th>Score</th><th>Interest</th>
-          <th>Tier</th><th>Language</th><th>Collections</th><th>Trend</th><th>Description</th>
+          <th>Tier</th><th>Risk</th><th>Language</th><th>Collections</th><th>Trend</th><th>Description</th>
         </tr></thead>
         <tbody>{"".join(rows)}</tbody>
       </table>
