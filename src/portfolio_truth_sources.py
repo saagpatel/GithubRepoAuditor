@@ -103,7 +103,48 @@ def discover_workspace_projects(
                 child, workspace_root, catalog_data=catalog_data, now=now, depth=2
             )
         )
-    return discovered
+    return _dedupe_checkouts_by_origin(discovered)
+
+
+def _dedupe_checkouts_by_origin(
+    discovered: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Collapse multiple on-disk checkouts of the same repo to one canonical project.
+
+    Linked git worktrees and stray duplicate clones (e.g. ``<repo>-security-fix``
+    left behind by multi-repo sweeps) all resolve to the same origin
+    (``repo_full_name``), so without this they each count as a distinct project —
+    inflating the portfolio count and dragging catalog-completeness toward zero.
+
+    Keep one canonical checkout per origin, preferring the directory whose name
+    matches the repo basename, then the shortest name, then alphabetical. Projects
+    without an origin are local-only and are never collapsed. Result is sorted by
+    name (case-insensitive), matching the prior discovery ordering.
+    """
+    by_origin: dict[str, list[dict[str, Any]]] = {}
+    canonical: list[dict[str, Any]] = []
+    for project in discovered:
+        origin = str(project.get("repo_full_name", "") or "").strip()
+        if origin:
+            by_origin.setdefault(origin.lower(), []).append(project)
+        else:
+            canonical.append(project)
+
+    for origin_key, group in by_origin.items():
+        repo_base = origin_key.rsplit("/", 1)[-1]
+        canonical.append(
+            min(
+                group,
+                key=lambda p: (
+                    str(p.get("name", "")).lower() != repo_base,
+                    len(str(p.get("name", ""))),
+                    str(p.get("name", "")).lower(),
+                ),
+            )
+        )
+
+    canonical.sort(key=lambda p: str(p.get("name", "")).lower())
+    return canonical
 
 
 def _discover_nested_projects(
