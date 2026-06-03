@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import datetime
+import json
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
 import requests
 
+from src.cli import _run_security_burndown_mode
 from src.ghas_alert_details import fetch_dependabot_details
 from src.security_burndown import (
     BurndownEntry,
@@ -739,3 +744,81 @@ class TestBurndownRoundTrip:
         assert "HIGH" in md
         # medium was filtered out — pip/requests still appears but as the no-ghsa entry
         assert "pip/requests" in md
+
+
+class TestRunSecurityBurndownMode:
+    """CLI dispatch (_run_security_burndown_mode) — markdown + JSON sidecar."""
+
+    def _write_ghas(self, output_dir, username: str) -> None:
+        today = datetime.date.today().isoformat()
+        ghas = {
+            "RepoA": {
+                "dependabot_details": [
+                    {
+                        "package": "lodash",
+                        "ecosystem": "npm",
+                        "scope": "runtime",
+                        "severity": "critical",
+                        "ghsa_id": "GHSA-aaaa-0001",
+                        "first_patched_version": "4.17.21",
+                    }
+                ]
+            },
+            "RepoB": {
+                "dependabot_details": [
+                    {
+                        "package": "lodash",
+                        "ecosystem": "npm",
+                        "scope": "runtime",
+                        "severity": "critical",
+                        "ghsa_id": "GHSA-aaaa-0001",
+                        "first_patched_version": "4.17.21",
+                    }
+                ]
+            },
+        }
+        (output_dir / f"ghas-alerts-{username}-{today}.json").write_text(
+            json.dumps(ghas), encoding="utf-8"
+        )
+
+    def test_writes_markdown_and_json_sidecar(self, tmp_path, capsys) -> None:
+        self._write_ghas(tmp_path, "octocat")
+        args = SimpleNamespace(output_dir=str(tmp_path), username="octocat")
+
+        _run_security_burndown_mode(args)
+
+        today = datetime.date.today().isoformat()
+        md_path = tmp_path / f"security-burndown-octocat-{today}.md"
+        json_path = tmp_path / f"security-burndown-octocat-{today}.json"
+        assert md_path.exists(), "markdown artifact should be written"
+        assert json_path.exists(), "JSON sidecar should be written"
+
+        payload = json.loads(json_path.read_text(encoding="utf-8"))
+        # one advisory (GHSA-aaaa-0001) spanning two repos
+        assert payload["distinct_advisories"] == 1
+        assert payload["repos_touched"] == 2
+        assert payload["total_repo_instances"] == 2
+        entry = payload["entries"][0]
+        assert entry["package"] == "lodash"
+        assert entry["severity"] == "critical"
+        assert entry["affected_repo_count"] == 2
+        assert sorted(entry["affected_repos"]) == ["RepoA", "RepoB"]
+
+    def test_no_ghas_file_exits_nonzero(self, tmp_path) -> None:
+        args = SimpleNamespace(output_dir=str(tmp_path), username="nobody")
+        with pytest.raises(SystemExit) as exc:
+            _run_security_burndown_mode(args)
+        assert exc.value.code == 1
+
+    def test_counts_only_ghas_exits_without_writing(self, tmp_path) -> None:
+        """A counts-only ghas file (no dependabot_details) exits 0, writes nothing."""
+        today = datetime.date.today().isoformat()
+        ghas = {"RepoA": {"dependabot": {"critical": 1, "available": True}}}
+        (tmp_path / f"ghas-alerts-octocat-{today}.json").write_text(
+            json.dumps(ghas), encoding="utf-8"
+        )
+        args = SimpleNamespace(output_dir=str(tmp_path), username="octocat")
+        with pytest.raises(SystemExit) as exc:
+            _run_security_burndown_mode(args)
+        assert exc.value.code == 0
+        assert not list(tmp_path.glob("security-burndown-*"))
