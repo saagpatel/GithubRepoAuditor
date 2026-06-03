@@ -1,5 +1,6 @@
 # src/portfolio_context_triage.py
 """Context triage runner — B1 of Arc H operational stream."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -17,6 +18,9 @@ class FailureMode(str, Enum):
 _DESCRIPTION_CONFIDENCE_WARN_BELOW = 0.5
 _CATALOG_COMPLETENESS_WARN_BELOW = 0.6
 _WEAK_CONTEXT_QUALITIES = {"none", "boilerplate"}
+# Context quality measures "can someone resume this?" — irrelevant for repos
+# that are intentionally not under active development, so don't flag them.
+_CONTEXT_EXEMPT_LIFECYCLES = {"archived", "dormant"}
 
 
 def assess_repo_failure_modes(repo: dict[str, Any]) -> list[FailureMode]:
@@ -45,10 +49,18 @@ def assess_repo_failure_modes(repo: dict[str, Any]) -> list[FailureMode]:
         modes.append(FailureMode.CATALOG)
 
     context_quality = _repo_context_quality(repo)
-    if context_quality in _WEAK_CONTEXT_QUALITIES:
+    if (
+        context_quality in _WEAK_CONTEXT_QUALITIES
+        and _repo_lifecycle_state(repo) not in _CONTEXT_EXEMPT_LIFECYCLES
+    ):
         modes.append(FailureMode.CONTEXT)
 
     return modes
+
+
+def _repo_lifecycle_state(repo: dict[str, Any]) -> str:
+    declared = repo.get("declared") if isinstance(repo.get("declared"), dict) else {}
+    return str(declared.get("lifecycle_state") or "").strip().lower()
 
 
 @dataclass
@@ -95,8 +107,4 @@ def _repo_context_quality(repo: dict[str, Any]) -> str:
 
 def run_triage(repos: list[dict[str, Any]]) -> list[TriageEntry]:
     """Return TriageEntry for every repo that has at least one failure mode."""
-    return [
-        TriageEntry.from_repo(repo)
-        for repo in repos
-        if assess_repo_failure_modes(repo)
-    ]
+    return [TriageEntry.from_repo(repo) for repo in repos if assess_repo_failure_modes(repo)]
