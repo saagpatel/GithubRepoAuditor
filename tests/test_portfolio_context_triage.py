@@ -1,5 +1,6 @@
 # tests/test_portfolio_context_triage.py
 """Tests for the context triage runner (Arc H B1)."""
+
 import json
 
 from src.portfolio_context_triage import (
@@ -15,6 +16,7 @@ def _entry(
     readme_stale_by_age=False,
     catalog_completeness=1.0,
     context_quality="full",
+    lifecycle_state="active",
 ) -> dict:
     return {
         "name": "test-repo",
@@ -24,6 +26,7 @@ def _entry(
         },
         "catalog_completeness": catalog_completeness,
         "context_quality": context_quality,
+        "declared": {"lifecycle_state": lifecycle_state},
     }
 
 
@@ -58,6 +61,45 @@ def test_nested_portfolio_truth_context_quality_flagged():
             "identity": {"display_name": "RepoA"},
             "derived": {"context_quality": "boilerplate"},
         }
+    )
+    assert FailureMode.CONTEXT in modes
+
+
+# Context quality is a "can someone resume this?" signal — irrelevant for repos
+# that are intentionally not under active development. Archived and dormant
+# repos must not be context-flagged even when their docs are boilerplate.
+
+
+def test_archived_repo_not_context_flagged():
+    modes = assess_repo_failure_modes(
+        _entry(context_quality="boilerplate", lifecycle_state="archived")
+    )
+    assert FailureMode.CONTEXT not in modes
+
+
+def test_dormant_repo_not_context_flagged():
+    modes = assess_repo_failure_modes(_entry(context_quality="none", lifecycle_state="dormant"))
+    assert FailureMode.CONTEXT not in modes
+
+
+def test_active_repo_with_weak_context_still_flagged():
+    modes = assess_repo_failure_modes(
+        _entry(context_quality="boilerplate", lifecycle_state="active")
+    )
+    assert FailureMode.CONTEXT in modes
+
+
+def test_maintenance_repo_with_weak_context_still_flagged():
+    modes = assess_repo_failure_modes(
+        _entry(context_quality="boilerplate", lifecycle_state="maintenance")
+    )
+    assert FailureMode.CONTEXT in modes
+
+
+def test_missing_lifecycle_state_defaults_to_flagged():
+    # no declared.lifecycle_state -> enforce context quality (do not suppress)
+    modes = assess_repo_failure_modes(
+        {"identity": {"display_name": "RepoB"}, "context_quality": "none"}
     )
     assert FailureMode.CONTEXT in modes
 
