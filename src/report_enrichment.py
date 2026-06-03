@@ -173,14 +173,24 @@ def build_risk_lookup(output_dir: Path | None) -> dict[str, dict[str, str]]:
         return {}
     lookup: dict[str, dict[str, str]] = {}
     for project in truth.get("projects") or []:
-        name = str((project.get("identity") or {}).get("display_name") or "")
+        identity = project.get("identity") or {}
+        name = str(identity.get("display_name") or "")
         if not name:
             continue
         risk = project.get("risk") or {}
-        lookup[name] = {
+        entry = {
             "risk_tier": str(risk.get("risk_tier") or "baseline"),
             "risk_summary": str(risk.get("risk_summary") or ""),
         }
+        lookup[name] = entry
+        # Alias each project under its GitHub repo name so render consumers that key
+        # by audit metadata.name resolve risk for repos whose local-dir display_name
+        # differs (e.g. "Signal & Noise" vs "signal-noise"). The alias is the SAME
+        # entry object; _extract_risk_posture dedups by identity so it never inflates
+        # the aggregate counts.
+        slug = str(identity.get("repo_full_name") or "").rsplit("/", 1)[-1]
+        if slug and slug not in lookup:
+            lookup[slug] = entry
     return lookup
 
 
@@ -191,7 +201,14 @@ def _extract_risk_posture(output_dir: Path | None) -> dict[str, Any]:
         return {}
     tier_counts: dict[str, int] = {}
     top_elevated: list[dict[str, Any]] = []
+    seen: set[int] = set()
     for name, entry in lookup.items():
+        # build_risk_lookup aliases each project under both its display_name and its
+        # GitHub slug (same entry object); count each project exactly once. Insertion
+        # order puts the display_name first, so top_elevated uses the human name.
+        if id(entry) in seen:
+            continue
+        seen.add(id(entry))
         tier = entry["risk_tier"]
         tier_counts[tier] = tier_counts.get(tier, 0) + 1
         if tier == "elevated":
