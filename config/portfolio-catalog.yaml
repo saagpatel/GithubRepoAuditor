@@ -778,3 +778,237 @@ repos:
     intended_disposition: maintain
     notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
       confirm purpose/criticality.'
+  AIFortuneTeller:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: fun
+  ApplyKit-public:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: commercial
+    tool_provenance: codex
+  Grotto:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+  ITServiceHealth:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: it-work
+  Notion:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: it-work
+  PortfolioCommandCenter:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: infrastructure
+  Pressfield:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+  Undertone:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+  Veritas:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+  cross-system-smoke:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: infrastructure
+  da-scaffold:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: experiment
+  hermes-harness-foundation:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: infrastructure
+  rag-knowledge-base:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: infrastructure
+  stockpulse:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: vanity
+  BattleGrid:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: fun
+  GithubRepoAuditor-public:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: infrastructure
+    tool_provenance: codex
+  LegalDocsReview:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: it-work
+  PomGambler-prod:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: fun
+    tool_provenance: codex
+  Relay:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+  ai-fluency-tracker:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: vanity
+    tool_provenance: claude-code
+  asc-radar:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: it-work
+    tool_provenance: claude-code
+  cost-tracker:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: infrastructure
+    tool_provenance: claude-code
+  portfolio-health:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: infrastructure
+    tool_provenance: claude-code
+  IncidentMgmt:
+    owner: d
+    lifecycle_state: dormant
+    review_cadence: quarterly
+    intended_disposition: maintain
+    category: it-work
+  SlackIncidentBot:
+    owner: d
+    lifecycle_state: dormant
+    review_cadence: quarterly
+    intended_disposition: maintain
+    category: it-work
+  TicketDocumentation:
+    owner: d
+    lifecycle_state: dormant
+    review_cadence: quarterly
+    intended_disposition: maintain
+    category: it-work
+  Construction:
+    owner: d
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
+    category: commercial
+    tool_provenance: gpt
+  ContentEngine:
+    owner: d
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
+    category: commercial
+    tool_provenance: gpt
+  DatabaseSchema:
+    owner: d
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
+    category: commercial
+    tool_provenance: gpt
+  FreeLanceInvoice:
+    owner: d
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
+    category: commercial
+    tool_provenance: gpt
+  Nexus:
+    owner: d
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
+    category: commercial
+    tool_provenance: gpt
+  OPscinema:
+    owner: d
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
+    category: commercial
+    tool_provenance: gpt
+  PixelForge:
+    owner: d
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
+    category: commercial
+    tool_provenance: gpt
+  RealEstate:
+    owner: d
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
+    category: commercial
+    tool_provenance: gpt
+  ShipKit:
+    owner: d
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
+    category: commercial
+    tool_provenance: gpt
+  SynthWave:
+    owner: d
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
+    category: commercial
+    tool_provenance: gpt
+  compliance-suite:
+    owner: d
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
+    category: commercial
+    tool_provenance: gpt
