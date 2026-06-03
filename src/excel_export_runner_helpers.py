@@ -145,7 +145,11 @@ def build_excel_workbook(
             (build_dependency_graph, (wb, data), {}),
             (build_score_explainer, (wb,), {}),
             (build_action_items, (wb, data), {}),
-            (build_hidden_data_sheets, (wb, data, trend_data, score_history, diff_data), {}),
+            (
+                build_hidden_data_sheets,
+                (wb, data, trend_data, score_history, diff_data),
+                {"risk_lookup": risk_lookup},
+            ),
             (
                 build_navigation,
                 (wb, data),

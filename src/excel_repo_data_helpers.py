@@ -80,6 +80,7 @@ def repo_detail_rows(
     data: dict,
     score_history: dict[str, list[float]] | None,
     ghas_lookup: dict | None = None,
+    risk_lookup: dict[str, str] | None = None,
 ) -> tuple[list[list[object]], list[list[object]], list[list[object]]]:
     memberships = collection_memberships(data)
     history = extend_score_history_with_current(data, score_history)
@@ -281,6 +282,7 @@ def repo_detail_rows(
                 if len(implementation_hotspot_lines) > 2
                 else "No third implementation hotspot is currently surfaced.",
                 *_arc_f_detail_cols(audit, ghas_lookup),
+                (risk_lookup or {}).get(repo_name, "") or "—",
             ]
         )
 

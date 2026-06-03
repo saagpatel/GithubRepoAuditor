@@ -1173,6 +1173,7 @@ def _build_hidden_data_sheets(
     trend_data: list[dict] | None = None,
     score_history: dict[str, list[float]] | None = None,
     diff_data: dict | None = None,
+    risk_lookup: dict[str, str] | None = None,
 ) -> None:
     _build_hidden_data_sheets_helper(
         wb,
@@ -1189,6 +1190,7 @@ def _build_hidden_data_sheets(
         build_core_hidden_rows=_build_core_hidden_rows,
         trend_history_window=TREND_HISTORY_WINDOW,
         tier_order=TIER_ORDER,
+        risk_lookup=risk_lookup,
     )
 
 

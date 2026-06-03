@@ -400,11 +400,22 @@ class TestArcFDetailCols:
         assert cols[7] == "—"
 
     def test_row_extended_by_8_columns(self) -> None:
-        """repo_detail_rows must return 78 columns per row (70 base + 8 Arc F)."""
+        """repo_detail_rows returns 79 columns per row (70 base + 8 Arc F + 1 risk tier)."""
         data = _make_report_data([_make_audit_with_arc_f()])
         detail_rows, _, _ = repo_detail_rows(data, None)
         assert len(detail_rows) == 1
-        assert len(detail_rows[0]) == 78
+        assert len(detail_rows[0]) == 79
+
+    def test_risk_tier_appended_as_column_79(self) -> None:
+        data = _make_report_data([_make_audit_with_arc_f(name="repo-alpha")])
+        detail_rows, _, _ = repo_detail_rows(data, None, risk_lookup={"repo-alpha": "elevated"})
+        assert len(detail_rows[0]) == 79
+        assert detail_rows[0][78] == "elevated"
+
+    def test_risk_tier_dash_when_no_lookup(self) -> None:
+        data = _make_report_data([_make_audit_with_arc_f()])
+        detail_rows, _, _ = repo_detail_rows(data, None)
+        assert detail_rows[0][78] == "—"
 
     def test_backward_compat_without_arc_f_fields(self) -> None:
         """Audit with no readme/activity Arc F fields must still produce 78 cols."""
@@ -427,7 +438,7 @@ class TestArcFDetailCols:
         }
         data = _make_report_data([bare_audit])
         detail_rows, _, _ = repo_detail_rows(data, None)
-        assert len(detail_rows[0]) == 78
+        assert len(detail_rows[0]) == 79
 
 
 # ─────────────────────────────────────────────────────────────
