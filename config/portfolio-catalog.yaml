@@ -76,7 +76,8 @@ groups:
 repos:
   AIGCCore:
     owner: d
-    purpose: local-first AI governance core with offline enforcement and hash-chained audit exports
+    purpose: local-first AI governance core with offline enforcement and hash-chained
+      audit exports
     lifecycle_state: active
     criticality: high
     review_cadence: weekly
@@ -86,10 +87,12 @@ repos:
     maturity_program: maintain
     target_maturity: operating
     automation_eligible: false
-    notes: Security posture inspected on 2026-05-09; secret scanning has zero alerts, while open code-scanning alerts require manual triage before automation.
+    notes: Security posture inspected on 2026-05-09; secret scanning has zero alerts,
+      while open code-scanning alerts require manual triage before automation.
   AuraForge:
     owner: d
-    purpose: local-first AI planning workspace for app specs and handoff-ready build plans
+    purpose: local-first AI planning workspace for app specs and handoff-ready build
+      plans
     lifecycle_state: active
     criticality: medium
     review_cadence: weekly
@@ -99,7 +102,8 @@ repos:
     maturity_program: maintain
     target_maturity: operating
     automation_eligible: false
-    notes: Security posture inspected on 2026-05-09; secret scanning is enabled with zero alerts, while CodeQL remains a manual follow-up.
+    notes: Security posture inspected on 2026-05-09; secret scanning is enabled with
+      zero alerts, while CodeQL remains a manual follow-up.
   ApplyKit:
     owner: d
     purpose: deterministic local-first application packet generation
@@ -225,7 +229,8 @@ repos:
     tool_provenance: claude-code
   SignalFlow:
     owner: d
-    purpose: local-first visual dataflow desktop app for node-based pipelines and local LLM workflows
+    purpose: local-first visual dataflow desktop app for node-based pipelines and
+      local LLM workflows
     lifecycle_state: active
     criticality: medium
     review_cadence: weekly
@@ -235,7 +240,8 @@ repos:
     maturity_program: maintain
     target_maturity: operating
     automation_eligible: false
-    notes: Security posture inspected on 2026-05-09; secret scanning has zero alerts, while CodeQL remains a manual follow-up.
+    notes: Security posture inspected on 2026-05-09; secret scanning has zero alerts,
+      while CodeQL remains a manual follow-up.
   TabTriage:
     owner: d
     lifecycle_state: active
@@ -586,7 +592,8 @@ repos:
     tool_provenance: codex
   StatusPage:
     owner: d
-    purpose: self-hosted status page with built-in monitoring and GitHub OAuth admin flow
+    purpose: self-hosted status page with built-in monitoring and GitHub OAuth admin
+      flow
     lifecycle_state: active
     review_cadence: monthly
     intended_disposition: maintain
@@ -594,7 +601,8 @@ repos:
     tool_provenance: codex
   MoneyPRJsViaGPT/StatusPage:
     owner: d
-    purpose: GPT-built StatusPage SaaS/beta variant kept as an archived reference path
+    purpose: GPT-built StatusPage SaaS/beta variant kept as an archived reference
+      path
     lifecycle_state: archived
     review_cadence: quarterly
     intended_disposition: archive
@@ -602,7 +610,8 @@ repos:
     tool_provenance: gpt
   IncidentWorkbench:
     owner: d
-    purpose: local-first desktop workbench for incident retrospectives and quarterly review reports
+    purpose: local-first desktop workbench for incident retrospectives and quarterly
+      review reports
     lifecycle_state: active
     review_cadence: monthly
     intended_disposition: maintain
@@ -631,7 +640,8 @@ repos:
     tool_provenance: codex
   Fun:GamePrjs/OrbitForge:
     owner: d
-    purpose: active desktop N-body gravity simulator with Rust physics and React/Three.js visuals
+    purpose: active desktop N-body gravity simulator with Rust physics and React/Three.js
+      visuals
     lifecycle_state: active
     review_cadence: monthly
     intended_disposition: maintain
@@ -670,3 +680,101 @@ repos:
     review_cadence: monthly
     intended_disposition: maintain
     category: it-work
+  CryptForge:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
+      confirm purpose/criticality.'
+  DeepTank:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
+      confirm purpose/criticality.'
+  DesktopPEt:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
+      confirm purpose/criticality.'
+  EarthPulse:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
+      confirm purpose/criticality.'
+  SmartClipboard:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
+      confirm purpose/criticality.'
+  SnippetLibrary:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
+      confirm purpose/criticality.'
+  TicketDashboard:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
+      confirm purpose/criticality.'
+  WorkdayDebrief:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
+      confirm purpose/criticality.'
+  sovereign:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
+      confirm purpose/criticality.'
+  Chronomap:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
+      confirm purpose/criticality.'
+  Conductor:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
+      confirm purpose/criticality.'
+  Echolocate:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
+      confirm purpose/criticality.'
+  prompt-englab:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
+      confirm purpose/criticality.'
+  TerraSynth:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
+      confirm purpose/criticality.'
