@@ -6781,6 +6781,12 @@ def _run_security_burndown_mode(args) -> None:
     out_path.write_text(markdown, encoding="utf-8")
     print_info(f"Burndown written to {out_path}")
 
+    # JSON sidecar for structured consumers (e.g. PortfolioCommandCenter desktop
+    # shell), mirroring the per-project security overlay's JSON-first contract.
+    json_path = output_dir / f"security-burndown-{username}-{today}.json"
+    json_path.write_text(json.dumps(report.to_dict(), indent=2), encoding="utf-8")
+    print_info(f"Burndown JSON written to {json_path}")
+
 
 # ── Main entry point ──────────────────────────────────────────────────
 def main() -> None:
