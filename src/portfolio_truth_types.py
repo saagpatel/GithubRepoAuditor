@@ -42,6 +42,11 @@ class IdentityFields:
     section_marker: str
     section_label: str
     has_git: bool
+    # GitHub "owner/repo" from the local git remote, when present. Lets risk and
+    # other truth-keyed overlays be matched by the GitHub repo name (audit
+    # metadata.name) and not only the local-dir display_name, which often differ
+    # (e.g. "Signal & Noise" vs "signal-noise").
+    repo_full_name: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return dataclasses.asdict(self)

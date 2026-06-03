@@ -105,6 +105,28 @@ def test_build_risk_lookup_empty_when_no_output_dir() -> None:
     assert build_risk_lookup(None) == {}
 
 
+def test_build_risk_lookup_also_keys_by_github_slug(tmp_path: Path) -> None:
+    # Truth keys by local-dir display_name, but render consumers look up by the
+    # GitHub repo name (audit metadata.name). When the truth identity carries the
+    # repo_full_name, risk must also be findable by that GitHub slug.
+    truth = {
+        "schema_version": "0.5.0",
+        "projects": [
+            {
+                "identity": {
+                    "display_name": "Signal & Noise",
+                    "repo_full_name": "saagpatel/signal-noise",
+                },
+                "risk": {"risk_tier": "elevated", "risk_summary": "Weak context."},
+            }
+        ],
+    }
+    (tmp_path / "portfolio-truth-latest.json").write_text(json.dumps(truth))
+    lookup = build_risk_lookup(tmp_path)
+    assert lookup["Signal & Noise"]["risk_tier"] == "elevated"
+    assert lookup["signal-noise"]["risk_tier"] == "elevated"
+
+
 def test_extract_risk_posture_still_derived_from_same_source(tmp_path: Path) -> None:
     # _extract_risk_posture is reimplemented on top of build_risk_lookup; aggregate
     # counts must still match the per-repo lookup.
