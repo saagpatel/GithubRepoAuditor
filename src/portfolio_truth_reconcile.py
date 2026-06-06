@@ -348,6 +348,7 @@ def _build_truth_project(
         section_label=_resolve_section_label(group_entry, raw_project),
         has_git=bool(raw_project["has_git"]),
         repo_full_name=str(raw_project.get("repo_full_name") or ""),
+        default_branch=str(raw_project.get("default_branch") or ""),
     )
 
     declared_values = {

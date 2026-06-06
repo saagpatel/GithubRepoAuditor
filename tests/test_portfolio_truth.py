@@ -1339,3 +1339,51 @@ def test_context_recovery_emits_drift_note_when_correcting(
     text = _apply_recovery_for(target_repo, portfolio_workspace, portfolio_catalog, legacy_registry)
     how_to_run = _how_to_run_section(text)
     assert "corrected" in how_to_run.lower() or "detected" in how_to_run.lower()
+
+
+# --- _git_default_branch ---------------------------------------------------
+
+
+def test_git_default_branch_reads_local_origin_head(tmp_path: Path) -> None:
+    from src.portfolio_truth_sources import _git_default_branch
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, capture_output=True, check=True)
+    # Point the local origin/HEAD ref at a non-"main" branch (no network/clone).
+    subprocess.run(
+        ["git", "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/develop"],
+        cwd=repo,
+        capture_output=True,
+        check=True,
+    )
+
+    assert _git_default_branch(repo) == "develop"
+
+
+def test_git_default_branch_keeps_multi_segment_branch(tmp_path: Path) -> None:
+    from src.portfolio_truth_sources import _git_default_branch
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, capture_output=True, check=True)
+    subprocess.run(
+        ["git", "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/release/v1"],
+        cwd=repo,
+        capture_output=True,
+        check=True,
+    )
+
+    # Only the remote name is stripped; the branch path stays intact.
+    assert _git_default_branch(repo) == "release/v1"
+
+
+def test_git_default_branch_empty_when_origin_head_unset(tmp_path: Path) -> None:
+    from src.portfolio_truth_sources import _git_default_branch
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, capture_output=True, check=True)
+
+    # A freshly init'd repo has no origin/HEAD → "" so callers fall back.
+    assert _git_default_branch(repo) == ""

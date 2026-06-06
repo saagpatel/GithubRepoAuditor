@@ -67,6 +67,7 @@ def _project(
     repo_full_name: str = "owner/MyRepo",
     has_git: bool = True,
     primary_context_file: str = "AGENTS.md",
+    default_branch: str = "",
 ) -> PortfolioTruthProject:
     return PortfolioTruthProject(
         identity=IdentityFields(
@@ -80,6 +81,7 @@ def _project(
             section_label="M",
             has_git=has_git,
             repo_full_name=repo_full_name,
+            default_branch=default_branch,
         ),
         declared=DeclaredFields(purpose=f"{display_name} does things."),
         derived=DerivedFields(
@@ -151,6 +153,26 @@ def test_context_pr_plan_respects_branch_prefix_and_default_branch() -> None:
         default_branch="trunk",
     )
     assert plan.branch_name == "bot/ctx-myrepo"
+    assert plan.default_branch == "trunk"
+
+
+def test_context_pr_plan_uses_repo_detected_default_branch() -> None:
+    # No explicit override: the repo's own detected default branch drives the
+    # PR base instead of the blanket "main".
+    plan = build_context_pr_plan(
+        _project(default_branch="develop"),
+        workspace_root=Path("/ws"),
+    )
+    assert plan.default_branch == "develop"
+
+
+def test_context_pr_plan_explicit_branch_overrides_repo_default() -> None:
+    # An explicit caller override wins over the repo's detected default branch.
+    plan = build_context_pr_plan(
+        _project(default_branch="develop"),
+        workspace_root=Path("/ws"),
+        default_branch="trunk",
+    )
     assert plan.default_branch == "trunk"
 
 

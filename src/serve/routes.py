@@ -14,6 +14,7 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
+from src.portfolio_truth_types import truth_latest_path
 from src.serve.runner import SAFE_FLAG_NAMES, get_session, spawn_run, validate_flags
 
 router = APIRouter()
@@ -34,7 +35,7 @@ def _escape(value: object) -> str:
 
 
 def _load_portfolio_truth(output_dir: Path) -> dict[str, Any]:
-    p = output_dir / "portfolio-truth-latest.json"
+    p = truth_latest_path(output_dir)
     if not p.exists():
         return {}
     try:
@@ -643,7 +644,7 @@ async def initiatives(request: Request) -> HTMLResponse:
 
     # Load portfolio-truth, keyed by identity.display_name
     projects_by_name: dict[str, dict[str, Any]] = {}
-    truth_path = output_dir / "portfolio-truth-latest.json"
+    truth_path = truth_latest_path(output_dir)
     if truth_path.exists():
         try:
             truth = json.loads(truth_path.read_text())
@@ -706,7 +707,7 @@ async def initiatives_suggestions(
     from src.suggest_initiatives import default_deadline_for_effort, generate_suggestions
 
     output_dir = _output_dir(request)
-    truth_path = output_dir / "portfolio-truth-latest.json"
+    truth_path = truth_latest_path(output_dir)
 
     if not truth_path.exists():
         return templates.TemplateResponse(
@@ -779,7 +780,7 @@ async def accept_initiative_route(
     from src.suggest_initiatives import accept_suggestion
 
     output_dir = _output_dir(request)
-    truth_path = output_dir / "portfolio-truth-latest.json"
+    truth_path = truth_latest_path(output_dir)
 
     if not truth_path.exists():
         return HTMLResponse(
@@ -957,7 +958,7 @@ async def initiative_gap(request: Request, repo_name: str, target: int = 0) -> H
 
     # Load portfolio-truth
     projects_by_name: dict[str, dict[str, Any]] = {}
-    truth_path = output_dir / "portfolio-truth-latest.json"
+    truth_path = truth_latest_path(output_dir)
     if truth_path.exists():
         try:
             truth = json.loads(truth_path.read_text())

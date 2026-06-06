@@ -179,8 +179,11 @@ def test_context_pr_apply_change_failure_returns_failed_and_restores_branch(
     result = execute_context_pr(_approved(), plan, dry_run=False, runner=runner)
     assert result.outcome == "failed"
     assert "disk full" in result.detail
-    # Best-effort restore to the default branch; never reaches commit/push/PR.
-    assert ["git", "checkout", "main"] in runner.command_args
+    # Force-restore to the default branch so a dirty tree from a partial
+    # apply_change can't block the checkout and strand us on the orphan.
+    assert ["git", "checkout", "-f", "main"] in runner.command_args
+    # The orphan branch is then deleted so a retry isn't blocked by "already exists".
+    assert ["git", "branch", "-D", "auto/context-repo"] in runner.command_args
     assert not any(args[:2] == ["git", "commit"] for args in runner.command_args)
     assert not any(args[:2] == ["gh", "pr"] for args in runner.command_args)
 
@@ -259,6 +262,17 @@ def test_context_pr_apply_runs_full_sequence_and_opens_pr(tmp_path: Path) -> Non
             "Automated context improvement.",
         ],
     ]
+
+
+def test_context_pr_applied_with_no_pr_url_surfaces_missing_reference(tmp_path: Path) -> None:
+    # gh reports success (rc 0) but prints no URL: the PR was created, so the
+    # outcome stays "applied" (re-running would duplicate it), but the empty
+    # reference is made visible in the detail rather than silently recorded.
+    runner = FakeRunner({("gh", "pr"): CommandResult(0, "")})
+    result = execute_context_pr(_approved(), _plan(tmp_path, []), dry_run=False, runner=runner)
+    assert result.outcome == "applied"
+    assert result.reference == ""
+    assert "no PR URL" in result.detail
 
 
 def test_context_pr_never_uses_force(tmp_path: Path) -> None:

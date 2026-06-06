@@ -41,6 +41,7 @@ from src.cli_output import create_progress, print_info, print_status, print_warn
 from src.cloner import clone_workspace
 from src.github_client import GitHubClient
 from src.models import AnalyzerResult, AuditReport, RepoAudit, RepoMetadata
+from src.portfolio_truth_types import TRUTH_LATEST_FILENAME, truth_latest_path
 from src.recurring_review import FULL_REFRESH_DAYS
 from src.report_enrichment import build_run_change_counts, build_run_change_summary
 from src.reporter import (
@@ -2742,7 +2743,7 @@ def _run_plan_campaign_mode(args) -> None:
     reviewer: str = getattr(args, "approval_reviewer", None) or _default_reviewer()
 
     # ── Load audit results from portfolio-truth-latest.json ───────────────────
-    truth_path = output_dir / "portfolio-truth-latest.json"
+    truth_path = truth_latest_path(output_dir)
     if not truth_path.exists():
         print_info(
             f"portfolio-truth-latest.json not found in {output_dir}. "
@@ -2870,7 +2871,7 @@ def _run_draft_readmes_mode(args) -> None:
 
     # ── Load audit results (portfolio-truth-latest.json or warehouse) ─────────
     audit_results: list[dict] = []
-    truth_path = output_dir / "portfolio-truth-latest.json"
+    truth_path = truth_latest_path(output_dir)
     if truth_path.exists():
         try:
             raw = json.loads(truth_path.read_text(encoding="utf-8"))
@@ -3036,7 +3037,7 @@ def _run_set_initiative_mode(args) -> None:
     # Load portfolio-truth to validate repo and check current tier
     import json as _json
 
-    pt_candidates = sorted(output_dir.glob("portfolio-truth-latest.json"))
+    pt_candidates = sorted(output_dir.glob(TRUTH_LATEST_FILENAME))
     if not pt_candidates:
         pt_candidates = sorted(output_dir.glob("portfolio-truth-*.json"))
     if not pt_candidates:
@@ -3046,7 +3047,7 @@ def _run_set_initiative_mode(args) -> None:
         )
         sys.exit(2)
 
-    pt_path = Path(str(output_dir / "portfolio-truth-latest.json"))
+    pt_path = truth_latest_path(output_dir)
     if not pt_path.exists():
         pt_path = pt_candidates[-1]
 
@@ -3109,7 +3110,7 @@ def _run_list_initiatives_mode(args) -> None:
 
     # Load portfolio-truth for current-tier lookup (best-effort)
     projects_by_name: dict[str, dict] = {}
-    pt_path = output_dir / "portfolio-truth-latest.json"
+    pt_path = truth_latest_path(output_dir)
     if pt_path.exists():
         try:
             pt_data = _json.loads(pt_path.read_text(encoding="utf-8"))
@@ -3194,7 +3195,7 @@ def _run_suggest_initiatives_mode(args) -> None:
     from src.maturity_tiers import tier_name
     from src.suggest_initiatives import generate_suggestions
 
-    truth_path = _Path(args.output_dir) / "portfolio-truth-latest.json"
+    truth_path = truth_latest_path(_Path(args.output_dir))
     if not truth_path.exists():
         print_warning(
             "portfolio-truth-latest.json not found. "
@@ -3238,7 +3239,7 @@ def _run_accept_suggestion_mode(args) -> None:
     from src.suggest_initiatives import accept_suggestion
 
     output_dir = Path(args.output_dir)
-    truth_path = output_dir / "portfolio-truth-latest.json"
+    truth_path = truth_latest_path(output_dir)
     if not truth_path.exists():
         print_warning(
             "portfolio-truth-latest.json not found. Run `audit run --portfolio-truth` first."
@@ -3369,7 +3370,7 @@ def _run_tier_gaps_export_mode(args) -> None:
     from src.maturity_tiers import compute_tier, tier_gap, tier_name
 
     output_dir = Path(args.output_dir)
-    truth_path = output_dir / "portfolio-truth-latest.json"
+    truth_path = truth_latest_path(output_dir)
     if not truth_path.exists():
         print_warning(
             "portfolio-truth-latest.json not found. Run `audit run --portfolio-truth` first."
@@ -5114,7 +5115,7 @@ def _run_auto_apply_approved_mode(args, output_dir: Path) -> None:
         print_info("No existing audit report found in output directory. Run a normal audit first.")
         return
 
-    truth_path = output_dir / "portfolio-truth-latest.json"
+    truth_path = truth_latest_path(output_dir)
     if not truth_path.exists():
         print_info("No portfolio truth snapshot found. Run --portfolio-truth first.")
         return
@@ -5586,7 +5587,7 @@ def _run_tier_recalibration_report_mode(args) -> None:
     from src.tier_recalibration import tier_distribution_report
 
     output_dir = Path(args.output_dir)
-    truth_path = output_dir / "portfolio-truth-latest.json"
+    truth_path = truth_latest_path(output_dir)
     if not truth_path.exists():
         print_warning(
             "portfolio-truth-latest.json not found. Run `audit run --portfolio-truth` first."
@@ -5626,7 +5627,7 @@ def _run_context_triage_mode(args) -> None:
     from src.portfolio_context_triage import run_triage
 
     output_dir = Path(args.output_dir)
-    truth_path = output_dir / "portfolio-truth-latest.json"
+    truth_path = truth_latest_path(output_dir)
     if not truth_path.exists():
         print_warning(
             "portfolio-truth-latest.json not found. Run `audit run --portfolio-truth` first."

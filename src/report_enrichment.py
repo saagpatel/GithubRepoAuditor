@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from src.portfolio_truth_types import truth_latest_path
 from src.terminology import ACTION_SYNC_CANONICAL_LABELS
 from src.weekly_packaging import finalize_weekly_pack
 from src.weekly_scheduling_overlay import apply_weekly_scheduling_overlay
@@ -164,7 +165,7 @@ def build_risk_lookup(output_dir: Path | None) -> dict[str, dict[str, str]]:
     """
     if not output_dir:
         return {}
-    truth_path = output_dir / "portfolio-truth-latest.json"
+    truth_path = truth_latest_path(output_dir)
     if not truth_path.is_file():
         return {}
     try:

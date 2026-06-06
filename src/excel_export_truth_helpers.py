@@ -5,12 +5,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from src.portfolio_truth_types import truth_latest_path
+
 
 def load_risk_truth(truth_dir: Path | None) -> tuple[dict[str, str], dict[str, int]]:
     if not truth_dir:
         return {}, {}
 
-    truth_path = truth_dir / "portfolio-truth-latest.json"
+    truth_path = truth_latest_path(truth_dir)
     if not truth_path.is_file():
         return {}, {}
 
