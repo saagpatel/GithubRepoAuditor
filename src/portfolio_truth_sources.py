@@ -285,6 +285,7 @@ def _inspect_project_dir(
         "group_entry": group_entry,
         "has_git": bool(git_facts.get("has_git")),
         "repo_full_name": str(git_facts.get("repo_full_name", "") or "").strip(),
+        "default_branch": str(git_facts.get("default_branch", "") or "").strip(),
         "context_files": context_files,
         "context_quality": context_analysis.context_quality,
         "primary_context_file": context_analysis.primary_context_file,
@@ -405,7 +406,21 @@ def _read_small_json(path: Path) -> dict[str, Any]:
 def _gather_git_facts(project_path: Path) -> dict[str, Any]:
     git_dir = project_path / ".git"
     if not git_dir.exists():
-        return {"has_git": False, "last_commit_at": None, "repo_full_name": ""}
+        return {
+            "has_git": False,
+            "last_commit_at": None,
+            "repo_full_name": "",
+            "default_branch": "",
+        }
+
+    # Computed once; ``last_commit_at`` is the only field the git-log probe below
+    # can refine, so every error path returns this base unchanged.
+    base = {
+        "has_git": True,
+        "last_commit_at": None,
+        "repo_full_name": _git_remote_full_name(project_path),
+        "default_branch": _git_default_branch(project_path),
+    }
 
     try:
         result = subprocess.run(
@@ -416,31 +431,43 @@ def _gather_git_facts(project_path: Path) -> dict[str, Any]:
             check=False,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired):
-        return {
-            "has_git": True,
-            "last_commit_at": None,
-            "repo_full_name": _git_remote_full_name(project_path),
-        }
+        return base
 
     if result.returncode != 0 or not result.stdout.strip():
-        return {
-            "has_git": True,
-            "last_commit_at": None,
-            "repo_full_name": _git_remote_full_name(project_path),
-        }
+        return base
 
     try:
         return {
-            "has_git": True,
+            **base,
             "last_commit_at": datetime.fromisoformat(result.stdout.strip().replace("Z", "+00:00")),
-            "repo_full_name": _git_remote_full_name(project_path),
         }
     except ValueError:
-        return {
-            "has_git": True,
-            "last_commit_at": None,
-            "repo_full_name": _git_remote_full_name(project_path),
-        }
+        return base
+
+
+def _git_default_branch(project_path: Path) -> str:
+    """The repo's default branch from the local ``origin/HEAD`` ref, if set.
+
+    Resolves only local refs (no network). Returns "" when ``origin/HEAD`` is
+    not set locally (common for repos that were ``git init``'d rather than
+    cloned) — callers fall back to the portfolio default.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(project_path), "symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return ""
+
+    if result.returncode != 0:
+        return ""
+    # e.g. "origin/main" -> "main"; partition keeps multi-segment branch names
+    # like "origin/release/v1" -> "release/v1" intact.
+    return result.stdout.strip().partition("/")[2].strip()
 
 
 def _git_remote_full_name(project_path: Path) -> str:

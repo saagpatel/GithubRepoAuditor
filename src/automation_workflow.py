@@ -53,8 +53,10 @@ from src.portfolio_truth_types import PortfolioTruthProject, PortfolioTruthSnaps
 CONTRACT_VERSION = "automation_workflow_v1"
 
 # Auto-PR branch defaults. ``default_branch`` is the PR base / the branch the
-# executor refuses to commit onto; it is a parameter (not a buried literal) so
-# callers can override per-repo, defaulting to the portfolio convention.
+# executor refuses to commit onto. It resolves in precedence order: an explicit
+# caller override, then the repo's own detected default branch
+# (``identity.default_branch``), then this portfolio-wide fallback. Passing ""
+# (the new default) means "auto-detect per repo".
 DEFAULT_BRANCH_PREFIX = "auto/context-"
 DEFAULT_DEFAULT_BRANCH = "main"
 
@@ -75,15 +77,18 @@ def build_context_pr_plan(
     *,
     workspace_root: Path,
     branch_prefix: str = DEFAULT_BRANCH_PREFIX,
-    default_branch: str = DEFAULT_DEFAULT_BRANCH,
+    default_branch: str = "",
 ) -> ExecutionPlan:
     """Build the ``ExecutionPlan`` for a context-improvement auto-PR.
 
     The plan's ``apply_change`` regenerates the managed context block from the
     project's current repository signals; the executor handles all git/gh
-    mechanics (and every safety rail) around it.
+    mechanics (and every safety rail) around it. The PR base resolves in
+    precedence order: explicit ``default_branch`` arg, the repo's detected
+    default branch, then the portfolio-wide fallback.
     """
     repo_path = workspace_root / project.identity.path
+    resolved_branch = default_branch or project.identity.default_branch or DEFAULT_DEFAULT_BRANCH
     display = project.identity.display_name
     commit_message = f"docs(context): refresh managed context block for {display}"
     pr_body = (
@@ -95,7 +100,7 @@ def build_context_pr_plan(
     )
     return ExecutionPlan(
         repo_path=repo_path,
-        default_branch=default_branch,
+        default_branch=resolved_branch,
         branch_name=f"{branch_prefix}{_branch_slug(project)}",
         commit_message=commit_message,
         pr_title=commit_message,
@@ -148,7 +153,7 @@ def execute_approved_proposals(
     dry_run: bool = True,
     runner: CommandRunner = default_command_runner,
     branch_prefix: str = DEFAULT_BRANCH_PREFIX,
-    default_branch: str = DEFAULT_DEFAULT_BRANCH,
+    default_branch: str = "",
 ) -> list[ExecutionResult]:
     """Execute every APPROVED proposal in the queue, behind the executor's rails.
 
