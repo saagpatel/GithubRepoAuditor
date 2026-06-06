@@ -239,6 +239,28 @@ def reject_proposal(
     )
 
 
+def mark_executed(
+    proposals: Iterable[AutomationProposal],
+    proposal_id: str,
+    *,
+    executed_at: str,
+    execution_ref: str,
+) -> list[AutomationProposal]:
+    """Transition an APPROVED proposal to EXECUTED after a successful apply.
+
+    Only an APPROVED proposal can be executed — this mirrors the ``require_approved``
+    gate so the execution lifecycle cannot skip approval.
+    """
+    return _transition(
+        proposals,
+        proposal_id,
+        expected_status=STATUS_APPROVED,
+        status=STATUS_EXECUTED,
+        executed_at=executed_at,
+        execution_ref=execution_ref,
+    )
+
+
 # --- enforcement gate ------------------------------------------------------
 
 
