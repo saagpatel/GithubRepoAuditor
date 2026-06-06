@@ -26,6 +26,7 @@ from functools import partial
 from pathlib import Path
 
 from src.automation_executor import (
+    AutomationExecutionError,
     CommandRunner,
     ExecutionPlan,
     ExecutionResult,
@@ -42,14 +43,10 @@ from src.automation_proposals import (
     mark_executed,
     save_proposals,
 )
-from src.portfolio_context_contract import (
-    render_managed_context_block,
-    upsert_managed_context_block,
-)
 from src.portfolio_context_recovery import (
-    _build_context_sections,
     _catalog_repo_key,
     _suggested_catalog_seed,
+    write_managed_context_block,
 )
 from src.portfolio_truth_types import PortfolioTruthProject, PortfolioTruthSnapshot
 
@@ -71,18 +68,6 @@ def _branch_slug(project: PortfolioTruthProject) -> str:
     raw = full.split("/")[-1] if full else project.identity.display_name
     slug = _BRANCH_UNSAFE.sub("-", raw).strip("-_.").lower()
     return slug or "repo"
-
-
-def _apply_managed_context(project: PortfolioTruthProject, repo_path: Path) -> None:
-    """Write/refresh the managed context block in the primary context file.
-
-    Mirrors ``apply_context_recovery_plan`` exactly so the auto-PR content stays
-    byte-identical to the direct-apply recovery path.
-    """
-    target_file = repo_path / project.derived.primary_context_file
-    existing = target_file.read_text(errors="replace") if target_file.exists() else ""
-    block = render_managed_context_block(_build_context_sections(project, repo_path))
-    target_file.write_text(upsert_managed_context_block(existing, block))
 
 
 def build_context_pr_plan(
@@ -115,7 +100,7 @@ def build_context_pr_plan(
         commit_message=commit_message,
         pr_title=commit_message,
         pr_body=pr_body,
-        apply_change=partial(_apply_managed_context, project),
+        apply_change=partial(write_managed_context_block, project),
         has_git=project.identity.has_git,
     )
 
@@ -178,43 +163,25 @@ def execute_approved_proposals(
 
     working = list(proposals)
     results: list[ExecutionResult] = []
-    applied_any = False
 
     for proposal in executable_proposals(proposals):
         project = _resolve_project(proposal, by_slug, by_name)
-        if project is None:
-            results.append(ExecutionResult(proposal.proposal_id, "skipped", "project-not-found"))
-            continue
-
-        if proposal.action_type == ACTION_CONTEXT_PR:
-            # A context-PR needs a real GitHub slug for the head/base refs; we
-            # never fabricate one from the local display name (decided 2026-06-06).
-            if not proposal.repo_full_name:
-                results.append(
-                    ExecutionResult(proposal.proposal_id, "skipped", "no-repo-full-name")
-                )
-                continue
-            plan = build_context_pr_plan(
+        # One proposal's failure must never abandon the rest of the batch: a
+        # safety-rail violation or a catalog I/O error becomes a `failed` result
+        # for that proposal, and the loop continues.
+        try:
+            result = _dispatch_proposal(
+                proposal,
                 project,
                 workspace_root=workspace_root,
+                catalog_path=catalog_path,
+                dry_run=dry_run,
+                runner=runner,
                 branch_prefix=branch_prefix,
                 default_branch=default_branch,
             )
-            result = execute_context_pr(proposal, plan, dry_run=dry_run, runner=runner)
-        elif proposal.action_type == ACTION_CATALOG_SEED:
-            result = execute_catalog_seed(
-                proposal,
-                catalog_path=catalog_path,
-                seeds=build_catalog_seeds_for(project),
-                dry_run=dry_run,
-            )
-        else:
-            results.append(
-                ExecutionResult(
-                    proposal.proposal_id, "skipped", f"unknown-action:{proposal.action_type}"
-                )
-            )
-            continue
+        except (AutomationExecutionError, OSError) as error:
+            result = ExecutionResult(proposal.proposal_id, "failed", str(error).strip())
 
         results.append(result)
         if result.outcome == "applied":
@@ -224,9 +191,54 @@ def execute_approved_proposals(
                 executed_at=executed_at,
                 execution_ref=result.reference,
             )
-            applied_any = True
 
-    if applied_any:
+    if any(result.outcome == "applied" for result in results):
         save_proposals(proposals_path, working)
 
     return results
+
+
+def _dispatch_proposal(
+    proposal: AutomationProposal,
+    project: PortfolioTruthProject | None,
+    *,
+    workspace_root: Path,
+    catalog_path: Path,
+    dry_run: bool,
+    runner: CommandRunner,
+    branch_prefix: str,
+    default_branch: str,
+) -> ExecutionResult:
+    """Route one APPROVED proposal to the right executor entry point.
+
+    Returns a ``skipped`` result for the policy cases (no matching project, a
+    context-PR without a GitHub slug, an unknown action); otherwise it builds
+    fresh content and calls the executor, whose own result/exception it surfaces.
+    """
+    if project is None:
+        return ExecutionResult(proposal.proposal_id, "skipped", "project-not-found")
+
+    if proposal.action_type == ACTION_CONTEXT_PR:
+        # A context-PR needs a real GitHub slug for the head/base refs; we never
+        # fabricate one from the local display name (decided 2026-06-06).
+        if not proposal.repo_full_name:
+            return ExecutionResult(proposal.proposal_id, "skipped", "no-repo-full-name")
+        plan = build_context_pr_plan(
+            project,
+            workspace_root=workspace_root,
+            branch_prefix=branch_prefix,
+            default_branch=default_branch,
+        )
+        return execute_context_pr(proposal, plan, dry_run=dry_run, runner=runner)
+
+    if proposal.action_type == ACTION_CATALOG_SEED:
+        return execute_catalog_seed(
+            proposal,
+            catalog_path=catalog_path,
+            seeds=build_catalog_seeds_for(project),
+            dry_run=dry_run,
+        )
+
+    return ExecutionResult(
+        proposal.proposal_id, "skipped", f"unknown-action:{proposal.action_type}"
+    )

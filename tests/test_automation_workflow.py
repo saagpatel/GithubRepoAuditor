@@ -373,3 +373,33 @@ def test_execute_skips_proposal_with_no_matching_project(tmp_path: Path) -> None
 
     assert results[0].outcome == "skipped"
     assert results[0].detail == "project-not-found"
+
+
+def test_execute_isolates_one_failure_from_the_rest_of_the_batch(tmp_path: Path) -> None:
+    # A catalog-seed pointed at a path whose parent is missing raises OSError
+    # inside the merge; that must become a `failed` result for THAT proposal and
+    # leave the following context-PR proposal free to apply.
+    catalog = _project(display_name="Cat", path="Cat", repo_full_name="owner/cat")
+    pr = _project(display_name="MyRepo", path="MyRepo", repo_full_name="owner/MyRepo")
+    (tmp_path / "MyRepo").mkdir()
+    proposals_path = tmp_path / "pending-proposals.json"
+    _write(
+        proposals_path,
+        _proposal(action_type=ACTION_CATALOG_SEED, display_name="Cat", repo_full_name="owner/cat"),
+        _proposal(),  # context-pr for MyRepo
+    )
+
+    results = execute_approved_proposals(
+        proposals_path=proposals_path,
+        snapshot=_snapshot(catalog, pr),
+        workspace_root=tmp_path,
+        catalog_path=tmp_path / "missing-dir" / "catalog.yaml",  # parent absent -> OSError
+        executed_at=NOW,
+        dry_run=False,
+        runner=FakeRunner(),
+    )
+
+    assert [r.outcome for r in results] == ["failed", "applied"]
+    by_id = {p.proposal_id: p for p in load_proposals(proposals_path)}
+    assert by_id["catalog-seed:owner/cat"].status == STATUS_APPROVED  # failed -> retryable
+    assert by_id["context-pr:owner/MyRepo"].status == STATUS_EXECUTED
