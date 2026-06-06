@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from src.portfolio_automation import select_automation_candidates
+from src.portfolio_truth_types import truth_latest_path
 from src.report_enrichment import build_weekly_review_pack
 
 CONTRACT_VERSION = "weekly_command_center_digest_v1"
@@ -29,7 +30,7 @@ def _mapping(value: Any) -> dict[str, Any]:
 
 
 def latest_portfolio_truth_path(output_dir: Path) -> Path | None:
-    latest = output_dir / "portfolio-truth-latest.json"
+    latest = truth_latest_path(output_dir)
     return latest if latest.is_file() else None
 
 

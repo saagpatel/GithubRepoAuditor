@@ -3,9 +3,21 @@ from __future__ import annotations
 import dataclasses
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 SCHEMA_VERSION = "0.5.0"
+
+# The published "latest" portfolio-truth artifact. The producer
+# (portfolio_truth_publish) writes it; every reader resolves it through
+# truth_latest_path() so the filename lives in exactly one place.
+TRUTH_LATEST_FILENAME = "portfolio-truth-latest.json"
+
+
+def truth_latest_path(output_dir: Path) -> Path:
+    """Resolve the canonical portfolio-truth-latest.json under an output dir."""
+    return output_dir / TRUTH_LATEST_FILENAME
+
 
 VALID_CONTEXT_QUALITY = {"full", "standard", "minimum-viable", "boilerplate", "none"}
 VALID_ACTIVITY_STATUS = {"active", "recent", "stale", "archived"}

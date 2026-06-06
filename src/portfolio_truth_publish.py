@@ -7,6 +7,7 @@ from pathlib import Path
 
 from src.portfolio_truth_reconcile import build_portfolio_truth_snapshot
 from src.portfolio_truth_render import render_portfolio_report_markdown, render_registry_markdown
+from src.portfolio_truth_types import truth_latest_path
 from src.portfolio_truth_validate import (
     validate_portfolio_report_markdown,
     validate_publish_targets,
@@ -56,7 +57,7 @@ def publish_portfolio_truth(
 
     snapshot_stamp = build_result.snapshot.generated_at.strftime("%Y-%m-%dT%H%M%SZ")
     snapshot_path = output_dir / f"portfolio-truth-{snapshot_stamp}.json"
-    latest_path = output_dir / "portfolio-truth-latest.json"
+    latest_path = truth_latest_path(output_dir)
     latest_name = latest_path.name
     snapshot_json = json.dumps(build_result.snapshot.to_dict(), indent=2) + "\n"
     registry_markdown = render_registry_markdown(build_result.snapshot)
