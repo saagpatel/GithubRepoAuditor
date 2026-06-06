@@ -159,11 +159,14 @@ def execute_context_pr(
     try:
         plan.apply_change(plan.repo_path)
     except Exception as error:  # noqa: BLE001 - surface as a failed result, not a strand
-        # The change failed after the branch was created; best-effort return to
-        # the default branch and delete the just-created branch so the repo is
-        # not stranded on a partial branch and a retry isn't blocked by an
-        # "already exists" orphan.
-        runner(["git", "checkout", default_branch], plan.repo_path)
+        # The change failed after the branch was created. apply_change may have
+        # left partial writes, so a plain checkout would be blocked ("local
+        # changes would be overwritten") and we'd be stranded on the orphan with
+        # the branch -D refused ("currently checked out"). Force-checkout the
+        # default branch — the worktree was verified clean before apply_change,
+        # so -f only discards its partial garbage — then delete the orphan so a
+        # retry isn't blocked by an "already exists" branch.
+        runner(["git", "checkout", "-f", default_branch], plan.repo_path)
         runner(["git", "branch", "-D", branch], plan.repo_path)
         return ExecutionResult(proposal.proposal_id, "failed", f"apply-change: {error}".strip())
 

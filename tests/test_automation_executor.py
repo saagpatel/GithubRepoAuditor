@@ -179,9 +179,10 @@ def test_context_pr_apply_change_failure_returns_failed_and_restores_branch(
     result = execute_context_pr(_approved(), plan, dry_run=False, runner=runner)
     assert result.outcome == "failed"
     assert "disk full" in result.detail
-    # Best-effort restore to the default branch; never reaches commit/push/PR.
-    assert ["git", "checkout", "main"] in runner.command_args
-    # The orphan branch is deleted so a retry isn't blocked by "already exists".
+    # Force-restore to the default branch so a dirty tree from a partial
+    # apply_change can't block the checkout and strand us on the orphan.
+    assert ["git", "checkout", "-f", "main"] in runner.command_args
+    # The orphan branch is then deleted so a retry isn't blocked by "already exists".
     assert ["git", "branch", "-D", "auto/context-repo"] in runner.command_args
     assert not any(args[:2] == ["git", "commit"] for args in runner.command_args)
     assert not any(args[:2] == ["gh", "pr"] for args in runner.command_args)
