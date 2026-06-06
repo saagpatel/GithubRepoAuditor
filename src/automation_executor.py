@@ -160,8 +160,11 @@ def execute_context_pr(
         plan.apply_change(plan.repo_path)
     except Exception as error:  # noqa: BLE001 - surface as a failed result, not a strand
         # The change failed after the branch was created; best-effort return to
-        # the default branch so the repo is not left stranded on a partial branch.
+        # the default branch and delete the just-created branch so the repo is
+        # not stranded on a partial branch and a retry isn't blocked by an
+        # "already exists" orphan.
         runner(["git", "checkout", default_branch], plan.repo_path)
+        runner(["git", "branch", "-D", branch], plan.repo_path)
         return ExecutionResult(proposal.proposal_id, "failed", f"apply-change: {error}".strip())
 
     for args in (
@@ -194,11 +197,21 @@ def execute_context_pr(
     if pr.returncode != 0:
         return ExecutionResult(proposal.proposal_id, "failed", f"gh pr create: {pr.stderr}".strip())
 
+    # gh prints the PR URL on success. If it somehow reported success with no
+    # URL, the PR was still created (rc 0) so we must not fail and re-run (that
+    # would duplicate it) — but surface the missing reference in the detail
+    # rather than silently recording an empty audit ref.
+    pr_url = pr.stdout.strip()
+    detail = (
+        f"Opened PR on branch {branch}."
+        if pr_url
+        else f"Opened PR on branch {branch} (gh returned no PR URL)."
+    )
     return ExecutionResult(
         proposal.proposal_id,
         "applied",
-        f"Opened PR on branch {branch}.",
-        reference=pr.stdout.strip(),
+        detail,
+        reference=pr_url,
     )
 
 
