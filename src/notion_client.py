@@ -77,7 +77,7 @@ def query_notion_collection(
 ) -> requests.Response | None:
     """Query a Notion database or data source with compatibility fallback."""
     body = body or {}
-    response = notion_request("POST", f"/data-sources/{collection_id}/query", token, version, body)
+    response = notion_request("POST", f"/data_sources/{collection_id}/query", token, version, body)
     if response is not None and response.status_code != 404:
         return response
     return notion_request("POST", f"/databases/{collection_id}/query", token, version, body)

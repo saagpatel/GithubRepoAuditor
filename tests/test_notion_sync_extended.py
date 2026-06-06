@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from src.notion_client import query_page_by_title
+from src.notion_client import query_notion_collection, query_page_by_title
 from src.notion_sync import (
     ELIGIBLE_TIERS,
     FLAG_TO_ACTION,
@@ -372,3 +372,31 @@ class TestQueryPageByTitle:
             query_page_by_title("db123", "My Title", "token", title_property="Title")
             call_body = mock_req.call_args[0][4]  # body is 5th positional arg
             assert call_body["filter"]["property"] == "Title"
+
+
+class TestQueryNotionCollection:
+    def test_queries_modern_data_source_endpoint_first(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+
+        with patch("src.notion_client.notion_request", return_value=mock_resp) as mock_req:
+            result = query_notion_collection("collection-123", "token", body={"page_size": 1})
+
+        assert result is mock_resp
+        assert mock_req.call_args[0][1] == "/data_sources/collection-123/query"
+
+    def test_falls_back_to_legacy_database_query_on_404(self):
+        missing_resp = MagicMock()
+        missing_resp.status_code = 404
+        legacy_resp = MagicMock()
+        legacy_resp.status_code = 200
+
+        with patch(
+            "src.notion_client.notion_request",
+            side_effect=[missing_resp, legacy_resp],
+        ) as mock_req:
+            result = query_notion_collection("database-123", "token")
+
+        assert result is legacy_resp
+        assert mock_req.call_args_list[0].args[1] == "/data_sources/database-123/query"
+        assert mock_req.call_args_list[1].args[1] == "/databases/database-123/query"
