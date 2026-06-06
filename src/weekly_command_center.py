@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from src.portfolio_automation import select_automation_candidates
 from src.report_enrichment import build_weekly_review_pack
 
 CONTRACT_VERSION = "weekly_command_center_digest_v1"
@@ -55,6 +56,9 @@ def build_weekly_command_center_digest(
     operator_summary = _mapping(snapshot.get("operator_summary"))
     repo_briefings = list(weekly_pack.get("repo_briefings") or [])
     decision_quality = _mapping(operator_summary.get("decision_quality_v1"))
+    decision_quality_status = (
+        _safe_text(decision_quality.get("decision_quality_status")) or "insufficient-data"
+    )
     truth = portfolio_truth or {}
     truth_summary = _build_truth_summary(truth)
 
@@ -78,8 +82,7 @@ def build_weekly_command_center_digest(
         "queue_pressure_summary": _safe_text(weekly_pack.get("queue_pressure_summary")),
         "operating_paths_summary": _safe_text(weekly_pack.get("operating_paths_summary")),
         "decision_quality": {
-            "status": _safe_text(decision_quality.get("decision_quality_status"))
-            or "insufficient-data",
+            "status": decision_quality_status,
             "human_skepticism_required": bool(
                 decision_quality.get("human_skepticism_required", True)
             ),
@@ -90,6 +93,13 @@ def build_weekly_command_center_digest(
         },
         "portfolio_truth": truth_summary,
         "path_attention": _build_path_attention_items(truth),
+        "automation_candidates": [
+            candidate.to_dict()
+            for candidate in select_automation_candidates(
+                truth,
+                decision_quality_status=decision_quality_status,
+            )
+        ],
         "risk_posture": {
             "elevated_count": truth_summary.get("elevated_risk_count", 0),
             "risk_tier_counts": truth_summary.get("risk_tier_counts", {}),
@@ -151,6 +161,17 @@ def render_weekly_command_center_markdown(digest: dict[str, Any]) -> str:
         for item in path_attention:
             lines.append(
                 f"- {item['repo']} — {item['headline']} ({item['registry_status']}, {item['context_quality']} context)"
+            )
+
+    lines.extend(["", "## Automation Candidates"])
+    automation_candidates = list(digest.get("automation_candidates") or [])
+    if not automation_candidates:
+        lines.append("- No repos currently clear the automation trust bar.")
+    else:
+        for item in automation_candidates:
+            lines.append(
+                f"- {item['repo']} ({item['registry_status']}, "
+                f"{item['path_confidence']} path confidence, {item['context_quality']} context)"
             )
 
     lines.extend(["", "## Risk Posture"])
