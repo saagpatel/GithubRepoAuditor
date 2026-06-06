@@ -138,6 +138,19 @@ def write_context_recovery_plan_artifacts(
     return json_path, markdown_path
 
 
+def write_managed_context_block(project: PortfolioTruthProject, project_path: Path) -> None:
+    """Refresh the managed context block in a project's primary context file.
+
+    The single source of truth for the read -> render -> upsert -> write sequence,
+    shared by ``apply_context_recovery_plan`` (direct apply) and the Arc D
+    automation executor's context-PR path so the two render byte-identical blocks.
+    """
+    target_file = project_path / project.derived.primary_context_file
+    existing_text = target_file.read_text(errors="replace") if target_file.exists() else ""
+    managed_block = render_managed_context_block(_build_context_sections(project, project_path))
+    target_file.write_text(upsert_managed_context_block(existing_text, managed_block))
+
+
 def apply_context_recovery_plan(
     snapshot: PortfolioTruthSnapshot,
     plan: ContextRecoveryPlan,
@@ -159,13 +172,8 @@ def apply_context_recovery_plan(
     for target in eligible_targets:
         project = project_index[target.project_key]
         project_path = workspace_root / project.identity.path
-        target_file = project_path / target.primary_context_file
         try:
-            existing_text = target_file.read_text(errors="replace") if target_file.exists() else ""
-            managed_block = render_managed_context_block(
-                _build_context_sections(project, project_path)
-            )
-            target_file.write_text(upsert_managed_context_block(existing_text, managed_block))
+            write_managed_context_block(project, project_path)
             updated.append(target.project_key)
             if target.suggested_catalog_seed:
                 catalog_seeds[_catalog_repo_key(project)] = target.suggested_catalog_seed
