@@ -1,3 +1,0 @@
-# codex-os-managed
-python3 -m pytest -q -p no:cacheprovider
-ruff check src/ tests/
