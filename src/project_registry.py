@@ -75,6 +75,23 @@ DEFAULT_MEMORY_META: dict[str, str] = {
     "skill_eval_harness_2026-05": "",
 }
 
+DEFAULT_NOTION_TITLE_ALIASES: dict[str, str] = {
+    "DesktopPEt-ready": "DesktopPEt",
+    "EarthPulse-readiness": "EarthPulse",
+    "GithubRepoAuditor-public": "GithubRepoAuditor",
+    "Notion Operating System": "Notion",
+    "OrbitForge (staging)": "OrbitForge",
+    "Personal Ops": "operator-os-docs",
+    "PomGambler-prod": "PomGambler",
+}
+
+DEFAULT_NOTION_PROJECTION_ONLY_ROWS: dict[str, str] = {
+    "app": "local runtime/app shell placeholder; not a portfolio-truth repo",
+    "claude-code-harness": "local agent harness projection; outside repo-root truth",
+    "Sandbox Local Portfolio Project": "actuation sandbox fixture row",
+    "SecondBrain": "knowledge vault under /Users/d/Documents; not a /Users/d/Projects repo",
+}
+
 # Operator-machine source locations (overridable via the "sources" block of
 # config/project-registry-overrides.json). Every source is optional.
 DEFAULT_SOURCES: dict[str, str] = {
@@ -107,19 +124,31 @@ def _strip_alias_prefix(alias: str) -> str:
 
 def load_overrides_config(
     config_path: Path | None,
-) -> tuple[dict[str, str], list[dict], dict[str, str]]:
+) -> tuple[dict[str, str], list[dict], dict[str, str], dict[str, str], dict[str, str]]:
     """Load overrides + supplementary + memory-meta, falling back to defaults."""
     if config_path is None or not config_path.exists():
         return (
             dict(DEFAULT_OVERRIDES),
             [dict(s) for s in DEFAULT_SUPPLEMENTARY],
             dict(DEFAULT_MEMORY_META),
+            dict(DEFAULT_NOTION_TITLE_ALIASES),
+            dict(DEFAULT_NOTION_PROJECTION_ONLY_ROWS),
         )
     data = json.loads(config_path.read_text())
     overrides = data.get("overrides", DEFAULT_OVERRIDES)
     supplementary = data.get("supplementary", DEFAULT_SUPPLEMENTARY)
     memory_meta = data.get("memory_meta", DEFAULT_MEMORY_META)
-    return dict(overrides), [dict(s) for s in supplementary], dict(memory_meta)
+    title_aliases = data.get("notion_title_aliases", DEFAULT_NOTION_TITLE_ALIASES)
+    projection_only = data.get(
+        "notion_projection_only_rows", DEFAULT_NOTION_PROJECTION_ONLY_ROWS
+    )
+    return (
+        dict(overrides),
+        [dict(s) for s in supplementary],
+        dict(memory_meta),
+        dict(title_aliases),
+        dict(projection_only),
+    )
 
 
 def load_source_paths(config_path: Path | None) -> dict[str, object]:
@@ -281,7 +310,13 @@ def build_project_registry(
     ``snapshot`` is the serialized portfolio-truth (``snapshot.to_dict()``).
     All other sources are optional and degrade gracefully.
     """
-    overrides, supplementary, memory_meta = load_overrides_config(overrides_config_path)
+    (
+        overrides,
+        supplementary,
+        memory_meta,
+        notion_title_aliases,
+        notion_projection_only_rows,
+    ) = load_overrides_config(overrides_config_path)
     generated_at = generated_at or datetime.now(timezone.utc)
 
     entries: list[_Entry] = [
@@ -323,8 +358,14 @@ def build_project_registry(
                     }
                 )
     override_norm = {normalize(raw): key for raw, key in overrides.items()}
+    title_alias_norm = {
+        normalize(raw): target for raw, target in notion_title_aliases.items()
+    }
+    projection_only_norm = {
+        normalize(raw): raw for raw in notion_projection_only_rows
+    }
 
-    def resolve_entry(raw: str) -> _Entry | None:
+    def resolve_entry_direct(raw: str) -> _Entry | None:
         norm = normalize(raw)
         if not norm:
             return None
@@ -334,12 +375,31 @@ def build_project_registry(
                 return target
         return index.get(norm)
 
+    def resolve_entry(raw: str) -> _Entry | None:
+        entry = resolve_entry_direct(raw)
+        if entry is not None:
+            return entry
+        alias_target = title_alias_norm.get(normalize(raw))
+        if alias_target:
+            return resolve_entry_direct(alias_target)
+        return None
+
     notion_orphans: list[str] = []
+    notion_projection_only: list[dict[str, str]] = []
     for title in _read_notion_titles(notion_snapshot_path):
         entry = resolve_entry(title)
         if entry is not None:
             entry.notion_local_title = title
             entry.add_alias(f"notion:{title}")
+        elif normalize(title) in projection_only_norm:
+            notion_projection_only.append(
+                {
+                    "title": title,
+                    "reason": notion_projection_only_rows.get(title)
+                    or notion_projection_only_rows.get(projection_only_norm[normalize(title)])
+                    or "",
+                }
+            )
         else:
             notion_orphans.append(title)
 
@@ -402,7 +462,14 @@ def build_project_registry(
         },
         "entry_count": len(entries),
         "resolution_overrides": overrides,
+        "projection_policy": {
+            "notion_title_aliases": notion_title_aliases,
+            "notion_projection_only_rows": notion_projection_only_rows,
+        },
         "entries": [e.to_dict() for e in entries],
+        "projection_only": {
+            "notion_local": sorted(notion_projection_only, key=lambda row: row["title"])
+        },
         "unmatched": {
             "bridge": sorted(bridge_orphans),
             "memory": memory_orphans,

@@ -1,5 +1,5 @@
 {
-	"_comment": "Operator-editable enrollment for the canonical project registry. 'overrides' pins hard normalization failures (drifted identifier -> canonical project_key). 'supplementary' enrolls real operator-OS projects the auditor does not track as git repos. 'memory_meta' maps ~/.claude memory note-slugs to their parent project (or '' for pure meta-notes). Consumed by src/project_registry.py; falls back to built-in defaults if this file is absent.",
+	"_comment": "Operator-editable enrollment for the canonical project registry. 'overrides' pins hard normalization failures (drifted identifier -> canonical project_key). 'supplementary' enrolls real operator-OS projects the auditor does not track as git repos. 'memory_meta' maps ~/.claude memory note-slugs to their parent project (or '' for pure meta-notes). 'notion_title_aliases' and 'notion_projection_only_rows' explain Local Portfolio projection differences that are not distinct GithubRepoAuditor truth projects. Consumed by src/project_registry.py and cross-system smoke checks; falls back to built-in defaults if this file is absent.",
 	"overrides": {
 		"jcc": "JobCommandCenter",
 		"jsm_export": "JSMTicketAnalyticsExport",
@@ -33,5 +33,20 @@
 		"github_repo_auditor_future_arcs": "GithubRepoAuditor",
 		"skill_library_port_2026-05": "",
 		"skill_eval_harness_2026-05": ""
+	},
+	"notion_title_aliases": {
+		"DesktopPEt-ready": "DesktopPEt",
+		"EarthPulse-readiness": "EarthPulse",
+		"GithubRepoAuditor-public": "GithubRepoAuditor",
+		"Notion Operating System": "Notion",
+		"OrbitForge (staging)": "OrbitForge",
+		"Personal Ops": "operator-os-docs",
+		"PomGambler-prod": "PomGambler"
+	},
+	"notion_projection_only_rows": {
+		"app": "local runtime/app shell placeholder; not a portfolio-truth repo",
+		"claude-code-harness": "local agent harness projection; outside repo-root truth",
+		"Sandbox Local Portfolio Project": "actuation sandbox fixture row",
+		"SecondBrain": "knowledge vault under /Users/d/Documents; not a /Users/d/Projects repo"
 	}
 }

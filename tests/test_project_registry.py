@@ -45,6 +45,7 @@ SNAPSHOT = _snapshot(
     ),
     _ident("Notion", "Notion", "saagpatel/notion-operating-system"),
     _ident("PortfolioCommandCenter", "PortfolioCommandCenter", "saagpatel/PortfolioCommandCenter"),
+    _ident("Fun:GamePrjs/DesktopPEt", "DesktopPEt", "saagpatel/DesktopPEt"),
 )
 
 
@@ -109,6 +110,13 @@ def test_resolve_supplementary_from_each_spelling():
     assert resolve("SecondBrain", index)["canonical_key"] == "supp:SecondBrain"
 
 
+def test_projection_policy_is_published_from_defaults():
+    registry = build_project_registry(SNAPSHOT, overrides_config_path=None)
+    policy = registry["projection_policy"]
+    assert policy["notion_title_aliases"]["DesktopPEt-ready"] == "DesktopPEt"
+    assert "SecondBrain" in policy["notion_projection_only_rows"]
+
+
 def test_resolve_returns_none_for_non_projects():
     registry = build_project_registry(SNAPSHOT, overrides_config_path=None)
     index = build_index(registry)
@@ -134,7 +142,17 @@ def test_build_degrades_gracefully_without_external_sources():
 def test_build_attaches_external_sources(tmp_path: Path):
     bridge = _bridge_db(tmp_path, ["MCPAudit", "PortfolioCommandCenter", "weekly-review"])
     snap = tmp_path / "snapshot.json"
-    snap.write_text(json.dumps({"projects": [{"title": "MCP Audit"}, {"title": "app"}]}))
+    snap.write_text(
+        json.dumps(
+            {
+                "projects": [
+                    {"title": "MCP Audit"},
+                    {"title": "DesktopPEt-ready"},
+                    {"title": "app"},
+                ]
+            }
+        )
+    )
     memdir = tmp_path / "memory"
     memdir.mkdir()
     (memdir / "project_mcpaudit.md").write_text("x")
@@ -151,9 +169,18 @@ def test_build_attaches_external_sources(tmp_path: Path):
     assert mcp["bridge_project_names"] == ["MCPAudit"]
     assert mcp["notion_local_title"] == "MCP Audit"
     assert mcp["memory_slug"] == "project_mcpaudit"
-    # bridge noise + notion junk land in unmatched, not on an entry
+    desktop = by_key["Fun:GamePrjs/DesktopPEt"]
+    assert desktop["notion_local_title"] == "DesktopPEt-ready"
+    assert "notion:DesktopPEt-ready" in desktop["aliases"]
+    # bridge noise lands in unmatched; projection-only Notion rows are explained separately
     assert "weekly-review" in registry["unmatched"]["bridge"]
-    assert "app" in registry["unmatched"]["notion_local"]
+    assert registry["unmatched"]["notion_local"] == []
+    assert registry["projection_only"]["notion_local"] == [
+        {
+            "title": "app",
+            "reason": "local runtime/app shell placeholder; not a portfolio-truth repo",
+        }
+    ]
     # PortfolioCommandCenter resolves from bridge but has no Notion/memory row
     assert by_key["PortfolioCommandCenter"]["bridge_project_names"] == ["PortfolioCommandCenter"]
     assert by_key["PortfolioCommandCenter"]["notion_local_title"] is None
