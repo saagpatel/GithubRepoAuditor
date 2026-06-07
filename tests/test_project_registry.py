@@ -154,6 +154,15 @@ def test_build_attaches_external_sources(tmp_path: Path):
             }
         )
     )
+    page_map = tmp_path / "notion-project-map.json"
+    page_map.write_text(
+        json.dumps(
+            {
+                "MCP Audit": {"localProjectId": "page-mcp"},
+                "DesktopPEt": {"localProjectId": "page-desktop"},
+            }
+        )
+    )
     memdir = tmp_path / "memory"
     memdir.mkdir()
     (memdir / "project_mcpaudit.md").write_text("x")
@@ -162,6 +171,7 @@ def test_build_attaches_external_sources(tmp_path: Path):
         SNAPSHOT,
         bridge_db_path=bridge,
         notion_snapshot_path=snap,
+        notion_project_map_path=page_map,
         memory_dir=memdir,
         overrides_config_path=None,
     )
@@ -169,9 +179,11 @@ def test_build_attaches_external_sources(tmp_path: Path):
     mcp = by_key["MCPAudit"]
     assert mcp["bridge_project_names"] == ["MCPAudit"]
     assert mcp["notion_local_title"] == "MCP Audit"
+    assert mcp["notion_local_page_id"] == "page-mcp"
     assert mcp["memory_slug"] == "project_mcpaudit"
     desktop = by_key["Fun:GamePrjs/DesktopPEt"]
     assert desktop["notion_local_title"] == "DesktopPEt-ready"
+    assert desktop["notion_local_page_id"] == "page-desktop"
     assert "notion:DesktopPEt-ready" in desktop["aliases"]
     # bridge noise lands in unmatched; projection-only Notion rows are explained separately
     assert "weekly-review" in registry["unmatched"]["bridge"]
