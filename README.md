@@ -9,6 +9,8 @@
 
 > Know the truth about every project you've ever started — because `git log` across 100 repos doesn't tell you which ones are worth finishing.
 
+📐 **Case study — [Operator OS: a multi-agent control plane over a 129-repo portfolio](CASE-STUDY.md).** How this auditor's truth layer anchors six local services and two coordinated coding agents (Claude Code + Codex), with real portfolio metrics and a [90-second demo plan](DEMO-PLAN.md).
+
 GitHub Repo Auditor is a portfolio audit and operator tool for developers with a lot of repositories. It clones every repo on your GitHub account, runs 12 analyzers across completeness and interest dimensions, assigns letter grades and achievement badges, preserves historical state, and generates actionable dashboards you can actually use to decide what to work on next. Built for developers who ship fast, start often, and need a system to manage the sprawl.
 
 Today the project is best understood as a GitHub portfolio operating system:
