@@ -19,6 +19,9 @@ tabs, one header action, one closing line.
 
 If those three land in 90 seconds, the demo worked.
 
+Current screenshot proof for the five-tab local demo is archived in
+[`docs/demo-proof/2026-06-07/`](docs/demo-proof/2026-06-07/).
+
 ---
 
 ## Pre-record setup (off-camera)
