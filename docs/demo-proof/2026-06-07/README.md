@@ -14,7 +14,7 @@ the window title `Portfolio Command Center Demo`.
 ## Source Truth
 
 - Truth artifact: `output/portfolio-truth-latest.json`
-- Truth generated at: `2026-06-07T08:32:03.303071+00:00`
+- Truth generated at: `2026-06-07T17:00:59.463918+00:00`
 - Schema: `0.5.0`
 - Projects: `129`
 - Weekly digest: `output/weekly-command-center-saagpatel-2026-06-03.json`
@@ -38,6 +38,13 @@ the window title `Portfolio Command Center Demo`.
 - `images/contact-sheet.png`
 
 The contact sheet is the quickest visual smoke check for all five frames.
+
+Refreshed on 2026-06-07 after re-running:
+
+```sh
+python -m src.cli --portfolio-truth --portfolio-truth-include-security saagpatel
+python -m src.cli triage saagpatel --control-center
+```
 
 Use `RECORDING-CHECKLIST.md` for the exact 90-second capture order and
 publish-time checks.
