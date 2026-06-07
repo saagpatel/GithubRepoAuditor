@@ -113,6 +113,7 @@ def test_resolve_supplementary_from_each_spelling():
 def test_projection_policy_is_published_from_defaults():
     registry = build_project_registry(SNAPSHOT, overrides_config_path=None)
     policy = registry["projection_policy"]
+    assert policy["schema_version"] == "notion_projection_policy.v1"
     assert policy["notion_title_aliases"]["DesktopPEt-ready"] == "DesktopPEt"
     assert "SecondBrain" in policy["notion_projection_only_rows"]
 

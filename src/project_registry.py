@@ -26,6 +26,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 SCHEMA_VERSION = "1.0"
+NOTION_PROJECTION_POLICY_SCHEMA_VERSION = "notion_projection_policy.v1"
 
 # Built-in fallbacks, mirrored by config/project-registry-overrides.json.
 # Hard normalization failures: drifted identifier -> canonical project_key.
@@ -124,13 +125,21 @@ def _strip_alias_prefix(alias: str) -> str:
 
 def load_overrides_config(
     config_path: Path | None,
-) -> tuple[dict[str, str], list[dict], dict[str, str], dict[str, str], dict[str, str]]:
+) -> tuple[
+    dict[str, str],
+    list[dict],
+    dict[str, str],
+    str,
+    dict[str, str],
+    dict[str, str],
+]:
     """Load overrides + supplementary + memory-meta, falling back to defaults."""
     if config_path is None or not config_path.exists():
         return (
             dict(DEFAULT_OVERRIDES),
             [dict(s) for s in DEFAULT_SUPPLEMENTARY],
             dict(DEFAULT_MEMORY_META),
+            NOTION_PROJECTION_POLICY_SCHEMA_VERSION,
             dict(DEFAULT_NOTION_TITLE_ALIASES),
             dict(DEFAULT_NOTION_PROJECTION_ONLY_ROWS),
         )
@@ -138,6 +147,10 @@ def load_overrides_config(
     overrides = data.get("overrides", DEFAULT_OVERRIDES)
     supplementary = data.get("supplementary", DEFAULT_SUPPLEMENTARY)
     memory_meta = data.get("memory_meta", DEFAULT_MEMORY_META)
+    projection_policy_schema_version = data.get(
+        "notion_projection_policy_schema_version",
+        NOTION_PROJECTION_POLICY_SCHEMA_VERSION,
+    )
     title_aliases = data.get("notion_title_aliases", DEFAULT_NOTION_TITLE_ALIASES)
     projection_only = data.get(
         "notion_projection_only_rows", DEFAULT_NOTION_PROJECTION_ONLY_ROWS
@@ -146,6 +159,7 @@ def load_overrides_config(
         dict(overrides),
         [dict(s) for s in supplementary],
         dict(memory_meta),
+        str(projection_policy_schema_version),
         dict(title_aliases),
         dict(projection_only),
     )
@@ -314,6 +328,7 @@ def build_project_registry(
         overrides,
         supplementary,
         memory_meta,
+        notion_projection_policy_schema_version,
         notion_title_aliases,
         notion_projection_only_rows,
     ) = load_overrides_config(overrides_config_path)
@@ -463,6 +478,7 @@ def build_project_registry(
         "entry_count": len(entries),
         "resolution_overrides": overrides,
         "projection_policy": {
+            "schema_version": notion_projection_policy_schema_version,
             "notion_title_aliases": notion_title_aliases,
             "notion_projection_only_rows": notion_projection_only_rows,
         },
