@@ -28,6 +28,50 @@ def _git_repo(path: Path, *, remote: bool = True) -> None:
         _run(["git", "remote", "add", "origin", "https://example.com/test/repo.git"], path)
 
 
+def test_restart_packet_reports_ahead_and_behind_from_upstream(tmp_path: Path) -> None:
+    remote = tmp_path / "remote.git"
+    _run(["git", "init", "--bare", "--initial-branch=main", str(remote)], tmp_path)
+
+    seed_repo = tmp_path / "SeedRepo"
+    _run(["git", "clone", str(remote), str(seed_repo)], tmp_path)
+    _run(["git", "config", "user.email", "test@example.com"], seed_repo)
+    _run(["git", "config", "user.name", "Test User"], seed_repo)
+    (seed_repo / "README.md").write_text("# seed\n")
+    _run(["git", "add", "README.md"], seed_repo)
+    _run(["git", "commit", "-m", "init"], seed_repo)
+    _run(["git", "push", "-u", "origin", "main"], seed_repo)
+
+    projects = tmp_path / "Projects"
+    ahead_repo = projects / "AheadRepo"
+    behind_repo = projects / "BehindRepo"
+    pusher_repo = tmp_path / "PusherRepo"
+    _run(["git", "clone", str(remote), str(ahead_repo)], tmp_path)
+    _run(["git", "clone", str(remote), str(behind_repo)], tmp_path)
+    _run(["git", "clone", str(remote), str(pusher_repo)], tmp_path)
+
+    _run(["git", "config", "user.email", "test@example.com"], ahead_repo)
+    _run(["git", "config", "user.name", "Test User"], ahead_repo)
+    (ahead_repo / "local.txt").write_text("local only\n")
+    _run(["git", "add", "local.txt"], ahead_repo)
+    _run(["git", "commit", "-m", "local"], ahead_repo)
+
+    _run(["git", "config", "user.email", "test@example.com"], pusher_repo)
+    _run(["git", "config", "user.name", "Test User"], pusher_repo)
+    (pusher_repo / "remote.txt").write_text("remote only\n")
+    _run(["git", "add", "remote.txt"], pusher_repo)
+    _run(["git", "commit", "-m", "remote"], pusher_repo)
+    _run(["git", "push"], pusher_repo)
+    _run(["git", "fetch"], behind_repo)
+
+    packet = build_restart_packet(workspace_root=projects, operating_repos=[])
+    repos = {repo["label"]: repo for repo in packet["active_working_set"]}
+
+    assert repos["AheadRepo"]["ahead"] == 1
+    assert repos["AheadRepo"]["behind"] == 0
+    assert repos["BehindRepo"]["ahead"] == 0
+    assert repos["BehindRepo"]["behind"] == 1
+
+
 def test_discovery_excludes_archive_dependency_and_eval_fixture_repos(tmp_path: Path) -> None:
     _git_repo(tmp_path / "RealRepo")
     _git_repo(tmp_path / ".portfolio-noise-archive" / "OldClone")

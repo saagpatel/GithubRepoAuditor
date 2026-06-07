@@ -156,7 +156,8 @@ def _parse_ahead_behind(repo: Path, upstream: str) -> tuple[int, int]:
     if len(parts) != 2:
         return 0, 0
     try:
-        return int(parts[0]), int(parts[1])
+        behind, ahead = int(parts[0]), int(parts[1])
+        return ahead, behind
     except ValueError:
         return 0, 0
 
