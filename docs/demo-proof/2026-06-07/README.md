@@ -38,3 +38,6 @@ the window title `Portfolio Command Center Demo`.
 - `images/contact-sheet.png`
 
 The contact sheet is the quickest visual smoke check for all five frames.
+
+Use `RECORDING-CHECKLIST.md` for the exact 90-second capture order and
+publish-time checks.
