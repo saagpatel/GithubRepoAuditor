@@ -52,6 +52,13 @@ Full flag reference (`audit serve --help`):
 Once started, open `http://127.0.0.1:8080/` in your browser. The server runs until you
 press Ctrl-C.
 
+For a token-free local demo from a clone:
+
+```bash
+make demo
+audit serve --output-dir output/demo
+```
+
 ## Routes
 
 ### `GET /`

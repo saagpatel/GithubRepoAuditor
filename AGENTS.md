@@ -14,14 +14,12 @@ queue.
 
 ## Current State
 
-Two stable layers ship: the audit tool (Phases 0–27) and the portfolio-truth layer
-(Phases 103–108), at schema `0.5.0`. 2209 tests collected, ruff clean, CI + CodeQL green on
-`main` (currently `bba2e08`). Active work is **Arc A — context-quality recovery**: the
-catalog-completeness flag has been driven to 0 and the weak-context flag is down from 24 to
-5 legitimate stragglers. Recent PRs #33–#38 seeded the repo catalog, added a discovery
-ignore-list for transient non-project dirs, exempted archived/dormant repos from the context
-flag, and fixed three false-negative bugs in the context-quality analyzer. All Arc A work
-merges to the `canonical` remote.
+The audit tool, portfolio-truth layer, risk/security overlay, Action Sync proposal
+lane, and local `audit serve`/desktop-consumer surfaces are active. The public
+remote is `canonical`; `origin` remains a stale private archive and should not be
+used for PRs. Do not trust hardcoded status or test-count claims in handoff text:
+rerun the local gates and inspect `output/portfolio-truth-latest.json` for the
+current Portfolio OS state.
 
 ## Stack
 
@@ -43,6 +41,7 @@ audit run <github-username> --doctor               # preflight diagnostics
 audit run <github-username> --html                 # full audit + workbook + dashboard
 audit triage <github-username> --control-center    # read-only operator queue
 audit report <github-username> --portfolio-truth   # regenerate workspace truth layer
+python -m src.cli --portfolio-truth --portfolio-truth-include-security <github-username>  # demo truth + security overlay
 audit serve                                        # local web UI at http://127.0.0.1:8080/
 
 # tests + gates
@@ -71,12 +70,10 @@ make workbook-gate                                 # workbook invariant check (w
 
 ## Next Recommended Move
 
-Finish Arc A by clearing the three remaining context flags blocked only by dirty worktrees
-(BattleGrid, LegalDocsReview, TabTriage) — land or stash each repo's in-progress work, then
-apply the same real-content-only check before injecting any block. After Arc A, the
-highest-leverage arc is **Arc B (enrichment-layer risk integration)**: surface the
-already-computed risk posture in the Excel workbook, HTML dashboard, and review-pack so all
-five render surfaces reach parity — a low-risk renderer extension. Arc C (wire or remove the
-six orphaned public functions) is a small, safe cleanup that can ride alongside.
+For Portfolio OS demo readiness, refresh `portfolio-truth-latest.json` with
+`--portfolio-truth-include-security`, refresh `audit triage --control-center`,
+then launch PortfolioCommandCenter with `pnpm tauri dev`. After demo readiness is
+settled, continue with the highest-signal live queue item from the current
+control-center output rather than reviving old roadmap counts.
 
 <!-- portfolio-context:end -->
