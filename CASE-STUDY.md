@@ -118,8 +118,8 @@ is one real snapshot.
 | Dimension | Breakdown |
 |---|---|
 | **Total projects** | **129** (128 git repos, 1 non-git working dir) |
-| **Activity status** | 22 recent · 90 active · 5 stale · 12 archived |
-| **Lifecycle** | 108 active · 6 maintenance · 3 dormant · 12 archived |
+| **Activity status** | 21 recent · 91 active · 5 stale · 12 archived |
+| **Lifecycle** | 107 active · 6 maintenance · 3 dormant · 12 archived · 1 uncataloged |
 | **Recency** | 91 repos touched in the last 7 days · 123 within 30 days · 127 within 90 days · median **4 days** since last meaningful activity |
 
 The recency curve is the punchline: **only 2 of 129 repos** are older than 90 days.
@@ -131,16 +131,18 @@ which is *exactly* why a timestamp-only view is useless. Almost everything looks
 
 | Dimension | Breakdown |
 |---|---|
-| **Risk tier** | 62 baseline · 27 moderate · 28 elevated · 12 deferred |
-| **Security risk** | **49 repos** carry at least one open high/critical security alert |
-| **Tests present** | 103 / 129 (80%) |
-| **CI present** | 83 / 129 (64%) |
-| **License present** | 102 / 129 (79%) |
-| **Context quality** | 68 minimum-viable · 29 standard · 16 full · 16 boilerplate |
+| **Risk tier** | 61 baseline · 27 moderate · 29 elevated · 12 deferred |
+| **Security posture** | **63 repos** carry open high/critical Dependabot alerts; **49 repos** are currently classified with security risk |
+| **Tests present** | 101 / 129 (78%) |
+| **CI present** | 81 / 129 (63%) |
+| **License present** | 100 / 129 (78%) |
+| **Context quality** | 67 minimum-viable · 29 standard · 16 full · 17 boilerplate |
 
-That **49** is the single most valuable number the system produces and the one
-`git log` can never give you: a precise, current count of repos with live
-high/critical security exposure, ready to be burned down.
+That **63** is the single most valuable number the desktop demo puts on screen
+and the one `git log` can never give you: a precise, current count of repos with
+live high/critical security exposure, ready to be burned down. The truth layer
+separately marks **49** repos as active security-risk items after applying its
+portfolio risk rules.
 
 ### Agent attribution — who built what
 
@@ -149,11 +151,11 @@ The truth file records a `tool_provenance` for each repo. Across 129 projects:
 | Builder | Repos attributed |
 |---|---|
 | **Claude Code** | **53** |
-| **Codex** | **23** |
+| **Codex** | **22** |
 | GPT (other) | 12 |
-| Unknown / human-seeded | 41 |
+| Unknown / human-seeded | 42 |
 
-**76 of 129 repos** are attributable to the two autonomous coding agents this
+**75 of 129 repos** are attributable to the two autonomous coding agents this
 control plane coordinates. That coordination is the other half of the story.
 
 ---

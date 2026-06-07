@@ -72,8 +72,10 @@ make workbook-gate                                 # workbook invariant check (w
 
 For Portfolio OS demo readiness, refresh `portfolio-truth-latest.json` with
 `--portfolio-truth-include-security`, refresh `audit triage --control-center`,
-then launch PortfolioCommandCenter with `pnpm tauri dev`. After demo readiness is
-settled, continue with the highest-signal live queue item from the current
-control-center output rather than reviving old roadmap counts.
+then launch PortfolioCommandCenter with `pnpm demo:desktop`. Current proof
+points: 129 projects, 63 open high/critical Dependabot-alert repos, and Weekly
+Digest says to start with codexkit. After demo readiness is settled, continue
+with the highest-signal live queue item from the current control-center output
+rather than reviving old roadmap counts.
 
 <!-- portfolio-context:end -->

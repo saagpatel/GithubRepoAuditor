@@ -13,10 +13,9 @@ tabs, one header action, one closing line.
 ## What the viewer should walk away knowing
 
 1. There's a **single source of truth** over 129 repos — graded, not just dated.
-2. It surfaces the one number `git log` can't: **49 repos with live high/critical
-   security alerts**, and exactly which package bump clears each.
-3. The truth is **regenerated live** from the app, and it knows **which agent**
-   (Claude Code / Codex) built which repo.
+2. It surfaces the number `git log` can't: **63 repos with open high/critical
+   Dependabot alerts**, plus which package bump clears each advisory group.
+3. The weekly digest gives one current decision: **start with codexkit**.
 
 If those three land in 90 seconds, the demo worked.
 
@@ -30,8 +29,10 @@ Do this before hitting record so the app opens warm and current:
    ```sh
    # in the auditor repo — flags FIRST, then username, run via python -m
    python -m src.cli --portfolio-truth --portfolio-truth-include-security <user>
+   python -m src.cli triage <user> --control-center
    ```
-2. **Launch the desktop shell** (release `.app`, or `pnpm tauri dev` for a dev run).
+2. **Launch the desktop shell** with `pnpm demo:desktop` from
+   `../PortfolioCommandCenter`.
 3. Confirm the header shows the correct **output directory** and a fresh
    `generated_at`.
 4. Set window to a **clean 1920×1080 capture**; hide the macOS menu bar clutter.
@@ -49,13 +50,13 @@ Do this before hitting record so the app opens warm and current:
 |---|---|---|---|
 | **0:00–0:10** | App launch / **Portfolio** tab | Open cold. Let the full 129-row table paint. | *"Every repo I've ever started — 129 of them — in one graded view. Not a commit log. A judgement."* |
 | **0:10–0:28** | **Portfolio** tab | Sort by risk tier; point at the columns: risk, context quality, registry status, **tool**, open high/critical alert count. | *"Each repo carries a risk tier, a context-quality grade, and who built it. `git log` gives you a timestamp; this tells you what the timestamp means."* |
-| **0:28–0:48** | **Risk + Security** tab | Filter to elevated-risk; show the posture counts (scanned / open-high-critical / critical / high). | *"49 of 129 repos have a live high or critical security alert. That's the number a timestamp can never give you."* |
+| **0:28–0:48** | **Risk + Security** tab | Filter to elevated-risk; show the posture counts (118 scanned / 63 with open high-critical / 65 critical / 191 high). | *"63 of 129 repos have an open high or critical Dependabot alert. That's the number a timestamp can never give you."* |
 | **0:48–1:02** | **Burndown** tab | Show the advisory-grouped fix list — one package bump → the repos it clears. | *"And it's actionable: each advisory is grouped by the single dependency bump that burns it down across every affected repo."* |
-| **1:02–1:14** | **Trends** → **Weekly Digest** | Flash the risk/security drift chart across snapshots, then the digest's headline + decision + next-step. | *"It keeps history, so I can see drift over time — and it hands me one decision and one next move each week."* |
+| **1:02–1:14** | **Trends** → **Weekly Digest** | Flash the risk/security drift chart across snapshots, then the digest's headline + decision + next-step. | *"It keeps history, so I can see drift over time — and today it says: start with codexkit."* |
 | **1:14–1:26** | Header **Run auditor** action | Click **Run auditor** (fast); show the views reload on completion. | *"This isn't a static export. I regenerate the truth live, right from the app."* |
 | **1:26–1:30** | Back on **Portfolio**, point at the **tool** column | Rest on the Claude Code / Codex attribution. | *"And it knows which agent built what — because two of them work this portfolio under one control plane."* |
 
-Total: **90 seconds**, six beats, one number that sticks (**49**).
+Total: **90 seconds**, six beats, one number that sticks (**63**).
 
 ---
 
@@ -79,7 +80,7 @@ shows the *control plane*, not just the dashboard:
 - [ ] Window at 1920×1080, menu-bar/desktop clutter hidden.
 - [ ] Individual repo names blurred or kept off-frame; show aggregates.
 - [ ] No terminal scrollback exposing absolute home paths, tokens, or hostnames.
-- [ ] The number **49** is on screen and called out by voice.
+- [ ] The number **63** is on screen and called out by voice.
 - [ ] Closing line names both agents (Claude Code + Codex) and "one control plane."
 - [ ] Final cut ≤ 90 seconds for the core demo.
 
