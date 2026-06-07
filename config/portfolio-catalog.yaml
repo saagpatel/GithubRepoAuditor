@@ -472,13 +472,6 @@ repos:
     review_cadence: weekly
     intended_disposition: maintain
     tool_provenance: claude-code
-  Sovereign:
-    owner: d
-    lifecycle_state: active
-    review_cadence: weekly
-    intended_disposition: maintain
-    category: fun
-    tool_provenance: claude-code
   SpecCompanion:
     owner: d
     lifecycle_state: active
@@ -741,6 +734,8 @@ repos:
     lifecycle_state: active
     review_cadence: weekly
     intended_disposition: maintain
+    category: fun
+    tool_provenance: claude-code
     notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
       confirm purpose/criticality.'
   Chronomap:
