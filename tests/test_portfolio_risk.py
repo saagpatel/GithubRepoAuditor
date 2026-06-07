@@ -124,6 +124,80 @@ def test_doctor_gap_false_for_non_strategic():
     assert "missing-doctor-standard" not in result["risk_factors"]
 
 
+def test_security_high_alert_adds_single_factor_moderate():
+    # An open high-severity Dependabot alert on an active, otherwise-healthy repo
+    # contributes exactly one factor — moderate, not elevated, on its own.
+    result = build_risk_entry(**_baseline_kwargs(security_high_alerts=2))
+    assert result["risk_tier"] == "moderate"
+    assert result["risk_factors"] == ["active-high-severity-alerts"]
+    assert result["security_risk"] is True
+    assert "open high/critical security alerts" in result["risk_summary"]
+
+
+def test_security_critical_alert_force_elevates():
+    # A lone open critical alert force-elevates even on an otherwise-clean repo —
+    # an unpatched critical CVE cannot hide behind good context/path hygiene.
+    result = build_risk_entry(**_baseline_kwargs(security_critical_alerts=1))
+    assert result["risk_tier"] == "elevated"
+    assert "active-high-severity-alerts" in result["risk_factors"]
+    assert result["security_risk"] is True
+
+
+def test_security_no_alerts_leaves_security_risk_false():
+    result = build_risk_entry(**_baseline_kwargs())
+    assert result["security_risk"] is False
+    assert "active-high-severity-alerts" not in result["risk_factors"]
+
+
+def test_security_alerts_ignored_when_not_active():
+    # Alerts on a stale (non-active) repo on the maintain path do not fire the
+    # factor or force elevation — the factor is gated on active status, like the others.
+    result = build_risk_entry(
+        **_baseline_kwargs(
+            activity_status="stale",
+            operating_path="maintain",
+            security_critical_alerts=3,
+            security_high_alerts=5,
+        )
+    )
+    assert result["risk_tier"] != "elevated"
+    assert result["security_risk"] is False
+    assert "active-high-severity-alerts" not in result["risk_factors"]
+
+
+def test_security_alerts_do_not_override_deferred_short_circuit():
+    # A stale, non-maintain repo short-circuits to deferred BEFORE any factor is
+    # evaluated — even open critical alerts cannot pull it out of deferred, and the
+    # deferred constant carries security_risk=False.
+    result = build_risk_entry(
+        **_baseline_kwargs(
+            activity_status="stale",
+            operating_path="experiment",
+            security_critical_alerts=4,
+            security_high_alerts=2,
+        )
+    )
+    assert result["risk_tier"] == "deferred"
+    assert result["security_risk"] is False
+    assert result["risk_factors"] == []
+
+
+def test_security_high_alert_stacks_toward_three_factor_elevation():
+    # A high alert counts toward the existing 3+ = elevated threshold alongside
+    # weak-context-active and no-run-instructions.
+    result = build_risk_entry(
+        **_baseline_kwargs(
+            context_quality="boilerplate",
+            run_instructions_present=False,
+            activity_status="active",
+            security_high_alerts=1,
+        )
+    )
+    assert result["risk_tier"] == "elevated"
+    assert "active-high-severity-alerts" in result["risk_factors"]
+    assert len(result["risk_factors"]) >= 3
+
+
 def test_portfolio_risk_summary_aggregates_tiers():
     projects = [
         {"risk": {"risk_tier": "elevated"}},

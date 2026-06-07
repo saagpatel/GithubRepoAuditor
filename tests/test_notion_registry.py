@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from src.notion_registry import _extract_select, _extract_title, _normalize_status
+from src.notion_registry import (
+    _extract_first_select,
+    _extract_select,
+    _extract_title,
+    _normalize_status,
+)
 
 
 class TestExtractTitle:
@@ -44,6 +49,25 @@ class TestExtractSelect:
     def test_missing_property(self):
         page = {"properties": {}}
         assert _extract_select(page, "Current State") == ""
+
+
+class TestExtractFirstSelect:
+    def test_prefers_legacy_property_name(self):
+        page = {
+            "properties": {
+                "Current State": {"type": "select", "select": {"name": "Active"}},
+                "Status": {"type": "select", "select": {"name": "Shipped"}},
+            },
+        }
+        assert _extract_first_select(page, "Current State", "Status") == "Active"
+
+    def test_falls_back_to_project_portfolio_property_name(self):
+        page = {
+            "properties": {
+                "Status": {"type": "select", "select": {"name": "Shipped"}},
+            },
+        }
+        assert _extract_first_select(page, "Current State", "Status") == "Shipped"
 
 
 class TestNormalizeStatus:

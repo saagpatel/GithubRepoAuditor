@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -158,6 +159,81 @@ class TestRepoDetailRoute:
     def test_unknown_repo_returns_404(self, client: TestClient) -> None:
         resp = client.get("/repos/nonexistent-repo-xyz")
         assert resp.status_code == 404
+
+    def test_known_repo_reads_production_warehouse_schema(self, tmp_path: Path) -> None:
+        from src.models import AnalyzerResult, AuditReport, RepoAudit, RepoMetadata
+        from src.warehouse import write_warehouse_snapshot
+
+        od = tmp_path / "output"
+        od.mkdir()
+        generated_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        (od / "portfolio-truth-latest.json").write_text(
+            json.dumps(
+                {
+                    "generated_at": generated_at.isoformat(),
+                    "repos": [
+                        {
+                            "name": "repo-alpha",
+                            "risk_score": 85.0,
+                            "completeness_score": 30.0,
+                            "total_score": 55.0,
+                            "language": "Python",
+                            "tier": 1,
+                        }
+                    ],
+                }
+            )
+        )
+        audit = RepoAudit(
+            metadata=RepoMetadata(
+                name="repo-alpha",
+                full_name="user/repo-alpha",
+                description="Production-schema fixture",
+                language="Python",
+                languages={"Python": 1},
+                private=False,
+                fork=False,
+                archived=False,
+                created_at=generated_at,
+                updated_at=generated_at,
+                pushed_at=generated_at,
+                default_branch="main",
+                stars=0,
+                forks=0,
+                open_issues=0,
+                size_kb=1,
+                html_url="https://github.com/user/repo-alpha",
+                clone_url="https://github.com/user/repo-alpha.git",
+            ),
+            analyzer_results=[
+                AnalyzerResult(
+                    dimension="testing",
+                    score=0.8,
+                    max_score=1.0,
+                    findings=["Tests are present"],
+                )
+            ],
+            overall_score=0.55,
+            completeness_tier="functional",
+        )
+        report = AuditReport(
+            username="user",
+            generated_at=generated_at,
+            total_repos=1,
+            repos_audited=1,
+            tier_distribution={"functional": 1},
+            average_score=0.55,
+            language_distribution={"Python": 1},
+            audits=[audit],
+            errors=[],
+        )
+        write_warehouse_snapshot(report, od)
+
+        resp = TestClient(create_app(output_dir=od)).get("/repos/repo-alpha")
+
+        assert resp.status_code == 200
+        assert "55.0" in resp.text
+        assert "testing" in resp.text
 
 
 class TestRunsRoute:

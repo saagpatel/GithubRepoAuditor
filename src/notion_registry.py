@@ -10,7 +10,7 @@ from src.notion_client import (
     REQUEST_DELAY,
     get_notion_token,
     load_notion_config,
-    notion_request,
+    query_notion_collection,
 )
 
 
@@ -43,7 +43,7 @@ def load_notion_registry(config_dir: Path = Path("config")) -> dict[str, str] | 
         if start_cursor:
             body["start_cursor"] = start_cursor
 
-        resp = notion_request("POST", f"/databases/{db_id}/query", token, version, body)
+        resp = query_notion_collection(db_id, token, version, body)
         if not resp or resp.status_code != 200:
             print("  Failed to query Notion projects database.", file=sys.stderr)
             break
@@ -52,7 +52,7 @@ def load_notion_registry(config_dir: Path = Path("config")) -> dict[str, str] | 
         for page in data.get("results", []):
             name = _extract_title(page)
             if name:
-                status = _extract_select(page, "Current State") or "active"
+                status = _extract_first_select(page, "Current State", "Status") or "active"
                 projects[name] = _normalize_status(status)
 
         if not data.get("has_more"):
@@ -85,6 +85,15 @@ def _extract_select(page: dict, prop_name: str) -> str:
     return ""
 
 
+def _extract_first_select(page: dict, *prop_names: str) -> str:
+    """Extract the first available select value across compatible schema names."""
+    for prop_name in prop_names:
+        value = _extract_select(page, prop_name)
+        if value:
+            return value
+    return ""
+
+
 def load_notion_project_context(config_dir: Path = Path("config")) -> dict[str, dict] | None:
     """Load project context from Notion for two-way sync.
 
@@ -111,7 +120,7 @@ def load_notion_project_context(config_dir: Path = Path("config")) -> dict[str, 
         if start_cursor:
             body["start_cursor"] = start_cursor
 
-        resp = notion_request("POST", f"/databases/{db_id}/query", token, version, body)
+        resp = query_notion_collection(db_id, token, version, body)
         if not resp or resp.status_code != 200:
             break
 
@@ -120,10 +129,10 @@ def load_notion_project_context(config_dir: Path = Path("config")) -> dict[str, 
             name = _extract_title(page)
             if name:
                 context[name] = {
-                    "portfolio_call": _extract_select(page, "Portfolio Call"),
-                    "momentum": _extract_select(page, "Momentum"),
-                    "current_state": _extract_select(page, "Current State"),
-                    "next_move": _extract_rich_text(page, "Next Move"),
+                    "portfolio_call": _extract_first_select(page, "Portfolio Call", "Verdict"),
+                    "momentum": _extract_first_select(page, "Momentum", "Pipeline Stage"),
+                    "current_state": _extract_first_select(page, "Current State", "Status"),
+                    "next_move": _extract_first_rich_text(page, "Next Move", "Notes"),
                 }
 
         if not data.get("has_more"):
@@ -141,6 +150,15 @@ def _extract_rich_text(page: dict, prop_name: str) -> str:
     rt = prop.get("rich_text", [])
     if rt:
         return rt[0].get("text", {}).get("content", "")
+    return ""
+
+
+def _extract_first_rich_text(page: dict, *prop_names: str) -> str:
+    """Extract the first available rich text value across compatible schema names."""
+    for prop_name in prop_names:
+        value = _extract_rich_text(page, prop_name)
+        if value:
+            return value
     return ""
 
 

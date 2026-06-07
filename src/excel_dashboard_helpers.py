@@ -239,9 +239,7 @@ def build_dashboard_operator_rows(
                 ),
                 (
                     "Freshness Detail",
-                    operator_context[
-                        "follow_through_recovery_freshness_hotspot_summary"
-                    ],
+                    operator_context["follow_through_recovery_freshness_hotspot_summary"],
                 ),
                 (
                     "Rebuild Hotspot",
@@ -281,9 +279,7 @@ def build_dashboard_operator_rows(
                 ),
                 (
                     "Fragile Reacquisition Confidence Hotspot",
-                    operator_context[
-                        "follow_through_fragile_reacquisition_confidence_hotspot"
-                    ],
+                    operator_context["follow_through_fragile_reacquisition_confidence_hotspot"],
                 ),
                 (
                     "Reacquisition Softening Hotspot",
@@ -291,15 +287,11 @@ def build_dashboard_operator_rows(
                 ),
                 (
                     "Revalidation Needed Hotspot",
-                    operator_context[
-                        "follow_through_reacquisition_revalidation_hotspot"
-                    ],
+                    operator_context["follow_through_reacquisition_revalidation_hotspot"],
                 ),
                 (
                     "Retired Confidence Hotspot",
-                    operator_context[
-                        "follow_through_reacquisition_retired_confidence_hotspot"
-                    ],
+                    operator_context["follow_through_reacquisition_retired_confidence_hotspot"],
                 ),
                 (
                     "Under Revalidation Hotspot",
@@ -307,9 +299,7 @@ def build_dashboard_operator_rows(
                 ),
                 (
                     "Rebuilding Restored Confidence Hotspot",
-                    operator_context[
-                        "follow_through_rebuilding_restored_confidence_hotspot"
-                    ],
+                    operator_context["follow_through_rebuilding_restored_confidence_hotspot"],
                 ),
                 (
                     "Re-Earning Confidence Hotspot",
@@ -317,15 +307,11 @@ def build_dashboard_operator_rows(
                 ),
                 (
                     "Just Re-Earned Confidence Hotspot",
-                    operator_context[
-                        "follow_through_just_reearned_confidence_hotspot"
-                    ],
+                    operator_context["follow_through_just_reearned_confidence_hotspot"],
                 ),
                 (
                     "Holding Re-Earned Confidence Hotspot",
-                    operator_context[
-                        "follow_through_holding_reearned_confidence_hotspot"
-                    ],
+                    operator_context["follow_through_holding_reearned_confidence_hotspot"],
                 ),
             ]
         )
@@ -435,9 +421,7 @@ def build_dashboard_operator_rows(
                 ),
                 (
                     "Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls",
-                    operator_context[
-                        "reset_reentry_rebuild_reentry_restore_rerererestore_churn"
-                    ],
+                    operator_context["reset_reentry_rebuild_reentry_restore_rerererestore_churn"],
                 ),
                 (
                     "Closure Forecast Summary",
@@ -505,9 +489,7 @@ def build_dashboard_top_attention_rows(
 
 def build_dashboard_top_opportunity_rows(audits: list[dict[str, Any]]) -> list[list[Any]]:
     rows: list[list[Any]] = []
-    audits_sorted = sorted(
-        audits, key=lambda audit: audit.get("overall_score", 0), reverse=True
-    )
+    audits_sorted = sorted(audits, key=lambda audit: audit.get("overall_score", 0), reverse=True)
     for audit in audits_sorted:
         action = (audit.get("action_candidates") or [{}])[0]
         hotspots = audit.get("hotspots") or []
@@ -545,8 +527,9 @@ def build_dashboard_kpi_specs(
     grade: str,
     average_score: float,
     tiers: dict[str, Any],
+    risk_lookup: dict[str, str] | None = None,
 ) -> list[tuple[str, Any, str | None, str | None]]:
-    return [
+    specs: list[tuple[str, Any, str | None, str | None]] = [
         ("Portfolio Grade", grade, None, None),
         ("Avg Score", f"{average_score:.2f}", None, None),
         ("Shipped", tiers.get("shipped", 0), "166534", "Tier Breakdown"),
@@ -559,6 +542,10 @@ def build_dashboard_kpi_specs(
             None,
         ),
     ]
+    if risk_lookup:
+        elevated = sum(1 for tier in risk_lookup.values() if tier == "elevated")
+        specs.append(("Elevated Risk", elevated, "DC2626", "Risk Summary"))
+    return specs
 
 
 def build_dashboard_sidebar_rows(
@@ -666,12 +653,8 @@ def build_dashboard_portfolio_trend_sparkline(
 
 
 def build_dashboard_dna_tiers(audits: list[dict[str, Any]]) -> list[str]:
-    audits_sorted = sorted(
-        audits, key=lambda audit: audit.get("overall_score", 0), reverse=True
-    )
-    return [
-        audit.get("completeness_tier", "abandoned") for audit in audits_sorted[:24]
-    ]
+    audits_sorted = sorted(audits, key=lambda audit: audit.get("overall_score", 0), reverse=True)
+    return [audit.get("completeness_tier", "abandoned") for audit in audits_sorted[:24]]
 
 
 def build_dashboard_highlight_rows(data: dict[str, Any]) -> dict[str, list[str]]:
@@ -679,9 +662,7 @@ def build_dashboard_highlight_rows(data: dict[str, Any]) -> dict[str, list[str]]
         "best_work": list(
             data.get("best_work") or data.get("summary", {}).get("highest_scored", [])
         )[:5],
-        "needs_attention": list(
-            data.get("summary", {}).get("lowest_scored", [])
-        )[:5],
+        "needs_attention": list(data.get("summary", {}).get("lowest_scored", []))[:5],
     }
 
 
@@ -734,7 +715,9 @@ def write_dashboard_visual_sections(
         ws.column_dimensions[get_column_letter(column_index)].hidden = True
     for column_letter, width in dashboard_preferred_widths().items():
         ws.column_dimensions[column_letter].width = width
-    _write_dashboard_language_chart(ws, build_dashboard_language_rows(data.get("language_distribution", {})))
+    _write_dashboard_language_chart(
+        ws, build_dashboard_language_rows(data.get("language_distribution", {}))
+    )
     _write_dashboard_scatter_section(ws, data.get("audits", []), section_font, subheader_font)
 
 
@@ -861,7 +844,9 @@ def _write_dashboard_language_chart(ws, language_rows: list[tuple[str, Any]]) ->
     ws.add_chart(lang_bar, "A35")
 
 
-def _write_dashboard_scatter_section(ws, audits: list[dict[str, Any]], section_font, subheader_font) -> None:
+def _write_dashboard_scatter_section(
+    ws, audits: list[dict[str, Any]], section_font, subheader_font
+) -> None:
     if len(audits) < 2:
         return
 
@@ -931,10 +916,14 @@ def _write_dashboard_scatter_section(ws, audits: list[dict[str, Any]], section_f
     chart.width = 10.5
     chart.height = 8
     ws.add_chart(chart, "J34")
-    _write_quadrant_table(ws, audits, legend_row=52, section_font=section_font, subheader_font=subheader_font)
+    _write_quadrant_table(
+        ws, audits, legend_row=52, section_font=section_font, subheader_font=subheader_font
+    )
 
 
-def _write_quadrant_table(ws, audits: list[dict[str, Any]], *, legend_row: int, section_font, subheader_font) -> None:
+def _write_quadrant_table(
+    ws, audits: list[dict[str, Any]], *, legend_row: int, section_font, subheader_font
+) -> None:
     buckets: list[list[str]] = [[], [], [], []]
     for audit in audits:
         x = audit.get("overall_score", 0)
@@ -970,6 +959,7 @@ def build_dashboard_sheet(
     score_history: dict[str, list[float]] | None = None,
     *,
     excel_mode: str,
+    risk_lookup: dict[str, str] | None = None,
     get_or_create_sheet,
     clear_worksheet,
     configure_sheet_view,
@@ -1052,6 +1042,7 @@ def build_dashboard_sheet(
             grade=grade,
             average_score=data["average_score"],
             tiers=tiers,
+            risk_lookup=risk_lookup,
         )
     ):
         link = f"#{sheet_location(target_sheet)}" if target_sheet else None
@@ -1191,6 +1182,7 @@ def build_dashboard_workbook_sheet(
     score_history: dict[str, list[float]] | None = None,
     *,
     excel_mode: str,
+    risk_lookup: dict[str, str] | None = None,
     get_or_create_sheet,
     clear_worksheet,
     configure_sheet_view,
@@ -1248,6 +1240,7 @@ def build_dashboard_workbook_sheet(
         diff_data,
         score_history,
         excel_mode=excel_mode,
+        risk_lookup=risk_lookup,
         get_or_create_sheet=get_or_create_sheet,
         clear_worksheet=clear_worksheet,
         configure_sheet_view=configure_sheet_view,

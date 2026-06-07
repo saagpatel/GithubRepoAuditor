@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -79,6 +80,23 @@ PROJECT_MARKERS = frozenset(
         "tests",
     }
 )
+# Directory-name substrings (case-insensitive) marking deliberate non-projects.
+# A match skips the directory AND its subtree during discovery, so neither the
+# container nor anything nested under it reaches the catalog-completeness gate.
+#   nogoprjs     -> operator-flagged "no-go" projects, never pursued
+#   smoke-export -> generated AuraForge signed-smoke-export bundles (no real repo)
+IGNORE_PROJECT_DIR_TOKENS = frozenset({"nogoprjs", "smoke-export"})
+# Transient / generated working directories matched by regex on the dir name —
+# e.g. a `<repo>-tmp-<timestamp>` clone left behind by a tooling run.
+IGNORE_PROJECT_DIR_PATTERNS: tuple[re.Pattern[str], ...] = (re.compile(r"-tmp-\d+$"),)
+
+
+def _is_ignored_project_dir(name: str) -> bool:
+    """True if a directory name is a transient/non-project artifact to skip."""
+    lowered = name.lower()
+    if any(token in lowered for token in IGNORE_PROJECT_DIR_TOKENS):
+        return True
+    return any(pattern.search(name) for pattern in IGNORE_PROJECT_DIR_PATTERNS)
 
 
 def discover_workspace_projects(
@@ -93,6 +111,8 @@ def discover_workspace_projects(
     for child in sorted(workspace_root.iterdir(), key=lambda item: item.name.lower()):
         if child.name.startswith(".") or not child.is_dir() or child.is_symlink():
             continue
+        if _is_ignored_project_dir(child.name):
+            continue
         if _is_project_dir(child):
             discovered.append(
                 _inspect_project_dir(child, workspace_root, catalog_data=catalog_data, now=now)
@@ -103,7 +123,48 @@ def discover_workspace_projects(
                 child, workspace_root, catalog_data=catalog_data, now=now, depth=2
             )
         )
-    return discovered
+    return _dedupe_checkouts_by_origin(discovered)
+
+
+def _dedupe_checkouts_by_origin(
+    discovered: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Collapse multiple on-disk checkouts of the same repo to one canonical project.
+
+    Linked git worktrees and stray duplicate clones (e.g. ``<repo>-security-fix``
+    left behind by multi-repo sweeps) all resolve to the same origin
+    (``repo_full_name``), so without this they each count as a distinct project —
+    inflating the portfolio count and dragging catalog-completeness toward zero.
+
+    Keep one canonical checkout per origin, preferring the directory whose name
+    matches the repo basename, then the shortest name, then alphabetical. Projects
+    without an origin are local-only and are never collapsed. Result is sorted by
+    name (case-insensitive), matching the prior discovery ordering.
+    """
+    by_origin: dict[str, list[dict[str, Any]]] = {}
+    canonical: list[dict[str, Any]] = []
+    for project in discovered:
+        origin = str(project.get("repo_full_name", "") or "").strip()
+        if origin:
+            by_origin.setdefault(origin.lower(), []).append(project)
+        else:
+            canonical.append(project)
+
+    for origin_key, group in by_origin.items():
+        repo_base = origin_key.rsplit("/", 1)[-1]
+        canonical.append(
+            min(
+                group,
+                key=lambda p: (
+                    str(p.get("name", "")).lower() != repo_base,
+                    len(str(p.get("name", ""))),
+                    str(p.get("name", "")).lower(),
+                ),
+            )
+        )
+
+    canonical.sort(key=lambda p: str(p.get("name", "")).lower())
+    return canonical
 
 
 def _discover_nested_projects(
@@ -120,6 +181,8 @@ def _discover_nested_projects(
     discovered: list[dict[str, Any]] = []
     for child in sorted(root.iterdir(), key=lambda item: item.name.lower()):
         if child.name.startswith(".") or not child.is_dir() or child.is_symlink():
+            continue
+        if _is_ignored_project_dir(child.name):
             continue
         if _is_project_dir(child):
             discovered.append(
@@ -222,6 +285,7 @@ def _inspect_project_dir(
         "group_entry": group_entry,
         "has_git": bool(git_facts.get("has_git")),
         "repo_full_name": str(git_facts.get("repo_full_name", "") or "").strip(),
+        "default_branch": str(git_facts.get("default_branch", "") or "").strip(),
         "context_files": context_files,
         "context_quality": context_analysis.context_quality,
         "primary_context_file": context_analysis.primary_context_file,
@@ -293,17 +357,6 @@ def _classify_context_quality(project_path: Path, context_files: list[str]) -> s
     return analyze_project_context(project_path, context_files).context_quality
 
 
-# Utility: reads context file text, respecting size and allowlist limits.
-# Called indirectly via context analysis pipeline.
-def read_context_text(project_path: Path, relative_file: str) -> str:
-    path = project_path / relative_file
-    if not path.is_file() or path.stat().st_size > MAX_CONTEXT_BYTES:
-        return ""
-    if path.name not in TEXT_ALLOWLIST:
-        return ""
-    return path.read_text(errors="replace")
-
-
 # Utility: returns True if context quality is "boilerplate".
 # Called indirectly via context analysis pipeline.
 def detect_boilerplate_context(project_path: Path, context_files: list[str]) -> bool:
@@ -353,7 +406,21 @@ def _read_small_json(path: Path) -> dict[str, Any]:
 def _gather_git_facts(project_path: Path) -> dict[str, Any]:
     git_dir = project_path / ".git"
     if not git_dir.exists():
-        return {"has_git": False, "last_commit_at": None, "repo_full_name": ""}
+        return {
+            "has_git": False,
+            "last_commit_at": None,
+            "repo_full_name": "",
+            "default_branch": "",
+        }
+
+    # Computed once; ``last_commit_at`` is the only field the git-log probe below
+    # can refine, so every error path returns this base unchanged.
+    base = {
+        "has_git": True,
+        "last_commit_at": None,
+        "repo_full_name": _git_remote_full_name(project_path),
+        "default_branch": _git_default_branch(project_path),
+    }
 
     try:
         result = subprocess.run(
@@ -364,31 +431,43 @@ def _gather_git_facts(project_path: Path) -> dict[str, Any]:
             check=False,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired):
-        return {
-            "has_git": True,
-            "last_commit_at": None,
-            "repo_full_name": _git_remote_full_name(project_path),
-        }
+        return base
 
     if result.returncode != 0 or not result.stdout.strip():
-        return {
-            "has_git": True,
-            "last_commit_at": None,
-            "repo_full_name": _git_remote_full_name(project_path),
-        }
+        return base
 
     try:
         return {
-            "has_git": True,
+            **base,
             "last_commit_at": datetime.fromisoformat(result.stdout.strip().replace("Z", "+00:00")),
-            "repo_full_name": _git_remote_full_name(project_path),
         }
     except ValueError:
-        return {
-            "has_git": True,
-            "last_commit_at": None,
-            "repo_full_name": _git_remote_full_name(project_path),
-        }
+        return base
+
+
+def _git_default_branch(project_path: Path) -> str:
+    """The repo's default branch from the local ``origin/HEAD`` ref, if set.
+
+    Resolves only local refs (no network). Returns "" when ``origin/HEAD`` is
+    not set locally (common for repos that were ``git init``'d rather than
+    cloned) — callers fall back to the portfolio default.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(project_path), "symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return ""
+
+    if result.returncode != 0:
+        return ""
+    # e.g. "origin/main" -> "main"; partition keeps multi-segment branch names
+    # like "origin/release/v1" -> "release/v1" intact.
+    return result.stdout.strip().partition("/")[2].strip()
 
 
 def _git_remote_full_name(project_path: Path) -> str:

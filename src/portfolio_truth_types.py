@@ -3,9 +3,21 @@ from __future__ import annotations
 import dataclasses
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = "0.4.0"
+SCHEMA_VERSION = "0.5.0"
+
+# The published "latest" portfolio-truth artifact. The producer
+# (portfolio_truth_publish) writes it; every reader resolves it through
+# truth_latest_path() so the filename lives in exactly one place.
+TRUTH_LATEST_FILENAME = "portfolio-truth-latest.json"
+
+
+def truth_latest_path(output_dir: Path) -> Path:
+    """Resolve the canonical portfolio-truth-latest.json under an output dir."""
+    return output_dir / TRUTH_LATEST_FILENAME
+
 
 VALID_CONTEXT_QUALITY = {"full", "standard", "minimum-viable", "boilerplate", "none"}
 VALID_ACTIVITY_STATUS = {"active", "recent", "stale", "archived"}
@@ -42,6 +54,14 @@ class IdentityFields:
     section_marker: str
     section_label: str
     has_git: bool
+    # GitHub "owner/repo" from the local git remote, when present. Lets risk and
+    # other truth-keyed overlays be matched by the GitHub repo name (audit
+    # metadata.name) and not only the local-dir display_name, which often differ
+    # (e.g. "Signal & Noise" vs "signal-noise").
+    repo_full_name: str = ""
+    # The repo's default branch (from local ``origin/HEAD``), when detectable.
+    # Empty when not set locally; consumers fall back to the portfolio default.
+    default_branch: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return dataclasses.asdict(self)
@@ -124,6 +144,32 @@ class RiskFields:
     doctor_gap: bool = False
     context_risk: bool = False
     path_risk: bool = False
+    security_risk: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return dataclasses.asdict(self)
+
+
+@dataclass(frozen=True)
+class SecurityFields:
+    """Live GitHub Advanced Security alert counts, overlaid opt-in from the latest
+    output/ghas-alerts-<username>-*.json. When alerts_available is False the repo was
+    not scanned (no token / GHAS disabled / not fetched) — distinct from a clean scan
+    with zero open alerts, so consumers don't mislabel an unscanned repo as secure."""
+
+    alerts_available: bool = False
+    dependabot_critical: int = 0
+    dependabot_high: int = 0
+    dependabot_medium: int = 0
+    dependabot_low: int = 0
+    code_scanning_critical: int = 0
+    code_scanning_high: int = 0
+    secret_scanning_open: int = 0
+
+    @property
+    def open_high_critical(self) -> int:
+        """Dependabot high + critical — the security-risk-factor trigger surface."""
+        return self.dependabot_high + self.dependabot_critical
 
     def to_dict(self) -> dict[str, Any]:
         return dataclasses.asdict(self)
@@ -135,6 +181,7 @@ class PortfolioTruthProject:
     declared: DeclaredFields
     derived: DerivedFields
     risk: RiskFields = field(default_factory=RiskFields)
+    security: SecurityFields = field(default_factory=SecurityFields)
     advisory: AdvisoryFields = field(default_factory=AdvisoryFields)
     provenance: dict[str, dict[str, str]] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
@@ -145,6 +192,7 @@ class PortfolioTruthProject:
             "declared": self.declared.to_dict(),
             "derived": self.derived.to_dict(),
             "risk": self.risk.to_dict(),
+            "security": self.security.to_dict(),
             "advisory": self.advisory.to_dict(),
             "provenance": self.provenance,
             "warnings": list(self.warnings),

@@ -41,6 +41,7 @@ from src.report_enrichment import (
     build_next_tie_break_candidate_line,
     build_queue_pressure_summary,
     build_repo_briefing,
+    build_risk_lookup,
     build_run_change_counts,
     build_run_change_summary,
     build_top_recommendation_summary,
@@ -70,13 +71,13 @@ def _file_path(output_dir: Path, prefix: str, username: str, dt: datetime, ext: 
 
 # ── JSON sanitization ───────────────────────────────────────────────
 
-_CONTROL_CHAR_RE = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f]')
+_CONTROL_CHAR_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 
 
 def _sanitize_for_json(obj: object) -> object:
     """Recursively strip control characters from strings to prevent JSON corruption."""
     if isinstance(obj, str):
-        return _CONTROL_CHAR_RE.sub('', obj)
+        return _CONTROL_CHAR_RE.sub("", obj)
     if isinstance(obj, dict):
         return {k: _sanitize_for_json(v) for k, v in obj.items()}
     if isinstance(obj, list):
@@ -85,7 +86,10 @@ def _sanitize_for_json(obj: object) -> object:
 
 
 def _has_preflight_issues(preflight_summary: dict) -> bool:
-    return bool(preflight_summary and (preflight_summary.get("blocking_errors") or preflight_summary.get("warnings")))
+    return bool(
+        preflight_summary
+        and (preflight_summary.get("blocking_errors") or preflight_summary.get("warnings"))
+    )
 
 
 # ── JSON Report ──────────────────────────────────────────────────────
@@ -197,19 +201,21 @@ def write_pcc_export(report: AuditReport, output_dir: Path) -> Path:
     records = []
     for audit in report.audits:
         m = audit.metadata
-        records.append({
-            "name": m.name,
-            "full_name": m.full_name,
-            "status": audit.completeness_tier,
-            "score": round(audit.overall_score, 3),
-            "url": m.html_url,
-            "last_activity": m.pushed_at.isoformat() if m.pushed_at else None,
-            "language": m.language,
-            "tier": audit.completeness_tier,
-            "flags": audit.flags,
-            "private": m.private,
-            "description": m.description,
-        })
+        records.append(
+            {
+                "name": m.name,
+                "full_name": m.full_name,
+                "status": audit.completeness_tier,
+                "score": round(audit.overall_score, 3),
+                "url": m.html_url,
+                "last_activity": m.pushed_at.isoformat() if m.pushed_at else None,
+                "language": m.language,
+                "tier": audit.completeness_tier,
+                "flags": audit.flags,
+                "private": m.private,
+                "description": m.description,
+            }
+        )
 
     with open(path, "w") as f:
         json.dump(records, f, indent=2)
@@ -235,9 +241,11 @@ def write_markdown_report(
     # Header
     _w(f"# GitHub Repo Audit: {report.username}")
     _w("")
-    _w(f"*Generated: {_date_str(report.generated_at)} | "
-       f"Repos audited: {report.repos_audited} / {report.total_repos} | "
-       f"Portfolio Grade: **{report.portfolio_grade}***")
+    _w(
+        f"*Generated: {_date_str(report.generated_at)} | "
+        f"Repos audited: {report.repos_audited} / {report.total_repos} | "
+        f"Portfolio Grade: **{report.portfolio_grade}***"
+    )
     _w("")
 
     # Summary table
@@ -270,6 +278,7 @@ def write_markdown_report(
     top_recommendation_summary = build_top_recommendation_summary(report_dict)
     trust_actionability_summary = build_trust_actionability_summary(report_dict)
     weekly_pack = build_weekly_review_pack(report_dict, diff_data)
+    risk_lookup = build_risk_lookup(output_dir)
     weekly_reason = resolve_weekly_story_value(
         weekly_pack,
         "why_this_week",
@@ -299,36 +308,94 @@ def write_markdown_report(
 
     _w("## Weekly Review Pack")
     _w("")
-    _w(f"- Product Mode: {weekly_pack.get('product_mode_summary', 'Weekly Review: use this artifact for the normal workbook-first operator loop.')}")
-    _w(f"- Artifact Role: {weekly_pack.get('artifact_role_summary', 'This artifact is the shared weekly handoff across workbook, HTML, Markdown, and review-pack.')}")
-    _w(f"- Suggested Reading Order: {weekly_pack.get('suggested_reading_order', 'Read Dashboard, then Run Changes, then Review Queue.')}")
-    _w(f"- Next Best Workflow Step: {weekly_pack.get('next_best_workflow_step', 'Open the standard workbook first, then use --control-center for read-only triage.')}")
-    _w(f"- Portfolio Headline: {weekly_pack.get('portfolio_headline', 'No weekly headline is recorded yet.')}")
-    _w(f"- Run Changes: {weekly_pack.get('run_change_summary', build_run_change_summary(diff_data))}")
+    _w(
+        f"- Product Mode: {weekly_pack.get('product_mode_summary', 'Weekly Review: use this artifact for the normal workbook-first operator loop.')}"
+    )
+    _w(
+        f"- Artifact Role: {weekly_pack.get('artifact_role_summary', 'This artifact is the shared weekly handoff across workbook, HTML, Markdown, and review-pack.')}"
+    )
+    _w(
+        f"- Suggested Reading Order: {weekly_pack.get('suggested_reading_order', 'Read Dashboard, then Run Changes, then Review Queue.')}"
+    )
+    _w(
+        f"- Next Best Workflow Step: {weekly_pack.get('next_best_workflow_step', 'Open the standard workbook first, then use --control-center for read-only triage.')}"
+    )
+    _w(
+        f"- Portfolio Headline: {weekly_pack.get('portfolio_headline', 'No weekly headline is recorded yet.')}"
+    )
+    _w(
+        f"- Run Changes: {weekly_pack.get('run_change_summary', build_run_change_summary(diff_data))}"
+    )
     _w(f"- Queue Pressure: {weekly_pack.get('queue_pressure_summary', queue_pressure_summary)}")
-    _w(f"- Trust / Actionability: {weekly_pack.get('trust_actionability_summary', trust_actionability_summary)}")
-    _w(f"- What To Do This Week: {weekly_pack.get('what_to_do_this_week', top_recommendation_summary)}")
-    _w(f"- Portfolio Catalog: {weekly_pack.get('portfolio_catalog_summary', 'No portfolio catalog contract is recorded yet.')}")
-    _w(f"- Operating Paths: {weekly_pack.get('operating_paths_summary', 'No normalized operating-path contract is recorded yet.')}")
-    _w(f"- Intent Alignment: {weekly_pack.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.')}")
-    _w(f"- Scorecards: {weekly_pack.get('scorecards_summary', 'No maturity scorecard is recorded yet.')}")
-    _w(f"- Implementation Hotspots: {weekly_pack.get('implementation_hotspots_summary', 'No meaningful implementation hotspots are currently surfaced.')}")
-    _w(f"- Operator Outcomes: {weekly_pack.get('operator_outcomes_summary', 'Not enough operator history is recorded yet to judge outcomes.')}")
-    _w(f"- Operator Effectiveness: {weekly_pack.get('operator_effectiveness_line', 'Not enough judged recommendation history is recorded yet to judge operator effectiveness.')}")
-    _w(f"- High-Pressure Queue Trend: {weekly_pack.get('high_pressure_queue_trend_line', 'High-pressure queue trend is not ready yet.')}")
-    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['readiness']}: {weekly_pack.get('action_sync_summary', 'No current campaign needs Action Sync yet, so the safest next move is to keep the story local.')}")
-    _w(f"- Next Action Sync Step: {weekly_pack.get('next_action_sync_step', 'Stay local for now; no current campaign needs preview or apply.')}")
-    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['apply_packet']}: {weekly_pack.get('apply_readiness_summary', 'No current campaign has a safe execution handoff yet, so the local story should stay local for now.')}")
-    _w(f"- Next Apply Candidate: {weekly_pack.get('next_apply_candidate', 'Stay local for now; no current campaign has a safe execution handoff.')}")
-    _w(f"- Action Sync Command Hint: {weekly_pack.get('action_sync_command_hint', 'No Action Sync command is recommended yet.')}")
-    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['post_apply_monitoring']}: {weekly_pack.get('campaign_outcomes_summary', 'No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.')}")
-    _w(f"- Next Monitoring Step: {weekly_pack.get('next_monitoring_step', 'Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.')}")
-    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['campaign_tuning']}: {weekly_pack.get('campaign_tuning_summary', 'Campaign tuning stays neutral until there is enough outcome history to bias tied recommendations.')}")
-    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}: {weekly_pack.get('next_tie_break_candidate', build_next_tie_break_candidate_line(weekly_pack))}")
-    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['historical_portfolio_intelligence']}: {weekly_pack.get('historical_portfolio_intelligence', 'Historical portfolio intelligence is still thin, so the weekly story should stay grounded in the current run and recent operator queue.')}")
-    _w(f"- Next Historical Focus: {weekly_pack.get('next_historical_focus', 'Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet.')}")
-    _w(f"- {ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}: {weekly_pack.get('automation_guidance_summary', 'Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture.')}")
-    _w(f"- Next Safe Automation Step: {weekly_pack.get('next_safe_automation_step', 'Stay local for now; no current campaign has a stronger safe automation posture than manual review.')}")
+    _w(
+        f"- Trust / Actionability: {weekly_pack.get('trust_actionability_summary', trust_actionability_summary)}"
+    )
+    _w(
+        f"- What To Do This Week: {weekly_pack.get('what_to_do_this_week', top_recommendation_summary)}"
+    )
+    _w(
+        f"- Portfolio Catalog: {weekly_pack.get('portfolio_catalog_summary', 'No portfolio catalog contract is recorded yet.')}"
+    )
+    _w(
+        f"- Operating Paths: {weekly_pack.get('operating_paths_summary', 'No normalized operating-path contract is recorded yet.')}"
+    )
+    _w(
+        f"- Intent Alignment: {weekly_pack.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.')}"
+    )
+    _w(
+        f"- Scorecards: {weekly_pack.get('scorecards_summary', 'No maturity scorecard is recorded yet.')}"
+    )
+    _w(
+        f"- Implementation Hotspots: {weekly_pack.get('implementation_hotspots_summary', 'No meaningful implementation hotspots are currently surfaced.')}"
+    )
+    _w(
+        f"- Operator Outcomes: {weekly_pack.get('operator_outcomes_summary', 'Not enough operator history is recorded yet to judge outcomes.')}"
+    )
+    _w(
+        f"- Operator Effectiveness: {weekly_pack.get('operator_effectiveness_line', 'Not enough judged recommendation history is recorded yet to judge operator effectiveness.')}"
+    )
+    _w(
+        f"- High-Pressure Queue Trend: {weekly_pack.get('high_pressure_queue_trend_line', 'High-pressure queue trend is not ready yet.')}"
+    )
+    _w(
+        f"- {ACTION_SYNC_CANONICAL_LABELS['readiness']}: {weekly_pack.get('action_sync_summary', 'No current campaign needs Action Sync yet, so the safest next move is to keep the story local.')}"
+    )
+    _w(
+        f"- Next Action Sync Step: {weekly_pack.get('next_action_sync_step', 'Stay local for now; no current campaign needs preview or apply.')}"
+    )
+    _w(
+        f"- {ACTION_SYNC_CANONICAL_LABELS['apply_packet']}: {weekly_pack.get('apply_readiness_summary', 'No current campaign has a safe execution handoff yet, so the local story should stay local for now.')}"
+    )
+    _w(
+        f"- Next Apply Candidate: {weekly_pack.get('next_apply_candidate', 'Stay local for now; no current campaign has a safe execution handoff.')}"
+    )
+    _w(
+        f"- Action Sync Command Hint: {weekly_pack.get('action_sync_command_hint', 'No Action Sync command is recommended yet.')}"
+    )
+    _w(
+        f"- {ACTION_SYNC_CANONICAL_LABELS['post_apply_monitoring']}: {weekly_pack.get('campaign_outcomes_summary', 'No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.')}"
+    )
+    _w(
+        f"- Next Monitoring Step: {weekly_pack.get('next_monitoring_step', 'Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.')}"
+    )
+    _w(
+        f"- {ACTION_SYNC_CANONICAL_LABELS['campaign_tuning']}: {weekly_pack.get('campaign_tuning_summary', 'Campaign tuning stays neutral until there is enough outcome history to bias tied recommendations.')}"
+    )
+    _w(
+        f"- {ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}: {weekly_pack.get('next_tie_break_candidate', build_next_tie_break_candidate_line(weekly_pack))}"
+    )
+    _w(
+        f"- {ACTION_SYNC_CANONICAL_LABELS['historical_portfolio_intelligence']}: {weekly_pack.get('historical_portfolio_intelligence', 'Historical portfolio intelligence is still thin, so the weekly story should stay grounded in the current run and recent operator queue.')}"
+    )
+    _w(
+        f"- Next Historical Focus: {weekly_pack.get('next_historical_focus', 'Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet.')}"
+    )
+    _w(
+        f"- {ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}: {weekly_pack.get('automation_guidance_summary', 'Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture.')}"
+    )
+    _w(
+        f"- Next Safe Automation Step: {weekly_pack.get('next_safe_automation_step', 'Stay local for now; no current campaign has a stronger safe automation posture than manual review.')}"
+    )
     _w("")
     _render_weekly_story_sections(_w, weekly_pack)
     _w("### Top Attention")
@@ -338,18 +405,32 @@ def write_markdown_report(
             f"- [{item.get('lane', 'ready')}] {item.get('repo', 'Portfolio')}: {item.get('title', 'Operator attention item')}"
         )
         _w(f"  - What Changed: {item.get('last_movement', 'Current run')}")
-        _w(f"  - Why It Matters: {item.get('why_it_won', item.get('why', 'Operator pressure is active.'))}")
+        _w(
+            f"  - Why It Matters: {item.get('why_it_won', item.get('why', 'Operator pressure is active.'))}"
+        )
         _w(f"  - What To Do Next: {item.get('next_step', 'Review the latest state.')}")
-        _w(f"  - Operator Focus: {item.get('operator_focus_line', 'Watch Closely: No operator focus bucket is currently surfaced.')}")
-        _w(f"  - Catalog: {item.get('catalog_line', 'No portfolio catalog contract is recorded yet.')}")
-        _w(f"  - {item.get('operating_path_line', 'Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet.')}")
-        _w(f"  - Intent Alignment: {item.get('intent_alignment', 'missing-contract')} — {item.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.')}")
+        _w(
+            f"  - Operator Focus: {item.get('operator_focus_line', 'Watch Closely: No operator focus bucket is currently surfaced.')}"
+        )
+        _w(
+            f"  - Catalog: {item.get('catalog_line', 'No portfolio catalog contract is recorded yet.')}"
+        )
+        _w(
+            f"  - {item.get('operating_path_line', 'Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet.')}"
+        )
+        _w(
+            f"  - Intent Alignment: {item.get('intent_alignment', 'missing-contract')} — {item.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.')}"
+        )
         _w(f"  - {item.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.')}")
-        _w(f"  - Maturity Gap: {item.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.')}")
+        _w(
+            f"  - Maturity Gap: {item.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.')}"
+        )
         _w("  - Evidence:")
         for evidence in item.get("evidence_strip", [])[:5]:
             command = f" [{evidence.get('command_hint')}]" if evidence.get("command_hint") else ""
-            _w(f"    - {evidence.get('label', 'Item')} — {evidence.get('summary', 'No evidence summary is recorded yet.')}{command}")
+            _w(
+                f"    - {evidence.get('label', 'Item')} — {evidence.get('summary', 'No evidence summary is recorded yet.')}{command}"
+            )
         _w(f"  - Checkpoint Timing: {item.get('follow_through_checkpoint_timing', 'Unknown')}")
         _w(
             f"  - Next Checkpoint: {item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}"
@@ -359,25 +440,55 @@ def write_markdown_report(
     _w("")
     _w("### Operator Focus")
     _w("")
-    _w(f"- Summary: {weekly_pack.get('operator_focus_summary', 'No operator focus bucket is currently surfaced.')}")
+    _w(
+        f"- Summary: {weekly_pack.get('operator_focus_summary', 'No operator focus bucket is currently surfaced.')}"
+    )
     if weekly_pack.get("top_below_target_scorecard_items"):
         _w("- Scorecard Gaps:")
         for item in weekly_pack.get("top_below_target_scorecard_items", [])[:5]:
             _w(f"  - {item.get('repo', 'Repo')} — {item.get('summary', 'Below target.')}")
-    _w(f"- Next Checkpoint: {weekly_pack.get('follow_through_checkpoint_summary', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
+    _w(
+        f"- Next Checkpoint: {weekly_pack.get('follow_through_checkpoint_summary', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}"
+    )
     focus_sections = [
-        ("Act Now", weekly_pack.get("top_act_now_items", []), "No immediate-action hotspots are currently surfaced."),
-        ("Watch Closely", weekly_pack.get("top_watch_closely_items", []), "No watch-closely hotspots are currently surfaced."),
-        ("Improving", weekly_pack.get("top_improving_items", []), "No clearly improving hotspots are currently surfaced."),
-        ("Fragile", weekly_pack.get("top_fragile_items", []), "No fragile hotspots are currently surfaced."),
-        ("Revalidate", weekly_pack.get("top_revalidate_items", []), "No revalidation hotspots are currently surfaced."),
+        (
+            "Act Now",
+            weekly_pack.get("top_act_now_items", []),
+            "No immediate-action hotspots are currently surfaced.",
+        ),
+        (
+            "Watch Closely",
+            weekly_pack.get("top_watch_closely_items", []),
+            "No watch-closely hotspots are currently surfaced.",
+        ),
+        (
+            "Improving",
+            weekly_pack.get("top_improving_items", []),
+            "No clearly improving hotspots are currently surfaced.",
+        ),
+        (
+            "Fragile",
+            weekly_pack.get("top_fragile_items", []),
+            "No fragile hotspots are currently surfaced.",
+        ),
+        (
+            "Revalidate",
+            weekly_pack.get("top_revalidate_items", []),
+            "No revalidation hotspots are currently surfaced.",
+        ),
     ]
     for label, items, empty_message in focus_sections:
         _w(f"- {label}:")
         if items:
             for item in items[:3]:
-                item_label = f"{item.get('repo')}: {item.get('title')}" if item.get("repo") else item.get("title", "Operator item")
-                _w(f"  - {item_label} — {item.get('operator_focus_summary', 'No operator focus bucket is currently surfaced.')}")
+                item_label = (
+                    f"{item.get('repo')}: {item.get('title')}"
+                    if item.get("repo")
+                    else item.get("title", "Operator item")
+                )
+                _w(
+                    f"  - {item_label} — {item.get('operator_focus_summary', 'No operator focus bucket is currently surfaced.')}"
+                )
         else:
             _w(f"  - {empty_message}")
     _w("")
@@ -386,34 +497,62 @@ def write_markdown_report(
     for briefing in weekly_pack.get("repo_briefings", [])[:3]:
         _w(f"#### {briefing.get('headline', briefing.get('repo', 'Repo briefing'))}")
         _w("")
-        _w(f"- Current State: {briefing.get('current_state_line', 'No current-state summary is recorded yet.')}")
-        _w(f"- What Changed: {briefing.get('what_changed_line', 'No change summary is recorded yet.')}")
-        _w(f"- Why It Matters: {briefing.get('why_it_won', briefing.get('why_it_matters_line', 'No explanation summary is recorded yet.'))}")
-        _w(f"- What To Do Next: {briefing.get('next_step', briefing.get('what_to_do_next_line', 'No next action is recorded yet.'))}")
-        _w(f"- Operator Focus: {briefing.get('operator_focus_line', 'Watch Closely: No operator focus bucket is currently surfaced.')}")
-        _w(f"- Catalog: {briefing.get('catalog_line', 'No portfolio catalog contract is recorded yet.')}")
-        _w(f"- {briefing.get('operating_path_line', 'Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet.')}")
-        _w(f"- Intent Alignment: {briefing.get('intent_alignment_line', 'missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.')}")
-        _w(f"- {briefing.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.')}")
-        _w(f"- Maturity Gap: {briefing.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.')}")
+        _w(
+            f"- Current State: {briefing.get('current_state_line', 'No current-state summary is recorded yet.')}"
+        )
+        _w(
+            f"- What Changed: {briefing.get('what_changed_line', 'No change summary is recorded yet.')}"
+        )
+        _w(
+            f"- Why It Matters: {briefing.get('why_it_won', briefing.get('why_it_matters_line', 'No explanation summary is recorded yet.'))}"
+        )
+        _w(
+            f"- What To Do Next: {briefing.get('next_step', briefing.get('what_to_do_next_line', 'No next action is recorded yet.'))}"
+        )
+        _w(
+            f"- Operator Focus: {briefing.get('operator_focus_line', 'Watch Closely: No operator focus bucket is currently surfaced.')}"
+        )
+        _w(
+            f"- Catalog: {briefing.get('catalog_line', 'No portfolio catalog contract is recorded yet.')}"
+        )
+        _w(
+            f"- {briefing.get('operating_path_line', 'Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet.')}"
+        )
+        _w(
+            f"- Intent Alignment: {briefing.get('intent_alignment_line', 'missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.')}"
+        )
+        _w(
+            f"- {briefing.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.')}"
+        )
+        _w(
+            f"- Maturity Gap: {briefing.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.')}"
+        )
         _w("- Evidence:")
         for evidence in briefing.get("evidence_strip", [])[:5]:
             command = f" [{evidence.get('command_hint')}]" if evidence.get("command_hint") else ""
-            _w(f"  - {evidence.get('label', 'Item')} — {evidence.get('summary', 'No evidence summary is recorded yet.')}{command}")
+            _w(
+                f"  - {evidence.get('label', 'Item')} — {evidence.get('summary', 'No evidence summary is recorded yet.')}{command}"
+            )
         _w(f"- Checkpoint Timing: {briefing.get('checkpoint_timing_line', 'Unknown')}")
-        _w(f"- What Would Count As Progress: {briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
+        _w(
+            f"- What Would Count As Progress: {briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}"
+        )
         _w("")
 
     if report.operator_summary or report.operator_queue:
         _w("### Operator Control Center")
         _w("")
-        _w(f"- Headline: {report.operator_summary.get('headline', 'No operator triage items are currently surfaced.')}")
+        _w(
+            f"- Headline: {report.operator_summary.get('headline', 'No operator triage items are currently surfaced.')}"
+        )
         if report.operator_summary.get("source_run_id"):
             _w(f"- Source Run: `{report.operator_summary.get('source_run_id')}`")
         if report.operator_summary.get("report_reference"):
             _w(f"- Latest Report: `{report.operator_summary.get('report_reference')}`")
         if report.operator_summary.get("next_recommended_run_mode"):
-            _w(f"- Next Recommended Run: `{report.operator_summary.get('next_recommended_run_mode')}`")
+            _w(
+                f"- Next Recommended Run: `{report.operator_summary.get('next_recommended_run_mode')}`"
+            )
         if report.operator_summary.get("watch_strategy"):
             _w(f"- Watch Strategy: `{report.operator_summary.get('watch_strategy')}`")
         if report.operator_summary.get("watch_decision_summary"):
@@ -432,7 +571,9 @@ def write_markdown_report(
         if report.operator_summary.get("follow_through_summary"):
             _w(f"- Follow-Through: {report.operator_summary.get('follow_through_summary')}")
         if report.operator_summary.get("follow_through_checkpoint_summary"):
-            _w(f"- Next Checkpoint: {report.operator_summary.get('follow_through_checkpoint_summary')}")
+            _w(
+                f"- Next Checkpoint: {report.operator_summary.get('follow_through_checkpoint_summary')}"
+            )
         if (report.operator_summary.get("action_sync_summary") or {}).get("summary"):
             _w(
                 f"- {ACTION_SYNC_CANONICAL_LABELS['readiness']}: {(report.operator_summary.get('action_sync_summary') or {}).get('summary')}"
@@ -440,56 +581,104 @@ def write_markdown_report(
         if report.operator_summary.get("next_action_sync_step"):
             _w(f"- Next Action Sync Step: {report.operator_summary.get('next_action_sync_step')}")
         if (report.operator_summary.get("apply_readiness_summary") or {}).get("summary"):
-            _w(f"- Apply Packet: {(report.operator_summary.get('apply_readiness_summary') or {}).get('summary')}")
+            _w(
+                f"- Apply Packet: {(report.operator_summary.get('apply_readiness_summary') or {}).get('summary')}"
+            )
         if (report.operator_summary.get("next_apply_candidate") or {}).get("summary"):
-            _w(f"- Next Apply Candidate: {(report.operator_summary.get('next_apply_candidate') or {}).get('summary')}")
-        command_hint = (report.operator_summary.get("next_apply_candidate") or {}).get("apply_command") or (report.operator_summary.get("next_apply_candidate") or {}).get("preview_command")
+            _w(
+                f"- Next Apply Candidate: {(report.operator_summary.get('next_apply_candidate') or {}).get('summary')}"
+            )
+        command_hint = (report.operator_summary.get("next_apply_candidate") or {}).get(
+            "apply_command"
+        ) or (report.operator_summary.get("next_apply_candidate") or {}).get("preview_command")
         if command_hint:
             _w(f"- Action Sync Command Hint: `{command_hint}`")
         if (report.operator_summary.get("campaign_outcomes_summary") or {}).get("summary"):
-            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['post_apply_monitoring']}: {(report.operator_summary.get('campaign_outcomes_summary') or {}).get('summary')}")
+            _w(
+                f"- {ACTION_SYNC_CANONICAL_LABELS['post_apply_monitoring']}: {(report.operator_summary.get('campaign_outcomes_summary') or {}).get('summary')}"
+            )
         if (report.operator_summary.get("next_monitoring_step") or {}).get("summary"):
-            _w(f"- Next Monitoring Step: {(report.operator_summary.get('next_monitoring_step') or {}).get('summary')}")
+            _w(
+                f"- Next Monitoring Step: {(report.operator_summary.get('next_monitoring_step') or {}).get('summary')}"
+            )
         if (report.operator_summary.get("intervention_ledger_summary") or {}).get("summary"):
-            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['historical_portfolio_intelligence']}: {(report.operator_summary.get('intervention_ledger_summary') or {}).get('summary')}")
+            _w(
+                f"- {ACTION_SYNC_CANONICAL_LABELS['historical_portfolio_intelligence']}: {(report.operator_summary.get('intervention_ledger_summary') or {}).get('summary')}"
+            )
         if (report.operator_summary.get("next_historical_focus") or {}).get("summary"):
-            _w(f"- Next Historical Focus: {(report.operator_summary.get('next_historical_focus') or {}).get('summary')}")
+            _w(
+                f"- Next Historical Focus: {(report.operator_summary.get('next_historical_focus') or {}).get('summary')}"
+            )
         if (report.operator_summary.get("automation_guidance_summary") or {}).get("summary"):
-            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}: {(report.operator_summary.get('automation_guidance_summary') or {}).get('summary')}")
+            _w(
+                f"- {ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}: {(report.operator_summary.get('automation_guidance_summary') or {}).get('summary')}"
+            )
         if (report.operator_summary.get("next_safe_automation_step") or {}).get("summary"):
-            _w(f"- Next Safe Automation Step: {(report.operator_summary.get('next_safe_automation_step') or {}).get('summary')}")
+            _w(
+                f"- Next Safe Automation Step: {(report.operator_summary.get('next_safe_automation_step') or {}).get('summary')}"
+            )
         if (report.operator_summary.get("approval_workflow_summary") or {}).get("summary"):
-            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}: {(report.operator_summary.get('approval_workflow_summary') or {}).get('summary')}")
+            _w(
+                f"- {ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}: {(report.operator_summary.get('approval_workflow_summary') or {}).get('summary')}"
+            )
         if (report.operator_summary.get("next_approval_review") or {}).get("summary"):
-            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['next_approval_review']}: {(report.operator_summary.get('next_approval_review') or {}).get('summary')}")
+            _w(
+                f"- {ACTION_SYNC_CANONICAL_LABELS['next_approval_review']}: {(report.operator_summary.get('next_approval_review') or {}).get('summary')}"
+            )
         if report.operator_summary.get("follow_through_escalation_summary"):
-            _w(f"- Follow-Through Aging and Escalation: {report.operator_summary.get('follow_through_escalation_summary')}")
+            _w(
+                f"- Follow-Through Aging and Escalation: {report.operator_summary.get('follow_through_escalation_summary')}"
+            )
         if report.operator_summary.get("follow_through_recovery_summary"):
-            _w(f"- Follow-Through Recovery and Escalation Retirement: {report.operator_summary.get('follow_through_recovery_summary')}")
+            _w(
+                f"- Follow-Through Recovery and Escalation Retirement: {report.operator_summary.get('follow_through_recovery_summary')}"
+            )
         if report.operator_summary.get("follow_through_recovery_persistence_summary"):
-            _w(f"- Follow-Through Recovery Persistence: {report.operator_summary.get('follow_through_recovery_persistence_summary')}")
+            _w(
+                f"- Follow-Through Recovery Persistence: {report.operator_summary.get('follow_through_recovery_persistence_summary')}"
+            )
         if report.operator_summary.get("follow_through_relapse_churn_summary"):
-            _w(f"- Follow-Through Relapse Churn: {report.operator_summary.get('follow_through_relapse_churn_summary')}")
+            _w(
+                f"- Follow-Through Relapse Churn: {report.operator_summary.get('follow_through_relapse_churn_summary')}"
+            )
         if report.operator_summary.get("follow_through_recovery_freshness_summary"):
-            _w(f"- Follow-Through Recovery Freshness: {report.operator_summary.get('follow_through_recovery_freshness_summary')}")
+            _w(
+                f"- Follow-Through Recovery Freshness: {report.operator_summary.get('follow_through_recovery_freshness_summary')}"
+            )
         if report.operator_summary.get("follow_through_recovery_memory_reset_summary"):
-            _w(f"- Follow-Through Recovery Memory Reset: {report.operator_summary.get('follow_through_recovery_memory_reset_summary')}")
+            _w(
+                f"- Follow-Through Recovery Memory Reset: {report.operator_summary.get('follow_through_recovery_memory_reset_summary')}"
+            )
         if report.operator_summary.get("follow_through_recovery_rebuild_strength_summary"):
-            _w(f"- Follow-Through Recovery Rebuild Strength: {report.operator_summary.get('follow_through_recovery_rebuild_strength_summary')}")
+            _w(
+                f"- Follow-Through Recovery Rebuild Strength: {report.operator_summary.get('follow_through_recovery_rebuild_strength_summary')}"
+            )
         if report.operator_summary.get("follow_through_recovery_reacquisition_summary"):
-            _w(f"- Follow-Through Recovery Reacquisition: {report.operator_summary.get('follow_through_recovery_reacquisition_summary')}")
+            _w(
+                f"- Follow-Through Recovery Reacquisition: {report.operator_summary.get('follow_through_recovery_reacquisition_summary')}"
+            )
         if report.operator_summary.get("follow_through_recovery_reacquisition_durability_summary"):
-            _w(f"- Follow-Through Reacquisition Durability: {report.operator_summary.get('follow_through_recovery_reacquisition_durability_summary')}")
-        if report.operator_summary.get("follow_through_recovery_reacquisition_consolidation_summary"):
-            _w(f"- Follow-Through Reacquisition Confidence: {report.operator_summary.get('follow_through_recovery_reacquisition_consolidation_summary')}")
+            _w(
+                f"- Follow-Through Reacquisition Durability: {report.operator_summary.get('follow_through_recovery_reacquisition_durability_summary')}"
+            )
+        if report.operator_summary.get(
+            "follow_through_recovery_reacquisition_consolidation_summary"
+        ):
+            _w(
+                f"- Follow-Through Reacquisition Confidence: {report.operator_summary.get('follow_through_recovery_reacquisition_consolidation_summary')}"
+            )
         primary_target = report.operator_summary.get("primary_target") or {}
         if primary_target:
             repo = f"{primary_target.get('repo')}: " if primary_target.get("repo") else ""
             _w(f"- Primary Target: {repo}{primary_target.get('title', 'Operator target')}")
         if report.operator_summary.get("primary_target_reason"):
-            _w(f"- Why This Is The Top Target: {report.operator_summary.get('primary_target_reason')}")
+            _w(
+                f"- Why This Is The Top Target: {report.operator_summary.get('primary_target_reason')}"
+            )
         if report.operator_summary.get("primary_target_done_criteria"):
-            _w(f"- What Counts As Done: {report.operator_summary.get('primary_target_done_criteria')}")
+            _w(
+                f"- What Counts As Done: {report.operator_summary.get('primary_target_done_criteria')}"
+            )
         if report.operator_summary.get("closure_guidance"):
             _w(f"- Closure Guidance: {report.operator_summary.get('closure_guidance')}")
         if report.operator_summary.get("primary_target_last_intervention"):
@@ -501,7 +690,9 @@ def write_markdown_report(
             outcome = intervention.get("outcome", event_type)
             _w(f"- What We Tried: {when} {event_type} for {repo}{title} ({outcome})".strip())
         if report.operator_summary.get("primary_target_resolution_evidence"):
-            _w(f"- Resolution Evidence: {report.operator_summary.get('primary_target_resolution_evidence')}")
+            _w(
+                f"- Resolution Evidence: {report.operator_summary.get('primary_target_resolution_evidence')}"
+            )
         if report.operator_summary.get("primary_target_confidence_label"):
             _w(
                 f"- Primary Target Confidence: {report.operator_summary.get('primary_target_confidence_label')} "
@@ -525,18 +716,28 @@ def write_markdown_report(
         _w(f"- Trust / Actionability: {trust_actionability_summary}")
         _w(f"- Top Recommendation: {top_recommendation_summary}")
         if report.operator_summary.get("adaptive_confidence_summary"):
-            _w(f"- Why This Confidence Is Actionable: {report.operator_summary.get('adaptive_confidence_summary')}")
+            _w(
+                f"- Why This Confidence Is Actionable: {report.operator_summary.get('adaptive_confidence_summary')}"
+            )
         if report.operator_summary.get("primary_target_exception_status") not in {None, "", "none"}:
             _w(
                 f"- Trust Policy Exception: {report.operator_summary.get('primary_target_exception_status')} "
                 f"({report.operator_summary.get('primary_target_exception_reason', 'No trust-policy exception reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_exception_pattern_status") not in {None, "", "none"}:
+        if report.operator_summary.get("primary_target_exception_pattern_status") not in {
+            None,
+            "",
+            "none",
+        }:
             _w(
                 f"- Exception Pattern Learning: {report.operator_summary.get('primary_target_exception_pattern_status')} "
                 f"({report.operator_summary.get('primary_target_exception_pattern_reason', 'No exception-pattern reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_trust_recovery_status") not in {None, "", "none"}:
+        if report.operator_summary.get("primary_target_trust_recovery_status") not in {
+            None,
+            "",
+            "none",
+        }:
             _w(
                 f"- Trust Recovery: {report.operator_summary.get('primary_target_trust_recovery_status')} "
                 f"({report.operator_summary.get('primary_target_trust_recovery_reason', 'No trust-recovery reason is recorded yet.')})"
@@ -547,18 +748,32 @@ def write_markdown_report(
                 f"({report.operator_summary.get('primary_target_recovery_confidence_score', 0.0):.2f})"
             )
         if report.operator_summary.get("recovery_confidence_summary"):
-            _w(f"- Recovery Confidence Summary: {report.operator_summary.get('recovery_confidence_summary')}")
-        if report.operator_summary.get("primary_target_exception_retirement_status") not in {None, "", "none"}:
+            _w(
+                f"- Recovery Confidence Summary: {report.operator_summary.get('recovery_confidence_summary')}"
+            )
+        if report.operator_summary.get("primary_target_exception_retirement_status") not in {
+            None,
+            "",
+            "none",
+        }:
             _w(
                 f"- Exception Retirement: {report.operator_summary.get('primary_target_exception_retirement_status')} "
                 f"({report.operator_summary.get('primary_target_exception_retirement_reason', 'No exception-retirement reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_policy_debt_status") not in {None, "", "none"}:
+        if report.operator_summary.get("primary_target_policy_debt_status") not in {
+            None,
+            "",
+            "none",
+        }:
             _w(
                 f"- Policy Debt Cleanup: {report.operator_summary.get('primary_target_policy_debt_status')} "
                 f"({report.operator_summary.get('primary_target_policy_debt_reason', 'No policy-debt reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_class_normalization_status") not in {None, "", "none"}:
+        if report.operator_summary.get("primary_target_class_normalization_status") not in {
+            None,
+            "",
+            "none",
+        }:
             _w(
                 f"- Class-Level Trust Normalization: {report.operator_summary.get('primary_target_class_normalization_status')} "
                 f"({report.operator_summary.get('primary_target_class_normalization_reason', 'No class-normalization reason is recorded yet.')})"
@@ -581,7 +796,9 @@ def write_markdown_report(
         if report.operator_summary.get("primary_target_class_trust_reweight_reasons"):
             _w(
                 "- Why Class Guidance Shifted: "
-                + ", ".join(report.operator_summary.get("primary_target_class_trust_reweight_reasons") or [])
+                + ", ".join(
+                    report.operator_summary.get("primary_target_class_trust_reweight_reasons") or []
+                )
             )
         if report.operator_summary.get("primary_target_class_trust_momentum_status"):
             _w(
@@ -656,7 +873,9 @@ def write_markdown_report(
                 f"- Reacquisition Controls: {report.operator_summary.get('primary_target_closure_forecast_reacquisition_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reacquisition_reason', 'No closure-forecast reacquisition reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reacquisition_persistence_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reacquisition_persistence_status"
+        ):
             _w(
                 f"- Reacquisition Persistence: {report.operator_summary.get('primary_target_closure_forecast_reacquisition_persistence_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reacquisition_persistence_score', 0.0):.2f}; "
@@ -667,7 +886,9 @@ def write_markdown_report(
                 f"- Recovery Churn Controls: {report.operator_summary.get('primary_target_closure_forecast_recovery_churn_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_recovery_churn_reason', 'No recovery-churn reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reacquisition_freshness_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reacquisition_freshness_status"
+        ):
             _w(
                 f"- Reacquisition Freshness: {report.operator_summary.get('primary_target_closure_forecast_reacquisition_freshness_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reacquisition_freshness_reason', 'No reacquisition-freshness reason is recorded yet.')})"
@@ -677,7 +898,9 @@ def write_markdown_report(
                 f"- Persistence Reset Controls: {report.operator_summary.get('primary_target_closure_forecast_persistence_reset_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_persistence_reset_reason', 'No persistence-reset reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_refresh_recovery_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_refresh_recovery_status"
+        ):
             _w(
                 f"- Reset Refresh Recovery: {report.operator_summary.get('primary_target_closure_forecast_reset_refresh_recovery_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_refresh_recovery_score', 0.0):.2f})"
@@ -687,188 +910,260 @@ def write_markdown_report(
                 f"- Reset Re-entry Controls: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_reason', 'No reset re-entry reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_persistence_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_persistence_status"
+        ):
             _w(
                 f"- Reset Re-entry Persistence: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_persistence_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_persistence_score', 0.0):.2f}; "
                 f"{report.operator_summary.get('primary_target_closure_forecast_reset_reentry_age_runs', 0)} run(s))"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_churn_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_churn_status"
+        ):
             _w(
                 f"- Reset Re-entry Churn Controls: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_churn_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_churn_reason', 'No reset re-entry churn reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_freshness_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_freshness_status"
+        ):
             _w(
                 f"- Reset Re-entry Freshness: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_freshness_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_freshness_reason', 'No reset re-entry freshness reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_reset_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_reset_status"
+        ):
             _w(
                 f"- Reset Re-entry Reset Controls: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_reset_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_reset_reason', 'No reset re-entry reset reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_refresh_recovery_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_refresh_recovery_status"
+        ):
             _w(
                 f"- Reset Re-entry Refresh Recovery: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_refresh_recovery_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_refresh_recovery_score', 0.0):.2f})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Controls: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reason', 'No reset re-entry rebuild reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_freshness_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_freshness_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Freshness: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_freshness_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_freshness_reason', 'No reset re-entry rebuild freshness reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reset_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_reset_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Reset Controls: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reset_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reset_reason', 'No reset re-entry rebuild reset reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_refresh_recovery_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_refresh_recovery_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Refresh Recovery: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_refresh_recovery_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_refresh_recovery_score', 0.0):.2f})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Re-entry Controls: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_reason', 'No reset re-entry rebuild re-entry reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_persistence_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_persistence_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Re-Entry Persistence: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_persistence_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_persistence_score', 0.0):.2f}; "
                 f"{report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_age_runs', 0)} run(s))"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_churn_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_churn_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Re-Entry Churn Controls: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_churn_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_churn_reason', 'No reset re-entry rebuild re-entry churn reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_freshness_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_freshness_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Re-Entry Freshness: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_freshness_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_freshness_reason', 'No reset re-entry rebuild re-entry freshness reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_reset_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_reset_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Re-Entry Reset Controls: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_reset_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_reset_reason', 'No reset re-entry rebuild re-entry reset reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Re-Entry Refresh Recovery: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_status')} "
                 f"({report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_summary', 'No reset re-entry rebuild re-entry refresh recovery summary is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Re-Entry Restore Controls: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reason', 'No reset re-entry rebuild re-entry restore reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Re-Entry Restore Freshness: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_reason', 'No reset re-entry rebuild re-entry restore freshness reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reset_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reset_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Re-Entry Restore Reset Controls: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reset_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_reset_reason', 'No reset re-entry rebuild re-entry restore reset reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Re-Entry Restore Refresh Recovery: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_status')} "
                 f"({report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_summary', 'No reset re-entry rebuild re-entry restore refresh recovery summary is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Re-Entry Restore Re-Restore Controls: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reason', 'No reset re-entry rebuild re-entry restore re-restore reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Re-Entry Restore Re-Restore Persistence: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_score', 0.0):.2f}; "
                 f"{report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_age_runs', 0)} run(s))"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Re-Entry Restore Re-Restore Churn Controls: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_reason', 'No reset re-entry rebuild re-entry restore re-restore churn reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Re-Entry Restore Re-Restore Freshness: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_reason', 'No reset re-entry rebuild re-entry restore re-restore freshness reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Re-Entry Restore Re-Restore Reset Controls: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_reason', 'No reset re-entry rebuild re-entry restore re-restore reset reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Re-Entry Restore Re-Restore Refresh Recovery: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_status')} "
                 f"({report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_summary', 'No reset re-entry rebuild re-entry restore re-restore refresh recovery summary is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Controls: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reason', 'No reset re-entry rebuild re-entry restore re-re-restore reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Persistence: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score', 0.0):.2f}; "
                 f"{report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs', 0)} run(s))"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Churn Controls: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_reason', 'No reset re-entry rebuild re-entry restore re-re-restore churn reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_reason', 'No reset re-entry rebuild re-entry restore re-re-restore freshness reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Controls: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_reason', 'No reset re-entry rebuild re-entry restore re-re-restore reset reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status')} "
                 f"({report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_summary', 'No reset re-entry rebuild re-entry restore re-re-restore refresh recovery summary is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Controls: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_reason', 'No reset re-entry rebuild re-entry restore re-re-re-restore reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score', 0.0):.2f}; "
                 f"{report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs', 0)} run(s))"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason', 'No reset re-entry rebuild re-entry restore re-re-re-restore churn reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_persistence_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_persistence_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Persistence: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_persistence_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_persistence_score', 0.0):.2f}; "
                 f"{report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_age_runs', 0)} run(s))"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_rebuild_churn_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_rebuild_churn_status"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Churn Controls: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_churn_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_rebuild_churn_reason', 'No reset re-entry rebuild churn reason is recorded yet.')})"
@@ -879,139 +1174,317 @@ def write_markdown_report(
                 f"({report.operator_summary.get('recommendation_drift_summary', 'No recommendation-drift summary is recorded yet.')})"
             )
         if report.operator_summary.get("exception_pattern_summary"):
-            _w(f"- Exception Pattern Summary: {report.operator_summary.get('exception_pattern_summary')}")
+            _w(
+                f"- Exception Pattern Summary: {report.operator_summary.get('exception_pattern_summary')}"
+            )
         if report.operator_summary.get("exception_retirement_summary"):
-            _w(f"- Exception Retirement Summary: {report.operator_summary.get('exception_retirement_summary')}")
+            _w(
+                f"- Exception Retirement Summary: {report.operator_summary.get('exception_retirement_summary')}"
+            )
         if report.operator_summary.get("policy_debt_summary"):
             _w(f"- Policy Debt Summary: {report.operator_summary.get('policy_debt_summary')}")
         if report.operator_summary.get("trust_normalization_summary"):
-            _w(f"- Trust Normalization Summary: {report.operator_summary.get('trust_normalization_summary')}")
+            _w(
+                f"- Trust Normalization Summary: {report.operator_summary.get('trust_normalization_summary')}"
+            )
         if report.operator_summary.get("class_memory_summary"):
             _w(f"- Class Memory Summary: {report.operator_summary.get('class_memory_summary')}")
         if report.operator_summary.get("class_decay_summary"):
             _w(f"- Class Decay Summary: {report.operator_summary.get('class_decay_summary')}")
         if report.operator_summary.get("class_reweighting_summary"):
-            _w(f"- Class Reweighting Summary: {report.operator_summary.get('class_reweighting_summary')}")
+            _w(
+                f"- Class Reweighting Summary: {report.operator_summary.get('class_reweighting_summary')}"
+            )
         if report.operator_summary.get("class_momentum_summary"):
             _w(f"- Class Momentum Summary: {report.operator_summary.get('class_momentum_summary')}")
         if report.operator_summary.get("class_reweight_stability_summary"):
-            _w(f"- Reweighting Stability Summary: {report.operator_summary.get('class_reweight_stability_summary')}")
+            _w(
+                f"- Reweighting Stability Summary: {report.operator_summary.get('class_reweight_stability_summary')}"
+            )
         if report.operator_summary.get("class_transition_health_summary"):
-            _w(f"- Class Transition Health Summary: {report.operator_summary.get('class_transition_health_summary')}")
+            _w(
+                f"- Class Transition Health Summary: {report.operator_summary.get('class_transition_health_summary')}"
+            )
         if report.operator_summary.get("class_transition_resolution_summary"):
-            _w(f"- Pending Transition Resolution Summary: {report.operator_summary.get('class_transition_resolution_summary')}")
+            _w(
+                f"- Pending Transition Resolution Summary: {report.operator_summary.get('class_transition_resolution_summary')}"
+            )
         if report.operator_summary.get("transition_closure_confidence_summary"):
-            _w(f"- Transition Closure Confidence Summary: {report.operator_summary.get('transition_closure_confidence_summary')}")
+            _w(
+                f"- Transition Closure Confidence Summary: {report.operator_summary.get('transition_closure_confidence_summary')}"
+            )
         if report.operator_summary.get("class_pending_debt_summary"):
-            _w(f"- Class Pending Debt Summary: {report.operator_summary.get('class_pending_debt_summary')}")
+            _w(
+                f"- Class Pending Debt Summary: {report.operator_summary.get('class_pending_debt_summary')}"
+            )
         if report.operator_summary.get("class_pending_resolution_summary"):
-            _w(f"- Class Pending Resolution Summary: {report.operator_summary.get('class_pending_resolution_summary')}")
+            _w(
+                f"- Class Pending Resolution Summary: {report.operator_summary.get('class_pending_resolution_summary')}"
+            )
         if report.operator_summary.get("pending_debt_freshness_summary"):
-            _w(f"- Pending Debt Freshness Summary: {report.operator_summary.get('pending_debt_freshness_summary')}")
+            _w(
+                f"- Pending Debt Freshness Summary: {report.operator_summary.get('pending_debt_freshness_summary')}"
+            )
         if report.operator_summary.get("pending_debt_decay_summary"):
-            _w(f"- Pending Debt Decay Summary: {report.operator_summary.get('pending_debt_decay_summary')}")
+            _w(
+                f"- Pending Debt Decay Summary: {report.operator_summary.get('pending_debt_decay_summary')}"
+            )
         if report.operator_summary.get("closure_forecast_reweighting_summary"):
-            _w(f"- Closure Forecast Reweighting Summary: {report.operator_summary.get('closure_forecast_reweighting_summary')}")
+            _w(
+                f"- Closure Forecast Reweighting Summary: {report.operator_summary.get('closure_forecast_reweighting_summary')}"
+            )
         if report.operator_summary.get("closure_forecast_momentum_summary"):
-            _w(f"- Closure Forecast Momentum Summary: {report.operator_summary.get('closure_forecast_momentum_summary')}")
+            _w(
+                f"- Closure Forecast Momentum Summary: {report.operator_summary.get('closure_forecast_momentum_summary')}"
+            )
         if report.operator_summary.get("closure_forecast_freshness_summary"):
-            _w(f"- Closure Forecast Freshness Summary: {report.operator_summary.get('closure_forecast_freshness_summary')}")
+            _w(
+                f"- Closure Forecast Freshness Summary: {report.operator_summary.get('closure_forecast_freshness_summary')}"
+            )
         if report.operator_summary.get("closure_forecast_stability_summary"):
-            _w(f"- Closure Forecast Stability Summary: {report.operator_summary.get('closure_forecast_stability_summary')}")
+            _w(
+                f"- Closure Forecast Stability Summary: {report.operator_summary.get('closure_forecast_stability_summary')}"
+            )
         if report.operator_summary.get("closure_forecast_hysteresis_summary"):
-            _w(f"- Closure Forecast Hysteresis Summary: {report.operator_summary.get('closure_forecast_hysteresis_summary')}")
+            _w(
+                f"- Closure Forecast Hysteresis Summary: {report.operator_summary.get('closure_forecast_hysteresis_summary')}"
+            )
         if report.operator_summary.get("closure_forecast_decay_summary"):
-            _w(f"- Closure Forecast Decay Summary: {report.operator_summary.get('closure_forecast_decay_summary')}")
+            _w(
+                f"- Closure Forecast Decay Summary: {report.operator_summary.get('closure_forecast_decay_summary')}"
+            )
         if report.operator_summary.get("closure_forecast_refresh_recovery_summary"):
-            _w(f"- Closure Forecast Refresh Recovery Summary: {report.operator_summary.get('closure_forecast_refresh_recovery_summary')}")
+            _w(
+                f"- Closure Forecast Refresh Recovery Summary: {report.operator_summary.get('closure_forecast_refresh_recovery_summary')}"
+            )
         if report.operator_summary.get("closure_forecast_reacquisition_summary"):
-            _w(f"- Closure Forecast Reacquisition Summary: {report.operator_summary.get('closure_forecast_reacquisition_summary')}")
+            _w(
+                f"- Closure Forecast Reacquisition Summary: {report.operator_summary.get('closure_forecast_reacquisition_summary')}"
+            )
         if report.operator_summary.get("closure_forecast_reacquisition_persistence_summary"):
-            _w(f"- Reacquisition Persistence Summary: {report.operator_summary.get('closure_forecast_reacquisition_persistence_summary')}")
+            _w(
+                f"- Reacquisition Persistence Summary: {report.operator_summary.get('closure_forecast_reacquisition_persistence_summary')}"
+            )
         if report.operator_summary.get("closure_forecast_recovery_churn_summary"):
-            _w(f"- Recovery Churn Summary: {report.operator_summary.get('closure_forecast_recovery_churn_summary')}")
+            _w(
+                f"- Recovery Churn Summary: {report.operator_summary.get('closure_forecast_recovery_churn_summary')}"
+            )
         if report.operator_summary.get("closure_forecast_reacquisition_freshness_summary"):
-            _w(f"- Reacquisition Freshness Summary: {report.operator_summary.get('closure_forecast_reacquisition_freshness_summary')}")
+            _w(
+                f"- Reacquisition Freshness Summary: {report.operator_summary.get('closure_forecast_reacquisition_freshness_summary')}"
+            )
         if report.operator_summary.get("closure_forecast_persistence_reset_summary"):
-            _w(f"- Persistence Reset Summary: {report.operator_summary.get('closure_forecast_persistence_reset_summary')}")
+            _w(
+                f"- Persistence Reset Summary: {report.operator_summary.get('closure_forecast_persistence_reset_summary')}"
+            )
         if report.operator_summary.get("closure_forecast_reset_refresh_recovery_summary"):
-            _w(f"- Reset Refresh Recovery Summary: {report.operator_summary.get('closure_forecast_reset_refresh_recovery_summary')}")
+            _w(
+                f"- Reset Refresh Recovery Summary: {report.operator_summary.get('closure_forecast_reset_refresh_recovery_summary')}"
+            )
         if report.operator_summary.get("closure_forecast_reset_reentry_summary"):
-            _w(f"- Reset Re-entry Summary: {report.operator_summary.get('closure_forecast_reset_reentry_summary')}")
+            _w(
+                f"- Reset Re-entry Summary: {report.operator_summary.get('closure_forecast_reset_reentry_summary')}"
+            )
         if report.operator_summary.get("closure_forecast_reset_reentry_persistence_summary"):
-            _w(f"- Reset Re-entry Persistence Summary: {report.operator_summary.get('closure_forecast_reset_reentry_persistence_summary')}")
+            _w(
+                f"- Reset Re-entry Persistence Summary: {report.operator_summary.get('closure_forecast_reset_reentry_persistence_summary')}"
+            )
         if report.operator_summary.get("closure_forecast_reset_reentry_churn_summary"):
-            _w(f"- Reset Re-entry Churn Summary: {report.operator_summary.get('closure_forecast_reset_reentry_churn_summary')}")
+            _w(
+                f"- Reset Re-entry Churn Summary: {report.operator_summary.get('closure_forecast_reset_reentry_churn_summary')}"
+            )
         if report.operator_summary.get("closure_forecast_reset_reentry_freshness_summary"):
-            _w(f"- Reset Re-entry Freshness Summary: {report.operator_summary.get('closure_forecast_reset_reentry_freshness_summary')}")
+            _w(
+                f"- Reset Re-entry Freshness Summary: {report.operator_summary.get('closure_forecast_reset_reentry_freshness_summary')}"
+            )
         if report.operator_summary.get("closure_forecast_reset_reentry_reset_summary"):
-            _w(f"- Reset Re-entry Reset Summary: {report.operator_summary.get('closure_forecast_reset_reentry_reset_summary')}")
+            _w(
+                f"- Reset Re-entry Reset Summary: {report.operator_summary.get('closure_forecast_reset_reentry_reset_summary')}"
+            )
         if report.operator_summary.get("closure_forecast_reset_reentry_refresh_recovery_summary"):
-            _w(f"- Reset Re-entry Refresh Recovery Summary: {report.operator_summary.get('closure_forecast_reset_reentry_refresh_recovery_summary')}")
+            _w(
+                f"- Reset Re-entry Refresh Recovery Summary: {report.operator_summary.get('closure_forecast_reset_reentry_refresh_recovery_summary')}"
+            )
         if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_summary"):
-            _w(f"- Reset Re-entry Rebuild Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_summary')}")
+            _w(
+                f"- Reset Re-entry Rebuild Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_summary')}"
+            )
         if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_freshness_summary"):
-            _w(f"- Reset Re-entry Rebuild Freshness Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_freshness_summary')}")
+            _w(
+                f"- Reset Re-entry Rebuild Freshness Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_freshness_summary')}"
+            )
         if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reset_summary"):
-            _w(f"- Reset Re-entry Rebuild Reset Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reset_summary')}")
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_refresh_recovery_summary"):
-            _w(f"- Reset Re-entry Rebuild Refresh Recovery Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_refresh_recovery_summary')}")
+            _w(
+                f"- Reset Re-entry Rebuild Reset Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reset_summary')}"
+            )
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_refresh_recovery_summary"
+        ):
+            _w(
+                f"- Reset Re-entry Rebuild Refresh Recovery Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_refresh_recovery_summary')}"
+            )
         if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_summary"):
-            _w(f"- Reset Re-entry Rebuild Re-entry Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_summary')}")
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_persistence_summary"):
-            _w(f"- Reset Re-entry Rebuild Re-Entry Persistence Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_persistence_summary')}")
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_churn_summary"):
-            _w(f"- Reset Re-entry Rebuild Re-Entry Churn Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_churn_summary')}")
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_freshness_summary"):
-            _w(f"- Reset Re-entry Rebuild Re-Entry Freshness Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_freshness_summary')}")
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_reset_summary"):
-            _w(f"- Reset Re-entry Rebuild Re-Entry Reset Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_reset_summary')}")
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_summary"):
-            _w(f"- Reset Re-entry Rebuild Re-Entry Refresh Recovery Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_summary')}")
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_summary"):
-            _w(f"- Reset Re-entry Rebuild Re-Entry Restore Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_summary')}")
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_summary"):
-            _w(f"- Reset Re-entry Rebuild Re-Entry Restore Freshness Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_summary')}")
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_reset_summary"):
-            _w(f"- Reset Re-entry Rebuild Re-Entry Restore Reset Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_reset_summary')}")
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_summary"):
-            _w(f"- Reset Re-entry Rebuild Re-Entry Restore Refresh Recovery Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_summary')}")
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_summary"):
-            _w(f"- Reset Re-entry Rebuild Re-Entry Restore Re-Restore Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_summary')}")
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_summary"):
-            _w(f"- Reset Re-entry Rebuild Re-Entry Restore Re-Restore Persistence Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_summary')}")
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_summary"):
-            _w(f"- Reset Re-entry Rebuild Re-Entry Restore Re-Restore Churn Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_summary')}")
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_summary"):
-            _w(f"- Reset Re-entry Rebuild Re-Entry Restore Re-Restore Freshness Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_summary')}")
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_summary"):
-            _w(f"- Reset Re-entry Rebuild Re-Entry Restore Re-Restore Reset Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_summary')}")
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_summary"):
-            _w(f"- Reset Re-entry Rebuild Re-Entry Restore Re-Restore Refresh Recovery Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_summary')}")
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_summary"):
-            _w(f"- Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_summary')}")
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_summary"):
-            _w(f"- Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Persistence Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_summary')}")
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_summary"):
-            _w(f"- Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Churn Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_summary')}")
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_summary"):
-            _w(f"- Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_summary')}")
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_summary"):
-            _w(f"- Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_summary')}")
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_summary"):
-            _w(f"- Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_summary')}")
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_summary"):
-            _w(f"- Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_summary')}")
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_summary"):
-            _w(f"- Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_summary')}")
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_summary"):
-            _w(f"- Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_summary')}")
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_persistence_summary"):
-            _w(f"- Reset Re-entry Rebuild Persistence Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_persistence_summary')}")
+            _w(
+                f"- Reset Re-entry Rebuild Re-entry Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_summary')}"
+            )
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_persistence_summary"
+        ):
+            _w(
+                f"- Reset Re-entry Rebuild Re-Entry Persistence Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_persistence_summary')}"
+            )
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_churn_summary"
+        ):
+            _w(
+                f"- Reset Re-entry Rebuild Re-Entry Churn Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_churn_summary')}"
+            )
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_freshness_summary"
+        ):
+            _w(
+                f"- Reset Re-entry Rebuild Re-Entry Freshness Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_freshness_summary')}"
+            )
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_reset_summary"
+        ):
+            _w(
+                f"- Reset Re-entry Rebuild Re-Entry Reset Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_reset_summary')}"
+            )
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_summary"
+        ):
+            _w(
+                f"- Reset Re-entry Rebuild Re-Entry Refresh Recovery Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_summary')}"
+            )
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_summary"
+        ):
+            _w(
+                f"- Reset Re-entry Rebuild Re-Entry Restore Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_summary')}"
+            )
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_summary"
+        ):
+            _w(
+                f"- Reset Re-entry Rebuild Re-Entry Restore Freshness Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_summary')}"
+            )
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_reset_summary"
+        ):
+            _w(
+                f"- Reset Re-entry Rebuild Re-Entry Restore Reset Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_reset_summary')}"
+            )
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_summary"
+        ):
+            _w(
+                f"- Reset Re-entry Rebuild Re-Entry Restore Refresh Recovery Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_summary')}"
+            )
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_summary"
+        ):
+            _w(
+                f"- Reset Re-entry Rebuild Re-Entry Restore Re-Restore Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_summary')}"
+            )
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_summary"
+        ):
+            _w(
+                f"- Reset Re-entry Rebuild Re-Entry Restore Re-Restore Persistence Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_persistence_summary')}"
+            )
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_summary"
+        ):
+            _w(
+                f"- Reset Re-entry Rebuild Re-Entry Restore Re-Restore Churn Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_churn_summary')}"
+            )
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_summary"
+        ):
+            _w(
+                f"- Reset Re-entry Rebuild Re-Entry Restore Re-Restore Freshness Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_summary')}"
+            )
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_summary"
+        ):
+            _w(
+                f"- Reset Re-entry Rebuild Re-Entry Restore Re-Restore Reset Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_summary')}"
+            )
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_summary"
+        ):
+            _w(
+                f"- Reset Re-entry Rebuild Re-Entry Restore Re-Restore Refresh Recovery Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_summary')}"
+            )
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_summary"
+        ):
+            _w(
+                f"- Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_summary')}"
+            )
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_summary"
+        ):
+            _w(
+                f"- Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Persistence Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_summary')}"
+            )
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_summary"
+        ):
+            _w(
+                f"- Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Churn Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_summary')}"
+            )
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_summary"
+        ):
+            _w(
+                f"- Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_summary')}"
+            )
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_summary"
+        ):
+            _w(
+                f"- Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reset_summary')}"
+            )
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_summary"
+        ):
+            _w(
+                f"- Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_summary')}"
+            )
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_summary"
+        ):
+            _w(
+                f"- Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_summary')}"
+            )
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_summary"
+        ):
+            _w(
+                f"- Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_summary')}"
+            )
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_summary"
+        ):
+            _w(
+                f"- Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_summary')}"
+            )
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_persistence_summary"
+        ):
+            _w(
+                f"- Reset Re-entry Rebuild Persistence Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_persistence_summary')}"
+            )
         if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_churn_summary"):
-            _w(f"- Reset Re-entry Rebuild Churn Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_churn_summary')}")
+            _w(
+                f"- Reset Re-entry Rebuild Churn Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_churn_summary')}"
+            )
         if report.operator_summary.get("recommendation_quality_summary"):
-            _w(f"- Recommendation Quality: {report.operator_summary.get('recommendation_quality_summary')}")
+            _w(
+                f"- Recommendation Quality: {report.operator_summary.get('recommendation_quality_summary')}"
+            )
         if report.operator_summary.get("confidence_validation_status"):
             _w(
                 f"- Confidence Validation: {report.operator_summary.get('confidence_validation_status')} "
@@ -1026,7 +1499,9 @@ def write_markdown_report(
                 )
             _w("- Recent Confidence Outcomes: " + "; ".join(recent_outcomes))
         if report.operator_summary.get("control_center_reference"):
-            _w(f"- Control Center Artifact: `{report.operator_summary.get('control_center_reference')}`")
+            _w(
+                f"- Control Center Artifact: `{report.operator_summary.get('control_center_reference')}`"
+            )
         counts = report.operator_summary.get("counts", {})
         _w(
             f"- Blocked: {counts.get('blocked', 0)} | Urgent: {counts.get('urgent', 0)} | "
@@ -1036,7 +1511,9 @@ def write_markdown_report(
             _w("- Top Attention:")
         for item in report.operator_queue[:6]:
             repo = f"{item.get('repo')}: " if item.get("repo") else ""
-            _w(f"- [{item.get('lane_label', item.get('lane', 'ready'))}] {repo}{item.get('title', 'Triage item')}")
+            _w(
+                f"- [{item.get('lane_label', item.get('lane', 'ready'))}] {repo}{item.get('title', 'Triage item')}"
+            )
             _w(f"  - Why: {item.get('summary', 'No summary available.')}")
             _w(f"  - Lane Reason: {item.get('lane_reason', 'Operator triage')}")
             _w(f"  - Next: {item.get('recommended_action', 'Review the latest state.')}")
@@ -1106,8 +1583,15 @@ def write_markdown_report(
         if recent_changes:
             _w("- Recent Changes:")
             for change in recent_changes[:3]:
-                subject = change.get("repo") or change.get("repo_full_name") or change.get("item_id") or "portfolio"
-                _w(f"  - {change.get('generated_at', '')[:10]} {subject}: {change.get('summary', change.get('kind', 'change'))}")
+                subject = (
+                    change.get("repo")
+                    or change.get("repo_full_name")
+                    or change.get("item_id")
+                    or "portfolio"
+                )
+                _w(
+                    f"  - {change.get('generated_at', '')[:10]} {subject}: {change.get('summary', change.get('kind', 'change'))}"
+                )
         _w("")
 
     if report.lenses:
@@ -1176,8 +1660,12 @@ def write_markdown_report(
         provider_coverage = report.security_posture.get("provider_coverage", {})
         open_alerts = report.security_posture.get("open_alerts", {})
         _w(f"- Average posture score: {report.security_posture.get('average_score', 0):.2f}")
-        _w(f"- Critical repos: {', '.join(report.security_posture.get('critical_repos', [])[:5]) or '—'}")
-        _w(f"- Repos with secrets: {', '.join(report.security_posture.get('repos_with_secrets', [])[:5]) or '—'}")
+        _w(
+            f"- Critical repos: {', '.join(report.security_posture.get('critical_repos', [])[:5]) or '—'}"
+        )
+        _w(
+            f"- Repos with secrets: {', '.join(report.security_posture.get('repos_with_secrets', [])[:5]) or '—'}"
+        )
         if provider_coverage:
             _w(
                 f"- GitHub coverage: {provider_coverage.get('github', {}).get('available_repos', 0)}/"
@@ -1192,11 +1680,35 @@ def write_markdown_report(
             )
         _w("")
 
+    if risk_lookup:
+        tier_counts: dict[str, int] = {}
+        for entry in risk_lookup.values():
+            tier_counts[entry["risk_tier"]] = tier_counts.get(entry["risk_tier"], 0) + 1
+        elevated_repos = sorted(
+            name for name, entry in risk_lookup.items() if entry["risk_tier"] == "elevated"
+        )
+        _w("### Risk Posture")
+        _w("")
+        _w(
+            f"- Elevated: {tier_counts.get('elevated', 0)} | "
+            f"Moderate: {tier_counts.get('moderate', 0)} | "
+            f"Baseline: {tier_counts.get('baseline', 0)} | "
+            f"Deferred: {tier_counts.get('deferred', 0)}"
+        )
+        _w(f"- Elevated repos: {', '.join(elevated_repos[:5]) or '—'}")
+        _w("")
+
     if report.campaign_summary:
-        github_projects = report.writeback_preview.get("github_projects", {}) if isinstance(report.writeback_preview, dict) else {}
+        github_projects = (
+            report.writeback_preview.get("github_projects", {})
+            if isinstance(report.writeback_preview, dict)
+            else {}
+        )
         _w("### Campaign Summary")
         _w("")
-        _w(f"- Campaign: {report.campaign_summary.get('label', report.campaign_summary.get('campaign_type', '—'))}")
+        _w(
+            f"- Campaign: {report.campaign_summary.get('label', report.campaign_summary.get('campaign_type', '—'))}"
+        )
         _w(f"- Actions: {report.campaign_summary.get('action_count', 0)}")
         _w(f"- Repos: {report.campaign_summary.get('repo_count', 0)}")
         _w(f"- Mode: {report.writeback_results.get('mode', 'preview')}")
@@ -1206,29 +1718,45 @@ def write_markdown_report(
             _w(f"- Apply Packet: {report.apply_readiness_summary.get('summary')}")
         if report.next_apply_candidate.get("summary"):
             _w(f"- Next Apply Candidate: {report.next_apply_candidate.get('summary')}")
-        command_hint = report.next_apply_candidate.get("apply_command") or report.next_apply_candidate.get("preview_command")
+        command_hint = report.next_apply_candidate.get(
+            "apply_command"
+        ) or report.next_apply_candidate.get("preview_command")
         if command_hint:
             _w(f"- Action Sync Command Hint: `{command_hint}`")
         if report.campaign_outcomes_summary.get("summary"):
-            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['post_apply_monitoring']}: {report.campaign_outcomes_summary.get('summary')}")
+            _w(
+                f"- {ACTION_SYNC_CANONICAL_LABELS['post_apply_monitoring']}: {report.campaign_outcomes_summary.get('summary')}"
+            )
         if report.next_monitoring_step.get("summary"):
             _w(f"- Next Monitoring Step: {report.next_monitoring_step.get('summary')}")
         if report.campaign_tuning_summary.get("summary"):
-            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['campaign_tuning']}: {report.campaign_tuning_summary.get('summary')}")
+            _w(
+                f"- {ACTION_SYNC_CANONICAL_LABELS['campaign_tuning']}: {report.campaign_tuning_summary.get('summary')}"
+            )
         if report.next_tuned_campaign.get("summary"):
-            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}: {report.next_tuned_campaign.get('summary')}")
+            _w(
+                f"- {ACTION_SYNC_CANONICAL_LABELS['next_tie_break_candidate']}: {report.next_tuned_campaign.get('summary')}"
+            )
         if report.intervention_ledger_summary.get("summary"):
-            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['historical_portfolio_intelligence']}: {report.intervention_ledger_summary.get('summary')}")
+            _w(
+                f"- {ACTION_SYNC_CANONICAL_LABELS['historical_portfolio_intelligence']}: {report.intervention_ledger_summary.get('summary')}"
+            )
         if report.next_historical_focus.get("summary"):
             _w(f"- Next Historical Focus: {report.next_historical_focus.get('summary')}")
         if report.automation_guidance_summary.get("summary"):
-            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}: {report.automation_guidance_summary.get('summary')}")
+            _w(
+                f"- {ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}: {report.automation_guidance_summary.get('summary')}"
+            )
         if report.next_safe_automation_step.get("summary"):
             _w(f"- Next Safe Automation Step: {report.next_safe_automation_step.get('summary')}")
         if report.approval_workflow_summary.get("summary"):
-            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}: {report.approval_workflow_summary.get('summary')}")
+            _w(
+                f"- {ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}: {report.approval_workflow_summary.get('summary')}"
+            )
         if report.next_approval_review.get("summary"):
-            _w(f"- {ACTION_SYNC_CANONICAL_LABELS['next_approval_review']}: {report.next_approval_review.get('summary')}")
+            _w(
+                f"- {ACTION_SYNC_CANONICAL_LABELS['next_approval_review']}: {report.next_approval_review.get('summary')}"
+            )
         if github_projects.get("enabled"):
             _w(
                 f"- GitHub Projects: {github_projects.get('status', 'disabled')} "
@@ -1304,13 +1832,19 @@ def write_markdown_report(
     if governance_summary or report.governance_results.get("results") or report.governance_drift:
         _w("### Governance Operator State")
         _w("")
-        _w(f"- Headline: {governance_summary.get('headline', 'Governance state is being tracked.')}")
+        _w(
+            f"- Headline: {governance_summary.get('headline', 'Governance state is being tracked.')}"
+        )
         _w(f"- Status: {governance_summary.get('status', 'preview')}")
         _w(f"- Approved: {'yes' if report.governance_approval else 'no'}")
         _w(f"- Needs Re-Approval: {'yes' if governance_summary.get('needs_reapproval') else 'no'}")
         _w(f"- Drift Count: {governance_summary.get('drift_count', len(report.governance_drift))}")
-        _w(f"- Applyable Count: {governance_summary.get('applyable_count', report.governance_preview.get('applyable_count', 0) if isinstance(report.governance_preview, dict) else 0)}")
-        _w(f"- Applied Count: {governance_summary.get('applied_count', len(report.governance_results.get('results', [])))}")
+        _w(
+            f"- Applyable Count: {governance_summary.get('applyable_count', report.governance_preview.get('applyable_count', 0) if isinstance(report.governance_preview, dict) else 0)}"
+        )
+        _w(
+            f"- Applied Count: {governance_summary.get('applied_count', len(report.governance_results.get('results', [])))}"
+        )
         _w(f"- Rollback Available: {governance_summary.get('rollback_available_count', 0)}")
         if governance_summary.get("approval_age_days") is not None:
             _w(f"- Approval Age (days): {governance_summary.get('approval_age_days')}")
@@ -1331,7 +1865,9 @@ def write_markdown_report(
                 repo_data["name"] if isinstance(repo_data, dict) else str(repo_data)
                 for repo_data in collection_data.get("repos", [])[:4]
             ]
-            _w(f"| {collection_name} | {len(collection_data.get('repos', []))} | {', '.join(repo_names) or '—'} |")
+            _w(
+                f"| {collection_name} | {len(collection_data.get('repos', []))} | {', '.join(repo_names) or '—'} |"
+            )
         _w("")
 
     preview = report.scenario_summary.get("portfolio_projection", {})
@@ -1395,11 +1931,14 @@ def write_markdown_report(
             badges_str = " ".join(f"`{b}`" for b in audit.badges[:3]) if audit.badges else "—"
             desc = _truncate(m.description)
             lang = m.language or "—"
-            _w(f"| {name_link} | {audit.grade} | {audit.overall_score:.2f} | {audit.interest_score:.2f} | {badges_str} | {lang} | {desc} |")
+            _w(
+                f"| {name_link} | {audit.grade} | {audit.overall_score:.2f} | {audit.interest_score:.2f} | {badges_str} | {lang} | {desc} |"
+            )
         _w("")
 
     # Quick Wins section
     from src.quick_wins import find_quick_wins
+
     quick_wins = find_quick_wins(report.audits)
     if quick_wins:
         _w("---")
@@ -1410,8 +1949,10 @@ def write_markdown_report(
         _w("|------|---------|-------|-----------|-----|------------|")
         for win in quick_wins:
             action = win["actions"][0] if win["actions"] else "—"
-            _w(f"| {win['name']} | {win['current_tier']} | {win['score']:.2f} | "
-               f"{win['next_tier']} | {win['gap']:.3f} | {action} |")
+            _w(
+                f"| {win['name']} | {win['current_tier']} | {win['score']:.2f} | "
+                f"{win['next_tier']} | {win['gap']:.3f} | {action} |"
+            )
         _w("")
 
     # Per-repo details
@@ -1425,33 +1966,59 @@ def write_markdown_report(
         m = audit.metadata
         briefing = build_repo_briefing(audit.to_dict(), report_dict, diff_data)
         _w("<details>")
-        _w(f"<summary>{briefing.get('headline', f'{m.name} — {audit.overall_score:.2f} ({audit.completeness_tier})')}</summary>")
+        _w(
+            f"<summary>{briefing.get('headline', f'{m.name} — {audit.overall_score:.2f} ({audit.completeness_tier})')}</summary>"
+        )
         _w("")
         _w("**Current State**")
         _w(f"- {briefing.get('current_state_line', 'No current-state summary is recorded yet.')}")
         _w(f"- URL: {m.html_url}")
-        _w(f"- Description: {briefing.get('current_state', {}).get('description', m.description or 'No description recorded yet.')}")
+        _w(
+            f"- Description: {briefing.get('current_state', {}).get('description', m.description or 'No description recorded yet.')}"
+        )
         _w("")
         _w("**What Changed**")
-        _w(f"- {briefing.get('what_changed', {}).get('last_movement', 'No change timing is recorded yet.')}")
-        _w(f"- {briefing.get('what_changed', {}).get('recent_change_summary', 'No recent change summary is recorded yet.')}")
-        _w(f"- Hotspot context: {briefing.get('what_changed', {}).get('top_hotspot_context', 'No hotspot context is recorded yet.')}")
+        _w(
+            f"- {briefing.get('what_changed', {}).get('last_movement', 'No change timing is recorded yet.')}"
+        )
+        _w(
+            f"- {briefing.get('what_changed', {}).get('recent_change_summary', 'No recent change summary is recorded yet.')}"
+        )
+        _w(
+            f"- Hotspot context: {briefing.get('what_changed', {}).get('top_hotspot_context', 'No hotspot context is recorded yet.')}"
+        )
         _w("")
         _w("**Why It Matters**")
-        _w(f"- Strongest drivers: {briefing.get('why_this_repo_looks_this_way', {}).get('strongest_drivers', 'No strong positive drivers recorded yet.')}")
-        _w(f"- Biggest drags: {briefing.get('why_this_repo_looks_this_way', {}).get('biggest_drags', 'No major drag factors recorded yet.')}")
-        _w(f"- Next tier gap: {briefing.get('why_this_repo_looks_this_way', {}).get('next_tier_gap', 'No next-tier gap is recorded yet.')}")
+        _w(
+            f"- Strongest drivers: {briefing.get('why_this_repo_looks_this_way', {}).get('strongest_drivers', 'No strong positive drivers recorded yet.')}"
+        )
+        _w(
+            f"- Biggest drags: {briefing.get('why_this_repo_looks_this_way', {}).get('biggest_drags', 'No major drag factors recorded yet.')}"
+        )
+        _w(
+            f"- Next tier gap: {briefing.get('why_this_repo_looks_this_way', {}).get('next_tier_gap', 'No next-tier gap is recorded yet.')}"
+        )
         _w("")
         _w("**Where To Start**")
-        _w(f"- {briefing.get('where_to_start_summary', 'No meaningful implementation hotspot is currently surfaced.')}")
+        _w(
+            f"- {briefing.get('where_to_start_summary', 'No meaningful implementation hotspot is currently surfaced.')}"
+        )
         for hotspot in briefing.get("implementation_hotspots", [])[:3]:
-            _w(f"- {_truncate(hotspot.get('path', 'repo root'), 80)}: {hotspot.get('signal_summary', 'No signal summary recorded yet.')}")
+            _w(
+                f"- {_truncate(hotspot.get('path', 'repo root'), 80)}: {hotspot.get('signal_summary', 'No signal summary recorded yet.')}"
+            )
         _w("")
         _w("**What To Do Next**")
-        _w(f"- Next best action: {briefing.get('what_to_do_next', {}).get('next_best_action', 'No clear next action is recorded yet.')}")
-        _w(f"- Rationale: {briefing.get('what_to_do_next', {}).get('rationale', 'No action rationale is recorded yet.')}")
+        _w(
+            f"- Next best action: {briefing.get('what_to_do_next', {}).get('next_best_action', 'No clear next action is recorded yet.')}"
+        )
+        _w(
+            f"- Rationale: {briefing.get('what_to_do_next', {}).get('rationale', 'No action rationale is recorded yet.')}"
+        )
         if briefing.get("what_to_do_next", {}).get("top_action_candidates"):
-            _w(f"- Other good candidates: {', '.join(briefing.get('what_to_do_next', {}).get('top_action_candidates', [])[:3])}")
+            _w(
+                f"- Other good candidates: {', '.join(briefing.get('what_to_do_next', {}).get('top_action_candidates', [])[:3])}"
+            )
         _w("")
         _w("| Dimension | Score | Key Findings |")
         _w("|-----------|-------|-------------|")
@@ -1459,10 +2026,12 @@ def write_markdown_report(
             findings = ", ".join(r.findings[:2]) if r.findings else "—"
             _w(f"| {r.dimension} | {r.score:.2f} | {findings} |")
         _w("")
-        _w(f"**Language:** {m.language or '—'} | "
-           f"**Size:** {m.size_kb} KB | "
-           f"**Stars:** {m.stars} | "
-           f"**Private:** {'Yes' if m.private else 'No'}")
+        _w(
+            f"**Language:** {m.language or '—'} | "
+            f"**Size:** {m.size_kb} KB | "
+            f"**Stars:** {m.stars} | "
+            f"**Private:** {'Yes' if m.private else 'No'}"
+        )
         if audit.lenses:
             _w("")
             _w("**Decision Lenses:**")
@@ -1482,17 +2051,44 @@ def write_markdown_report(
         if audit.score_explanation:
             _w("")
             _w("**Repo Briefing Summary:**")
-            _w(f"- What Changed: {briefing.get('what_changed_line', 'No change summary is recorded yet.')}")
-            _w(f"- Why It Matters: {briefing.get('why_it_matters_line', 'No explanation summary is recorded yet.')}")
-            _w(f"- Where To Start: {briefing.get('where_to_start_summary', 'No meaningful implementation hotspot is currently surfaced.')}")
-            _w(f"- What To Do Next: {briefing.get('what_to_do_next_line', 'No next action is recorded yet.')}")
-            _w(f"- Follow-Through: {briefing.get('follow_through_line', 'No follow-through evidence is recorded yet.')}")
-            _w(f"- Catalog: {briefing.get('catalog_line', 'No portfolio catalog contract is recorded yet.')}")
-            _w(f"- {briefing.get('operating_path_line', 'Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet.')}")
-            _w(f"- Intent Alignment: {briefing.get('intent_alignment_line', 'missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.')}")
+            _w(
+                f"- What Changed: {briefing.get('what_changed_line', 'No change summary is recorded yet.')}"
+            )
+            _w(
+                f"- Why It Matters: {briefing.get('why_it_matters_line', 'No explanation summary is recorded yet.')}"
+            )
+            _w(
+                f"- Where To Start: {briefing.get('where_to_start_summary', 'No meaningful implementation hotspot is currently surfaced.')}"
+            )
+            _w(
+                f"- What To Do Next: {briefing.get('what_to_do_next_line', 'No next action is recorded yet.')}"
+            )
+            _w(
+                f"- Follow-Through: {briefing.get('follow_through_line', 'No follow-through evidence is recorded yet.')}"
+            )
+            _w(
+                f"- Catalog: {briefing.get('catalog_line', 'No portfolio catalog contract is recorded yet.')}"
+            )
+            _w(
+                f"- {briefing.get('operating_path_line', 'Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet.')}"
+            )
+            _w(
+                f"- Intent Alignment: {briefing.get('intent_alignment_line', 'missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.')}"
+            )
             _w(f"- Checkpoint Timing: {briefing.get('checkpoint_timing_line', 'Unknown')}")
-            _w(f"- Escalation: {briefing.get('escalation_line', 'Unknown: No stronger follow-through escalation is currently surfaced.')}")
-            _w(f"- What Would Count As Progress: {briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}")
+            _w(
+                f"- Escalation: {briefing.get('escalation_line', 'Unknown: No stronger follow-through escalation is currently surfaced.')}"
+            )
+            _w(
+                f"- What Would Count As Progress: {briefing.get('checkpoint_line', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}"
+            )
+        risk_entry = risk_lookup.get(m.name)
+        if risk_entry and risk_entry.get("risk_tier"):
+            _w("")
+            risk_line = f"**Risk Tier:** {risk_entry['risk_tier']}"
+            if risk_entry.get("risk_summary"):
+                risk_line += f" — {risk_entry['risk_summary']}"
+            _w(risk_line)
         if audit.security_posture:
             _w("")
             _w("**Security Posture:**")
@@ -1545,9 +2141,7 @@ def _write_ranked_list(
     for i, name in enumerate(names, 1):
         audit = audit_map.get(name)
         if audit:
-            lines.append(
-                f"{i}. {name} — {audit.overall_score:.2f} ({audit.completeness_tier})"
-            )
+            lines.append(f"{i}. {name} — {audit.overall_score:.2f} ({audit.completeness_tier})")
 
 
 def _group_by_tier(audits: list[RepoAudit]) -> dict[str, list[RepoAudit]]:
@@ -1571,9 +2165,11 @@ def _write_reconciliation_section(lines: list[str], report: AuditReport) -> None
     _w("")
     _w("## Registry Reconciliation")
     _w("")
-    _w(f"*Registry: {recon.registry_total} projects | "
-       f"GitHub: {recon.github_total} repos | "
-       f"Matched: {len(recon.matched)}*")
+    _w(
+        f"*Registry: {recon.registry_total} projects | "
+        f"GitHub: {recon.github_total} repos | "
+        f"Matched: {len(recon.matched)}*"
+    )
     _w("")
 
     # On GitHub but not in registry
@@ -1585,8 +2181,10 @@ def _write_reconciliation_section(lines: list[str], report: AuditReport) -> None
         for name in recon.on_github_not_registry:
             audit = audit_map.get(name)
             if audit:
-                _w(f"| {name} | {audit.completeness_tier} | "
-                   f"{audit.overall_score:.2f} | {audit.metadata.language or '—'} |")
+                _w(
+                    f"| {name} | {audit.completeness_tier} | "
+                    f"{audit.overall_score:.2f} | {audit.metadata.language or '—'} |"
+                )
         _w("")
 
     # In registry but not on GitHub
@@ -1606,8 +2204,10 @@ def _write_reconciliation_section(lines: list[str], report: AuditReport) -> None
         _w("| Project | Registry Status | Audit Tier | Score |")
         _w("|---------|----------------|------------|-------|")
         for m in recon.matched:
-            _w(f"| {m['github_name']} | {m['registry_status']} | "
-               f"{m['audit_tier']} | {m['score']:.2f} |")
+            _w(
+                f"| {m['github_name']} | {m['registry_status']} | "
+                f"{m['audit_tier']} | {m['score']:.2f} |"
+            )
         _w("")
 
     # Status alignment cross-tab
@@ -1622,10 +2222,14 @@ def _write_reconciliation_section(lines: list[str], report: AuditReport) -> None
             for m in recon.matched:
                 if m["registry_status"] == reg_status:
                     counts[m["audit_tier"]] = counts.get(m["audit_tier"], 0) + 1
-            _w(f"| {reg_status} | {counts.get('shipped', 0)} | "
-               f"{counts.get('functional', 0)} | {counts.get('wip', 0)} | "
-               f"{counts.get('skeleton', 0)} | {counts.get('abandoned', 0)} |")
+            _w(
+                f"| {reg_status} | {counts.get('shipped', 0)} | "
+                f"{counts.get('functional', 0)} | {counts.get('wip', 0)} | "
+                f"{counts.get('skeleton', 0)} | {counts.get('abandoned', 0)} |"
+            )
         _w("")
+
+
 def _render_weekly_story_sections(_w, weekly_pack: dict) -> None:
     story = weekly_pack.get("weekly_story_v1") or {}
     for section in story.get("sections") or []:
@@ -1634,14 +2238,18 @@ def _render_weekly_story_sections(_w, weekly_pack: dict) -> None:
         _w(f"### {section.get('label', 'Weekly Story')}")
         _w("")
         _w(f"- Summary: {section.get('headline', 'No section summary is recorded yet.')}")
-        _w(f"- {section.get('next_label', 'Next Step')}: {section.get('next_step', 'No next step is recorded yet.')}")
+        _w(
+            f"- {section.get('next_label', 'Next Step')}: {section.get('next_step', 'No next step is recorded yet.')}"
+        )
         _w(f"- State: {section.get('state', 'idle')}")
         evidence_items = list(section.get("evidence_items") or [])
         if evidence_items:
             _w("- Evidence:")
             for item in evidence_items[:5]:
                 command = f" [{item.get('command_hint')}]" if item.get("command_hint") else ""
-                _w(f"  - {item.get('label', 'Item')} — {item.get('summary', 'No evidence summary is recorded yet.')}{command}")
+                _w(
+                    f"  - {item.get('label', 'Item')} — {item.get('summary', 'No evidence summary is recorded yet.')}{command}"
+                )
         else:
             _w("- Evidence: No supporting evidence is currently surfaced.")
         _w("")

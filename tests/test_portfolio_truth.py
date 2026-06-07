@@ -16,8 +16,12 @@ from src.portfolio_context_recovery import (
 )
 from src.portfolio_truth_publish import publish_portfolio_truth
 from src.portfolio_truth_reconcile import build_portfolio_truth_snapshot
-from src.portfolio_truth_render import render_registry_markdown
+from src.portfolio_truth_render import (
+    render_portfolio_report_markdown,
+    render_registry_markdown,
+)
 from src.portfolio_truth_sources import _classify_context_quality, _extract_github_full_name
+from src.portfolio_truth_validate import validate_portfolio_report_markdown
 from src.registry_parser import parse_registry
 
 
@@ -32,6 +36,47 @@ def _set_mtime(path: Path, timestamp: float) -> None:
     import os
 
     os.utime(path, (timestamp, timestamp))
+
+
+def _security_test_project(
+    name: str,
+    *,
+    critical: int,
+    high: int,
+    available: bool = True,
+    tier: str = "elevated",
+):
+    """Minimal PortfolioTruthProject for exercising security render helpers directly."""
+    from src.portfolio_truth_types import (
+        DeclaredFields,
+        DerivedFields,
+        IdentityFields,
+        PortfolioTruthProject,
+        RiskFields,
+        SecurityFields,
+    )
+
+    return PortfolioTruthProject(
+        identity=IdentityFields(
+            project_key=name,
+            display_name=name,
+            path=name,
+            top_level_dir=name,
+            group_key="g",
+            group_label="G",
+            section_marker="Standalone Projects",
+            section_label="Standalone",
+            has_git=True,
+        ),
+        declared=DeclaredFields(),
+        derived=DerivedFields(),
+        risk=RiskFields(risk_tier=tier),
+        security=SecurityFields(
+            alerts_available=available,
+            dependabot_critical=critical,
+            dependabot_high=high,
+        ),
+    )
 
 
 def test_extract_github_full_name_uses_exact_github_host() -> None:
@@ -201,7 +246,151 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     assert gamma.identity.section_marker == "iOS Projects"
     assert gamma.derived.stack == ["Swift"]
 
-    assert result.snapshot.schema_version == "0.4.0"
+    assert result.snapshot.schema_version == "0.5.0"
+
+
+def test_build_security_fields_maps_ghas_entry() -> None:
+    from src.portfolio_truth_reconcile import _build_security_fields
+
+    fields = _build_security_fields(
+        {
+            "dependabot": {"critical": 2, "high": 3, "medium": 4, "low": 5, "available": True},
+            "code_scanning": {"critical": 1, "high": 6, "available": True},
+            "secret_scanning": {"open": 7, "available": True},
+        }
+    )
+    assert fields.alerts_available is True
+    assert fields.dependabot_critical == 2
+    assert fields.dependabot_high == 3
+    assert fields.dependabot_medium == 4
+    assert fields.dependabot_low == 5
+    assert fields.code_scanning_critical == 1
+    assert fields.code_scanning_high == 6
+    assert fields.secret_scanning_open == 7
+    assert fields.open_high_critical == 5
+
+
+def test_build_security_fields_none_is_unscanned() -> None:
+    from src.portfolio_truth_reconcile import _build_security_fields
+
+    fields = _build_security_fields(None)
+    assert fields.alerts_available is False
+    assert fields.open_high_critical == 0
+    assert fields.dependabot_critical == 0
+
+
+def test_build_security_fields_unavailable_dependabot_is_not_available() -> None:
+    from src.portfolio_truth_reconcile import _build_security_fields
+
+    fields = _build_security_fields(
+        {"dependabot": {"available": False}, "secret_scanning": {"open": 0, "available": False}}
+    )
+    assert fields.alerts_available is False
+    assert fields.dependabot_high == 0
+
+
+def test_build_security_fields_scanned_clean_is_available_with_zero_counts() -> None:
+    # A repo whose Dependabot scan succeeded with zero open alerts must read as
+    # scanned-and-clean (available=True), distinct from an unscanned repo.
+    from src.portfolio_truth_reconcile import _build_security_fields
+
+    fields = _build_security_fields({"dependabot": {"available": True}})
+    assert fields.alerts_available is True
+    assert fields.dependabot_high == 0
+    assert fields.dependabot_critical == 0
+    assert fields.open_high_critical == 0
+
+
+def test_security_overlay_populates_and_force_elevates(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    now = datetime.fromtimestamp(1_700_200_000, tz=timezone.utc)
+    security = {
+        "Alpha": {
+            "dependabot": {"critical": 1, "high": 0, "medium": 0, "low": 2, "available": True},
+            "code_scanning": {"critical": 0, "high": 0, "available": True},
+            "secret_scanning": {"open": 0, "available": True},
+        }
+    }
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=now,
+        security_alerts_by_name=security,
+    )
+    projects = {p.identity.display_name: p for p in result.snapshot.projects}
+    alpha = projects["Alpha"]
+    assert alpha.security.alerts_available is True
+    assert alpha.security.dependabot_critical == 1
+    assert alpha.risk.security_risk is True
+    assert alpha.risk.risk_tier == "elevated"
+    assert "active-high-severity-alerts" in alpha.risk.risk_factors
+
+    # A repo with no security entry stays unscanned (overlay is strictly opt-in).
+    calibrate = projects["Calibrate"]
+    assert calibrate.security.alerts_available is False
+    assert calibrate.security.dependabot_critical == 0
+    assert calibrate.risk.security_risk is False
+
+    # Serialized snapshot carries the security block.
+    alpha_dict = alpha.to_dict()
+    assert "security" in alpha_dict
+    assert alpha_dict["security"]["dependabot_critical"] == 1
+
+
+def test_security_overlay_absent_leaves_repos_unscanned(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    now = datetime.fromtimestamp(1_700_200_000, tz=timezone.utc)
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=now,
+    )
+    for project in result.snapshot.projects:
+        assert project.security.alerts_available is False
+        assert project.security.open_high_critical == 0
+        assert project.risk.security_risk is False
+
+
+def test_select_security_entry_joins_by_repo_name_when_display_differs() -> None:
+    # GHAS is keyed by repo name ("signal-noise"); the local dir is "Signal & Noise".
+    from src.portfolio_truth_reconcile import _select_security_entry
+
+    entry = {"dependabot": {"high": 9, "available": True}}
+    lookup = {"signal-noise": entry}
+    assert _select_security_entry(lookup, "saagpatel/signal-noise", "Signal & Noise") is entry
+
+
+def test_select_security_entry_falls_back_to_display_name() -> None:
+    from src.portfolio_truth_reconcile import _select_security_entry
+
+    entry = {"dependabot": {"high": 1, "available": True}}
+    # No repo_full_name (local-only repo) → must fall back to display_name.
+    assert _select_security_entry({"Alpha": entry}, None, "Alpha") is entry
+
+
+def test_select_security_entry_prefers_repo_name_over_display() -> None:
+    from src.portfolio_truth_reconcile import _select_security_entry
+
+    by_repo = {"dependabot": {"high": 2, "available": True}}
+    by_display = {"dependabot": {"high": 5, "available": True}}
+    lookup = {"the-repo": by_repo, "DisplayName": by_display}
+    assert _select_security_entry(lookup, "owner/the-repo", "DisplayName") is by_repo
+
+
+def test_select_security_entry_returns_none_when_unmatched() -> None:
+    from src.portfolio_truth_reconcile import _select_security_entry
+
+    assert _select_security_entry({"other": {}}, "owner/missing", "AlsoMissing") is None
 
 
 def test_truth_snapshot_matches_repo_contracts_by_full_name(
@@ -323,6 +512,167 @@ def test_rendered_registry_round_trips_through_parser(
     assert parsed["Alpha"] in {"active", "recent", "parked", "archived"}
     assert "## Portfolio Summary" in markdown
     assert "## Cowork Task Notes" in markdown
+
+
+def test_registry_render_surfaces_security_and_round_trips(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+    tmp_path: Path,
+) -> None:
+    security = {
+        "Alpha": {
+            "dependabot": {"critical": 2, "high": 1, "medium": 0, "low": 0, "available": True},
+            "code_scanning": {"available": True},
+            "secret_scanning": {"open": 0, "available": True},
+        }
+    }
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        security_alerts_by_name=security,
+    )
+    markdown = render_registry_markdown(result.snapshot)
+
+    # Per-repo Notes flag fires for the scanned repo carrying open high/critical alerts.
+    assert "[security: 2 critical / 1 high open Dependabot alerts]" in markdown
+    # Aggregate rows land in the Portfolio Summary table.
+    assert "| Repos scanned for security alerts | 1 |" in markdown
+    assert "| Repos with open high/critical alerts | 1 |" in markdown
+    assert "| Open critical Dependabot alerts | 2 |" in markdown
+    assert "| Open high Dependabot alerts | 1 |" in markdown
+
+    # The security flag is pipe-free + digit summary rows, so the parser round-trip is
+    # unchanged: same project row count, no inflation from the new content.
+    registry_path = tmp_path / "generated-registry.md"
+    registry_path.write_text(markdown)
+    parsed = parse_registry(registry_path)
+    assert len(parsed) == len(result.snapshot.projects)
+
+
+def test_registry_render_omits_security_flag_when_unscanned(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+    )
+    markdown = render_registry_markdown(result.snapshot)
+    assert "[security:" not in markdown
+    # Summary rows stay present, all zero, documenting that the overlay was not run.
+    assert "| Repos scanned for security alerts | 0 |" in markdown
+    assert "| Repos with open high/critical alerts | 0 |" in markdown
+
+
+def test_portfolio_report_security_posture_lists_open_alerts(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    security = {
+        "Alpha": {
+            "dependabot": {"critical": 1, "high": 2, "medium": 0, "low": 0, "available": True},
+            "code_scanning": {"available": True},
+            "secret_scanning": {"open": 0, "available": True},
+        }
+    }
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        security_alerts_by_name=security,
+    )
+    markdown = render_portfolio_report_markdown(result.snapshot, "output/x.json")
+
+    assert "## Security Posture" in markdown
+    assert "[Security Posture](#security-posture)" in markdown
+    assert "- **Alpha** [elevated]: 1 critical, 2 high open Dependabot alerts" in markdown
+    assert (
+        "- Security posture: scanned `1`, with open high/critical Dependabot alerts `1`" in markdown
+    )
+    # The new section keeps the report validator green.
+    validate_portfolio_report_markdown(markdown)
+
+
+def test_portfolio_report_security_posture_scanned_clear(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    # Scanned with zero open high/critical reads as "all clear", distinct from "not run".
+    security = {
+        "Alpha": {
+            "dependabot": {"critical": 0, "high": 0, "medium": 3, "low": 0, "available": True},
+            "code_scanning": {"available": True},
+            "secret_scanning": {"open": 0, "available": True},
+        }
+    }
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        security_alerts_by_name=security,
+    )
+    markdown = render_portfolio_report_markdown(result.snapshot, "output/x.json")
+    assert "All 1 scanned repos are clear of open high/critical Dependabot alerts." in markdown
+    validate_portfolio_report_markdown(markdown)
+
+    # Same guard governs the registry: a scanned repo with only medium alerts gets no
+    # per-repo flag, but it still counts as scanned in the summary table.
+    registry_md = render_registry_markdown(result.snapshot)
+    assert "[security:" not in registry_md
+    assert "| Repos scanned for security alerts | 1 |" in registry_md
+    assert "| Repos with open high/critical alerts | 0 |" in registry_md
+
+
+def test_security_attention_items_caps_at_five_and_sorts_critical_first() -> None:
+    from src.portfolio_truth_render import (
+        MAX_SECURITY_ATTENTION_ITEMS,
+        _security_attention_items,
+    )
+
+    projects = [
+        _security_test_project("low-high", critical=0, high=1),
+        _security_test_project("mid-crit", critical=2, high=0),
+        _security_test_project("top-crit", critical=5, high=0),
+        _security_test_project("clean", critical=0, high=0),  # excluded: nothing open
+        _security_test_project("unscanned", critical=9, high=9, available=False),  # excluded
+        _security_test_project("a-high", critical=0, high=3),
+        _security_test_project("b-high", critical=0, high=3),
+        _security_test_project("c-crit", critical=1, high=0),
+    ]
+    items = _security_attention_items(projects)
+
+    # clean + unscanned drop out; six remain but the list is capped.
+    assert len(items) == MAX_SECURITY_ATTENTION_ITEMS
+    names = [project.identity.display_name for project in items]
+    # critical desc, then high desc, then name asc — and the capped tail (low-high) falls off.
+    assert names == ["top-crit", "mid-crit", "c-crit", "a-high", "b-high"]
+
+
+def test_portfolio_report_security_posture_not_run(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+    )
+    markdown = render_portfolio_report_markdown(result.snapshot, "output/x.json")
+    assert "Security overlay not run for this snapshot" in markdown
+    assert "- Security posture: scanned `0`," in markdown
+    validate_portfolio_report_markdown(markdown)
 
 
 def test_duplicate_display_names_are_disambiguated_in_registry(tmp_path: Path) -> None:
@@ -989,3 +1339,51 @@ def test_context_recovery_emits_drift_note_when_correcting(
     text = _apply_recovery_for(target_repo, portfolio_workspace, portfolio_catalog, legacy_registry)
     how_to_run = _how_to_run_section(text)
     assert "corrected" in how_to_run.lower() or "detected" in how_to_run.lower()
+
+
+# --- _git_default_branch ---------------------------------------------------
+
+
+def test_git_default_branch_reads_local_origin_head(tmp_path: Path) -> None:
+    from src.portfolio_truth_sources import _git_default_branch
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, capture_output=True, check=True)
+    # Point the local origin/HEAD ref at a non-"main" branch (no network/clone).
+    subprocess.run(
+        ["git", "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/develop"],
+        cwd=repo,
+        capture_output=True,
+        check=True,
+    )
+
+    assert _git_default_branch(repo) == "develop"
+
+
+def test_git_default_branch_keeps_multi_segment_branch(tmp_path: Path) -> None:
+    from src.portfolio_truth_sources import _git_default_branch
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, capture_output=True, check=True)
+    subprocess.run(
+        ["git", "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/release/v1"],
+        cwd=repo,
+        capture_output=True,
+        check=True,
+    )
+
+    # Only the remote name is stripped; the branch path stays intact.
+    assert _git_default_branch(repo) == "release/v1"
+
+
+def test_git_default_branch_empty_when_origin_head_unset(tmp_path: Path) -> None:
+    from src.portfolio_truth_sources import _git_default_branch
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, capture_output=True, check=True)
+
+    # A freshly init'd repo has no origin/HEAD → "" so callers fall back.
+    assert _git_default_branch(repo) == ""

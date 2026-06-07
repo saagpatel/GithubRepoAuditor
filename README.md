@@ -200,8 +200,17 @@ make demo
 
 Expected outputs include `output/demo/demo-report.json`,
 `output/demo/demo-workbook.xlsx`, `output/demo/dashboard-*.html`,
-`output/demo/operator-control-center-demo.json`, and
-`output/demo/operator-control-center-demo.md`.
+`output/demo/operator-control-center-demo.json`,
+`output/demo/operator-control-center-demo.md`,
+`output/demo/portfolio-truth-latest.json`, and
+`output/demo/portfolio-warehouse.db`.
+
+To browse the same fixture in the local web UI:
+
+```bash
+pip install -e ".[serve]"
+audit serve --output-dir output/demo
+```
 
 ### Quick start (subcommand form)
 

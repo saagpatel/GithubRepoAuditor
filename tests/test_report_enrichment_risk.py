@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from src.report_enrichment import build_weekly_review_pack
+from src.report_enrichment import build_risk_lookup, build_weekly_review_pack
 
 
 def _make_report() -> dict:
@@ -81,3 +81,60 @@ def test_risk_posture_empty_when_truth_absent(tmp_path: Path) -> None:
 def test_risk_posture_empty_when_no_output_dir() -> None:
     pack = build_weekly_review_pack(_make_report())
     assert pack.get("risk_posture") == {}
+
+
+def test_build_risk_lookup_maps_name_to_tier_and_summary(tmp_path: Path) -> None:
+    (tmp_path / "portfolio-truth-latest.json").write_text(
+        json.dumps(_make_truth(elevated=1, moderate=1, baseline=1))
+    )
+    lookup = build_risk_lookup(tmp_path)
+    assert set(lookup) == {"ElevatedRepo0", "ModerateRepo0", "BaselineRepo0"}
+    assert lookup["ElevatedRepo0"] == {
+        "risk_tier": "elevated",
+        "risk_summary": "Elevated repo 0 has weak context.",
+    }
+    assert lookup["ModerateRepo0"]["risk_tier"] == "moderate"
+    assert lookup["BaselineRepo0"]["risk_tier"] == "baseline"
+
+
+def test_build_risk_lookup_empty_when_truth_absent(tmp_path: Path) -> None:
+    assert build_risk_lookup(tmp_path) == {}
+
+
+def test_build_risk_lookup_empty_when_no_output_dir() -> None:
+    assert build_risk_lookup(None) == {}
+
+
+def test_build_risk_lookup_also_keys_by_github_slug(tmp_path: Path) -> None:
+    # Truth keys by local-dir display_name, but render consumers look up by the
+    # GitHub repo name (audit metadata.name). When the truth identity carries the
+    # repo_full_name, risk must also be findable by that GitHub slug.
+    truth = {
+        "schema_version": "0.5.0",
+        "projects": [
+            {
+                "identity": {
+                    "display_name": "Signal & Noise",
+                    "repo_full_name": "saagpatel/signal-noise",
+                },
+                "risk": {"risk_tier": "elevated", "risk_summary": "Weak context."},
+            }
+        ],
+    }
+    (tmp_path / "portfolio-truth-latest.json").write_text(json.dumps(truth))
+    lookup = build_risk_lookup(tmp_path)
+    assert lookup["Signal & Noise"]["risk_tier"] == "elevated"
+    assert lookup["signal-noise"]["risk_tier"] == "elevated"
+
+
+def test_extract_risk_posture_still_derived_from_same_source(tmp_path: Path) -> None:
+    # _extract_risk_posture is reimplemented on top of build_risk_lookup; aggregate
+    # counts must still match the per-repo lookup.
+    (tmp_path / "portfolio-truth-latest.json").write_text(
+        json.dumps(_make_truth(elevated=2, moderate=1, baseline=3))
+    )
+    pack = build_weekly_review_pack(_make_report(), output_dir=tmp_path)
+    risk = pack["risk_posture"]
+    lookup = build_risk_lookup(tmp_path)
+    elevated = [n for n, e in lookup.items() if e["risk_tier"] == "elevated"]
+    assert risk["elevated_count"] == len(elevated) == 2

@@ -2,6 +2,7 @@ output/*.json
 output/*.md
 output/*.xlsx
 output/*.html
+output/*.sh
 output/*.db
 output/workbook-gate/
 output/~$*

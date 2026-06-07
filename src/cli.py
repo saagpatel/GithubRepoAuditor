@@ -41,6 +41,7 @@ from src.cli_output import create_progress, print_info, print_status, print_warn
 from src.cloner import clone_workspace
 from src.github_client import GitHubClient
 from src.models import AnalyzerResult, AuditReport, RepoAudit, RepoMetadata
+from src.portfolio_truth_types import TRUTH_LATEST_FILENAME, truth_latest_path
 from src.recurring_review import FULL_REFRESH_DAYS
 from src.report_enrichment import build_run_change_counts, build_run_change_summary
 from src.reporter import (
@@ -377,6 +378,49 @@ def _build_triage_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
     )
 
 
+def _add_automation_proposal_flags(parser: argparse.ArgumentParser) -> None:
+    """Arc D phase-3b bounded-automation proposal triage flags.
+
+    Added to both the ``report`` subparser and the legacy parser so the queue
+    can be driven from either invocation form, mirroring the context-recovery
+    flags. Execution is dry-run unless ``--apply`` is also given.
+    """
+    parser.add_argument(
+        "--propose-automation",
+        action="store_true",
+        help="Generate/refresh bounded-automation proposals for eligible repos",
+    )
+    parser.add_argument(
+        "--list-proposals",
+        action="store_true",
+        help="List the durable bounded-automation proposal queue",
+    )
+    parser.add_argument(
+        "--approve-proposal",
+        type=str,
+        default=None,
+        metavar="ID",
+        help="Approve a pending bounded-automation proposal by id",
+    )
+    parser.add_argument(
+        "--reject-proposal",
+        type=str,
+        default=None,
+        metavar="ID",
+        help="Reject a pending bounded-automation proposal by id",
+    )
+    parser.add_argument(
+        "--execute-proposals",
+        action="store_true",
+        help="Execute approved bounded-automation proposals (dry-run unless --apply)",
+    )
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="With --execute-proposals: actually apply (open PRs / write catalog seeds)",
+    )
+
+
 def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
     """Subcommand: `audit report` — generate exports, packets, and writebacks."""
     p = subparsers.add_parser(
@@ -409,6 +453,7 @@ def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         action="store_true",
         help="Run context quality triage across the portfolio",
     )
+    _add_automation_proposal_flags(p)
     p.add_argument(
         "--excel-mode",
         choices=["template", "standard"],
@@ -621,6 +666,15 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--portfolio-truth-include-security",
+        action="store_true",
+        help=(
+            "Overlay the security.* GHAS alert counts on each project from the latest "
+            "output/ghas-alerts-<username>-*.json file, feeding the active-high-severity-alerts "
+            "risk factor (requires a prior `audit report --ghas-alerts` run)"
+        ),
+    )
+    parser.add_argument(
         "--portfolio-context-recovery",
         action="store_true",
         help="Build the active/recent weak-context recovery plan and optionally apply the safe context upgrades",
@@ -651,6 +705,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Allow context recovery to apply to repos with uncommitted changes",
     )
+    _add_automation_proposal_flags(parser)
     parser.add_argument(
         "--workspace-root",
         type=Path,
@@ -1431,6 +1486,27 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _build_security_burndown_subparser(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
+    """Subcommand: `audit security-burndown` — ranked fixable-vuln burndown."""
+    p = subparsers.add_parser(
+        "security-burndown",
+        help="Ranked list of fixable prod-reachable critical/high Dependabot advisories",
+        description=(
+            "Load the latest GHAS alert file for a user and produce a ranked burndown\n"
+            "of fixable runtime-scope critical/high Dependabot advisories.\n\n"
+            "Requires a prior `audit report <username> --ghas-alerts` run that captured\n"
+            "per-alert detail (fetch with an up-to-date version of this tool)."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument("username", help="GitHub username whose GHAS file to load")
+    p.add_argument(
+        "--output-dir",
+        default="output",
+        help="Directory containing ghas-alerts-<username>-*.json (default: output/)",
+    )
+
+
 def build_subcommand_parser() -> argparse.ArgumentParser:
     """Return the subcommand-aware parser used by main().
 
@@ -1459,6 +1535,7 @@ def build_subcommand_parser() -> argparse.ArgumentParser:
     _build_triage_subparser(subparsers)
     _build_report_subparser(subparsers)
     _build_serve_subparser(subparsers)
+    _build_security_burndown_subparser(subparsers)
     return parser
 
 
@@ -2666,7 +2743,7 @@ def _run_plan_campaign_mode(args) -> None:
     reviewer: str = getattr(args, "approval_reviewer", None) or _default_reviewer()
 
     # ── Load audit results from portfolio-truth-latest.json ───────────────────
-    truth_path = output_dir / "portfolio-truth-latest.json"
+    truth_path = truth_latest_path(output_dir)
     if not truth_path.exists():
         print_info(
             f"portfolio-truth-latest.json not found in {output_dir}. "
@@ -2794,7 +2871,7 @@ def _run_draft_readmes_mode(args) -> None:
 
     # ── Load audit results (portfolio-truth-latest.json or warehouse) ─────────
     audit_results: list[dict] = []
-    truth_path = output_dir / "portfolio-truth-latest.json"
+    truth_path = truth_latest_path(output_dir)
     if truth_path.exists():
         try:
             raw = json.loads(truth_path.read_text(encoding="utf-8"))
@@ -2960,7 +3037,7 @@ def _run_set_initiative_mode(args) -> None:
     # Load portfolio-truth to validate repo and check current tier
     import json as _json
 
-    pt_candidates = sorted(output_dir.glob("portfolio-truth-latest.json"))
+    pt_candidates = sorted(output_dir.glob(TRUTH_LATEST_FILENAME))
     if not pt_candidates:
         pt_candidates = sorted(output_dir.glob("portfolio-truth-*.json"))
     if not pt_candidates:
@@ -2970,7 +3047,7 @@ def _run_set_initiative_mode(args) -> None:
         )
         sys.exit(2)
 
-    pt_path = Path(str(output_dir / "portfolio-truth-latest.json"))
+    pt_path = truth_latest_path(output_dir)
     if not pt_path.exists():
         pt_path = pt_candidates[-1]
 
@@ -3033,7 +3110,7 @@ def _run_list_initiatives_mode(args) -> None:
 
     # Load portfolio-truth for current-tier lookup (best-effort)
     projects_by_name: dict[str, dict] = {}
-    pt_path = output_dir / "portfolio-truth-latest.json"
+    pt_path = truth_latest_path(output_dir)
     if pt_path.exists():
         try:
             pt_data = _json.loads(pt_path.read_text(encoding="utf-8"))
@@ -3118,7 +3195,7 @@ def _run_suggest_initiatives_mode(args) -> None:
     from src.maturity_tiers import tier_name
     from src.suggest_initiatives import generate_suggestions
 
-    truth_path = _Path(args.output_dir) / "portfolio-truth-latest.json"
+    truth_path = truth_latest_path(_Path(args.output_dir))
     if not truth_path.exists():
         print_warning(
             "portfolio-truth-latest.json not found. "
@@ -3162,7 +3239,7 @@ def _run_accept_suggestion_mode(args) -> None:
     from src.suggest_initiatives import accept_suggestion
 
     output_dir = Path(args.output_dir)
-    truth_path = output_dir / "portfolio-truth-latest.json"
+    truth_path = truth_latest_path(output_dir)
     if not truth_path.exists():
         print_warning(
             "portfolio-truth-latest.json not found. Run `audit run --portfolio-truth` first."
@@ -3293,7 +3370,7 @@ def _run_tier_gaps_export_mode(args) -> None:
     from src.maturity_tiers import compute_tier, tier_gap, tier_name
 
     output_dir = Path(args.output_dir)
-    truth_path = output_dir / "portfolio-truth-latest.json"
+    truth_path = truth_latest_path(output_dir)
     if not truth_path.exists():
         print_warning(
             "portfolio-truth-latest.json not found. Run `audit run --portfolio-truth` first."
@@ -5038,7 +5115,7 @@ def _run_auto_apply_approved_mode(args, output_dir: Path) -> None:
         print_info("No existing audit report found in output directory. Run a normal audit first.")
         return
 
-    truth_path = output_dir / "portfolio-truth-latest.json"
+    truth_path = truth_latest_path(output_dir)
     if not truth_path.exists():
         print_info("No portfolio truth snapshot found. Run --portfolio-truth first.")
         return
@@ -5187,6 +5264,52 @@ def _load_release_count_by_name(*, output_dir: Path, username: str) -> dict[str,
     return result
 
 
+def _load_security_alerts_by_name(*, output_dir: Path, username: str) -> dict[str, dict] | None:
+    """Load per-repo GHAS alert counts from the latest output/ghas-alerts-<username>-*.json.
+
+    The file is already keyed by display name in the shape SecurityFields expects
+    ({name: {"dependabot": {...}, "code_scanning": {...}, "secret_scanning": {...}}}),
+    so the overlay needs no transformation. Returns None (with a warning) if no GHAS
+    report is found — the security overlay is then skipped, leaving counts at zero.
+    """
+    import logging
+
+    _log = logging.getLogger(__name__)
+
+    ghas_files = sorted(
+        output_dir.glob(f"ghas-alerts-{username}-*.json"),
+        key=lambda p: p.stat().st_mtime,
+    )
+    if not ghas_files:
+        _log.warning(
+            "--portfolio-truth-include-security requires a prior `audit report --ghas-alerts` "
+            "run; no ghas-alerts-%s-*.json found in %s — skipping security overlay",
+            username,
+            output_dir,
+        )
+        return None
+
+    ghas_path = ghas_files[-1]
+    try:
+        with ghas_path.open() as fh:
+            data = json.load(fh)
+    except Exception as exc:  # noqa: BLE001
+        _log.warning(
+            "--portfolio-truth-include-security: could not read %s: %s — skipping",
+            ghas_path,
+            exc,
+        )
+        return None
+
+    if not isinstance(data, dict):
+        _log.warning(
+            "--portfolio-truth-include-security: %s is not a name-keyed object — skipping",
+            ghas_path,
+        )
+        return None
+    return {name: entry for name, entry in data.items() if isinstance(entry, dict)}
+
+
 def _run_portfolio_truth_mode(args) -> None:
     from src.portfolio_truth_publish import publish_portfolio_truth
 
@@ -5211,6 +5334,13 @@ def _run_portfolio_truth_mode(args) -> None:
             username=args.username,
         )
 
+    security_alerts_by_name: dict[str, dict] | None = None
+    if getattr(args, "portfolio_truth_include_security", False):
+        security_alerts_by_name = _load_security_alerts_by_name(
+            output_dir=output_dir,
+            username=args.username,
+        )
+
     result = publish_portfolio_truth(
         workspace_root=workspace_root,
         output_dir=output_dir,
@@ -5220,6 +5350,7 @@ def _run_portfolio_truth_mode(args) -> None:
         legacy_registry_path=legacy_registry_path,
         include_notion=True,
         release_count_by_name=release_count_by_name,
+        security_alerts_by_name=security_alerts_by_name,
     )
     print_info(f"Portfolio truth snapshot: {result.latest_path}")
     print_info(f"Portfolio truth history snapshot: {result.snapshot_path}")
@@ -5309,6 +5440,146 @@ def _run_portfolio_context_recovery_mode(args) -> None:
     print_info(f"Portfolio audit compatibility output: {truth_result.portfolio_report_output}")
 
 
+def _run_automation_proposals_mode(args) -> None:
+    """Triage the durable bounded-automation proposal queue (Arc D phase 3b).
+
+    Handles --propose-automation / --list-proposals / --approve-proposal /
+    --reject-proposal / --execute-proposals. The approval gate and every git/gh
+    safety rail live in the executor + proposal layers; this is thin dispatch.
+    """
+    from datetime import datetime, timezone
+
+    from src.automation_proposals import (
+        ACTION_CATALOG_SEED,
+        ACTION_CONTEXT_PR,
+        ProposalApprovalError,
+        ProposalNotFoundError,
+        approve_proposal,
+        build_automation_proposals,
+        load_proposals,
+        reject_proposal,
+        save_proposals,
+    )
+    from src.portfolio_automation import select_automation_candidates
+
+    output_dir = Path(args.output_dir)
+    proposals_path = output_dir / "pending-proposals.json"
+    now = datetime.now(timezone.utc).isoformat()
+
+    if getattr(args, "approve_proposal", None) or getattr(args, "reject_proposal", None):
+        try:
+            proposals = load_proposals(proposals_path)
+            if getattr(args, "approve_proposal", None):
+                updated = approve_proposal(
+                    proposals,
+                    args.approve_proposal,
+                    approved_by="local-operator",
+                    approved_at=now,
+                )
+                label = f"Approved proposal {args.approve_proposal!r}."
+            else:
+                updated = reject_proposal(proposals, args.reject_proposal, rejected_at=now)
+                label = f"Rejected proposal {args.reject_proposal!r}."
+        except (ProposalNotFoundError, ProposalApprovalError, ValueError) as exc:
+            print_warning(str(exc))
+            return
+        save_proposals(proposals_path, updated)
+        print_info(label)
+        return
+
+    if getattr(args, "list_proposals", False):
+        proposals = load_proposals(proposals_path)
+        if not proposals:
+            print_info("No bounded-automation proposals in the queue.")
+            return
+        print_info(f"Bounded-automation proposal queue ({len(proposals)} total):")
+        for proposal in proposals:
+            print_info(f"  {proposal.status}: {proposal.proposal_id} — {proposal.description}")
+        return
+
+    if getattr(args, "propose_automation", False):
+        from src.weekly_command_center import load_latest_portfolio_truth
+
+        _truth_path, truth = load_latest_portfolio_truth(output_dir)
+        if not truth:
+            print_warning("No portfolio truth snapshot found. Run --portfolio-truth first.")
+            return
+        try:
+            _report_path, _diff, report = _refresh_latest_report_state(output_dir, args)
+            decision_quality_status = (
+                (report.operator_summary or {})
+                .get("decision_quality_v1", {})
+                .get("decision_quality_status", "")
+            )
+        except FileNotFoundError:
+            decision_quality_status = ""
+        candidates = select_automation_candidates(
+            truth, decision_quality_status=decision_quality_status
+        )
+        existing = load_proposals(proposals_path)
+        merged = build_automation_proposals(
+            candidates, action_type=ACTION_CONTEXT_PR, created_at=now, existing=existing
+        )
+        merged = build_automation_proposals(
+            candidates, action_type=ACTION_CATALOG_SEED, created_at=now, existing=merged
+        )
+        save_proposals(proposals_path, merged)
+        print_info(
+            f"Proposal queue: {len(merged)} total ({len(merged) - len(existing)} new) "
+            f"from {len(candidates)} eligible candidate(s)."
+        )
+        return
+
+    if getattr(args, "execute_proposals", False):
+        from src.automation_proposals import executable_proposals
+        from src.automation_workflow import execute_approved_proposals
+        from src.portfolio_truth_reconcile import build_portfolio_truth_snapshot
+
+        # Building a fresh portfolio snapshot scans the whole workspace (+ Notion);
+        # skip that entirely when nothing is approved to execute.
+        if not executable_proposals(load_proposals(proposals_path)):
+            print_info("No approved bounded-automation proposals to execute.")
+            return
+
+        workspace_root = Path(getattr(args, "workspace_root", None) or DEFAULT_PORTFOLIO_WORKSPACE)
+        catalog_path = (
+            Path(args.catalog)
+            if getattr(args, "catalog", None)
+            else Path("config/portfolio-catalog.yaml")
+        )
+        registry_output = (
+            Path(args.registry_output)
+            if getattr(args, "registry_output", None)
+            else workspace_root / "project-registry.md"
+        )
+        legacy_registry_path = (
+            Path(args.registry) if getattr(args, "registry", None) else registry_output
+        )
+        build_result = build_portfolio_truth_snapshot(
+            workspace_root=workspace_root,
+            catalog_path=catalog_path if catalog_path.exists() else None,
+            legacy_registry_path=legacy_registry_path,
+            include_notion=True,
+        )
+        apply = bool(getattr(args, "apply", False))
+        results = execute_approved_proposals(
+            proposals_path=proposals_path,
+            snapshot=build_result.snapshot,
+            workspace_root=workspace_root,
+            catalog_path=catalog_path,
+            executed_at=now,
+            dry_run=not apply,
+        )
+        if not results:
+            print_info("No approved bounded-automation proposals to execute.")
+            return
+        for result in results:
+            print_info(f"  {result.outcome}: {result.proposal_id} — {result.detail}")
+        mode = "apply" if apply else "dry-run"
+        print_info(f"Execute proposals ({mode}): {len(results)} approved proposal(s) processed.")
+        return
+
+
 def _run_tier_recalibration_report_mode(args) -> None:
     """Generate tier distribution report and flag bunching (Arc H A4)."""
     from datetime import date, datetime, timezone
@@ -5316,7 +5587,7 @@ def _run_tier_recalibration_report_mode(args) -> None:
     from src.tier_recalibration import tier_distribution_report
 
     output_dir = Path(args.output_dir)
-    truth_path = output_dir / "portfolio-truth-latest.json"
+    truth_path = truth_latest_path(output_dir)
     if not truth_path.exists():
         print_warning(
             "portfolio-truth-latest.json not found. Run `audit run --portfolio-truth` first."
@@ -5356,7 +5627,7 @@ def _run_context_triage_mode(args) -> None:
     from src.portfolio_context_triage import run_triage
 
     output_dir = Path(args.output_dir)
-    truth_path = output_dir / "portfolio-truth-latest.json"
+    truth_path = truth_latest_path(output_dir)
     if not truth_path.exists():
         print_warning(
             "portfolio-truth-latest.json not found. Run `audit run --portfolio-truth` first."
@@ -5381,7 +5652,9 @@ def _run_context_triage_mode(args) -> None:
         project_key = identity.get("project_key") or ""
         name = identity.get("display_name") or project.get("name", "")
         repo_keys.extend(key for key in (project_key, name) if key)
-    catalog_scores = validate_catalog(catalog_path, sorted(set(repo_keys))) if catalog_path.exists() else {}
+    catalog_scores = (
+        validate_catalog(catalog_path, sorted(set(repo_keys))) if catalog_path.exists() else {}
+    )
 
     enriched: list[dict] = []
     for project in projects:
@@ -5882,6 +6155,7 @@ def _write_report_outputs(
             print_info(f"Vulnerability report: {vuln_path}")
 
     if getattr(args, "ghas_alerts", False) or getattr(args, "vuln_check", False):
+        from src.ghas_alert_details import fetch_dependabot_details
         from src.ghas_alerts import fetch_ghas_alerts, format_ghas_summary
 
         ghas_token: str | None = getattr(args, "token", None) or None
@@ -5890,6 +6164,17 @@ def _write_report_outputs(
             token=ghas_token,
             cache=cache,
         )
+        # Enrich each repo entry with per-alert detail for security-burndown.
+        # fetch_dependabot_details paginates the same endpoint as fetch_ghas_alerts
+        # but lives in a separate module to keep ghas_alerts.py byte-identical to
+        # main (editing it triggers ruff-format reflows that CodeQL flags).
+        dep_details = fetch_dependabot_details(
+            report_data.get("audits", []),
+            token=ghas_token,
+            cache=cache,
+        )
+        for repo_name in ghas_data:
+            ghas_data[repo_name]["dependabot_details"] = dep_details.get(repo_name, [])
         print_info(format_ghas_summary(ghas_data))
         if ghas_data:
             ghas_path = (
@@ -6516,6 +6801,9 @@ def _infer_subcommand_from_flags(args: argparse.Namespace) -> str:
         "tier_gaps",
         "tier_recalibration_report",
         "context_triage",
+        "propose_automation",
+        "list_proposals",
+        "execute_proposals",
     )
     for flag in report_flags:
         if getattr(args, flag, False):
@@ -6524,11 +6812,15 @@ def _infer_subcommand_from_flags(args: argparse.Namespace) -> str:
         return "report"
     if getattr(args, "writeback_target", None):
         return "report"
+    if getattr(args, "approve_proposal", None) or getattr(args, "reject_proposal", None):
+        return "report"
 
     return "run"
 
 
-_KNOWN_SUBCOMMANDS: frozenset[str] = frozenset({"run", "triage", "report", "serve"})
+_KNOWN_SUBCOMMANDS: frozenset[str] = frozenset(
+    {"run", "triage", "report", "serve", "security-burndown"}
+)
 
 
 def _emit_legacy_deprecation_warning(inferred: str) -> None:
@@ -6610,10 +6902,15 @@ def _rewrite_legacy_argv(argv: list[str]) -> tuple[list[str], bool]:
                 "--apply-readmes",
                 "--upload-badges",
                 "--notion-sync",
+                "--propose-automation",
+                "--list-proposals",
+                "--execute-proposals",
             ]
         )
         or "--campaign" in rest
         or "--writeback-target" in rest
+        or "--approve-proposal" in rest
+        or "--reject-proposal" in rest
     ):
         inferred = "report"
     else:
@@ -6621,6 +6918,70 @@ def _rewrite_legacy_argv(argv: list[str]) -> tuple[list[str], bool]:
 
     # Rewrite: insert inferred subcommand before the username
     return [inferred, first] + rest, True
+
+
+def _run_security_burndown_mode(args) -> None:
+    """Dispatch for `audit security-burndown <username>`."""
+    import datetime
+
+    from src.security_burndown import build_security_burndown, render_burndown_markdown
+
+    output_dir = Path(args.output_dir)
+    username = args.username
+
+    # Load latest ghas-alerts file (mirrors _load_security_alerts_by_name glob)
+    ghas_files = sorted(
+        output_dir.glob(f"ghas-alerts-{username}-*.json"),
+        key=lambda p: p.stat().st_mtime,
+    )
+    if not ghas_files:
+        print_info(
+            f"No ghas-alerts-{username}-*.json found in {output_dir}. "
+            "Run `audit report <username> --ghas-alerts` first."
+        )
+        raise SystemExit(1)
+
+    ghas_path = ghas_files[-1]
+    try:
+        with ghas_path.open() as fh:
+            ghas_data = json.load(fh)
+    except Exception as exc:  # noqa: BLE001
+        print_info(f"Could not read {ghas_path}: {exc}")
+        raise SystemExit(1)
+
+    if not isinstance(ghas_data, dict):
+        print_info(f"{ghas_path} is not a name-keyed object — cannot build burndown.")
+        raise SystemExit(1)
+
+    # Detect old counts-only files (no dependabot_details on any entry)
+    has_details = any(
+        isinstance(entry.get("dependabot_details"), list)
+        for entry in ghas_data.values()
+        if isinstance(entry, dict)
+    )
+    if not has_details:
+        print_info(
+            f"Warning: {ghas_path.name} contains counts only — no per-alert detail.\n"
+            "Re-run `audit report <username> --ghas-alerts` to capture detail, "
+            "then retry security-burndown."
+        )
+        raise SystemExit(0)
+
+    report = build_security_burndown(ghas_data)
+    markdown = render_burndown_markdown(report)
+
+    print(markdown)
+
+    today = datetime.date.today().isoformat()
+    out_path = output_dir / f"security-burndown-{username}-{today}.md"
+    out_path.write_text(markdown, encoding="utf-8")
+    print_info(f"Burndown written to {out_path}")
+
+    # JSON sidecar for structured consumers (e.g. PortfolioCommandCenter desktop
+    # shell), mirroring the per-project security overlay's JSON-first contract.
+    json_path = output_dir / f"security-burndown-{username}-{today}.json"
+    json_path.write_text(json.dumps(report.to_dict(), indent=2), encoding="utf-8")
+    print_info(f"Burndown JSON written to {json_path}")
 
 
 # ── Main entry point ──────────────────────────────────────────────────
@@ -6636,6 +6997,12 @@ def main() -> None:
 
     subcommand_parser = build_subcommand_parser()
     legacy_parser = build_parser()
+
+    # ── Subcommand: security-burndown (own parser — no legacy equivalent) ──
+    if argv and argv[0] == "security-burndown":
+        sb_args = subcommand_parser.parse_args(argv)
+        _run_security_burndown_mode(sb_args)
+        return
 
     if argv and argv[0] in _KNOWN_SUBCOMMANDS:
         # Subcommand form — detect the subcommand with the subcommand parser,
@@ -6726,6 +7093,16 @@ def main() -> None:
         return
     if portfolio_context_recovery_mode:
         _run_portfolio_context_recovery_mode(args)
+        return
+
+    if (
+        getattr(args, "propose_automation", False)
+        or getattr(args, "list_proposals", False)
+        or getattr(args, "execute_proposals", False)
+        or getattr(args, "approve_proposal", None)
+        or getattr(args, "reject_proposal", None)
+    ):
+        _run_automation_proposals_mode(args)
         return
 
     if args.doctor:

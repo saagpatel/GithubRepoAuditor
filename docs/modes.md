@@ -20,8 +20,9 @@ safe fixture demo first:
 make demo
 ```
 
-That writes sample JSON, workbook, HTML, and control-center artifacts to
-`output/demo/` without a GitHub token.
+That writes sample JSON, workbook, HTML, control-center, portfolio-truth, and warehouse
+artifacts to `output/demo/` without a GitHub token. If the `[serve]` extra is installed,
+you can browse the fixture with `audit serve --output-dir output/demo`.
 
 Recommended path:
 

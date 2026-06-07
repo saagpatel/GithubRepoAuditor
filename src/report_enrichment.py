@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from src.portfolio_truth_types import truth_latest_path
 from src.terminology import ACTION_SYNC_CANONICAL_LABELS
 from src.weekly_packaging import finalize_weekly_pack
 from src.weekly_scheduling_overlay import apply_weekly_scheduling_overlay
@@ -154,32 +155,65 @@ def _metadata(audit: Any) -> dict[str, Any]:
     return metadata
 
 
-def _extract_risk_posture(output_dir: Path | None) -> dict[str, Any]:
-    """Load portfolio-truth-latest.json and extract risk tier summary. Returns {} if unavailable."""
+def build_risk_lookup(output_dir: Path | None) -> dict[str, dict[str, str]]:
+    """Canonical per-repo risk reader: display_name -> {risk_tier, risk_summary}.
+
+    Single source of truth for risk data loaded from portfolio-truth-latest.json.
+    Render surfaces that need a per-repo risk tier consume this directly, and
+    _extract_risk_posture derives its aggregate counts from it. Returns {} when the
+    truth snapshot is missing, unreadable, or has no named projects.
+    """
     if not output_dir:
         return {}
-    truth_path = output_dir / "portfolio-truth-latest.json"
+    truth_path = truth_latest_path(output_dir)
     if not truth_path.is_file():
         return {}
     try:
         truth = json.loads(truth_path.read_text())
     except Exception:
         return {}
-    projects = truth.get("projects") or []
+    lookup: dict[str, dict[str, str]] = {}
+    for project in truth.get("projects") or []:
+        identity = project.get("identity") or {}
+        name = str(identity.get("display_name") or "")
+        if not name:
+            continue
+        risk = project.get("risk") or {}
+        entry = {
+            "risk_tier": str(risk.get("risk_tier") or "baseline"),
+            "risk_summary": str(risk.get("risk_summary") or ""),
+        }
+        lookup[name] = entry
+        # Alias each project under its GitHub repo name so render consumers that key
+        # by audit metadata.name resolve risk for repos whose local-dir display_name
+        # differs (e.g. "Signal & Noise" vs "signal-noise"). The alias is the SAME
+        # entry object; _extract_risk_posture dedups by identity so it never inflates
+        # the aggregate counts.
+        slug = str(identity.get("repo_full_name") or "").rsplit("/", 1)[-1]
+        if slug and slug not in lookup:
+            lookup[slug] = entry
+    return lookup
+
+
+def _extract_risk_posture(output_dir: Path | None) -> dict[str, Any]:
+    """Aggregate risk tier summary, derived from build_risk_lookup. Returns {} if unavailable."""
+    lookup = build_risk_lookup(output_dir)
+    if not lookup:
+        return {}
     tier_counts: dict[str, int] = {}
     top_elevated: list[dict[str, Any]] = []
-    for project in projects:
-        risk = project.get("risk") or {}
-        tier = str(risk.get("risk_tier") or "baseline")
+    seen: set[int] = set()
+    for name, entry in lookup.items():
+        # build_risk_lookup aliases each project under both its display_name and its
+        # GitHub slug (same entry object); count each project exactly once. Insertion
+        # order puts the display_name first, so top_elevated uses the human name.
+        if id(entry) in seen:
+            continue
+        seen.add(id(entry))
+        tier = entry["risk_tier"]
         tier_counts[tier] = tier_counts.get(tier, 0) + 1
         if tier == "elevated":
-            identity = project.get("identity") or {}
-            top_elevated.append(
-                {
-                    "repo": str(identity.get("display_name") or ""),
-                    "risk_summary": str(risk.get("risk_summary") or ""),
-                }
-            )
+            top_elevated.append({"repo": name, "risk_summary": entry["risk_summary"]})
     return {
         "elevated_count": tier_counts.get("elevated", 0),
         "moderate_count": tier_counts.get("moderate", 0),
@@ -1403,419 +1437,386 @@ def no_follow_through_reacquisition_revalidation_recovery() -> str:
     return NO_FOLLOW_THROUGH_REACQUISITION_REVALIDATION_RECOVERY
 
 
-def build_follow_through_status_label(value: Any) -> str:
+# Follow-through status-label data table: mapping key -> (default status, labels).
+# The 16 ``build_follow_through_*_status_label`` builders differ only in this data;
+# they all share ``_follow_through_status_label`` for the lookup logic.
+_FOLLOW_THROUGH_STATUS_LABELS: dict[str, tuple[str, dict[str, str]]] = {
+    "follow_through_status": (
+        "unknown",
+        {
+            "untouched": "Untouched",
+            "attempted": "Attempted",
+            "waiting-on-evidence": "Waiting on Evidence",
+            "stale-follow-through": "Stale Follow-Through",
+            "resolved": "Resolved",
+            "unknown": "Unknown",
+        },
+    ),
+    "follow_through_checkpoint_status": (
+        "unknown",
+        {
+            "not-due": "Not Due",
+            "due-soon": "Due Soon",
+            "overdue": "Overdue",
+            "satisfied": "Satisfied",
+            "unknown": "Unknown",
+        },
+    ),
+    "follow_through_escalation_status": (
+        "unknown",
+        {
+            "none": "None",
+            "watch": "Watch",
+            "nudge": "Nudge",
+            "escalate-now": "Escalate Now",
+            "resolved-watch": "Resolved Watch",
+            "unknown": "Unknown",
+        },
+    ),
+    "follow_through_recovery_status": (
+        "none",
+        {
+            "none": "None",
+            "recovering": "Recovering",
+            "retiring-watch": "Retiring Watch",
+            "retired": "Retired",
+            "relapsing": "Relapsing",
+            "insufficient-evidence": "Insufficient Evidence",
+        },
+    ),
+    "follow_through_recovery_persistence_status": (
+        "none",
+        {
+            "none": "None",
+            "just-recovering": "Just Recovering",
+            "holding-recovery": "Holding Recovery",
+            "holding-retiring-watch": "Holding Retiring Watch",
+            "sustained-retiring-watch": "Sustained Retiring Watch",
+            "sustained-retired": "Sustained Retired",
+            "fragile-recovery": "Fragile Recovery",
+            "insufficient-evidence": "Insufficient Evidence",
+        },
+    ),
+    "follow_through_relapse_churn_status": (
+        "none",
+        {
+            "none": "None",
+            "watch": "Watch",
+            "fragile": "Fragile",
+            "churn": "Churn",
+            "blocked": "Blocked",
+            "insufficient-evidence": "Insufficient Evidence",
+        },
+    ),
+    "follow_through_recovery_freshness_status": (
+        "none",
+        {
+            "none": "None",
+            "fresh": "Fresh",
+            "holding-fresh": "Holding Fresh",
+            "mixed-age": "Mixed Age",
+            "stale": "Stale",
+            "insufficient-evidence": "Insufficient Evidence",
+        },
+    ),
+    "follow_through_recovery_decay_status": (
+        "none",
+        {
+            "none": "None",
+            "softening": "Softening",
+            "aging": "Aging",
+            "fragile-aging": "Fragile Aging",
+            "expired": "Expired",
+            "insufficient-evidence": "Insufficient Evidence",
+        },
+    ),
+    "follow_through_recovery_memory_reset_status": (
+        "none",
+        {
+            "none": "None",
+            "reset-watch": "Reset Watch",
+            "resetting": "Resetting",
+            "reset": "Reset",
+            "rebuilding": "Rebuilding",
+            "insufficient-evidence": "Insufficient Evidence",
+        },
+    ),
+    "follow_through_recovery_rebuild_strength_status": (
+        "none",
+        {
+            "none": "None",
+            "just-rebuilding": "Just Rebuilding",
+            "building": "Building",
+            "holding-rebuild": "Holding Rebuild",
+            "fragile-rebuild": "Fragile Rebuild",
+            "insufficient-evidence": "Insufficient Evidence",
+        },
+    ),
+    "follow_through_recovery_reacquisition_status": (
+        "none",
+        {
+            "none": "None",
+            "reacquiring": "Reacquiring",
+            "just-reacquired": "Just Reacquired",
+            "holding-reacquired": "Holding Reacquired",
+            "reacquired": "Reacquired",
+            "fragile-reacquisition": "Fragile Reacquisition",
+            "insufficient-evidence": "Insufficient Evidence",
+        },
+    ),
+    "follow_through_recovery_reacquisition_durability_status": (
+        "none",
+        {
+            "none": "None",
+            "just-reacquired": "Just Reacquired",
+            "consolidating": "Consolidating",
+            "holding-reacquired": "Holding Reacquired",
+            "durable-reacquired": "Durable Reacquired",
+            "softening": "Softening",
+            "insufficient-evidence": "Insufficient Evidence",
+        },
+    ),
+    "follow_through_recovery_reacquisition_consolidation_status": (
+        "none",
+        {
+            "none": "None",
+            "building-confidence": "Building Confidence",
+            "holding-confidence": "Holding Confidence",
+            "durable-confidence": "Durable Confidence",
+            "fragile-confidence": "Fragile Confidence",
+            "reversing": "Reversing",
+            "insufficient-evidence": "Insufficient Evidence",
+        },
+    ),
+    "follow_through_reacquisition_softening_decay_status": (
+        "none",
+        {
+            "none": "None",
+            "softening-watch": "Softening Watch",
+            "step-down": "Step-Down",
+            "revalidation-needed": "Revalidation Needed",
+            "retired-softening": "Retired Softening",
+            "insufficient-evidence": "Insufficient Evidence",
+        },
+    ),
+    "follow_through_reacquisition_confidence_retirement_status": (
+        "none",
+        {
+            "none": "None",
+            "watch-retirement": "Watch Retirement",
+            "retiring-confidence": "Retiring Confidence",
+            "retired-confidence": "Retired Confidence",
+            "revalidation-needed": "Revalidation Needed",
+            "insufficient-evidence": "Insufficient Evidence",
+        },
+    ),
+    "follow_through_reacquisition_revalidation_recovery_status": (
+        "none",
+        {
+            "none": "None",
+            "under-revalidation": "Under Revalidation",
+            "rebuilding-restored-confidence": "Rebuilding Restored Confidence",
+            "reearning-confidence": "Re-Earning Confidence",
+            "just-reearned-confidence": "Just Re-Earned Confidence",
+            "holding-reearned-confidence": "Holding Re-Earned Confidence",
+            "insufficient-evidence": "Insufficient Evidence",
+        },
+    ),
+}
+
+
+# Follow-through summary data table: mapping key -> fallback constant. The 16
+# ``*_summary`` (and ``checkpoint``) builders differ only in this data; they all
+# share ``_follow_through_summary`` for the lookup logic.
+_FOLLOW_THROUGH_SUMMARIES: dict[str, str] = {
+    "follow_through_summary": NO_FOLLOW_THROUGH_SUMMARY,
+    "follow_through_next_checkpoint": NO_FOLLOW_THROUGH_CHECKPOINT,
+    "follow_through_escalation_summary": NO_FOLLOW_THROUGH_ESCALATION,
+    "follow_through_recovery_summary": NO_FOLLOW_THROUGH_RECOVERY,
+    "follow_through_recovery_persistence_summary": NO_FOLLOW_THROUGH_RECOVERY_PERSISTENCE,
+    "follow_through_relapse_churn_summary": NO_FOLLOW_THROUGH_RELAPSE_CHURN,
+    "follow_through_recovery_freshness_summary": NO_FOLLOW_THROUGH_RECOVERY_FRESHNESS,
+    "follow_through_recovery_decay_summary": NO_FOLLOW_THROUGH_RECOVERY_DECAY,
+    "follow_through_recovery_memory_reset_summary": NO_FOLLOW_THROUGH_RECOVERY_MEMORY_RESET,
+    "follow_through_recovery_rebuild_strength_summary": NO_FOLLOW_THROUGH_RECOVERY_REBUILD_STRENGTH,
+    "follow_through_recovery_reacquisition_summary": NO_FOLLOW_THROUGH_RECOVERY_REACQUISITION,
+    "follow_through_recovery_reacquisition_durability_summary": NO_FOLLOW_THROUGH_REACQUISITION_DURABILITY,
+    "follow_through_recovery_reacquisition_consolidation_summary": NO_FOLLOW_THROUGH_REACQUISITION_CONSOLIDATION,
+    "follow_through_reacquisition_softening_decay_summary": NO_FOLLOW_THROUGH_REACQUISITION_SOFTENING_DECAY,
+    "follow_through_reacquisition_confidence_retirement_summary": NO_FOLLOW_THROUGH_REACQUISITION_CONFIDENCE_RETIREMENT,
+    "follow_through_reacquisition_revalidation_recovery_summary": NO_FOLLOW_THROUGH_REACQUISITION_REVALIDATION_RECOVERY,
+}
+
+
+def _follow_through_status_label(value: Any, *, key: str) -> str:
+    """Resolve a follow-through status code to its display label.
+
+    ``key`` selects the (default status, labels) entry from
+    ``_FOLLOW_THROUGH_STATUS_LABELS``. Unrecognized statuses are hyphen-split
+    and title-cased, matching the legacy per-builder behavior.
+    """
+    default, labels = _FOLLOW_THROUGH_STATUS_LABELS[key]
     mapped = _mapping(value)
-    status = str(
-        mapped.get("follow_through_status", value if isinstance(value, str) else "") or "unknown"
-    )
-    labels = {
-        "untouched": "Untouched",
-        "attempted": "Attempted",
-        "waiting-on-evidence": "Waiting on Evidence",
-        "stale-follow-through": "Stale Follow-Through",
-        "resolved": "Resolved",
-        "unknown": "Unknown",
-    }
+    status = str(mapped.get(key, value if isinstance(value, str) else "") or default)
     return labels.get(status, status.replace("-", " ").title())
+
+
+def _follow_through_summary(value: Any, *, key: str) -> str:
+    """Resolve a follow-through summary value, falling back to its NO_* constant.
+
+    ``key`` selects the fallback from ``_FOLLOW_THROUGH_SUMMARIES``.
+    """
+    mapped = _mapping(value)
+    return str(mapped.get(key) or _FOLLOW_THROUGH_SUMMARIES[key])
+
+
+def build_follow_through_status_label(value: Any) -> str:
+    return _follow_through_status_label(value, key="follow_through_status")
 
 
 def build_follow_through_summary(value: Any) -> str:
-    mapped = _mapping(value)
-    return str(mapped.get("follow_through_summary") or NO_FOLLOW_THROUGH_SUMMARY)
+    return _follow_through_summary(value, key="follow_through_summary")
 
 
 def build_follow_through_checkpoint(value: Any) -> str:
-    mapped = _mapping(value)
-    return str(mapped.get("follow_through_next_checkpoint") or NO_FOLLOW_THROUGH_CHECKPOINT)
+    return _follow_through_summary(value, key="follow_through_next_checkpoint")
 
 
 def build_follow_through_checkpoint_status_label(value: Any) -> str:
-    mapped = _mapping(value)
-    status = str(
-        mapped.get("follow_through_checkpoint_status", value if isinstance(value, str) else "")
-        or "unknown"
-    )
-    labels = {
-        "not-due": "Not Due",
-        "due-soon": "Due Soon",
-        "overdue": "Overdue",
-        "satisfied": "Satisfied",
-        "unknown": "Unknown",
-    }
-    return labels.get(status, status.replace("-", " ").title())
+    return _follow_through_status_label(value, key="follow_through_checkpoint_status")
 
 
 def build_follow_through_escalation_status_label(value: Any) -> str:
-    mapped = _mapping(value)
-    status = str(
-        mapped.get("follow_through_escalation_status", value if isinstance(value, str) else "")
-        or "unknown"
-    )
-    labels = {
-        "none": "None",
-        "watch": "Watch",
-        "nudge": "Nudge",
-        "escalate-now": "Escalate Now",
-        "resolved-watch": "Resolved Watch",
-        "unknown": "Unknown",
-    }
-    return labels.get(status, status.replace("-", " ").title())
+    return _follow_through_status_label(value, key="follow_through_escalation_status")
 
 
 def build_follow_through_escalation_summary(value: Any) -> str:
-    mapped = _mapping(value)
-    return str(mapped.get("follow_through_escalation_summary") or NO_FOLLOW_THROUGH_ESCALATION)
+    return _follow_through_summary(value, key="follow_through_escalation_summary")
 
 
 def build_follow_through_recovery_status_label(value: Any) -> str:
-    mapped = _mapping(value)
-    status = str(
-        mapped.get("follow_through_recovery_status", value if isinstance(value, str) else "")
-        or "none"
-    )
-    labels = {
-        "none": "None",
-        "recovering": "Recovering",
-        "retiring-watch": "Retiring Watch",
-        "retired": "Retired",
-        "relapsing": "Relapsing",
-        "insufficient-evidence": "Insufficient Evidence",
-    }
-    return labels.get(status, status.replace("-", " ").title())
+    return _follow_through_status_label(value, key="follow_through_recovery_status")
 
 
 def build_follow_through_recovery_summary(value: Any) -> str:
-    mapped = _mapping(value)
-    return str(mapped.get("follow_through_recovery_summary") or NO_FOLLOW_THROUGH_RECOVERY)
+    return _follow_through_summary(value, key="follow_through_recovery_summary")
 
 
 def build_follow_through_recovery_persistence_status_label(value: Any) -> str:
-    mapped = _mapping(value)
-    status = str(
-        mapped.get(
-            "follow_through_recovery_persistence_status", value if isinstance(value, str) else ""
-        )
-        or "none"
-    )
-    labels = {
-        "none": "None",
-        "just-recovering": "Just Recovering",
-        "holding-recovery": "Holding Recovery",
-        "holding-retiring-watch": "Holding Retiring Watch",
-        "sustained-retiring-watch": "Sustained Retiring Watch",
-        "sustained-retired": "Sustained Retired",
-        "fragile-recovery": "Fragile Recovery",
-        "insufficient-evidence": "Insufficient Evidence",
-    }
-    return labels.get(status, status.replace("-", " ").title())
+    return _follow_through_status_label(value, key="follow_through_recovery_persistence_status")
 
 
 def build_follow_through_recovery_persistence_summary(value: Any) -> str:
-    mapped = _mapping(value)
-    return str(
-        mapped.get("follow_through_recovery_persistence_summary")
-        or NO_FOLLOW_THROUGH_RECOVERY_PERSISTENCE
-    )
+    return _follow_through_summary(value, key="follow_through_recovery_persistence_summary")
 
 
 def build_follow_through_relapse_churn_status_label(value: Any) -> str:
-    mapped = _mapping(value)
-    status = str(
-        mapped.get("follow_through_relapse_churn_status", value if isinstance(value, str) else "")
-        or "none"
-    )
-    labels = {
-        "none": "None",
-        "watch": "Watch",
-        "fragile": "Fragile",
-        "churn": "Churn",
-        "blocked": "Blocked",
-        "insufficient-evidence": "Insufficient Evidence",
-    }
-    return labels.get(status, status.replace("-", " ").title())
+    return _follow_through_status_label(value, key="follow_through_relapse_churn_status")
 
 
 def build_follow_through_relapse_churn_summary(value: Any) -> str:
-    mapped = _mapping(value)
-    return str(
-        mapped.get("follow_through_relapse_churn_summary") or NO_FOLLOW_THROUGH_RELAPSE_CHURN
-    )
+    return _follow_through_summary(value, key="follow_through_relapse_churn_summary")
 
 
 def build_follow_through_recovery_freshness_status_label(value: Any) -> str:
-    mapped = _mapping(value)
-    status = str(
-        mapped.get(
-            "follow_through_recovery_freshness_status", value if isinstance(value, str) else ""
-        )
-        or "none"
-    )
-    labels = {
-        "none": "None",
-        "fresh": "Fresh",
-        "holding-fresh": "Holding Fresh",
-        "mixed-age": "Mixed Age",
-        "stale": "Stale",
-        "insufficient-evidence": "Insufficient Evidence",
-    }
-    return labels.get(status, status.replace("-", " ").title())
+    return _follow_through_status_label(value, key="follow_through_recovery_freshness_status")
 
 
 def build_follow_through_recovery_freshness_summary(value: Any) -> str:
-    mapped = _mapping(value)
-    return str(
-        mapped.get("follow_through_recovery_freshness_summary")
-        or NO_FOLLOW_THROUGH_RECOVERY_FRESHNESS
-    )
+    return _follow_through_summary(value, key="follow_through_recovery_freshness_summary")
 
 
 def build_follow_through_recovery_decay_status_label(value: Any) -> str:
-    mapped = _mapping(value)
-    status = str(
-        mapped.get("follow_through_recovery_decay_status", value if isinstance(value, str) else "")
-        or "none"
-    )
-    labels = {
-        "none": "None",
-        "softening": "Softening",
-        "aging": "Aging",
-        "fragile-aging": "Fragile Aging",
-        "expired": "Expired",
-        "insufficient-evidence": "Insufficient Evidence",
-    }
-    return labels.get(status, status.replace("-", " ").title())
+    return _follow_through_status_label(value, key="follow_through_recovery_decay_status")
 
 
 def build_follow_through_recovery_decay_summary(value: Any) -> str:
-    mapped = _mapping(value)
-    return str(
-        mapped.get("follow_through_recovery_decay_summary") or NO_FOLLOW_THROUGH_RECOVERY_DECAY
-    )
+    return _follow_through_summary(value, key="follow_through_recovery_decay_summary")
 
 
 def build_follow_through_recovery_memory_reset_status_label(value: Any) -> str:
-    mapped = _mapping(value)
-    status = str(
-        mapped.get(
-            "follow_through_recovery_memory_reset_status", value if isinstance(value, str) else ""
-        )
-        or "none"
-    )
-    labels = {
-        "none": "None",
-        "reset-watch": "Reset Watch",
-        "resetting": "Resetting",
-        "reset": "Reset",
-        "rebuilding": "Rebuilding",
-        "insufficient-evidence": "Insufficient Evidence",
-    }
-    return labels.get(status, status.replace("-", " ").title())
+    return _follow_through_status_label(value, key="follow_through_recovery_memory_reset_status")
 
 
 def build_follow_through_recovery_memory_reset_summary(value: Any) -> str:
-    mapped = _mapping(value)
-    return str(
-        mapped.get("follow_through_recovery_memory_reset_summary")
-        or NO_FOLLOW_THROUGH_RECOVERY_MEMORY_RESET
-    )
+    return _follow_through_summary(value, key="follow_through_recovery_memory_reset_summary")
 
 
 def build_follow_through_recovery_rebuild_strength_status_label(value: Any) -> str:
-    mapped = _mapping(value)
-    status = str(
-        mapped.get(
-            "follow_through_recovery_rebuild_strength_status",
-            value if isinstance(value, str) else "",
-        )
-        or "none"
+    return _follow_through_status_label(
+        value, key="follow_through_recovery_rebuild_strength_status"
     )
-    labels = {
-        "none": "None",
-        "just-rebuilding": "Just Rebuilding",
-        "building": "Building",
-        "holding-rebuild": "Holding Rebuild",
-        "fragile-rebuild": "Fragile Rebuild",
-        "insufficient-evidence": "Insufficient Evidence",
-    }
-    return labels.get(status, status.replace("-", " ").title())
 
 
 def build_follow_through_recovery_rebuild_strength_summary(value: Any) -> str:
-    mapped = _mapping(value)
-    return str(
-        mapped.get("follow_through_recovery_rebuild_strength_summary")
-        or NO_FOLLOW_THROUGH_RECOVERY_REBUILD_STRENGTH
-    )
+    return _follow_through_summary(value, key="follow_through_recovery_rebuild_strength_summary")
 
 
 def build_follow_through_recovery_reacquisition_status_label(value: Any) -> str:
-    mapped = _mapping(value)
-    status = str(
-        mapped.get(
-            "follow_through_recovery_reacquisition_status", value if isinstance(value, str) else ""
-        )
-        or "none"
-    )
-    labels = {
-        "none": "None",
-        "reacquiring": "Reacquiring",
-        "just-reacquired": "Just Reacquired",
-        "holding-reacquired": "Holding Reacquired",
-        "reacquired": "Reacquired",
-        "fragile-reacquisition": "Fragile Reacquisition",
-        "insufficient-evidence": "Insufficient Evidence",
-    }
-    return labels.get(status, status.replace("-", " ").title())
+    return _follow_through_status_label(value, key="follow_through_recovery_reacquisition_status")
 
 
 def build_follow_through_recovery_reacquisition_summary(value: Any) -> str:
-    mapped = _mapping(value)
-    return str(
-        mapped.get("follow_through_recovery_reacquisition_summary")
-        or NO_FOLLOW_THROUGH_RECOVERY_REACQUISITION
-    )
+    return _follow_through_summary(value, key="follow_through_recovery_reacquisition_summary")
 
 
 def build_follow_through_reacquisition_durability_status_label(value: Any) -> str:
-    mapped = _mapping(value)
-    status = str(
-        mapped.get(
-            "follow_through_recovery_reacquisition_durability_status",
-            value if isinstance(value, str) else "",
-        )
-        or "none"
+    return _follow_through_status_label(
+        value, key="follow_through_recovery_reacquisition_durability_status"
     )
-    labels = {
-        "none": "None",
-        "just-reacquired": "Just Reacquired",
-        "consolidating": "Consolidating",
-        "holding-reacquired": "Holding Reacquired",
-        "durable-reacquired": "Durable Reacquired",
-        "softening": "Softening",
-        "insufficient-evidence": "Insufficient Evidence",
-    }
-    return labels.get(status, status.replace("-", " ").title())
 
 
 def build_follow_through_reacquisition_durability_summary(value: Any) -> str:
-    mapped = _mapping(value)
-    return str(
-        mapped.get("follow_through_recovery_reacquisition_durability_summary")
-        or NO_FOLLOW_THROUGH_REACQUISITION_DURABILITY
+    return _follow_through_summary(
+        value, key="follow_through_recovery_reacquisition_durability_summary"
     )
 
 
 def build_follow_through_reacquisition_consolidation_status_label(value: Any) -> str:
-    mapped = _mapping(value)
-    status = str(
-        mapped.get(
-            "follow_through_recovery_reacquisition_consolidation_status",
-            value if isinstance(value, str) else "",
-        )
-        or "none"
+    return _follow_through_status_label(
+        value, key="follow_through_recovery_reacquisition_consolidation_status"
     )
-    labels = {
-        "none": "None",
-        "building-confidence": "Building Confidence",
-        "holding-confidence": "Holding Confidence",
-        "durable-confidence": "Durable Confidence",
-        "fragile-confidence": "Fragile Confidence",
-        "reversing": "Reversing",
-        "insufficient-evidence": "Insufficient Evidence",
-    }
-    return labels.get(status, status.replace("-", " ").title())
 
 
 def build_follow_through_reacquisition_consolidation_summary(value: Any) -> str:
-    mapped = _mapping(value)
-    return str(
-        mapped.get("follow_through_recovery_reacquisition_consolidation_summary")
-        or NO_FOLLOW_THROUGH_REACQUISITION_CONSOLIDATION
+    return _follow_through_summary(
+        value, key="follow_through_recovery_reacquisition_consolidation_summary"
     )
 
 
 def build_follow_through_reacquisition_softening_decay_status_label(value: Any) -> str:
-    mapped = _mapping(value)
-    status = str(
-        mapped.get(
-            "follow_through_reacquisition_softening_decay_status",
-            value if isinstance(value, str) else "",
-        )
-        or "none"
+    return _follow_through_status_label(
+        value, key="follow_through_reacquisition_softening_decay_status"
     )
-    labels = {
-        "none": "None",
-        "softening-watch": "Softening Watch",
-        "step-down": "Step-Down",
-        "revalidation-needed": "Revalidation Needed",
-        "retired-softening": "Retired Softening",
-        "insufficient-evidence": "Insufficient Evidence",
-    }
-    return labels.get(status, status.replace("-", " ").title())
 
 
 def build_follow_through_reacquisition_softening_decay_summary(value: Any) -> str:
-    mapped = _mapping(value)
-    return str(
-        mapped.get("follow_through_reacquisition_softening_decay_summary")
-        or NO_FOLLOW_THROUGH_REACQUISITION_SOFTENING_DECAY
+    return _follow_through_summary(
+        value, key="follow_through_reacquisition_softening_decay_summary"
     )
 
 
 def build_follow_through_reacquisition_confidence_retirement_status_label(value: Any) -> str:
-    mapped = _mapping(value)
-    status = str(
-        mapped.get(
-            "follow_through_reacquisition_confidence_retirement_status",
-            value if isinstance(value, str) else "",
-        )
-        or "none"
+    return _follow_through_status_label(
+        value, key="follow_through_reacquisition_confidence_retirement_status"
     )
-    labels = {
-        "none": "None",
-        "watch-retirement": "Watch Retirement",
-        "retiring-confidence": "Retiring Confidence",
-        "retired-confidence": "Retired Confidence",
-        "revalidation-needed": "Revalidation Needed",
-        "insufficient-evidence": "Insufficient Evidence",
-    }
-    return labels.get(status, status.replace("-", " ").title())
 
 
 def build_follow_through_reacquisition_confidence_retirement_summary(value: Any) -> str:
-    mapped = _mapping(value)
-    return str(
-        mapped.get("follow_through_reacquisition_confidence_retirement_summary")
-        or NO_FOLLOW_THROUGH_REACQUISITION_CONFIDENCE_RETIREMENT
+    return _follow_through_summary(
+        value, key="follow_through_reacquisition_confidence_retirement_summary"
     )
 
 
 def build_follow_through_reacquisition_revalidation_recovery_status_label(value: Any) -> str:
-    mapped = _mapping(value)
-    status = str(
-        mapped.get(
-            "follow_through_reacquisition_revalidation_recovery_status",
-            value if isinstance(value, str) else "",
-        )
-        or "none"
+    return _follow_through_status_label(
+        value, key="follow_through_reacquisition_revalidation_recovery_status"
     )
-    labels = {
-        "none": "None",
-        "under-revalidation": "Under Revalidation",
-        "rebuilding-restored-confidence": "Rebuilding Restored Confidence",
-        "reearning-confidence": "Re-Earning Confidence",
-        "just-reearned-confidence": "Just Re-Earned Confidence",
-        "holding-reearned-confidence": "Holding Re-Earned Confidence",
-        "insufficient-evidence": "Insufficient Evidence",
-    }
-    return labels.get(status, status.replace("-", " ").title())
 
 
 def build_follow_through_reacquisition_revalidation_recovery_summary(value: Any) -> str:
-    mapped = _mapping(value)
-    return str(
-        mapped.get("follow_through_reacquisition_revalidation_recovery_summary")
-        or NO_FOLLOW_THROUGH_REACQUISITION_REVALIDATION_RECOVERY
+    return _follow_through_summary(
+        value, key="follow_through_reacquisition_revalidation_recovery_summary"
     )
 
 

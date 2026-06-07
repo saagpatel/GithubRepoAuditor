@@ -14,6 +14,7 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
+from src.portfolio_truth_types import truth_latest_path
 from src.serve.runner import SAFE_FLAG_NAMES, get_session, spawn_run, validate_flags
 
 router = APIRouter()
@@ -34,7 +35,7 @@ def _escape(value: object) -> str:
 
 
 def _load_portfolio_truth(output_dir: Path) -> dict[str, Any]:
-    p = output_dir / "portfolio-truth-latest.json"
+    p = truth_latest_path(output_dir)
     if not p.exists():
         return {}
     try:
@@ -60,6 +61,13 @@ def _repo_list(truth: dict[str, Any]) -> list[dict[str, Any]]:
     if isinstance(repos, list):
         return repos
     return []
+
+
+def _table_columns(conn: sqlite3.Connection, table_name: str) -> set[str]:
+    try:
+        return {row[1] for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()}
+    except sqlite3.Error:
+        return set()
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -122,18 +130,33 @@ async def repo_detail(request: Request, name: str) -> HTMLResponse:
     conn = _connect_warehouse(output_dir)
     if conn is not None:
         try:
-            rows = conn.execute(
-                """
-                SELECT rs.run_id, ar.generated_at, rs.total_score,
-                       rs.completeness_score, rs.risk_score
-                FROM   repo_snapshots rs
-                JOIN   audit_runs ar ON ar.run_id = rs.run_id
-                WHERE  rs.repo_name = ?
-                ORDER  BY ar.generated_at DESC
-                LIMIT  5
-                """,
-                (name,),
-            ).fetchall()
+            if "repo_name" in _table_columns(conn, "repo_snapshots"):
+                rows = conn.execute(
+                    """
+                    SELECT rs.run_id, ar.generated_at, rs.total_score,
+                           rs.completeness_score, rs.risk_score
+                    FROM   repo_snapshots rs
+                    JOIN   audit_runs ar ON ar.run_id = rs.run_id
+                    WHERE  rs.repo_name = ?
+                    ORDER  BY ar.generated_at DESC
+                    LIMIT  5
+                    """,
+                    (name,),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT rs.run_id, ar.generated_at, rs.overall_score AS total_score,
+                           NULL AS completeness_score, NULL AS risk_score
+                    FROM   repo_snapshots rs
+                    JOIN   audit_runs ar ON ar.run_id = rs.run_id
+                    JOIN   repos r ON r.repo_id = rs.repo_id
+                    WHERE  r.name = ? OR r.full_name = ? OR rs.repo_id = ?
+                    ORDER  BY ar.generated_at DESC
+                    LIMIT  5
+                    """,
+                    (name, name, name),
+                ).fetchall()
             history = [dict(r) for r in rows]
         except sqlite3.Error:
             # Optional warehouse history should not block the repo detail page.
@@ -146,17 +169,31 @@ async def repo_detail(request: Request, name: str) -> HTMLResponse:
     conn2 = _connect_warehouse(output_dir)
     if conn2 is not None:
         try:
-            rows2 = conn2.execute(
-                """
-                SELECT ds.dimension, ds.score, ds.weight
-                FROM   dimension_scores ds
-                JOIN   audit_runs ar ON ar.run_id = ds.run_id
-                WHERE  ds.repo_name = ?
-                ORDER  BY ar.generated_at DESC
-                LIMIT  20
-                """,
-                (name,),
-            ).fetchall()
+            if "repo_name" in _table_columns(conn2, "dimension_scores"):
+                rows2 = conn2.execute(
+                    """
+                    SELECT ds.dimension, ds.score, ds.weight
+                    FROM   dimension_scores ds
+                    JOIN   audit_runs ar ON ar.run_id = ds.run_id
+                    WHERE  ds.repo_name = ?
+                    ORDER  BY ar.generated_at DESC
+                    LIMIT  20
+                    """,
+                    (name,),
+                ).fetchall()
+            else:
+                rows2 = conn2.execute(
+                    """
+                    SELECT ds.dimension, ds.score, ds.max_score AS weight
+                    FROM   dimension_scores ds
+                    JOIN   audit_runs ar ON ar.run_id = ds.run_id
+                    JOIN   repos r ON r.repo_id = ds.repo_id
+                    WHERE  r.name = ? OR r.full_name = ? OR ds.repo_id = ?
+                    ORDER  BY ar.generated_at DESC
+                    LIMIT  20
+                    """,
+                    (name, name, name),
+                ).fetchall()
             dimension_scores = [dict(r) for r in rows2]
         except sqlite3.Error:
             # Optional dimension breakdown should not block the repo detail page.
@@ -643,7 +680,7 @@ async def initiatives(request: Request) -> HTMLResponse:
 
     # Load portfolio-truth, keyed by identity.display_name
     projects_by_name: dict[str, dict[str, Any]] = {}
-    truth_path = output_dir / "portfolio-truth-latest.json"
+    truth_path = truth_latest_path(output_dir)
     if truth_path.exists():
         try:
             truth = json.loads(truth_path.read_text())
@@ -706,7 +743,7 @@ async def initiatives_suggestions(
     from src.suggest_initiatives import default_deadline_for_effort, generate_suggestions
 
     output_dir = _output_dir(request)
-    truth_path = output_dir / "portfolio-truth-latest.json"
+    truth_path = truth_latest_path(output_dir)
 
     if not truth_path.exists():
         return templates.TemplateResponse(
@@ -779,7 +816,7 @@ async def accept_initiative_route(
     from src.suggest_initiatives import accept_suggestion
 
     output_dir = _output_dir(request)
-    truth_path = output_dir / "portfolio-truth-latest.json"
+    truth_path = truth_latest_path(output_dir)
 
     if not truth_path.exists():
         return HTMLResponse(
@@ -957,7 +994,7 @@ async def initiative_gap(request: Request, repo_name: str, target: int = 0) -> H
 
     # Load portfolio-truth
     projects_by_name: dict[str, dict[str, Any]] = {}
-    truth_path = output_dir / "portfolio-truth-latest.json"
+    truth_path = truth_latest_path(output_dir)
     if truth_path.exists():
         try:
             truth = json.loads(truth_path.read_text())

@@ -145,6 +145,7 @@ def validate_portfolio_report_markdown(markdown: str) -> None:
         "## Audit Methodology",
         "## Canonical Portfolio Truth Table",
         "## Coverage Summary",
+        "## Security Posture",
         "## Accuracy Findings",
         "## Recommended Next Sync Steps",
     )
