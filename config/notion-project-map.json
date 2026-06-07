@@ -5,6 +5,12 @@
 	"portfolio-index": {
 		"localProjectId": "378c21f1-caf0-814e-b127-ddbfe578e1e5"
 	},
+	"bridge-db": {
+		"localProjectId": "34cc21f1-caf0-81cd-9650-cf2253d7afd4"
+	},
+	"cross-system-smoke": {
+		"localProjectId": "378c21f1-caf0-81ec-b2db-f8a73ab0fb28"
+	},
 	"PortfolioCommandCenter": {
 		"localProjectId": "378c21f1-caf0-819a-86c3-c0c41d12eef3"
 	},
