@@ -431,6 +431,19 @@ Common fixes:
 
 There is also a longer operator guide in [docs/operator-troubleshooting.md](docs/operator-troubleshooting.md).
 
+## Proof Packages
+
+Cross-repo done-state proof now uses `proof-package.v1`; see
+[docs/proof-package-contract.md](docs/proof-package-contract.md). The first
+concrete package is the PortfolioCommandCenter five-tab local demo proof at
+[docs/demo-proof/2026-06-07/proof-package.json](docs/demo-proof/2026-06-07/proof-package.json).
+
+Validate a package with:
+
+```bash
+python scripts/validate_proof_package.py docs/demo-proof/2026-06-07/proof-package.json
+```
+
 ## License
 
 MIT
