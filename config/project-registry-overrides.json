@@ -1,0 +1,37 @@
+{
+	"_comment": "Operator-editable enrollment for the canonical project registry. 'overrides' pins hard normalization failures (drifted identifier -> canonical project_key). 'supplementary' enrolls real operator-OS projects the auditor does not track as git repos. 'memory_meta' maps ~/.claude memory note-slugs to their parent project (or '' for pure meta-notes). Consumed by src/project_registry.py; falls back to built-in defaults if this file is absent.",
+	"overrides": {
+		"jcc": "JobCommandCenter",
+		"jsm_export": "JSMTicketAnalyticsExport",
+		"bhv": "BrowserHistoryVisualizer",
+		"netmapper": "NetworkMapper",
+		"notion_os": "Notion",
+		"screenshotselect": "ScreenshottoDataSelect",
+		"interruptionresume": "Interruption Resume Studio"
+	},
+	"supplementary": [
+		{
+			"canonical_key": "supp:personal-ops",
+			"display_name": "personal-ops",
+			"repo_full_name": null,
+			"group_key": "operator_infra",
+			"lifecycle_state": "active",
+			"note": "Local operator control plane (127.0.0.1:46210). Most active project in bridge-db yet absent from auditor portfolio-truth."
+		},
+		{
+			"canonical_key": "supp:SecondBrain",
+			"display_name": "SecondBrain",
+			"repo_full_name": null,
+			"group_key": "operator_infra",
+			"lifecycle_state": "active",
+			"note": "4-layer knowledge vault at /Users/d/Documents/SecondBrain (engraph-indexed). Not a git repo; absent from auditor."
+		}
+	],
+	"memory_meta": {
+		"personal_ops_codebase": "supp:personal-ops",
+		"personal_ops_vision": "supp:personal-ops",
+		"github_repo_auditor_future_arcs": "GithubRepoAuditor",
+		"skill_library_port_2026-05": "",
+		"skill_eval_harness_2026-05": ""
+	}
+}
