@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import src.operator_control_center as operator_control_center
@@ -119,6 +120,86 @@ def test_operator_snapshot_assigns_expected_lanes(tmp_path: Path):
     assert lanes["RepoD drift needs review"] == "urgent"
     assert lanes["Enable secret scanning"] == "ready"
     assert lanes["Review RepoB"] == "deferred"
+
+
+def test_operator_snapshot_suppresses_cleared_security_posture_from_latest_truth(
+    tmp_path: Path,
+):
+    (tmp_path / "portfolio-truth-latest.json").write_text(
+        json.dumps(
+            {
+                "projects": [
+                    {
+                        "identity": {
+                            "display_name": "RepoC",
+                            "project_key": "RepoC",
+                            "repo_full_name": "user/RepoC",
+                        },
+                        "security": {
+                            "alerts_available": True,
+                            "dependabot_critical": 0,
+                            "dependabot_high": 0,
+                            "dependabot_medium": 2,
+                            "dependabot_low": 1,
+                            "code_scanning_critical": 0,
+                            "code_scanning_high": 0,
+                            "secret_scanning_open": 0,
+                        },
+                    }
+                ]
+            }
+        )
+    )
+    report = _make_report(
+        preflight_summary={"status": "ok", "blocking_errors": 0, "warnings": 0, "checks": []},
+        material_changes=[
+            {
+                "change_key": "security-1",
+                "change_type": "security-change",
+                "repo_name": "RepoC",
+                "severity": 1.0,
+                "title": "RepoC security posture changed",
+                "summary": "healthy -> watch",
+                "recommended_next_step": "Inspect the repo security state before approving new actions.",
+            },
+            {
+                "change_key": "security-lens-1",
+                "change_type": "lens-delta",
+                "repo_name": "RepoC",
+                "severity": 1.0,
+                "title": "RepoC shifted on security posture",
+                "summary": "security_posture changed by -0.155.",
+                "recommended_next_step": "Review this lens change before reprioritizing actions.",
+                "details": {"lens": "security_posture"},
+            },
+            {
+                "change_key": "ship-1",
+                "change_type": "lens-delta",
+                "repo_name": "RepoC",
+                "severity": 0.9,
+                "title": "RepoC shifted on ship readiness",
+                "summary": "ship_readiness changed by -0.114.",
+                "recommended_next_step": "Review this lens change before reprioritizing actions.",
+                "details": {"lens": "ship_readiness"},
+            },
+        ],
+        review_targets=[
+            {
+                "repo": "RepoC",
+                "reason": "security_posture changed by -0.155.",
+                "severity": 1.0,
+                "recommended_next_step": "Review this lens change before reprioritizing actions.",
+            }
+        ],
+    )
+
+    snapshot = build_operator_snapshot(report, output_dir=tmp_path)
+    titles = {item["title"] for item in snapshot["operator_queue"]}
+
+    assert "RepoC security posture changed" not in titles
+    assert "RepoC shifted on security posture" not in titles
+    assert "Review RepoC" not in titles
+    assert "RepoC shifted on ship readiness" in titles
 
 
 def test_operator_snapshot_treats_project_mirror_drift_as_campaign_drift(tmp_path: Path):

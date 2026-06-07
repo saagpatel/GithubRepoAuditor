@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
@@ -9,6 +10,7 @@ from src.governance_activation import build_governance_summary
 from src.intervention_ledger import load_intervention_ledger_bundle
 from src.operator_acknowledgments import is_change_acknowledged, load_acknowledgments
 from src.operator_effectiveness import build_operator_effectiveness_bundle
+from src.portfolio_truth_types import truth_latest_path
 from src.recurring_review import build_review_bundle
 from src.warehouse import (
     load_operator_calibration_history,
@@ -206,6 +208,7 @@ def build_operator_snapshot(
     campaign_summary = report_data.get("campaign_summary") or {}
     writeback_preview = report_data.get("writeback_preview") or {}
     rollback_preview = report_data.get("rollback_preview") or {}
+    cleared_security_repos = _latest_truth_cleared_security_repos(output_dir)
 
     for check in preflight.get("checks") or []:
         status = check.get("status", check.get("severity", "warning"))
@@ -292,6 +295,8 @@ def build_operator_snapshot(
     for change in report_data.get("material_changes") or []:
         if change.get("severity", 0.0) < 0.8:
             continue
+        if _is_cleared_security_posture_item(change, cleared_security_repos):
+            continue
         queue.append(
             _queue_item(
                 item_id=f"review-change:{change.get('change_key', change.get('title', 'change'))}",
@@ -311,6 +316,8 @@ def build_operator_snapshot(
         )
 
     for target in review_targets:
+        if _is_cleared_security_posture_item(target, cleared_security_repos):
+            continue
         recommended = target.get("recommended_next_step", "")
         safe_to_defer = "safe to defer" in recommended.lower()
         lane = "deferred" if safe_to_defer else "ready"
@@ -832,6 +839,63 @@ def _queue_item(
         "age_days": age_days,
         "links": links,
     }
+
+
+def _latest_truth_cleared_security_repos(output_dir: Path) -> set[str]:
+    """Repos whose latest scanned truth overlay has no open high-severity security risk."""
+    truth_path = truth_latest_path(output_dir)
+    if not truth_path.is_file():
+        return set()
+    try:
+        truth = json.loads(truth_path.read_text())
+    except Exception:
+        return set()
+    repos: set[str] = set()
+    for project in truth.get("projects") or []:
+        if not isinstance(project, dict):
+            continue
+        security = project.get("security") or {}
+        if not security.get("alerts_available"):
+            continue
+        if any(
+            int(security.get(key) or 0) > 0
+            for key in (
+                "dependabot_critical",
+                "dependabot_high",
+                "code_scanning_critical",
+                "code_scanning_high",
+                "secret_scanning_open",
+            )
+        ):
+            continue
+        identity = project.get("identity") or {}
+        for name in (
+            identity.get("display_name"),
+            identity.get("project_key"),
+            str(identity.get("repo_full_name") or "").rsplit("/", 1)[-1],
+        ):
+            if name:
+                repos.add(str(name))
+    return repos
+
+
+def _is_cleared_security_posture_item(item: dict, cleared_security_repos: set[str]) -> bool:
+    repo = str(item.get("repo_name") or item.get("repo") or "")
+    if not repo or repo not in cleared_security_repos:
+        return False
+    details = item.get("details") or {}
+    text = " ".join(
+        str(value or "")
+        for value in (
+            item.get("change_type"),
+            item.get("title"),
+            item.get("summary"),
+            item.get("reason"),
+            item.get("recommended_next_step"),
+            details.get("lens") if isinstance(details, dict) else "",
+        )
+    ).lower()
+    return "security-change" in text or "security_posture" in text or "security posture" in text
 
 
 def _normalize_review_summary(summary: dict) -> dict:
