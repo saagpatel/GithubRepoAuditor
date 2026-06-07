@@ -1,0 +1,52 @@
+# Saagar portfolio — gitleaks baseline
+# Generated 2026-06-07 from full-history audit (gitleaks 8.30.1, 93 repos).
+# All 25 findings were confirmed false-positives: test fixtures, mock API files,
+# build artifacts, doc curl examples, and audit-output project_key strings.
+#
+# Drop this in at a repo root as `.gitleaks.toml` to silence those FP classes.
+# It EXTENDS the default ruleset (real secrets outside these paths still fire).
+#
+# TRADE-OFF: this allowlists whole path CLASSES (tests/, mocks, build dirs, docs).
+# A real secret committed *inside* a test file would also be suppressed. For these
+# repos that's an accepted trade; if you want stricter, pin by commit instead
+# (see the commented [[rules]]-free allowlist.commits example at the bottom).
+
+title = "Saagar portfolio gitleaks baseline (2026-06-07 audit)"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Audited false-positives: test fixtures, mocks, build artifacts, docs, audit output"
+paths = [
+  # test suites (GHRA, mcpforge, AssistSupport, IncidentWorkbench, Notion)
+  '''(^|/)tests?/''',
+  '''.*\.test\.(ts|tsx|js|jsx|py|rs)$''',
+  '''(^|/)test_[^/]*\.py$''',
+  '''.*_test\.(go|py|rs)$''',
+  # mock / fixture API files (DevToolsTranslator src/api/mock.ts)
+  '''(^|/)mocks?\.(ts|tsx|js|jsx)$''',
+  '''(^|/)__mocks__/''',
+  '''(^|/)fixtures?/''',
+  # build / generated artifacts (NeuralNetwork .next, DevToolsTranslator .vite-dist)
+  '''(^|/)\.next/''',
+  '''(^|/)\.vite-dist/''',
+  '''(^|/)dist/''',
+  '''(^|/)build/''',
+  '''(^|/)out/''',
+  # auditor output JSON (GithubRepoAuditor output/*.json — project_key strings)
+  '''(^|/)output/.*\.json$''',
+  # documentation curl examples (IncidentWorkbench README/QUICKSTART)
+  '''(^|/)(README|QUICKSTART|CHANGELOG|CONTRIBUTING|DOCS?)\.(md|mdx)$''',
+  '''(^|/)docs?/''',
+  # web/extension manifests (APIReverse extension/chrome/manifest.json — public key)
+  '''(^|/)manifest\.json$''',
+]
+
+# Optional stricter alternative — comment out `paths` above and pin the exact
+# audited commits instead (precise, but brittle as history rewrites):
+# commits = [
+#   "93f3bde46a", "40655ccd64", "c73a115e77", "0d4917e899", "e68e7190b9",
+#   "2af50ef5de", "2d8a1b8653", "8ba9437be9", "059b951e81", "da395afc8b",
+#   "36e4235a39", "567b269726", "ed1ed23342", "1c58b56da8", "f54dd92b5a",
+# ]
