@@ -5310,6 +5310,46 @@ def _load_security_alerts_by_name(*, output_dir: Path, username: str) -> dict[st
     return {name: entry for name, entry in data.items() if isinstance(entry, dict)}
 
 
+WAREHOUSE_REPORT_STALE_DAYS = 7
+
+
+def _warn_if_warehouse_report_stale(output_dir: Path, username: str) -> None:
+    """Warn when the legacy warehouse report is missing or stale (F2).
+
+    Notion OS's external-signal-sync reads ``audit-report-<username>-*.json`` (the
+    3.7 warehouse report), but ``--portfolio-truth`` mode does NOT regenerate it —
+    the truth pipeline scans the workspace and never runs the GitHub audit that
+    produces warehouse data. Per the F2 "keep both artifacts live" decision, surface
+    the gap at generation time so the operator runs ``audit report <username>`` to
+    keep Notion's Repo Auditor signal fresh. Complements the cross-system-smoke C2
+    check, which catches the same drift at smoke time.
+    """
+    from datetime import date
+
+    reports = sorted(output_dir.glob(f"audit-report-{username}-*.json"))
+    if not reports:
+        print_warning(
+            f"No audit-report-{username}-*.json in {output_dir}: Notion's Repo Auditor "
+            f"signal reads that warehouse report and this --portfolio-truth run did not "
+            f"create one. Run `audit report {username}` to generate it (F2)."
+        )
+        return
+    match = re.search(r"(\d{4}-\d{2}-\d{2})", reports[-1].name)
+    if not match:
+        return
+    try:
+        report_date = date.fromisoformat(match.group(1))
+    except ValueError:
+        return
+    age = (date.today() - report_date).days
+    if age > WAREHOUSE_REPORT_STALE_DAYS:
+        print_warning(
+            f"Newest warehouse report {reports[-1].name} is {age}d old: Notion's Repo "
+            f"Auditor signal reads it and is now stale. Run `audit report {username}` to "
+            f"refresh the warehouse report (F2 — both artifacts kept live by decision)."
+        )
+
+
 def _run_portfolio_truth_mode(args) -> None:
     from src.portfolio_truth_publish import publish_portfolio_truth
 
@@ -5361,6 +5401,7 @@ def _run_portfolio_truth_mode(args) -> None:
         f"(registry {'updated' if result.registry_changed else 'unchanged'}, "
         f"report {'updated' if result.report_changed else 'unchanged'})"
     )
+    _warn_if_warehouse_report_stale(output_dir, args.username)
 
 
 def _run_portfolio_context_recovery_mode(args) -> None:
