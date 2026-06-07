@@ -29,6 +29,38 @@ def _mapping(value: Any) -> dict[str, Any]:
     return {}
 
 
+def _weekly_pack_source(report_data: dict[str, Any], snapshot: dict[str, Any]) -> dict[str, Any]:
+    source = dict(report_data)
+    snapshot_summary = _mapping(snapshot.get("operator_summary"))
+    if snapshot_summary:
+        source["operator_summary"] = snapshot_summary
+    if "operator_queue" in snapshot:
+        source["operator_queue"] = list(snapshot.get("operator_queue") or [])
+    return source
+
+
+def _operator_primary_repo(
+    operator_summary: dict[str, Any], operator_queue: list[dict[str, Any]]
+) -> str:
+    primary_target = _mapping(operator_summary.get("primary_target"))
+    repo = _safe_text(primary_target.get("repo"))
+    if repo:
+        return repo
+    if operator_queue:
+        return _safe_text(_mapping(operator_queue[0]).get("repo"))
+    return ""
+
+
+def _operator_decision(
+    operator_summary: dict[str, Any], operator_queue: list[dict[str, Any]]
+) -> str:
+    decision = _safe_text(operator_summary.get("what_to_do_next"))
+    repo = _operator_primary_repo(operator_summary, operator_queue)
+    if decision and repo and repo.lower() not in decision.lower():
+        return f"{decision} Start with {repo}."
+    return decision
+
+
 def latest_portfolio_truth_path(output_dir: Path) -> Path | None:
     latest = truth_latest_path(output_dir)
     return latest if latest.is_file() else None
@@ -52,9 +84,10 @@ def build_weekly_command_center_digest(
     report_reference: str = "",
     generated_at: str = "",
 ) -> dict[str, Any]:
-    weekly_pack = build_weekly_review_pack(report_data, diff_data)
+    weekly_pack = build_weekly_review_pack(_weekly_pack_source(report_data, snapshot), diff_data)
     weekly_story = _mapping(weekly_pack.get("weekly_story_v1"))
     operator_summary = _mapping(snapshot.get("operator_summary"))
+    operator_queue = list(snapshot.get("operator_queue") or [])
     repo_briefings = list(weekly_pack.get("repo_briefings") or [])
     decision_quality = _mapping(operator_summary.get("decision_quality_v1"))
     decision_quality_status = (
@@ -62,6 +95,11 @@ def build_weekly_command_center_digest(
     )
     truth = portfolio_truth or {}
     truth_summary = _build_truth_summary(truth)
+    operator_decision = _operator_decision(operator_summary, operator_queue)
+    operator_why = _safe_text(operator_summary.get("trend_summary")) or _safe_text(
+        operator_summary.get("why_it_matters")
+    )
+    queue_pressure_summary = operator_why or _safe_text(weekly_pack.get("queue_pressure_summary"))
 
     return {
         "contract_version": CONTRACT_VERSION,
@@ -72,15 +110,18 @@ def build_weekly_command_center_digest(
         "report_reference": report_reference or _safe_text(report_data.get("latest_report_path")),
         "control_center_reference": control_center_reference,
         "portfolio_truth_reference": portfolio_truth_reference,
-        "headline": _safe_text(weekly_story.get("headline"))
+        "headline": _safe_text(operator_summary.get("headline"))
+        or _safe_text(weekly_story.get("headline"))
         or "No weekly headline is recorded yet.",
-        "decision": _safe_text(weekly_story.get("decision"))
+        "decision": operator_decision
+        or _safe_text(weekly_story.get("decision"))
         or "Continue the normal operator review loop.",
-        "why_this_week": _safe_text(weekly_story.get("why_this_week"))
+        "why_this_week": operator_why
+        or _safe_text(weekly_story.get("why_this_week"))
         or "No weekly rationale is recorded yet.",
         "next_step": _safe_text(weekly_story.get("next_step"))
         or "Open the workbook first, then use the read-only control center.",
-        "queue_pressure_summary": _safe_text(weekly_pack.get("queue_pressure_summary")),
+        "queue_pressure_summary": queue_pressure_summary,
         "operating_paths_summary": _safe_text(weekly_pack.get("operating_paths_summary")),
         "decision_quality": {
             "status": decision_quality_status,
@@ -110,7 +151,11 @@ def build_weekly_command_center_digest(
             **_build_security_summary(truth),
             "top_alerts": _build_security_attention_items(truth),
         },
-        "section_digest": _build_section_digest(weekly_story),
+        "section_digest": _build_section_digest(
+            weekly_story,
+            operator_decision=operator_decision,
+            operator_why=operator_why,
+        ),
         "top_repo_briefings": [
             {
                 "repo": _safe_text(item.get("repo")) or "Repo",
@@ -410,18 +455,29 @@ def _build_security_attention_items(portfolio_truth: dict[str, Any]) -> list[dic
     return items[:MAX_SECURITY_ATTENTION_ITEMS]
 
 
-def _build_section_digest(weekly_story: dict[str, Any]) -> list[dict[str, Any]]:
+def _build_section_digest(
+    weekly_story: dict[str, Any],
+    *,
+    operator_decision: str = "",
+    operator_why: str = "",
+) -> list[dict[str, Any]]:
     sections = list(weekly_story.get("sections") or [])
-    return [
-        {
-            "id": _safe_text(section.get("id")),
-            "label": _safe_text(section.get("label")) or "Section",
-            "state": _safe_text(section.get("state")) or "idle",
-            "headline": _safe_text(section.get("headline"))
-            or "No section headline is recorded yet.",
-            "next_step": _safe_text(section.get("next_step"))
-            or "No section next step is recorded yet.",
-            "reason_codes": list(section.get("reason_codes") or []),
-        }
-        for section in sections
-    ]
+    digest = []
+    for section in sections:
+        section_id = _safe_text(section.get("id"))
+        headline = _safe_text(section.get("headline")) or "No section headline is recorded yet."
+        next_step = _safe_text(section.get("next_step")) or "No section next step is recorded yet."
+        if section_id == "weekly-priority":
+            headline = operator_why or headline
+            next_step = operator_decision or next_step
+        digest.append(
+            {
+                "id": section_id,
+                "label": _safe_text(section.get("label")) or "Section",
+                "state": _safe_text(section.get("state")) or "idle",
+                "headline": headline,
+                "next_step": next_step,
+                "reason_codes": list(section.get("reason_codes") or []),
+            }
+        )
+    return digest

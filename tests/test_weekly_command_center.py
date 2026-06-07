@@ -133,6 +133,109 @@ def test_build_weekly_command_center_digest_surfaces_truth_and_guardrails() -> N
     assert "JobCommandCenter" in rendered_md
 
 
+def test_build_weekly_command_center_digest_prefers_control_center_snapshot_focus() -> None:
+    stale_job_item = {
+        "repo": "JobCommandCenter",
+        "title": "JobCommandCenter security posture changed",
+        "recommended_action": "Inspect the repo security state before approving new actions.",
+        "operator_focus_summary": "JobCommandCenter security posture changed and needs review.",
+        "follow_through_checkpoint": "Confirm the stale security item is still open.",
+    }
+    fresh_codexkit_item = {
+        "repo": "codexkit",
+        "title": "codexkit moved materially",
+        "recommended_action": "Review whether this change should affect priority or tier.",
+        "operator_focus_summary": "codexkit moved materially and is now the top open item.",
+        "follow_through_checkpoint": "Confirm codexkit no longer returns as the top target.",
+    }
+    report_data = {
+        "username": "testuser",
+        "generated_at": "2026-04-14T12:00:00+00:00",
+        "operator_summary": {
+            "what_to_do_next": (
+                "Act with review: Inspect the repo security state before approving new actions."
+            ),
+            "follow_through_checkpoint_summary": (
+                "Start with JobCommandCenter: JobCommandCenter security posture changed."
+            ),
+            "decision_quality_v1": {},
+        },
+        "operator_queue": [stale_job_item],
+        "audits": [
+            {
+                "metadata": {"name": "JobCommandCenter", "language": "TypeScript"},
+                "overall_score": 0.72,
+                "grade": "B",
+                "completeness_tier": "standard",
+                "score_explanation": {
+                    "top_positive_drivers": ["CI present"],
+                    "top_negative_drivers": ["stale security posture"],
+                    "next_tier_gap_summary": "Security review must be reconciled.",
+                    "next_best_action": "Inspect the repo security state.",
+                    "next_best_action_rationale": "Stale report input says this is first.",
+                },
+            },
+            {
+                "metadata": {"name": "codexkit", "language": "Python"},
+                "overall_score": 0.66,
+                "grade": "B",
+                "completeness_tier": "standard",
+                "score_explanation": {
+                    "top_positive_drivers": ["recent movement"],
+                    "top_negative_drivers": ["priority needs review"],
+                    "next_tier_gap_summary": "Decide whether movement changes priority.",
+                    "next_best_action": "Review whether this change should affect priority or tier.",
+                    "next_best_action_rationale": "Fresh control-center snapshot says this is first.",
+                },
+            },
+        ],
+    }
+    snapshot = {
+        "operator_summary": {
+            "what_to_do_next": (
+                "Act with review: Close the remaining top target next: "
+                "Review whether this change should affect priority or tier."
+            ),
+            "follow_through_checkpoint_summary": (
+                "Start with codexkit: codexkit moved materially."
+            ),
+            "trend_summary": (
+                "The operator picture is improving: 3 attention item(s) cleared since the "
+                "last run, and 7 still remain open. Remaining focus: codexkit."
+            ),
+            "decision_quality_v1": {
+                "decision_quality_status": "strong",
+                "recommendation_quality_summary": (
+                    "Strong recommendation because the next step is tied directly to the current top target."
+                ),
+            },
+        },
+        "operator_queue": [fresh_codexkit_item],
+    }
+
+    digest = build_weekly_command_center_digest(
+        report_data,
+        snapshot,
+        generated_at="2026-04-14T12:00:00+00:00",
+    )
+
+    assert "codexkit" in digest["decision"]
+    assert "JobCommandCenter" not in digest["decision"]
+    assert "Inspect the repo security state" not in digest["decision"]
+    assert "codexkit" in digest["why_this_week"]
+    assert "10 urgent" not in digest["queue_pressure_summary"]
+    weekly_priority = next(
+        section for section in digest["section_digest"] if section["id"] == "weekly-priority"
+    )
+    assert "codexkit" in weekly_priority["headline"]
+    assert "Inspect the repo security state" not in weekly_priority["next_step"]
+    operator_focus = next(
+        section for section in digest["section_digest"] if section["id"] == "operator-focus"
+    )
+    assert "codexkit" in operator_focus["headline"]
+    assert digest["top_repo_briefings"][0]["repo"] == "codexkit"
+
+
 def _sec(available: bool, critical: int = 0, high: int = 0) -> dict:
     return {
         "alerts_available": available,
