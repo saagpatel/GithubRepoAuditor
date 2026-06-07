@@ -305,9 +305,23 @@ def build_project_registry(
 
     by_key = {e.canonical_key: e for e in entries}
     index: dict[str, _Entry] = {}
+    collisions: list[dict] = []
     for entry in entries:
         for form in entry.matchset:
-            index.setdefault(form, entry)
+            existing = index.get(form)
+            if existing is None:
+                index[form] = entry
+            elif existing is not entry:
+                # Two distinct projects normalize to the same form: the index
+                # keeps the first (stable), so the second would mis-resolve.
+                # Surface it as a warning rather than failing silently.
+                collisions.append(
+                    {
+                        "normalized_form": form,
+                        "kept": existing.canonical_key,
+                        "shadowed": entry.canonical_key,
+                    }
+                )
     override_norm = {normalize(raw): key for raw, key in overrides.items()}
 
     def resolve_entry(raw: str) -> _Entry | None:
@@ -395,6 +409,7 @@ def build_project_registry(
             "notion_local": sorted(notion_orphans),
             "notion_pageid_map": sorted(pageid_unmatched),
         },
+        "warnings": {"normalized_key_collisions": collisions},
     }
 
 

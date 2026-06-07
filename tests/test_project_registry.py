@@ -159,6 +159,22 @@ def test_build_attaches_external_sources(tmp_path: Path):
     assert by_key["PortfolioCommandCenter"]["notion_local_title"] is None
 
 
+def test_normalized_key_collision_is_surfaced_not_silent():
+    # Two distinct projects whose display names normalize to the same form.
+    colliding = _snapshot(
+        _ident("NetMapper", "Net Mapper", "saagpatel/NetMapper"),
+        _ident("NetworkMapperAlt", "NetMapper", "saagpatel/NetworkMapperAlt"),
+    )
+    registry = build_project_registry(colliding, overrides_config_path=None)
+    collisions = registry["warnings"]["normalized_key_collisions"]
+    assert any(c["normalized_form"] == "netmapper" for c in collisions)
+
+
+def test_real_snapshot_shape_has_no_collisions_block_when_clean():
+    registry = build_project_registry(SNAPSHOT, overrides_config_path=None)
+    assert registry["warnings"]["normalized_key_collisions"] == []
+
+
 def test_scoring_pageids_attach_to_matching_entries():
     registry = build_project_registry(
         SNAPSHOT,
