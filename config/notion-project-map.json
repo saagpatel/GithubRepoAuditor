@@ -11,6 +11,9 @@
 	"cross-system-smoke": {
 		"localProjectId": "378c21f1-caf0-81ec-b2db-f8a73ab0fb28"
 	},
+	"evals": {
+		"localProjectId": "378c21f1-caf0-8160-886b-cdace674000e"
+	},
 	"PortfolioCommandCenter": {
 		"localProjectId": "378c21f1-caf0-819a-86c3-c0c41d12eef3"
 	},
