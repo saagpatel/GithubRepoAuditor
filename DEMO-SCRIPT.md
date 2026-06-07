@@ -6,7 +6,7 @@ Drive **PortfolioCommandCenter**; read the **bold spoken lines**; do the
 speech, leaving ~18 s of breathing room inside a 90 s cut.
 
 **Delivery:** conversational, confident, ~150 wpm. Pause on the dashes. Land hard
-on the word **forty-nine** — that's the line that sells the whole system.
+on the word **sixty-three** — that's the line that sells the whole system.
 
 ---
 
@@ -23,7 +23,7 @@ on the word **forty-nine** — that's the line that sells the whole system.
 ### 0:28 — Risk + Security tab
 `[SCREEN]` Switch to Risk + Security. Filter to elevated risk; let the security posture counts fill the frame.
 
-> **"And here's the number a timestamp can never give you — forty-nine of these repos have a live, high-or-critical security alert. Right now."**
+> **"And here's the number a timestamp can never give you — sixty-three of these repos have a live, high-or-critical security alert. Right now."**
 
 ### 0:48 — Burndown tab
 `[SCREEN]` Switch to Burndown. Hover one advisory group so the "repos cleared by this bump" list expands.
@@ -52,12 +52,12 @@ on the word **forty-nine** — that's the line that sells the whole system.
 ## Pickup lines (swap in if a beat runs long or you want a different close)
 
 - **Tighter cold open:** *"A hundred and twenty-nine repos. One question: which ones are actually worth finishing? This answers it."*
-- **Alt security beat:** *"Forty-nine live security alerts across the portfolio — and the exact bump that clears each one."*
+- **Alt security beat:** *"Sixty-three repos with live high-or-critical alerts — and the exact bump that clears each one."*
 - **Alt close (coordination-forward):** *"Two autonomous agents, hundreds of branches, one source of truth keeping them honest."*
 
 ## Numbers cheat-sheet (say these exactly)
-- **129** total repos · **49** with open high/critical alerts
-- Agent attribution: **Claude Code 53 · Codex 23** (the two coordinated lanes)
+- **129** total repos · **63** with open high/critical Dependabot alerts · **49** classified security-risk items
+- Agent attribution: **Claude Code 53 · Codex 22** (the two coordinated lanes)
 - Recency: **91** repos touched in the last 7 days — "almost everything looks recent, which is *why* a timestamp is useless"
 
 *Pairs with DEMO-PLAN.md. Keep individual repo names blurred or off-frame when
