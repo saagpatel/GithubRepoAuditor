@@ -1,0 +1,30 @@
+{
+  "distinct_advisories": 2,
+  "total_repo_instances": 3,
+  "repos_touched": 2,
+  "entries": [
+    {
+      "package": "demo-runtime",
+      "ecosystem": "pip",
+      "severity": "critical",
+      "ghsa_id": "GHSA-DEMO-0001",
+      "first_patched_version": "2.0.0",
+      "affected_repos": [
+        "RepoC"
+      ],
+      "affected_repo_count": 1
+    },
+    {
+      "package": "demo-ui-kit",
+      "ecosystem": "npm",
+      "severity": "high",
+      "ghsa_id": "GHSA-DEMO-0002",
+      "first_patched_version": "4.1.0",
+      "affected_repos": [
+        "RepoB",
+        "RepoC"
+      ],
+      "affected_repo_count": 2
+    }
+  ]
+}

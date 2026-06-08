@@ -109,6 +109,10 @@ Treat campaign/writeback, GitHub Projects, Notion sync, catalog overrides, score
 
 - Safe demo path: run `make demo` after a local clone to generate sample artifacts from the committed fixture without a GitHub token.
 - Demo fixture: [fixtures/demo/sample-report.json](fixtures/demo/sample-report.json)
+- Operator OS case study: [CASE-STUDY.md](CASE-STUDY.md)
+- Public-safe recording plan: [DEMO-PLAN.md](DEMO-PLAN.md)
+- Product brief: [docs/product/operator-os-product-brief.md](docs/product/operator-os-product-brief.md)
+- Public fixture proof package: [docs/demo-proof/public-fixture/README.md](docs/demo-proof/public-fixture/README.md)
 - Product modes: [docs/modes.md](docs/modes.md)
 - Web UI operator guide: [docs/audit-serve.md](docs/audit-serve.md)
 - CLI migration (flat → subcommand): [docs/audit-cli-migration.md](docs/audit-cli-migration.md)
@@ -192,6 +196,8 @@ pip install "github-repo-auditor[serve]"
 ### Try the safe demo
 
 The demo uses committed fixture data and writes only to `output/demo/`.
+Use this path for public recordings and screenshots. The live local portfolio
+output is private operator evidence unless it has been intentionally sanitized.
 
 ```bash
 git clone https://github.com/saagpatel/GithubRepoAuditor.git
@@ -204,8 +210,10 @@ Expected outputs include `output/demo/demo-report.json`,
 `output/demo/demo-workbook.xlsx`, `output/demo/dashboard-*.html`,
 `output/demo/operator-control-center-demo.json`,
 `output/demo/operator-control-center-demo.md`,
-`output/demo/portfolio-truth-latest.json`, and
-`output/demo/portfolio-warehouse.db`.
+`output/demo/portfolio-truth-latest.json`,
+`output/demo/weekly-command-center-sample-user-2026-04-12.json`,
+`output/demo/security-burndown-sample-user-2026-04-12.json`,
+`output/demo/pending-proposals.json`, and `output/demo/portfolio-warehouse.db`.
 
 To browse the same fixture in the local web UI:
 
@@ -213,6 +221,9 @@ To browse the same fixture in the local web UI:
 pip install -e ".[serve]"
 audit serve --output-dir output/demo
 ```
+
+To record the Portfolio Command Center wedge from the same fixture, follow
+[DEMO-PLAN.md](DEMO-PLAN.md) and point the desktop app at `output/demo/`.
 
 ### Quick start (subcommand form)
 

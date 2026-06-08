@@ -1,0 +1,227 @@
+{
+  "schema_version": "proof-package.v1",
+  "package_id": "public-fixture-portfolio-command-center-demo",
+  "subject": {
+    "repo": "PortfolioCommandCenter",
+    "lane": "public-fixture-demo",
+    "claim": "Portfolio Command Center can be demonstrated from fixture-backed GitHub Repo Auditor artifacts without private local operating data."
+  },
+  "producer": {
+    "repo": "GithubRepoAuditor",
+    "mode": "fixture",
+    "commands": [
+      "make demo",
+      "python scripts/validate_proof_package.py docs/demo-proof/public-fixture/proof-package.json",
+      "pnpm demo:desktop"
+    ]
+  },
+  "source_state": {
+    "source_data_mode": "fixture",
+    "fixture": "../../../fixtures/demo/sample-report.json",
+    "generated_output_dir": "../../../output/demo",
+    "source_truth_schema": "demo-pcc-v1",
+    "freshness_window_hours": null
+  },
+  "claims": [
+    {
+      "id": "fixture-input",
+      "statement": "The public demo source is a committed fixture file, not the private live portfolio output.",
+      "status": "passed",
+      "evidence": [
+        "fixture-report"
+      ]
+    },
+    {
+      "id": "demo-generation",
+      "statement": "The fixture demo command generates the JSON, workbook, dashboard, control-center, truth, and warehouse artifacts under output/demo.",
+      "status": "passed",
+      "evidence": [
+        "demo-make-target",
+        "demo-build-script",
+        "demo-report",
+        "demo-workbook",
+        "demo-dashboard",
+        "demo-control-center-json",
+        "demo-control-center-markdown",
+        "demo-portfolio-truth",
+        "demo-weekly-digest",
+        "demo-security-burndown",
+        "demo-history-previous",
+        "demo-history-current",
+        "demo-proposals",
+        "demo-warehouse"
+      ]
+    },
+    {
+      "id": "desktop-compatible-schema",
+      "statement": "The generated portfolio truth uses the PortfolioCommandCenter projects schema rather than the older lightweight repos demo shape.",
+      "status": "passed",
+      "evidence": [
+        "demo-portfolio-truth",
+        "demo-weekly-digest",
+        "demo-security-burndown"
+      ]
+    },
+    {
+      "id": "public-recording-boundary",
+      "statement": "The public recording checklist requires fixture output and blocks private local data exposure.",
+      "status": "passed",
+      "evidence": [
+        "recording-checklist"
+      ]
+    },
+    {
+      "id": "visual-capture",
+      "statement": "Final public screenshots or video frames still need a frame-level privacy review after capture.",
+      "status": "partial",
+      "evidence": [
+        "summary"
+      ]
+    }
+  ],
+  "verification": {
+    "overall": "partial",
+    "checks": [
+      {
+        "name": "manifest references fixture input and generated output paths",
+        "status": "passed"
+      },
+      {
+        "name": "visual capture from Portfolio Command Center",
+        "status": "partial"
+      }
+    ],
+    "missing_receipts": [],
+    "known_gaps": [
+      "This package proves the data path and recording boundary. It does not include captured public screenshots yet.",
+      "Portfolio Command Center must be pointed at output/demo during recording."
+    ]
+  },
+  "safety": {
+    "redaction": "fixture-only",
+    "secrets_checked": true,
+    "live_write_performed": false,
+    "private_data_required": false
+  },
+  "artifacts": [
+    {
+      "id": "summary",
+      "kind": "summary",
+      "path": "SUMMARY.md",
+      "description": "Human-readable public fixture demo summary.",
+      "required": true
+    },
+    {
+      "id": "recording-checklist",
+      "kind": "checklist",
+      "path": "RECORDING-CHECKLIST.md",
+      "description": "Public-safe recording checklist and redaction guard.",
+      "required": true
+    },
+    {
+      "id": "fixture-report",
+      "kind": "fixture",
+      "path": "../../../fixtures/demo/sample-report.json",
+      "description": "Committed fixture report used as the public demo source.",
+      "required": true
+    },
+    {
+      "id": "demo-make-target",
+      "kind": "repo-doc",
+      "path": "../../../Makefile",
+      "description": "Make target that runs the fixture demo generator.",
+      "required": true
+    },
+    {
+      "id": "demo-build-script",
+      "kind": "script",
+      "path": "../../../scripts/build_demo_artifacts.py",
+      "description": "Fixture artifact generator for output/demo.",
+      "required": true
+    },
+    {
+      "id": "demo-report",
+      "kind": "json",
+      "path": "../../../output/demo/demo-report.json",
+      "description": "Generated demo report.",
+      "required": true
+    },
+    {
+      "id": "demo-workbook",
+      "kind": "workbook",
+      "path": "../../../output/demo/demo-workbook.xlsx",
+      "description": "Generated demo workbook.",
+      "required": true
+    },
+    {
+      "id": "demo-dashboard",
+      "kind": "html",
+      "path": "../../../output/demo/dashboard-sample-user-2026-04-12.html",
+      "description": "Generated demo HTML dashboard.",
+      "required": true
+    },
+    {
+      "id": "demo-control-center-json",
+      "kind": "json",
+      "path": "../../../output/demo/operator-control-center-demo.json",
+      "description": "Generated demo operator control-center JSON.",
+      "required": true
+    },
+    {
+      "id": "demo-control-center-markdown",
+      "kind": "markdown",
+      "path": "../../../output/demo/operator-control-center-demo.md",
+      "description": "Generated demo operator control-center Markdown.",
+      "required": true
+    },
+    {
+      "id": "demo-portfolio-truth",
+      "kind": "json",
+      "path": "../../../output/demo/portfolio-truth-latest.json",
+      "description": "Generated demo portfolio truth snapshot.",
+      "required": true
+    },
+    {
+      "id": "demo-weekly-digest",
+      "kind": "json",
+      "path": "../../../output/demo/weekly-command-center-sample-user-2026-04-12.json",
+      "description": "Generated demo weekly command-center digest.",
+      "required": true
+    },
+    {
+      "id": "demo-security-burndown",
+      "kind": "json",
+      "path": "../../../output/demo/security-burndown-sample-user-2026-04-12.json",
+      "description": "Generated demo security burndown report.",
+      "required": true
+    },
+    {
+      "id": "demo-history-previous",
+      "kind": "json",
+      "path": "../../../output/demo/portfolio-truth-2026-04-05T120000Z.json",
+      "description": "Generated previous demo truth snapshot for trends.",
+      "required": true
+    },
+    {
+      "id": "demo-history-current",
+      "kind": "json",
+      "path": "../../../output/demo/portfolio-truth-2026-04-12T120000Z.json",
+      "description": "Generated current demo truth snapshot for trends.",
+      "required": true
+    },
+    {
+      "id": "demo-proposals",
+      "kind": "json",
+      "path": "../../../output/demo/pending-proposals.json",
+      "description": "Generated empty automation proposal queue.",
+      "required": true
+    },
+    {
+      "id": "demo-warehouse",
+      "kind": "sqlite",
+      "path": "../../../output/demo/portfolio-warehouse.db",
+      "description": "Generated demo warehouse snapshot.",
+      "required": true
+    }
+  ]
+}

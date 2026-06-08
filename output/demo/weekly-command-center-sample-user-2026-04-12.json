@@ -1,0 +1,69 @@
+{
+  "username": "sample-user",
+  "generated_at": "2026-04-12T12:00:00+00:00",
+  "headline": "Fixture portfolio has one security-driven next move.",
+  "decision": "Review RepoC before expanding lower-pressure cleanup.",
+  "why_this_week": "RepoC carries the only critical fixture alert and demonstrates the operator-approved review lane.",
+  "next_step": "Open the burndown view, confirm the grouped fix, then record the decision.",
+  "risk_posture": {
+    "elevated_count": 2,
+    "risk_tier_counts": {
+      "elevated": 2,
+      "moderate": 0,
+      "baseline": 1,
+      "deferred": 0
+    },
+    "top_elevated": [
+      {
+        "repo": "RepoB",
+        "risk_tier": "elevated",
+        "risk_summary": "Security follow-through needs operator review."
+      },
+      {
+        "repo": "RepoC",
+        "risk_tier": "elevated",
+        "risk_summary": "Security follow-through needs operator review."
+      }
+    ]
+  },
+  "security_posture": {
+    "scanned_count": 3,
+    "repos_with_open_high_critical": 2,
+    "total_open_critical": 1,
+    "total_open_high": 3,
+    "top_alerts": [
+      {
+        "repo": "RepoB",
+        "risk_tier": "elevated",
+        "dependabot_critical": 0,
+        "dependabot_high": 1
+      },
+      {
+        "repo": "RepoC",
+        "risk_tier": "elevated",
+        "dependabot_critical": 1,
+        "dependabot_high": 2
+      }
+    ]
+  },
+  "path_attention": [
+    {
+      "repo": "RepoA",
+      "headline": "Fixture context is intentionally compact.",
+      "registry_status": "active",
+      "context_quality": "full"
+    },
+    {
+      "repo": "RepoB",
+      "headline": "Fixture context is intentionally compact.",
+      "registry_status": "recent",
+      "context_quality": "minimum-viable"
+    },
+    {
+      "repo": "RepoC",
+      "headline": "Fixture context is intentionally compact.",
+      "registry_status": "parked",
+      "context_quality": "minimum-viable"
+    }
+  ]
+}

@@ -1,0 +1,245 @@
+{
+  "schema_version": "demo-pcc-v1",
+  "generated_at": "2026-04-05T12:00:00+00:00",
+  "workspace_root": "fixtures/demo",
+  "projects": [
+    {
+      "identity": {
+        "project_key": "RepoA",
+        "display_name": "RepoA",
+        "path": "fixtures/demo/RepoA",
+        "section_marker": "fixture-demo",
+        "has_git": true,
+        "top_level_dir": "fixtures",
+        "group_key": "demo",
+        "group_label": "Demo Portfolio",
+        "section_label": "Fixture Demo"
+      },
+      "declared": {
+        "operating_path": "fixtures/demo/RepoA",
+        "category": "demo-product",
+        "tool_provenance": "Codex",
+        "lifecycle_state": "shipped",
+        "purpose": "A polished shipped project.",
+        "criticality": "demo",
+        "review_cadence": "weekly",
+        "intended_disposition": "keep",
+        "maturity_program": "operator-os-fixture",
+        "target_maturity": "public-demo",
+        "automation_eligible": false
+      },
+      "derived": {
+        "context_quality": "full",
+        "registry_status": "active",
+        "attention_state": "active-product",
+        "stack": [
+          "Python"
+        ],
+        "context_files": [
+          "README.md",
+          "docs/current-state.md"
+        ],
+        "context_file_count": 2,
+        "primary_context_file": "README.md",
+        "project_summary_present": true,
+        "current_state_present": true,
+        "stack_present": true,
+        "run_instructions_present": true,
+        "known_risks_present": false,
+        "next_recommended_move_present": true,
+        "last_meaningful_activity_at": "2026-04-05T12:00:00+00:00",
+        "activity_status": "current",
+        "has_tests": true,
+        "has_ci": true,
+        "has_license": true,
+        "readme_char_count": 2100,
+        "release_count": 2
+      },
+      "risk": {
+        "risk_tier": "baseline",
+        "risk_factors": [],
+        "risk_summary": "No elevated fixture risk.",
+        "security_risk": false,
+        "doctor_gap": false,
+        "context_risk": false,
+        "path_risk": false
+      },
+      "security": {
+        "alerts_available": true,
+        "dependabot_critical": 0,
+        "dependabot_high": 0,
+        "dependabot_medium": 0,
+        "dependabot_low": 0,
+        "secret_scanning_open": 0,
+        "code_scanning_critical": 0,
+        "code_scanning_high": 0
+      },
+      "advisory": {
+        "legacy_status": "shipped",
+        "legacy_context_quality": "full",
+        "legacy_category": "fixture-demo",
+        "legacy_tool_provenance": "sample"
+      }
+    },
+    {
+      "identity": {
+        "project_key": "RepoB",
+        "display_name": "RepoB",
+        "path": "fixtures/demo/RepoB",
+        "section_marker": "fixture-demo",
+        "has_git": true,
+        "top_level_dir": "fixtures",
+        "group_key": "demo",
+        "group_label": "Demo Portfolio",
+        "section_label": "Fixture Demo"
+      },
+      "declared": {
+        "operating_path": "fixtures/demo/RepoB",
+        "category": "demo-support",
+        "tool_provenance": "Claude Code",
+        "lifecycle_state": "functional",
+        "purpose": "A functional project with follow-through left to do.",
+        "criticality": "demo",
+        "review_cadence": "weekly",
+        "intended_disposition": "keep",
+        "maturity_program": "operator-os-fixture",
+        "target_maturity": "public-demo",
+        "automation_eligible": false
+      },
+      "derived": {
+        "context_quality": "minimum-viable",
+        "registry_status": "recent",
+        "attention_state": "decision-needed",
+        "stack": [
+          "TypeScript"
+        ],
+        "context_files": [
+          "README.md",
+          "docs/current-state.md"
+        ],
+        "context_file_count": 2,
+        "primary_context_file": "README.md",
+        "project_summary_present": true,
+        "current_state_present": true,
+        "stack_present": true,
+        "run_instructions_present": false,
+        "known_risks_present": false,
+        "next_recommended_move_present": true,
+        "last_meaningful_activity_at": "2026-04-05T12:00:00+00:00",
+        "activity_status": "current",
+        "has_tests": true,
+        "has_ci": false,
+        "has_license": true,
+        "readme_char_count": 1800,
+        "release_count": 0
+      },
+      "risk": {
+        "risk_tier": "moderate",
+        "risk_factors": [
+          "open high/critical alerts"
+        ],
+        "risk_summary": "Security follow-through needs operator review.",
+        "security_risk": true,
+        "doctor_gap": false,
+        "context_risk": true,
+        "path_risk": false
+      },
+      "security": {
+        "alerts_available": true,
+        "dependabot_critical": 0,
+        "dependabot_high": 1,
+        "dependabot_medium": 2,
+        "dependabot_low": 1,
+        "secret_scanning_open": 0,
+        "code_scanning_critical": 0,
+        "code_scanning_high": 0
+      },
+      "advisory": {
+        "legacy_status": "functional",
+        "legacy_context_quality": "minimum-viable",
+        "legacy_category": "fixture-demo",
+        "legacy_tool_provenance": "sample"
+      }
+    },
+    {
+      "identity": {
+        "project_key": "RepoC",
+        "display_name": "RepoC",
+        "path": "fixtures/demo/RepoC",
+        "section_marker": "fixture-demo",
+        "has_git": true,
+        "top_level_dir": "fixtures",
+        "group_key": "demo",
+        "group_label": "Demo Portfolio",
+        "section_label": "Fixture Demo"
+      },
+      "declared": {
+        "operating_path": "fixtures/demo/RepoC",
+        "category": "demo-support",
+        "tool_provenance": "Codex",
+        "lifecycle_state": "wip",
+        "purpose": "A risky work-in-progress project.",
+        "criticality": "demo",
+        "review_cadence": "weekly",
+        "intended_disposition": "keep",
+        "maturity_program": "operator-os-fixture",
+        "target_maturity": "public-demo",
+        "automation_eligible": true
+      },
+      "derived": {
+        "context_quality": "minimum-viable",
+        "registry_status": "parked",
+        "attention_state": "decision-needed",
+        "stack": [
+          "Python"
+        ],
+        "context_files": [
+          "README.md",
+          "docs/current-state.md"
+        ],
+        "context_file_count": 2,
+        "primary_context_file": "README.md",
+        "project_summary_present": true,
+        "current_state_present": false,
+        "stack_present": true,
+        "run_instructions_present": true,
+        "known_risks_present": false,
+        "next_recommended_move_present": true,
+        "last_meaningful_activity_at": "2026-04-05T12:00:00+00:00",
+        "activity_status": "current",
+        "has_tests": false,
+        "has_ci": false,
+        "has_license": true,
+        "readme_char_count": 1500,
+        "release_count": 0
+      },
+      "risk": {
+        "risk_tier": "moderate",
+        "risk_factors": [
+          "open high/critical alerts"
+        ],
+        "risk_summary": "Security follow-through needs operator review.",
+        "security_risk": true,
+        "doctor_gap": true,
+        "context_risk": true,
+        "path_risk": false
+      },
+      "security": {
+        "alerts_available": true,
+        "dependabot_critical": 1,
+        "dependabot_high": 2,
+        "dependabot_medium": 1,
+        "dependabot_low": 0,
+        "secret_scanning_open": 0,
+        "code_scanning_critical": 0,
+        "code_scanning_high": 1
+      },
+      "advisory": {
+        "legacy_status": "wip",
+        "legacy_context_quality": "minimum-viable",
+        "legacy_category": "fixture-demo",
+        "legacy_tool_provenance": "sample"
+      }
+    }
+  ]
+}
