@@ -96,6 +96,7 @@ def render_portfolio_report_markdown(
     grouped = _group_projects(snapshot.projects)
     context_counts = Counter(project.derived.context_quality for project in snapshot.projects)
     registry_counts = Counter(project.derived.registry_status for project in snapshot.projects)
+    attention_counts = Counter(project.derived.attention_state for project in snapshot.projects)
     operating_path_counts = Counter(
         project.declared.operating_path or "unspecified" for project in snapshot.projects
     )
@@ -140,13 +141,14 @@ def render_portfolio_report_markdown(
         "- The truth layer scans the local workspace first, using directory metadata and small allowlisted context files only.",
         "- Declared ownership, lifecycle, review cadence, category, and tool hints come from `portfolio-catalog.yaml` when present.",
         "- Local git recency and safe filesystem timestamps drive the derived activity and compatibility status fields.",
+        "- Registry status describes activity recency; attention state decides whether an item deserves default operator attention.",
         "- Legacy registry values are treated as migration evidence only; they do not override derived activity or context truth.",
         "- Optional Notion fields are advisory and are not allowed to replace declared lifecycle or owner data.",
         "",
         "## Canonical Portfolio Truth Table",
         "",
-        "| Project | Path | Group | Operating Path | Path Status | Lifecycle | Registry Status | Context | Tool | Category | Risk |",
-        "|---------|------|-------|----------------|-------------|-----------|-----------------|---------|------|----------|------|",
+        "| Project | Path | Group | Operating Path | Path Status | Lifecycle | Registry Status | Attention State | Context | Tool | Category | Risk |",
+        "|---------|------|-------|----------------|-------------|-----------|-----------------|-----------------|---------|------|----------|------|",
     ]
     for project in snapshot.projects:
         path_status = project.derived.path_confidence
@@ -156,7 +158,8 @@ def render_portfolio_report_markdown(
             f"| {project.identity.display_name} | `{project.identity.path}` | {project.identity.section_marker} | "
             f"{project.declared.operating_path or '—'} | {path_status} | "
             f"{project.declared.lifecycle_state or '—'} | {project.derived.registry_status} | "
-            f"{project.derived.context_quality} | {project.declared.tool_provenance or 'unknown'} | {project.declared.category or 'unknown'} | {project.risk.risk_tier} |"
+            f"{project.derived.attention_state} | {project.derived.context_quality} | "
+            f"{project.declared.tool_provenance or 'unknown'} | {project.declared.category or 'unknown'} | {project.risk.risk_tier} |"
         )
 
     lines.extend(
@@ -166,6 +169,7 @@ def render_portfolio_report_markdown(
             "",
             f"- Context coverage: full `{context_counts.get('full', 0)}`, standard `{context_counts.get('standard', 0)}`, minimum-viable `{context_counts.get('minimum-viable', 0)}`, boilerplate `{context_counts.get('boilerplate', 0)}`, none `{context_counts.get('none', 0)}`",
             f"- Registry status distribution: active `{registry_counts.get('active', 0)}`, recent `{registry_counts.get('recent', 0)}`, parked `{registry_counts.get('parked', 0)}`, archived `{registry_counts.get('archived', 0)}`",
+            f"- Default attention distribution: active-product `{attention_counts.get('active-product', 0)}`, active-infra `{attention_counts.get('active-infra', 0)}`, decision-needed `{attention_counts.get('decision-needed', 0)}`, manual-only `{attention_counts.get('manual-only', 0)}`, experiment `{attention_counts.get('experiment', 0)}`, parked `{attention_counts.get('parked', 0)}`, archived `{attention_counts.get('archived', 0)}`",
             f"- Operating path distribution: maintain `{operating_path_counts.get('maintain', 0)}`, finish `{operating_path_counts.get('finish', 0)}`, archive `{operating_path_counts.get('archive', 0)}`, experiment `{operating_path_counts.get('experiment', 0)}`, unspecified `{operating_path_counts.get('unspecified', 0)}`",
             f"- Investigate overrides currently surfaced: `{override_counts.get('investigate', 0)}`",
             f"- Risk posture: elevated `{risk_tier_counts.get('elevated', 0)}`, moderate `{risk_tier_counts.get('moderate', 0)}`, baseline `{risk_tier_counts.get('baseline', 0)}`, deferred `{risk_tier_counts.get('deferred', 0)}`",
@@ -184,6 +188,12 @@ def render_portfolio_report_markdown(
             f" | Recent `{sum(1 for item in projects if item.derived.registry_status == 'recent')}`"
             f" | Parked `{sum(1 for item in projects if item.derived.registry_status == 'parked')}`"
             f" | Archived `{sum(1 for item in projects if item.derived.registry_status == 'archived')}`"
+        )
+        lines.append(
+            f"- Default attention: active-product `{sum(1 for item in projects if item.derived.attention_state == 'active-product')}`, "
+            f"active-infra `{sum(1 for item in projects if item.derived.attention_state == 'active-infra')}`, "
+            f"decision-needed `{sum(1 for item in projects if item.derived.attention_state == 'decision-needed')}`, "
+            f"non-default `{sum(1 for item in projects if item.derived.attention_state not in {'active-product', 'active-infra', 'decision-needed'})}`"
         )
         lines.append(
             f"- Context: full `{sum(1 for item in projects if item.derived.context_quality == 'full')}`, "

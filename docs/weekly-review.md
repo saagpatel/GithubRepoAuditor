@@ -21,7 +21,7 @@ Use this guide for the normal ongoing operator loop. If you need the broader pro
 The primary workbook, HTML, Markdown, review-pack, and scheduled-handoff surfaces all tell the same compressed operator story:
 
 - `Act Now` means blocked or urgent pressure is active right now.
-- `Watch Closely` means the repo is active and deserves attention, but it does not outrank the highest-pressure work yet.
+- `Watch Closely` means the repo has an active attention state or concrete decision signal, but it does not outrank the highest-pressure work yet.
 - `Improving` means the path is stabilizing and recent action is helping.
 - `Fragile` means progress is real but easy to lose.
 - `Revalidate` means confidence still needs to be rebuilt before the repo should be treated as restored.

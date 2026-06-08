@@ -229,6 +229,7 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     assert alpha.declared.category == "commercial"
     assert alpha.derived.context_quality == "full"
     assert alpha.derived.registry_status == "active"
+    assert alpha.derived.attention_state == "active-product"
     assert alpha.derived.primary_context_file == "CLAUDE.md"
     assert alpha.derived.project_summary_present is True
     assert alpha.derived.next_recommended_move_present is True
@@ -242,11 +243,91 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     assert beta.declared.category == "it-work"
     assert beta.derived.context_quality == "boilerplate"
     assert beta.derived.registry_status == "parked"
+    assert beta.derived.attention_state == "parked"
 
     assert gamma.identity.section_marker == "iOS Projects"
     assert gamma.derived.stack == ["Swift"]
 
-    assert result.snapshot.schema_version == "0.5.0"
+    assert result.snapshot.schema_version == "0.6.0"
+    assert result.snapshot.source_summary["attention_state_counts"]["active-product"] == 1
+    assert result.snapshot.source_summary["attention_state_counts"]["parked"] == 1
+
+
+def test_attention_state_classifier_separates_activity_from_operator_attention() -> None:
+    from src.portfolio_truth_reconcile import _attention_state_for
+
+    assert (
+        _attention_state_for(
+            registry_status="active",
+            lifecycle_state="active",
+            operating_path="maintain",
+            intended_disposition="maintain",
+            category="commercial",
+            path_override="",
+            risk_entry={"security_risk": False},
+        )
+        == "active-product"
+    )
+    assert (
+        _attention_state_for(
+            registry_status="active",
+            lifecycle_state="active",
+            operating_path="maintain",
+            intended_disposition="maintain",
+            category="infrastructure",
+            path_override="",
+            risk_entry={"security_risk": False},
+        )
+        == "active-infra"
+    )
+    assert (
+        _attention_state_for(
+            registry_status="active",
+            lifecycle_state="active",
+            operating_path="maintain",
+            intended_disposition="maintain",
+            category="vanity",
+            path_override="investigate",
+            risk_entry={"security_risk": False},
+        )
+        == "decision-needed"
+    )
+    assert (
+        _attention_state_for(
+            registry_status="active",
+            lifecycle_state="active",
+            operating_path="maintain",
+            intended_disposition="maintain",
+            category="fun",
+            path_override="",
+            risk_entry={"security_risk": False},
+        )
+        == "manual-only"
+    )
+    assert (
+        _attention_state_for(
+            registry_status="active",
+            lifecycle_state="active",
+            operating_path="experiment",
+            intended_disposition="experiment",
+            category="vanity",
+            path_override="investigate",
+            risk_entry={"security_risk": True},
+        )
+        == "experiment"
+    )
+    assert (
+        _attention_state_for(
+            registry_status="archived",
+            lifecycle_state="archived",
+            operating_path="archive",
+            intended_disposition="archive",
+            category="commercial",
+            path_override="investigate",
+            risk_entry={"security_risk": True},
+        )
+        == "archived"
+    )
 
 
 def test_build_security_fields_maps_ghas_entry() -> None:

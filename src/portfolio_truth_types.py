@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = "0.5.0"
+SCHEMA_VERSION = "0.6.0"
 
 # The published "latest" portfolio-truth artifact. The producer
 # (portfolio_truth_publish) writes it; every reader resolves it through
@@ -22,6 +22,16 @@ def truth_latest_path(output_dir: Path) -> Path:
 VALID_CONTEXT_QUALITY = {"full", "standard", "minimum-viable", "boilerplate", "none"}
 VALID_ACTIVITY_STATUS = {"active", "recent", "stale", "archived"}
 VALID_REGISTRY_STATUS = {"active", "recent", "parked", "archived"}
+VALID_ATTENTION_STATES = {
+    "active-product",
+    "active-infra",
+    "decision-needed",
+    "parked",
+    "archived",
+    "experiment",
+    "evidence-history",
+    "manual-only",
+}
 VALID_LIFECYCLE_STATES = {"active", "maintenance", "dormant", "experimental", "archived"}
 VALID_CATEGORY_TAGS = {
     "commercial",
@@ -105,6 +115,7 @@ class DerivedFields:
     last_meaningful_activity_at: datetime | None = None
     activity_status: str = "stale"
     registry_status: str = "parked"
+    attention_state: str = "parked"
     path_override: str = ""
     path_confidence: str = "legacy"
     path_rationale: str = ""
