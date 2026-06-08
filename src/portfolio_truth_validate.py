@@ -12,6 +12,7 @@ from src.portfolio_truth_render import registry_project_labels
 from src.portfolio_truth_types import (
     SCHEMA_VERSION,
     VALID_ACTIVITY_STATUS,
+    VALID_ATTENTION_STATES,
     VALID_CONTEXT_QUALITY,
     VALID_DOCTOR_STANDARDS,
     VALID_LIFECYCLE_STATES,
@@ -48,6 +49,10 @@ def validate_truth_snapshot(snapshot: PortfolioTruthSnapshot) -> None:
         if project.derived.registry_status not in VALID_REGISTRY_STATUS:
             raise ValueError(
                 f"Invalid registry status for {key}: {project.derived.registry_status}"
+            )
+        if project.derived.attention_state not in VALID_ATTENTION_STATES:
+            raise ValueError(
+                f"Invalid attention state for {key}: {project.derived.attention_state}"
             )
         completeness_flags = (
             project.derived.project_summary_present,

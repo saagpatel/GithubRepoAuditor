@@ -14,6 +14,7 @@ def _make_portfolio_truth() -> dict:
                 "declared": {"operating_path": "maintain"},
                 "derived": {
                     "registry_status": "active",
+                    "attention_state": "decision-needed",
                     "activity_status": "active",
                     "path_override": "investigate",
                     "path_confidence": "low",
@@ -34,6 +35,7 @@ def _make_portfolio_truth() -> dict:
                 "declared": {"operating_path": ""},
                 "derived": {
                     "registry_status": "active",
+                    "attention_state": "decision-needed",
                     "activity_status": "active",
                     "path_override": "investigate",
                     "path_confidence": "low",
@@ -50,10 +52,32 @@ def _make_portfolio_truth() -> dict:
                 },
             },
             {
+                "identity": {"display_name": "QuietActive"},
+                "declared": {"operating_path": "maintain"},
+                "derived": {
+                    "registry_status": "active",
+                    "attention_state": "manual-only",
+                    "activity_status": "active",
+                    "path_override": "",
+                    "path_confidence": "high",
+                    "context_quality": "standard",
+                    "path_rationale": "Active registry entry, but not default operator attention.",
+                },
+                "risk": {
+                    "risk_tier": "baseline",
+                    "risk_factors": [],
+                    "risk_summary": "No current attention decision.",
+                    "doctor_gap": False,
+                    "context_risk": False,
+                    "path_risk": False,
+                },
+            },
+            {
                 "identity": {"display_name": "ArchiveMe"},
                 "declared": {"operating_path": "archive"},
                 "derived": {
                     "registry_status": "archived",
+                    "attention_state": "archived",
                     "activity_status": "stale",
                     "path_override": "",
                     "path_confidence": "high",
@@ -116,15 +140,22 @@ def test_build_weekly_command_center_digest_surfaces_truth_and_guardrails() -> N
     assert digest["contract_version"] == "weekly_command_center_digest_v1"
     assert digest["authority_cap"] == "bounded-automation"
     assert digest["decision_quality"]["status"] == "needs-skepticism"
-    assert digest["portfolio_truth"]["project_count"] == 3
+    assert digest["portfolio_truth"]["project_count"] == 4
+    assert digest["portfolio_truth"]["active_project_count"] == 3
+    assert digest["portfolio_truth"]["default_attention_count"] == 2
+    assert digest["portfolio_truth"]["decision_needed_count"] == 2
     assert digest["portfolio_truth"]["investigate_override_count"] == 2
+    assert digest["portfolio_truth"]["attention_state_counts"]["manual-only"] == 1
     assert digest["path_attention"][0]["repo"] == "JobCommandCenter"
     assert digest["path_attention"][0]["headline"] == "Unspecified stable path"
+    assert all(item["attention_state"] == "decision-needed" for item in digest["path_attention"])
+    assert "QuietActive" not in {item["repo"] for item in digest["path_attention"]}
     assert digest["report_only_guardrail"].startswith("This digest is descriptive only.")
 
     # Risk posture assertions
     assert digest["risk_posture"]["elevated_count"] == 2
     assert digest["portfolio_truth"]["risk_tier_counts"]["elevated"] == 2
+    assert digest["portfolio_truth"]["risk_tier_counts"]["baseline"] == 1
     assert digest["portfolio_truth"]["risk_tier_counts"]["deferred"] == 1
 
     rendered_md = render_weekly_command_center_markdown(digest)

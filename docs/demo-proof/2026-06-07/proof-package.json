@@ -1,0 +1,183 @@
+{
+  "schema_version": "proof-package.v1",
+  "package_id": "20260607-portfolio-command-center-demo",
+  "subject": {
+    "repo": "PortfolioCommandCenter",
+    "lane": "local-desktop-demo",
+    "claim": "The five-tab desktop demo reflects the current GithubRepoAuditor portfolio truth snapshot."
+  },
+  "producer": {
+    "repo": "GithubRepoAuditor",
+    "mode": "demo",
+    "commands": [
+      "python -m src.cli --portfolio-truth --portfolio-truth-include-security saagpatel",
+      "python -m src.cli triage saagpatel --control-center",
+      "pnpm demo:desktop"
+    ]
+  },
+  "source_state": {
+    "generated_at": "2026-06-07T17:00:59.463918+00:00",
+    "git_branch": "main",
+    "git_status": "dirty-preexisting-delete:.github/pull_request_template.md",
+    "freshness_window_hours": 24,
+    "source_truth_schema": "0.5.0"
+  },
+  "claims": [
+    {
+      "id": "portfolio-tab-count",
+      "statement": "The Portfolio tab shows 129 projects from the truth snapshot.",
+      "status": "passed",
+      "evidence": [
+        "portfolio-screenshot",
+        "portfolio-truth"
+      ]
+    },
+    {
+      "id": "risk-security-tab",
+      "statement": "The Risk + Security tab shows 117 scanned repos and 63 repos with open high/critical Dependabot alerts.",
+      "status": "passed",
+      "evidence": [
+        "risk-security-screenshot",
+        "portfolio-truth"
+      ]
+    },
+    {
+      "id": "burndown-tab",
+      "statement": "The Burndown tab renders advisory-grouped fix guidance with affected repo counts.",
+      "status": "passed",
+      "evidence": [
+        "burndown-screenshot"
+      ]
+    },
+    {
+      "id": "trends-tab",
+      "statement": "The Trends tab renders risk-tier and high/critical history charts.",
+      "status": "passed",
+      "evidence": [
+        "trends-screenshot"
+      ]
+    },
+    {
+      "id": "weekly-digest-tab",
+      "statement": "The Weekly Digest tab shows the current decision ending with 'Start with codexkit.'",
+      "status": "passed",
+      "evidence": [
+        "weekly-digest-screenshot",
+        "weekly-digest-json"
+      ]
+    },
+    {
+      "id": "five-frame-contact-sheet",
+      "statement": "A contact sheet exists for quick visual smoke review of all five frames.",
+      "status": "passed",
+      "evidence": [
+        "contact-sheet"
+      ]
+    }
+  ],
+  "verification": {
+    "overall": "passed",
+    "checks": [
+      {
+        "name": "manifest references local screenshots and source receipts",
+        "status": "passed"
+      },
+      {
+        "name": "demo proof README lists commands, source truth, and proof points",
+        "status": "passed"
+      }
+    ],
+    "missing_receipts": [],
+    "known_gaps": [
+      "This package proves the 2026-06-07 local demo capture, not current live runtime freshness after that timestamp.",
+      "PortfolioCommandCenter is the subject repo; screenshot evidence is intentionally stored under the GithubRepoAuditor producer repo."
+    ]
+  },
+  "safety": {
+    "redaction": "none",
+    "secrets_checked": true,
+    "live_write_performed": false
+  },
+  "artifacts": [
+    {
+      "id": "demo-readme",
+      "kind": "summary",
+      "path": "README.md",
+      "description": "Human-readable demo proof summary.",
+      "required": true
+    },
+    {
+      "id": "recording-checklist",
+      "kind": "checklist",
+      "path": "RECORDING-CHECKLIST.md",
+      "description": "90-second capture order and publish-time checks.",
+      "required": true
+    },
+    {
+      "id": "portfolio-screenshot",
+      "kind": "screenshot",
+      "path": "images/01-portfolio.png",
+      "description": "Portfolio tab screenshot.",
+      "required": true
+    },
+    {
+      "id": "risk-security-screenshot",
+      "kind": "screenshot",
+      "path": "images/02-risk-security.png",
+      "description": "Risk + Security tab screenshot.",
+      "required": true
+    },
+    {
+      "id": "burndown-screenshot",
+      "kind": "screenshot",
+      "path": "images/03-burndown.png",
+      "description": "Burndown tab screenshot.",
+      "required": true
+    },
+    {
+      "id": "trends-screenshot",
+      "kind": "screenshot",
+      "path": "images/04-trends.png",
+      "description": "Trends tab screenshot.",
+      "required": true
+    },
+    {
+      "id": "weekly-digest-screenshot",
+      "kind": "screenshot",
+      "path": "images/05-weekly-digest.png",
+      "description": "Weekly Digest tab screenshot.",
+      "required": true
+    },
+    {
+      "id": "contact-sheet",
+      "kind": "screenshot",
+      "path": "images/contact-sheet.png",
+      "description": "Five-frame visual smoke contact sheet.",
+      "required": true
+    },
+    {
+      "id": "portfolio-truth",
+      "kind": "json-receipt",
+      "path": "../../../output/portfolio-truth-latest.json",
+      "description": "Canonical portfolio truth snapshot consumed by the demo.",
+      "required": true,
+      "owner_repo": "GithubRepoAuditor"
+    },
+    {
+      "id": "weekly-digest-json",
+      "kind": "json-receipt",
+      "path": "../../../output/weekly-command-center-saagpatel-2026-06-03.json",
+      "description": "Weekly command-center digest consumed by the Weekly Digest tab.",
+      "required": true,
+      "owner_repo": "GithubRepoAuditor"
+    },
+    {
+      "id": "portfolio-command-center-readme",
+      "kind": "repo-doc",
+      "path": "../../../../PortfolioCommandCenter/README.md",
+      "description": "Subject repo demo instructions and proof pointer.",
+      "required": true,
+      "owner_repo": "PortfolioCommandCenter"
+    }
+  ]
+}

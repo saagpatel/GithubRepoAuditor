@@ -1,0 +1,57 @@
+{
+  "schema_version": "proof-package.v1",
+  "package_id": "fixture-valid-proof-package",
+  "subject": {
+    "repo": "FixtureRepo",
+    "lane": "demo-proof",
+    "claim": "The fixture demo proof is structurally valid."
+  },
+  "producer": {
+    "repo": "FixtureRepo",
+    "mode": "demo",
+    "commands": [
+      "fixture demo"
+    ]
+  },
+  "source_state": {
+    "generated_at": "2026-06-07T00:00:00Z",
+    "git_branch": "main",
+    "git_status": "clean",
+    "freshness_window_hours": 24
+  },
+  "claims": [
+    {
+      "id": "fixture-evidence-present",
+      "statement": "The required fixture evidence file exists.",
+      "status": "passed",
+      "evidence": [
+        "fixture-evidence"
+      ]
+    }
+  ],
+  "verification": {
+    "overall": "passed",
+    "checks": [
+      {
+        "name": "manifest structural validation",
+        "status": "passed"
+      }
+    ],
+    "missing_receipts": [],
+    "known_gaps": []
+  },
+  "safety": {
+    "redaction": "none",
+    "secrets_checked": true,
+    "live_write_performed": false
+  },
+  "artifacts": [
+    {
+      "id": "fixture-evidence",
+      "kind": "evidence",
+      "path": "evidence/example.txt",
+      "description": "Tiny fixture evidence file.",
+      "required": true
+    }
+  ]
+}

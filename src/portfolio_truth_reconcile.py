@@ -61,6 +61,7 @@ PRECEDENCE_MATRIX: dict[str, list[str]] = {
     "derived.last_meaningful_activity_at": ["git", "workspace"],
     "derived.activity_status": ["derived"],
     "derived.registry_status": ["derived"],
+    "derived.attention_state": ["derived"],
     "derived.path_override": ["normalized"],
     "derived.path_confidence": ["normalized"],
     "derived.path_rationale": ["normalized"],
@@ -221,6 +222,9 @@ def build_portfolio_truth_snapshot(
         ),
         "registry_status_counts": dict(
             Counter(project.derived.registry_status for project in projects)
+        ),
+        "attention_state_counts": dict(
+            Counter(project.derived.attention_state for project in projects)
         ),
         "duplicate_display_names": _duplicate_display_names(projects),
         "unresolved_duplicate_display_names": _unresolved_duplicate_display_names(projects),
@@ -458,6 +462,15 @@ def _build_truth_project(
         security_high_alerts=security.dependabot_high,
         security_critical_alerts=security.dependabot_critical,
     )
+    attention_state = _attention_state_for(
+        registry_status=registry_status,
+        lifecycle_state=declared_values["lifecycle_state"],
+        operating_path=path_entry.get("operating_path", ""),
+        intended_disposition=declared_values["intended_disposition"],
+        category=declared_values["category"],
+        path_override=path_entry.get("path_override", ""),
+        risk_entry=risk_entry,
+    )
 
     declared = DeclaredFields(
         owner=declared_values["owner"],
@@ -482,6 +495,7 @@ def _build_truth_project(
     }
     provenance["derived.activity_status"] = {"source": "derived", "detail": activity_status}
     provenance["derived.registry_status"] = {"source": "derived", "detail": registry_status}
+    provenance["derived.attention_state"] = {"source": "derived", "detail": attention_state}
     provenance["derived.stack"] = {"source": "workspace", "detail": ", ".join(raw_project["stack"])}
     provenance["derived.context_files"] = {
         "source": "workspace",
@@ -543,6 +557,7 @@ def _build_truth_project(
         last_meaningful_activity_at=last_activity,
         activity_status=activity_status,
         registry_status=registry_status,
+        attention_state=attention_state,
         path_override=path_entry.get("path_override", ""),
         path_confidence=path_entry.get("path_confidence", "legacy"),
         path_rationale=path_entry.get("path_rationale", ""),
@@ -723,3 +738,36 @@ def _registry_status_for(activity_status: str) -> str:
     if activity_status == "stale":
         return "parked"
     return activity_status
+
+
+def _attention_state_for(
+    *,
+    registry_status: str,
+    lifecycle_state: str,
+    operating_path: str,
+    intended_disposition: str,
+    category: str,
+    path_override: str,
+    risk_entry: dict[str, Any],
+) -> str:
+    if registry_status == "archived" or lifecycle_state == "archived" or operating_path == "archive":
+        return "archived"
+    if (
+        operating_path == "experiment"
+        or intended_disposition == "experiment"
+        or lifecycle_state == "experimental"
+    ):
+        return "experiment"
+    if registry_status == "parked":
+        return "parked"
+    if path_override == "investigate" or not operating_path or risk_entry.get("security_risk"):
+        return "decision-needed"
+    if registry_status in {"active", "recent"} and operating_path in {"maintain", "finish"}:
+        if category == "infrastructure":
+            return "active-infra"
+        if category == "commercial":
+            return "active-product"
+        return "manual-only"
+    if registry_status in {"active", "recent"}:
+        return "manual-only"
+    return "parked"

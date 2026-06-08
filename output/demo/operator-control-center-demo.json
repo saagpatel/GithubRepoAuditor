@@ -1,0 +1,134 @@
+{
+  "username": "sample-user",
+  "generated_at": "2026-04-12T12:00:00+00:00",
+  "report_reference": "",
+  "watch_state": {},
+  "campaign_summary": {
+    "campaign_type": "security-review",
+    "label": "Security Review",
+    "action_count": 1,
+    "repo_count": 1
+  },
+  "writeback_preview": {
+    "sync_mode": "reconcile",
+    "repos": [
+      {
+        "repo": "RepoC",
+        "topics": [
+          "ghra-call-security-review"
+        ],
+        "issue_title": "[Repo Auditor] Security Review",
+        "notion_action_count": 1
+      }
+    ]
+  },
+  "writeback_results": {
+    "mode": "apply",
+    "target": "github",
+    "results": [
+      {
+        "repo_full_name": "sample-user/RepoC",
+        "target": "github-issue",
+        "status": "created",
+        "url": "https://github.com/sample-user/RepoC/issues/1"
+      }
+    ]
+  },
+  "managed_state_drift": [
+    {
+      "repo_full_name": "sample-user/RepoC",
+      "target": "github-issue",
+      "drift_state": "managed-issue-edited"
+    }
+  ],
+  "operator_summary": {
+    "headline": "RepoC still needs security follow-through before the queue will calm down.",
+    "counts": {
+      "blocked": 1,
+      "urgent": 1,
+      "ready": 1,
+      "deferred": 1
+    },
+    "source_run_id": "sample-user:2026-04-12T12:00:00+00:00",
+    "next_recommended_run_mode": "incremental",
+    "watch_strategy": "adaptive",
+    "watch_decision_summary": "The current baseline is still compatible, so incremental watch remains safe for the next run.",
+    "what_changed": "RepoC drift needs review and RepoB reopened a release checklist item.",
+    "why_it_matters": "Live drift is still present, so security work should stay ahead of lower-pressure cleanup.",
+    "what_to_do_next": "Review RepoC first, then close RepoB's reopened checklist item.",
+    "trend_summary": "Queue pressure is stable but still sticky.",
+    "follow_through_summary": "One urgent item is still repeating in the recent window.",
+    "primary_target_reason": "RepoC remains the top target because live drift is still open.",
+    "closure_guidance": "Clear RepoC's security drift before moving to lower-pressure work.",
+    "primary_target_trust_policy": "verify-first",
+    "primary_target_trust_policy_reason": "The recommendation is sound, but recent reopen noise means it should still be reviewed before acting.",
+    "control_center_reference": "output/demo/operator-control-center-sample-user-2026-04-12.json"
+  },
+  "operator_queue": [
+    {
+      "repo": "RepoC",
+      "title": "Security drift needs review",
+      "lane": "blocked",
+      "lane_label": "Blocked",
+      "lane_reason": "Governed security drift is still unresolved.",
+      "kind": "campaign",
+      "priority": 1,
+      "summary": "RepoC still needs a governance decision before the security review can settle.",
+      "recommended_action": "Open the governed control preview and decide whether to apply CodeQL.",
+      "repo_url": "https://github.com/sample-user/RepoC",
+      "links": [
+        {
+          "label": "GitHub Issue",
+          "url": "https://github.com/sample-user/RepoC/issues/1"
+        }
+      ]
+    },
+    {
+      "repo": "RepoB",
+      "title": "Release checklist reopened",
+      "lane": "urgent",
+      "lane_label": "Needs Attention Now",
+      "lane_reason": "A previously quiet repo reopened a visible checklist item.",
+      "kind": "review",
+      "priority": 2,
+      "summary": "RepoB needs a small release follow-through pass.",
+      "recommended_action": "Re-run the release checklist and close the missing item.",
+      "repo_url": "https://github.com/sample-user/RepoB"
+    },
+    {
+      "repo": "RepoA",
+      "title": "Protect shipped momentum",
+      "lane": "ready",
+      "lane_label": "Ready for Manual Action",
+      "lane_reason": "RepoA is healthy enough that a small polish task would keep it strong.",
+      "kind": "maintenance",
+      "priority": 3,
+      "summary": "A small polish pass would keep the showcase repo strong.",
+      "recommended_action": "Tidy the release notes and publish the next small maintenance release.",
+      "repo_url": "https://github.com/sample-user/RepoA"
+    },
+    {
+      "repo": "RepoA",
+      "title": "Archive old brainstorm notes",
+      "lane": "deferred",
+      "lane_label": "Safe to Defer",
+      "lane_reason": "This is cleanup-only work with no current pressure.",
+      "kind": "cleanup",
+      "priority": 4,
+      "summary": "Backlog cleanup is optional this week.",
+      "recommended_action": "Leave this alone unless priorities change.",
+      "repo_url": "https://github.com/sample-user/RepoA"
+    }
+  ],
+  "portfolio_outcomes_summary": {},
+  "operator_effectiveness_summary": {},
+  "high_pressure_queue_history": [],
+  "operator_setup_health": {},
+  "operator_recent_changes": [],
+  "review_summary": {
+    "review_id": "sample-review-1",
+    "status": "open",
+    "source_run_id": "sample-user:2026-04-12T12:00:00+00:00"
+  },
+  "preflight_summary": {}
+}

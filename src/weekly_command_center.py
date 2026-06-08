@@ -193,7 +193,7 @@ def render_weekly_command_center_markdown(digest: dict[str, Any]) -> str:
         f"- Next Step: {_safe_text(digest.get('next_step'))}",
         f"- Decision Quality: `{_safe_text(decision_quality.get('status'))}` — {_safe_text(decision_quality.get('summary'))}",
         f"- Operating Paths: {_safe_text(digest.get('operating_paths_summary')) or 'No operating-path summary is recorded yet.'}",
-        f"- Portfolio Truth: {portfolio_truth.get('project_count', 0)} projects, {portfolio_truth.get('active_project_count', 0)} active, {portfolio_truth.get('investigate_override_count', 0)} with investigate override, {portfolio_truth.get('low_confidence_path_count', 0)} low-confidence paths",
+        f"- Portfolio Truth: {portfolio_truth.get('project_count', 0)} projects, {portfolio_truth.get('active_project_count', 0)} active registry entries, {portfolio_truth.get('default_attention_count', 0)} default attention, {portfolio_truth.get('decision_needed_count', 0)} decision-needed",
         f"- Risk Posture: {risk_posture.get('elevated_count', 0)} elevated, {tier_counts.get('moderate', 0)} moderate, {tier_counts.get('baseline', 0)} baseline",
         f"- Security Posture: {security_posture.get('scanned_count', 0)} scanned, {security_posture.get('repos_with_open_high_critical', 0)} with open high/critical Dependabot alerts ({security_posture.get('total_open_critical', 0)} critical, {security_posture.get('total_open_high', 0)} high)",
         "",
@@ -206,7 +206,7 @@ def render_weekly_command_center_markdown(digest: dict[str, Any]) -> str:
     else:
         for item in path_attention:
             lines.append(
-                f"- {item['repo']} — {item['headline']} ({item['registry_status']}, {item['context_quality']} context)"
+                f"- {item['repo']} — {item['headline']} ({item['attention_state']}, {item['registry_status']} registry, {item['context_quality']} context)"
             )
 
     lines.extend(["", "## Automation Candidates"])
@@ -285,6 +285,7 @@ def _build_truth_summary(portfolio_truth: dict[str, Any]) -> dict[str, Any]:
     path_counts: dict[str, int] = {}
     override_counts: dict[str, int] = {}
     risk_tier_counts: dict[str, int] = {}
+    attention_state_counts: dict[str, int] = {}
     active_project_count = 0
     low_confidence_path_count = 0
 
@@ -298,6 +299,8 @@ def _build_truth_summary(portfolio_truth: dict[str, Any]) -> dict[str, Any]:
         path_counts[operating_path] = path_counts.get(operating_path, 0) + 1
         override = _safe_text(derived.get("path_override")) or "none"
         override_counts[override] = override_counts.get(override, 0) + 1
+        attention_state = _safe_text(derived.get("attention_state")) or "manual-only"
+        attention_state_counts[attention_state] = attention_state_counts.get(attention_state, 0) + 1
         tier = _safe_text(risk.get("risk_tier")) or "baseline"
         risk_tier_counts[tier] = risk_tier_counts.get(tier, 0) + 1
         if _safe_text(derived.get("registry_status")) == "active":
@@ -311,8 +314,14 @@ def _build_truth_summary(portfolio_truth: dict[str, Any]) -> dict[str, Any]:
         "context_quality_counts": context_counts,
         "operating_path_counts": path_counts,
         "path_override_counts": override_counts,
+        "attention_state_counts": attention_state_counts,
         "risk_tier_counts": risk_tier_counts,
         "elevated_risk_count": risk_tier_counts.get("elevated", 0),
+        "default_attention_count": sum(
+            attention_state_counts.get(state, 0)
+            for state in ("active-product", "active-infra", "decision-needed")
+        ),
+        "decision_needed_count": attention_state_counts.get("decision-needed", 0),
         "low_confidence_path_count": low_confidence_path_count,
         "investigate_override_count": override_counts.get("investigate", 0),
     }
@@ -321,7 +330,7 @@ def _build_truth_summary(portfolio_truth: dict[str, Any]) -> dict[str, Any]:
 def _build_path_attention_items(portfolio_truth: dict[str, Any]) -> list[dict[str, Any]]:
     projects = list(portfolio_truth.get("projects") or [])
     candidates: list[dict[str, Any]] = []
-    status_rank = {"active": 0, "candidate": 1, "parked": 2, "archived": 3}
+    status_rank = {"decision-needed": 0, "active-product": 1, "active-infra": 2}
     context_rank = {"none": 0, "boilerplate": 1, "minimum-viable": 2, "standard": 3, "full": 4}
 
     for project in projects:
@@ -329,7 +338,8 @@ def _build_path_attention_items(portfolio_truth: dict[str, Any]) -> list[dict[st
         declared = _mapping(project.get("declared"))
         derived = _mapping(project.get("derived"))
         registry_status = _safe_text(derived.get("registry_status"))
-        if registry_status not in {"active", "candidate"}:
+        attention_state = _safe_text(derived.get("attention_state"))
+        if attention_state != "decision-needed":
             continue
         operating_path = _safe_text(declared.get("operating_path"))
         override = _safe_text(derived.get("path_override"))
@@ -348,6 +358,7 @@ def _build_path_attention_items(portfolio_truth: dict[str, Any]) -> list[dict[st
             {
                 "repo": _safe_text(identity.get("display_name")) or "Repo",
                 "headline": headline,
+                "attention_state": attention_state,
                 "registry_status": registry_status or "unknown",
                 "context_quality": context_quality,
                 "path_confidence": _safe_text(derived.get("path_confidence")) or "legacy",
@@ -359,7 +370,7 @@ def _build_path_attention_items(portfolio_truth: dict[str, Any]) -> list[dict[st
 
     candidates.sort(
         key=lambda item: (
-            status_rank.get(item["registry_status"], 9),
+            status_rank.get(item["attention_state"], 9),
             0 if item["operating_path"] == "unspecified" else 1,
             0 if item["path_confidence"] == "low" else 1,
             context_rank.get(item["context_quality"], 9),

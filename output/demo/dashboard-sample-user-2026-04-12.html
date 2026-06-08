@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8'>
+<title>Portfolio Dashboard: sample-user</title>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #F8FAFC; color: #1B2A4A; line-height: 1.6; }
+    header { background: #1B2A4A; color: white; padding: 24px 32px; }
+    header h1 { font-size: 24px; margin-bottom: 4px; }
+    header p { color: #94A3B8; font-size: 14px; }
+    .kpi-row { display: flex; gap: 16px; padding: 24px 32px; }
+    .kpi-card { flex: 1; background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; text-align: center; }
+    .kpi-label { font-size: 12px; color: #64748B; text-transform: uppercase; letter-spacing: 1px; }
+    .kpi-value { font-size: 32px; font-weight: 700; color: #1B2A4A; }
+    .lens-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+    .lens-card, .panel { background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; }
+    .lens-score { font-size: 28px; font-weight: 700; color: #1D4ED8; margin: 8px 0; }
+    .lens-text { color: #64748B; font-size: 13px; }
+    .analyst-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+    .meta-line { margin-bottom: 8px; color: #334155; }
+    .pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .pill { display: inline-block; padding: 4px 10px; border-radius: 999px; background: #E0F2FE; color: #075985; font-size: 12px; }
+    .bullet-list { margin: 12px 0 0 18px; color: #334155; }
+    .bullet-list li { margin-bottom: 6px; }
+    .muted { color: #64748B; }
+    .compact-table { font-size: 12px; }
+    .compact-table th, .compact-table td { padding: 6px 8px; }
+    .section { padding: 24px 32px; }
+    .section h2 { font-size: 18px; color: #1B2A4A; margin-bottom: 16px; border-bottom: 2px solid #E2E8F0; padding-bottom: 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { background: #1B2A4A; color: white; padding: 8px 12px; text-align: left; font-weight: 600; }
+    td { padding: 6px 12px; border-bottom: 1px solid #E2E8F0; }
+    tr:nth-child(even) { background: #F8FAFC; }
+    tr:hover { background: #EEF2FF; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .desc { color: #64748B; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sparkline { font-family: 'Courier New', monospace; color: #0EA5E9; letter-spacing: 1px; }
+    a { color: #0EA5E9; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .filters { display: flex; gap: 8px; margin-bottom: 12px; }
+    .filters select, .filters input { padding: 6px 12px; border: 1px solid #CBD5E1; border-radius: 4px; font-size: 13px; }
+    .filters input { flex: 1; }
+    canvas { width: 100%; max-width: 800px; border: 1px solid #E2E8F0; border-radius: 8px; background: white; }
+    .tooltip { position: absolute; background: #1B2A4A; color: white; padding: 6px 10px; border-radius: 4px; font-size: 12px; pointer-events: none; display: none; z-index: 10; }
+    .bar-chart { max-width: 500px; }
+    .bar-row { display: flex; align-items: center; margin-bottom: 8px; }
+    .bar-label { width: 90px; font-size: 13px; font-weight: 600; }
+    .bar-bg { flex: 1; height: 24px; background: #E2E8F0; border-radius: 4px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+    .bar-count { width: 40px; text-align: right; font-size: 13px; color: #64748B; margin-left: 8px; }
+    .empty-state { color: #64748B; font-style: italic; padding: 16px 0; }
+    .trends-delta { margin-bottom: 16px; font-size: 14px; color: #1B2A4A; }
+    footer { text-align: center; padding: 24px; color: #94A3B8; font-size: 12px; border-top: 1px solid #E2E8F0; margin-top: 32px; }
+    @media print {
+      .filters { display: none; }
+      canvas { display: none; }
+      header { background: white; color: #1B2A4A; border-bottom: 2px solid #1B2A4A; }
+      header p { color: #64748B; }
+      body { font-size: 10pt; }
+      .kpi-card { break-inside: avoid; }
+      .section { page-break-inside: avoid; }
+    }
+    </style>
+</head>
+<body>
+
+    <header>
+      <h1>Portfolio Dashboard: sample-user</h1>
+      <p>Generated 2026-04-12 | 3 repos audited | Grade <span style="color:#15803D;font-weight:bold">B</span></p>
+    </header>
+
+    <div class="kpi-row">
+      <div class="kpi-card"><div class="kpi-label">Avg Score</div><div class="kpi-value">0.65</div></div>
+      <div class="kpi-card"><div class="kpi-label">Shipped</div><div class="kpi-value" style="color:#166534">1</div></div>
+      <div class="kpi-card"><div class="kpi-label">Functional</div><div class="kpi-value" style="color:#1565C0">1</div></div>
+      <div class="kpi-card"><div class="kpi-label">Needs Work</div><div class="kpi-value" style="color:#C2410C">0</div></div>
+    </div>
+
+    <div class="section">
+      <h2>Risk Posture</h2>
+      <div class="kpi-row">
+        <div class="kpi-card"><div class="kpi-label">Elevated</div>
+          <div class="kpi-value" style="color:#DC2626">2</div></div>
+        <div class="kpi-card"><div class="kpi-label">Moderate</div>
+          <div class="kpi-value" style="color:#D97706">0</div></div>
+        <div class="kpi-card"><div class="kpi-label">Baseline</div>
+          <div class="kpi-value" style="color:#16A34A">1</div></div>
+        <div class="kpi-card"><div class="kpi-label">Deferred</div>
+          <div class="kpi-value" style="color:#6B7280">0</div></div>
+      </div>
+      <ul><li><strong>RepoB</strong>: Security follow-through needs operator review.</li><li><strong>RepoC</strong>: Security follow-through needs operator review.</li></ul>
+    </div>
+
+
+    <div class="section">
+      <h2>Operator Control Center</h2>
+      <div class="panel">
+        <div class="meta-line"><strong>Headline:</strong> RepoC still needs security follow-through before the queue will calm down.</div>
+        <div class="meta-line"><strong>Run Changes:</strong> Average score moved +0.020; 0 meaningful improvements, 0 regressions, 1 promotions, and 1 demotions were recorded.</div>
+        <div class="meta-line"><strong>Queue Pressure:</strong> 1 blocked, 1 urgent, 1 ready, and 1 deferred item(s) are currently in the queue.</div>
+        <div class="meta-line"><strong>Trust / Actionability:</strong> verify-first — The recommendation is sound, but recent reopen noise means it should still be reviewed before acting.</div>
+        <div class="meta-line"><strong>Top Recommendation:</strong> Review RepoC first, then close RepoB&#x27;s reopened checklist item.</div>
+        <div class="meta-line"><strong>Source Run:</strong> sample-user:2026-04-12T12:00:00+00:00</div>
+        <div class="meta-line"><strong>Next Recommended Run:</strong> incremental</div>
+        <div class="meta-line"><strong>Watch Strategy:</strong> adaptive</div>
+        <div class="meta-line"><strong>Watch Decision:</strong> The current baseline is still compatible, so incremental watch remains safe for the next run.</div>
+        <div class="meta-line"><strong>What Changed:</strong> RepoC drift needs review and RepoB reopened a release checklist item.</div>
+        <div class="meta-line"><strong>Why It Matters:</strong> Live drift is still present, so security work should stay ahead of lower-pressure cleanup.</div>
+        <div class="meta-line"><strong>What To Do Next:</strong> Review RepoC first, then close RepoB&#x27;s reopened checklist item.</div>
+        <div class="meta-line"><strong>Trend:</strong> Queue pressure is stable but still sticky.</div>
+        <div class="meta-line"><strong>Accountability:</strong> No accountability summary is recorded yet.</div>
+        <div class="meta-line"><strong>Follow-Through:</strong> One urgent item is still repeating in the recent window.</div>
+        <div class="meta-line"><strong>Next Checkpoint:</strong> Use the next run or linked artifact to confirm whether the recommendation moved.</div>
+        <div class="meta-line"><strong>Escalation:</strong> No stronger follow-through escalation is currently surfaced.</div>
+        <div class="meta-line"><strong>Recovery / Retirement:</strong> No follow-through recovery or escalation-retirement signal is currently surfaced.</div>
+        <div class="meta-line"><strong>Recovery Persistence:</strong> No follow-through recovery persistence signal is currently surfaced.</div>
+        <div class="meta-line"><strong>Relapse Churn:</strong> No relapse churn is currently surfaced.</div>
+        <div class="meta-line"><strong>Recovery Freshness:</strong> No follow-through recovery freshness signal is currently surfaced.</div>
+        <div class="meta-line"><strong>Recovery Memory Reset:</strong> No follow-through recovery memory reset signal is currently surfaced.</div>
+        <div class="meta-line"><strong>Recovery Rebuild Strength:</strong> No follow-through recovery rebuild-strength signal is currently surfaced.</div>
+        <div class="meta-line"><strong>Recovery Reacquisition:</strong> No follow-through recovery reacquisition signal is currently surfaced.</div>
+        <div class="meta-line"><strong>Reacquisition Durability:</strong> No follow-through reacquisition durability signal is currently surfaced.</div>
+        <div class="meta-line"><strong>Reacquisition Confidence:</strong> No follow-through reacquisition confidence-consolidation signal is currently surfaced.</div>
+        <div class="meta-line"><strong>Reacquisition Softening Decay:</strong> No reacquisition softening-decay signal is currently surfaced.</div>
+        <div class="meta-line"><strong>Reacquisition Confidence Retirement:</strong> No reacquisition confidence-retirement signal is currently surfaced.</div>
+        <div class="meta-line"><strong>Revalidation Recovery:</strong> No post-revalidation recovery or confidence re-earning signal is currently surfaced.</div>
+        <div class="meta-line"><strong>Primary Target:</strong> No active target</div>
+        <div class="meta-line"><strong>Why This Is The Top Target:</strong> RepoC remains the top target because live drift is still open.</div>
+        <div class="meta-line"><strong>What Counts As Done:</strong> No done-state guidance is recorded yet.</div>
+        <div class="meta-line"><strong>Closure Guidance:</strong> Clear RepoC&#x27;s security drift before moving to lower-pressure work.</div>
+        <div class="meta-line"><strong>What We Tried:</strong> No intervention evidence is recorded yet.</div>
+        <div class="meta-line"><strong>Resolution Evidence:</strong> No resolution evidence is recorded yet.</div>
+        <div class="meta-line"><strong>Primary Target Confidence:</strong> low (0.00)</div>
+        <div class="meta-line"><strong>Confidence Reasons:</strong> No confidence rationale is recorded yet.</div>
+        <div class="meta-line"><strong>Next Action Confidence:</strong> low (0.00)</div>
+        <div class="meta-line"><strong>Trust Policy:</strong> verify-first — The recommendation is sound, but recent reopen noise means it should still be reviewed before acting.</div>
+        <div class="meta-line"><strong>Why This Confidence Is Actionable:</strong> No adaptive confidence summary is recorded yet.</div>
+        <div class="meta-line"><strong>Trust Policy Exception:</strong> none — No trust-policy exception reason is recorded yet.</div>
+        <div class="meta-line"><strong>Exception Pattern Learning:</strong> none — No exception-pattern reason is recorded yet.</div>
+        <div class="meta-line"><strong>Trust Recovery:</strong> none — No trust-recovery reason is recorded yet.</div>
+        <div class="meta-line"><strong>Recovery Confidence:</strong> low (0.00) — No recovery-confidence summary is recorded yet.</div>
+        <div class="meta-line"><strong>Exception Retirement:</strong> none — No exception-retirement reason is recorded yet.</div>
+        <div class="meta-line"><strong>Policy Debt Cleanup:</strong> none — No policy-debt reason is recorded yet.</div>
+        <div class="meta-line"><strong>Class-Level Trust Normalization:</strong> none — No class-normalization reason is recorded yet.</div>
+        <div class="meta-line"><strong>Class Memory Freshness:</strong> insufficient-data — No class-memory freshness reason is recorded yet.</div>
+        <div class="meta-line"><strong>Trust Decay Controls:</strong> none — No class-decay reason is recorded yet.</div>
+        <div class="meta-line"><strong>Class Trust Reweighting:</strong> neutral (0.00)</div>
+        <div class="meta-line"><strong>Why Class Guidance Shifted:</strong> No class reweighting rationale is recorded yet.</div>
+        <div class="meta-line"><strong>Class Trust Momentum:</strong> insufficient-data (0.00)</div>
+        <div class="meta-line"><strong>Reweighting Stability:</strong> watch — none: No class transition reason is recorded yet.</div>
+        <div class="meta-line"><strong>Class Transition Health:</strong> none — No class transition health reason is recorded yet.</div>
+        <div class="meta-line"><strong>Pending Transition Resolution:</strong> none — No class transition resolution reason is recorded yet.</div>
+        <div class="meta-line"><strong>Transition Closure Confidence:</strong> low (0.00) — none</div>
+        <div class="meta-line"><strong>Class Pending Debt Audit:</strong> none — No class pending-debt reason is recorded yet.</div>
+        <div class="meta-line"><strong>Pending Debt Freshness:</strong> insufficient-data — No pending-debt freshness reason is recorded yet.</div>
+        <div class="meta-line"><strong>Closure Forecast Reweighting:</strong> neutral (0.00)</div>
+        <div class="meta-line"><strong>Closure Forecast Momentum:</strong> insufficient-data (0.00)</div>
+        <div class="meta-line"><strong>Closure Forecast Freshness:</strong> insufficient-data — No closure-forecast freshness reason is recorded yet.</div>
+        <div class="meta-line"><strong>Closure Forecast Hysteresis:</strong> watch — none: No closure-forecast hysteresis reason is recorded yet.</div>
+        <div class="meta-line"><strong>Hysteresis Decay Controls:</strong> none — No closure-forecast decay reason is recorded yet.</div>
+        <div class="meta-line"><strong>Closure Forecast Refresh Recovery:</strong> none (0.00)</div>
+        <div class="meta-line"><strong>Reacquisition Controls:</strong> none — No closure-forecast reacquisition reason is recorded yet.</div>
+        <div class="meta-line"><strong>Reacquisition Persistence:</strong> none (0.00; 0 run(s))</div>
+        <div class="meta-line"><strong>Recovery Churn Controls:</strong> none — No recovery-churn reason is recorded yet.</div>
+        <div class="meta-line"><strong>Reacquisition Freshness:</strong> insufficient-data — No reacquisition-freshness reason is recorded yet.</div>
+        <div class="meta-line"><strong>Persistence Reset Controls:</strong> none — No persistence-reset reason is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Refresh Recovery:</strong> none (0.00)</div>
+        <div class="meta-line"><strong>Reset Re-entry Controls:</strong> none — No reset re-entry reason is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Persistence:</strong> none (0.00; 0 run(s))</div>
+        <div class="meta-line"><strong>Reset Re-entry Churn Controls:</strong> none — No reset re-entry churn reason is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Freshness:</strong> insufficient-data — No reset re-entry freshness reason is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Reset Controls:</strong> none — No reset re-entry reset reason is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Refresh Recovery:</strong> none (0.00)</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Controls:</strong> none — No reset re-entry rebuild reason is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Freshness:</strong> insufficient-data — No reset re-entry rebuild freshness reason is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Reset Controls:</strong> none — No reset re-entry rebuild reset reason is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Refresh Recovery:</strong> none (0.00)</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-entry Controls:</strong> none — No reset re-entry rebuild re-entry reason is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Persistence:</strong> none (0.00; 0 run(s))</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Churn Controls:</strong> none — No reset re-entry rebuild re-entry churn reason is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Freshness:</strong> insufficient-data — No reset re-entry rebuild re-entry freshness reason is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Reset Controls:</strong> none — No reset re-entry rebuild re-entry reset reason is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Refresh Recovery:</strong> none — No reset re-entry rebuild re-entry refresh recovery summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Controls:</strong> none — No reset re-entry rebuild re-entry restore reason is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Freshness:</strong> insufficient-data — No reset re-entry rebuild re-entry restore freshness reason is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Reset Controls:</strong> none — No reset re-entry rebuild re-entry restore reset reason is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Refresh Recovery:</strong> none — No reset re-entry rebuild re-entry restore refresh recovery summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Controls:</strong> none — No reset re-entry rebuild re-entry restore re-restore reason is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Persistence:</strong> none (0.00; 0 run(s))</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Churn Controls:</strong> none — No reset re-entry rebuild re-entry restore re-restore churn reason is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Freshness:</strong> insufficient-data — No reset re-entry rebuild re-entry restore re-restore freshness reason is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Reset Controls:</strong> none — No reset re-entry rebuild re-entry restore re-restore reset reason is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Refresh Recovery:</strong> none — No reset re-entry rebuild re-entry restore re-restore refresh recovery summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Controls:</strong> none — No reset re-entry rebuild re-entry restore re-re-restore reason is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Persistence:</strong> none (0.00; 0 run(s))</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Churn Controls:</strong> none — No reset re-entry rebuild re-entry restore re-re-restore churn reason is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness:</strong> insufficient-data — No reset re-entry rebuild re-entry restore re-re-restore freshness reason is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Controls:</strong> none — No reset re-entry rebuild re-entry restore re-re-restore reset reason is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery:</strong> none — No reset re-entry rebuild re-entry restore re-re-restore refresh recovery summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Controls:</strong> none — No reset re-entry rebuild re-entry restore re-re-re-restore reason is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence:</strong> none (0.00; 0 run(s))</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Controls:</strong> none — No reset re-entry rebuild re-entry restore re-re-re-restore churn reason is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Persistence:</strong> none (0.00; 0 run(s))</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Churn Controls:</strong> none — No reset re-entry rebuild churn reason is recorded yet.</div>
+        <div class="meta-line"><strong>Recommendation Drift:</strong> stable — No recommendation-drift summary is recorded yet.</div>
+        <div class="meta-line"><strong>Exception Pattern Summary:</strong> No exception-pattern summary is recorded yet.</div>
+        <div class="meta-line"><strong>Exception Retirement Summary:</strong> No exception-retirement summary is recorded yet.</div>
+        <div class="meta-line"><strong>Policy Debt Summary:</strong> No policy-debt summary is recorded yet.</div>
+        <div class="meta-line"><strong>Trust Normalization Summary:</strong> No trust-normalization summary is recorded yet.</div>
+        <div class="meta-line"><strong>Class Memory Summary:</strong> No class-memory summary is recorded yet.</div>
+        <div class="meta-line"><strong>Class Decay Summary:</strong> No class-decay summary is recorded yet.</div>
+        <div class="meta-line"><strong>Class Reweighting Summary:</strong> No class reweighting summary is recorded yet.</div>
+        <div class="meta-line"><strong>Class Momentum Summary:</strong> No class momentum summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reweighting Stability Summary:</strong> No reweighting stability summary is recorded yet.</div>
+        <div class="meta-line"><strong>Class Transition Health Summary:</strong> No class transition health summary is recorded yet.</div>
+        <div class="meta-line"><strong>Pending Transition Resolution Summary:</strong> No class transition resolution summary is recorded yet.</div>
+        <div class="meta-line"><strong>Transition Closure Confidence Summary:</strong> No transition-closure confidence summary is recorded yet.</div>
+        <div class="meta-line"><strong>Class Pending Debt Summary:</strong> No class pending-debt summary is recorded yet.</div>
+        <div class="meta-line"><strong>Class Pending Resolution Summary:</strong> No class pending-resolution summary is recorded yet.</div>
+        <div class="meta-line"><strong>Pending Debt Freshness Summary:</strong> No pending-debt freshness summary is recorded yet.</div>
+        <div class="meta-line"><strong>Pending Debt Decay Summary:</strong> No pending-debt decay summary is recorded yet.</div>
+        <div class="meta-line"><strong>Closure Forecast Reweighting Summary:</strong> No closure-forecast reweighting summary is recorded yet.</div>
+        <div class="meta-line"><strong>Closure Forecast Momentum Summary:</strong> No closure-forecast momentum summary is recorded yet.</div>
+        <div class="meta-line"><strong>Closure Forecast Freshness Summary:</strong> No closure-forecast freshness summary is recorded yet.</div>
+        <div class="meta-line"><strong>Closure Forecast Stability Summary:</strong> No closure-forecast stability summary is recorded yet.</div>
+        <div class="meta-line"><strong>Closure Forecast Hysteresis Summary:</strong> No closure-forecast hysteresis summary is recorded yet.</div>
+        <div class="meta-line"><strong>Closure Forecast Decay Summary:</strong> No closure-forecast decay summary is recorded yet.</div>
+        <div class="meta-line"><strong>Closure Forecast Refresh Recovery Summary:</strong> No closure-forecast refresh-recovery summary is recorded yet.</div>
+        <div class="meta-line"><strong>Closure Forecast Reacquisition Summary:</strong> No closure-forecast reacquisition summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reacquisition Persistence Summary:</strong> No reacquisition-persistence summary is recorded yet.</div>
+        <div class="meta-line"><strong>Recovery Churn Summary:</strong> No recovery-churn summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reacquisition Freshness Summary:</strong> No reacquisition-freshness summary is recorded yet.</div>
+        <div class="meta-line"><strong>Persistence Reset Summary:</strong> No persistence-reset summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Refresh Recovery Summary:</strong> No reset-refresh recovery summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Summary:</strong> No reset re-entry summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Persistence Summary:</strong> No reset re-entry persistence summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Churn Summary:</strong> No reset re-entry churn summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Freshness Summary:</strong> No reset re-entry freshness summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Reset Summary:</strong> No reset re-entry reset summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Refresh Recovery Summary:</strong> No reset re-entry refresh-recovery summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Summary:</strong> No reset re-entry rebuild summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Freshness Summary:</strong> No reset re-entry rebuild-freshness summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Reset Summary:</strong> No reset re-entry rebuild-reset summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Refresh Recovery Summary:</strong> No reset re-entry rebuild-refresh-recovery summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-entry Summary:</strong> No reset re-entry rebuild re-entry summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Persistence Summary:</strong> No reset re-entry rebuild re-entry persistence summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Churn Summary:</strong> No reset re-entry rebuild re-entry churn summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Freshness Summary:</strong> No reset re-entry rebuild re-entry freshness summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Reset Summary:</strong> No reset re-entry rebuild re-entry reset summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Refresh Recovery Summary:</strong> No reset re-entry rebuild re-entry refresh recovery summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Summary:</strong> No reset re-entry rebuild re-entry restore summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Freshness Summary:</strong> No reset re-entry rebuild re-entry restore freshness summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Reset Summary:</strong> No reset re-entry rebuild re-entry restore reset summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Refresh Recovery Summary:</strong> No reset re-entry rebuild re-entry restore refresh recovery summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Summary:</strong> No reset re-entry rebuild re-entry restore re-restore summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Persistence Summary:</strong> No reset re-entry rebuild re-entry restore re-restore persistence summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Churn Summary:</strong> No reset re-entry rebuild re-entry restore re-restore churn summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Freshness Summary:</strong> No reset re-entry rebuild re-entry restore re-restore freshness summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Reset Summary:</strong> No reset re-entry rebuild re-entry restore re-restore reset summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Restore Refresh Recovery Summary:</strong> No reset re-entry rebuild re-entry restore re-restore refresh recovery summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Summary:</strong> No reset re-entry rebuild re-entry restore re-re-restore summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Persistence Summary:</strong> No reset re-entry rebuild re-entry restore re-re-restore persistence summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Churn Summary:</strong> No reset re-entry rebuild re-entry restore re-re-restore churn summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Freshness Summary:</strong> No reset re-entry rebuild re-entry restore re-re-restore freshness summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Reset Summary:</strong> No reset re-entry rebuild re-entry restore re-re-restore reset summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Restore Refresh Recovery Summary:</strong> No reset re-entry rebuild re-entry restore re-re-restore refresh recovery summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Summary:</strong> No reset re-entry rebuild re-entry restore re-re-re-restore summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Persistence Summary:</strong> No reset re-entry rebuild re-entry restore re-re-re-restore persistence summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Re-Entry Restore Re-Re-Re-Restore Churn Summary:</strong> No reset re-entry rebuild re-entry restore re-re-re-restore churn summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Persistence Summary:</strong> No reset re-entry rebuild-persistence summary is recorded yet.</div>
+        <div class="meta-line"><strong>Reset Re-entry Rebuild Churn Summary:</strong> No reset re-entry rebuild-churn summary is recorded yet.</div>
+        <div class="meta-line"><strong>Recommendation Quality:</strong> No recommendation-quality summary is recorded yet.</div>
+        <div class="meta-line"><strong>Confidence Validation:</strong> insufficient-data — No confidence-calibration summary is recorded yet.</div>
+        <div class="meta-line"><strong>Recent Confidence Outcomes:</strong> No recent judged confidence outcomes are recorded yet.</div>
+        <div class="meta-line"><strong>Blocked:</strong> 1 | <strong>Urgent:</strong> 1 | <strong>Ready:</strong> 1 | <strong>Deferred:</strong> 1</div>
+        <ul class="bullet-list"><li><strong>[Blocked]</strong> RepoC: Security drift needs review<br><span class='muted'>RepoC still needs a governance decision before the security review can settle.</span><br><span class='muted'><strong>Why this lane:</strong> Governed security drift is still unresolved.</span><br><span class='muted'><strong>Next:</strong> Open the governed control preview and decide whether to apply CodeQL.</span><br><span class='muted'><strong>Last movement:</strong> Current run</span><br><span class='muted'><strong>Follow-through:</strong> Unknown — No follow-through evidence is recorded yet.</span><br><span class='muted'><strong>Checkpoint timing:</strong> Unknown</span><br><span class='muted'><strong>Escalation:</strong> Unknown — No stronger follow-through escalation is currently surfaced.</span><br><span class='muted'><strong>Recovery / Retirement:</strong> None — No follow-through recovery or escalation-retirement signal is currently surfaced.</span><br><span class='muted'><strong>Recovery Persistence:</strong> None — No follow-through recovery persistence signal is currently surfaced.</span><br><span class='muted'><strong>Relapse Churn:</strong> None — No relapse churn is currently surfaced.</span><br><span class='muted'><strong>Recovery Freshness:</strong> None — No follow-through recovery freshness signal is currently surfaced.</span><br><span class='muted'><strong>Recovery Memory Reset:</strong> None — No follow-through recovery memory reset signal is currently surfaced.</span><br><span class='muted'><strong>Recovery Rebuild Strength:</strong> None — No follow-through recovery rebuild-strength signal is currently surfaced.</span><br><span class='muted'><strong>Recovery Reacquisition:</strong> None — No follow-through recovery reacquisition signal is currently surfaced.</span><br><span class='muted'><strong>Reacquisition Durability:</strong> None — No follow-through reacquisition durability signal is currently surfaced.</span><br><span class='muted'><strong>Reacquisition Confidence:</strong> None — No follow-through reacquisition confidence-consolidation signal is currently surfaced.</span><br><span class='muted'><strong>Reacquisition Softening Decay:</strong> None — No reacquisition softening-decay signal is currently surfaced.</span><br><span class='muted'><strong>Reacquisition Confidence Retirement:</strong> None — No reacquisition confidence-retirement signal is currently surfaced.</span><br><span class='muted'><strong>Revalidation Recovery:</strong> None — No post-revalidation recovery or confidence re-earning signal is currently surfaced.</span><br><span class='muted'><strong>Next checkpoint:</strong> Use the next run or linked artifact to confirm whether the recommendation moved.</span><br><span class='muted'><strong>Artifact:</strong> https://github.com/sample-user/RepoC/issues/1</span></li><li><strong>[Needs Attention Now]</strong> RepoB: Release checklist reopened<br><span class='muted'>RepoB needs a small release follow-through pass.</span><br><span class='muted'><strong>Why this lane:</strong> A previously quiet repo reopened a visible checklist item.</span><br><span class='muted'><strong>Next:</strong> Re-run the release checklist and close the missing item.</span><br><span class='muted'><strong>Last movement:</strong> Current run</span><br><span class='muted'><strong>Follow-through:</strong> Unknown — No follow-through evidence is recorded yet.</span><br><span class='muted'><strong>Checkpoint timing:</strong> Unknown</span><br><span class='muted'><strong>Escalation:</strong> Unknown — No stronger follow-through escalation is currently surfaced.</span><br><span class='muted'><strong>Recovery / Retirement:</strong> None — No follow-through recovery or escalation-retirement signal is currently surfaced.</span><br><span class='muted'><strong>Recovery Persistence:</strong> None — No follow-through recovery persistence signal is currently surfaced.</span><br><span class='muted'><strong>Relapse Churn:</strong> None — No relapse churn is currently surfaced.</span><br><span class='muted'><strong>Recovery Freshness:</strong> None — No follow-through recovery freshness signal is currently surfaced.</span><br><span class='muted'><strong>Recovery Memory Reset:</strong> None — No follow-through recovery memory reset signal is currently surfaced.</span><br><span class='muted'><strong>Recovery Rebuild Strength:</strong> None — No follow-through recovery rebuild-strength signal is currently surfaced.</span><br><span class='muted'><strong>Recovery Reacquisition:</strong> None — No follow-through recovery reacquisition signal is currently surfaced.</span><br><span class='muted'><strong>Reacquisition Durability:</strong> None — No follow-through reacquisition durability signal is currently surfaced.</span><br><span class='muted'><strong>Reacquisition Confidence:</strong> None — No follow-through reacquisition confidence-consolidation signal is currently surfaced.</span><br><span class='muted'><strong>Reacquisition Softening Decay:</strong> None — No reacquisition softening-decay signal is currently surfaced.</span><br><span class='muted'><strong>Reacquisition Confidence Retirement:</strong> None — No reacquisition confidence-retirement signal is currently surfaced.</span><br><span class='muted'><strong>Revalidation Recovery:</strong> None — No post-revalidation recovery or confidence re-earning signal is currently surfaced.</span><br><span class='muted'><strong>Next checkpoint:</strong> Use the next run or linked artifact to confirm whether the recommendation moved.</span><br><span class='muted'><strong>Artifact:</strong> No linked artifact available yet.</span></li><li><strong>[Ready for Manual Action]</strong> RepoA: Protect shipped momentum<br><span class='muted'>A small polish pass would keep the showcase repo strong.</span><br><span class='muted'><strong>Why this lane:</strong> RepoA is healthy enough that a small polish task would keep it strong.</span><br><span class='muted'><strong>Next:</strong> Tidy the release notes and publish the next small maintenance release.</span><br><span class='muted'><strong>Last movement:</strong> Current run</span><br><span class='muted'><strong>Follow-through:</strong> Unknown — No follow-through evidence is recorded yet.</span><br><span class='muted'><strong>Checkpoint timing:</strong> Unknown</span><br><span class='muted'><strong>Escalation:</strong> Unknown — No stronger follow-through escalation is currently surfaced.</span><br><span class='muted'><strong>Recovery / Retirement:</strong> None — No follow-through recovery or escalation-retirement signal is currently surfaced.</span><br><span class='muted'><strong>Recovery Persistence:</strong> None — No follow-through recovery persistence signal is currently surfaced.</span><br><span class='muted'><strong>Relapse Churn:</strong> None — No relapse churn is currently surfaced.</span><br><span class='muted'><strong>Recovery Freshness:</strong> None — No follow-through recovery freshness signal is currently surfaced.</span><br><span class='muted'><strong>Recovery Memory Reset:</strong> None — No follow-through recovery memory reset signal is currently surfaced.</span><br><span class='muted'><strong>Recovery Rebuild Strength:</strong> None — No follow-through recovery rebuild-strength signal is currently surfaced.</span><br><span class='muted'><strong>Recovery Reacquisition:</strong> None — No follow-through recovery reacquisition signal is currently surfaced.</span><br><span class='muted'><strong>Reacquisition Durability:</strong> None — No follow-through reacquisition durability signal is currently surfaced.</span><br><span class='muted'><strong>Reacquisition Confidence:</strong> None — No follow-through reacquisition confidence-consolidation signal is currently surfaced.</span><br><span class='muted'><strong>Reacquisition Softening Decay:</strong> None — No reacquisition softening-decay signal is currently surfaced.</span><br><span class='muted'><strong>Reacquisition Confidence Retirement:</strong> None — No reacquisition confidence-retirement signal is currently surfaced.</span><br><span class='muted'><strong>Revalidation Recovery:</strong> None — No post-revalidation recovery or confidence re-earning signal is currently surfaced.</span><br><span class='muted'><strong>Next checkpoint:</strong> Use the next run or linked artifact to confirm whether the recommendation moved.</span><br><span class='muted'><strong>Artifact:</strong> No linked artifact available yet.</span></li><li><strong>[Safe to Defer]</strong> RepoA: Archive old brainstorm notes<br><span class='muted'>Backlog cleanup is optional this week.</span><br><span class='muted'><strong>Why this lane:</strong> This is cleanup-only work with no current pressure.</span><br><span class='muted'><strong>Next:</strong> Leave this alone unless priorities change.</span><br><span class='muted'><strong>Last movement:</strong> Current run</span><br><span class='muted'><strong>Follow-through:</strong> Unknown — No follow-through evidence is recorded yet.</span><br><span class='muted'><strong>Checkpoint timing:</strong> Unknown</span><br><span class='muted'><strong>Escalation:</strong> Unknown — No stronger follow-through escalation is currently surfaced.</span><br><span class='muted'><strong>Recovery / Retirement:</strong> None — No follow-through recovery or escalation-retirement signal is currently surfaced.</span><br><span class='muted'><strong>Recovery Persistence:</strong> None — No follow-through recovery persistence signal is currently surfaced.</span><br><span class='muted'><strong>Relapse Churn:</strong> None — No relapse churn is currently surfaced.</span><br><span class='muted'><strong>Recovery Freshness:</strong> None — No follow-through recovery freshness signal is currently surfaced.</span><br><span class='muted'><strong>Recovery Memory Reset:</strong> None — No follow-through recovery memory reset signal is currently surfaced.</span><br><span class='muted'><strong>Recovery Rebuild Strength:</strong> None — No follow-through recovery rebuild-strength signal is currently surfaced.</span><br><span class='muted'><strong>Recovery Reacquisition:</strong> None — No follow-through recovery reacquisition signal is currently surfaced.</span><br><span class='muted'><strong>Reacquisition Durability:</strong> None — No follow-through reacquisition durability signal is currently surfaced.</span><br><span class='muted'><strong>Reacquisition Confidence:</strong> None — No follow-through reacquisition confidence-consolidation signal is currently surfaced.</span><br><span class='muted'><strong>Reacquisition Softening Decay:</strong> None — No reacquisition softening-decay signal is currently surfaced.</span><br><span class='muted'><strong>Reacquisition Confidence Retirement:</strong> None — No reacquisition confidence-retirement signal is currently surfaced.</span><br><span class='muted'><strong>Revalidation Recovery:</strong> None — No post-revalidation recovery or confidence re-earning signal is currently surfaced.</span><br><span class='muted'><strong>Next checkpoint:</strong> Use the next run or linked artifact to confirm whether the recommendation moved.</span><br><span class='muted'><strong>Artifact:</strong> No linked artifact available yet.</span></li></ul>
+        <div class="meta-line"><strong>Recently Changed:</strong></div>
+        <ul class="bullet-list"><li>No recent operator changes were loaded.</li></ul>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Weekly Review Pack</h2>
+      <div class="analyst-grid">
+        <div class="panel">
+          <div class="meta-line"><strong>Product Mode:</strong> Action Sync: use this artifact to confirm the local campaign story first, then preview or apply GitHub, GitHub Projects, or Notion mirrors only after the repo-level decision is settled.</div>
+          <div class="meta-line"><strong>Artifact Role:</strong> Local report remains authoritative; campaigns, writeback, and GitHub Projects are managed mirrors of the decision already made here.</div>
+          <div class="meta-line"><strong>Suggested Reading Order:</strong> Read Review Queue first, then the control-center headline and primary target, then the campaign preview or writeback section before syncing outward.</div>
+          <div class="meta-line"><strong>Next Best Workflow Step:</strong> Keep the local artifact as the source of truth, then use campaign preview or writeback only when the repo decision is already clear.</div>
+          <div class="meta-line"><strong>Portfolio Headline:</strong> RepoC still needs security follow-through before the queue will calm down.</div>
+          <div class="meta-line"><strong>Run Changes:</strong> Average score moved +0.020; 0 meaningful improvements, 0 regressions, 1 promotions, and 1 demotions were recorded.</div>
+          <div class="meta-line"><strong>Queue Pressure:</strong> 1 blocked, 1 urgent, 1 ready, and 1 deferred item(s) are currently in the queue.</div>
+          <div class="meta-line"><strong>Trust / Actionability:</strong> verify-first — The recommendation is sound, but recent reopen noise means it should still be reviewed before acting.</div>
+          <div class="meta-line"><strong>What To Do This Week:</strong> Review RepoC first, then close RepoB&#x27;s reopened checklist item. Start with RepoC if you need a concrete place to begin.</div>
+          <div class="meta-line"><strong>Portfolio Catalog:</strong> No portfolio catalog contract is recorded yet.</div>
+          <div class="meta-line"><strong>Operating Paths:</strong> No normalized operating-path contract is recorded yet.</div>
+          <div class="meta-line"><strong>Intent Alignment:</strong> Intent alignment cannot be judged until a portfolio catalog contract exists.</div>
+          <div class="meta-line"><strong>Scorecards:</strong> No maturity scorecard is recorded yet.</div>
+          <div class="meta-line"><strong>Implementation Hotspots:</strong> No meaningful implementation hotspots are currently surfaced.</div>
+          <div class="meta-line"><strong>Operator Outcomes:</strong> Not enough operator history is recorded yet to judge whether recent actions are improving portfolio outcomes.</div>
+          <div class="meta-line"><strong>Operator Effectiveness:</strong> Not enough judged recommendation history is recorded yet to judge operator effectiveness.</div>
+          <div class="meta-line"><strong>High-Pressure Queue Trend:</strong> High-pressure queue trend is not ready yet.</div>
+          <div class="meta-line"><strong>Action Sync Readiness:</strong> No current campaign needs Action Sync yet, so the safest next move is to keep the story local.</div>
+          <div class="meta-line"><strong>Next Action Sync Step:</strong> Stay local for now; no current campaign needs preview or apply.</div>
+          <div class="meta-line"><strong>Apply Packet:</strong> No current campaign has a safe execution handoff yet, so the local story should stay local for now.</div>
+          <div class="meta-line"><strong>Next Apply Candidate:</strong> Stay local for now; no current campaign has a safe execution handoff.</div>
+          <div class="meta-line"><strong>Action Sync Command Hint:</strong> No Action Sync command is recommended yet.</div>
+          <div class="meta-line"><strong>Post-Apply Monitoring:</strong> No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.</div>
+          <div class="meta-line"><strong>Next Monitoring Step:</strong> Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.</div>
+          <div class="meta-line"><strong>Campaign Tuning:</strong> Campaign tuning stays neutral until there is enough outcome history to bias tied recommendations.</div>
+          <div class="meta-line"><strong>Next Tie-Break Candidate:</strong> No current campaign needs a tie-break candidate yet.</div>
+          <div class="meta-line"><strong>Historical Portfolio Intelligence:</strong> Historical portfolio intelligence is still thin, so the weekly story should stay grounded in the current run and recent operator queue.</div>
+          <div class="meta-line"><strong>Next Historical Focus:</strong> Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet.</div>
+          <div class="meta-line"><strong>Automation Guidance:</strong> Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture.</div>
+          <div class="meta-line"><strong>Next Safe Automation Step:</strong> Stay local for now; no current campaign has a stronger safe automation posture than manual review.</div>
+          <div class="meta-line"><strong>Approval Workflow:</strong> No current approval needs review yet, so the approval workflow can stay local for now.</div>
+          <div class="meta-line"><strong>Next Approval Review:</strong> Stay local for now; no current approval needs review.</div>
+
+            <div class="panel">
+              <h3>Action Sync Readiness</h3>
+              <div class="meta-line"><strong>Summary:</strong> No current campaign needs Action Sync yet, so the safest next move is to keep the story local.</div>
+              <div class="meta-line"><strong>Next Step:</strong> Stay local for now; no current campaign needs preview or apply.</div>
+              <div class="meta-line"><strong>State:</strong> idle</div>
+              <ul class="bullet-list"><li>No supporting evidence is currently surfaced.</li></ul>
+            </div>
+
+            <div class="panel">
+              <h3>Apply Packet</h3>
+              <div class="meta-line"><strong>Summary:</strong> No current campaign has a safe execution handoff yet, so the local story should stay local for now.</div>
+              <div class="meta-line"><strong>Next Candidate:</strong> Stay local for now; no current campaign has a safe execution handoff.</div>
+              <div class="meta-line"><strong>State:</strong> idle</div>
+              <ul class="bullet-list"><li>No supporting evidence is currently surfaced.</li></ul>
+            </div>
+
+            <div class="panel">
+              <h3>Post-Apply Monitoring</h3>
+              <div class="meta-line"><strong>Summary:</strong> No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.</div>
+              <div class="meta-line"><strong>Next Step:</strong> Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.</div>
+              <div class="meta-line"><strong>State:</strong> idle</div>
+              <ul class="bullet-list"><li>No supporting evidence is currently surfaced.</li></ul>
+            </div>
+
+            <div class="panel">
+              <h3>Campaign Tuning</h3>
+              <div class="meta-line"><strong>Summary:</strong> Campaign tuning stays neutral until there is enough outcome history to bias tied recommendations.</div>
+              <div class="meta-line"><strong>Next Tie-Break Candidate:</strong> No current campaign needs a tie-break candidate yet.</div>
+              <div class="meta-line"><strong>State:</strong> idle</div>
+              <ul class="bullet-list"><li>No supporting evidence is currently surfaced.</li></ul>
+            </div>
+
+            <div class="panel">
+              <h3>Historical Portfolio Intelligence</h3>
+              <div class="meta-line"><strong>Summary:</strong> Historical portfolio intelligence is still thin, so the weekly story should stay grounded in the current run and recent operator queue.</div>
+              <div class="meta-line"><strong>Next Focus:</strong> Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet.</div>
+              <div class="meta-line"><strong>State:</strong> idle</div>
+              <ul class="bullet-list"><li>No supporting evidence is currently surfaced.</li></ul>
+            </div>
+
+            <div class="panel">
+              <h3>Automation Guidance</h3>
+              <div class="meta-line"><strong>Summary:</strong> Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture.</div>
+              <div class="meta-line"><strong>Next Step:</strong> Stay local for now; no current campaign has a stronger safe automation posture than manual review.</div>
+              <div class="meta-line"><strong>State:</strong> idle</div>
+              <ul class="bullet-list"><li>No supporting evidence is currently surfaced.</li></ul>
+            </div>
+
+            <div class="panel">
+              <h3>Approval Workflow</h3>
+              <div class="meta-line"><strong>Summary:</strong> No current approval needs review yet, so the approval workflow can stay local for now.</div>
+              <div class="meta-line"><strong>Next Approval Review:</strong> Stay local for now; no current approval needs review.</div>
+              <div class="meta-line"><strong>State:</strong> idle</div>
+              <ul class="bullet-list"><li>No supporting evidence is currently surfaced.</li></ul>
+            </div>
+
+            <div class="panel">
+              <h3>Operator Focus</h3>
+              <div class="meta-line"><strong>Summary:</strong> 2 item(s) need immediate action first, led by RepoC, RepoB.</div>
+              <div class="meta-line"><strong>Next Checkpoint:</strong> Use the next run or linked artifact to confirm whether the recommendation moved.</div>
+              <div class="meta-line"><strong>State:</strong> act-now</div>
+              <ul class="bullet-list"><li><strong>RepoC</strong> — Governed security drift is still unresolved.</li><li><strong>RepoB</strong> — A previously quiet repo reopened a visible checklist item.</li><li><strong>RepoA</strong> — No follow-through evidence is recorded yet.</li><li><strong>RepoA</strong> — No follow-through evidence is recorded yet.</li></ul>
+            </div>
+
+          <div class="meta-line"><strong>Operator Focus:</strong> 2 item(s) need immediate action first, led by RepoC, RepoB.</div>
+          <div class="meta-line"><strong>Next Checkpoint:</strong> Use the next run or linked artifact to confirm whether the recommendation moved.</div>
+          <div class='meta-line'><strong>Act Now:</strong></div><ul class='bullet-list'><li><strong>RepoC: Security drift needs review</strong> — Governed security drift is still unresolved.</li><li><strong>RepoB: Release checklist reopened</strong> — A previously quiet repo reopened a visible checklist item.</li></ul><div class='meta-line'><strong>Watch Closely:</strong></div><ul class='bullet-list'><li><strong>RepoA: Protect shipped momentum</strong> — No follow-through evidence is recorded yet.</li><li><strong>RepoA: Archive old brainstorm notes</strong> — No follow-through evidence is recorded yet.</li></ul><div class='meta-line'><strong>Improving:</strong></div><ul class='bullet-list'><li>No clearly improving hotspots are currently surfaced.</li></ul><div class='meta-line'><strong>Fragile:</strong></div><ul class='bullet-list'><li>No fragile hotspots are currently surfaced.</li></ul><div class='meta-line'><strong>Revalidate:</strong></div><ul class='bullet-list'><li>No revalidation hotspots are currently surfaced.</li></ul>
+          <h3>Top Attention</h3>
+          <ul class="bullet-list"><li><strong>RepoC:</strong> Security drift needs review<br><span class='muted'><strong>What Changed:</strong> Current run</span><br><span class='muted'><strong>Why It Matters:</strong> Governed security drift is still unresolved.</span><br><span class='muted'><strong>What To Do Next:</strong> Open the governed control preview and decide whether to apply CodeQL.</span><br><span class='muted'><strong>Operator Focus:</strong> Act Now: Governed security drift is still unresolved.</span><br><span class='muted'><strong>Catalog:</strong> No portfolio catalog contract is recorded yet.</span><br><span class='muted'><strong>Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet.</strong></span><br><span class='muted'><strong>Intent Alignment:</strong> missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.</span><br><span class='muted'><strong>Scorecard: No maturity scorecard is recorded yet.</strong></span><br><span class='muted'><strong>Maturity Gap:</strong> No maturity gap summary is recorded yet.</span><br><span class='muted'><strong>Evidence:</strong> Operator Focus: Act Now: Governed security drift is still unresolved.; Action Sync: Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.; Automation Guidance: Automation Guidance: keep the next step human-led until a bounded safe posture is surfaced.; Approval Workflow: Approval Workflow: no current approval needs review yet.</span><br><span class='muted'><strong>Checkpoint Timing:</strong> Unknown</span><br><span class='muted'><strong>Next Checkpoint:</strong> Use the next run or linked artifact to confirm whether the recommendation moved.</span></li><li><strong>RepoB:</strong> Release checklist reopened<br><span class='muted'><strong>What Changed:</strong> Current run</span><br><span class='muted'><strong>Why It Matters:</strong> A previously quiet repo reopened a visible checklist item.</span><br><span class='muted'><strong>What To Do Next:</strong> Re-run the release checklist and close the missing item.</span><br><span class='muted'><strong>Operator Focus:</strong> Act Now: A previously quiet repo reopened a visible checklist item.</span><br><span class='muted'><strong>Catalog:</strong> No portfolio catalog contract is recorded yet.</span><br><span class='muted'><strong>Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet.</strong></span><br><span class='muted'><strong>Intent Alignment:</strong> missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.</span><br><span class='muted'><strong>Scorecard: No maturity scorecard is recorded yet.</strong></span><br><span class='muted'><strong>Maturity Gap:</strong> No maturity gap summary is recorded yet.</span><br><span class='muted'><strong>Evidence:</strong> Operator Focus: Act Now: A previously quiet repo reopened a visible checklist item.; Action Sync: Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.; Automation Guidance: Automation Guidance: keep the next step human-led until a bounded safe posture is surfaced.; Approval Workflow: Approval Workflow: no current approval needs review yet.</span><br><span class='muted'><strong>Checkpoint Timing:</strong> Unknown</span><br><span class='muted'><strong>Next Checkpoint:</strong> Use the next run or linked artifact to confirm whether the recommendation moved.</span></li><li><strong>RepoA:</strong> Protect shipped momentum<br><span class='muted'><strong>What Changed:</strong> Current run</span><br><span class='muted'><strong>Why It Matters:</strong> RepoA is healthy enough that a small polish task would keep it strong.</span><br><span class='muted'><strong>What To Do Next:</strong> Tidy the release notes and publish the next small maintenance release.</span><br><span class='muted'><strong>Operator Focus:</strong> Watch Closely: No follow-through evidence is recorded yet.</span><br><span class='muted'><strong>Catalog:</strong> No portfolio catalog contract is recorded yet.</span><br><span class='muted'><strong>Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet.</strong></span><br><span class='muted'><strong>Intent Alignment:</strong> missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.</span><br><span class='muted'><strong>Scorecard: No maturity scorecard is recorded yet.</strong></span><br><span class='muted'><strong>Maturity Gap:</strong> No maturity gap summary is recorded yet.</span><br><span class='muted'><strong>Evidence:</strong> Operator Focus: Watch Closely: No follow-through evidence is recorded yet.; Action Sync: Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.; Automation Guidance: Automation Guidance: keep the next step human-led until a bounded safe posture is surfaced.; Approval Workflow: Approval Workflow: no current approval needs review yet.</span><br><span class='muted'><strong>Checkpoint Timing:</strong> Unknown</span><br><span class='muted'><strong>Next Checkpoint:</strong> Use the next run or linked artifact to confirm whether the recommendation moved.</span></li><li><strong>RepoA:</strong> Archive old brainstorm notes<br><span class='muted'><strong>What Changed:</strong> Current run</span><br><span class='muted'><strong>Why It Matters:</strong> This is cleanup-only work with no current pressure.</span><br><span class='muted'><strong>What To Do Next:</strong> Leave this alone unless priorities change.</span><br><span class='muted'><strong>Operator Focus:</strong> Watch Closely: No follow-through evidence is recorded yet.</span><br><span class='muted'><strong>Catalog:</strong> No portfolio catalog contract is recorded yet.</span><br><span class='muted'><strong>Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet.</strong></span><br><span class='muted'><strong>Intent Alignment:</strong> missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.</span><br><span class='muted'><strong>Scorecard: No maturity scorecard is recorded yet.</strong></span><br><span class='muted'><strong>Maturity Gap:</strong> No maturity gap summary is recorded yet.</span><br><span class='muted'><strong>Evidence:</strong> Operator Focus: Watch Closely: No follow-through evidence is recorded yet.; Action Sync: Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.; Automation Guidance: Automation Guidance: keep the next step human-led until a bounded safe posture is surfaced.; Approval Workflow: Approval Workflow: no current approval needs review yet.</span><br><span class='muted'><strong>Checkpoint Timing:</strong> Unknown</span><br><span class='muted'><strong>Next Checkpoint:</strong> Use the next run or linked artifact to confirm whether the recommendation moved.</span></li></ul>
+        </div>
+        <div class="panel">
+          <h3>Top Repo Drilldowns</h3>
+
+            <div class="panel">
+              <h3><a href="#repo-repoc">RepoC — 0.44 (wip)</a></h3>
+              <div class="meta-line"><strong>Current State:</strong> Score 0.44, grade D, wip tier, Python, trend: No history is recorded yet, so this view is using the current run only.</div>
+              <div class="meta-line"><strong>What Changed:</strong> Regressed 0.080 versus the last run. Tier moved functional -&gt; wip. Score regressed 0.080 since the last run. Tier moved functional -&gt; wip.</div>
+              <div class="meta-line"><strong>Why It Matters:</strong> Strongest drivers: Security (0.28), Testing (0.18). Biggest drags: Testing (0.18), Security (0.28). Next tier gap: Needs +0.31 to reach shipped.</div>
+              <div class="meta-line"><strong>Where To Start:</strong> No meaningful implementation hotspot is currently surfaced.</div>
+              <div class="meta-line"><strong>What To Do Next:</strong> Open the governed control preview and decide whether to apply CodeQL. No action rationale is recorded yet.</div>
+              <div class="meta-line"><strong>Operator Focus:</strong> Act Now: Governed security drift is still unresolved.</div>
+              <div class="meta-line"><strong>Catalog:</strong> No portfolio catalog contract is recorded yet.</div>
+              <div class="meta-line"><strong>Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet.</strong></div>
+              <div class="meta-line"><strong>Intent Alignment:</strong> missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.</div>
+              <div class="meta-line"><strong>Scorecard: No maturity scorecard is recorded yet.</strong></div>
+              <div class="meta-line"><strong>Maturity Gap:</strong> No maturity gap summary is recorded yet.</div>
+              <div class="meta-line"><strong>Evidence:</strong> Where To Start: No meaningful implementation hotspot is currently surfaced.; Operator Focus: Act Now: Governed security drift is still unresolved.; Action Sync: Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.; Automation Guidance: Automation Guidance: keep the next step human-led until a bounded safe posture is surfaced.</div>
+              <div class="meta-line"><strong>Checkpoint Timing:</strong> Unknown</div>
+              <div class="meta-line"><strong>What Would Count As Progress:</strong> Use the next run or linked artifact to confirm whether the recommendation moved.</div>
+            </div>
+
+            <div class="panel">
+              <h3><a href="#repo-repob">RepoB — 0.62 (functional)</a></h3>
+              <div class="meta-line"><strong>Current State:</strong> Score 0.62, grade C, functional tier, TypeScript, trend: No history is recorded yet, so this view is using the current run only.</div>
+              <div class="meta-line"><strong>What Changed:</strong> Regressed 0.060 versus the last run. Score regressed 0.060 since the last run.</div>
+              <div class="meta-line"><strong>Why It Matters:</strong> Strongest drivers: Security (0.66), Testing (0.55), Release (0.48). Biggest drags: Release (0.48), Testing (0.55), Security (0.66). Next tier gap: Needs +0.13 to reach shipped.</div>
+              <div class="meta-line"><strong>Where To Start:</strong> No meaningful implementation hotspot is currently surfaced.</div>
+              <div class="meta-line"><strong>What To Do Next:</strong> Re-run the release checklist and close the missing item. No action rationale is recorded yet.</div>
+              <div class="meta-line"><strong>Operator Focus:</strong> Act Now: A previously quiet repo reopened a visible checklist item.</div>
+              <div class="meta-line"><strong>Catalog:</strong> No portfolio catalog contract is recorded yet.</div>
+              <div class="meta-line"><strong>Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet.</strong></div>
+              <div class="meta-line"><strong>Intent Alignment:</strong> missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.</div>
+              <div class="meta-line"><strong>Scorecard: No maturity scorecard is recorded yet.</strong></div>
+              <div class="meta-line"><strong>Maturity Gap:</strong> No maturity gap summary is recorded yet.</div>
+              <div class="meta-line"><strong>Evidence:</strong> Where To Start: No meaningful implementation hotspot is currently surfaced.; Operator Focus: Act Now: A previously quiet repo reopened a visible checklist item.; Action Sync: Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.; Automation Guidance: Automation Guidance: keep the next step human-led until a bounded safe posture is surfaced.</div>
+              <div class="meta-line"><strong>Checkpoint Timing:</strong> Unknown</div>
+              <div class="meta-line"><strong>What Would Count As Progress:</strong> Use the next run or linked artifact to confirm whether the recommendation moved.</div>
+            </div>
+
+            <div class="panel">
+              <h3><a href="#repo-repoa">RepoA — 0.88 (shipped)</a></h3>
+              <div class="meta-line"><strong>Current State:</strong> Score 0.88, grade A, shipped tier, Python, trend: No history is recorded yet, so this view is using the current run only.</div>
+              <div class="meta-line"><strong>What Changed:</strong> Improved 0.090 versus the last run. Tier moved functional -&gt; shipped. Score improved 0.090 since the last run. Tier moved functional -&gt; shipped.</div>
+              <div class="meta-line"><strong>Why It Matters:</strong> Strongest drivers: Testing (0.90), Documentation (0.85), Security (0.82). Biggest drags: Security (0.82), Documentation (0.85), Testing (0.90). Next tier gap: Already at shipped tier; focus on protecting momentum and preventing drift.</div>
+              <div class="meta-line"><strong>Where To Start:</strong> No meaningful implementation hotspot is currently surfaced.</div>
+              <div class="meta-line"><strong>What To Do Next:</strong> Tidy the release notes and publish the next small maintenance release. No action rationale is recorded yet.</div>
+              <div class="meta-line"><strong>Operator Focus:</strong> Watch Closely: No follow-through evidence is recorded yet.</div>
+              <div class="meta-line"><strong>Catalog:</strong> No portfolio catalog contract is recorded yet.</div>
+              <div class="meta-line"><strong>Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet.</strong></div>
+              <div class="meta-line"><strong>Intent Alignment:</strong> missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.</div>
+              <div class="meta-line"><strong>Scorecard: No maturity scorecard is recorded yet.</strong></div>
+              <div class="meta-line"><strong>Maturity Gap:</strong> No maturity gap summary is recorded yet.</div>
+              <div class="meta-line"><strong>Evidence:</strong> Where To Start: No meaningful implementation hotspot is currently surfaced.; Operator Focus: Watch Closely: No follow-through evidence is recorded yet.; Action Sync: Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.; Automation Guidance: Automation Guidance: keep the next step human-led until a bounded safe posture is surfaced.</div>
+              <div class="meta-line"><strong>Checkpoint Timing:</strong> Unknown</div>
+              <div class="meta-line"><strong>What Would Count As Progress:</strong> Use the next run or linked artifact to confirm whether the recommendation moved.</div>
+            </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Top Attention / Next Action</h2>
+      <div class="panel">
+        <ul class="bullet-list"><li><strong>RepoC: Security drift needs review</strong><br><span class='muted'><strong>Why it matters:</strong> Governed security drift is still unresolved.</span><br><span class='muted'><strong>What to do next:</strong> Open the governed control preview and decide whether to apply CodeQL.</span><br><span class='muted'><strong>Operator Focus:</strong> Act Now: Governed security drift is still unresolved.</span><br><span class='muted'><strong>Catalog:</strong> No portfolio catalog contract is recorded yet.</span><br><span class='muted'><strong>Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet.</strong></span><br><span class='muted'><strong>Intent Alignment:</strong> missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.</span><br><span class='muted'><strong>Scorecard: No maturity scorecard is recorded yet.</strong></span><br><span class='muted'><strong>Maturity Gap:</strong> No maturity gap summary is recorded yet.</span><br><span class='muted'><strong>Action Sync:</strong> Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.</span><br><span class='muted'><strong>Apply Packet:</strong> Apply Packet: no current execution handoff is surfaced.</span><br><span class='muted'><strong>Post-Apply Monitoring:</strong> Post-Apply Monitoring: no recent Action Sync apply needs follow-up yet.</span><br><span class='muted'><strong>Campaign Tuning:</strong> Campaign Tuning: recommendations stay neutral until more outcome history is available.</span><br><span class='muted'><strong>Approval Workflow:</strong> Approval Workflow: no current approval needs review yet.</span><br><span class='muted'><strong>Checkpoint timing:</strong> Unknown</span></li><li><strong>RepoB: Release checklist reopened</strong><br><span class='muted'><strong>Why it matters:</strong> A previously quiet repo reopened a visible checklist item.</span><br><span class='muted'><strong>What to do next:</strong> Re-run the release checklist and close the missing item.</span><br><span class='muted'><strong>Operator Focus:</strong> Act Now: A previously quiet repo reopened a visible checklist item.</span><br><span class='muted'><strong>Catalog:</strong> No portfolio catalog contract is recorded yet.</span><br><span class='muted'><strong>Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet.</strong></span><br><span class='muted'><strong>Intent Alignment:</strong> missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.</span><br><span class='muted'><strong>Scorecard: No maturity scorecard is recorded yet.</strong></span><br><span class='muted'><strong>Maturity Gap:</strong> No maturity gap summary is recorded yet.</span><br><span class='muted'><strong>Action Sync:</strong> Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.</span><br><span class='muted'><strong>Apply Packet:</strong> Apply Packet: no current execution handoff is surfaced.</span><br><span class='muted'><strong>Post-Apply Monitoring:</strong> Post-Apply Monitoring: no recent Action Sync apply needs follow-up yet.</span><br><span class='muted'><strong>Campaign Tuning:</strong> Campaign Tuning: recommendations stay neutral until more outcome history is available.</span><br><span class='muted'><strong>Approval Workflow:</strong> Approval Workflow: no current approval needs review yet.</span><br><span class='muted'><strong>Checkpoint timing:</strong> Unknown</span></li><li><strong>RepoA: Protect shipped momentum</strong><br><span class='muted'><strong>Why it matters:</strong> RepoA is healthy enough that a small polish task would keep it strong.</span><br><span class='muted'><strong>What to do next:</strong> Tidy the release notes and publish the next small maintenance release.</span><br><span class='muted'><strong>Operator Focus:</strong> Watch Closely: No follow-through evidence is recorded yet.</span><br><span class='muted'><strong>Catalog:</strong> No portfolio catalog contract is recorded yet.</span><br><span class='muted'><strong>Operating Path: Unspecified (legacy confidence) — No operating-path rationale is recorded yet.</strong></span><br><span class='muted'><strong>Intent Alignment:</strong> missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.</span><br><span class='muted'><strong>Scorecard: No maturity scorecard is recorded yet.</strong></span><br><span class='muted'><strong>Maturity Gap:</strong> No maturity gap summary is recorded yet.</span><br><span class='muted'><strong>Action Sync:</strong> Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites.</span><br><span class='muted'><strong>Apply Packet:</strong> Apply Packet: no current execution handoff is surfaced.</span><br><span class='muted'><strong>Post-Apply Monitoring:</strong> Post-Apply Monitoring: no recent Action Sync apply needs follow-up yet.</span><br><span class='muted'><strong>Campaign Tuning:</strong> Campaign Tuning: recommendations stay neutral until more outcome history is available.</span><br><span class='muted'><strong>Approval Workflow:</strong> Approval Workflow: no current approval needs review yet.</span><br><span class='muted'><strong>Checkpoint timing:</strong> Unknown</span></li></ul>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Analyst View</h2>
+      <div class="analyst-grid">
+        <div class="panel">
+          <div class="meta-line"><strong>Profile:</strong> default</div>
+          <div class="meta-line"><strong>Collection:</strong> all</div>
+          <div class="pill-row"><span class='pill'>showcase: 1</span></div>
+        </div>
+        <div class="panel">
+          <h3>Profile Leaders</h3>
+          <table class="compact-table">
+            <thead><tr><th>Repo</th><th>Profile Score</th><th>Tier</th></tr></thead>
+            <tbody><tr><td>RepoA</td><td class="num">0.880</td><td>shipped</td></tr><tr><td>RepoB</td><td class="num">0.620</td><td>functional</td></tr><tr><td>RepoC</td><td class="num">0.440</td><td>wip</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Decision Lenses</h2>
+      <div class="lens-grid"><div class='lens-card'><div class='kpi-label'>ship readiness</div><div class='lens-score'>0.71</div><div class='lens-text'>Delivery readiness</div></div><div class='lens-card'><div class='kpi-label'>showcase value</div><div class='lens-score'>0.63</div><div class='lens-text'>Story and polish</div></div></div>
+    </div>
+
+    <div class="section">
+      <h2>Security Overview</h2>
+      <div class="lens-grid">
+        <div class="lens-card">
+          <div class="kpi-label">Avg Security Score</div>
+          <div class="lens-score">0.58</div>
+          <div class="lens-text">Portfolio-wide merged security posture.</div>
+        </div>
+        <div class="lens-card">
+          <div class="kpi-label">GitHub Coverage</div>
+          <div class="lens-score">3</div>
+          <div class="lens-text">Repos with GitHub-native security evidence available.</div>
+        </div>
+        <div class="lens-card">
+          <div class="kpi-label">Scorecard Coverage</div>
+          <div class="lens-score">0</div>
+          <div class="lens-text">Repos with external Scorecard evidence loaded.</div>
+        </div>
+        <div class="lens-card">
+          <div class="kpi-label">Open Alerts</div>
+          <div class="lens-score">3</div>
+          <div class="lens-text">Combined code and secret scanning alerts.</div>
+        </div>
+      </div>
+    </div>
+<div class="section"><h2>Completeness vs Interest</h2>
+<canvas id="scatter" width="800" height="500"></canvas>
+<div id="tooltip" class="tooltip"></div>
+</div>
+
+    <div class="section">
+      <h2>All Repos</h2>
+      <div class="filters">
+        <select id="sort-mode" onchange="sortTable()">
+          <option value="profile">Profile Rank</option>
+          <option value="overall">Overall Score</option>
+        </select>
+        <select id="filter-tier" onchange="filterTable()">
+          <option value="all">All Tiers</option>
+          <option value="shipped">Shipped</option>
+          <option value="functional">Functional</option>
+          <option value="wip">WIP</option>
+          <option value="skeleton">Skeleton</option>
+          <option value="abandoned">Abandoned</option>
+        </select>
+        <select id="filter-grade" onchange="filterTable()">
+          <option value="all">All Grades</option>
+          <option value="A">A</option><option value="B">B</option>
+          <option value="C">C</option><option value="D">D</option>
+          <option value="F">F</option>
+        </select>
+        <select id="filter-collection" onchange="filterTable()">
+          <option value="all">All Collections</option><option value="showcase">showcase</option>
+        </select>
+        <input id="search" type="text" placeholder="Search repos..." oninput="filterTable()">
+      </div>
+      <table id="repo-table">
+        <thead><tr>
+          <th>Repo</th><th>Profile</th><th>Grade</th><th>Score</th><th>Interest</th>
+          <th>Tier</th><th>Risk</th><th>Language</th><th>Collections</th><th>Trend</th><th>Description</th>
+        </tr></thead>
+        <tbody><tr data-tier="shipped" data-risk="baseline" data-grade="A" data-name="RepoA" data-collections="showcase" data-overall="0.880" data-profile="0.880"><td><a href="#repo-repoa">RepoA</a></td><td class="num">0.880</td><td style="color:#166534;font-weight:bold;text-align:center">A</td><td class="num">0.880</td><td class="num">0.610</td><td style="color:#166534;font-weight:bold">shipped</td><td style="color:#16a34a;font-weight:bold">baseline</td><td>Python</td><td>showcase</td><td class="sparkline"></td><td class="desc">A polished shipped project.<br><span class="muted"><strong>Next:</strong> Publish the next maintenance release</span><br><span class="muted"><strong>Gap:</strong> Already at shipped tier; focus on protecting momentum and preventing drift.</span></td></tr><tr data-tier="functional" data-risk="elevated" data-grade="C" data-name="RepoB" data-collections="" data-overall="0.620" data-profile="0.620"><td><a href="#repo-repob">RepoB</a></td><td class="num">0.620</td><td style="color:#CA8A04;font-weight:bold;text-align:center">C</td><td class="num">0.620</td><td class="num">0.370</td><td style="color:#1565C0;font-weight:bold">functional</td><td style="color:#dc2626;font-weight:bold">elevated</td><td>TypeScript</td><td>—</td><td class="sparkline"></td><td class="desc">A functional project with follow-through left to do.<br><span class="muted"><strong>Next:</strong> Close the reopened release item</span><br><span class="muted"><strong>Gap:</strong> Needs +0.13 to reach shipped.</span></td></tr><tr data-tier="wip" data-risk="elevated" data-grade="D" data-name="RepoC" data-collections="" data-overall="0.440" data-profile="0.440"><td><a href="#repo-repoc">RepoC</a></td><td class="num">0.440</td><td style="color:#C2410C;font-weight:bold;text-align:center">D</td><td class="num">0.440</td><td class="num">0.160</td><td style="color:#D97706;font-weight:bold">wip</td><td style="color:#dc2626;font-weight:bold">elevated</td><td>Python</td><td>—</td><td class="sparkline"></td><td class="desc">A risky work-in-progress project.<br><span class="muted"><strong>Next:</strong> Preview governance controls</span><br><span class="muted"><strong>Gap:</strong> Needs +0.31 to reach shipped.</span></td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>Repo Drilldowns</h2>
+      <div class="analyst-grid">
+
+            <div class="panel" id="repo-repoa">
+              <h3>RepoA — 0.88 (shipped)</h3>
+              <div class="meta-line"><strong>Current State:</strong> Score 0.88, grade A, shipped tier, Python, trend: No history is recorded yet, so this view is using the current run only.</div>
+              <div class="meta-line"><strong>Description:</strong> A polished shipped project.</div>
+              <div class="meta-line"><strong>Why This Repo Looks This Way:</strong> Strongest drivers: Testing (0.90), Documentation (0.85), Security (0.82). Biggest drags: Security (0.82), Documentation (0.85), Testing (0.90). Next tier gap: Already at shipped tier; focus on protecting momentum and preventing drift.</div>
+              <div class="meta-line"><strong>What Changed:</strong> Improved 0.090 versus the last run. Tier moved functional -&gt; shipped. Score improved 0.090 since the last run. Tier moved functional -&gt; shipped.</div>
+              <div class="meta-line"><strong>Hotspot Context:</strong> Keep release notes fresh</div>
+              <div class="meta-line"><strong>Where To Start:</strong> No meaningful implementation hotspot is currently surfaced.</div>
+              <ul class="bullet-list"><li>No implementation hotspots are currently surfaced.</li></ul>
+              <div class="meta-line"><strong>What To Do Next:</strong> Tidy the release notes and publish the next small maintenance release.</div>
+              <div class="meta-line"><strong>Rationale:</strong> No action rationale is recorded yet.</div>
+              <div class="meta-line"><strong>Follow-Through:</strong> Unknown: No follow-through evidence is recorded yet.</div>
+              <div class="meta-line"><strong>Checkpoint Timing:</strong> Unknown</div>
+              <div class="meta-line"><strong>Escalation:</strong> Unknown: No stronger follow-through escalation is currently surfaced.</div>
+              <div class="meta-line"><strong>What Would Count As Progress:</strong> Use the next run or linked artifact to confirm whether the recommendation moved.</div>
+              <div class="meta-line"><strong>Linked Artifact:</strong> No linked artifact available yet.</div>
+            </div>
+
+            <div class="panel" id="repo-repob">
+              <h3>RepoB — 0.62 (functional)</h3>
+              <div class="meta-line"><strong>Current State:</strong> Score 0.62, grade C, functional tier, TypeScript, trend: No history is recorded yet, so this view is using the current run only.</div>
+              <div class="meta-line"><strong>Description:</strong> A functional project with follow-through left to do.</div>
+              <div class="meta-line"><strong>Why This Repo Looks This Way:</strong> Strongest drivers: Security (0.66), Testing (0.55), Release (0.48). Biggest drags: Release (0.48), Testing (0.55), Security (0.66). Next tier gap: Needs +0.13 to reach shipped.</div>
+              <div class="meta-line"><strong>What Changed:</strong> Regressed 0.060 versus the last run. Score regressed 0.060 since the last run.</div>
+              <div class="meta-line"><strong>Hotspot Context:</strong> Finish release checklist</div>
+              <div class="meta-line"><strong>Where To Start:</strong> No meaningful implementation hotspot is currently surfaced.</div>
+              <ul class="bullet-list"><li>No implementation hotspots are currently surfaced.</li></ul>
+              <div class="meta-line"><strong>What To Do Next:</strong> Re-run the release checklist and close the missing item.</div>
+              <div class="meta-line"><strong>Rationale:</strong> No action rationale is recorded yet.</div>
+              <div class="meta-line"><strong>Follow-Through:</strong> Unknown: No follow-through evidence is recorded yet.</div>
+              <div class="meta-line"><strong>Checkpoint Timing:</strong> Unknown</div>
+              <div class="meta-line"><strong>Escalation:</strong> Unknown: No stronger follow-through escalation is currently surfaced.</div>
+              <div class="meta-line"><strong>What Would Count As Progress:</strong> Use the next run or linked artifact to confirm whether the recommendation moved.</div>
+              <div class="meta-line"><strong>Linked Artifact:</strong> No linked artifact available yet.</div>
+            </div>
+
+            <div class="panel" id="repo-repoc">
+              <h3>RepoC — 0.44 (wip)</h3>
+              <div class="meta-line"><strong>Current State:</strong> Score 0.44, grade D, wip tier, Python, trend: No history is recorded yet, so this view is using the current run only.</div>
+              <div class="meta-line"><strong>Description:</strong> A risky work-in-progress project.</div>
+              <div class="meta-line"><strong>Why This Repo Looks This Way:</strong> Strongest drivers: Security (0.28), Testing (0.18). Biggest drags: Testing (0.18), Security (0.28). Next tier gap: Needs +0.31 to reach shipped.</div>
+              <div class="meta-line"><strong>What Changed:</strong> Regressed 0.080 versus the last run. Tier moved functional -&gt; wip. Score regressed 0.080 since the last run. Tier moved functional -&gt; wip.</div>
+              <div class="meta-line"><strong>Hotspot Context:</strong> Security posture needs attention</div>
+              <div class="meta-line"><strong>Where To Start:</strong> No meaningful implementation hotspot is currently surfaced.</div>
+              <ul class="bullet-list"><li>No implementation hotspots are currently surfaced.</li></ul>
+              <div class="meta-line"><strong>What To Do Next:</strong> Open the governed control preview and decide whether to apply CodeQL.</div>
+              <div class="meta-line"><strong>Rationale:</strong> No action rationale is recorded yet.</div>
+              <div class="meta-line"><strong>Follow-Through:</strong> Unknown: No follow-through evidence is recorded yet.</div>
+              <div class="meta-line"><strong>Checkpoint Timing:</strong> Unknown</div>
+              <div class="meta-line"><strong>Escalation:</strong> Unknown: No stronger follow-through escalation is currently surfaced.</div>
+              <div class="meta-line"><strong>What Would Count As Progress:</strong> Use the next run or linked artifact to confirm whether the recommendation moved.</div>
+              <div class="meta-line"><strong>Linked Artifact:</strong> No linked artifact available yet.</div>
+            </div>
+
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Portfolio Trends</h2>
+      <p class="empty-state">Not enough historical data for trends. Run audits over time to see portfolio evolution.</p>
+    </div>
+
+    <div class="section">
+      <h2>Run Changes</h2>
+        <div class="analyst-grid">
+        <div class="panel">
+          <div class="meta-line"><strong>Summary:</strong> Average score moved +0.020; 0 meaningful improvements, 0 regressions, 1 promotions, and 1 demotions were recorded.</div>
+          <div class="meta-line"><strong>Why It Matters:</strong> 1 blocked, 1 urgent, 1 ready, and 1 deferred item(s) are currently in the queue.</div>
+          <div class="meta-line"><strong>What To Do Next:</strong> Review RepoC first, then close RepoB&#x27;s reopened checklist item. Start with RepoC if you need a concrete place to begin.</div>
+          <div class="meta-line"><strong>Improving:</strong> 0 | <strong>Regressing:</strong> 0</div>
+          <div class="meta-line"><strong>Promotions:</strong> 1 | <strong>Demotions:</strong> 1</div>
+          <div class="meta-line"><strong>Security / Governance:</strong> 1 / 1</div>
+        </div>
+        <div class="panel">
+          <table class="compact-table">
+            <thead><tr><th>Repo</th><th>Delta</th><th>Tier Change</th></tr></thead>
+            <tbody><tr><td>RepoA</td><td class='num'>+0.090</td><td>functional → shipped</td></tr><tr><td>RepoC</td><td class='num'>-0.080</td><td>functional → wip</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Compare</h2>
+      <div class="analyst-grid">
+        <div class="panel">
+          <div class="meta-line"><strong>Average score delta:</strong> +0.020</div>
+          <table class="compact-table">
+            <thead><tr><th>Lens</th><th>Delta</th></tr></thead>
+            <tbody><tr><td>ship_readiness</td><td class='num'>+0.030</td></tr><tr><td>security_posture</td><td class='num'>-0.010</td></tr></tbody>
+          </table>
+        </div>
+        <div class="panel">
+          <h3>Top Movers</h3>
+          <table class="compact-table">
+            <thead><tr><th>Repo</th><th>Score Delta</th><th>Tier</th></tr></thead>
+            <tbody><tr><td>RepoA</td><td class='num'>+0.090</td><td>functional → shipped</td></tr><tr><td>RepoC</td><td class='num'>-0.080</td><td>functional → wip</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Scenario Preview</h2>
+      <div class="analyst-grid">
+        <div class="panel">
+          <div class="meta-line"><strong>Projected average score delta:</strong> +0.000</div>
+          <div class="meta-line"><strong>Projected promotions:</strong> 0</div>
+          <div class="meta-line"><strong>Selected repos:</strong> 3</div>
+        </div>
+        <div class="panel">
+          <table class="compact-table">
+            <thead><tr><th>Lever</th><th>Lens</th><th>Repos</th><th>Avg Lift</th></tr></thead>
+            <tbody><tr><td>Publish the next maintenance release</td><td></td><td class='num'>1</td><td class='num'>+0.000</td></tr><tr><td>Close the reopened release item</td><td></td><td class='num'>1</td><td class='num'>+0.000</td></tr><tr><td>Preview governance controls</td><td></td><td class='num'>1</td><td class='num'>+0.000</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Governance Operator State</h2>
+      <div class="meta-line"><strong>Headline:</strong> Governed security drift needs review.</div><div class="meta-line"><strong>Status:</strong> drifted</div><div class="meta-line"><strong>Approved:</strong> no | <strong>Needs Re-Approval:</strong> no</div><div class="meta-line"><strong>Drift Count:</strong> 1 | <strong>Applied Results:</strong> 0 | <strong>Rollback Available:</strong> 1</div>
+      <table class="compact-table">
+        <thead><tr><th>Repo</th><th>State</th><th>Action</th><th>Expected Lift</th><th>Source</th></tr></thead>
+        <tbody><tr><td>RepoC</td><td>ready</td><td>Enable CodeQL default setup</td><td class='num'>0.12</td><td>github</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>Campaign</h2>
+      <div class="analyst-grid">
+        <div class="panel">
+          <div class="meta-line"><strong>Campaign:</strong> Security Review</div>
+          <div class="meta-line"><strong>Actions:</strong> 1</div>
+          <div class="meta-line"><strong>Repos:</strong> 1</div>
+          <div class="meta-line"><strong>Sync mode:</strong> reconcile</div>
+          <div class="meta-line"><strong>Drift:</strong> 1</div>
+          <div class="meta-line"><strong>Action Sync:</strong> Stay local for now; no current campaign needs preview or apply.</div>
+          <div class="meta-line"><strong>Apply Packet:</strong> No current campaign has a safe execution handoff yet, so the local story should stay local for now.</div>
+          <div class="meta-line"><strong>Command Hint:</strong> No Action Sync command is recommended yet.</div>
+          <div class="meta-line"><strong>Post-Apply Monitoring:</strong> No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local.</div>
+          <div class="meta-line"><strong>Next Monitoring Step:</strong> Stay local for now; no recent Action Sync apply needs post-apply follow-up yet.</div>
+          <div class="meta-line"><strong>Campaign Tuning:</strong> Campaign tuning stays neutral until there is enough outcome history to bias tied recommendations.</div>
+          <div class="meta-line"><strong>Next Tie-Break Candidate:</strong> No current campaign needs a tie-break candidate yet.</div>
+          <div class="meta-line"><strong>Automation Guidance:</strong> Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture.</div>
+          <div class="meta-line"><strong>Next Safe Automation Step:</strong> Stay local for now; no current campaign has a stronger safe automation posture than manual review.</div>
+          <div class="meta-line"><strong>Approval Workflow:</strong> No current approval needs review yet, so the approval workflow can stay local for now.</div>
+          <div class="meta-line"><strong>Next Approval Review:</strong> Stay local for now; no current approval needs review.</div>
+          <div class="meta-line"><strong>GitHub Projects:</strong> disabled
+            (— #0, 0 items)</div>
+        </div>
+        <div class="panel">
+          <table class="compact-table">
+            <thead><tr><th>Repo</th><th>Managed Issue</th><th>Topics</th><th>Projects</th><th>Notion</th></tr></thead>
+            <tbody><tr><td>RepoC</td><td>[Repo Auditor] Security Review</td><td class="num">1</td><td class="num">0</td><td class="num">1</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Writeback Results</h2>
+      <div class="meta-line"><strong>Mode:</strong> apply |
+      <strong>Target:</strong> github</div>
+      <div class="meta-line"><strong>Managed drift:</strong> 1</div>
+      <table class="compact-table">
+        <thead><tr><th>Repo</th><th>Target</th><th>Status</th><th>Details</th></tr></thead>
+        <tbody><tr><td>sample-user/RepoC</td><td>github-issue</td><td>created</td><td>https://github.com/sample-user/RepoC/issues/1</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>Tech Radar</h2>
+      <table>
+        <thead><tr><th>Language</th><th>Repos</th><th>Trend</th><th>Category</th></tr></thead>
+        <tbody><tr><td>TypeScript</td><td class="num">44</td><td class="sparkline">▁▂▆▆▆▆▆▇▇█</td><td style="color:#166534;font-weight:bold">Adopt</td></tr><tr><td>Rust</td><td class="num">32</td><td class="sparkline">▁▁▁▁▁▁▁███</td><td style="color:#6B7280;font-weight:bold">Hold</td></tr><tr><td>Python</td><td class="num">19</td><td class="sparkline">▁▂▄▄▄▄▄▅██</td><td style="color:#166534;font-weight:bold">Adopt</td></tr><tr><td>Swift</td><td class="num">16</td><td class="sparkline">▅▅▅▅▅▅▅▅▅▅</td><td style="color:#6B7280;font-weight:bold">Hold</td></tr><tr><td>Shell</td><td class="num">4</td><td class="sparkline">▁▁▁▁▂▂▂▂██</td><td style="color:#1565C0;font-weight:bold">Trial</td></tr><tr><td>Makefile</td><td class="num">3</td><td class="sparkline">▁█▆▆▆▆▆▆▆▆</td><td style="color:#1565C0;font-weight:bold">Trial</td></tr><tr><td>GDScript</td><td class="num">3</td><td class="sparkline">▅▅▅▅▅▅▅▅▅▅</td><td style="color:#6B7280;font-weight:bold">Hold</td></tr><tr><td>JavaScript</td><td class="num">2</td><td class="sparkline">▅▅▅▅▅▅▅▅▅▅</td><td style="color:#6B7280;font-weight:bold">Hold</td></tr><tr><td>PLpgSQL</td><td class="num">1</td><td class="sparkline">▅▅▅▅▅▅▅▅▅▅</td><td style="color:#6B7280;font-weight:bold">Hold</td></tr><tr><td>Go</td><td class="num">1</td><td class="sparkline">▁▁████████</td><td style="color:#1565C0;font-weight:bold">Trial</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>Tier Distribution</h2>
+      <div class="bar-chart"><div class="bar-row"><span class="bar-label">Shipped</span><div class="bar-bg"><div class="bar-fill" style="width:33%;background:#166534"></div></div><span class="bar-count">1</span></div><div class="bar-row"><span class="bar-label">Functional</span><div class="bar-bg"><div class="bar-fill" style="width:33%;background:#1565C0"></div></div><span class="bar-count">1</span></div><div class="bar-row"><span class="bar-label">Wip</span><div class="bar-bg"><div class="bar-fill" style="width:33%;background:#D97706"></div></div><span class="bar-count">1</span></div><div class="bar-row"><span class="bar-label">Skeleton</span><div class="bar-bg"><div class="bar-fill" style="width:0%;background:#C2410C"></div></div><span class="bar-count">0</span></div><div class="bar-row"><span class="bar-label">Abandoned</span><div class="bar-bg"><div class="bar-fill" style="width:0%;background:#6B7280"></div></div><span class="bar-count">0</span></div></div>
+    </div>
+
+    <footer>
+      <p>Generated by <a href="https://github.com/saagpatel/GithubRepoAuditor">GithubRepoAuditor</a></p>
+    </footer>
+<script id="dashboard-data" type="application/json">{"username": "sample-user", "date": "2026-04-12", "grade": "B", "average_score": 0.65, "repos_audited": 3, "tier_distribution": {"shipped": 1, "functional": 1, "wip": 1, "skeleton": 0, "abandoned": 0}, "selected_profile": "default", "selected_collection": null, "profile_leaders": [{"name": "RepoA", "profile_score": 0.88, "overall_score": 0.88, "tier": "shipped"}, {"name": "RepoB", "profile_score": 0.62, "overall_score": 0.62, "tier": "functional"}, {"name": "RepoC", "profile_score": 0.44, "overall_score": 0.44, "tier": "wip"}], "collection_names": ["showcase"], "audits": [{"name": "RepoA", "grade": "A", "score": 0.88, "interest": 0.61, "tier": "shipped", "language": "Python", "description": "A polished shipped project.", "url": "https://github.com/sample-user/RepoA", "badges": 2, "profile_score": 0.88, "collections": ["showcase"], "security_label": "healthy", "hotspot_count": 1}, {"name": "RepoB", "grade": "C", "score": 0.62, "interest": 0.37, "tier": "functional", "language": "TypeScript", "description": "A functional project with follow-through left to do.", "url": "https://github.com/sample-user/RepoB", "badges": 0, "profile_score": 0.62, "collections": [], "security_label": "watch", "hotspot_count": 1}, {"name": "RepoC", "grade": "D", "score": 0.44, "interest": 0.16, "tier": "wip", "language": "Python", "description": "A risky work-in-progress project.", "url": "https://github.com/sample-user/RepoC", "badges": 0, "profile_score": 0.44, "collections": [], "security_label": "critical", "hotspot_count": 1}]}</script>
+<script>
+    const DATA = JSON.parse(document.getElementById('dashboard-data').textContent);
+    // Tier colors for scatter chart
+    const TIER_COLORS = {shipped:'#166534',functional:'#1565C0',wip:'#D97706',skeleton:'#C2410C',abandoned:'#6B7280'};
+
+    // Scatter chart
+    (function() {
+      const canvas = document.getElementById('scatter');
+      if (!canvas || !DATA.audits.length) return;
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height;
+      const pad = 50;
+
+      function draw() {
+        ctx.clearRect(0,0,W,H);
+        ctx.fillStyle = 'white'; ctx.fillRect(0,0,W,H);
+
+        // Grid
+        ctx.strokeStyle = '#E2E8F0'; ctx.lineWidth = 1;
+        for (let i = 0; i <= 10; i++) {
+          const x = pad + (W-2*pad)*i/10, y = pad + (H-2*pad)*i/10;
+          ctx.beginPath(); ctx.moveTo(x, pad); ctx.lineTo(x, H-pad); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W-pad, y); ctx.stroke();
+        }
+
+        // Quadrant lines
+        ctx.strokeStyle = '#808080'; ctx.lineWidth = 1.5; ctx.setLineDash([6,4]);
+        const qx = pad + (W-2*pad)*0.55, qy = pad + (H-2*pad)*(1-0.45);
+        ctx.beginPath(); ctx.moveTo(qx, pad); ctx.lineTo(qx, H-pad); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(pad, qy); ctx.lineTo(W-pad, qy); ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Axis labels
+        ctx.fillStyle = '#64748B'; ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('Completeness', W/2, H-8);
+        ctx.save(); ctx.translate(12, H/2); ctx.rotate(-Math.PI/2); ctx.fillText('Interest', 0, 0); ctx.restore();
+
+        // Axis ticks
+        ctx.fillStyle = '#94A3B8'; ctx.font = '10px sans-serif';
+        for (let i = 0; i <= 10; i += 2) {
+          const v = i/10;
+          ctx.textAlign = 'center'; ctx.fillText(v.toFixed(1), pad+(W-2*pad)*v, H-pad+16);
+          ctx.textAlign = 'right'; ctx.fillText(v.toFixed(1), pad-8, pad+(H-2*pad)*(1-v)+4);
+        }
+
+        // Points
+        DATA.audits.forEach(a => {
+          const x = pad + (W-2*pad)*a.score;
+          const y = pad + (H-2*pad)*(1-a.interest);
+          ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI*2);
+          ctx.fillStyle = TIER_COLORS[a.tier] || '#6B7280';
+          ctx.fill();
+          ctx.strokeStyle = 'white'; ctx.lineWidth = 1; ctx.stroke();
+        });
+      }
+      draw();
+
+      // Hover tooltip
+      const tooltip = document.getElementById('tooltip');
+      canvas.addEventListener('mousemove', e => {
+        const rect = canvas.getBoundingClientRect();
+        const mx = (e.clientX - rect.left) * (W / rect.width);
+        const my = (e.clientY - rect.top) * (H / rect.height);
+        let found = null;
+        DATA.audits.forEach(a => {
+          const x = pad + (W-2*pad)*a.score;
+          const y = pad + (H-2*pad)*(1-a.interest);
+          if (Math.hypot(mx-x, my-y) < 8) found = a;
+        });
+        if (found) {
+          tooltip.style.display = 'block';
+          tooltip.style.left = (e.clientX + 12) + 'px';
+          tooltip.style.top = (e.clientY - 8) + 'px';
+          tooltip.textContent = found.name + ' (score:' + found.score + ' interest:' + found.interest + ')';
+        } else {
+          tooltip.style.display = 'none';
+        }
+      });
+      canvas.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+    })();
+
+    // Table filtering
+    function filterTable() {
+      const tier = document.getElementById('filter-tier').value;
+      const grade = document.getElementById('filter-grade').value;
+      const collection = document.getElementById('filter-collection').value;
+      const search = document.getElementById('search').value.toLowerCase();
+      document.querySelectorAll('#repo-table tbody tr').forEach(row => {
+        const show = (tier === 'all' || row.dataset.tier === tier)
+          && (grade === 'all' || row.dataset.grade === grade)
+          && (collection === 'all' || row.dataset.collections.includes(collection.toLowerCase()))
+          && row.dataset.name.toLowerCase().includes(search);
+        row.style.display = show ? '' : 'none';
+      });
+    }
+
+    function sortTable() {
+      const mode = document.getElementById('sort-mode').value;
+      const tbody = document.querySelector('#repo-table tbody');
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      rows.sort((a, b) => parseFloat(b.dataset[mode]) - parseFloat(a.dataset[mode]));
+      rows.forEach(row => tbody.appendChild(row));
+    }
+
+    // Sortable columns
+    document.querySelectorAll('#repo-table th').forEach((th, i) => {
+      th.style.cursor = 'pointer';
+      th.addEventListener('click', () => {
+        const tbody = document.querySelector('#repo-table tbody');
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        const asc = th.dataset.sort !== 'asc';
+        th.dataset.sort = asc ? 'asc' : 'desc';
+        rows.sort((a, b) => {
+          const va = a.children[i].textContent, vb = b.children[i].textContent;
+          const na = parseFloat(va), nb = parseFloat(vb);
+          if (!isNaN(na) && !isNaN(nb)) return asc ? na - nb : nb - na;
+          return asc ? va.localeCompare(vb) : vb.localeCompare(va);
+        });
+        rows.forEach(r => tbody.appendChild(r));
+      });
+    });
+
+    sortTable();
+    </script>
+</body>
+</html>
