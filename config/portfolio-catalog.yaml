@@ -74,6 +74,29 @@ groups:
     tool_provenance: claude-code
     order: 70
 repos:
+  _machine/machine-control-tower/bin:
+    owner: d
+    purpose: nested command-bin folder under the machine control tower; not an independent portfolio project
+    lifecycle_state: archived
+    review_cadence: monthly
+    intended_disposition: archive
+    category: infrastructure
+    tool_provenance: codex
+    maturity_program: archive
+    target_maturity: archived
+    notes: Enrolled only to prevent the nested bin directory from being treated as a standalone decision-needed project.
+  agent-bridge:
+    owner: d
+    purpose: local SQLite-backed MCP shared-state bus for coordinating coding agents
+    lifecycle_state: active
+    criticality: high
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: infrastructure
+    tool_provenance: codex
+    maturity_program: maintain
+    target_maturity: operating
+    automation_eligible: false
   AIGCCore:
     owner: d
     purpose: local-first AI governance core with offline enforcement and hash-chained
@@ -407,11 +430,17 @@ repos:
     tool_provenance: claude-code
   mcpforge:
     owner: d
+    purpose: FastMCP server generator and validation toolkit
     lifecycle_state: active
+    criticality: high
     review_cadence: weekly
     intended_disposition: maintain
+    category: infrastructure
     tool_provenance: claude-code
+    maturity_program: maintain
+    target_maturity: operating
     automation_eligible: false
+    notes: Use docs/CURRENT-STATE.md for dated release posture, but AGENTS.md is the current primary context contract required by portfolio truth.
   ModelColosseum:
     owner: d
     lifecycle_state: active
@@ -837,10 +866,37 @@ repos:
     intended_disposition: experiment
   hermes-harness-foundation:
     owner: d
-    lifecycle_state: active
+    purpose: local-only manifesto-stage foundation for the planned Frontier Sentinel orchestrator
+    lifecycle_state: experimental
     review_cadence: weekly
-    intended_disposition: maintain
+    intended_disposition: experiment
     category: infrastructure
+    maturity_program: experiment
+    target_maturity: functional
+    notes: Manifesto-stage and pre-implementation; keep non-default until the operator decides push/build/park.
+  operator-os-docs:
+    owner: d
+    purpose: architecture and coherence documentation package for the local Operator OS
+    lifecycle_state: experimental
+    review_cadence: monthly
+    intended_disposition: experiment
+    category: infrastructure
+    tool_provenance: codex
+    maturity_program: experiment
+    target_maturity: functional
+    notes: Evidence/history-style docs; use only when a cross-system architecture or conformance decision is active.
+  portfolio-index:
+    owner: d
+    purpose: public-safe static portfolio index for hiring-manager review
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: vanity
+    tool_provenance: claude-code
+    maturity_program: maintain
+    target_maturity: operating
+    automation_eligible: false
+    notes: Keep manual-only unless code or deployment work is active; resume and custom-domain decisions are mostly external to this repo.
   rag-knowledge-base:
     owner: d
     lifecycle_state: active
