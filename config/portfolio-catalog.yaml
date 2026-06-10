@@ -698,10 +698,12 @@ repos:
     category: it-work
   TicketHandoff:
     owner: d
-    lifecycle_state: maintenance
-    review_cadence: monthly
-    intended_disposition: maintain
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
     category: it-work
+    purpose: On-demand Jira handoff assistant retained as historical support-tooling reference; not active ideation.
+    notes: Parked from default attention on 2026-06-10; reactivate only if IT handoff tooling becomes an explicit product lane.
   CryptForge:
     owner: d
     lifecycle_state: active
@@ -749,8 +751,9 @@ repos:
     lifecycle_state: active
     review_cadence: weekly
     intended_disposition: maintain
-    notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
-      confirm purpose/criticality.'
+    category: vanity
+    purpose: On-demand native Jira ticket dashboard for local workload visibility and SLA metrics.
+    notes: Already resolved to manual-only baseline; keep out of default ideation unless IT tooling is explicitly reactivated.
   WorkdayDebrief:
     owner: d
     lifecycle_state: active
@@ -838,6 +841,18 @@ repos:
     review_cadence: weekly
     intended_disposition: maintain
     category: infrastructure
+    tool_provenance: codex
+    purpose: Canonical desktop command center over GithubRepoAuditor portfolio truth snapshots and weekly command-center artifacts.
+    notes: Keep as the canonical infrastructure candidate; public/demo posture lives in PortfolioCommandCenter-public.
+  PortfolioCommandCenter-public:
+    owner: d
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
+    category: infrastructure
+    tool_provenance: codex
+    purpose: Public-safe demo mirror of PortfolioCommandCenter retained for fixture/demo workflows, not an independent ideation source.
+    notes: Keep non-default; use canonical PortfolioCommandCenter for local infrastructure planning.
   Pressfield:
     owner: d
     lifecycle_state: active
@@ -976,16 +991,20 @@ repos:
     category: it-work
   SlackIncidentBot:
     owner: d
-    lifecycle_state: dormant
+    lifecycle_state: archived
     review_cadence: quarterly
-    intended_disposition: maintain
+    intended_disposition: archive
     category: it-work
+    purpose: On-demand Slack incident lifecycle bot retained as historical support-tooling reference; not active ideation.
+    notes: Parked from default attention on 2026-06-10; reactivate only if incident tooling becomes an explicit product lane.
   TicketDocumentation:
     owner: d
-    lifecycle_state: dormant
+    lifecycle_state: archived
     review_cadence: quarterly
-    intended_disposition: maintain
+    intended_disposition: archive
     category: it-work
+    purpose: On-demand local ticket documentation assistant retained as historical support-tooling reference; not active ideation.
+    notes: Parked from default attention on 2026-06-10; reactivate only if IT documentation tooling becomes an explicit product lane.
   Construction:
     owner: d
     lifecycle_state: archived
