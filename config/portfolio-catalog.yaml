@@ -74,6 +74,19 @@ groups:
     tool_provenance: claude-code
     order: 70
 repos:
+  _machine/machine-control-tower:
+    owner: d
+    purpose: local machine-ops and Codex operating-layer control surface for durable operator cockpit assets
+    lifecycle_state: active
+    criticality: high
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: infrastructure
+    tool_provenance: codex
+    maturity_program: maintain
+    target_maturity: operating
+    doctor_standard: full
+    notes: Owns Raycast script commands, active-project verification routing, read-only ops snapshots, and mirrored Codex operating-layer prompt/eval snapshots for /Users/d.
   _machine/machine-control-tower/bin:
     owner: d
     purpose: nested command-bin folder under the machine control tower; not an independent portfolio project
