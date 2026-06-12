@@ -251,8 +251,8 @@ repos:
     tool_provenance: claude-code
   ResumeEvolver:
     owner: d
-    lifecycle_state: active
-    review_cadence: weekly
+    lifecycle_state: maintenance
+    review_cadence: monthly
     intended_disposition: maintain
     tool_provenance: codex
     doctor_standard: basic
