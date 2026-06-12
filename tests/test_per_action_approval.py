@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -22,12 +23,17 @@ from src.plan_campaign import (
 # ---------------------------------------------------------------------------
 
 
+def _recent_generated_at() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
 def _make_packet(
     goal: str = "add CI to all repos",
     *,
     num_actions: int = 2,
-    generated_at: str = "2026-05-12T00:00:00+00:00",
+    generated_at: str | None = None,
 ) -> CampaignPlanPacket:
+    generated_at = generated_at or _recent_generated_at()
     actions = [
         CampaignAction(
             repo_name=f"repo-{i}",
@@ -215,6 +221,7 @@ class TestBackwardCompat:
 
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
+            generated_at = _recent_generated_at()
             # Write a record whose actions have NO 'state' field
             save_approval_record(
                 output_dir,
@@ -224,7 +231,7 @@ class TestBackwardCompat:
                     "approval_subject_type": "campaign-plan",
                     "subject_key": "legacykey001",
                     "source_run_id": "",
-                    "approved_at": "2026-05-12T00:00:00+00:00",
+                    "approved_at": generated_at,
                     "approved_by": "tester",
                     "approval_note": "legacy",
                     "action_type": "campaign-plan",
@@ -235,7 +242,7 @@ class TestBackwardCompat:
                     "llm_provider": "fake",
                     "llm_model": "m",
                     "llm_cost_usd": 0.0,
-                    "generated_at": "2026-05-12T00:00:00+00:00",
+                    "generated_at": generated_at,
                     "status": "approved-manual",
                     "actions": [
                         {
@@ -260,6 +267,7 @@ class TestBackwardCompat:
 
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
+            generated_at = _recent_generated_at()
             save_approval_record(
                 output_dir,
                 {
@@ -268,7 +276,7 @@ class TestBackwardCompat:
                     "approval_subject_type": "campaign-plan",
                     "subject_key": "statekey002",
                     "source_run_id": "",
-                    "approved_at": "2026-05-12T00:00:00+00:00",
+                    "approved_at": generated_at,
                     "approved_by": "tester",
                     "approval_note": "state test",
                     "action_type": "campaign-plan",
@@ -279,7 +287,7 @@ class TestBackwardCompat:
                     "llm_provider": "fake",
                     "llm_model": "m",
                     "llm_cost_usd": 0.0,
-                    "generated_at": "2026-05-12T00:00:00+00:00",
+                    "generated_at": generated_at,
                     "status": "approved-manual",
                     "actions": [
                         {
@@ -319,6 +327,7 @@ class TestApplyPathGate:
         from src.plan_campaign import _goal_subject_key, _packet_record_id
         from src.warehouse import save_approval_record
 
+        generated_at = _recent_generated_at()
         packet = CampaignPlanPacket(
             goal=goal,
             actions=actions,
@@ -327,7 +336,7 @@ class TestApplyPathGate:
             llm_provider="fake",
             llm_model="m",
             llm_cost_usd=0.0,
-            generated_at="2026-05-12T00:00:00+00:00",
+            generated_at=generated_at,
         )
         record_id = _packet_record_id(packet)
         actions_dicts = [
@@ -351,7 +360,7 @@ class TestApplyPathGate:
                 "approval_subject_type": "campaign-plan",
                 "subject_key": _goal_subject_key(goal),
                 "source_run_id": "",
-                "approved_at": "2026-05-12T00:00:00+00:00",
+                "approved_at": generated_at,
                 "approved_by": "tester",
                 "approval_note": goal,
                 "action_type": "campaign-plan",
@@ -362,7 +371,7 @@ class TestApplyPathGate:
                 "llm_provider": "fake",
                 "llm_model": "m",
                 "llm_cost_usd": 0.0,
-                "generated_at": "2026-05-12T00:00:00+00:00",
+                "generated_at": generated_at,
                 "status": "approved-manual",
                 "actions": actions_dicts,
             },

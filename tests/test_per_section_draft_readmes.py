@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -21,10 +22,14 @@ from src.draft_readmes import (
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
+def _recent_generated_at() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
 def _make_packet(
     repo_name: str = "test-repo",
     proposed_readme: str = "## Installation\npip install foo\n\n## Usage\nrun it\n",
-    generated_at: str = "2026-05-11T00:00:00+00:00",
+    generated_at: str | None = None,
 ) -> DraftReadmePacket:
     return DraftReadmePacket(
         repo_name=repo_name,
@@ -34,7 +39,7 @@ def _make_packet(
         llm_provider="openai",
         llm_model="gpt-4",
         llm_cost_usd=0.001,
-        generated_at=generated_at,
+        generated_at=generated_at or _recent_generated_at(),
     )
 
 
@@ -233,6 +238,7 @@ class TestLegacyDraftReadmeRecords:
 
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
+            generated_at = _recent_generated_at()
             save_approval_record(
                 output_dir,
                 {
@@ -241,13 +247,13 @@ class TestLegacyDraftReadmeRecords:
                     "approval_subject_type": "draft-readme",
                     "subject_key": "legacy-repo",
                     "source_run_id": "",
-                    "approved_at": "2026-05-11T00:00:00+00:00",
+                    "approved_at": generated_at,
                     "approved_by": "tester",
                     "approval_note": "legacy",
                     "action_type": "draft-readme",
                     "target_context": "legacy-repo",
                     "decision": "",
-                    "timestamp": "2026-05-11T00:00:00+00:00",
+                    "timestamp": generated_at,
                     "status": "approved-manual",
                     "repo_name": "legacy-repo",
                     "current_readme_sha": None,
@@ -256,7 +262,7 @@ class TestLegacyDraftReadmeRecords:
                     "llm_provider": "openai",
                     "llm_model": "gpt-4",
                     "llm_cost_usd": 0.0,
-                    "generated_at": "2026-05-11T00:00:00+00:00",
+                    "generated_at": generated_at,
                     "context_repos": [],
                 },
             )

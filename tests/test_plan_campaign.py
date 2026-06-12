@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -26,6 +27,10 @@ from src.plan_campaign import (
 )
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+
+def _recent_generated_at() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
 def _make_repo(name: str = "my-repo", **kwargs: Any) -> dict:
@@ -531,12 +536,13 @@ class TestCLIDispatch:
 
 def _make_approved_packet(
     goal: str = "archive dead repos",
-    generated_at: str = "2026-05-11T00:00:00+00:00",
+    generated_at: str | None = None,
     status: str = "approved-manual",
 ) -> tuple[CampaignPlanPacket, dict]:
     """Return a (packet, ledger_record) pair for test setup."""
     from src.plan_campaign import _goal_subject_key, _packet_record_id
 
+    generated_at = generated_at or _recent_generated_at()
     actions = [
         CampaignAction(
             repo_name="old-repo",
@@ -612,7 +618,7 @@ class TestLoadApprovedCampaignPlans:
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)
             _, fresh_record = _make_approved_packet(
-                "fresh goal", generated_at="2026-05-11T00:00:00+00:00"
+                "fresh goal", generated_at=_recent_generated_at()
             )
             _, stale_record = _make_approved_packet(
                 "stale goal", generated_at="2026-01-01T00:00:00+00:00"

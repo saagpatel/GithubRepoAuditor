@@ -125,7 +125,7 @@ class FakeParser:
         self.args = args
         self.error_message: str | None = None
 
-    def parse_args(self) -> Namespace:
+    def parse_args(self, args=None) -> Namespace:
         return self.args
 
     def error(self, message: str) -> None:

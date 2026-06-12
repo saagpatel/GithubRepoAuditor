@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tempfile
 import warnings
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -23,6 +24,10 @@ from src.draft_readmes import (
 from src.llm_cost import BudgetExceededError
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+
+def _recent_generated_at() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
 def _make_repo(
@@ -512,7 +517,7 @@ def _make_approved_packet(
     repo_name: str = "my-repo",
     *,
     status: str = "approved-manual",
-    generated_at: str = "2026-05-11T10:00:00+00:00",
+    generated_at: str | None = None,
     proposed_readme: str = "# My Repo\n\nA great project.",
 ) -> DraftReadmePacket:
     return DraftReadmePacket(
@@ -523,7 +528,7 @@ def _make_approved_packet(
         llm_provider="fake",
         llm_model="fake-model",
         llm_cost_usd=0.001,
-        generated_at=generated_at,
+        generated_at=generated_at or _recent_generated_at(),
         context_repos=[],
     )
 
