@@ -1,0 +1,4 @@
+# codex-os-managed
+uv run python -m src.cli report saagpatel --portfolio-truth
+uv run --extra dev ruff check .
+uv run --extra dev --extra serve --extra semantic --extra config pytest -q

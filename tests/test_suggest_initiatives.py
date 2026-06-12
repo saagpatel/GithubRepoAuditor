@@ -35,6 +35,10 @@ undo_dismiss = _si_mod.undo_dismiss
 # ── Factories ─────────────────────────────────────────────────────────────────
 
 
+def _fresh_cache_ts() -> str:
+    return f"{date.today().isoformat()}T00:00:00+00:00"
+
+
 def _make_pt_repo(
     name: str = "TestRepo",
     has_git: bool = True,
@@ -1318,7 +1322,7 @@ class TestPersistentSuggestionCache:
 
         cache: OrderedDict = OrderedDict()
         key, suggestions, cost = self._make_cache_entry()
-        cache[key] = (suggestions, cost, "2026-05-12T00:00:00+00:00")
+        cache[key] = (suggestions, cost, _fresh_cache_ts())
         path = suggestion_cache_path(tmp_path)
         save_suggestion_cache(path, cache)
 
@@ -1352,7 +1356,7 @@ class TestPersistentSuggestionCache:
 
         cache: OrderedDict = OrderedDict()
         key, suggestions, cost = self._make_cache_entry("my-key")
-        ts = "2026-05-12T00:00:00+00:00"
+        ts = _fresh_cache_ts()
         cache[key] = (suggestions, cost, ts)
         path = suggestion_cache_path(tmp_path)
         save_suggestion_cache(path, cache)
@@ -1423,7 +1427,7 @@ class TestPersistentSuggestionCache:
 
         cache: OrderedDict = OrderedDict()
         key, suggestions, cost = self._make_cache_entry()
-        cache[key] = (suggestions, cost, "2026-05-12T00:00:00+00:00")
+        cache[key] = (suggestions, cost, _fresh_cache_ts())
         path = suggestion_cache_path(tmp_path)
         save_suggestion_cache(path, cache)
         assert path.exists()
@@ -1511,7 +1515,7 @@ class TestBoundedEviction:
         cache: OrderedDict = OrderedDict()
         for i in range(5):
             s = self._make_suggestion(f"Repo{i}")
-            cache[f"key-{i}"] = ([s], 0.0, "2026-05-12T00:00:00+00:00")
+            cache[f"key-{i}"] = ([s], 0.0, _fresh_cache_ts())
 
         path = suggestion_cache_path(tmp_path)
         save_suggestion_cache(path, cache)
