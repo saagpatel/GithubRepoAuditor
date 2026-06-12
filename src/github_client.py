@@ -316,6 +316,17 @@ class GitHubClient:
             logger.warning("Failed to fetch releases for %s/%s: %s", owner, repo, exc)
             return [], True
 
+    def list_open_pull_requests(self, owner: str, repo: str) -> list[dict]:
+        """Fetch all open pull requests for a repo, following pagination."""
+        try:
+            return self._paginate(
+                f"{API_BASE}/repos/{owner}/{repo}/pulls",
+                {"state": "open", "per_page": "100"},
+            )
+        except requests.HTTPError as exc:
+            logger.warning("Failed to fetch open PRs for %s/%s: %s", owner, repo, exc)
+            return []
+
     def get_pull_requests(
         self, owner: str, repo: str, state: str = "all", count: int = 50
     ) -> list[dict]:
@@ -424,11 +435,7 @@ class GitHubClient:
             contextual_high = 0
             for alert in alerts:
                 rule = alert.get("rule", {}) if isinstance(alert, dict) else {}
-                raw = (
-                    rule.get("security_severity_level")
-                    or rule.get("severity")
-                    or ""
-                ).lower()
+                raw = (rule.get("security_severity_level") or rule.get("severity") or "").lower()
                 rule_id = str(rule.get("id") or "")
                 if raw == "critical":
                     severity_counts["critical"] += 1

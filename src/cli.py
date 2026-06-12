@@ -1085,6 +1085,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run setup diagnostics only and exit without auditing repos",
     )
     parser.add_argument(
+        "--list-open-prs",
+        default=None,
+        metavar="OWNER/REPO",
+        help="Print all open pull requests for OWNER/REPO, one per line as '#<number>: <title>'",
+    )
+    parser.add_argument(
         "--control-center",
         action="store_true",
         help="Summarize the latest operator state without running a new audit",
@@ -2585,6 +2591,15 @@ def _run_acknowledgment_capture_mode(args, parser) -> None:
 
     print_info(f"Acknowledgment store: {saved_path}")
     print_info("Run --control-center to confirm the item is filtered from the queue.")
+
+
+def _run_list_open_prs_mode(args) -> None:
+    repo_arg: str = args.list_open_prs
+    owner, _, repo = repo_arg.partition("/")
+    client = GitHubClient(token=args.token)
+    prs = client.list_open_pull_requests(owner, repo)
+    for pr in prs:
+        print(f"#{pr['number']}: {pr['title']}")
 
 
 def _run_doctor_mode(args, config_inspection) -> None:
@@ -7148,6 +7163,10 @@ def main() -> None:
 
     if args.doctor:
         _run_doctor_mode(args, config_inspection)
+        return
+
+    if getattr(args, "list_open_prs", None):
+        _run_list_open_prs_mode(args)
         return
 
     if args.control_center:
