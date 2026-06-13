@@ -87,17 +87,6 @@ repos:
     target_maturity: operating
     doctor_standard: full
     notes: Owns Raycast script commands, active-project verification routing, read-only ops snapshots, and mirrored Codex operating-layer prompt/eval snapshots for /Users/d.
-  _machine/machine-control-tower/bin:
-    owner: d
-    purpose: nested command-bin folder under the machine control tower; not an independent portfolio project
-    lifecycle_state: archived
-    review_cadence: monthly
-    intended_disposition: archive
-    category: infrastructure
-    tool_provenance: codex
-    maturity_program: archive
-    target_maturity: archived
-    notes: Enrolled only to prevent the nested bin directory from being treated as a standalone decision-needed project.
   agent-bridge:
     owner: d
     purpose: local SQLite-backed MCP shared-state bus for coordinating coding agents
@@ -454,6 +443,20 @@ repos:
     target_maturity: operating
     automation_eligible: false
     notes: Use docs/CURRENT-STATE.md for dated release posture, but AGENTS.md is the current primary context contract required by portfolio truth.
+  mcp-trust:
+    owner: d
+    purpose: neutral public trust registry and scan-backed grading surface for MCP servers
+    lifecycle_state: active
+    criticality: high
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: infrastructure
+    tool_provenance: unknown
+    maturity_program: maintain
+    target_maturity: operating
+    automation_eligible: false
+    doctor_standard: basic
+    notes: Fresh v0.1.0 Python/FastAPI/Typer repo with v1 launch runbook; public launch is gated on real catalog seeding, sandboxed engine scans, live deploy smoke, and outreach loop validation.
   ModelColosseum:
     owner: d
     lifecycle_state: active
@@ -550,10 +553,11 @@ repos:
     tool_provenance: claude-code
   GhostRoutes:
     owner: d
-    lifecycle_state: active
-    review_cadence: weekly
-    intended_disposition: maintain
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
     tool_provenance: claude-code
+    notes: Archived from active operator attention on 2026-06-13 because the local git object database cannot read HEAD (`bad tree object HEAD`). Repair should be a deliberate reclone/reset lane, not an in-place portfolio audit mutation.
   Liminal:
     owner: d
     lifecycle_state: active
@@ -625,15 +629,6 @@ repos:
     intended_disposition: maintain
     category: fun
     tool_provenance: codex
-  StatusPage:
-    owner: d
-    purpose: self-hosted status page with built-in monitoring and GitHub OAuth admin
-      flow
-    lifecycle_state: active
-    review_cadence: monthly
-    intended_disposition: maintain
-    category: infrastructure
-    tool_provenance: codex
   MoneyPRJsViaGPT/StatusPage:
     owner: d
     purpose: GPT-built StatusPage SaaS/beta variant kept as an archived reference
@@ -652,14 +647,6 @@ repos:
     intended_disposition: maintain
     category: it-work
     tool_provenance: codex
-  ITPRJsViaClaude/IncidentWorkbench:
-    owner: d
-    purpose: earlier production-ready IT incident review workbench kept for reference
-    lifecycle_state: maintenance
-    review_cadence: quarterly
-    intended_disposition: maintain
-    category: it-work
-    tool_provenance: unknown
   KBFreshnessDetector:
     owner: d
     lifecycle_state: maintenance
@@ -682,14 +669,6 @@ repos:
     intended_disposition: maintain
     category: fun
     tool_provenance: codex
-  FunGamePrjs/OrbitForge:
-    owner: d
-    purpose: older build-ready staging copy of the OrbitForge gravity simulator
-    lifecycle_state: dormant
-    review_cadence: quarterly
-    intended_disposition: archive
-    category: fun
-    tool_provenance: unknown
   PersonalKBDrafter:
     owner: d
     lifecycle_state: maintenance
@@ -824,13 +803,6 @@ repos:
     review_cadence: weekly
     intended_disposition: maintain
     category: fun
-  ApplyKit-public:
-    owner: d
-    lifecycle_state: active
-    review_cadence: weekly
-    intended_disposition: maintain
-    category: commercial
-    tool_provenance: codex
   Grotto:
     owner: d
     lifecycle_state: active
@@ -887,6 +859,20 @@ repos:
     review_cadence: weekly
     intended_disposition: maintain
     category: infrastructure
+  cross-provider-egress-guard:
+    owner: d
+    purpose: destination-aware egress-control hardening lane for Claude Code and Codex hook surfaces
+    lifecycle_state: active
+    criticality: high
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: infrastructure
+    tool_provenance: claude-code
+    maturity_program: maintain
+    target_maturity: operating
+    automation_eligible: false
+    doctor_standard: basic
+    notes: Lane is live end-to-end as of 2026-06-12; keep residual hardening, policy widening, and hook deployment under explicit operator review.
   da-scaffold:
     owner: d
     lifecycle_state: active
@@ -913,6 +899,19 @@ repos:
     maturity_program: experiment
     target_maturity: functional
     notes: Evidence/history-style docs; use only when a cross-system architecture or conformance decision is active.
+  fable-outputs:
+    owner: d
+    purpose: time-boxed Fable-window artifact and campaign-output workspace
+    lifecycle_state: experimental
+    criticality: medium
+    review_cadence: weekly
+    intended_disposition: experiment
+    category: infrastructure
+    tool_provenance: claude-ai
+    maturity_program: experiment
+    target_maturity: functional
+    automation_eligible: false
+    notes: Active through the June 10-22, 2026 Fable window; staged harness/config changes are operator-installed only, then archive or park the campaign workspace after final index review.
   portfolio-index:
     owner: d
     purpose: public-safe static portfolio index for hiring-manager review
@@ -943,26 +942,12 @@ repos:
     review_cadence: monthly
     intended_disposition: maintain
     category: fun
-  GithubRepoAuditor-public:
-    owner: d
-    lifecycle_state: active
-    review_cadence: monthly
-    intended_disposition: maintain
-    category: infrastructure
-    tool_provenance: codex
   LegalDocsReview:
     owner: d
     lifecycle_state: active
     review_cadence: monthly
     intended_disposition: maintain
     category: it-work
-  PomGambler-prod:
-    owner: d
-    lifecycle_state: active
-    review_cadence: monthly
-    intended_disposition: maintain
-    category: fun
-    tool_provenance: codex
   Relay:
     owner: d
     lifecycle_state: active

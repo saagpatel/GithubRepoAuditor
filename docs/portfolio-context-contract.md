@@ -77,6 +77,7 @@ Accepted aliases include:
   - `Local Development`
   - `Commands`
   - `Quick Start`
+  - `Quickstart`
   - `Build & Run`
   - `Getting Started`
   - `Usage`

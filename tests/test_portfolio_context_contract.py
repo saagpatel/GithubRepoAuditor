@@ -132,6 +132,17 @@ def test_run_instructions_in_subsections_of_quick_start(tmp_path):
     assert result.run_instructions_present is True
 
 
+def test_run_instructions_match_quickstart_heading(tmp_path):
+    _write(
+        tmp_path,
+        "README.md",
+        "# Proj\n\nA tool that does a thing.\n\n"
+        "## Quickstart\n\n```bash\nproj serve\n```\n",
+    )
+    result = analyze_project_context(tmp_path, ["README.md"])
+    assert result.run_instructions_present is True
+
+
 def test_heading_containing_alias_term_matches(tmp_path):
     # "## Commands By Mode" contains the "commands" alias but is not an exact match.
     _write(
