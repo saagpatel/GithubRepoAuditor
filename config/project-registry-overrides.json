@@ -36,13 +36,20 @@
 	},
 	"notion_projection_policy_schema_version": "notion_projection_policy.v1",
 	"notion_title_aliases": {
+		"DesktopTerrarium": "desktop_terrarium",
 		"DesktopPEt-ready": "DesktopPEt",
 		"EarthPulse-readiness": "EarthPulse",
+		"FreelanceInvoice": "FreeLanceInvoice",
 		"GithubRepoAuditor-public": "GithubRepoAuditor",
+		"KBFreshness": "KBFreshnessDetector",
 		"Notion Operating System": "Notion",
+		"OrbitMechanics": "OrbitMechanic",
 		"OrbitForge (staging)": "OrbitForge",
 		"Personal Ops": "operator-os-docs",
-		"PomGambler-prod": "PomGambler"
+		"PhantomFrequencies": "Phantom Frequencies",
+		"PomGambler-prod": "PomGambler",
+		"seismoscope": "Seismoscope",
+		"signal-noise": "Signal & Noise"
 	},
 	"notion_projection_only_rows": {
 		"app": "local runtime/app shell placeholder; not a portfolio-truth repo",

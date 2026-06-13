@@ -54,6 +54,7 @@ CONTEXT_SECTION_ALIASES: dict[str, tuple[str, ...]] = {
         "run instructions",
         "development commands",
         "quick start",
+        "quickstart",
         "build run",
         "getting started",
         "usage",

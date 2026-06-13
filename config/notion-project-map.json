@@ -8,6 +8,9 @@
 	"bridge-db": {
 		"localProjectId": "34cc21f1-caf0-81cd-9650-cf2253d7afd4"
 	},
+	"personal-ops": {
+		"localProjectId": "35bc21f1-caf0-81cb-9426-dd264ef668b2"
+	},
 	"cross-system-smoke": {
 		"localProjectId": "378c21f1-caf0-81ec-b2db-f8a73ab0fb28"
 	},
@@ -16,6 +19,15 @@
 	},
 	"PortfolioCommandCenter": {
 		"localProjectId": "378c21f1-caf0-819a-86c3-c0c41d12eef3"
+	},
+	"GithubRepoAuditor": {
+		"localProjectId": "377c21f1-caf0-817d-9d57-e59a673dd0b7"
+	},
+	"Grotto": {
+		"localProjectId": "377c21f1-caf0-81d3-add8-f9f31584d5ae"
+	},
+	"Pressfield": {
+		"localProjectId": "377c21f1-caf0-8175-8858-ee479b9ef673"
 	},
 	"CryptForge": {
 		"localProjectId": "326c21f1-caf0-8169-a680-e1ef6f5157e7"
