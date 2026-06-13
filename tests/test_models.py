@@ -71,6 +71,28 @@ class TestRepoMetadata:
         meta = RepoMetadata.from_api_response(data)
         assert meta.pushed_at is None
 
+    def test_count_fields_default_to_zero_when_absent(self):
+        data = {
+            "name": "sparse",
+            "full_name": "user/sparse",
+            "description": None,
+            "language": None,
+            "private": False,
+            "fork": False,
+            "archived": False,
+            "created_at": "2024-01-01T00:00:00Z",
+            "updated_at": "2024-01-01T00:00:00Z",
+            "pushed_at": None,
+            "default_branch": "main",
+            "html_url": "",
+            "clone_url": "",
+        }
+        meta = RepoMetadata.from_api_response(data)
+        assert meta.stars == 0
+        assert meta.forks == 0
+        assert meta.open_issues == 0
+        assert meta.size_kb == 0
+
 
 class TestAnalyzerResult:
     def test_to_dict(self):
