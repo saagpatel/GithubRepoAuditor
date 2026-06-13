@@ -217,5 +217,14 @@
 	},
 	"GhostRoutes": {
 		"localProjectId": "32dc21f1-caf0-813a-9ca9-ef7062c11bf8"
+	},
+	"mcp-trust": {
+		"localProjectId": "37ec21f1-caf0-8110-bcd5-c1f4219623d9"
+	},
+	"cross-provider-egress-guard": {
+		"localProjectId": "37ec21f1-caf0-8110-8081-d87ffe80e1c3"
+	},
+	"fable-outputs": {
+		"localProjectId": "37ec21f1-caf0-81b8-b365-e894672184ac"
 	}
 }
