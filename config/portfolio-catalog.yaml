@@ -557,7 +557,8 @@ repos:
     review_cadence: quarterly
     intended_disposition: archive
     tool_provenance: claude-code
-    notes: Archived from active operator attention on 2026-06-13 because the local git object database cannot read HEAD (`bad tree object HEAD`). Repair should be a deliberate reclone/reset lane, not an in-place portfolio audit mutation.
+    maturity_program: archive
+    notes: Archived from active operator attention on 2026-06-13. The corrupt local checkout was preserved at /Users/d/Projects/GhostRoutes.corrupt-20260613T124820Z and /Users/d/Projects/GhostRoutes was restored from a fresh origin clone. Keep this repo archived/deferred unless explicitly reactivated.
   Liminal:
     owner: d
     lifecycle_state: active
