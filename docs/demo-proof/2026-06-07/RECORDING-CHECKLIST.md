@@ -6,10 +6,29 @@ the script in `../../../DEMO-SCRIPT.md`.
 
 The numbers below are historical proof values for this captured local package.
 For a new live recording, regenerate the proof package and query the current
-canonical snapshot before writing spoken lines:
+canonical artifacts before writing spoken lines:
 
 ```sh
-jq '{generated_at,total:(.projects|length),counts:.source_summary.attention_state_counts}' output/portfolio-truth-latest.json
+jq '
+def security_sum($field): ([.projects[] | (.security[$field] // 0)] | add) // 0;
+{
+  generated_at,
+  total:(.projects|length),
+  attention_counts:.source_summary.attention_state_counts,
+  security:{
+    scanned:([.projects[] | select(.security.alerts_available == true)] | length),
+    with_open_high_critical:([.projects[] | select(((.security.dependabot_critical // 0) + (.security.dependabot_high // 0) + (.security.code_scanning_critical // 0) + (.security.code_scanning_high // 0) + (.security.secret_scanning_open // 0)) > 0)] | length),
+    dependabot_critical:security_sum("dependabot_critical"),
+    dependabot_high:security_sum("dependabot_high"),
+    code_scanning_critical:security_sum("code_scanning_critical"),
+    code_scanning_high:security_sum("code_scanning_high"),
+    secret_scanning_open:security_sum("secret_scanning_open")
+  },
+  tool_provenance:([.projects[].declared.tool_provenance // "unknown"] | group_by(.) | map({key:.[0], count:length}))
+}' output/portfolio-truth-latest.json
+
+latest_weekly=$(ls -t output/weekly-command-center-*.json | head -n 1)
+jq '{generated_at,decision}' "$latest_weekly"
 ```
 
 ## Preflight
