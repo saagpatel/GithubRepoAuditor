@@ -5351,7 +5351,7 @@ def _warn_if_warehouse_report_stale(output_dir: Path, username: str) -> None:
 
 
 def _run_portfolio_truth_mode(args) -> None:
-    from src.portfolio_truth_publish import publish_portfolio_truth
+    from src.portfolio_truth_publish import PortfolioTruthPublishError, publish_portfolio_truth
 
     output_dir = Path(args.output_dir)
     workspace_root = Path(args.workspace_root)
@@ -5381,17 +5381,20 @@ def _run_portfolio_truth_mode(args) -> None:
             username=args.username,
         )
 
-    result = publish_portfolio_truth(
-        workspace_root=workspace_root,
-        output_dir=output_dir,
-        registry_output=registry_output,
-        portfolio_report_output=portfolio_report_output,
-        catalog_path=Path(args.catalog) if args.catalog else None,
-        legacy_registry_path=legacy_registry_path,
-        include_notion=True,
-        release_count_by_name=release_count_by_name,
-        security_alerts_by_name=security_alerts_by_name,
-    )
+    try:
+        result = publish_portfolio_truth(
+            workspace_root=workspace_root,
+            output_dir=output_dir,
+            registry_output=registry_output,
+            portfolio_report_output=portfolio_report_output,
+            catalog_path=Path(args.catalog) if args.catalog else None,
+            legacy_registry_path=legacy_registry_path,
+            include_notion=True,
+            release_count_by_name=release_count_by_name,
+            security_alerts_by_name=security_alerts_by_name,
+        )
+    except PortfolioTruthPublishError as exc:
+        raise SystemExit(str(exc)) from exc
     print_info(f"Portfolio truth snapshot: {result.latest_path}")
     print_info(f"Portfolio truth history snapshot: {result.snapshot_path}")
     print_info(f"Project registry compatibility output: {result.registry_output}")

@@ -21,7 +21,19 @@
 		"localProjectId": "378c21f1-caf0-819a-86c3-c0c41d12eef3"
 	},
 	"GithubRepoAuditor": {
-		"localProjectId": "377c21f1-caf0-817d-9d57-e59a673dd0b7"
+		"localProjectId": "332c21f1-caf0-8125-b553-f75377da8fed"
+	},
+	"GitHub Repo Auditor": {
+		"localProjectId": "332c21f1-caf0-8125-b553-f75377da8fed"
+	},
+	"MCPAudit": {
+		"localProjectId": "332c21f1-caf0-8150-a80f-d23b2b9e601d"
+	},
+	"MCP Audit": {
+		"localProjectId": "332c21f1-caf0-8150-a80f-d23b2b9e601d"
+	},
+	"Notion": {
+		"localProjectId": "332c21f1-caf0-81c5-85fb-d7451163ab6b"
 	},
 	"Grotto": {
 		"localProjectId": "377c21f1-caf0-81d3-add8-f9f31584d5ae"
@@ -217,14 +229,5 @@
 	},
 	"GhostRoutes": {
 		"localProjectId": "32dc21f1-caf0-813a-9ca9-ef7062c11bf8"
-	},
-	"mcp-trust": {
-		"localProjectId": "37ec21f1-caf0-8110-bcd5-c1f4219623d9"
-	},
-	"cross-provider-egress-guard": {
-		"localProjectId": "37ec21f1-caf0-8110-8081-d87ffe80e1c3"
-	},
-	"fable-outputs": {
-		"localProjectId": "37ec21f1-caf0-81b8-b365-e894672184ac"
 	}
 }

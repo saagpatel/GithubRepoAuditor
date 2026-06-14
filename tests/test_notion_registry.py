@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from src.notion_registry import (
     _extract_first_select,
     _extract_select,
@@ -37,6 +40,17 @@ class TestExtractSelect:
             },
         }
         assert _extract_select(page, "Current State") == "Active"
+
+    def test_extracts_status_property(self):
+        page = {
+            "properties": {
+                "Pipeline Stage": {
+                    "type": "status",
+                    "status": {"name": "Post-Build Review Done"},
+                },
+            },
+        }
+        assert _extract_select(page, "Pipeline Stage") == "Post-Build Review Done"
 
     def test_null_select(self):
         page = {
@@ -87,3 +101,8 @@ class TestNormalizeStatus:
 
     def test_unknown_defaults_active(self):
         assert _normalize_status("Something New") == "active"
+
+
+def test_live_notion_config_uses_operational_local_portfolio_projects():
+    config = json.loads(Path("config/notion-config.json").read_text())
+    assert config["projects_data_source_id"] == "7858b551-4ce9-4bc3-ad1d-07b187d7117b"
