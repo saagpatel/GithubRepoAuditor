@@ -4,6 +4,14 @@ Use this as the operator checklist for recording the 2026-06-07
 PortfolioCommandCenter demo. It assumes the proof package in this directory and
 the script in `../../../DEMO-SCRIPT.md`.
 
+The numbers below are historical proof values for this captured local package.
+For a new live recording, regenerate the proof package and query the current
+canonical snapshot before writing spoken lines:
+
+```sh
+jq '{generated_at,total:(.projects|length),counts:.source_summary.attention_state_counts}' output/portfolio-truth-latest.json
+```
+
 ## Preflight
 
 - [ ] Run from `/Users/d/Projects/PortfolioCommandCenter`:

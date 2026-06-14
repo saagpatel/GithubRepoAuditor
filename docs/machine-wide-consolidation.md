@@ -21,6 +21,13 @@ The packet combines:
 - archive/dependency/temp exclusions so old cleanup waves do not reappear as
   live work
 
+For current portfolio truth counts, query the canonical generated snapshot
+instead of copying counts into continuation notes:
+
+```sh
+jq '{generated_at,total:(.projects|length),counts:.source_summary.attention_state_counts}' output/portfolio-truth-latest.json
+```
+
 ## Consolidation Policy
 
 1. Start from the packet, not from a raw filesystem scan.
@@ -47,7 +54,7 @@ The packet combines:
 5. Keep restart prompts short. Tell the next session to rerun the packet and
    inspect the live repo state, not to inherit stale chat counts.
 
-## 2026-06-07 Baseline
+## 2026-06-07 Historical Baseline
 
 The first verified packet run after adding the restart surface reported:
 
@@ -76,7 +83,8 @@ The top active working set was:
 12. `PortfolioCommandCenter`
 
 These counts are evidence from one run, not a permanent registry. Rerun the
-packet before making a new decision.
+packet and re-query `output/portfolio-truth-latest.json` before making a new
+decision.
 
 ## Next Strong Lane
 
