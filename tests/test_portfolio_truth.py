@@ -970,6 +970,10 @@ def test_publish_refuses_to_drop_existing_notion_context(
         "src.portfolio_truth_sources.load_notion_project_context",
         lambda _config_dir: None,
     )
+    monkeypatch.setattr(
+        "src.portfolio_truth_publish._notion_project_context_configured",
+        lambda: True,
+    )
 
     with pytest.raises(RuntimeError, match="0 Notion context rows"):
         publish_portfolio_truth(
