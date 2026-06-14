@@ -17,6 +17,12 @@ Use JSON when another tool should consume the result:
 python -m src.codex_restart_packet --workspace-root /Users/d/Projects --json
 ```
 
+For the current generated portfolio truth counts, query the canonical snapshot directly:
+
+```sh
+jq '{generated_at,total:(.projects|length),counts:.source_summary.attention_state_counts}' output/portfolio-truth-latest.json
+```
+
 ## What It Decides
 
 - which repos are dirty, off-main, missing upstream, or ahead/behind upstream

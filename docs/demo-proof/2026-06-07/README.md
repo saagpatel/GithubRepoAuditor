@@ -19,6 +19,14 @@ the window title `Portfolio Command Center Demo`.
 - Projects: `129`
 - Weekly digest: `output/weekly-command-center-saagpatel-2026-06-03.json`
 
+These values are historical evidence for the screenshot package captured on
+2026-06-07. For current live private portfolio counts, query the canonical
+snapshot instead of reusing these numbers:
+
+```sh
+jq '{generated_at,total:(.projects|length),counts:.source_summary.attention_state_counts}' output/portfolio-truth-latest.json
+```
+
 ## Proof Points
 
 - Portfolio: `129` projects visible in the header and table count.

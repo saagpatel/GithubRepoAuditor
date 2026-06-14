@@ -7,9 +7,9 @@
 [![Release](https://img.shields.io/github/v/release/saagpatel/GithubRepoAuditor?display_name=tag)](https://github.com/saagpatel/GithubRepoAuditor/releases/latest)
 [![License](https://img.shields.io/github/license/saagpatel/GithubRepoAuditor.svg)](LICENSE)
 
-> Know the truth about every project you've ever started — because `git log` across 100 repos doesn't tell you which ones are worth finishing.
+> Know the truth about every project you've ever started — because `git log` across a crowded repo portfolio doesn't tell you which ones are worth finishing.
 
-📐 **Case study — [Operator OS: a multi-agent control plane over a 129-repo portfolio](CASE-STUDY.md).** How this auditor's truth layer anchors six local services and two coordinated coding agents (Claude Code + Codex), with real portfolio metrics and a [90-second demo plan](DEMO-PLAN.md).
+📐 **Case study — [Operator OS: a multi-agent control plane over a repo portfolio](CASE-STUDY.md).** How this auditor's truth layer anchors six local services and two coordinated coding agents (Claude Code + Codex), with real portfolio metrics and a [90-second demo plan](DEMO-PLAN.md).
 
 GitHub Repo Auditor is a portfolio audit and operator tool for developers with a lot of repositories. It clones every repo on your GitHub account, runs 12 analyzers across completeness and interest dimensions, assigns letter grades and achievement badges, preserves historical state, and generates actionable dashboards you can actually use to decide what to work on next. Built for developers who ship fast, start often, and need a system to manage the sprawl.
 
@@ -346,6 +346,12 @@ Before normal runs start, the CLI now performs a shared preflight that checks co
 For day-to-day operations, `--control-center` is now the clean read-only entrypoint. It reuses the latest report, review state, campaign history, governance drift, and setup health to build one shared operator queue without running a new audit or mutating any external system.
 
 The portfolio truth layer now has its own dedicated generation path. `--portfolio-truth` scans the configured local projects workspace, produces `output/portfolio-truth-latest.json` plus dated historical truth snapshots, and regenerates the configured project-registry and portfolio-audit Markdown compatibility outputs from that same truth contract instead of treating either markdown file as canonical.
+
+For current live portfolio counts, query the canonical snapshot instead of copying numbers into handoff or demo docs:
+
+```bash
+jq '{generated_at,total:(.projects|length),counts:.source_summary.attention_state_counts}' output/portfolio-truth-latest.json
+```
 
 Phase 104 added a second standalone workspace mode: `--portfolio-context-recovery`. That mode freezes the active/recent weak-context cohort from the live truth snapshot, writes dry-run recovery plan artifacts into `output/`, skips dirty or temporary repos automatically, and can apply bounded minimum-context upgrades plus repo-level catalog seeds before regenerating the truth snapshot and compatibility outputs.
 
