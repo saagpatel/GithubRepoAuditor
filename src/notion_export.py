@@ -9,6 +9,8 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from src.registry_parser import _normalize
+
 RAW_EXCERPT_LIMIT = 2000
 
 
@@ -50,7 +52,7 @@ def _normalize_audit_event(
     if not name:
         return None
 
-    project = mapping.get(name)
+    project = _lookup_project_mapping(name, mapping)
     if not project:
         return None
 
@@ -98,6 +100,20 @@ def _normalize_audit_event(
         "rawExcerpt": raw,
         "machineData": machine_data,
     }
+
+
+def _lookup_project_mapping(name: str, mapping: dict[str, dict]) -> dict | None:
+    """Resolve exact and safe normalized project-name aliases in the page map."""
+    project = mapping.get(name)
+    if project:
+        return project
+    normalized = _normalize(name)
+    if not normalized:
+        return None
+    for mapped_name, mapped_project in mapping.items():
+        if _normalize(mapped_name) == normalized:
+            return mapped_project
+    return None
 
 
 def _build_raw_excerpt(

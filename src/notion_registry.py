@@ -76,9 +76,12 @@ def _extract_title(page: dict) -> str:
 
 
 def _extract_select(page: dict, prop_name: str) -> str:
-    """Extract a select property value from a Notion page."""
+    """Extract a select/status property value from a Notion page."""
     props = page.get("properties", {})
     prop = props.get(prop_name, {})
+    status = prop.get("status")
+    if status:
+        return status.get("name", "")
     sel = prop.get("select")
     if sel:
         return sel.get("name", "")

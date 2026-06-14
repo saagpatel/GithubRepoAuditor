@@ -38,6 +38,17 @@ class TestExtractSelect:
         }
         assert _extract_select(page, "Current State") == "Active"
 
+    def test_extracts_status_property(self):
+        page = {
+            "properties": {
+                "Pipeline Stage": {
+                    "type": "status",
+                    "status": {"name": "Post-Build Review Done"},
+                },
+            },
+        }
+        assert _extract_select(page, "Pipeline Stage") == "Post-Build Review Done"
+
     def test_null_select(self):
         page = {
             "properties": {

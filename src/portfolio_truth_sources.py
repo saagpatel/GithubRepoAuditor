@@ -259,7 +259,25 @@ def load_safe_notion_project_context(
             "momentum": str(context.get("momentum", "") or "").strip(),
             "current_state": str(context.get("current_state", "") or "").strip(),
         }
+    for raw_alias, target in _load_notion_title_aliases(config_dir).items():
+        alias_context = sanitized.get(_normalize(raw_alias))
+        if alias_context:
+            sanitized.setdefault(_normalize(target), alias_context)
     return sanitized
+
+
+def _load_notion_title_aliases(config_dir: Path) -> dict[str, str]:
+    path = config_dir / "project-registry-overrides.json"
+    if not path.is_file():
+        return {}
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}
+    aliases = data.get("notion_title_aliases", {})
+    if not isinstance(aliases, dict):
+        return {}
+    return {str(raw): str(target) for raw, target in aliases.items() if raw and target}
 
 
 def _inspect_project_dir(

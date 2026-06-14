@@ -29,6 +29,10 @@ class PortfolioTruthPublishResult:
     project_registry_path: Path | None = None
 
 
+class PortfolioTruthPublishError(RuntimeError):
+    """Raised when publishing would corrupt or misrepresent portfolio truth."""
+
+
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _CONFIG_DIR = _REPO_ROOT / "config"
 
@@ -100,6 +104,11 @@ def publish_portfolio_truth(
     snapshot_stamp = build_result.snapshot.generated_at.strftime("%Y-%m-%dT%H%M%SZ")
     snapshot_path = output_dir / f"portfolio-truth-{snapshot_stamp}.json"
     latest_path = truth_latest_path(output_dir)
+    _guard_against_notion_context_drop(
+        build_result.snapshot.source_summary,
+        latest_path=latest_path,
+        include_notion=include_notion,
+    )
     latest_name = latest_path.name
     snapshot_json = json.dumps(build_result.snapshot.to_dict(), indent=2) + "\n"
     project_registry_path = output_dir / "project-registry.json"
@@ -184,3 +193,56 @@ def _content_changed(path: Path, content: str) -> bool:
     if not path.exists():
         return True
     return path.read_text() != content
+
+
+def _guard_against_notion_context_drop(
+    source_summary: dict[str, object],
+    *,
+    latest_path: Path,
+    include_notion: bool,
+) -> None:
+    """Avoid overwriting local truth when Notion bootstrap silently disappears."""
+    if not include_notion or not _notion_project_context_configured():
+        return
+    current_rows = _int_value(source_summary.get("notion_context_rows"))
+    if current_rows != 0:
+        return
+    previous_rows = _previous_notion_context_rows(latest_path)
+    if previous_rows is None or previous_rows <= 0:
+        return
+    raise PortfolioTruthPublishError(
+        "Refusing to publish portfolio truth with 0 Notion context rows because "
+        f"{latest_path} currently has {previous_rows}. Load NOTION_TOKEN or run "
+        "with an explicit no-Notion path before replacing local portfolio truth."
+    )
+
+
+def _notion_project_context_configured() -> bool:
+    path = _CONFIG_DIR / "notion-config.json"
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return False
+    return bool(str(data.get("projects_data_source_id", "")).strip())
+
+
+def _previous_notion_context_rows(latest_path: Path) -> int | None:
+    try:
+        data = json.loads(latest_path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    source_summary = data.get("source_summary", {})
+    if not isinstance(source_summary, dict):
+        return None
+    return _int_value(source_summary.get("notion_context_rows"))
+
+
+def _int_value(value: object) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return None

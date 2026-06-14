@@ -5,6 +5,7 @@ import json
 from src.notion_export import (
     _build_event_key,
     _find_biggest_drag,
+    _lookup_project_mapping,
     _normalize_audit_event,
     _severity_from_grade,
     export_notion_events,
@@ -125,6 +126,19 @@ class TestNormalizeEvent:
         mapping = {"MappedRepo": {"localProjectId": "uuid-123"}}
         event = _normalize_audit_event(audit, "2026-03-28", mapping)
         assert event is None
+
+
+class TestProjectMappingLookup:
+    def test_exact_match_wins(self):
+        mapping = {
+            "GitHub Repo Auditor": {"localProjectId": "spaced-id"},
+            "GithubRepoAuditor": {"localProjectId": "exact-id"},
+        }
+        assert _lookup_project_mapping("GithubRepoAuditor", mapping)["localProjectId"] == "exact-id"
+
+    def test_normalized_alias_match_resolves_spacing_and_case(self):
+        mapping = {"MCP Audit": {"localProjectId": "mcp-id"}}
+        assert _lookup_project_mapping("MCPAudit", mapping)["localProjectId"] == "mcp-id"
 
 
 class TestBiggestDrag:

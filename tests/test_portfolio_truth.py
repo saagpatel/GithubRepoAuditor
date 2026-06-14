@@ -20,7 +20,11 @@ from src.portfolio_truth_render import (
     render_portfolio_report_markdown,
     render_registry_markdown,
 )
-from src.portfolio_truth_sources import _classify_context_quality, _extract_github_full_name
+from src.portfolio_truth_sources import (
+    _classify_context_quality,
+    _extract_github_full_name,
+    load_safe_notion_project_context,
+)
 from src.portfolio_truth_validate import validate_portfolio_report_markdown
 from src.registry_parser import parse_registry
 
@@ -83,6 +87,37 @@ def test_extract_github_full_name_uses_exact_github_host() -> None:
     assert _extract_github_full_name("https://github.com/octo/repo.git") == "octo/repo"
     assert _extract_github_full_name("git@github.com:octo/repo.git") == "octo/repo"
     assert _extract_github_full_name("https://evil.example/github.com/octo/repo.git") == ""
+
+
+def test_notion_context_uses_configured_title_aliases(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "project-registry-overrides.json").write_text(
+        json.dumps(
+            {
+                "notion_title_aliases": {
+                    "Notion Operating System": "Notion",
+                }
+            }
+        )
+    )
+
+    monkeypatch.setattr(
+        "src.portfolio_truth_sources.load_notion_project_context",
+        lambda _config_dir: {
+            "Notion Operating System": {
+                "portfolio_call": "Build Now",
+                "momentum": "Post-Build Review Done",
+                "current_state": "Shipped",
+            }
+        },
+    )
+
+    context = load_safe_notion_project_context(config_dir)
+
+    assert context["notion"]["current_state"] == "Shipped"
 
 
 @pytest.fixture
@@ -913,6 +948,45 @@ def test_publish_failure_leaves_live_files_untouched(
     assert registry_output.read_text() == "sentinel-registry\n"
     assert report_output.read_text() == "sentinel-report\n"
     assert not list(output_dir.glob("*.tmp"))
+
+
+def test_publish_refuses_to_drop_existing_notion_context(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    latest_path = output_dir / "portfolio-truth-latest.json"
+    latest_path.write_text(
+        json.dumps({"source_summary": {"notion_context_rows": 137}}) + "\n"
+    )
+    registry_output = portfolio_workspace / "project-registry.md"
+    report_output = portfolio_workspace / "PORTFOLIO-AUDIT-REPORT.md"
+
+    monkeypatch.setattr(
+        "src.portfolio_truth_sources.load_notion_project_context",
+        lambda _config_dir: None,
+    )
+    monkeypatch.setattr(
+        "src.portfolio_truth_publish._notion_project_context_configured",
+        lambda: True,
+    )
+
+    with pytest.raises(RuntimeError, match="0 Notion context rows"):
+        publish_portfolio_truth(
+            workspace_root=portfolio_workspace,
+            output_dir=output_dir,
+            registry_output=registry_output,
+            portfolio_report_output=report_output,
+            catalog_path=portfolio_catalog,
+            legacy_registry_path=legacy_registry,
+            include_notion=True,
+        )
+
+    assert json.loads(latest_path.read_text())["source_summary"]["notion_context_rows"] == 137
 
 
 def test_context_recovery_plan_freezes_and_filters_targets(

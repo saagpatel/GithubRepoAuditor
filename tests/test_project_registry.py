@@ -85,6 +85,23 @@ def test_resolve_joins_spelling_variants():
         assert result["canonical_key"] == "MCPAudit", spelling
 
 
+def test_configured_notion_title_aliases_cover_operating_spellings():
+    snapshot = _snapshot(
+        _ident("GithubRepoAuditor", "GithubRepoAuditor", "saagpatel/GithubRepoAuditor"),
+        _ident("MCPAudit", "MCPAudit", "saagpatel/MCPAudit"),
+        _ident("Notion", "Notion", "saagpatel/notion-operating-system"),
+    )
+    registry = build_project_registry(
+        snapshot,
+        notion_snapshot_path=None,
+        overrides_config_path=Path("config/project-registry-overrides.json"),
+    )
+    index = build_index(registry)
+    assert resolve("GitHub Repo Auditor", index)["canonical_key"] == "GithubRepoAuditor"
+    assert resolve("MCP Audit", index)["canonical_key"] == "MCPAudit"
+    assert resolve("Notion Operating System", index)["canonical_key"] == "Notion"
+
+
 def test_resolve_hard_normalization_failures_via_override():
     registry = build_project_registry(SNAPSHOT, overrides_config_path=None)
     index = build_index(registry)
