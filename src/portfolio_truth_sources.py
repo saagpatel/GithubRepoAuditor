@@ -89,6 +89,7 @@ IGNORE_PROJECT_DIR_TOKENS = frozenset({"nogoprjs", "smoke-export"})
 # Transient / generated working directories matched by regex on the dir name —
 # e.g. a `<repo>-tmp-<timestamp>` clone left behind by a tooling run.
 IGNORE_PROJECT_DIR_PATTERNS: tuple[re.Pattern[str], ...] = (re.compile(r"-tmp-\d+$"),)
+ARCHIVE_REMOTE_BASENAME_TOKENS = frozenset({"private-archive", "scrubbed-import"})
 
 
 def _is_ignored_project_dir(name: str) -> bool:
@@ -489,20 +490,74 @@ def _git_default_branch(project_path: Path) -> str:
 
 
 def _git_remote_full_name(project_path: Path) -> str:
+    remotes = _git_github_remotes(project_path)
+    if not remotes:
+        return ""
+    return _select_portfolio_identity_remote(project_path.name, remotes)
+
+
+def _git_github_remotes(project_path: Path) -> list[tuple[str, str]]:
     try:
         result = subprocess.run(
-            ["git", "-C", str(project_path), "remote", "get-url", "origin"],
+            ["git", "-C", str(project_path), "remote", "-v"],
             capture_output=True,
             text=True,
             timeout=5,
             check=False,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired):
-        return ""
+        return []
 
     if result.returncode != 0:
-        return ""
-    return _extract_github_full_name(result.stdout.strip())
+        return []
+
+    seen: set[tuple[str, str]] = set()
+    remotes: list[tuple[str, str]] = []
+    for line in result.stdout.splitlines():
+        parts = line.split()
+        if len(parts) < 3 or parts[2] != "(fetch)":
+            continue
+        remote_name = parts[0].strip()
+        full_name = _extract_github_full_name(parts[1])
+        if not remote_name or not full_name:
+            continue
+        key = (remote_name, full_name.lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        remotes.append((remote_name, full_name))
+    return remotes
+
+
+def _select_portfolio_identity_remote(checkout_name: str, remotes: list[tuple[str, str]]) -> str:
+    """Choose the GitHub repo identity used by portfolio truth.
+
+    ``origin`` remains the normal source of truth. An explicit ``canonical``
+    remote wins, and archive/import origins can yield to a remote whose repo
+    basename matches the local checkout directory.
+    """
+    for remote_name, full_name in remotes:
+        if remote_name == "canonical":
+            return full_name
+
+    origin = next((full_name for remote_name, full_name in remotes if remote_name == "origin"), "")
+    if not origin:
+        return remotes[0][1]
+    if not _is_archive_repo_identity(origin):
+        return origin
+
+    checkout_key = checkout_name.lower()
+    for remote_name, full_name in remotes:
+        if remote_name == "origin" or _is_archive_repo_identity(full_name):
+            continue
+        if full_name.rsplit("/", 1)[-1].lower() == checkout_key:
+            return full_name
+    return origin
+
+
+def _is_archive_repo_identity(full_name: str) -> bool:
+    repo_name = full_name.rsplit("/", 1)[-1].lower()
+    return any(token in repo_name for token in ARCHIVE_REMOTE_BASENAME_TOKENS)
 
 
 def _extract_github_full_name(remote_url: str) -> str:

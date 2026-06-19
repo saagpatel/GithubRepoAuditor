@@ -26,7 +26,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 SCHEMA_VERSION = "1.0"
-NOTION_PROJECTION_POLICY_SCHEMA_VERSION = "notion_projection_policy.v1"
+NOTION_PROJECTION_POLICY_SCHEMA_VERSION = "notion_projection_policy.v2"
 
 # Built-in fallbacks, mirrored by config/project-registry-overrides.json.
 # Hard normalization failures: drifted identifier -> canonical project_key.
@@ -93,6 +93,11 @@ DEFAULT_NOTION_PROJECTION_ONLY_ROWS: dict[str, str] = {
     "SecondBrain": "knowledge vault under /Users/d/Documents; not a /Users/d/Projects repo",
 }
 
+DEFAULT_NOTION_TRUTH_SHADOW_ROWS: dict[str, str] = {
+    "agent-bridge-launch": "agent-bridge",
+    "PortfolioCommandCenter-public": "PortfolioCommandCenter",
+}
+
 # Operator-machine source locations (overridable via the "sources" block of
 # config/project-registry-overrides.json). Every source is optional.
 DEFAULT_SOURCES: dict[str, str] = {
@@ -132,6 +137,7 @@ def load_overrides_config(
     str,
     dict[str, str],
     dict[str, str],
+    dict[str, str],
 ]:
     """Load overrides + supplementary + memory-meta, falling back to defaults."""
     if config_path is None or not config_path.exists():
@@ -142,6 +148,7 @@ def load_overrides_config(
             NOTION_PROJECTION_POLICY_SCHEMA_VERSION,
             dict(DEFAULT_NOTION_TITLE_ALIASES),
             dict(DEFAULT_NOTION_PROJECTION_ONLY_ROWS),
+            dict(DEFAULT_NOTION_TRUTH_SHADOW_ROWS),
         )
     data = json.loads(config_path.read_text())
     overrides = data.get("overrides", DEFAULT_OVERRIDES)
@@ -155,6 +162,9 @@ def load_overrides_config(
     projection_only = data.get(
         "notion_projection_only_rows", DEFAULT_NOTION_PROJECTION_ONLY_ROWS
     )
+    truth_shadow = data.get(
+        "notion_truth_shadow_rows", DEFAULT_NOTION_TRUTH_SHADOW_ROWS
+    )
     return (
         dict(overrides),
         [dict(s) for s in supplementary],
@@ -162,6 +172,7 @@ def load_overrides_config(
         str(projection_policy_schema_version),
         dict(title_aliases),
         dict(projection_only),
+        dict(truth_shadow),
     )
 
 
@@ -331,6 +342,7 @@ def build_project_registry(
         notion_projection_policy_schema_version,
         notion_title_aliases,
         notion_projection_only_rows,
+        notion_truth_shadow_rows,
     ) = load_overrides_config(overrides_config_path)
     generated_at = generated_at or datetime.now(timezone.utc)
 
@@ -481,6 +493,7 @@ def build_project_registry(
             "schema_version": notion_projection_policy_schema_version,
             "notion_title_aliases": notion_title_aliases,
             "notion_projection_only_rows": notion_projection_only_rows,
+            "notion_truth_shadow_rows": notion_truth_shadow_rows,
         },
         "entries": [e.to_dict() for e in entries],
         "projection_only": {

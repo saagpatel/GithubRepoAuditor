@@ -23,6 +23,7 @@ from src.portfolio_truth_render import (
 from src.portfolio_truth_sources import (
     _classify_context_quality,
     _extract_github_full_name,
+    _git_remote_full_name,
     load_safe_notion_project_context,
 )
 from src.portfolio_truth_validate import validate_portfolio_report_markdown
@@ -87,6 +88,92 @@ def test_extract_github_full_name_uses_exact_github_host() -> None:
     assert _extract_github_full_name("https://github.com/octo/repo.git") == "octo/repo"
     assert _extract_github_full_name("git@github.com:octo/repo.git") == "octo/repo"
     assert _extract_github_full_name("https://evil.example/github.com/octo/repo.git") == ""
+
+
+def test_git_remote_full_name_prefers_canonical_remote(tmp_path: Path) -> None:
+    repo = tmp_path / "GithubRepoAuditor"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, capture_output=True, check=True)
+    subprocess.run(
+        [
+            "git",
+            "remote",
+            "add",
+            "origin",
+            "https://github.com/saagpatel/GithubRepoAuditor-private-archive-20260518.git",
+        ],
+        cwd=repo,
+        capture_output=True,
+        check=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "remote",
+            "add",
+            "canonical",
+            "https://github.com/saagpatel/GithubRepoAuditor.git",
+        ],
+        cwd=repo,
+        capture_output=True,
+        check=True,
+    )
+
+    assert _git_remote_full_name(repo) == "saagpatel/GithubRepoAuditor"
+
+
+def test_git_remote_full_name_prefers_matching_public_remote_for_archive_origin(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "ApplyKit"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, capture_output=True, check=True)
+    subprocess.run(
+        [
+            "git",
+            "remote",
+            "add",
+            "origin",
+            "https://github.com/saagpatel/ApplyKit-private-archive-20260517.git",
+        ],
+        cwd=repo,
+        capture_output=True,
+        check=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "remote",
+            "add",
+            "legacy-origin",
+            "https://github.com/saagpatel/ApplyKit.git",
+        ],
+        cwd=repo,
+        capture_output=True,
+        check=True,
+    )
+
+    assert _git_remote_full_name(repo) == "saagpatel/ApplyKit"
+
+
+def test_git_remote_full_name_keeps_normal_origin(tmp_path: Path) -> None:
+    repo = tmp_path / "NormalProject"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, capture_output=True, check=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", "https://github.com/saagpatel/NormalProject.git"],
+        cwd=repo,
+        capture_output=True,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "remote", "add", "mirror", "https://github.com/saagpatel/OtherProject.git"],
+        cwd=repo,
+        capture_output=True,
+        check=True,
+    )
+
+    assert _git_remote_full_name(repo) == "saagpatel/NormalProject"
 
 
 def test_notion_context_uses_configured_title_aliases(

@@ -1,18 +1,19 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://local.invalid/github-repo-auditor/notion-projection-policy.v1.schema.json",
+  "$id": "https://local.invalid/github-repo-auditor/notion-projection-policy.v2.schema.json",
   "title": "Notion projection policy",
-  "description": "Explains Local Portfolio rows that are aliases of, or intentional projections outside, GithubRepoAuditor portfolio truth.",
+  "description": "Explains Local Portfolio rows that are aliases of, intentional projections outside, or canonical shadows for GithubRepoAuditor portfolio truth.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schema_version",
     "notion_title_aliases",
-    "notion_projection_only_rows"
+    "notion_projection_only_rows",
+    "notion_truth_shadow_rows"
   ],
   "properties": {
     "schema_version": {
-      "const": "notion_projection_policy.v1"
+      "const": "notion_projection_policy.v2"
     },
     "notion_title_aliases": {
       "type": "object",
@@ -22,6 +23,13 @@
       }
     },
     "notion_projection_only_rows": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "notion_truth_shadow_rows": {
       "type": "object",
       "additionalProperties": {
         "type": "string",
