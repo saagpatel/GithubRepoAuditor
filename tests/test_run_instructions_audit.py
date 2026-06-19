@@ -92,9 +92,9 @@ def test_build_record_resolves_path_and_all_six_claims():
             "project_summary_present": True,  # one set True to prove per-field mapping
         },
     }
-    record = build_record(project, "/Users/d/Projects")
+    record = build_record(project, os.path.expanduser("~/Projects"))
 
-    assert record["abs_path"] == "/Users/d/Projects/Fun:GamePrjs/BattleGrid"
+    assert record["abs_path"] == os.path.expanduser("~/Projects/Fun:GamePrjs/BattleGrid")
     assert record["primary_file_name"] == "AGENTS.md"  # no CLAUDE.md → AGENTS.md
     assert record["context_files"] == ["AGENTS.md", "README.md"]
     assert record["project_key"] == "Fun:GamePrjs/BattleGrid"
