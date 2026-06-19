@@ -387,7 +387,8 @@ repos:
     review_cadence: weekly
     intended_disposition: maintain
     tool_provenance: claude-code
-    category: vanity
+    category: infrastructure
+    notes: Active operating-layer infrastructure, but scope-closed steady maintenance; surface only concrete bridge, sync, health, or cross-system state decisions.
   Codec:
     owner: d
     lifecycle_state: active
@@ -489,7 +490,8 @@ repos:
     review_cadence: weekly
     intended_disposition: maintain
     tool_provenance: claude-code
-    category: vanity
+    category: infrastructure
+    notes: Active operating-layer localhost daemon; surface runtime or operator-signal decisions only after fresh read-only verification.
   Premise:
     owner: d
     lifecycle_state: active
