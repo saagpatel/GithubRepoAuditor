@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from src.portfolio_automation import select_automation_candidates
+from src.portfolio_decision_queue import build_decision_queue, summarize_decision_queue
 from src.portfolio_truth_types import truth_latest_path
 from src.report_enrichment import build_weekly_review_pack
 
@@ -95,6 +96,8 @@ def build_weekly_command_center_digest(
     )
     truth = portfolio_truth or {}
     truth_summary = _build_truth_summary(truth)
+    decision_queue = build_decision_queue(truth)
+    decision_queue_summary = summarize_decision_queue(decision_queue)
     operator_decision = _operator_decision(operator_summary, operator_queue)
     operator_why = _safe_text(operator_summary.get("trend_summary")) or _safe_text(
         operator_summary.get("why_it_matters")
@@ -133,7 +136,8 @@ def build_weekly_command_center_digest(
             or "Decision quality is not available yet.",
             "authority_cap": _safe_text(decision_quality.get("authority_cap")) or AUTHORITY_CAP,
         },
-        "portfolio_truth": truth_summary,
+        "portfolio_truth": {**truth_summary, **decision_queue_summary},
+        "decision_queue": decision_queue,
         "path_attention": _build_path_attention_items(truth),
         "automation_candidates": [
             candidate.to_dict()
@@ -193,12 +197,29 @@ def render_weekly_command_center_markdown(digest: dict[str, Any]) -> str:
         f"- Next Step: {_safe_text(digest.get('next_step'))}",
         f"- Decision Quality: `{_safe_text(decision_quality.get('status'))}` — {_safe_text(decision_quality.get('summary'))}",
         f"- Operating Paths: {_safe_text(digest.get('operating_paths_summary')) or 'No operating-path summary is recorded yet.'}",
-        f"- Portfolio Truth: {portfolio_truth.get('project_count', 0)} projects, {portfolio_truth.get('active_project_count', 0)} active registry entries, {portfolio_truth.get('default_attention_count', 0)} default attention, {portfolio_truth.get('decision_needed_count', 0)} decision-needed",
+        f"- Portfolio Truth: {portfolio_truth.get('project_count', 0)} projects, {portfolio_truth.get('active_project_count', 0)} active registry entries, {portfolio_truth.get('default_attention_count', 0)} default attention, {portfolio_truth.get('decision_queue_count', 0)} decision queue",
         f"- Risk Posture: {risk_posture.get('elevated_count', 0)} elevated, {tier_counts.get('moderate', 0)} moderate, {tier_counts.get('baseline', 0)} baseline",
         f"- Security Posture: {security_posture.get('scanned_count', 0)} scanned, {security_posture.get('repos_with_open_high_critical', 0)} with open high/critical Dependabot alerts ({security_posture.get('total_open_critical', 0)} critical, {security_posture.get('total_open_high', 0)} high)",
         "",
-        "## Path Attention",
+        "## Decision Queue",
     ]
+
+    decision_queue = list(digest.get("decision_queue") or [])
+    if not decision_queue:
+        lines.append("- No portfolio decisions clear the current evidence bar.")
+    else:
+        for item in decision_queue:
+            lines.append(
+                f"- **{item['project']}** [{item['decision_type']}]: "
+                f"{item['why_now']} Next: {item['recommended_action']}"
+            )
+
+    lines.extend(
+        [
+            "",
+            "## Path Attention",
+        ]
+    )
 
     path_attention = list(digest.get("path_attention") or [])
     if not path_attention:
