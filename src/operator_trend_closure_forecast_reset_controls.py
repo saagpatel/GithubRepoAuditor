@@ -8188,85 +8188,110 @@ def _rerererestore_text(text: str) -> str:
     return transformed
 
 
+# Restore-tier depth arithmetic. A restore-tier word is "store"/"stored"/"storing"
+# prefixed by one "re" per depth level: restore(1) -> rerestore(2) -> rererestore(3)
+# -> rerererestore(4). The translation shims below previously hand-spelled every
+# depth-shifted output string; they now share this single primitive, which moves a
+# status token's restore tier by `delta` levels (passthrough/unknown tokens carry no
+# tier word and are returned unchanged).
+_RESTORE_TIER_BASES = ("storing", "stored", "store")
+
+
+def _shift_restore_tier(token: str, delta: int) -> str:
+    parts = token.split("-")
+    for index, part in enumerate(parts):
+        for base in _RESTORE_TIER_BASES:
+            if not part.endswith(base):
+                continue
+            prefix = part[: -len(base)]
+            if not prefix or len(prefix) % 2 or prefix != "re" * (len(prefix) // 2):
+                return token
+            new_depth = len(prefix) // 2 + delta
+            if new_depth < 1:
+                return token
+            parts[index] = "re" * new_depth + base
+            return "-".join(parts)
+    return token
+
+
+def _translate_restore_tier_status(status: str, *, delta: int, recognized: frozenset[str]) -> str:
+    # Recognized inputs are translated by shifting their restore tier `delta` levels.
+    # Passthrough terms (none/blocked/reversing/insufficient-data) are recognized but
+    # carry no tier word, so the shift returns them unchanged. Anything else -> "none".
+    if status in recognized:
+        return _shift_restore_tier(status, delta)
+    return "none"
+
+
+_STATUS_TO_RERERESTORE_INPUTS = frozenset(
+    {
+        "pending-confirmation-rebuild-reentry-rerererestore",
+        "pending-clearance-rebuild-reentry-rerererestore",
+        "rerererestored-confirmation-rebuild-reentry",
+        "rerererestored-clearance-rebuild-reentry",
+        "blocked",
+        "none",
+    }
+)
+_PERSISTENCE_TO_RERERESTORE_INPUTS = frozenset(
+    {
+        "just-rerererestored",
+        "holding-confirmation-rebuild-reentry-rerererestore",
+        "holding-clearance-rebuild-reentry-rerererestore",
+        "sustained-confirmation-rebuild-reentry-rerererestore",
+        "sustained-clearance-rebuild-reentry-rerererestore",
+        "reversing",
+        "insufficient-data",
+        "none",
+    }
+)
+_REFRESH_TO_RERERESTORE_INPUTS = frozenset(
+    {
+        "recovering-confirmation-rebuild-reentry-rererestore-reset",
+        "recovering-clearance-rebuild-reentry-rererestore-reset",
+        "rerererestoring-confirmation-rebuild-reentry",
+        "rerererestoring-clearance-rebuild-reentry",
+        "reversing",
+        "blocked",
+        "none",
+    }
+)
+_PERSISTENCE_FROM_RERERESTORE_INPUTS = frozenset(
+    {
+        "just-rererestored",
+        "holding-confirmation-rebuild-reentry-rererestore",
+        "holding-clearance-rebuild-reentry-rererestore",
+        "sustained-confirmation-rebuild-reentry-rererestore",
+        "sustained-clearance-rebuild-reentry-rererestore",
+        "reversing",
+        "insufficient-data",
+        "none",
+    }
+)
+
+
 def _status_to_rererestore_status(status: str) -> str:
-    return {
-        "pending-confirmation-rebuild-reentry-rerererestore": (
-            "pending-confirmation-rebuild-reentry-rererestore"
-        ),
-        "pending-clearance-rebuild-reentry-rerererestore": (
-            "pending-clearance-rebuild-reentry-rererestore"
-        ),
-        "rerererestored-confirmation-rebuild-reentry": (
-            "rererestored-confirmation-rebuild-reentry"
-        ),
-        "rerererestored-clearance-rebuild-reentry": (
-            "rererestored-clearance-rebuild-reentry"
-        ),
-        "blocked": "blocked",
-        "none": "none",
-    }.get(status, "none")
+    return _translate_restore_tier_status(
+        status, delta=-1, recognized=_STATUS_TO_RERERESTORE_INPUTS
+    )
 
 
 def _persistence_status_to_rererestore_status(status: str) -> str:
-    return {
-        "just-rerererestored": "just-rererestored",
-        "holding-confirmation-rebuild-reentry-rerererestore": (
-            "holding-confirmation-rebuild-reentry-rererestore"
-        ),
-        "holding-clearance-rebuild-reentry-rerererestore": (
-            "holding-clearance-rebuild-reentry-rererestore"
-        ),
-        "sustained-confirmation-rebuild-reentry-rerererestore": (
-            "sustained-confirmation-rebuild-reentry-rererestore"
-        ),
-        "sustained-clearance-rebuild-reentry-rerererestore": (
-            "sustained-clearance-rebuild-reentry-rererestore"
-        ),
-        "reversing": "reversing",
-        "insufficient-data": "insufficient-data",
-        "none": "none",
-    }.get(status, "none")
+    return _translate_restore_tier_status(
+        status, delta=-1, recognized=_PERSISTENCE_TO_RERERESTORE_INPUTS
+    )
 
 
 def _refresh_status_to_rererestore_refresh_status(status: str) -> str:
-    return {
-        "recovering-confirmation-rebuild-reentry-rererestore-reset": (
-            "recovering-confirmation-rebuild-reentry-rerestore-reset"
-        ),
-        "recovering-clearance-rebuild-reentry-rererestore-reset": (
-            "recovering-clearance-rebuild-reentry-rerestore-reset"
-        ),
-        "rerererestoring-confirmation-rebuild-reentry": (
-            "rererestoring-confirmation-rebuild-reentry"
-        ),
-        "rerererestoring-clearance-rebuild-reentry": (
-            "rererestoring-clearance-rebuild-reentry"
-        ),
-        "reversing": "reversing",
-        "blocked": "blocked",
-        "none": "none",
-    }.get(status, "none")
+    return _translate_restore_tier_status(
+        status, delta=-1, recognized=_REFRESH_TO_RERERESTORE_INPUTS
+    )
 
 
 def _persistence_status_from_rererestore_status(status: str) -> str:
-    return {
-        "just-rererestored": "just-rerererestored",
-        "holding-confirmation-rebuild-reentry-rererestore": (
-            "holding-confirmation-rebuild-reentry-rerererestore"
-        ),
-        "holding-clearance-rebuild-reentry-rererestore": (
-            "holding-clearance-rebuild-reentry-rerererestore"
-        ),
-        "sustained-confirmation-rebuild-reentry-rererestore": (
-            "sustained-confirmation-rebuild-reentry-rerererestore"
-        ),
-        "sustained-clearance-rebuild-reentry-rererestore": (
-            "sustained-clearance-rebuild-reentry-rerererestore"
-        ),
-        "reversing": "reversing",
-        "insufficient-data": "insufficient-data",
-        "none": "none",
-    }.get(status, "none")
+    return _translate_restore_tier_status(
+        status, delta=1, recognized=_PERSISTENCE_FROM_RERERESTORE_INPUTS
+    )
 
 
 def _translate_target_for_persistence(target: dict[str, Any]) -> dict[str, Any]:
