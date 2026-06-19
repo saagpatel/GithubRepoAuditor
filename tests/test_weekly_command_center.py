@@ -144,8 +144,16 @@ def test_build_weekly_command_center_digest_surfaces_truth_and_guardrails() -> N
     assert digest["portfolio_truth"]["active_project_count"] == 3
     assert digest["portfolio_truth"]["default_attention_count"] == 2
     assert digest["portfolio_truth"]["decision_needed_count"] == 2
+    assert digest["portfolio_truth"]["decision_queue_count"] == 2
+    assert digest["portfolio_truth"]["decision_queue_type_counts"] == {
+        "owner or human decision": 2
+    }
     assert digest["portfolio_truth"]["investigate_override_count"] == 2
     assert digest["portfolio_truth"]["attention_state_counts"]["manual-only"] == 1
+    assert [item["project"] for item in digest["decision_queue"]] == [
+        "GithubRepoAuditor",
+        "JobCommandCenter",
+    ]
     assert digest["path_attention"][0]["repo"] == "JobCommandCenter"
     assert digest["path_attention"][0]["headline"] == "Unspecified stable path"
     assert all(item["attention_state"] == "decision-needed" for item in digest["path_attention"])
@@ -159,6 +167,8 @@ def test_build_weekly_command_center_digest_surfaces_truth_and_guardrails() -> N
     assert digest["portfolio_truth"]["risk_tier_counts"]["deferred"] == 1
 
     rendered_md = render_weekly_command_center_markdown(digest)
+    assert "## Decision Queue" in rendered_md
+    assert "owner or human decision" in rendered_md
     assert "## Risk Posture" in rendered_md
     assert "GithubRepoAuditor" in rendered_md
     assert "JobCommandCenter" in rendered_md
@@ -353,6 +363,11 @@ def test_security_posture_surfaces_open_alerts_critical_first() -> None:
     top = posture["top_alerts"]
     assert [item["repo"] for item in top] == ["CriticalRepo", "HighRepo"]
     assert top[0]["dependabot_critical"] == 2
+    assert [item["project"] for item in digest["decision_queue"]] == [
+        "CriticalRepo",
+        "HighRepo",
+    ]
+    assert digest["portfolio_truth"]["decision_queue_count"] == 2
 
     rendered = render_weekly_command_center_markdown(digest)
     assert "## Security Posture" in rendered
@@ -384,3 +399,56 @@ def test_security_posture_reports_not_run_when_no_overlay() -> None:
     rendered = render_weekly_command_center_markdown(digest)
     assert "## Security Posture" in rendered
     assert "Security overlay not run" in rendered
+
+
+def test_default_attention_watch_set_does_not_create_decision_queue() -> None:
+    portfolio_truth = {
+        "projects": [
+            {
+                "identity": {"display_name": "ActiveProduct"},
+                "declared": {"operating_path": "finish"},
+                "derived": {
+                    "registry_status": "active",
+                    "attention_state": "active-product",
+                    "activity_status": "active",
+                    "path_override": "",
+                    "path_confidence": "high",
+                    "context_quality": "standard",
+                },
+                "risk": {
+                    "risk_tier": "baseline",
+                    "risk_factors": [],
+                    "risk_summary": "No elevated risk factors.",
+                    "security_risk": False,
+                },
+            },
+            {
+                "identity": {"display_name": "ActiveInfra"},
+                "declared": {"operating_path": "maintain"},
+                "derived": {
+                    "registry_status": "active",
+                    "attention_state": "active-infra",
+                    "activity_status": "active",
+                    "path_override": "",
+                    "path_confidence": "high",
+                    "context_quality": "standard",
+                },
+                "risk": {
+                    "risk_tier": "baseline",
+                    "risk_factors": [],
+                    "risk_summary": "No elevated risk factors.",
+                    "security_risk": False,
+                },
+            },
+        ]
+    }
+
+    digest = _digest_for(portfolio_truth)
+
+    assert digest["portfolio_truth"]["default_attention_count"] == 2
+    assert digest["portfolio_truth"]["decision_queue_count"] == 0
+    assert digest["decision_queue"] == []
+
+    rendered = render_weekly_command_center_markdown(digest)
+    assert "2 default attention, 0 decision queue" in rendered
+    assert "No portfolio decisions clear the current evidence bar." in rendered
