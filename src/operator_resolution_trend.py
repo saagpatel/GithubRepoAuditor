@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from functools import lru_cache
+
 from src.operator_trend_apply_chain import (
     run_resolution_trend_apply_chain as _run_resolution_trend_apply_chain_helper,
 )
@@ -5857,20 +5859,42 @@ def _apply_reacquisition_reset_refresh_recovery_and_reentry(
     }
 
 
-def _closure_forecast_reset_reentry_side_from_status(status: str) -> str:
-    if status in {"pending-confirmation-reentry", "reentered-confirmation"}:
+@lru_cache(maxsize=None)
+def _side_sets(confirmation_members: tuple[str, ...]) -> tuple[frozenset[str], frozenset[str]]:
+    return (
+        frozenset(confirmation_members),
+        frozenset(member.replace("confirmation", "clearance") for member in confirmation_members),
+    )
+
+
+def _resolve_side(status: str, *confirmation_members: str) -> str:
+    # Shared side classifier for the reset/reentry/rebuild/restore status families. The
+    # clearance-side set is the confirmation-side set with "confirmation" swapped for
+    # "clearance"; confirmation membership wins, so a confirmation-only token (e.g.
+    # "just-rererestored") resolves to confirmation even though the swap also lands it
+    # in clearance. Returns "none" for anything unrecognized.
+    confirmation, clearance = _side_sets(confirmation_members)
+    if status in confirmation:
         return "confirmation"
-    if status in {"pending-clearance-reentry", "reentered-clearance"}:
+    if status in clearance:
         return "clearance"
     return "none"
+
+
+def _closure_forecast_reset_reentry_side_from_status(status: str) -> str:
+    return _resolve_side(
+        status,
+        "pending-confirmation-reentry",
+        "reentered-confirmation",
+    )
 
 
 def _closure_forecast_reset_reentry_side_from_recovery_status(status: str) -> str:
-    if status in {"recovering-confirmation-reset", "reentering-confirmation"}:
-        return "confirmation"
-    if status in {"recovering-clearance-reset", "reentering-clearance"}:
-        return "clearance"
-    return "none"
+    return _resolve_side(
+        status,
+        "recovering-confirmation-reset",
+        "reentering-confirmation",
+    )
 
 
 def _closure_forecast_reset_reentry_side_from_event(event: dict) -> str:
@@ -6993,17 +7017,11 @@ def _apply_reset_reentry_persistence_and_churn(
 
 
 def _closure_forecast_reset_reentry_side_from_persistence_status(status: str) -> str:
-    if status in {
+    return _resolve_side(
+        status,
         "holding-confirmation-reentry",
         "sustained-confirmation-reentry",
-    }:
-        return "confirmation"
-    if status in {
-        "holding-clearance-reentry",
-        "sustained-clearance-reentry",
-    }:
-        return "clearance"
-    return "none"
+    )
 
 
 def _closure_forecast_reset_reentry_memory_side_from_event(event: dict) -> str:
@@ -7424,25 +7442,19 @@ def _apply_reset_reentry_freshness_and_reset(
 
 
 def _closure_forecast_reset_reentry_rebuild_side_from_status(status: str) -> str:
-    if status in {"pending-confirmation-rebuild", "rebuilt-confirmation-reentry"}:
-        return "confirmation"
-    if status in {"pending-clearance-rebuild", "rebuilt-clearance-reentry"}:
-        return "clearance"
-    return "none"
+    return _resolve_side(
+        status,
+        "pending-confirmation-rebuild",
+        "rebuilt-confirmation-reentry",
+    )
 
 
 def _closure_forecast_reset_reentry_rebuild_side_from_recovery_status(status: str) -> str:
-    if status in {
+    return _resolve_side(
+        status,
         "recovering-confirmation-reentry-reset",
         "rebuilding-confirmation-reentry",
-    }:
-        return "confirmation"
-    if status in {
-        "recovering-clearance-reentry-reset",
-        "rebuilding-clearance-reentry",
-    }:
-        return "clearance"
-    return "none"
+    )
 
 
 def _closure_forecast_reset_reentry_refresh_path_label(event: dict) -> str:
@@ -7754,17 +7766,11 @@ def _apply_reset_reentry_refresh_recovery_and_rebuild(
 
 
 def _closure_forecast_reset_reentry_rebuild_side_from_persistence_status(status: str) -> str:
-    if status in {
+    return _resolve_side(
+        status,
         "holding-confirmation-rebuild",
         "sustained-confirmation-rebuild",
-    }:
-        return "confirmation"
-    if status in {
-        "holding-clearance-rebuild",
-        "sustained-clearance-rebuild",
-    }:
-        return "clearance"
-    return "none"
+    )
 
 
 def _closure_forecast_reset_reentry_rebuild_side_from_event(event: dict) -> str:
@@ -8272,31 +8278,19 @@ def _apply_reset_reentry_rebuild_freshness_and_reset(
 def _closure_forecast_reset_reentry_rebuild_side_from_refresh_recovery_status(
     status: str,
 ) -> str:
-    if status in {
+    return _resolve_side(
+        status,
         "recovering-confirmation-rebuild-reset",
         "reentering-confirmation-rebuild",
-    }:
-        return "confirmation"
-    if status in {
-        "recovering-clearance-rebuild-reset",
-        "reentering-clearance-rebuild",
-    }:
-        return "clearance"
-    return "none"
+    )
 
 
 def _closure_forecast_reset_reentry_rebuild_side_from_reentry_status(status: str) -> str:
-    if status in {
+    return _resolve_side(
+        status,
         "pending-confirmation-rebuild-reentry",
         "reentered-confirmation-rebuild",
-    }:
-        return "confirmation"
-    if status in {
-        "pending-clearance-rebuild-reentry",
-        "reentered-clearance-rebuild",
-    }:
-        return "clearance"
-    return "none"
+    )
 
 
 def _closure_forecast_reset_reentry_rebuild_refresh_path_label(event: dict) -> str:
@@ -9139,17 +9133,11 @@ def _apply_reset_reentry_rebuild_refresh_recovery_and_reentry(
 def _closure_forecast_reset_reentry_rebuild_reentry_side_from_persistence_status(
     status: str,
 ) -> str:
-    if status in {
+    return _resolve_side(
+        status,
         "holding-confirmation-rebuild-reentry",
         "sustained-confirmation-rebuild-reentry",
-    }:
-        return "confirmation"
-    if status in {
-        "holding-clearance-rebuild-reentry",
-        "sustained-clearance-rebuild-reentry",
-    }:
-        return "clearance"
-    return "none"
+    )
 
 
 def _closure_forecast_reset_reentry_rebuild_reentry_side_from_event(event: dict) -> str:
@@ -10934,49 +10922,31 @@ def _apply_reset_reentry_rebuild_reentry_freshness_and_reset(
 def _closure_forecast_reset_reentry_rebuild_reentry_side_from_refresh_recovery_status(
     status: str,
 ) -> str:
-    if status in {
+    return _resolve_side(
+        status,
         "recovering-confirmation-rebuild-reentry-reset",
         "restoring-confirmation-rebuild-reentry",
-    }:
-        return "confirmation"
-    if status in {
-        "recovering-clearance-rebuild-reentry-reset",
-        "restoring-clearance-rebuild-reentry",
-    }:
-        return "clearance"
-    return "none"
+    )
 
 
 def _closure_forecast_reset_reentry_rebuild_reentry_side_from_restore_status(
     status: str,
 ) -> str:
-    if status in {
+    return _resolve_side(
+        status,
         "pending-confirmation-rebuild-reentry-restore",
         "restored-confirmation-rebuild-reentry",
-    }:
-        return "confirmation"
-    if status in {
-        "pending-clearance-rebuild-reentry-restore",
-        "restored-clearance-rebuild-reentry",
-    }:
-        return "clearance"
-    return "none"
+    )
 
 
 def _closure_forecast_reset_reentry_rebuild_reentry_side_from_restore_persistence_status(
     status: str,
 ) -> str:
-    if status in {
+    return _resolve_side(
+        status,
         "holding-confirmation-rebuild-reentry-restore",
         "sustained-confirmation-rebuild-reentry-restore",
-    }:
-        return "confirmation"
-    if status in {
-        "holding-clearance-rebuild-reentry-restore",
-        "sustained-clearance-rebuild-reentry-restore",
-    }:
-        return "clearance"
-    return "none"
+    )
 
 
 def _closure_forecast_reset_reentry_rebuild_reentry_refresh_path_label(event: dict) -> str:
@@ -14039,33 +14009,21 @@ def _apply_reset_reentry_rebuild_reentry_restore_refresh_recovery_and_rerestore(
 def _closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_side_from_status(
     status: str,
 ) -> str:
-    if status in {
+    return _resolve_side(
+        status,
         "pending-confirmation-rebuild-reentry-rerestore",
         "rerestored-confirmation-rebuild-reentry",
-    }:
-        return "confirmation"
-    if status in {
-        "pending-clearance-rebuild-reentry-rerestore",
-        "rerestored-clearance-rebuild-reentry",
-    }:
-        return "clearance"
-    return "none"
+    )
 
 
 def _closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_side_from_persistence_status(
     status: str,
 ) -> str:
-    if status in {
+    return _resolve_side(
+        status,
         "holding-confirmation-rebuild-reentry-rerestore",
         "sustained-confirmation-rebuild-reentry-rerestore",
-    }:
-        return "confirmation"
-    if status in {
-        "holding-clearance-rebuild-reentry-rerestore",
-        "sustained-clearance-rebuild-reentry-rerestore",
-    }:
-        return "clearance"
-    return "none"
+    )
 
 
 def _closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_side_from_event(
@@ -16140,33 +16098,21 @@ def _apply_reset_reentry_rebuild_reentry_restore_rerestore_freshness_and_reset(
 def _closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_side_from_status(
     status: str,
 ) -> str:
-    if status in {
+    return _resolve_side(
+        status,
         "pending-confirmation-rebuild-reentry-rererestore",
         "rererestored-confirmation-rebuild-reentry",
-    }:
-        return "confirmation"
-    if status in {
-        "pending-clearance-rebuild-reentry-rererestore",
-        "rererestored-clearance-rebuild-reentry",
-    }:
-        return "clearance"
-    return "none"
+    )
 
 
 def _closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_side_from_refresh_recovery_status(
     status: str,
 ) -> str:
-    if status in {
+    return _resolve_side(
+        status,
         "recovering-confirmation-rebuild-reentry-rerestore-reset",
         "rererestoring-confirmation-rebuild-reentry",
-    }:
-        return "confirmation"
-    if status in {
-        "recovering-clearance-rebuild-reentry-rerestore-reset",
-        "rererestoring-clearance-rebuild-reentry",
-    }:
-        return "clearance"
-    return "none"
+    )
 
 
 def _closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_path_label(
@@ -17169,18 +17115,12 @@ def _apply_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_and_
 def _closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_side_from_persistence_status(
     status: str,
 ) -> str:
-    if status in {
+    return _resolve_side(
+        status,
         "just-rererestored",
         "holding-confirmation-rebuild-reentry-rererestore",
         "sustained-confirmation-rebuild-reentry-rererestore",
-    }:
-        return "confirmation"
-    if status in {
-        "holding-clearance-rebuild-reentry-rererestore",
-        "sustained-clearance-rebuild-reentry-rererestore",
-    }:
-        return "clearance"
-    return "none"
+    )
 
 
 def _closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_side_from_event(
