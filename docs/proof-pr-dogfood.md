@@ -12,7 +12,7 @@ environment and render the proof block from a generated receipt:
 ```bash
 python3 -m venv /tmp/gra-proof-pr-venv
 /tmp/gra-proof-pr-venv/bin/python -m pip install \
-  git+https://github.com/saagpatel/proof-pr.git@v0.2.9
+  git+https://github.com/saagpatel/proof-pr.git@v0.2.10
 /tmp/gra-proof-pr-venv/bin/proof-pr init \
   --cwd . \
   --tier T1 \
@@ -35,6 +35,7 @@ Add `--check <id> --fix-only` when you want just one copyable command and compac
 receipt patch, instead of the full hygiene report. It keeps hygiene read-only.
 The reusable workflow writes the normal hygiene report plus a focused public git
 metadata fix block to the GitHub job summary when that finding exists.
+If no focused fix is needed, the block prints a clean no-action-needed note.
 
 For GithubRepoAuditor, keep the risk tier honest:
 
