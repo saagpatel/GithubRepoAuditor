@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.operator_trend_closure_forecast_history import target_closure_forecast_history
+from src.operator_trend_closure_forecast_core import target_closure_forecast_history
 
 
 def _target_class_key(item: dict) -> str:

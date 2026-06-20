@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.operator_trend_closure_forecast_reset_refresh import (
+from src.operator_trend_closure_forecast_reset_controls import (
     apply_reset_refresh_reentry_control,
     closure_forecast_reset_refresh_hotspots,
     closure_forecast_reset_refresh_recovery_for_target,

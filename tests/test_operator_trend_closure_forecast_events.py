@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.operator_trend_closure_forecast_events import class_closure_forecast_events
+from src.operator_trend_closure_forecast_core import class_closure_forecast_events
 
 
 def _queue_identity(item: dict) -> str:
