@@ -1,0 +1,158 @@
+"""Clone-free portfolio scoring from the GitHub API alone.
+
+Lists a user's repos, materializes a sparse API-sourced skeleton for each
+(``api_checkout``), runs the *existing, unmodified* analyzer engine against the
+skeleton, and scores with ``scorer.score_repo`` — producing a portfolio report
+without cloning any repository.
+
+This is the engine behind the hosted "paste your GitHub username" report. The
+result is honestly labelled API-only: structure / testing / CI / docs / README /
+dependency presence are recovered from the API, but deep code-quality,
+secret-scanning, and dependency-age signals require the full local scan (the OSS
+CLI). Security scoring runs offline by default because GitHub Advanced Security
+endpoints are not readable on other users' repositories.
+"""
+
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, cast
+
+from src.analyzers import run_all_analyzers
+from src.api_checkout import materialize_api_workspace
+from src.models import RepoAudit, RepoMetadata
+from src.scorer import score_repo
+
+if TYPE_CHECKING:
+    from src.github_client import GitHubClient
+
+logger = logging.getLogger(__name__)
+
+API_ONLY_MODE = "api_only"
+API_ONLY_FIDELITY_NOTE = (
+    "API-only scan: scored from GitHub API metadata and repository structure "
+    "without cloning. Deep code-quality, secret-scanning, and dependency-age "
+    "signals require the full local scan (OSS CLI)."
+)
+
+
+class _InteractiveClient:
+    """Wrap a GitHubClient to skip GitHub's async-computed ``stats/*`` endpoints.
+
+    ``stats/contributors``, ``stats/commit_activity`` and ``stats/participation``
+    return ``202 Accepted`` while GitHub computes them, and the client retries
+    with multi-second backoff — fine for a batch CLI run, far too slow for an
+    interactive hosted report (it dominated a 5-repo live scan at ~100s). The
+    analyzers already treat these as "unavailable" (empty list / dict), so scores
+    degrade gracefully rather than break. Every other method delegates unchanged.
+    """
+
+    def __init__(self, inner: GitHubClient) -> None:
+        self._inner = inner
+
+    def get_contributor_stats(self, *args, **kwargs) -> list:
+        return []
+
+    def get_commit_activity(self, *args, **kwargs) -> list:
+        return []
+
+    def get_participation_stats(self, *args, **kwargs) -> dict:
+        return {}
+
+    def __getattr__(self, name: str):
+        return getattr(self._inner, name)
+
+
+def _portfolio_lang_freq(repos: list[RepoMetadata]) -> dict[str, float]:
+    """Fraction of repos using each primary language (for novelty discounting)."""
+    counts: dict[str, int] = {}
+    for repo in repos:
+        if repo.language:
+            counts[repo.language] = counts.get(repo.language, 0) + 1
+    total = sum(counts.values())
+    if not total:
+        return {}
+    return {lang: n / total for lang, n in counts.items()}
+
+
+def score_repos_api_only(
+    repos: list[RepoMetadata],
+    client: GitHubClient,
+    *,
+    portfolio_lang_freq: dict[str, float] | None = None,
+    security_offline: bool = True,
+    fast: bool = True,
+) -> list[RepoAudit]:
+    """Score a list of repos from the API alone, returning one audit per repo.
+
+    ``fast`` (default) skips GitHub's slow async ``stats/*`` endpoints so the
+    scan stays interactive; pass ``fast=False`` for a thorough scan that includes
+    contributor/commit-activity stats. A repo that fails to materialize or score
+    is skipped with a warning so one bad repo never aborts the portfolio scan.
+    """
+    if portfolio_lang_freq is None:
+        portfolio_lang_freq = _portfolio_lang_freq(repos)
+
+    scan_client = cast("GitHubClient", _InteractiveClient(client)) if fast else client
+
+    audits: list[RepoAudit] = []
+    with materialize_api_workspace(repos, scan_client) as workspace:
+        for repo in repos:
+            repo_path = workspace.get(repo.name)
+            if repo_path is None:
+                continue
+            try:
+                results = run_all_analyzers(repo_path, repo, scan_client)
+                audit = score_repo(
+                    repo,
+                    results,
+                    repo_path=repo_path,
+                    portfolio_lang_freq=portfolio_lang_freq,
+                    github_client=scan_client,
+                    security_offline=security_offline,
+                )
+                audits.append(audit)
+            except Exception as exc:  # noqa: BLE001 — one bad repo must not abort the scan
+                logger.warning("API-only scoring failed for %s: %s", repo.name, exc)
+    return audits
+
+
+@dataclass
+class ApiOnlyReport:
+    """A clone-free portfolio report, ready for JSON serialization."""
+
+    username: str
+    audits: list[RepoAudit]
+    mode: str = API_ONLY_MODE
+    fidelity_note: str = API_ONLY_FIDELITY_NOTE
+
+    def to_dict(self) -> dict:
+        return {
+            "username": self.username,
+            "mode": self.mode,
+            "fidelity_note": self.fidelity_note,
+            "repo_count": len(self.audits),
+            "repos": [audit.to_dict() for audit in self.audits],
+        }
+
+
+def audit_user_api_only(
+    username: str,
+    client: GitHubClient,
+    *,
+    max_repos: int | None = None,
+    fast: bool = True,
+) -> ApiOnlyReport:
+    """List a user's repos and score them clone-free via the GitHub API."""
+    raw = client.list_repos(username)
+    if max_repos is not None:
+        raw = raw[:max_repos]
+
+    # API-only fidelity tradeoff: scored from the repo-list payload's primary
+    # `language` without spending a get_languages() call per repo, so
+    # `metadata.languages` (byte breakdown) stays empty — language-fraction
+    # signals are intentionally absent, not silently wrong.
+    repos = [RepoMetadata.from_api_response(data) for data in raw]
+    audits = score_repos_api_only(repos, client, fast=fast)
+    return ApiOnlyReport(username=username, audits=audits)
