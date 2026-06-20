@@ -1528,9 +1528,27 @@ def apply_reset_reentry_refresh_rebuild_control(
     }
 
 
-def closure_forecast_reset_reentry_refresh_hotspots(
+class _RefreshHotspotsSpec(NamedTuple):
+    """Tier-specific literals for the reset-reentry refresh-recovery hotspot selector.
+
+    The reset-reentry / rebuild-reentry refresh hotspot selectors share one
+    group-by-class / max-abs-score / status-filter / sort algorithm and differ
+    only in the per-tier score, status, and path keys and the confirmation /
+    clearance status sets. Proven byte-identical by the composer golden plus a
+    branch-spanning differential.
+    """
+
+    score_key: str
+    status_key: str
+    path_key: str
+    confirmation_statuses: frozenset[str]
+    clearance_statuses: frozenset[str]
+
+
+def _refresh_hotspots_base(
     resolution_targets: list[dict[str, Any]],
     *,
+    spec: _RefreshHotspotsSpec,
     mode: str,
     target_class_key: Callable[[dict[str, Any]], str],
 ) -> list[dict[str, Any]]:
@@ -1542,38 +1560,25 @@ def closure_forecast_reset_reentry_refresh_hotspots(
         current = {
             "scope": "class",
             "label": class_key,
-            "closure_forecast_reset_reentry_refresh_recovery_score": target.get(
-                "closure_forecast_reset_reentry_refresh_recovery_score",
-                0.0,
-            ),
-            "closure_forecast_reset_reentry_refresh_recovery_status": target.get(
-                "closure_forecast_reset_reentry_refresh_recovery_status",
-                "none",
-            ),
-            "recent_reset_reentry_refresh_path": target.get(
-                "recent_reset_reentry_refresh_path",
-                "",
-            ),
+            spec.score_key: target.get(spec.score_key, 0.0),
+            spec.status_key: target.get(spec.status_key, "none"),
+            spec.path_key: target.get(spec.path_key, ""),
         }
         existing = grouped.get(class_key)
-        if existing is None or abs(
-            float(current["closure_forecast_reset_reentry_refresh_recovery_score"] or 0.0)
-        ) > abs(float(existing["closure_forecast_reset_reentry_refresh_recovery_score"] or 0.0)):
+        if existing is None or abs(float(current[spec.score_key] or 0.0)) > abs(
+            float(existing[spec.score_key] or 0.0)
+        ):
             grouped[class_key] = current
     hotspots = list(grouped.values())
     if mode == "confirmation":
         hotspots = [
             item
             for item in hotspots
-            if item.get("closure_forecast_reset_reentry_refresh_recovery_status")
-            in {
-                "recovering-confirmation-reentry-reset",
-                "rebuilding-confirmation-reentry",
-            }
+            if item.get(spec.status_key) in spec.confirmation_statuses
         ]
         hotspots.sort(
             key=lambda item: (
-                -float(item.get("closure_forecast_reset_reentry_refresh_recovery_score", 0.0) or 0.0),
+                -float(item.get(spec.score_key, 0.0) or 0.0),
                 str(item.get("label", "")),
             )
         )
@@ -1581,19 +1586,155 @@ def closure_forecast_reset_reentry_refresh_hotspots(
         hotspots = [
             item
             for item in hotspots
-            if item.get("closure_forecast_reset_reentry_refresh_recovery_status")
-            in {
-                "recovering-clearance-reentry-reset",
-                "rebuilding-clearance-reentry",
-            }
+            if item.get(spec.status_key) in spec.clearance_statuses
         ]
         hotspots.sort(
             key=lambda item: (
-                float(item.get("closure_forecast_reset_reentry_refresh_recovery_score", 0.0) or 0.0),
+                float(item.get(spec.score_key, 0.0) or 0.0),
                 str(item.get("label", "")),
             )
         )
     return hotspots[:5]
+
+
+_RESET_REENTRY_REFRESH_HOTSPOTS_SPEC = _RefreshHotspotsSpec(
+    score_key='closure_forecast_reset_reentry_refresh_recovery_score',
+    status_key='closure_forecast_reset_reentry_refresh_recovery_status',
+    path_key='recent_reset_reentry_refresh_path',
+    confirmation_statuses=frozenset({'rebuilding-confirmation-reentry', 'recovering-confirmation-reentry-reset'}),
+    clearance_statuses=frozenset({'rebuilding-clearance-reentry', 'recovering-clearance-reentry-reset'}),
+)
+
+_REBUILD_REENTRY_REFRESH_HOTSPOTS_SPEC = _RefreshHotspotsSpec(
+    score_key='closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_score',
+    status_key='closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_status',
+    path_key='recent_reset_reentry_rebuild_reentry_refresh_path',
+    confirmation_statuses=frozenset({'recovering-confirmation-rebuild-reentry-reset', 'restoring-confirmation-rebuild-reentry'}),
+    clearance_statuses=frozenset({'recovering-clearance-rebuild-reentry-reset', 'restoring-clearance-rebuild-reentry'}),
+)
+
+
+def closure_forecast_reset_reentry_refresh_hotspots(
+    resolution_targets: list[dict[str, Any]],
+    *,
+    mode: str,
+    target_class_key: Callable[[dict[str, Any]], str],
+) -> list[dict[str, Any]]:
+    return _refresh_hotspots_base(
+        resolution_targets,
+        spec=_RESET_REENTRY_REFRESH_HOTSPOTS_SPEC,
+        mode=mode,
+        target_class_key=target_class_key,
+    )
+
+
+class _RefreshRecoverySummarySpec(NamedTuple):
+    """Tier-specific literals for the reset-reentry refresh-recovery summary renderer.
+
+    The reset-reentry / rebuild-reentry refresh-recovery summaries share one
+    status-string-driven render algorithm and differ only in the status / score /
+    reason keys, the per-tier status tokens, and the reworded prose. The
+    ``*_text`` fields are ``str.format`` templates over ``{label}`` / ``{score}``
+    / ``{hotspot_label}``. Proven byte-identical by the composer golden plus an
+    exhaustive branch differential.
+    """
+
+    status_key: str
+    score_key: str
+    reason_key: str
+    recovering_confirmation_status: str
+    recovering_clearance_status: str
+    rebuilding_confirmation_status: str
+    rebuilding_clearance_status: str
+    recovering_confirmation_text: str
+    recovering_clearance_text: str
+    rebuilding_confirmation_text: str
+    rebuilding_clearance_text: str
+    reversing_text: str
+    blocked_reason_default: str
+    recovering_confirmation_hotspot_text: str
+    recovering_clearance_hotspot_text: str
+    default_text: str
+
+
+def _refresh_recovery_summary_base(
+    primary_target: dict[str, Any],
+    recovering_confirmation_hotspots: list[dict[str, Any]],
+    recovering_clearance_hotspots: list[dict[str, Any]],
+    *,
+    spec: _RefreshRecoverySummarySpec,
+    target_label: Callable[[dict[str, Any]], str],
+) -> str:
+    label = target_label(primary_target) or "The current target"
+    status = str(primary_target.get(spec.status_key, "none"))
+    score = float(primary_target.get(spec.score_key, 0.0) or 0.0)
+    if status == spec.recovering_confirmation_status:
+        return spec.recovering_confirmation_text.format(label=label, score=score)
+    if status == spec.recovering_clearance_status:
+        return spec.recovering_clearance_text.format(label=label, score=score)
+    if status == spec.rebuilding_confirmation_status:
+        return spec.rebuilding_confirmation_text.format(label=label, score=score)
+    if status == spec.rebuilding_clearance_status:
+        return spec.rebuilding_clearance_text.format(label=label, score=score)
+    if status == "reversing":
+        return spec.reversing_text.format(label=label, score=score)
+    if status == "blocked":
+        return str(
+            primary_target.get(
+                spec.reason_key,
+                spec.blocked_reason_default.format(label=label),
+            )
+        )
+    if recovering_confirmation_hotspots:
+        hotspot = recovering_confirmation_hotspots[0]
+        return spec.recovering_confirmation_hotspot_text.format(
+            hotspot_label=hotspot.get("label", "recent hotspots")
+        )
+    if recovering_clearance_hotspots:
+        hotspot = recovering_clearance_hotspots[0]
+        return spec.recovering_clearance_hotspot_text.format(
+            hotspot_label=hotspot.get("label", "recent hotspots")
+        )
+    return spec.default_text
+
+
+_RESET_REENTRY_REFRESH_RECOVERY_SUMMARY_SPEC = _RefreshRecoverySummarySpec(
+    status_key='closure_forecast_reset_reentry_refresh_recovery_status',
+    score_key='closure_forecast_reset_reentry_refresh_recovery_score',
+    reason_key='closure_forecast_reset_reentry_rebuild_reason',
+    recovering_confirmation_status='recovering-confirmation-reentry-reset',
+    recovering_clearance_status='recovering-clearance-reentry-reset',
+    rebuilding_confirmation_status='rebuilding-confirmation-reentry',
+    rebuilding_clearance_status='rebuilding-clearance-reentry',
+    recovering_confirmation_text='Fresh confirmation-side evidence is returning after reset re-entry softened or reset for {label}, but it has not yet rebuilt stronger reset re-entry ({score:.2f}).',
+    recovering_clearance_text='Fresh clearance-side evidence is returning after reset re-entry softened or reset for {label}, but it has not yet rebuilt stronger reset re-entry ({score:.2f}).',
+    rebuilding_confirmation_text='Confirmation-side reset re-entry for {label} is rebuilding strongly enough that stronger restored posture may be re-earned soon ({score:.2f}).',
+    rebuilding_clearance_text='Clearance-side reset re-entry for {label} is rebuilding strongly enough that stronger restored caution may be re-earned soon ({score:.2f}).',
+    reversing_text='The post-reset reset re-entry recovery attempt for {label} is changing direction, so rebuild stays blocked ({score:.2f}).',
+    blocked_reason_default='Local target instability is still preventing positive confirmation-side reset re-entry rebuild for {label}.',
+    recovering_confirmation_hotspot_text='Confirmation-side reset re-entry recovery is strongest around {hotspot_label}, so those classes are closest to rebuilding stronger restored confirmation posture.',
+    recovering_clearance_hotspot_text='Clearance-side reset re-entry recovery is strongest around {hotspot_label}, so those classes are closest to rebuilding stronger restored clearance posture.',
+    default_text='No reset re-entry rebuild attempt is active enough yet to re-earn stronger restored posture.',
+)
+
+_REBUILD_REENTRY_REFRESH_RECOVERY_SUMMARY_SPEC = _RefreshRecoverySummarySpec(
+    status_key='closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_status',
+    score_key='closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_score',
+    reason_key='closure_forecast_reset_reentry_rebuild_reentry_restore_reason',
+    recovering_confirmation_status='recovering-confirmation-rebuild-reentry-reset',
+    recovering_clearance_status='recovering-clearance-rebuild-reentry-reset',
+    rebuilding_confirmation_status='restoring-confirmation-rebuild-reentry',
+    rebuilding_clearance_status='restoring-clearance-rebuild-reentry',
+    recovering_confirmation_text='Fresh confirmation-side evidence is returning after rebuilt re-entry softened or reset for {label}, but it has not yet restored stronger rebuilt re-entry posture ({score:.2f}).',
+    recovering_clearance_text='Fresh clearance-side evidence is returning after rebuilt re-entry softened or reset for {label}, but it has not yet restored stronger rebuilt re-entry posture ({score:.2f}).',
+    rebuilding_confirmation_text='Confirmation-side rebuilt re-entry for {label} is recovering strongly enough that stronger rebuilt re-entry posture may be restored soon ({score:.2f}).',
+    rebuilding_clearance_text='Clearance-side rebuilt re-entry for {label} is recovering strongly enough that stronger rebuilt re-entry posture may be restored soon ({score:.2f}).',
+    reversing_text='The post-reset rebuilt re-entry recovery attempt for {label} is changing direction, so stronger rebuilt re-entry posture stays blocked ({score:.2f}).',
+    blocked_reason_default='Local target instability is still preventing positive confirmation-side rebuilt re-entry restore for {label}.',
+    recovering_confirmation_hotspot_text='Confirmation-side rebuilt re-entry recovery is strongest around {hotspot_label}, so those classes are closest to restoring stronger rebuilt confirmation posture.',
+    recovering_clearance_hotspot_text='Clearance-side rebuilt re-entry recovery is strongest around {hotspot_label}, so those classes are closest to restoring stronger rebuilt clearance posture.',
+    default_text='No rebuilt re-entry recovery attempt is active enough yet to restore stronger posture.',
+)
 
 
 def closure_forecast_reset_reentry_refresh_recovery_summary(
@@ -1603,57 +1744,13 @@ def closure_forecast_reset_reentry_refresh_recovery_summary(
     *,
     target_label: Callable[[dict[str, Any]], str],
 ) -> str:
-    label = target_label(primary_target) or "The current target"
-    status = str(
-        primary_target.get("closure_forecast_reset_reentry_refresh_recovery_status", "none")
+    return _refresh_recovery_summary_base(
+        primary_target,
+        recovering_confirmation_hotspots,
+        recovering_clearance_hotspots,
+        spec=_RESET_REENTRY_REFRESH_RECOVERY_SUMMARY_SPEC,
+        target_label=target_label,
     )
-    score = float(primary_target.get("closure_forecast_reset_reentry_refresh_recovery_score", 0.0) or 0.0)
-    if status == "recovering-confirmation-reentry-reset":
-        return (
-            f"Fresh confirmation-side evidence is returning after reset re-entry softened or reset for {label}, "
-            f"but it has not yet rebuilt stronger reset re-entry ({score:.2f})."
-        )
-    if status == "recovering-clearance-reentry-reset":
-        return (
-            f"Fresh clearance-side evidence is returning after reset re-entry softened or reset for {label}, "
-            f"but it has not yet rebuilt stronger reset re-entry ({score:.2f})."
-        )
-    if status == "rebuilding-confirmation-reentry":
-        return (
-            f"Confirmation-side reset re-entry for {label} is rebuilding strongly enough "
-            f"that stronger restored posture may be re-earned soon ({score:.2f})."
-        )
-    if status == "rebuilding-clearance-reentry":
-        return (
-            f"Clearance-side reset re-entry for {label} is rebuilding strongly enough "
-            f"that stronger restored caution may be re-earned soon ({score:.2f})."
-        )
-    if status == "reversing":
-        return (
-            f"The post-reset reset re-entry recovery attempt for {label} is changing "
-            f"direction, so rebuild stays blocked ({score:.2f})."
-        )
-    if status == "blocked":
-        return str(
-            primary_target.get(
-                "closure_forecast_reset_reentry_rebuild_reason",
-                f"Local target instability is still preventing positive confirmation-side "
-                f"reset re-entry rebuild for {label}.",
-            )
-        )
-    if recovering_confirmation_hotspots:
-        hotspot = recovering_confirmation_hotspots[0]
-        return (
-            f"Confirmation-side reset re-entry recovery is strongest around {hotspot.get('label', 'recent hotspots')}, "
-            "so those classes are closest to rebuilding stronger restored confirmation posture."
-        )
-    if recovering_clearance_hotspots:
-        hotspot = recovering_clearance_hotspots[0]
-        return (
-            f"Clearance-side reset re-entry recovery is strongest around {hotspot.get('label', 'recent hotspots')}, "
-            "so those classes are closest to rebuilding stronger restored clearance posture."
-        )
-    return "No reset re-entry rebuild attempt is active enough yet to re-earn stronger restored posture."
 
 
 class _TierSummarySpec(NamedTuple):
@@ -4245,68 +4342,12 @@ def closure_forecast_reset_reentry_rebuild_reentry_refresh_hotspots(
     mode: str,
     target_class_key: Callable[[dict[str, Any]], str],
 ) -> list[dict[str, Any]]:
-    grouped: dict[str, dict[str, Any]] = {}
-    for target in resolution_targets:
-        class_key = target_class_key(target)
-        if not class_key:
-            continue
-        current = {
-            "scope": "class",
-            "label": class_key,
-            "closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_score": target.get(
-                "closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_score",
-                0.0,
-            ),
-            "closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_status": target.get(
-                "closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_status",
-                "none",
-            ),
-            "recent_reset_reentry_rebuild_reentry_refresh_path": target.get(
-                "recent_reset_reentry_rebuild_reentry_refresh_path",
-                "",
-            ),
-        }
-        existing = grouped.get(class_key)
-        if existing is None or abs(
-            float(current["closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_score"] or 0.0)
-        ) > abs(
-            float(existing["closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_score"] or 0.0)
-        ):
-            grouped[class_key] = current
-    hotspots = list(grouped.values())
-    if mode == "confirmation":
-        hotspots = [
-            item
-            for item in hotspots
-            if item.get("closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_status")
-            in {
-                "recovering-confirmation-rebuild-reentry-reset",
-                "restoring-confirmation-rebuild-reentry",
-            }
-        ]
-        hotspots.sort(
-            key=lambda item: (
-                -float(item.get("closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_score", 0.0) or 0.0),
-                str(item.get("label", "")),
-            )
-        )
-    else:
-        hotspots = [
-            item
-            for item in hotspots
-            if item.get("closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_status")
-            in {
-                "recovering-clearance-rebuild-reentry-reset",
-                "restoring-clearance-rebuild-reentry",
-            }
-        ]
-        hotspots.sort(
-            key=lambda item: (
-                float(item.get("closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_score", 0.0) or 0.0),
-                str(item.get("label", "")),
-            )
-        )
-    return hotspots[:5]
+    return _refresh_hotspots_base(
+        resolution_targets,
+        spec=_REBUILD_REENTRY_REFRESH_HOTSPOTS_SPEC,
+        mode=mode,
+        target_class_key=target_class_key,
+    )
 
 
 def closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_summary(
@@ -4316,59 +4357,13 @@ def closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_summary(
     *,
     target_label: Callable[[dict[str, Any]], str],
 ) -> str:
-    label = target_label(primary_target) or "The current target"
-    status = str(
-        primary_target.get("closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_status", "none")
+    return _refresh_recovery_summary_base(
+        primary_target,
+        recovering_confirmation_hotspots,
+        recovering_clearance_hotspots,
+        spec=_REBUILD_REENTRY_REFRESH_RECOVERY_SUMMARY_SPEC,
+        target_label=target_label,
     )
-    score = float(
-        primary_target.get("closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_score", 0.0) or 0.0
-    )
-    if status == "recovering-confirmation-rebuild-reentry-reset":
-        return (
-            f"Fresh confirmation-side evidence is returning after rebuilt re-entry softened or "
-            f"reset for {label}, but it has not yet restored stronger rebuilt re-entry posture "
-            f"({score:.2f})."
-        )
-    if status == "recovering-clearance-rebuild-reentry-reset":
-        return (
-            f"Fresh clearance-side evidence is returning after rebuilt re-entry softened or reset "
-            f"for {label}, but it has not yet restored stronger rebuilt re-entry posture ({score:.2f})."
-        )
-    if status == "restoring-confirmation-rebuild-reentry":
-        return (
-            f"Confirmation-side rebuilt re-entry for {label} is recovering strongly enough that "
-            f"stronger rebuilt re-entry posture may be restored soon ({score:.2f})."
-        )
-    if status == "restoring-clearance-rebuild-reentry":
-        return (
-            f"Clearance-side rebuilt re-entry for {label} is recovering strongly enough that "
-            f"stronger rebuilt re-entry posture may be restored soon ({score:.2f})."
-        )
-    if status == "reversing":
-        return (
-            f"The post-reset rebuilt re-entry recovery attempt for {label} is changing direction, "
-            f"so stronger rebuilt re-entry posture stays blocked ({score:.2f})."
-        )
-    if status == "blocked":
-        return str(
-            primary_target.get(
-                "closure_forecast_reset_reentry_rebuild_reentry_restore_reason",
-                f"Local target instability is still preventing positive confirmation-side rebuilt re-entry restore for {label}.",
-            )
-        )
-    if recovering_confirmation_hotspots:
-        hotspot = recovering_confirmation_hotspots[0]
-        return (
-            f"Confirmation-side rebuilt re-entry recovery is strongest around {hotspot.get('label', 'recent hotspots')}, "
-            "so those classes are closest to restoring stronger rebuilt confirmation posture."
-        )
-    if recovering_clearance_hotspots:
-        hotspot = recovering_clearance_hotspots[0]
-        return (
-            f"Clearance-side rebuilt re-entry recovery is strongest around {hotspot.get('label', 'recent hotspots')}, "
-            "so those classes are closest to restoring stronger rebuilt clearance posture."
-        )
-    return "No rebuilt re-entry recovery attempt is active enough yet to restore stronger posture."
 
 
 def closure_forecast_reset_reentry_rebuild_reentry_restore_summary(
