@@ -5773,11 +5773,11 @@ def closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persisten
         if freshness_status == "fresh":
             magnitude += 0.10
         elif freshness_status == "mixed-age":
-            magnitude -= 0.10
+            magnitude = max(0.0, magnitude - 0.10)
         if momentum_status in {"reversing", "unstable"}:
-            magnitude -= 0.15
+            magnitude = max(0.0, magnitude - 0.15)
         if stability_status == "oscillating":
-            magnitude -= 0.15
+            magnitude = max(0.0, magnitude - 0.15)
         if (
             event.get(
                 "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_status",
@@ -5785,7 +5785,7 @@ def closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persisten
             )
             != "none"
         ):
-            magnitude -= 0.15
+            magnitude = max(0.0, magnitude - 0.15)
         weighted_total += sign * magnitude * weight
         weight_sum += weight
 

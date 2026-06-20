@@ -637,7 +637,7 @@
     "reversing": {
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs": 2,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason": "The re-re-re-restored rebuilt re-entry posture is already weakening, so it is being softened again.",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score": -0.08,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score": 0.09,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status": "reversing",
       "recent_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_path": "rebuilt-confirmation-reentry -> strong-conf"
     },
@@ -894,7 +894,7 @@
     "clamp-divergence": {
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 2,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": "Confirmation-side re-re-restored posture has stayed aligned long enough to keep the stronger rerestored forecast in place.",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": 0.24,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": 0.31,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": "holding-confirmation-rebuild-reentry-rererestore",
       "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": "strong-conf -> decrement-conf"
     },
@@ -929,7 +929,7 @@
     "sparse": {
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": "",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": 0.24,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": 0.31,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": "none",
       "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": "sparse-none -> strong-conf -> decrement-conf"
     },
