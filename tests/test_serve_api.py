@@ -51,6 +51,17 @@ def _http_error(
 
 
 # ---------------------------------------------------------------------------
+# Health
+# ---------------------------------------------------------------------------
+def test_health_ok(client: TestClient) -> None:
+    resp = client.get("/api/health")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "ok"
+    assert "github_token" in body
+
+
+# ---------------------------------------------------------------------------
 # Happy path
 # ---------------------------------------------------------------------------
 def test_report_returns_serialized_report(client: TestClient) -> None:

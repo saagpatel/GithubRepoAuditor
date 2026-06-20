@@ -47,6 +47,11 @@ class SqliteWaitlistStore:
     def __init__(self, path: str) -> None:
         self._path = path
         self._lock = threading.Lock()
+        # Ensure the parent dir exists so the DB can be created on a fresh host
+        # (e.g. a container before its volume path is populated).
+        parent = Path(path).parent
+        if parent != Path(""):
+            parent.mkdir(parents=True, exist_ok=True)
         with self._lock, closing(self._connect()) as conn, conn:
             conn.execute(
                 "CREATE TABLE IF NOT EXISTS waitlist ("

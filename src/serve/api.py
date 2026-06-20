@@ -135,6 +135,18 @@ def _http_exception(exc: requests.HTTPError, username: str) -> HTTPException:
     return HTTPException(status_code=502, detail="Upstream GitHub error")
 
 
+@router.get("/health")
+def health(
+    client: GitHubClient = Depends(get_github_client),
+) -> dict[str, Any]:
+    """Liveness/readiness probe for the deployment platform.
+
+    Reports whether a server-side GitHub token is configured — without it the
+    endpoint runs on the unauthenticated 60 req/hr limit and degrades fast.
+    """
+    return {"status": "ok", "github_token": bool(getattr(client, "token", None))}
+
+
 @router.get("/report/{username}")
 def report(
     request: Request,

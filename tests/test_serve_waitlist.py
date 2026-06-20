@@ -35,6 +35,12 @@ def test_store_add_and_count(tmp_path) -> None:
     assert store.count() == 1
 
 
+def test_store_creates_missing_parent_dir(tmp_path) -> None:
+    # Parent dir does not exist yet — the store must create it, not crash.
+    store = SqliteWaitlistStore(str(tmp_path / "nested" / "dir" / "wl.db"))
+    assert store.add("a@b.co") is True
+
+
 def test_store_dedupes_case_insensitively(tmp_path) -> None:
     store = SqliteWaitlistStore(str(tmp_path / "wl.db"))
     assert store.add("Dev@Example.com") is True
