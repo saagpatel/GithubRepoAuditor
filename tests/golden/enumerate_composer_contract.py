@@ -8,23 +8,26 @@ builders, the hotspot selectors, and the summary renderers -- whose dict/list/st
 outputs feed the operator decision-quality string contract. This enumerator
 captures those composers across a status-spanning corpus into a frozen golden.
 
-Why it must exist BEFORE any ``recovery_state(target, *, depth)`` collapse: the
-per-tier composer families (rebuild / rererestore / rerererestore) are near-clones
-with a real, OBSERVABLE logic delta. Concretely, the rebuild persistence builder
-floors per-event magnitude at zero::
+Why it exists BEFORE any ``recovery_state(target, *, depth)`` collapse: the per-tier
+composer families (rebuild / rererestore / rerererestore) are near-clones, and the
+net both pins all 44 composers for the collapse and guards a real correctness fix.
+``magnitude`` is per-event evidence strength (non-negative by concept; ``sign``
+carries the direction). The rebuild persistence builder floors it at zero on every
+decrement::
 
     magnitude = max(0.0, magnitude - 0.10)   # rebuild
 
-while the rererestore builder does not::
-
-    magnitude -= 0.10                        # rererestore
-
-That unclamped negative survives the symmetric final ``clamp_round(.., -0.95,
-0.95)`` and reaches ``persistence_score`` -- so the SAME structural input yields a
-different score per tier (the pinned "clamp-divergence" scenario records 0.31 for
-rebuild vs 0.24 for rererestore). The str->str golden cannot
-see this. Any collapse of these families must reproduce THIS golden byte-for-byte;
-an intentional unification shows up here as a reviewed diff, never a silent one.
+The rererestore builder originally omitted that floor (``magnitude -= 0.10``), so an
+over-penalized confirmation event could go NEGATIVE and -- after ``sign`` -- count
+against its own side, producing a spurious clearance-leaning ``persistence_score``.
+That divergence was invisible to the str->str golden. T3-2 phase 5 fixed it: the
+rererestore builder now floors exactly like rebuild, so the SAME structural input
+yields the SAME score across the tiers. The "clamp-divergence" scenario (the input
+that drives a decrement event's magnitude below zero) now records 0.31 for BOTH
+rebuild and rererestore, and ``test_magnitude_floor_unifies_rebuild_and_rererestore_tiers``
+pins that convergence -- a regression that re-removed the floor would re-diverge and
+fail. Any future change to these families must reproduce THIS golden byte-for-byte;
+an intentional behavior change shows up here as a reviewed diff, never a silent one.
 
 Fixed-harness validity: the injected callables below are deterministic stand-ins,
 not the production wiring (which threads ~15 helpers per composer). The golden's
@@ -32,7 +35,7 @@ validity does NOT depend on production-identical callables -- it pins composer
 behavior under a FIXED harness, and the collapse must reproduce it under the SAME
 harness. The harness only has to be (a) held constant between generation and check
 (it is -- one enumerator) and (b) rich enough to exercise the real branches (the
-companion test guards a non-degenerate branch count and the clamp divergence).
+companion test guards a non-degenerate branch count and the magnitude-floor fix).
 
 Regenerate only with an intentional, reviewed behavior change::
 
@@ -373,8 +376,9 @@ def _for_target_scenarios() -> list[
     }
     reversing_target = {**conf_target, "closure_forecast_momentum_status": "reversing"}
     return [
-        # The divergence fixture: confirmation side, one strong event + one decrement
-        # event -> rebuild floors the decrement to 0, rererestore keeps it negative.
+        # The floor-path fixture: confirmation side, one strong event + one decrement
+        # event whose magnitude crosses below zero. Both rebuild and the (now-fixed)
+        # rererestore floor it at 0, so they agree; the scenario name is historical.
         ("clamp-divergence", conf_target, [strong, decrement], {}),
         ("sustained-confirmation", conf_target, [strong, strong, strong], {}),
         (

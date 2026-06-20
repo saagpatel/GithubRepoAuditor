@@ -83,24 +83,23 @@ def test_composer_reproduces_golden(name: str) -> None:
     assert LIVE[name] == GOLDEN[name]
 
 
-def test_clamp_divergence_between_tiers_is_pinned() -> None:
-    # The whole reason this net exists: the rebuild and rererestore persistence
-    # builders are near-clones, but the rebuild per-event magnitude floor makes the
-    # SAME structural input ("clamp-divergence" scenario) yield a different score.
-    # A naive collapse that translated one tier into the other would erase this and
-    # this assertion would fail -- which is the point.
+def test_magnitude_floor_unifies_rebuild_and_rererestore_tiers() -> None:
+    # T3-2 phase 5 fix: the rererestore persistence builder now floors per-event
+    # magnitude at 0 (max(0.0, ..)) exactly like rebuild -- previously it omitted the
+    # floor (magnitude -= X), letting an over-penalized confirmation event go negative
+    # and count against its own side. With the floor, the SAME structural input (the
+    # "clamp-divergence" floor-path scenario) yields the SAME score across the tiers.
+    # This pins the fix: a regression that re-removed the floor would re-diverge here.
     rebuild = GOLDEN[_REBUILD_PERSISTENCE]["clamp-divergence"]
     rererestore = GOLDEN[_RERERESTORE_PERSISTENCE]["clamp-divergence"]
     rebuild_score = rebuild[_REBUILD_SCORE_KEY]
     rererestore_score = rererestore[_RERERESTORE_SCORE_KEY]
-    assert rebuild_score != rererestore_score, (rebuild_score, rererestore_score)
-    # Rebuild floors the negative decrement term at 0, so it stays the higher score.
-    assert rebuild_score > rererestore_score, (rebuild_score, rererestore_score)
+    assert rebuild_score == rererestore_score, (rebuild_score, rererestore_score)
 
-    # The rerererestore tier is a thin wrapper that translates keys and delegates to
-    # the rererestore builder, so it also does NOT floor the magnitude. Pin it as a
-    # named three-way invariant: it diverges from the flooring rebuild tier (F7). A
-    # collapse that accidentally gave it rebuild's floor would break this.
+    # The rerererestore tier wraps + delegates to the now-fixed rererestore builder,
+    # so this confirmation-side scenario no longer yields a spurious NEGATIVE score
+    # (the bug symptom). It need not equal rebuild -- the wrapper feeds translated
+    # inputs -- but it must reflect the floor (be non-negative here).
     rerererestore = GOLDEN[_RERERESTORE_WRAP_PERSISTENCE]["clamp-divergence"]
     rerererestore_score = rerererestore[_RERERESTORE_WRAP_SCORE_KEY]
-    assert rerererestore_score != rebuild_score, (rerererestore_score, rebuild_score)
+    assert rerererestore_score >= 0.0, rerererestore_score
