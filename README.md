@@ -113,6 +113,7 @@ Treat campaign/writeback, GitHub Projects, Notion sync, catalog overrides, score
 - Public-safe recording plan: [DEMO-PLAN.md](DEMO-PLAN.md)
 - Product brief: [docs/product/operator-os-product-brief.md](docs/product/operator-os-product-brief.md)
 - Public fixture proof package: [docs/demo-proof/public-fixture/README.md](docs/demo-proof/public-fixture/README.md)
+- proof-pr dogfood: [docs/proof-pr-dogfood.md](docs/proof-pr-dogfood.md)
 - Product modes: [docs/modes.md](docs/modes.md)
 - Web UI operator guide: [docs/audit-serve.md](docs/audit-serve.md)
 - CLI migration (flat → subcommand): [docs/audit-cli-migration.md](docs/audit-cli-migration.md)
