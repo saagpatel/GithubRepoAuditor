@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, NamedTuple, Sequence
 
 
 def closure_forecast_reset_side_from_status(status: str) -> str:
@@ -2944,6 +2944,250 @@ def apply_reset_reentry_rebuild_freshness_and_reset(
     }
 
 
+class _PersistenceTierSpec(NamedTuple):
+    """Tier-specific literals for the reset-reentry persistence builder.
+
+    The rebuild / rererestore persistence families share one algorithm (proven by the
+    composer golden) and differ only in the event/target keys they read, the status
+    tokens they match and emit, and their reason prose. This spec carries those
+    differences so a single base implementation serves every tier.
+    """
+
+    status_key: str
+    recovery_status_key: str
+    freshness_key: str
+    reset_key: str
+    settled_values: frozenset[str]
+    settling_values: frozenset[str]
+    just_value: str
+    sustained_confirmation: str
+    sustained_clearance: str
+    holding_confirmation: str
+    holding_clearance: str
+    reasons: dict[str, str]
+    age_key: str
+    score_key: str
+    status_out_key: str
+    reason_key: str
+    path_key: str
+
+
+def _persistence_for_target_base(
+    target: dict[str, Any],
+    closure_forecast_events: list[dict[str, Any]],
+    transition_history_meta: dict[str, Any],
+    *,
+    spec: _PersistenceTierSpec,
+    ordered_reset_reentry_events_for_target: Callable[
+        [dict[str, Any], list[dict[str, Any]]], list[dict[str, Any]]
+    ],
+    side_from_event: Callable[[dict[str, Any]], str],
+    closure_forecast_direction_majority: Callable[[list[str]], str],
+    closure_forecast_direction_reversing: Callable[[str, str], bool],
+    clamp_round: Callable[..., float],
+    path_label: Callable[[dict[str, Any]], str],
+    persistence_window_runs: int,
+) -> dict[str, Any]:
+    matching_events = ordered_reset_reentry_events_for_target(
+        target,
+        closure_forecast_events,
+    )[:persistence_window_runs]
+    relevant_events = [
+        event for event in matching_events if side_from_event(event) != "none"
+    ]
+    current_side = side_from_event(matching_events[0]) if matching_events else "none"
+    persistence_age_runs = 0
+    for event in matching_events:
+        event_side = side_from_event(event)
+        if event_side != current_side or event_side == "none":
+            break
+        persistence_age_runs += 1
+
+    weighted_total = 0.0
+    weight_sum = 0.0
+    directions: list[str] = []
+    for index, event in enumerate(relevant_events[:persistence_window_runs]):
+        weight = (1.0, 0.8, 0.6, 0.4)[min(index, persistence_window_runs - 1)]
+        event_side = side_from_event(event)
+        sign = 1.0 if event_side == "confirmation" else -1.0
+        directions.append(
+            "supporting-confirmation" if sign > 0 else "supporting-clearance"
+        )
+        magnitude = 0.0
+        if event.get(spec.status_key, "none") in spec.settled_values:
+            magnitude += 0.15
+        if event.get(spec.recovery_status_key, "none") in spec.settling_values:
+            magnitude += 0.10
+        momentum_status = str(
+            event.get("closure_forecast_momentum_status", "insufficient-data")
+        )
+        if (
+            event_side == "confirmation" and momentum_status == "sustained-confirmation"
+        ) or (event_side == "clearance" and momentum_status == "sustained-clearance"):
+            magnitude += 0.10
+        stability_status = str(event.get("closure_forecast_stability_status", "watch"))
+        if stability_status == "stable":
+            magnitude += 0.10
+        freshness_status = str(event.get(spec.freshness_key, "insufficient-data"))
+        if freshness_status == "fresh":
+            magnitude += 0.10
+        elif freshness_status == "mixed-age":
+            magnitude = max(0.0, magnitude - 0.10)
+        if momentum_status in {"reversing", "unstable"}:
+            magnitude = max(0.0, magnitude - 0.15)
+        if stability_status == "oscillating":
+            magnitude = max(0.0, magnitude - 0.15)
+        if event.get(spec.reset_key, "none") != "none":
+            magnitude = max(0.0, magnitude - 0.15)
+        weighted_total += sign * magnitude * weight
+        weight_sum += weight
+
+    persistence_score = clamp_round(
+        weighted_total / max(weight_sum, 1.0),
+        lower=-0.95,
+        upper=0.95,
+    )
+    current_momentum_status = str(
+        target.get("closure_forecast_momentum_status", "insufficient-data")
+    )
+    current_stability_status = str(
+        target.get("closure_forecast_stability_status", "watch")
+    )
+    current_freshness_status = str(target.get(spec.freshness_key, "insufficient-data"))
+    earlier_majority = closure_forecast_direction_majority(directions[1:])
+    current_direction = (
+        "supporting-confirmation"
+        if current_side == "confirmation"
+        else "supporting-clearance"
+        if current_side == "clearance"
+        else "neutral"
+    )
+
+    if current_side == "none" and not relevant_events:
+        persistence_status = "none"
+    elif (
+        target.get(spec.status_key, "none") in spec.settled_values
+        and persistence_age_runs == 1
+    ):
+        persistence_status = spec.just_value
+    elif len(relevant_events) < 2:
+        persistence_status = "insufficient-data"
+    elif (
+        closure_forecast_direction_reversing(current_direction, earlier_majority)
+        or current_momentum_status in {"reversing", "unstable"}
+        or target.get(spec.reset_key, "none") != "none"
+    ):
+        persistence_status = "reversing"
+    elif (
+        current_side == "confirmation"
+        and persistence_age_runs >= 3
+        and current_freshness_status == "fresh"
+        and current_momentum_status == "sustained-confirmation"
+        and current_stability_status != "oscillating"
+    ):
+        persistence_status = spec.sustained_confirmation
+    elif (
+        current_side == "clearance"
+        and persistence_age_runs >= 3
+        and current_freshness_status == "fresh"
+        and current_momentum_status == "sustained-clearance"
+        and current_stability_status != "oscillating"
+    ):
+        persistence_status = spec.sustained_clearance
+    elif (
+        current_side == "confirmation"
+        and persistence_age_runs >= 2
+        and persistence_score > 0
+    ):
+        persistence_status = spec.holding_confirmation
+    elif (
+        current_side == "clearance"
+        and persistence_age_runs >= 2
+        and persistence_score < 0
+    ):
+        persistence_status = spec.holding_clearance
+    else:
+        persistence_status = "none"
+
+    persistence_reason = spec.reasons.get(persistence_status, "")
+
+    return {
+        spec.age_key: persistence_age_runs,
+        spec.score_key: persistence_score,
+        spec.status_out_key: persistence_status,
+        spec.reason_key: persistence_reason,
+        spec.path_key: " -> ".join(
+            path_label(event) for event in matching_events if event
+        ),
+    }
+
+
+_REBUILD_PERSISTENCE_SPEC = _PersistenceTierSpec(
+    status_key="closure_forecast_reset_reentry_rebuild_status",
+    recovery_status_key="closure_forecast_reset_reentry_refresh_recovery_status",
+    freshness_key="closure_forecast_reset_reentry_freshness_status",
+    reset_key="closure_forecast_reset_reentry_reset_status",
+    settled_values=frozenset(
+        {"rebuilt-confirmation-reentry", "rebuilt-clearance-reentry"}
+    ),
+    settling_values=frozenset(
+        {"rebuilding-confirmation-reentry", "rebuilding-clearance-reentry"}
+    ),
+    just_value="just-rebuilt",
+    sustained_confirmation="sustained-confirmation-rebuild",
+    sustained_clearance="sustained-clearance-rebuild",
+    holding_confirmation="holding-confirmation-rebuild",
+    holding_clearance="holding-clearance-rebuild",
+    reasons={
+        "just-rebuilt": "Stronger reset re-entry posture has been rebuilt, but it has not yet proved it can hold.",
+        "holding-confirmation-rebuild": "Confirmation-side rebuild has stayed aligned long enough to keep the restored forecast in place.",
+        "holding-clearance-rebuild": "Clearance-side rebuild has stayed aligned long enough to keep the restored caution in place.",
+        "sustained-confirmation-rebuild": "Confirmation-side rebuild is now holding with enough follow-through to trust the restored forecast more.",
+        "sustained-clearance-rebuild": "Clearance-side rebuild is now holding with enough follow-through to trust the restored caution more.",
+        "reversing": "The rebuilt posture is already weakening, so it is being softened again.",
+        "insufficient-data": "Rebuilt reset re-entry is still too lightly exercised to say whether the restored forecast can hold.",
+    },
+    age_key="closure_forecast_reset_reentry_rebuild_age_runs",
+    score_key="closure_forecast_reset_reentry_rebuild_persistence_score",
+    status_out_key="closure_forecast_reset_reentry_rebuild_persistence_status",
+    reason_key="closure_forecast_reset_reentry_rebuild_persistence_reason",
+    path_key="recent_reset_reentry_rebuild_persistence_path",
+)
+
+
+_RERERESTORE_PERSISTENCE_SPEC = _PersistenceTierSpec(
+    status_key="closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status",
+    recovery_status_key="closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_status",
+    freshness_key="closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_status",
+    reset_key="closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_status",
+    settled_values=frozenset(
+        {"rererestored-confirmation-rebuild-reentry", "rererestored-clearance-rebuild-reentry"}
+    ),
+    settling_values=frozenset(
+        {"rererestoring-confirmation-rebuild-reentry", "rererestoring-clearance-rebuild-reentry"}
+    ),
+    just_value="just-rererestored",
+    sustained_confirmation="sustained-confirmation-rebuild-reentry-rererestore",
+    sustained_clearance="sustained-clearance-rebuild-reentry-rererestore",
+    holding_confirmation="holding-confirmation-rebuild-reentry-rererestore",
+    holding_clearance="holding-clearance-rebuild-reentry-rererestore",
+    reasons={
+        "just-rererestored": "Stronger rerestored rebuilt re-entry posture has been re-re-restored, but it has not yet proved it can hold.",
+        "holding-confirmation-rebuild-reentry-rererestore": "Confirmation-side re-re-restored posture has stayed aligned long enough to keep the stronger rerestored forecast in place.",
+        "holding-clearance-rebuild-reentry-rererestore": "Clearance-side re-re-restored posture has stayed aligned long enough to keep the stronger rerestored caution in place.",
+        "sustained-confirmation-rebuild-reentry-rererestore": "Confirmation-side re-re-restored posture is now holding with enough follow-through to trust the stronger rerestored forecast more.",
+        "sustained-clearance-rebuild-reentry-rererestore": "Clearance-side re-re-restored posture is now holding with enough follow-through to trust the stronger rerestored caution more.",
+        "reversing": "The re-re-restored rebuilt re-entry posture is already weakening, so it is being softened again.",
+        "insufficient-data": "Re-re-restored rebuilt re-entry is still too lightly exercised to say whether the stronger posture can hold.",
+    },
+    age_key="closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs",
+    score_key="closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score",
+    status_out_key="closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status",
+    reason_key="closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason",
+    path_key="recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path",
+)
+
+
 def closure_forecast_reset_reentry_rebuild_persistence_for_target(
     target: dict[str, Any],
     closure_forecast_events: list[dict[str, Any]],
@@ -2959,177 +3203,19 @@ def closure_forecast_reset_reentry_rebuild_persistence_for_target(
     closure_forecast_reset_reentry_rebuild_path_label: Callable[[dict[str, Any]], str],
     class_reset_reentry_rebuild_persistence_window_runs: int,
 ) -> dict[str, Any]:
-    matching_events = ordered_reset_reentry_events_for_target(
+    return _persistence_for_target_base(
         target,
         closure_forecast_events,
-    )[:class_reset_reentry_rebuild_persistence_window_runs]
-    relevant_events = [
-        event
-        for event in matching_events
-        if closure_forecast_reset_reentry_rebuild_side_from_event(event) != "none"
-    ]
-    current_side = (
-        closure_forecast_reset_reentry_rebuild_side_from_event(matching_events[0])
-        if matching_events
-        else "none"
+        transition_history_meta,
+        spec=_REBUILD_PERSISTENCE_SPEC,
+        ordered_reset_reentry_events_for_target=ordered_reset_reentry_events_for_target,
+        side_from_event=closure_forecast_reset_reentry_rebuild_side_from_event,
+        closure_forecast_direction_majority=closure_forecast_direction_majority,
+        closure_forecast_direction_reversing=closure_forecast_direction_reversing,
+        clamp_round=clamp_round,
+        path_label=closure_forecast_reset_reentry_rebuild_path_label,
+        persistence_window_runs=class_reset_reentry_rebuild_persistence_window_runs,
     )
-    persistence_age_runs = 0
-    for event in matching_events:
-        event_side = closure_forecast_reset_reentry_rebuild_side_from_event(event)
-        if event_side != current_side or event_side == "none":
-            break
-        persistence_age_runs += 1
-
-    weighted_total = 0.0
-    weight_sum = 0.0
-    directions: list[str] = []
-    for index, event in enumerate(relevant_events[:class_reset_reentry_rebuild_persistence_window_runs]):
-        weight = (1.0, 0.8, 0.6, 0.4)[
-            min(index, class_reset_reentry_rebuild_persistence_window_runs - 1)
-        ]
-        event_side = closure_forecast_reset_reentry_rebuild_side_from_event(event)
-        sign = 1.0 if event_side == "confirmation" else -1.0
-        directions.append("supporting-confirmation" if sign > 0 else "supporting-clearance")
-        magnitude = 0.0
-        if event.get("closure_forecast_reset_reentry_rebuild_status", "none") in {
-            "rebuilt-confirmation-reentry",
-            "rebuilt-clearance-reentry",
-        }:
-            magnitude += 0.15
-        if event.get("closure_forecast_reset_reentry_refresh_recovery_status", "none") in {
-            "rebuilding-confirmation-reentry",
-            "rebuilding-clearance-reentry",
-        }:
-            magnitude += 0.10
-        momentum_status = event.get("closure_forecast_momentum_status", "insufficient-data")
-        if (event_side == "confirmation" and momentum_status == "sustained-confirmation") or (
-            event_side == "clearance" and momentum_status == "sustained-clearance"
-        ):
-            magnitude += 0.10
-        stability_status = event.get("closure_forecast_stability_status", "watch")
-        if stability_status == "stable":
-            magnitude += 0.10
-        freshness_status = event.get(
-            "closure_forecast_reset_reentry_freshness_status",
-            "insufficient-data",
-        )
-        if freshness_status == "fresh":
-            magnitude += 0.10
-        elif freshness_status == "mixed-age":
-            magnitude = max(0.0, magnitude - 0.10)
-        if momentum_status in {"reversing", "unstable"}:
-            magnitude = max(0.0, magnitude - 0.15)
-        if stability_status == "oscillating":
-            magnitude = max(0.0, magnitude - 0.15)
-        if event.get("closure_forecast_reset_reentry_reset_status", "none") != "none":
-            magnitude = max(0.0, magnitude - 0.15)
-        weighted_total += sign * magnitude * weight
-        weight_sum += weight
-
-    persistence_score = clamp_round(
-        weighted_total / max(weight_sum, 1.0),
-        lower=-0.95,
-        upper=0.95,
-    )
-    current_momentum_status = target.get(
-        "closure_forecast_momentum_status",
-        "insufficient-data",
-    )
-    current_stability_status = target.get("closure_forecast_stability_status", "watch")
-    current_freshness_status = target.get(
-        "closure_forecast_reset_reentry_freshness_status",
-        "insufficient-data",
-    )
-    earlier_majority = closure_forecast_direction_majority(directions[1:])
-    current_direction = (
-        "supporting-confirmation"
-        if current_side == "confirmation"
-        else "supporting-clearance"
-        if current_side == "clearance"
-        else "neutral"
-    )
-
-    if current_side == "none" and not relevant_events:
-        persistence_status = "none"
-    elif (
-        target.get("closure_forecast_reset_reentry_rebuild_status", "none")
-        in {"rebuilt-confirmation-reentry", "rebuilt-clearance-reentry"}
-        and persistence_age_runs == 1
-    ):
-        persistence_status = "just-rebuilt"
-    elif len(relevant_events) < 2:
-        persistence_status = "insufficient-data"
-    elif (
-        closure_forecast_direction_reversing(current_direction, earlier_majority)
-        or current_momentum_status in {"reversing", "unstable"}
-        or target.get("closure_forecast_reset_reentry_reset_status", "none") != "none"
-    ):
-        persistence_status = "reversing"
-    elif (
-        current_side == "confirmation"
-        and persistence_age_runs >= 3
-        and current_freshness_status == "fresh"
-        and current_momentum_status == "sustained-confirmation"
-        and current_stability_status != "oscillating"
-    ):
-        persistence_status = "sustained-confirmation-rebuild"
-    elif (
-        current_side == "clearance"
-        and persistence_age_runs >= 3
-        and current_freshness_status == "fresh"
-        and current_momentum_status == "sustained-clearance"
-        and current_stability_status != "oscillating"
-    ):
-        persistence_status = "sustained-clearance-rebuild"
-    elif current_side == "confirmation" and persistence_age_runs >= 2 and persistence_score > 0:
-        persistence_status = "holding-confirmation-rebuild"
-    elif current_side == "clearance" and persistence_age_runs >= 2 and persistence_score < 0:
-        persistence_status = "holding-clearance-rebuild"
-    else:
-        persistence_status = "none"
-
-    if persistence_status == "just-rebuilt":
-        persistence_reason = (
-            "Stronger reset re-entry posture has been rebuilt, but it has not yet proved it can hold."
-        )
-    elif persistence_status == "holding-confirmation-rebuild":
-        persistence_reason = (
-            "Confirmation-side rebuild has stayed aligned long enough to keep the restored forecast in place."
-        )
-    elif persistence_status == "holding-clearance-rebuild":
-        persistence_reason = (
-            "Clearance-side rebuild has stayed aligned long enough to keep the restored caution in place."
-        )
-    elif persistence_status == "sustained-confirmation-rebuild":
-        persistence_reason = (
-            "Confirmation-side rebuild is now holding with enough follow-through to trust the restored forecast more."
-        )
-    elif persistence_status == "sustained-clearance-rebuild":
-        persistence_reason = (
-            "Clearance-side rebuild is now holding with enough follow-through to trust the restored caution more."
-        )
-    elif persistence_status == "reversing":
-        persistence_reason = (
-            "The rebuilt posture is already weakening, so it is being softened again."
-        )
-    elif persistence_status == "insufficient-data":
-        persistence_reason = (
-            "Rebuilt reset re-entry is still too lightly exercised to say whether the restored forecast can hold."
-        )
-    else:
-        persistence_reason = ""
-
-    return {
-        "closure_forecast_reset_reentry_rebuild_age_runs": persistence_age_runs,
-        "closure_forecast_reset_reentry_rebuild_persistence_score": persistence_score,
-        "closure_forecast_reset_reentry_rebuild_persistence_status": persistence_status,
-        "closure_forecast_reset_reentry_rebuild_persistence_reason": persistence_reason,
-        "recent_reset_reentry_rebuild_persistence_path": " -> ".join(
-            closure_forecast_reset_reentry_rebuild_path_label(event)
-            for event in matching_events
-            if event
-        ),
-    }
 
 
 def closure_forecast_reset_reentry_rebuild_churn_for_target(
@@ -5678,226 +5764,19 @@ def closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persisten
     clamp_round: Callable[..., float],
     class_reset_reentry_rebuild_reentry_restore_rererestore_window_runs: int,
 ) -> dict[str, Any]:
-    matching_events = ordered_reset_reentry_events_for_target(
+    return _persistence_for_target_base(
         target,
         closure_forecast_events,
-    )[:class_reset_reentry_rebuild_reentry_restore_rererestore_window_runs]
-    relevant_events = [
-        event
-        for event in matching_events
-        if closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_side_from_event(
-            event
-        )
-        != "none"
-    ]
-    current_side = (
-        closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_side_from_event(
-            matching_events[0]
-        )
-        if matching_events
-        else "none"
+        transition_history_meta,
+        spec=_RERERESTORE_PERSISTENCE_SPEC,
+        ordered_reset_reentry_events_for_target=ordered_reset_reentry_events_for_target,
+        side_from_event=closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_side_from_event,
+        closure_forecast_direction_majority=closure_forecast_direction_majority,
+        closure_forecast_direction_reversing=closure_forecast_direction_reversing,
+        clamp_round=clamp_round,
+        path_label=closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_path_label,
+        persistence_window_runs=class_reset_reentry_rebuild_reentry_restore_rererestore_window_runs,
     )
-    persistence_age_runs = 0
-    for event in matching_events:
-        event_side = (
-            closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_side_from_event(
-                event
-            )
-        )
-        if event_side != current_side or event_side == "none":
-            break
-        persistence_age_runs += 1
-
-    weighted_total = 0.0
-    weight_sum = 0.0
-    directions: list[str] = []
-    for index, event in enumerate(
-        relevant_events[:class_reset_reentry_rebuild_reentry_restore_rererestore_window_runs]
-    ):
-        weight = (1.0, 0.8, 0.6, 0.4)[
-            min(
-                index,
-                class_reset_reentry_rebuild_reentry_restore_rererestore_window_runs - 1,
-            )
-        ]
-        event_side = (
-            closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_side_from_event(
-                event
-            )
-        )
-        sign = 1.0 if event_side == "confirmation" else -1.0
-        directions.append(
-            "supporting-confirmation" if sign > 0 else "supporting-clearance"
-        )
-        magnitude = 0.0
-        if event.get(
-            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status",
-            "none",
-        ) in {
-            "rererestored-confirmation-rebuild-reentry",
-            "rererestored-clearance-rebuild-reentry",
-        }:
-            magnitude += 0.15
-        if event.get(
-            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_status",
-            "none",
-        ) in {
-            "rererestoring-confirmation-rebuild-reentry",
-            "rererestoring-clearance-rebuild-reentry",
-        }:
-            magnitude += 0.10
-        momentum_status = str(
-            event.get("closure_forecast_momentum_status", "insufficient-data")
-        )
-        if (event_side == "confirmation" and momentum_status == "sustained-confirmation") or (
-            event_side == "clearance" and momentum_status == "sustained-clearance"
-        ):
-            magnitude += 0.10
-        stability_status = str(event.get("closure_forecast_stability_status", "watch"))
-        if stability_status == "stable":
-            magnitude += 0.10
-        freshness_status = str(
-            event.get(
-                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_status",
-                "insufficient-data",
-            )
-        )
-        if freshness_status == "fresh":
-            magnitude += 0.10
-        elif freshness_status == "mixed-age":
-            magnitude = max(0.0, magnitude - 0.10)
-        if momentum_status in {"reversing", "unstable"}:
-            magnitude = max(0.0, magnitude - 0.15)
-        if stability_status == "oscillating":
-            magnitude = max(0.0, magnitude - 0.15)
-        if (
-            event.get(
-                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_status",
-                "none",
-            )
-            != "none"
-        ):
-            magnitude = max(0.0, magnitude - 0.15)
-        weighted_total += sign * magnitude * weight
-        weight_sum += weight
-
-    persistence_score = clamp_round(
-        weighted_total / max(weight_sum, 1.0),
-        lower=-0.95,
-        upper=0.95,
-    )
-    current_momentum_status = str(
-        target.get("closure_forecast_momentum_status", "insufficient-data")
-    )
-    current_stability_status = str(target.get("closure_forecast_stability_status", "watch"))
-    current_freshness_status = str(
-        target.get(
-            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_status",
-            "insufficient-data",
-        )
-    )
-    earlier_majority = closure_forecast_direction_majority(directions[1:])
-    current_direction = (
-        "supporting-confirmation"
-        if current_side == "confirmation"
-        else "supporting-clearance"
-        if current_side == "clearance"
-        else "neutral"
-    )
-
-    if current_side == "none" and not relevant_events:
-        persistence_status = "none"
-    elif (
-        target.get(
-            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status",
-            "none",
-        )
-        in {
-            "rererestored-confirmation-rebuild-reentry",
-            "rererestored-clearance-rebuild-reentry",
-        }
-        and persistence_age_runs == 1
-    ):
-        persistence_status = "just-rererestored"
-    elif len(relevant_events) < 2:
-        persistence_status = "insufficient-data"
-    elif (
-        closure_forecast_direction_reversing(current_direction, earlier_majority)
-        or current_momentum_status in {"reversing", "unstable"}
-        or target.get(
-            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_status",
-            "none",
-        )
-        != "none"
-    ):
-        persistence_status = "reversing"
-    elif (
-        current_side == "confirmation"
-        and persistence_age_runs >= 3
-        and current_freshness_status == "fresh"
-        and current_momentum_status == "sustained-confirmation"
-        and current_stability_status != "oscillating"
-    ):
-        persistence_status = "sustained-confirmation-rebuild-reentry-rererestore"
-    elif (
-        current_side == "clearance"
-        and persistence_age_runs >= 3
-        and current_freshness_status == "fresh"
-        and current_momentum_status == "sustained-clearance"
-        and current_stability_status != "oscillating"
-    ):
-        persistence_status = "sustained-clearance-rebuild-reentry-rererestore"
-    elif current_side == "confirmation" and persistence_age_runs >= 2 and persistence_score > 0:
-        persistence_status = "holding-confirmation-rebuild-reentry-rererestore"
-    elif current_side == "clearance" and persistence_age_runs >= 2 and persistence_score < 0:
-        persistence_status = "holding-clearance-rebuild-reentry-rererestore"
-    else:
-        persistence_status = "none"
-
-    if persistence_status == "just-rererestored":
-        persistence_reason = (
-            "Stronger rerestored rebuilt re-entry posture has been re-re-restored, but it has not yet proved it can hold."
-        )
-    elif persistence_status == "holding-confirmation-rebuild-reentry-rererestore":
-        persistence_reason = (
-            "Confirmation-side re-re-restored posture has stayed aligned long enough to keep the stronger rerestored forecast in place."
-        )
-    elif persistence_status == "holding-clearance-rebuild-reentry-rererestore":
-        persistence_reason = (
-            "Clearance-side re-re-restored posture has stayed aligned long enough to keep the stronger rerestored caution in place."
-        )
-    elif persistence_status == "sustained-confirmation-rebuild-reentry-rererestore":
-        persistence_reason = (
-            "Confirmation-side re-re-restored posture is now holding with enough follow-through to trust the stronger rerestored forecast more."
-        )
-    elif persistence_status == "sustained-clearance-rebuild-reentry-rererestore":
-        persistence_reason = (
-            "Clearance-side re-re-restored posture is now holding with enough follow-through to trust the stronger rerestored caution more."
-        )
-    elif persistence_status == "reversing":
-        persistence_reason = (
-            "The re-re-restored rebuilt re-entry posture is already weakening, so it is being softened again."
-        )
-    elif persistence_status == "insufficient-data":
-        persistence_reason = (
-            "Re-re-restored rebuilt re-entry is still too lightly exercised to say whether the stronger posture can hold."
-        )
-    else:
-        persistence_reason = ""
-
-    return {
-        "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": persistence_age_runs,
-        "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": persistence_score,
-        "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": persistence_status,
-        "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": persistence_reason,
-        "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": " -> ".join(
-            closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_path_label(
-                event
-            )
-            for event in matching_events
-            if event
-        ),
-    }
 
 
 def closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_for_target(
