@@ -4671,19 +4671,6 @@ def closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness
         weighted_rererestore_evidence_count,
         1.0,
     )
-    aligned_recent_event_count = sum(
-        1
-        for event in relevant_events[
-            :class_reset_reentry_rebuild_reentry_restore_rererestore_freshness_window_runs
-        ][:2]
-        if (
-            closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_side_from_event(
-                event
-            )
-            == current_side
-            and current_side != "none"
-        )
-    )
     return {
         "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status": freshness_status,
         "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_reason": _rererestore_freshness_reason(
@@ -4714,8 +4701,13 @@ def closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness
             weighted_clearance_like,
             recent_window_weight_share,
         ),
-        "has_fresh_aligned_recent_evidence": (
-            freshness_status == "fresh" and aligned_recent_event_count >= 2
+        "has_fresh_aligned_recent_evidence": any(
+            closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_side_from_event(
+                event
+            )
+            == current_side
+            and current_side != "none"
+            for event in relevant_events[:2]
         ),
     }
 

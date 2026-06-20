@@ -723,7 +723,7 @@
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_memory_weight": 1.0,
       "decayed_rererestored_rebuild_reentry_clearance_rate": 0.0,
       "decayed_rererestored_rebuild_reentry_confirmation_rate": 1.0,
-      "has_fresh_aligned_recent_evidence": false,
+      "has_fresh_aligned_recent_evidence": true,
       "recent_reset_reentry_rebuild_reentry_restore_rererestore_signal_mix": "1.00 weighted re-re-restored run(s) with 1.00 confirmation-like, 0.00 clearance-like, and 100% of the signal from the freshest runs."
     },
     "clearance-hold": {
@@ -759,7 +759,7 @@
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_memory_weight": 1.0,
       "decayed_rererestored_rebuild_reentry_clearance_rate": 0.0,
       "decayed_rererestored_rebuild_reentry_confirmation_rate": 1.0,
-      "has_fresh_aligned_recent_evidence": false,
+      "has_fresh_aligned_recent_evidence": true,
       "recent_reset_reentry_rebuild_reentry_restore_rererestore_signal_mix": "1.00 weighted re-re-restored run(s) with 1.00 confirmation-like, 0.00 clearance-like, and 100% of the signal from the freshest runs."
     },
     "sparse": {
@@ -768,7 +768,7 @@
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_memory_weight": 1.0,
       "decayed_rererestored_rebuild_reentry_clearance_rate": 0.0,
       "decayed_rererestored_rebuild_reentry_confirmation_rate": 1.0,
-      "has_fresh_aligned_recent_evidence": false,
+      "has_fresh_aligned_recent_evidence": true,
       "recent_reset_reentry_rebuild_reentry_restore_rererestore_signal_mix": "1.00 weighted re-re-restored run(s) with 1.00 confirmation-like, 0.00 clearance-like, and 100% of the signal from the freshest runs."
     },
     "sustained-confirmation": {
