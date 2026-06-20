@@ -143,10 +143,11 @@ class RateLimiter:
     def enabled(self) -> bool:
         return self._limit > 0
 
-    def allow(self, ip: str) -> bool:
+    def allow(self, ip: str, bucket: str = "default") -> bool:
+        """Whether this IP is within budget for ``bucket`` (separate quotas)."""
         if not self.enabled:
             return True
-        count = self._store.incr(f"rl:{ip}", self._window)
+        count = self._store.incr(f"rl:{bucket}:{ip}", self._window)
         return count <= self._limit
 
 

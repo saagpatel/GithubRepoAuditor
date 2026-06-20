@@ -1,5 +1,6 @@
 import type { Report } from "@/lib/types";
 import RepoCard from "./RepoCard";
+import WaitlistForm from "./WaitlistForm";
 
 export default function ReportView({ report }: { report: Report }) {
 	// Worst-graded first: the report's job is to point at what to fix.
@@ -38,6 +39,8 @@ export default function ReportView({ report }: { report: Report }) {
 				</span>
 				<code>pipx run github-repo-auditor audit {report.username}</code>
 			</div>
+
+			<WaitlistForm source={report.username} />
 		</section>
 	);
 }

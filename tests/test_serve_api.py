@@ -171,6 +171,18 @@ def test_cors_allows_frontend_origin(client: TestClient) -> None:
     assert resp.headers.get("access-control-allow-origin") == origin
 
 
+def test_cors_preflight_allows_waitlist_post(client: TestClient) -> None:
+    resp = client.options(
+        "/api/waitlist",
+        headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+    assert resp.status_code == 200
+    assert "POST" in resp.headers.get("access-control-allow-methods", "")
+
+
 def test_cors_origins_reads_env(monkeypatch) -> None:
     from src.serve.api import cors_origins
 
@@ -233,3 +245,50 @@ def test_client_ip_honors_forwarded_when_trusted(monkeypatch) -> None:
     monkeypatch.setenv("GHRA_TRUST_FORWARDED_FOR", "true")
     req = _FakeRequest({"x-forwarded-for": "9.9.9.9, 1.2.3.4"}, host="1.2.3.4")
     assert client_ip(req) == "9.9.9.9"  # type: ignore[arg-type]
+
+
+# ---------------------------------------------------------------------------
+# Waitlist capture
+# ---------------------------------------------------------------------------
+def test_waitlist_accepts_valid_email(client: TestClient) -> None:
+    resp = client.post(
+        "/api/waitlist", json={"email": "dev@example.com", "source": "octocat"}
+    )
+    assert resp.status_code == 201
+    assert resp.json()["status"] == "joined"
+
+
+def test_waitlist_is_idempotent(client: TestClient) -> None:
+    client.post("/api/waitlist", json={"email": "dev@example.com"})
+    resp = client.post("/api/waitlist", json={"email": "dev@example.com"})
+    assert resp.status_code == 201
+    assert resp.json()["status"] == "already_joined"
+
+
+def test_waitlist_dedupes_case_insensitively_through_endpoint(
+    client: TestClient,
+) -> None:
+    first = client.post("/api/waitlist", json={"email": "Dev@Example.com"})
+    second = client.post("/api/waitlist", json={"email": "dev@example.com"})
+    assert first.json()["status"] == "joined"
+    assert second.json()["status"] == "already_joined"
+
+
+def test_waitlist_rejects_invalid_email(client: TestClient) -> None:
+    resp = client.post("/api/waitlist", json={"email": "not-an-email"})
+    assert resp.status_code == 422
+
+
+def test_waitlist_requires_email_field(client: TestClient) -> None:
+    resp = client.post("/api/waitlist", json={"source": "octocat"})
+    assert resp.status_code == 422  # pydantic: missing required field
+
+
+def test_waitlist_throttled(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("GHRA_RATE_LIMIT", "1")
+    monkeypatch.setenv("GHRA_RATE_WINDOW_SECONDS", "3600")
+    local_client = _make_client(tmp_path)
+    first = local_client.post("/api/waitlist", json={"email": "a@b.co"})
+    second = local_client.post("/api/waitlist", json={"email": "c@d.co"})
+    assert first.status_code == 201
+    assert second.status_code == 429

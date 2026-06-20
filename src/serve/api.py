@@ -19,11 +19,13 @@ from typing import Any
 
 import requests
 from fastapi import APIRouter, Depends, HTTPException, Path, Request
+from pydantic import BaseModel, Field
 
 from src.api_only import audit_user_api_only
 from src.github_client import GitHubClient, GitHubClientError
 from src.serve.hosting import RateLimiter, ReportCache
 from src.serve.runner import validate_username
+from src.serve.waitlist import WaitlistStore, is_valid_email
 
 router = APIRouter(prefix="/api", tags=["report"])
 
@@ -100,6 +102,11 @@ def client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
+def get_waitlist_store(request: Request) -> WaitlistStore:
+    """Return the app-wide waitlist store (built once in the app factory)."""
+    return request.app.state.waitlist_store
+
+
 def _is_rate_limited(status: int | None, response: requests.Response | None) -> bool:
     """True when a GitHub error is rate-limiting (429, or 403 with quota at 0)."""
     if status == 429:
@@ -170,3 +177,32 @@ def report(
     payload = result.to_dict()
     cache.put(safe_username, payload)
     return payload
+
+
+class WaitlistSignup(BaseModel):
+    """Body for the monitoring-waitlist capture."""
+
+    email: str = Field(..., max_length=254)  # RFC 5321 max; matches is_valid_email
+    # Optional context — e.g. the username whose report the visitor was viewing.
+    source: str | None = Field(default=None, max_length=120)
+
+
+@router.post("/waitlist", status_code=201)
+def join_waitlist(
+    request: Request,
+    signup: WaitlistSignup,
+    store: WaitlistStore = Depends(get_waitlist_store),
+    limiter: RateLimiter = Depends(get_rate_limiter),
+) -> dict[str, Any]:
+    """Capture an email for the monitoring waitlist (idempotent on email)."""
+    # Separate throttle bucket so browsing reports never exhausts signup budget.
+    if not limiter.allow(client_ip(request), bucket="waitlist"):
+        raise HTTPException(
+            status_code=429, detail="Rate limit exceeded; try again later"
+        )
+    if not is_valid_email(signup.email):
+        raise HTTPException(status_code=422, detail="Enter a valid email address")
+
+    created = store.add(signup.email, source=signup.source)
+    # Idempotent: a repeat email is a success, not an error.
+    return {"status": "joined" if created else "already_joined"}

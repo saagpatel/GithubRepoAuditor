@@ -19,6 +19,7 @@ def create_app(output_dir: Path | None = None) -> "FastAPI":  # noqa: F821
         build_report_cache,
     )
     from src.serve.routes import router
+    from src.serve.waitlist import build_waitlist_store
 
     app = FastAPI(
         title="Audit Serve",
@@ -26,12 +27,12 @@ def create_app(output_dir: Path | None = None) -> "FastAPI":  # noqa: F821
         version="1.0.0",
     )
 
-    # CORS so the Next.js frontend can call /api/report from the browser. Only
-    # GET is exposed; no credentials (the endpoint is public + unauthenticated).
+    # CORS so the Next.js frontend can call the API from the browser: GET for
+    # reports, POST for the waitlist. No credentials (public, unauthenticated).
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins(),
-        allow_methods=["GET"],
+        allow_methods=["GET", "POST"],
         allow_headers=["*"],
     )
 
@@ -44,6 +45,7 @@ def create_app(output_dir: Path | None = None) -> "FastAPI":  # noqa: F821
     kv_store = build_kv_store()
     app.state.report_cache = build_report_cache(kv_store)
     app.state.rate_limiter = build_rate_limiter(kv_store)
+    app.state.waitlist_store = build_waitlist_store(app.state.output_dir)
 
     static_dir = Path(__file__).parent / "static"
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")

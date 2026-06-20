@@ -1,4 +1,4 @@
-import ReportExplorer from "@/components/ReportExplorer";
+import UsernameForm from "@/components/UsernameForm";
 
 export default function Home() {
 	return (
@@ -11,7 +11,7 @@ export default function Home() {
 					public repo, and surface the highest-leverage fixes for each one.
 					Free, no signup.
 				</p>
-				<ReportExplorer />
+				<UsernameForm />
 			</section>
 
 			<footer className="foot wrap" style={{ paddingLeft: 0, paddingRight: 0 }}>

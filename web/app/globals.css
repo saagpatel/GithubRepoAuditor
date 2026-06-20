@@ -381,3 +381,88 @@ button.go:disabled {
 	padding: 24px 0 60px;
 	border-top: 1px solid var(--line);
 }
+
+/* ---- Report nav (shareable page) ---- */
+.report-nav {
+	padding: 32px 0 0;
+}
+.report-nav .back {
+	font-family: var(--mono);
+	font-size: 13px;
+	color: var(--ink-dim);
+}
+.report-nav .back:hover {
+	color: var(--accent);
+	text-decoration: none;
+}
+
+/* ---- Waitlist capture ---- */
+.waitlist {
+	margin: 0 0 80px;
+	padding: 22px 24px;
+	background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%);
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
+}
+.waitlist-copy {
+	font-size: 15px;
+	color: var(--ink-dim);
+	max-width: 56ch;
+	margin-bottom: 14px;
+}
+.waitlist-copy strong {
+	color: var(--ink);
+	font-weight: 600;
+}
+.waitlist-row {
+	display: flex;
+	gap: 10px;
+	max-width: 480px;
+}
+.waitlist-row input {
+	flex: 1;
+	background: var(--bg);
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
+	padding: 13px 14px;
+	color: var(--ink);
+	font-size: 15px;
+	font-family: var(--sans);
+	outline: 0;
+	transition: border-color 0.15s ease;
+}
+.waitlist-row input:focus {
+	border-color: var(--accent);
+}
+.waitlist-row button {
+	background: transparent;
+	color: var(--accent);
+	border: 1px solid var(--accent);
+	border-radius: var(--radius);
+	font-family: var(--sans);
+	font-weight: 600;
+	font-size: 15px;
+	padding: 0 20px;
+	cursor: pointer;
+	transition:
+		background 0.15s ease,
+		color 0.15s ease;
+}
+.waitlist-row button:hover:not(:disabled) {
+	background: var(--accent);
+	color: var(--accent-ink);
+}
+.waitlist-row button:disabled {
+	opacity: 0.55;
+	cursor: progress;
+}
+.waitlist-done {
+	margin: 0 0 80px;
+	padding: 20px 24px;
+	background: var(--panel);
+	border: 1px solid var(--line);
+	border-left: 3px solid var(--grade-a);
+	border-radius: var(--radius);
+	color: var(--ink);
+	font-size: 15px;
+}
