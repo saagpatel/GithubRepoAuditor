@@ -1297,247 +1297,21 @@ def closure_forecast_reset_reentry_refresh_recovery_for_target(
     closure_forecast_reset_reentry_refresh_path_label: Callable[[dict[str, Any]], str],
     class_reset_reentry_refresh_rebuild_window_runs: int,
 ) -> dict[str, Any]:
-    matching_events = ordered_reset_reentry_events_for_target(
+    return _recovery_for_target_base(
         target,
         closure_forecast_events,
-    )[:class_reset_reentry_refresh_rebuild_window_runs]
-    recent_reset_reentry_side = "none"
-    latest_reset_index: int | None = None
-    for index, event in enumerate(matching_events):
-        event_reset_side = closure_forecast_reset_side_from_status(
-            str(event.get("closure_forecast_reset_reentry_reset_status", "none"))
-        )
-        if event_reset_side != "none":
-            recent_reset_reentry_side = event_reset_side
-            latest_reset_index = index
-            break
-
-    relevant_events: list[dict[str, Any]] = []
-    directions: list[str] = []
-    weighted_total = 0.0
-    weight_sum = 0.0
-    for event in matching_events:
-        score = float(event.get("closure_forecast_reweight_score", 0.0) or 0.0)
-        direction = normalized_closure_forecast_direction(
-            str(event.get("closure_forecast_reweight_direction", "neutral")),
-            score,
-        )
-        if (
-            closure_forecast_reset_side_from_status(
-                str(event.get("closure_forecast_reset_reentry_reset_status", "none"))
-            )
-            == "none"
-            and direction == "neutral"
-            and abs(score) < 0.05
-        ):
-            continue
-        relevant_events.append(event)
-        directions.append(direction)
-        if len(relevant_events) > class_reset_reentry_refresh_rebuild_window_runs:
-            break
-        if direction == "neutral":
-            signal_strength = 0.0
-            sign = 0.0
-        else:
-            signal_strength = max(abs(score), 0.05)
-            sign = 1.0 if direction == "supporting-confirmation" else -1.0
-        freshness_factor = {
-            "fresh": 1.00,
-            "mixed-age": 0.60,
-            "stale": 0.25,
-            "insufficient-data": 0.10,
-        }.get(
-            str(event.get("closure_forecast_reset_reentry_freshness_status", "insufficient-data")),
-            0.10,
-        )
-        weight = (1.0, 0.8, 0.6, 0.4)[
-            min(len(relevant_events) - 1, class_reset_reentry_refresh_rebuild_window_runs - 1)
-        ]
-        weighted_total += sign * signal_strength * freshness_factor * weight
-        weight_sum += weight
-
-    recovery_score = clamp_round(
-        weighted_total / max(weight_sum, 1.0),
-        lower=-0.95,
-        upper=0.95,
+        transition_history_meta,
+        spec=_RESET_REENTRY_RECOVERY_SPEC,
+        ordered_reset_reentry_events_for_target=ordered_reset_reentry_events_for_target,
+        closure_forecast_reset_side_from_status=closure_forecast_reset_side_from_status,
+        normalized_closure_forecast_direction=normalized_closure_forecast_direction,
+        clamp_round=clamp_round,
+        closure_forecast_direction_majority=closure_forecast_direction_majority,
+        target_specific_normalization_noise=target_specific_normalization_noise,
+        closure_forecast_direction_reversing=closure_forecast_direction_reversing,
+        path_label=closure_forecast_reset_reentry_refresh_path_label,
+        window_runs=class_reset_reentry_refresh_rebuild_window_runs,
     )
-    current_score = float(target.get("closure_forecast_reweight_score", 0.0) or 0.0)
-    current_direction = normalized_closure_forecast_direction(
-        str(target.get("closure_forecast_reweight_direction", "neutral")),
-        current_score,
-    )
-    current_freshness = str(
-        target.get("closure_forecast_reset_reentry_freshness_status", "insufficient-data")
-    )
-    current_momentum = str(target.get("closure_forecast_momentum_status", "insufficient-data"))
-    current_stability = str(target.get("closure_forecast_stability_status", "watch"))
-    earlier_majority = closure_forecast_direction_majority(directions[1:])
-    local_noise = target_specific_normalization_noise(target, transition_history_meta)
-    direction_reversing = closure_forecast_direction_reversing(
-        current_direction,
-        earlier_majority,
-    )
-    opposes_reset = (
-        recent_reset_reentry_side == "confirmation"
-        and current_direction == "supporting-clearance"
-    ) or (
-        recent_reset_reentry_side == "clearance"
-        and current_direction == "supporting-confirmation"
-    )
-    aligned_fresh_runs_after_reset = 0
-    if latest_reset_index is not None and latest_reset_index > 0:
-        for event in matching_events[:latest_reset_index]:
-            score = float(event.get("closure_forecast_reweight_score", 0.0) or 0.0)
-            direction = normalized_closure_forecast_direction(
-                str(event.get("closure_forecast_reweight_direction", "neutral")),
-                score,
-            )
-            event_side = (
-                "confirmation"
-                if direction == "supporting-confirmation"
-                else "clearance"
-                if direction == "supporting-clearance"
-                else "none"
-            )
-            if (
-                event_side == recent_reset_reentry_side
-                and event.get(
-                    "closure_forecast_reset_reentry_freshness_status",
-                    "insufficient-data",
-                )
-                == "fresh"
-            ):
-                aligned_fresh_runs_after_reset += 1
-    current_side = (
-        "confirmation"
-        if current_direction == "supporting-confirmation"
-        else "clearance"
-        if current_direction == "supporting-clearance"
-        else "none"
-    )
-    current_event_already_counted = any(
-        event.get("generated_at", "") == ""
-        and float(event.get("closure_forecast_reweight_score", 0.0) or 0.0) == current_score
-        and event.get("closure_forecast_reweight_direction", "neutral")
-        == target.get("closure_forecast_reweight_direction", "neutral")
-        for event in matching_events[: latest_reset_index or 0]
-    )
-    if (
-        current_side == recent_reset_reentry_side
-        and current_freshness == "fresh"
-        and not current_event_already_counted
-    ):
-        aligned_fresh_runs_after_reset += 1
-
-    if len(relevant_events) < 2 or recent_reset_reentry_side == "none":
-        recovery_status = "none"
-    elif local_noise and current_direction == "supporting-confirmation":
-        recovery_status = "blocked"
-    elif opposes_reset or direction_reversing:
-        recovery_status = "reversing"
-    elif (
-        recent_reset_reentry_side == "confirmation"
-        and current_direction == "supporting-confirmation"
-        and current_freshness == "fresh"
-        and recovery_score >= 0.25
-        and current_stability != "oscillating"
-    ):
-        recovery_status = "rebuilding-confirmation-reentry"
-    elif (
-        recent_reset_reentry_side == "clearance"
-        and current_direction == "supporting-clearance"
-        and current_freshness == "fresh"
-        and recovery_score <= -0.25
-        and current_stability != "oscillating"
-    ):
-        recovery_status = "rebuilding-clearance-reentry"
-    elif (
-        recent_reset_reentry_side == "confirmation"
-        and current_direction == "supporting-confirmation"
-        and current_freshness in {"fresh", "mixed-age"}
-        and recovery_score >= 0.15
-    ):
-        recovery_status = "recovering-confirmation-reentry-reset"
-    elif (
-        recent_reset_reentry_side == "clearance"
-        and current_direction == "supporting-clearance"
-        and current_freshness in {"fresh", "mixed-age"}
-        and recovery_score <= -0.15
-    ):
-        recovery_status = "recovering-clearance-reentry-reset"
-    else:
-        recovery_status = "none"
-
-    if (
-        recovery_status == "rebuilding-confirmation-reentry"
-        and current_freshness == "fresh"
-        and current_momentum == "sustained-confirmation"
-        and current_stability == "stable"
-        and not local_noise
-        and aligned_fresh_runs_after_reset >= 2
-    ):
-        rebuild_status = "rebuilt-confirmation-reentry"
-        rebuild_reason = (
-            "Fresh confirmation-side follow-through has rebuilt stronger "
-            "confirmation-side reset re-entry."
-        )
-    elif (
-        recovery_status == "rebuilding-clearance-reentry"
-        and current_freshness == "fresh"
-        and current_momentum == "sustained-clearance"
-        and current_stability == "stable"
-        and aligned_fresh_runs_after_reset >= 2
-    ):
-        rebuild_status = "rebuilt-clearance-reentry"
-        rebuild_reason = (
-            "Fresh clearance-side pressure has rebuilt stronger clearance-side "
-            "reset re-entry."
-        )
-    elif local_noise and recovery_status in {
-        "recovering-confirmation-reentry-reset",
-        "rebuilding-confirmation-reentry",
-        "blocked",
-    }:
-        rebuild_status = "blocked"
-        rebuild_reason = (
-            "Local target instability is still preventing positive confirmation-side "
-            "reset re-entry rebuild."
-        )
-    elif recovery_status in {
-        "recovering-confirmation-reentry-reset",
-        "rebuilding-confirmation-reentry",
-    }:
-        rebuild_status = "pending-confirmation-rebuild"
-        rebuild_reason = (
-            "Fresh confirmation-side evidence is returning after reset re-entry was "
-            "softened or reset, but it has not yet rebuilt stronger reset re-entry."
-        )
-    elif recovery_status in {
-        "recovering-clearance-reentry-reset",
-        "rebuilding-clearance-reentry",
-    }:
-        rebuild_status = "pending-clearance-rebuild"
-        rebuild_reason = (
-            "Fresh clearance-side evidence is returning after reset re-entry was "
-            "softened or reset, but it has not yet rebuilt stronger reset re-entry."
-        )
-    else:
-        rebuild_status = "none"
-        rebuild_reason = ""
-
-    return {
-        "closure_forecast_reset_reentry_refresh_recovery_score": recovery_score,
-        "closure_forecast_reset_reentry_refresh_recovery_status": recovery_status,
-        "closure_forecast_reset_reentry_rebuild_status": rebuild_status,
-        "closure_forecast_reset_reentry_rebuild_reason": rebuild_reason,
-        "recent_reset_reentry_refresh_path": " -> ".join(
-            closure_forecast_reset_reentry_refresh_path_label(event)
-            for event in matching_events
-            if event
-        ),
-        "recent_reset_reentry_side": recent_reset_reentry_side,
-        "aligned_fresh_runs_after_latest_reset_reentry_reset": aligned_fresh_runs_after_reset,
-    }
 
 
 def apply_reset_reentry_refresh_rebuild_control(
@@ -4106,6 +3880,32 @@ _RERERESTORE_RECOVERY_SPEC = _RecoveryTierSpec(
     path_key="recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path",
     reset_side_key="recent_rererestore_reset_side",
     aligned_fresh_key="aligned_fresh_runs_after_latest_rererestore_reset",
+)
+
+
+_RESET_REENTRY_RECOVERY_SPEC = _RecoveryTierSpec(
+    reset_key='closure_forecast_reset_reentry_reset_status',
+    freshness_key='closure_forecast_reset_reentry_freshness_status',
+    restoring_confirmation='rebuilding-confirmation-reentry',
+    restoring_clearance='rebuilding-clearance-reentry',
+    recovering_confirmation='recovering-confirmation-reentry-reset',
+    recovering_clearance='recovering-clearance-reentry-reset',
+    restored_confirmation='rebuilt-confirmation-reentry',
+    restored_clearance='rebuilt-clearance-reentry',
+    pending_confirmation='pending-confirmation-rebuild',
+    pending_clearance='pending-clearance-rebuild',
+    reason_restored_confirmation='Fresh confirmation-side follow-through has rebuilt stronger confirmation-side reset re-entry.',
+    reason_restored_clearance='Fresh clearance-side pressure has rebuilt stronger clearance-side reset re-entry.',
+    reason_blocked='Local target instability is still preventing positive confirmation-side reset re-entry rebuild.',
+    reason_pending_confirmation='Fresh confirmation-side evidence is returning after reset re-entry was softened or reset, but it has not yet rebuilt stronger reset re-entry.',
+    reason_pending_clearance='Fresh clearance-side evidence is returning after reset re-entry was softened or reset, but it has not yet rebuilt stronger reset re-entry.',
+    score_key='closure_forecast_reset_reentry_refresh_recovery_score',
+    recovery_status_key='closure_forecast_reset_reentry_refresh_recovery_status',
+    next_status_key='closure_forecast_reset_reentry_rebuild_status',
+    next_reason_key='closure_forecast_reset_reentry_rebuild_reason',
+    path_key='recent_reset_reentry_refresh_path',
+    reset_side_key='recent_reset_reentry_side',
+    aligned_fresh_key='aligned_fresh_runs_after_latest_reset_reentry_reset',
 )
 
 
