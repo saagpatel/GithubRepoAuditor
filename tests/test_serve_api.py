@@ -150,3 +150,24 @@ def test_max_repos_clamped_to_cap(client: TestClient) -> None:
 
     assert resp.status_code == 200
     assert mock_audit.call_args.kwargs["max_repos"] == MAX_REPOS_CAP
+
+
+# ---------------------------------------------------------------------------
+# CORS (browser frontend reachability)
+# ---------------------------------------------------------------------------
+def test_cors_allows_frontend_origin(client: TestClient) -> None:
+    report = ApiOnlyReport(username="octocat", audits=[])
+    origin = "http://localhost:3000"
+    with patch("src.serve.api.audit_user_api_only", return_value=report):
+        resp = client.get("/api/report/octocat", headers={"Origin": origin})
+    assert resp.status_code == 200
+    assert resp.headers.get("access-control-allow-origin") == origin
+
+
+def test_cors_origins_reads_env(monkeypatch) -> None:
+    from src.serve.api import cors_origins
+
+    monkeypatch.setenv("GHRA_CORS_ORIGINS", "https://a.example, https://b.example")
+    assert cors_origins() == ["https://a.example", "https://b.example"]
+    monkeypatch.delenv("GHRA_CORS_ORIGINS", raising=False)
+    assert cors_origins() == ["http://localhost:3000", "http://127.0.0.1:3000"]

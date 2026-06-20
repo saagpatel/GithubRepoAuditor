@@ -35,6 +35,19 @@ MAX_REPOS_CAP = 30
 # requests still work, just at a lower rate limit).
 TOKEN_ENV_VAR = "GHRA_GITHUB_TOKEN"
 
+# Comma-separated allowed CORS origins for the browser frontend. Defaults to the
+# local Next.js dev server; set to the deployed origin (or "*") in production.
+CORS_ORIGINS_ENV_VAR = "GHRA_CORS_ORIGINS"
+DEFAULT_CORS_ORIGINS = ("http://localhost:3000", "http://127.0.0.1:3000")
+
+
+def cors_origins() -> list[str]:
+    """Resolve allowed CORS origins from env, falling back to the dev server."""
+    raw = os.environ.get(CORS_ORIGINS_ENV_VAR, "").strip()
+    if not raw:
+        return list(DEFAULT_CORS_ORIGINS)
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
 
 def get_github_client() -> GitHubClient:
     """Provide a GitHubClient for the request (overridable in tests/deploys).
