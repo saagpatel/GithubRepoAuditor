@@ -8831,9 +8831,27 @@ def _apply_reset_reentry_rebuild_refresh_reentry_control(
     }
 
 
-def _closure_forecast_reset_reentry_rebuild_refresh_hotspots(
+class _RefreshHotspotsSpec(NamedTuple):
+    """Tier-specific literals for the reset-reentry refresh-recovery hotspot selector.
+
+    The rebuild / restore / rerestore refresh hotspot selectors share one
+    group-by-class / max-abs-score / status-filter / sort algorithm and differ
+    only in the per-tier score, status, and path keys and the confirmation /
+    clearance status sets. Proven byte-identical by an exhaustive branch
+    differential.
+    """
+
+    score_key: str
+    status_key: str
+    path_key: str
+    confirmation_statuses: frozenset[str]
+    clearance_statuses: frozenset[str]
+
+
+def _refresh_hotspots_base(
     resolution_targets: list[dict],
     *,
+    spec: _RefreshHotspotsSpec,
     mode: str,
 ) -> list[dict]:
     grouped: dict[str, dict] = {}
@@ -8844,64 +8862,72 @@ def _closure_forecast_reset_reentry_rebuild_refresh_hotspots(
         current = {
             "scope": "class",
             "label": class_key,
-            "closure_forecast_reset_reentry_rebuild_refresh_recovery_score": target.get(
-                "closure_forecast_reset_reentry_rebuild_refresh_recovery_score",
-                0.0,
-            ),
-            "closure_forecast_reset_reentry_rebuild_refresh_recovery_status": target.get(
-                "closure_forecast_reset_reentry_rebuild_refresh_recovery_status",
-                "none",
-            ),
-            "recent_reset_reentry_rebuild_refresh_path": target.get(
-                "recent_reset_reentry_rebuild_refresh_path",
-                "",
-            ),
+            spec.score_key: target.get(spec.score_key, 0.0),
+            spec.status_key: target.get(spec.status_key, "none"),
+            spec.path_key: target.get(spec.path_key, ""),
         }
         existing = grouped.get(class_key)
-        if existing is None or abs(
-            current["closure_forecast_reset_reentry_rebuild_refresh_recovery_score"]
-        ) > abs(existing["closure_forecast_reset_reentry_rebuild_refresh_recovery_score"]):
+        if existing is None or abs(current[spec.score_key]) > abs(
+            existing[spec.score_key]
+        ):
             grouped[class_key] = current
     hotspots = list(grouped.values())
     if mode == "confirmation":
         hotspots = [
             item
             for item in hotspots
-            if item.get("closure_forecast_reset_reentry_rebuild_refresh_recovery_status")
-            in {
-                "recovering-confirmation-rebuild-reset",
-                "reentering-confirmation-rebuild",
-            }
+            if item.get(spec.status_key) in spec.confirmation_statuses
         ]
         hotspots.sort(
-            key=lambda item: (
-                -item.get(
-                    "closure_forecast_reset_reentry_rebuild_refresh_recovery_score",
-                    0.0,
-                ),
-                item.get("label", ""),
-            )
+            key=lambda item: (-item.get(spec.score_key, 0.0), item.get("label", ""))
         )
     else:
         hotspots = [
             item
             for item in hotspots
-            if item.get("closure_forecast_reset_reentry_rebuild_refresh_recovery_status")
-            in {
-                "recovering-clearance-rebuild-reset",
-                "reentering-clearance-rebuild",
-            }
+            if item.get(spec.status_key) in spec.clearance_statuses
         ]
         hotspots.sort(
-            key=lambda item: (
-                item.get(
-                    "closure_forecast_reset_reentry_rebuild_refresh_recovery_score",
-                    0.0,
-                ),
-                item.get("label", ""),
-            )
+            key=lambda item: (item.get(spec.score_key, 0.0), item.get("label", ""))
         )
     return hotspots[:5]
+
+
+_REBUILD_REFRESH_HOTSPOTS_SPEC = _RefreshHotspotsSpec(
+    score_key='closure_forecast_reset_reentry_rebuild_refresh_recovery_score',
+    status_key='closure_forecast_reset_reentry_rebuild_refresh_recovery_status',
+    path_key='recent_reset_reentry_rebuild_refresh_path',
+    confirmation_statuses=frozenset({'recovering-confirmation-rebuild-reset', 'reentering-confirmation-rebuild'}),
+    clearance_statuses=frozenset({'recovering-clearance-rebuild-reset', 'reentering-clearance-rebuild'}),
+)
+
+_RESTORE_REFRESH_HOTSPOTS_SPEC = _RefreshHotspotsSpec(
+    score_key='closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_score',
+    status_key='closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_status',
+    path_key='recent_reset_reentry_rebuild_reentry_restore_refresh_path',
+    confirmation_statuses=frozenset({'recovering-confirmation-rebuild-reentry-restore-reset', 'rerestoring-confirmation-rebuild-reentry'}),
+    clearance_statuses=frozenset({'recovering-clearance-rebuild-reentry-restore-reset', 'rerestoring-clearance-rebuild-reentry'}),
+)
+
+_RERESTORE_REFRESH_HOTSPOTS_SPEC = _RefreshHotspotsSpec(
+    score_key='closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_score',
+    status_key='closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_status',
+    path_key='recent_reset_reentry_rebuild_reentry_restore_rerestore_refresh_path',
+    confirmation_statuses=frozenset({'recovering-confirmation-rebuild-reentry-rerestore-reset', 'rererestoring-confirmation-rebuild-reentry'}),
+    clearance_statuses=frozenset({'recovering-clearance-rebuild-reentry-rerestore-reset', 'rererestoring-clearance-rebuild-reentry'}),
+)
+
+
+def _closure_forecast_reset_reentry_rebuild_refresh_hotspots(
+    resolution_targets: list[dict],
+    *,
+    mode: str,
+) -> list[dict]:
+    return _refresh_hotspots_base(
+        resolution_targets,
+        spec=_REBUILD_REFRESH_HOTSPOTS_SPEC,
+        mode=mode,
+    )
 
 
 def _closure_forecast_reset_reentry_rebuild_refresh_recovery_summary(
@@ -13437,80 +13463,11 @@ def _closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_hotspots(
     *,
     mode: str,
 ) -> list[dict]:
-    grouped: dict[str, dict] = {}
-    for target in resolution_targets:
-        class_key = _target_class_key(target)
-        if not class_key:
-            continue
-        current = {
-            "scope": "class",
-            "label": class_key,
-            "closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_score": target.get(
-                "closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_score",
-                0.0,
-            ),
-            "closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_status": target.get(
-                "closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_status",
-                "none",
-            ),
-            "recent_reset_reentry_rebuild_reentry_restore_refresh_path": target.get(
-                "recent_reset_reentry_rebuild_reentry_restore_refresh_path",
-                "",
-            ),
-        }
-        existing = grouped.get(class_key)
-        if existing is None or abs(
-            current["closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_score"]
-        ) > abs(
-            existing[
-                "closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_score"
-            ]
-        ):
-            grouped[class_key] = current
-    hotspots = list(grouped.values())
-    if mode == "confirmation":
-        hotspots = [
-            item
-            for item in hotspots
-            if item.get(
-                "closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_status"
-            )
-            in {
-                "recovering-confirmation-rebuild-reentry-restore-reset",
-                "rerestoring-confirmation-rebuild-reentry",
-            }
-        ]
-        hotspots.sort(
-            key=lambda item: (
-                -item.get(
-                    "closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_score",
-                    0.0,
-                ),
-                item.get("label", ""),
-            )
-        )
-    else:
-        hotspots = [
-            item
-            for item in hotspots
-            if item.get(
-                "closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_status"
-            )
-            in {
-                "recovering-clearance-rebuild-reentry-restore-reset",
-                "rerestoring-clearance-rebuild-reentry",
-            }
-        ]
-        hotspots.sort(
-            key=lambda item: (
-                item.get(
-                    "closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_score",
-                    0.0,
-                ),
-                item.get("label", ""),
-            )
-        )
-    return hotspots[:5]
+    return _refresh_hotspots_base(
+        resolution_targets,
+        spec=_RESTORE_REFRESH_HOTSPOTS_SPEC,
+        mode=mode,
+    )
 
 
 def _closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_summary(
@@ -16403,82 +16360,11 @@ def _closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_ho
     *,
     mode: str,
 ) -> list[dict]:
-    grouped: dict[str, dict] = {}
-    for target in resolution_targets:
-        class_key = _target_class_key(target)
-        if not class_key:
-            continue
-        current = {
-            "scope": "class",
-            "label": class_key,
-            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_score": target.get(
-                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_score",
-                0.0,
-            ),
-            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_status": target.get(
-                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_status",
-                "none",
-            ),
-            "recent_reset_reentry_rebuild_reentry_restore_rerestore_refresh_path": target.get(
-                "recent_reset_reentry_rebuild_reentry_restore_rerestore_refresh_path",
-                "",
-            ),
-        }
-        existing = grouped.get(class_key)
-        if existing is None or abs(
-            current[
-                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_score"
-            ]
-        ) > abs(
-            existing[
-                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_score"
-            ]
-        ):
-            grouped[class_key] = current
-    hotspots = list(grouped.values())
-    if mode == "confirmation":
-        hotspots = [
-            item
-            for item in hotspots
-            if item.get(
-                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_status"
-            )
-            in {
-                "recovering-confirmation-rebuild-reentry-rerestore-reset",
-                "rererestoring-confirmation-rebuild-reentry",
-            }
-        ]
-        hotspots.sort(
-            key=lambda item: (
-                -item.get(
-                    "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_score",
-                    0.0,
-                ),
-                item.get("label", ""),
-            )
-        )
-    else:
-        hotspots = [
-            item
-            for item in hotspots
-            if item.get(
-                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_status"
-            )
-            in {
-                "recovering-clearance-rebuild-reentry-rerestore-reset",
-                "rererestoring-clearance-rebuild-reentry",
-            }
-        ]
-        hotspots.sort(
-            key=lambda item: (
-                item.get(
-                    "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_score",
-                    0.0,
-                ),
-                item.get("label", ""),
-            )
-        )
-    return hotspots[:5]
+    return _refresh_hotspots_base(
+        resolution_targets,
+        spec=_RERESTORE_REFRESH_HOTSPOTS_SPEC,
+        mode=mode,
+    )
 
 
 def _closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_summary(
