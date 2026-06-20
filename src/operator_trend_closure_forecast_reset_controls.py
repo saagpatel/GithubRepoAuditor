@@ -3218,6 +3218,148 @@ def closure_forecast_reset_reentry_rebuild_persistence_for_target(
     )
 
 
+class _ChurnTierSpec(NamedTuple):
+    """Tier-specific literals for the reset-reentry churn builder.
+
+    The rebuild / rererestore churn families share one algorithm and differ only in
+    the per-event freshness/reset keys they read, their reason prose, and their
+    output keys.
+    """
+
+    freshness_key: str
+    reset_key: str
+    reasons: dict[str, str]
+    score_key: str
+    status_out_key: str
+    reason_key: str
+    path_key: str
+
+
+def _churn_for_target_base(
+    target: dict[str, Any],
+    closure_forecast_events: list[dict[str, Any]],
+    transition_history_meta: dict[str, Any],
+    *,
+    spec: _ChurnTierSpec,
+    ordered_reset_reentry_events_for_target: Callable[
+        [dict[str, Any], list[dict[str, Any]]], list[dict[str, Any]]
+    ],
+    side_from_event: Callable[[dict[str, Any]], str],
+    class_direction_flip_count: Callable[[list[str]], int],
+    target_specific_normalization_noise: Callable[
+        [dict[str, Any], dict[str, Any]], bool
+    ],
+    clamp_round: Callable[..., float],
+    path_label: Callable[[dict[str, Any]], str],
+    window_runs: int,
+) -> dict[str, Any]:
+    matching_events = ordered_reset_reentry_events_for_target(
+        target,
+        closure_forecast_events,
+    )[:window_runs]
+    relevant_events = [
+        event for event in matching_events if side_from_event(event) != "none"
+    ]
+    side_path = [side_from_event(event) for event in relevant_events]
+    current_side = side_path[0] if side_path else "none"
+    local_noise = target_specific_normalization_noise(target, transition_history_meta)
+    if current_side == "none":
+        churn_score = 0.0
+        churn_status = "none"
+    else:
+        flip_count = class_direction_flip_count(
+            [
+                "supporting-confirmation"
+                if side == "confirmation"
+                else "supporting-clearance"
+                for side in side_path
+            ]
+        )
+        churn_score = float(flip_count) * 0.20
+        stability_status = str(target.get("closure_forecast_stability_status", "watch"))
+        momentum_status = str(
+            target.get("closure_forecast_momentum_status", "insufficient-data")
+        )
+        if stability_status == "oscillating":
+            churn_score += 0.15
+        if momentum_status == "reversing":
+            churn_score += 0.10
+        if momentum_status == "unstable":
+            churn_score += 0.10
+        freshness_path = [
+            str(event.get(spec.freshness_key, "insufficient-data"))
+            for event in relevant_events
+        ]
+        if any(
+            previous == "fresh"
+            and current in {"mixed-age", "stale", "insufficient-data"}
+            for previous, current in zip(freshness_path, freshness_path[1:])
+        ):
+            churn_score += 0.10
+        if any(
+            event.get(spec.reset_key, "none") != "none" for event in relevant_events
+        ):
+            churn_score += 0.10
+        if (
+            len(relevant_events) >= 2
+            and side_path[0] == side_path[1]
+            and relevant_events[0].get(spec.freshness_key, "insufficient-data")
+            == "fresh"
+            and relevant_events[1].get(spec.freshness_key, "insufficient-data")
+            == "fresh"
+        ):
+            churn_score -= 0.10
+        churn_score = clamp_round(churn_score, lower=0.0, upper=0.95)
+        if local_noise and current_side == "confirmation":
+            churn_status = "blocked"
+        elif churn_score >= 0.45 or flip_count >= 2:
+            churn_status = "churn"
+        elif churn_score >= 0.20:
+            churn_status = "watch"
+        else:
+            churn_status = "none"
+
+    churn_reason = spec.reasons.get(churn_status, "")
+    return {
+        spec.score_key: churn_score,
+        spec.status_out_key: churn_status,
+        spec.reason_key: churn_reason,
+        spec.path_key: " -> ".join(
+            path_label(event) for event in matching_events if event
+        ),
+    }
+
+
+_REBUILD_CHURN_SPEC = _ChurnTierSpec(
+    freshness_key="closure_forecast_reset_reentry_freshness_status",
+    reset_key="closure_forecast_reset_reentry_reset_status",
+    reasons={
+        "blocked": "Local target instability is preventing positive confirmation-side rebuild persistence.",
+        "churn": "Rebuilt reset re-entry is flipping enough that restored posture should be softened quickly.",
+        "watch": "Rebuilt reset re-entry is wobbling and may lose its restored strength soon.",
+    },
+    score_key="closure_forecast_reset_reentry_rebuild_churn_score",
+    status_out_key="closure_forecast_reset_reentry_rebuild_churn_status",
+    reason_key="closure_forecast_reset_reentry_rebuild_churn_reason",
+    path_key="recent_reset_reentry_rebuild_churn_path",
+)
+
+
+_RERERESTORE_CHURN_SPEC = _ChurnTierSpec(
+    freshness_key="closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_status",
+    reset_key="closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_status",
+    reasons={
+        "blocked": "Local target instability is preventing positive confirmation-side re-re-restored hold.",
+        "churn": "Re-re-restored rebuilt re-entry is flipping enough that stronger posture should be softened quickly.",
+        "watch": "Re-re-restored rebuilt re-entry is wobbling and may lose its stronger posture soon.",
+    },
+    score_key="closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_score",
+    status_out_key="closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status",
+    reason_key="closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_reason",
+    path_key="recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path",
+)
+
+
 def closure_forecast_reset_reentry_rebuild_churn_for_target(
     target: dict[str, Any],
     closure_forecast_events: list[dict[str, Any]],
@@ -3233,102 +3375,19 @@ def closure_forecast_reset_reentry_rebuild_churn_for_target(
     closure_forecast_reset_reentry_rebuild_path_label: Callable[[dict[str, Any]], str],
     class_reset_reentry_rebuild_persistence_window_runs: int,
 ) -> dict[str, Any]:
-    matching_events = ordered_reset_reentry_events_for_target(
+    return _churn_for_target_base(
         target,
         closure_forecast_events,
-    )[:class_reset_reentry_rebuild_persistence_window_runs]
-    relevant_events = [
-        event
-        for event in matching_events
-        if closure_forecast_reset_reentry_rebuild_side_from_event(event) != "none"
-    ]
-    side_path = [
-        closure_forecast_reset_reentry_rebuild_side_from_event(event) for event in relevant_events
-    ]
-    current_side = side_path[0] if side_path else "none"
-    local_noise = target_specific_normalization_noise(target, transition_history_meta)
-    if current_side == "none":
-        churn_score = 0.0
-        churn_status = "none"
-        churn_reason = ""
-    else:
-        flip_count = class_direction_flip_count(
-            [
-                "supporting-confirmation" if side == "confirmation" else "supporting-clearance"
-                for side in side_path
-            ]
-        )
-        churn_score = float(flip_count) * 0.20
-        stability_status = target.get("closure_forecast_stability_status", "watch")
-        momentum_status = target.get("closure_forecast_momentum_status", "insufficient-data")
-        if stability_status == "oscillating":
-            churn_score += 0.15
-        if momentum_status == "reversing":
-            churn_score += 0.10
-        if momentum_status == "unstable":
-            churn_score += 0.10
-        freshness_path = [
-            event.get(
-                "closure_forecast_reset_reentry_freshness_status",
-                "insufficient-data",
-            )
-            for event in relevant_events
-        ]
-        if any(
-            previous == "fresh" and current in {"mixed-age", "stale", "insufficient-data"}
-            for previous, current in zip(freshness_path, freshness_path[1:])
-        ):
-            churn_score += 0.10
-        if any(
-            event.get("closure_forecast_reset_reentry_reset_status", "none") != "none"
-            for event in relevant_events
-        ):
-            churn_score += 0.10
-        if (
-            len(relevant_events) >= 2
-            and side_path[0] == side_path[1]
-            and relevant_events[0].get(
-                "closure_forecast_reset_reentry_freshness_status",
-                "insufficient-data",
-            )
-            == "fresh"
-            and relevant_events[1].get(
-                "closure_forecast_reset_reentry_freshness_status",
-                "insufficient-data",
-            )
-            == "fresh"
-        ):
-            churn_score -= 0.10
-        churn_score = clamp_round(churn_score, lower=0.0, upper=0.95)
-        if local_noise and current_side == "confirmation":
-            churn_status = "blocked"
-            churn_reason = (
-                "Local target instability is preventing positive confirmation-side rebuild persistence."
-            )
-        elif churn_score >= 0.45 or flip_count >= 2:
-            churn_status = "churn"
-            churn_reason = (
-                "Rebuilt reset re-entry is flipping enough that restored posture should be softened quickly."
-            )
-        elif churn_score >= 0.20:
-            churn_status = "watch"
-            churn_reason = (
-                "Rebuilt reset re-entry is wobbling and may lose its restored strength soon."
-            )
-        else:
-            churn_status = "none"
-            churn_reason = ""
-
-    return {
-        "closure_forecast_reset_reentry_rebuild_churn_score": churn_score,
-        "closure_forecast_reset_reentry_rebuild_churn_status": churn_status,
-        "closure_forecast_reset_reentry_rebuild_churn_reason": churn_reason,
-        "recent_reset_reentry_rebuild_churn_path": " -> ".join(
-            closure_forecast_reset_reentry_rebuild_path_label(event)
-            for event in matching_events
-            if event
-        ),
-    }
+        transition_history_meta,
+        spec=_REBUILD_CHURN_SPEC,
+        ordered_reset_reentry_events_for_target=ordered_reset_reentry_events_for_target,
+        side_from_event=closure_forecast_reset_reentry_rebuild_side_from_event,
+        class_direction_flip_count=class_direction_flip_count,
+        target_specific_normalization_noise=target_specific_normalization_noise,
+        clamp_round=clamp_round,
+        path_label=closure_forecast_reset_reentry_rebuild_path_label,
+        window_runs=class_reset_reentry_rebuild_persistence_window_runs,
+    )
 
 
 def apply_reset_reentry_rebuild_persistence_and_churn_control(
@@ -5798,118 +5857,19 @@ def closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_for
     clamp_round: Callable[..., float],
     class_reset_reentry_rebuild_reentry_restore_rererestore_window_runs: int,
 ) -> dict[str, Any]:
-    matching_events = ordered_reset_reentry_events_for_target(
+    return _churn_for_target_base(
         target,
         closure_forecast_events,
-    )[:class_reset_reentry_rebuild_reentry_restore_rererestore_window_runs]
-    relevant_events = [
-        event
-        for event in matching_events
-        if closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_side_from_event(
-            event
-        )
-        != "none"
-    ]
-    side_path = [
-        closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_side_from_event(
-            event
-        )
-        for event in relevant_events
-    ]
-    current_side = side_path[0] if side_path else "none"
-    local_noise = target_specific_normalization_noise(target, transition_history_meta)
-    if current_side == "none":
-        churn_score = 0.0
-        churn_status = "none"
-        churn_reason = ""
-    else:
-        flip_count = class_direction_flip_count(
-            [
-                "supporting-confirmation" if side == "confirmation" else "supporting-clearance"
-                for side in side_path
-            ]
-        )
-        churn_score = float(flip_count) * 0.20
-        stability_status = str(target.get("closure_forecast_stability_status", "watch"))
-        momentum_status = str(
-            target.get("closure_forecast_momentum_status", "insufficient-data")
-        )
-        if stability_status == "oscillating":
-            churn_score += 0.15
-        if momentum_status == "reversing":
-            churn_score += 0.10
-        if momentum_status == "unstable":
-            churn_score += 0.10
-        freshness_path = [
-            str(
-                event.get(
-                    "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_status",
-                    "insufficient-data",
-                )
-            )
-            for event in relevant_events
-        ]
-        if any(
-            previous == "fresh" and current in {"mixed-age", "stale", "insufficient-data"}
-            for previous, current in zip(freshness_path, freshness_path[1:])
-        ):
-            churn_score += 0.10
-        if any(
-            event.get(
-                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reset_status",
-                "none",
-            )
-            != "none"
-            for event in relevant_events
-        ):
-            churn_score += 0.10
-        if (
-            len(relevant_events) >= 2
-            and side_path[0] == side_path[1]
-            and relevant_events[0].get(
-                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_status",
-                "insufficient-data",
-            )
-            == "fresh"
-            and relevant_events[1].get(
-                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_freshness_status",
-                "insufficient-data",
-            )
-            == "fresh"
-        ):
-            churn_score -= 0.10
-        churn_score = clamp_round(churn_score, lower=0.0, upper=0.95)
-        if local_noise and current_side == "confirmation":
-            churn_status = "blocked"
-            churn_reason = (
-                "Local target instability is preventing positive confirmation-side re-re-restored hold."
-            )
-        elif churn_score >= 0.45 or flip_count >= 2:
-            churn_status = "churn"
-            churn_reason = (
-                "Re-re-restored rebuilt re-entry is flipping enough that stronger posture should be softened quickly."
-            )
-        elif churn_score >= 0.20:
-            churn_status = "watch"
-            churn_reason = (
-                "Re-re-restored rebuilt re-entry is wobbling and may lose its stronger posture soon."
-            )
-        else:
-            churn_status = "none"
-            churn_reason = ""
-
-    return {
-        "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_score": churn_score,
-        "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status": churn_status,
-        "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_reason": churn_reason,
-        "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": " -> ".join(
-            closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_path_label(
-                event
-            )
-            for event in matching_events
-            if event
-        ),
-    }
+        transition_history_meta,
+        spec=_RERERESTORE_CHURN_SPEC,
+        ordered_reset_reentry_events_for_target=ordered_reset_reentry_events_for_target,
+        side_from_event=closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_side_from_event,
+        class_direction_flip_count=class_direction_flip_count,
+        target_specific_normalization_noise=target_specific_normalization_noise,
+        clamp_round=clamp_round,
+        path_label=closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_path_label,
+        window_runs=class_reset_reentry_rebuild_reentry_restore_rererestore_window_runs,
+    )
 
 
 def apply_reset_reentry_rebuild_reentry_restore_rererestore_persistence_and_churn_control(
