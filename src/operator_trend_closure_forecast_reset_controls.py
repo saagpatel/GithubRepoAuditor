@@ -3544,9 +3544,29 @@ def apply_reset_reentry_rebuild_persistence_and_churn_control(
     }
 
 
-def closure_forecast_reset_reentry_rebuild_hotspots(
+class _HotspotsTierSpec(NamedTuple):
+    """Tier-specific literals for the reset-reentry hotspot selector.
+
+    The rebuild / rererestore hotspot selectors share one group/filter/sort
+    algorithm and differ only in the per-tier persistence/churn keys, the
+    ``just-*`` mode token, and the holding/sustained status set.
+    """
+
+    age_key: str
+    persistence_score_key: str
+    persistence_status_key: str
+    churn_score_key: str
+    churn_status_key: str
+    persistence_path_key: str
+    churn_path_key: str
+    just_mode: str
+    holding_statuses: frozenset[str]
+
+
+def _hotspots_base(
     resolution_targets: list[dict[str, Any]],
     *,
+    spec: _HotspotsTierSpec,
     mode: str,
     target_class_key: Callable[[dict[str, Any]], str],
 ) -> list[dict[str, Any]]:
@@ -3558,52 +3578,32 @@ def closure_forecast_reset_reentry_rebuild_hotspots(
         current = {
             "scope": "class",
             "label": class_key,
-            "closure_forecast_reset_reentry_rebuild_age_runs": target.get(
-                "closure_forecast_reset_reentry_rebuild_age_runs",
-                0,
+            spec.age_key: target.get(spec.age_key, 0),
+            spec.persistence_score_key: target.get(spec.persistence_score_key, 0.0),
+            spec.persistence_status_key: target.get(
+                spec.persistence_status_key, "none"
             ),
-            "closure_forecast_reset_reentry_rebuild_persistence_score": target.get(
-                "closure_forecast_reset_reentry_rebuild_persistence_score",
-                0.0,
-            ),
-            "closure_forecast_reset_reentry_rebuild_persistence_status": target.get(
-                "closure_forecast_reset_reentry_rebuild_persistence_status",
-                "none",
-            ),
-            "closure_forecast_reset_reentry_rebuild_churn_score": target.get(
-                "closure_forecast_reset_reentry_rebuild_churn_score",
-                0.0,
-            ),
-            "closure_forecast_reset_reentry_rebuild_churn_status": target.get(
-                "closure_forecast_reset_reentry_rebuild_churn_status",
-                "none",
-            ),
-            "recent_reset_reentry_rebuild_persistence_path": target.get(
-                "recent_reset_reentry_rebuild_persistence_path",
-                "",
-            ),
-            "recent_reset_reentry_rebuild_churn_path": target.get(
-                "recent_reset_reentry_rebuild_churn_path",
-                "",
-            ),
+            spec.churn_score_key: target.get(spec.churn_score_key, 0.0),
+            spec.churn_status_key: target.get(spec.churn_status_key, "none"),
+            spec.persistence_path_key: target.get(spec.persistence_path_key, ""),
+            spec.churn_path_key: target.get(spec.churn_path_key, ""),
         }
         existing = grouped.get(class_key)
         if existing is None or abs(
-            float(current["closure_forecast_reset_reentry_rebuild_persistence_score"] or 0.0)
-        ) > abs(float(existing["closure_forecast_reset_reentry_rebuild_persistence_score"] or 0.0)):
+            float(current[spec.persistence_score_key] or 0.0)
+        ) > abs(float(existing[spec.persistence_score_key] or 0.0)):
             grouped[class_key] = current
     hotspots = list(grouped.values())
-    if mode == "just-rebuilt":
+    if mode == spec.just_mode:
         hotspots = [
             item
             for item in hotspots
-            if item.get("closure_forecast_reset_reentry_rebuild_persistence_status")
-            == "just-rebuilt"
+            if item.get(spec.persistence_status_key) == spec.just_mode
         ]
         hotspots.sort(
             key=lambda item: (
-                -int(item.get("closure_forecast_reset_reentry_rebuild_age_runs", 0) or 0),
-                -abs(float(item.get("closure_forecast_reset_reentry_rebuild_persistence_score", 0.0) or 0.0)),
+                -int(item.get(spec.age_key, 0) or 0),
+                -abs(float(item.get(spec.persistence_score_key, 0.0) or 0.0)),
                 str(item.get("label", "")),
             )
         )
@@ -3611,18 +3611,12 @@ def closure_forecast_reset_reentry_rebuild_hotspots(
         hotspots = [
             item
             for item in hotspots
-            if item.get("closure_forecast_reset_reentry_rebuild_persistence_status")
-            in {
-                "holding-confirmation-rebuild",
-                "holding-clearance-rebuild",
-                "sustained-confirmation-rebuild",
-                "sustained-clearance-rebuild",
-            }
+            if item.get(spec.persistence_status_key) in spec.holding_statuses
         ]
         hotspots.sort(
             key=lambda item: (
-                -int(item.get("closure_forecast_reset_reentry_rebuild_age_runs", 0) or 0),
-                -abs(float(item.get("closure_forecast_reset_reentry_rebuild_persistence_score", 0.0) or 0.0)),
+                -int(item.get(spec.age_key, 0) or 0),
+                -abs(float(item.get(spec.persistence_score_key, 0.0) or 0.0)),
                 str(item.get("label", "")),
             )
         )
@@ -3630,17 +3624,70 @@ def closure_forecast_reset_reentry_rebuild_hotspots(
         hotspots = [
             item
             for item in hotspots
-            if item.get("closure_forecast_reset_reentry_rebuild_churn_status")
-            in {"watch", "churn", "blocked"}
+            if item.get(spec.churn_status_key) in {"watch", "churn", "blocked"}
         ]
         hotspots.sort(
             key=lambda item: (
-                -float(item.get("closure_forecast_reset_reentry_rebuild_churn_score", 0.0) or 0.0),
-                -int(item.get("closure_forecast_reset_reentry_rebuild_age_runs", 0) or 0),
+                -float(item.get(spec.churn_score_key, 0.0) or 0.0),
+                -int(item.get(spec.age_key, 0) or 0),
                 str(item.get("label", "")),
             )
         )
     return hotspots[:5]
+
+
+_REBUILD_HOTSPOTS_SPEC = _HotspotsTierSpec(
+    age_key="closure_forecast_reset_reentry_rebuild_age_runs",
+    persistence_score_key="closure_forecast_reset_reentry_rebuild_persistence_score",
+    persistence_status_key="closure_forecast_reset_reentry_rebuild_persistence_status",
+    churn_score_key="closure_forecast_reset_reentry_rebuild_churn_score",
+    churn_status_key="closure_forecast_reset_reentry_rebuild_churn_status",
+    persistence_path_key="recent_reset_reentry_rebuild_persistence_path",
+    churn_path_key="recent_reset_reentry_rebuild_churn_path",
+    just_mode="just-rebuilt",
+    holding_statuses=frozenset(
+        {
+            "holding-confirmation-rebuild",
+            "holding-clearance-rebuild",
+            "sustained-confirmation-rebuild",
+            "sustained-clearance-rebuild",
+        }
+    ),
+)
+
+
+_RERERESTORE_HOTSPOTS_SPEC = _HotspotsTierSpec(
+    age_key="closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs",
+    persistence_score_key="closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score",
+    persistence_status_key="closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status",
+    churn_score_key="closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_score",
+    churn_status_key="closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status",
+    persistence_path_key="recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path",
+    churn_path_key="recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path",
+    just_mode="just-rererestored",
+    holding_statuses=frozenset(
+        {
+            "holding-confirmation-rebuild-reentry-rererestore",
+            "holding-clearance-rebuild-reentry-rererestore",
+            "sustained-confirmation-rebuild-reentry-rererestore",
+            "sustained-clearance-rebuild-reentry-rererestore",
+        }
+    ),
+)
+
+
+def closure_forecast_reset_reentry_rebuild_hotspots(
+    resolution_targets: list[dict[str, Any]],
+    *,
+    mode: str,
+    target_class_key: Callable[[dict[str, Any]], str],
+) -> list[dict[str, Any]]:
+    return _hotspots_base(
+        resolution_targets,
+        spec=_REBUILD_HOTSPOTS_SPEC,
+        mode=mode,
+        target_class_key=target_class_key,
+    )
 
 
 def closure_forecast_reset_reentry_rebuild_persistence_summary(
@@ -6184,131 +6231,12 @@ def closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_hotspots(
     mode: str,
     target_class_key: Callable[[dict[str, Any]], str],
 ) -> list[dict[str, Any]]:
-    grouped: dict[str, dict[str, Any]] = {}
-    for target in resolution_targets:
-        class_key = target_class_key(target)
-        if not class_key:
-            continue
-        current = {
-            "scope": "class",
-            "label": class_key,
-            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": target.get(
-                "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs",
-                0,
-            ),
-            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": target.get(
-                "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score",
-                0.0,
-            ),
-            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": target.get(
-                "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status",
-                "none",
-            ),
-            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_score": target.get(
-                "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_score",
-                0.0,
-            ),
-            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status": target.get(
-                "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status",
-                "none",
-            ),
-            "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": target.get(
-                "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path",
-                "",
-            ),
-            "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": target.get(
-                "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path",
-                "",
-            ),
-        }
-        existing = grouped.get(class_key)
-        if existing is None or abs(
-            current[
-                "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score"
-            ]
-        ) > abs(
-            existing[
-                "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score"
-            ]
-        ):
-            grouped[class_key] = current
-    hotspots = list(grouped.values())
-    if mode == "just-rererestored":
-        hotspots = [
-            item
-            for item in hotspots
-            if item.get(
-                "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status"
-            )
-            == "just-rererestored"
-        ]
-        hotspots.sort(
-            key=lambda item: (
-                -item.get(
-                    "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs",
-                    0,
-                ),
-                -abs(
-                    item.get(
-                        "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score",
-                        0.0,
-                    )
-                ),
-                item.get("label", ""),
-            )
-        )
-    elif mode == "holding":
-        hotspots = [
-            item
-            for item in hotspots
-            if item.get(
-                "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status"
-            )
-            in {
-                "holding-confirmation-rebuild-reentry-rererestore",
-                "holding-clearance-rebuild-reentry-rererestore",
-                "sustained-confirmation-rebuild-reentry-rererestore",
-                "sustained-clearance-rebuild-reentry-rererestore",
-            }
-        ]
-        hotspots.sort(
-            key=lambda item: (
-                -item.get(
-                    "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs",
-                    0,
-                ),
-                -abs(
-                    item.get(
-                        "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score",
-                        0.0,
-                    )
-                ),
-                item.get("label", ""),
-            )
-        )
-    else:
-        hotspots = [
-            item
-            for item in hotspots
-            if item.get(
-                "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status"
-            )
-            in {"watch", "churn", "blocked"}
-        ]
-        hotspots.sort(
-            key=lambda item: (
-                -item.get(
-                    "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_score",
-                    0.0,
-                ),
-                -item.get(
-                    "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs",
-                    0,
-                ),
-                item.get("label", ""),
-            )
-        )
-    return hotspots[:5]
+    return _hotspots_base(
+        resolution_targets,
+        spec=_RERERESTORE_HOTSPOTS_SPEC,
+        mode=mode,
+        target_class_key=target_class_key,
+    )
 
 
 def closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_summary(
