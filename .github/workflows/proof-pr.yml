@@ -1,0 +1,17 @@
+name: proof-pr
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  proof:
+    uses: saagpatel/proof-pr/.github/workflows/proof-pr-receipt.yml@v0.1.3
+    with:
+      receipt_path: proof-pr.json
+      proof_pr_ref: v0.1.3
+      artifact_name: github-repo-auditor-proof-pr
+      artifact_glob: proof-pr-artifacts/**
