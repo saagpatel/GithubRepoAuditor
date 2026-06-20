@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from src.operator_trend_closure_forecast_freshness import closure_forecast_event_has_evidence
-from src.operator_trend_closure_forecast_reacquisition import (
+from src.operator_trend_closure_forecast_freshness_controls import closure_forecast_event_has_evidence
+from src.operator_trend_closure_forecast_reacquisition_controls import (
     apply_closure_forecast_reacquisition_control,
     apply_reacquisition_persistence_and_churn_control,
     closure_forecast_reacquisition_hotspots,
