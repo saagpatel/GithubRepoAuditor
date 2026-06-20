@@ -8930,54 +8930,254 @@ def _closure_forecast_reset_reentry_rebuild_refresh_hotspots(
     )
 
 
+class _RefreshRecoverySummarySpec(NamedTuple):
+    """Tier literals for the reset-reentry refresh-recovery summary renderer.
+
+    Rebuild / restore / rerestore refresh-recovery summaries share one
+    status-string render algorithm and differ only in the status / score /
+    reason keys, the per-tier status tokens, and the reworded prose. ``*_text``
+    are ``str.format`` templates over ``{label}`` / ``{score}`` /
+    ``{hotspot_label}``. Proven byte-identical by an exhaustive branch differential.
+    """
+
+    status_key: str
+    score_key: str
+    reason_key: str
+    recovering_confirmation_status: str
+    recovering_clearance_status: str
+    reentering_confirmation_status: str
+    reentering_clearance_status: str
+    recovering_confirmation_text: str
+    recovering_clearance_text: str
+    reentering_confirmation_text: str
+    reentering_clearance_text: str
+    reversing_text: str
+    blocked_reason_default: str
+    recovering_confirmation_hotspot_text: str
+    recovering_clearance_hotspot_text: str
+    default_text: str
+
+
+def _refresh_recovery_summary_base(
+    primary_target: dict,
+    recovering_confirmation_hotspots: list[dict],
+    recovering_clearance_hotspots: list[dict],
+    *,
+    spec: _RefreshRecoverySummarySpec,
+) -> str:
+    label = _target_label(primary_target) or "The current target"
+    status = primary_target.get(spec.status_key, "none")
+    score = primary_target.get(spec.score_key, 0.0)
+    if status == spec.recovering_confirmation_status:
+        return spec.recovering_confirmation_text.format(label=label, score=score)
+    if status == spec.recovering_clearance_status:
+        return spec.recovering_clearance_text.format(label=label, score=score)
+    if status == spec.reentering_confirmation_status:
+        return spec.reentering_confirmation_text.format(label=label, score=score)
+    if status == spec.reentering_clearance_status:
+        return spec.reentering_clearance_text.format(label=label, score=score)
+    if status == "reversing":
+        return spec.reversing_text.format(label=label, score=score)
+    if status == "blocked":
+        return primary_target.get(
+            spec.reason_key,
+            spec.blocked_reason_default.format(label=label),
+        )
+    if recovering_confirmation_hotspots:
+        hotspot = recovering_confirmation_hotspots[0]
+        return spec.recovering_confirmation_hotspot_text.format(
+            hotspot_label=hotspot.get("label", "recent hotspots")
+        )
+    if recovering_clearance_hotspots:
+        hotspot = recovering_clearance_hotspots[0]
+        return spec.recovering_clearance_hotspot_text.format(
+            hotspot_label=hotspot.get("label", "recent hotspots")
+        )
+    return spec.default_text
+
+
+_REBUILD_REFRESH_RECOVERY_SUMMARY_SPEC = _RefreshRecoverySummarySpec(
+    status_key='closure_forecast_reset_reentry_rebuild_refresh_recovery_status',
+    score_key='closure_forecast_reset_reentry_rebuild_refresh_recovery_score',
+    reason_key='closure_forecast_reset_reentry_rebuild_reentry_reason',
+    recovering_confirmation_status='recovering-confirmation-rebuild-reset',
+    recovering_clearance_status='recovering-clearance-rebuild-reset',
+    reentering_confirmation_status='reentering-confirmation-rebuild',
+    reentering_clearance_status='reentering-clearance-rebuild',
+    recovering_confirmation_text='Fresh confirmation-side evidence is returning after rebuilt posture softened or reset for {label}, but it has not yet re-earned stronger rebuilt posture ({score:.2f}).',
+    recovering_clearance_text='Fresh clearance-side evidence is returning after rebuilt posture softened or reset for {label}, but it has not yet re-earned stronger rebuilt posture ({score:.2f}).',
+    reentering_confirmation_text='Confirmation-side rebuilt posture for {label} is recovering strongly enough that stronger restored posture may be re-earned soon ({score:.2f}).',
+    reentering_clearance_text='Clearance-side rebuilt posture for {label} is recovering strongly enough that stronger restored caution may be re-earned soon ({score:.2f}).',
+    reversing_text='The post-reset rebuilt recovery attempt for {label} is changing direction, so stronger rebuilt posture stays blocked ({score:.2f}).',
+    blocked_reason_default='Local target instability is still preventing positive confirmation-side rebuilt re-entry for {label}.',
+    recovering_confirmation_hotspot_text='Confirmation-side rebuilt recovery is strongest around {hotspot_label}, so those classes are closest to re-earning stronger rebuilt confirmation posture.',
+    recovering_clearance_hotspot_text='Clearance-side rebuilt recovery is strongest around {hotspot_label}, so those classes are closest to re-earning stronger rebuilt clearance posture.',
+    default_text='No rebuilt reset re-entry recovery attempt is active enough yet to re-earn stronger restored posture.',
+)
+
+_RESTORE_REFRESH_RECOVERY_SUMMARY_SPEC = _RefreshRecoverySummarySpec(
+    status_key='closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_status',
+    score_key='closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_score',
+    reason_key='closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reason',
+    recovering_confirmation_status='recovering-confirmation-rebuild-reentry-restore-reset',
+    recovering_clearance_status='recovering-clearance-rebuild-reentry-restore-reset',
+    reentering_confirmation_status='rerestoring-confirmation-rebuild-reentry',
+    reentering_clearance_status='rerestoring-clearance-rebuild-reentry',
+    recovering_confirmation_text='Fresh confirmation-side evidence is returning after restored rebuilt re-entry softened or reset for {label}, but it has not yet re-restored stronger restored posture ({score:.2f}).',
+    recovering_clearance_text='Fresh clearance-side evidence is returning after restored rebuilt re-entry softened or reset for {label}, but it has not yet re-restored stronger restored posture ({score:.2f}).',
+    reentering_confirmation_text='Confirmation-side restored rebuilt re-entry for {label} is recovering strongly enough that stronger restored posture may be re-restored soon ({score:.2f}).',
+    reentering_clearance_text='Clearance-side restored rebuilt re-entry for {label} is recovering strongly enough that stronger restored posture may be re-restored soon ({score:.2f}).',
+    reversing_text='The post-reset restored rebuilt re-entry recovery attempt for {label} is changing direction, so stronger restored posture stays blocked ({score:.2f}).',
+    blocked_reason_default='Local target instability is still preventing positive confirmation-side restored rebuilt re-entry re-restore for {label}.',
+    recovering_confirmation_hotspot_text='Confirmation-side restored rebuilt re-entry recovery is strongest around {hotspot_label}, so those classes are closest to re-restoring stronger restored confirmation posture.',
+    recovering_clearance_hotspot_text='Clearance-side restored rebuilt re-entry recovery is strongest around {hotspot_label}, so those classes are closest to re-restoring stronger restored clearance posture.',
+    default_text='No restored rebuilt re-entry recovery attempt is active enough yet to re-restore stronger posture.',
+)
+
+_RERESTORE_REFRESH_RECOVERY_SUMMARY_SPEC = _RefreshRecoverySummarySpec(
+    status_key='closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_status',
+    score_key='closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_score',
+    reason_key='closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reason',
+    recovering_confirmation_status='recovering-confirmation-rebuild-reentry-rerestore-reset',
+    recovering_clearance_status='recovering-clearance-rebuild-reentry-rerestore-reset',
+    reentering_confirmation_status='rererestoring-confirmation-rebuild-reentry',
+    reentering_clearance_status='rererestoring-clearance-rebuild-reentry',
+    recovering_confirmation_text='Fresh confirmation-side evidence is returning after rerestored rebuilt re-entry softened or reset for {label}, but it has not yet re-re-restored stronger rerestored posture ({score:.2f}).',
+    recovering_clearance_text='Fresh clearance-side evidence is returning after rerestored rebuilt re-entry softened or reset for {label}, but it has not yet re-re-restored stronger rerestored posture ({score:.2f}).',
+    reentering_confirmation_text='Confirmation-side rerestored rebuilt re-entry for {label} is recovering strongly enough that stronger rerestored posture may be re-re-restored soon ({score:.2f}).',
+    reentering_clearance_text='Clearance-side rerestored rebuilt re-entry for {label} is recovering strongly enough that stronger rerestored posture may be re-re-restored soon ({score:.2f}).',
+    reversing_text='The post-reset rerestored rebuilt re-entry recovery attempt for {label} is changing direction, so stronger posture stays blocked ({score:.2f}).',
+    blocked_reason_default='Local target instability is still preventing positive confirmation-side rerestored rebuilt re-entry re-re-restore for {label}.',
+    recovering_confirmation_hotspot_text='Confirmation-side rerestored rebuilt re-entry recovery is strongest around {hotspot_label}, so those classes are closest to re-re-restoring stronger rerestored confirmation posture.',
+    recovering_clearance_hotspot_text='Clearance-side rerestored rebuilt re-entry recovery is strongest around {hotspot_label}, so those classes are closest to re-re-restoring stronger rerestored clearance posture.',
+    default_text='No rerestored rebuilt re-entry recovery attempt is active enough yet to re-re-restore stronger posture.',
+)
+
+
 def _closure_forecast_reset_reentry_rebuild_refresh_recovery_summary(
     primary_target: dict,
     recovering_confirmation_hotspots: list[dict],
     recovering_clearance_hotspots: list[dict],
 ) -> str:
+    return _refresh_recovery_summary_base(
+        primary_target,
+        recovering_confirmation_hotspots,
+        recovering_clearance_hotspots,
+        spec=_REBUILD_REFRESH_RECOVERY_SUMMARY_SPEC,
+    )
+
+
+class _TierSummarySpec(NamedTuple):
+    """Tier literals for the reset-reentry tier-rollup summary renderer.
+
+    Rebuild-reentry / rerestore / rererestore rollup summaries share one
+    status-string render algorithm and differ only in the status / reason keys,
+    the per-tier status tokens, and the reworded prose. ``*_text`` are
+    ``str.format`` templates over ``{label}`` / ``{hotspot_label}``. Proven
+    byte-identical by an exhaustive branch differential.
+    """
+
+    status_key: str
+    reason_key: str
+    pending_confirmation_status: str
+    pending_clearance_status: str
+    reentered_confirmation_status: str
+    reentered_clearance_status: str
+    pending_confirmation_text: str
+    pending_clearance_text: str
+    reentered_confirmation_text: str
+    reentered_clearance_text: str
+    blocked_reason_default: str
+    recovering_confirmation_hotspot_text: str
+    recovering_clearance_hotspot_text: str
+    default_text: str
+
+
+def _tier_summary_base(
+    primary_target: dict,
+    recovering_confirmation_hotspots: list[dict],
+    recovering_clearance_hotspots: list[dict],
+    *,
+    spec: _TierSummarySpec,
+) -> str:
     label = _target_label(primary_target) or "The current target"
-    status = primary_target.get(
-        "closure_forecast_reset_reentry_rebuild_refresh_recovery_status",
-        "none",
-    )
-    score = primary_target.get(
-        "closure_forecast_reset_reentry_rebuild_refresh_recovery_score",
-        0.0,
-    )
-    if status == "recovering-confirmation-rebuild-reset":
-        return (
-            f"Fresh confirmation-side evidence is returning after rebuilt posture softened or reset for {label}, "
-            f"but it has not yet re-earned stronger rebuilt posture ({score:.2f})."
-        )
-    if status == "recovering-clearance-rebuild-reset":
-        return (
-            f"Fresh clearance-side evidence is returning after rebuilt posture softened or reset for {label}, "
-            f"but it has not yet re-earned stronger rebuilt posture ({score:.2f})."
-        )
-    if status == "reentering-confirmation-rebuild":
-        return f"Confirmation-side rebuilt posture for {label} is recovering strongly enough that stronger restored posture may be re-earned soon ({score:.2f})."
-    if status == "reentering-clearance-rebuild":
-        return f"Clearance-side rebuilt posture for {label} is recovering strongly enough that stronger restored caution may be re-earned soon ({score:.2f})."
-    if status == "reversing":
-        return f"The post-reset rebuilt recovery attempt for {label} is changing direction, so stronger rebuilt posture stays blocked ({score:.2f})."
+    status = primary_target.get(spec.status_key, "none")
+    if status == spec.pending_confirmation_status:
+        return spec.pending_confirmation_text.format(label=label)
+    if status == spec.pending_clearance_status:
+        return spec.pending_clearance_text.format(label=label)
+    if status == spec.reentered_confirmation_status:
+        return spec.reentered_confirmation_text.format(label=label)
+    if status == spec.reentered_clearance_status:
+        return spec.reentered_clearance_text.format(label=label)
     if status == "blocked":
         return primary_target.get(
-            "closure_forecast_reset_reentry_rebuild_reentry_reason",
-            f"Local target instability is still preventing positive confirmation-side rebuilt re-entry for {label}.",
+            spec.reason_key,
+            spec.blocked_reason_default.format(label=label),
         )
     if recovering_confirmation_hotspots:
         hotspot = recovering_confirmation_hotspots[0]
-        return (
-            f"Confirmation-side rebuilt recovery is strongest around {hotspot.get('label', 'recent hotspots')}, "
-            "so those classes are closest to re-earning stronger rebuilt confirmation posture."
+        return spec.recovering_confirmation_hotspot_text.format(
+            hotspot_label=hotspot.get("label", "recent hotspots")
         )
     if recovering_clearance_hotspots:
         hotspot = recovering_clearance_hotspots[0]
-        return (
-            f"Clearance-side rebuilt recovery is strongest around {hotspot.get('label', 'recent hotspots')}, "
-            "so those classes are closest to re-earning stronger rebuilt clearance posture."
+        return spec.recovering_clearance_hotspot_text.format(
+            hotspot_label=hotspot.get("label", "recent hotspots")
         )
-    return "No rebuilt reset re-entry recovery attempt is active enough yet to re-earn stronger restored posture."
+    return spec.default_text
+
+
+_REBUILD_REENTRY_SUMMARY_SPEC = _TierSummarySpec(
+    status_key='closure_forecast_reset_reentry_rebuild_reentry_status',
+    reason_key='closure_forecast_reset_reentry_rebuild_reentry_reason',
+    pending_confirmation_status='pending-confirmation-rebuild-reentry',
+    pending_clearance_status='pending-clearance-rebuild-reentry',
+    reentered_confirmation_status='reentered-confirmation-rebuild',
+    reentered_clearance_status='reentered-clearance-rebuild',
+    pending_confirmation_text='Fresh confirmation-side evidence is returning after rebuilt posture softened or reset for {label}, but stronger rebuilt posture still needs more fresh follow-through before it is re-earned.',
+    pending_clearance_text='Fresh clearance-side evidence is returning after rebuilt posture softened or reset for {label}, but stronger rebuilt posture still needs more fresh follow-through before it is re-earned.',
+    reentered_confirmation_text='Fresh confirmation-side follow-through for {label} has re-earned stronger rebuilt confirmation posture.',
+    reentered_clearance_text='Fresh clearance-side pressure for {label} has re-earned stronger rebuilt clearance posture.',
+    blocked_reason_default='Local target instability is still preventing positive confirmation-side rebuilt re-entry for {label}.',
+    recovering_confirmation_hotspot_text='Confirmation-side rebuilt re-entry is closest around {hotspot_label}, but it still needs one more layer of fresh confirmation follow-through.',
+    recovering_clearance_hotspot_text='Clearance-side rebuilt re-entry is closest around {hotspot_label}, but it still needs one more layer of fresh clearance follow-through.',
+    default_text='No rebuilt re-entry control is changing the current restored closure-forecast posture right now.',
+)
+
+_RERESTORE_SUMMARY_SPEC = _TierSummarySpec(
+    status_key='closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_status',
+    reason_key='closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reason',
+    pending_confirmation_status='pending-confirmation-rebuild-reentry-rerestore',
+    pending_clearance_status='pending-clearance-rebuild-reentry-rerestore',
+    reentered_confirmation_status='rerestored-confirmation-rebuild-reentry',
+    reentered_clearance_status='rerestored-clearance-rebuild-reentry',
+    pending_confirmation_text='Fresh confirmation-side evidence is returning after restored rebuilt re-entry softened or reset for {label}, but stronger restored posture still needs more fresh follow-through before it is re-restored.',
+    pending_clearance_text='Fresh clearance-side evidence is returning after restored rebuilt re-entry softened or reset for {label}, but stronger restored posture still needs more fresh follow-through before it is re-restored.',
+    reentered_confirmation_text='Fresh confirmation-side follow-through for {label} has re-restored stronger restored rebuilt re-entry posture.',
+    reentered_clearance_text='Fresh clearance-side pressure for {label} has re-restored stronger restored rebuilt re-entry posture.',
+    blocked_reason_default='Local target instability is still preventing positive confirmation-side restored rebuilt re-entry re-restore for {label}.',
+    recovering_confirmation_hotspot_text='Confirmation-side restored rebuilt re-entry is closest to being re-restored around {hotspot_label}, but it still needs one more layer of fresh confirmation follow-through.',
+    recovering_clearance_hotspot_text='Clearance-side restored rebuilt re-entry is closest to being re-restored around {hotspot_label}, but it still needs one more layer of fresh clearance follow-through.',
+    default_text='No restored rebuilt re-entry re-restore control is changing the current closure-forecast posture right now.',
+)
+
+_RERERESTORE_SUMMARY_SPEC = _TierSummarySpec(
+    status_key='closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status',
+    reason_key='closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reason',
+    pending_confirmation_status='pending-confirmation-rebuild-reentry-rererestore',
+    pending_clearance_status='pending-clearance-rebuild-reentry-rererestore',
+    reentered_confirmation_status='rererestored-confirmation-rebuild-reentry',
+    reentered_clearance_status='rererestored-clearance-rebuild-reentry',
+    pending_confirmation_text='Fresh confirmation-side evidence is returning after rerestored rebuilt re-entry softened or reset for {label}, but stronger rerestored posture still needs more fresh follow-through before it is re-re-restored.',
+    pending_clearance_text='Fresh clearance-side evidence is returning after rerestored rebuilt re-entry softened or reset for {label}, but stronger rerestored posture still needs more fresh follow-through before it is re-re-restored.',
+    reentered_confirmation_text='Fresh confirmation-side follow-through for {label} has re-re-restored stronger rerestored rebuilt re-entry posture.',
+    reentered_clearance_text='Fresh clearance-side pressure for {label} has re-re-restored stronger rerestored rebuilt re-entry posture.',
+    blocked_reason_default='Local target instability is still preventing positive confirmation-side rerestored rebuilt re-entry re-re-restore for {label}.',
+    recovering_confirmation_hotspot_text='Confirmation-side rerestored rebuilt re-entry is closest to being re-re-restored around {hotspot_label}, but it still needs one more layer of fresh confirmation follow-through.',
+    recovering_clearance_hotspot_text='Clearance-side rerestored rebuilt re-entry is closest to being re-re-restored around {hotspot_label}, but it still needs one more layer of fresh clearance follow-through.',
+    default_text='No rerestored rebuilt re-entry re-re-restore control is changing the current closure-forecast posture right now.',
+)
 
 
 def _closure_forecast_reset_reentry_rebuild_reentry_summary(
@@ -8985,43 +9185,12 @@ def _closure_forecast_reset_reentry_rebuild_reentry_summary(
     recovering_confirmation_hotspots: list[dict],
     recovering_clearance_hotspots: list[dict],
 ) -> str:
-    label = _target_label(primary_target) or "The current target"
-    status = primary_target.get(
-        "closure_forecast_reset_reentry_rebuild_reentry_status",
-        "none",
+    return _tier_summary_base(
+        primary_target,
+        recovering_confirmation_hotspots,
+        recovering_clearance_hotspots,
+        spec=_REBUILD_REENTRY_SUMMARY_SPEC,
     )
-    if status == "pending-confirmation-rebuild-reentry":
-        return (
-            f"Fresh confirmation-side evidence is returning after rebuilt posture softened or reset for {label}, "
-            "but stronger rebuilt posture still needs more fresh follow-through before it is re-earned."
-        )
-    if status == "pending-clearance-rebuild-reentry":
-        return (
-            f"Fresh clearance-side evidence is returning after rebuilt posture softened or reset for {label}, "
-            "but stronger rebuilt posture still needs more fresh follow-through before it is re-earned."
-        )
-    if status == "reentered-confirmation-rebuild":
-        return f"Fresh confirmation-side follow-through for {label} has re-earned stronger rebuilt confirmation posture."
-    if status == "reentered-clearance-rebuild":
-        return f"Fresh clearance-side pressure for {label} has re-earned stronger rebuilt clearance posture."
-    if status == "blocked":
-        return primary_target.get(
-            "closure_forecast_reset_reentry_rebuild_reentry_reason",
-            f"Local target instability is still preventing positive confirmation-side rebuilt re-entry for {label}.",
-        )
-    if recovering_confirmation_hotspots:
-        hotspot = recovering_confirmation_hotspots[0]
-        return (
-            f"Confirmation-side rebuilt re-entry is closest around {hotspot.get('label', 'recent hotspots')}, "
-            "but it still needs one more layer of fresh confirmation follow-through."
-        )
-    if recovering_clearance_hotspots:
-        hotspot = recovering_clearance_hotspots[0]
-        return (
-            f"Clearance-side rebuilt re-entry is closest around {hotspot.get('label', 'recent hotspots')}, "
-            "but it still needs one more layer of fresh clearance follow-through."
-        )
-    return "No rebuilt re-entry control is changing the current restored closure-forecast posture right now."
 
 
 def _apply_reset_reentry_rebuild_refresh_recovery_and_reentry(
@@ -10529,9 +10698,29 @@ def _apply_reset_reentry_rebuild_reentry_freshness_reset_control(
     }
 
 
-def _closure_forecast_reset_reentry_rebuild_reentry_freshness_hotspots(
+class _FreshnessHotspotsSpec(NamedTuple):
+    """Tier literals for the reset-reentry freshness hotspot selector.
+
+    Rebuild-reentry / restore freshness hotspot selectors share one
+    group-by-class / max-dominant-rate / freshness-filter / sort algorithm and
+    differ only in the per-tier freshness/rate/signal/age keys and the
+    event-count output key. The ``dominant_count`` output key and the
+    fresh/stale mode tokens are identical across tiers and stay inline. Proven
+    byte-identical by an exhaustive branch differential.
+    """
+
+    freshness_status_key: str
+    confirmation_rate_key: str
+    clearance_rate_key: str
+    signal_mix_key: str
+    event_count_out_key: str
+    age_runs_key: str
+
+
+def _freshness_hotspots_base(
     resolution_targets: list[dict],
     *,
+    spec: _FreshnessHotspotsSpec,
     mode: str,
 ) -> list[dict]:
     grouped: dict[str, dict] = {}
@@ -10542,29 +10731,17 @@ def _closure_forecast_reset_reentry_rebuild_reentry_freshness_hotspots(
         current = {
             "scope": "class",
             "label": class_key,
-            "closure_forecast_reset_reentry_rebuild_reentry_freshness_status": target.get(
-                "closure_forecast_reset_reentry_rebuild_reentry_freshness_status",
-                "insufficient-data",
+            spec.freshness_status_key: target.get(
+                spec.freshness_status_key, "insufficient-data"
             ),
-            "decayed_reentered_rebuild_confirmation_rate": target.get(
-                "decayed_reentered_rebuild_confirmation_rate",
-                0.0,
-            ),
-            "decayed_reentered_rebuild_clearance_rate": target.get(
-                "decayed_reentered_rebuild_clearance_rate",
-                0.0,
-            ),
-            "recent_reset_reentry_rebuild_reentry_signal_mix": target.get(
-                "recent_reset_reentry_rebuild_reentry_signal_mix",
-                "",
-            ),
+            spec.confirmation_rate_key: target.get(spec.confirmation_rate_key, 0.0),
+            spec.clearance_rate_key: target.get(spec.clearance_rate_key, 0.0),
+            spec.signal_mix_key: target.get(spec.signal_mix_key, ""),
             "dominant_count": max(
-                target.get("decayed_reentered_rebuild_confirmation_rate", 0.0),
-                target.get("decayed_reentered_rebuild_clearance_rate", 0.0),
+                target.get(spec.confirmation_rate_key, 0.0),
+                target.get(spec.clearance_rate_key, 0.0),
             ),
-            "reentry_event_count": int(
-                target.get("closure_forecast_reset_reentry_rebuild_reentry_age_runs", 0) or 0
-            ),
+            spec.event_count_out_key: int(target.get(spec.age_runs_key, 0) or 0),
         }
         existing = grouped.get(class_key)
         if existing is None or current["dominant_count"] > existing["dominant_count"]:
@@ -10575,26 +10752,55 @@ def _closure_forecast_reset_reentry_rebuild_reentry_freshness_hotspots(
         hotspots = [
             item
             for item in hotspots
-            if item.get("closure_forecast_reset_reentry_rebuild_reentry_freshness_status")
-            == "fresh"
+            if item.get(spec.freshness_status_key) == "fresh"
             and item.get("dominant_count", 0.0) > 0.0
         ]
     else:
         hotspots = [
             item
             for item in hotspots
-            if item.get("closure_forecast_reset_reentry_rebuild_reentry_freshness_status")
-            == "stale"
+            if item.get(spec.freshness_status_key) == "stale"
             and item.get("dominant_count", 0.0) > 0.0
         ]
     hotspots.sort(
         key=lambda item: (
             -item.get("dominant_count", 0.0),
-            -item.get("reentry_event_count", 0),
+            -item.get(spec.event_count_out_key, 0),
             item.get("label", ""),
         )
     )
     return hotspots[:5]
+
+
+_REBUILD_REENTRY_FRESHNESS_HOTSPOTS_SPEC = _FreshnessHotspotsSpec(
+    freshness_status_key='closure_forecast_reset_reentry_rebuild_reentry_freshness_status',
+    confirmation_rate_key='decayed_reentered_rebuild_confirmation_rate',
+    clearance_rate_key='decayed_reentered_rebuild_clearance_rate',
+    signal_mix_key='recent_reset_reentry_rebuild_reentry_signal_mix',
+    event_count_out_key='reentry_event_count',
+    age_runs_key='closure_forecast_reset_reentry_rebuild_reentry_age_runs',
+)
+
+_RESTORE_FRESHNESS_HOTSPOTS_SPEC = _FreshnessHotspotsSpec(
+    freshness_status_key='closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_status',
+    confirmation_rate_key='decayed_restored_rebuild_reentry_confirmation_rate',
+    clearance_rate_key='decayed_restored_rebuild_reentry_clearance_rate',
+    signal_mix_key='recent_reset_reentry_rebuild_reentry_restore_signal_mix',
+    event_count_out_key='restore_event_count',
+    age_runs_key='closure_forecast_reset_reentry_rebuild_reentry_restore_age_runs',
+)
+
+
+def _closure_forecast_reset_reentry_rebuild_reentry_freshness_hotspots(
+    resolution_targets: list[dict],
+    *,
+    mode: str,
+) -> list[dict]:
+    return _freshness_hotspots_base(
+        resolution_targets,
+        spec=_REBUILD_REENTRY_FRESHNESS_HOTSPOTS_SPEC,
+        mode=mode,
+    )
 
 
 def _closure_forecast_reset_reentry_rebuild_reentry_freshness_summary(
@@ -12547,71 +12753,11 @@ def _closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_hotspots(
     *,
     mode: str,
 ) -> list[dict]:
-    grouped: dict[str, dict] = {}
-    for target in resolution_targets:
-        class_key = _target_class_key(target)
-        if not class_key:
-            continue
-        current = {
-            "scope": "class",
-            "label": class_key,
-            "closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_status": target.get(
-                "closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_status",
-                "insufficient-data",
-            ),
-            "decayed_restored_rebuild_reentry_confirmation_rate": target.get(
-                "decayed_restored_rebuild_reentry_confirmation_rate",
-                0.0,
-            ),
-            "decayed_restored_rebuild_reentry_clearance_rate": target.get(
-                "decayed_restored_rebuild_reentry_clearance_rate",
-                0.0,
-            ),
-            "recent_reset_reentry_rebuild_reentry_restore_signal_mix": target.get(
-                "recent_reset_reentry_rebuild_reentry_restore_signal_mix",
-                "",
-            ),
-            "dominant_count": max(
-                target.get("decayed_restored_rebuild_reentry_confirmation_rate", 0.0),
-                target.get("decayed_restored_rebuild_reentry_clearance_rate", 0.0),
-            ),
-            "restore_event_count": int(
-                target.get(
-                    "closure_forecast_reset_reentry_rebuild_reentry_restore_age_runs",
-                    0,
-                )
-                or 0
-            ),
-        }
-        existing = grouped.get(class_key)
-        if existing is None or current["dominant_count"] > existing["dominant_count"]:
-            grouped[class_key] = current
-
-    hotspots = list(grouped.values())
-    if mode == "fresh":
-        hotspots = [
-            item
-            for item in hotspots
-            if item.get("closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_status")
-            == "fresh"
-            and item.get("dominant_count", 0.0) > 0.0
-        ]
-    else:
-        hotspots = [
-            item
-            for item in hotspots
-            if item.get("closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_status")
-            == "stale"
-            and item.get("dominant_count", 0.0) > 0.0
-        ]
-    hotspots.sort(
-        key=lambda item: (
-            -item.get("dominant_count", 0.0),
-            -item.get("restore_event_count", 0),
-            item.get("label", ""),
-        )
+    return _freshness_hotspots_base(
+        resolution_targets,
+        spec=_RESTORE_FRESHNESS_HOTSPOTS_SPEC,
+        mode=mode,
     )
-    return hotspots[:5]
 
 
 def _closure_forecast_reset_reentry_rebuild_reentry_restore_freshness_summary(
@@ -13475,49 +13621,12 @@ def _closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_sum
     recovering_confirmation_hotspots: list[dict],
     recovering_clearance_hotspots: list[dict],
 ) -> str:
-    label = _target_label(primary_target) or "The current target"
-    status = primary_target.get(
-        "closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_status",
-        "none",
+    return _refresh_recovery_summary_base(
+        primary_target,
+        recovering_confirmation_hotspots,
+        recovering_clearance_hotspots,
+        spec=_RESTORE_REFRESH_RECOVERY_SUMMARY_SPEC,
     )
-    score = primary_target.get(
-        "closure_forecast_reset_reentry_rebuild_reentry_restore_refresh_recovery_score",
-        0.0,
-    )
-    if status == "recovering-confirmation-rebuild-reentry-restore-reset":
-        return (
-            f"Fresh confirmation-side evidence is returning after restored rebuilt re-entry softened or reset for {label}, "
-            f"but it has not yet re-restored stronger restored posture ({score:.2f})."
-        )
-    if status == "recovering-clearance-rebuild-reentry-restore-reset":
-        return (
-            f"Fresh clearance-side evidence is returning after restored rebuilt re-entry softened or reset for {label}, "
-            f"but it has not yet re-restored stronger restored posture ({score:.2f})."
-        )
-    if status == "rerestoring-confirmation-rebuild-reentry":
-        return f"Confirmation-side restored rebuilt re-entry for {label} is recovering strongly enough that stronger restored posture may be re-restored soon ({score:.2f})."
-    if status == "rerestoring-clearance-rebuild-reentry":
-        return f"Clearance-side restored rebuilt re-entry for {label} is recovering strongly enough that stronger restored posture may be re-restored soon ({score:.2f})."
-    if status == "reversing":
-        return f"The post-reset restored rebuilt re-entry recovery attempt for {label} is changing direction, so stronger restored posture stays blocked ({score:.2f})."
-    if status == "blocked":
-        return primary_target.get(
-            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reason",
-            f"Local target instability is still preventing positive confirmation-side restored rebuilt re-entry re-restore for {label}.",
-        )
-    if recovering_confirmation_hotspots:
-        hotspot = recovering_confirmation_hotspots[0]
-        return (
-            f"Confirmation-side restored rebuilt re-entry recovery is strongest around {hotspot.get('label', 'recent hotspots')}, "
-            "so those classes are closest to re-restoring stronger restored confirmation posture."
-        )
-    if recovering_clearance_hotspots:
-        hotspot = recovering_clearance_hotspots[0]
-        return (
-            f"Clearance-side restored rebuilt re-entry recovery is strongest around {hotspot.get('label', 'recent hotspots')}, "
-            "so those classes are closest to re-restoring stronger restored clearance posture."
-        )
-    return "No restored rebuilt re-entry recovery attempt is active enough yet to re-restore stronger posture."
 
 
 def _closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_summary(
@@ -13525,43 +13634,12 @@ def _closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_summary(
     recovering_confirmation_hotspots: list[dict],
     recovering_clearance_hotspots: list[dict],
 ) -> str:
-    label = _target_label(primary_target) or "The current target"
-    status = primary_target.get(
-        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_status",
-        "none",
+    return _tier_summary_base(
+        primary_target,
+        recovering_confirmation_hotspots,
+        recovering_clearance_hotspots,
+        spec=_RERESTORE_SUMMARY_SPEC,
     )
-    if status == "pending-confirmation-rebuild-reentry-rerestore":
-        return (
-            f"Fresh confirmation-side evidence is returning after restored rebuilt re-entry softened or reset for {label}, "
-            "but stronger restored posture still needs more fresh follow-through before it is re-restored."
-        )
-    if status == "pending-clearance-rebuild-reentry-rerestore":
-        return (
-            f"Fresh clearance-side evidence is returning after restored rebuilt re-entry softened or reset for {label}, "
-            "but stronger restored posture still needs more fresh follow-through before it is re-restored."
-        )
-    if status == "rerestored-confirmation-rebuild-reentry":
-        return f"Fresh confirmation-side follow-through for {label} has re-restored stronger restored rebuilt re-entry posture."
-    if status == "rerestored-clearance-rebuild-reentry":
-        return f"Fresh clearance-side pressure for {label} has re-restored stronger restored rebuilt re-entry posture."
-    if status == "blocked":
-        return primary_target.get(
-            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_reason",
-            f"Local target instability is still preventing positive confirmation-side restored rebuilt re-entry re-restore for {label}.",
-        )
-    if recovering_confirmation_hotspots:
-        hotspot = recovering_confirmation_hotspots[0]
-        return (
-            f"Confirmation-side restored rebuilt re-entry is closest to being re-restored around {hotspot.get('label', 'recent hotspots')}, "
-            "but it still needs one more layer of fresh confirmation follow-through."
-        )
-    if recovering_clearance_hotspots:
-        hotspot = recovering_clearance_hotspots[0]
-        return (
-            f"Clearance-side restored rebuilt re-entry is closest to being re-restored around {hotspot.get('label', 'recent hotspots')}, "
-            "but it still needs one more layer of fresh clearance follow-through."
-        )
-    return "No restored rebuilt re-entry re-restore control is changing the current closure-forecast posture right now."
 
 
 def _apply_reset_reentry_rebuild_reentry_restore_refresh_recovery_and_rerestore(
@@ -16372,49 +16450,12 @@ def _closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_re
     recovering_confirmation_hotspots: list[dict],
     recovering_clearance_hotspots: list[dict],
 ) -> str:
-    label = _target_label(primary_target) or "The current target"
-    status = primary_target.get(
-        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_status",
-        "none",
+    return _refresh_recovery_summary_base(
+        primary_target,
+        recovering_confirmation_hotspots,
+        recovering_clearance_hotspots,
+        spec=_RERESTORE_REFRESH_RECOVERY_SUMMARY_SPEC,
     )
-    score = primary_target.get(
-        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_score",
-        0.0,
-    )
-    if status == "recovering-confirmation-rebuild-reentry-rerestore-reset":
-        return (
-            f"Fresh confirmation-side evidence is returning after rerestored rebuilt re-entry softened or reset for {label}, "
-            f"but it has not yet re-re-restored stronger rerestored posture ({score:.2f})."
-        )
-    if status == "recovering-clearance-rebuild-reentry-rerestore-reset":
-        return (
-            f"Fresh clearance-side evidence is returning after rerestored rebuilt re-entry softened or reset for {label}, "
-            f"but it has not yet re-re-restored stronger rerestored posture ({score:.2f})."
-        )
-    if status == "rererestoring-confirmation-rebuild-reentry":
-        return f"Confirmation-side rerestored rebuilt re-entry for {label} is recovering strongly enough that stronger rerestored posture may be re-re-restored soon ({score:.2f})."
-    if status == "rererestoring-clearance-rebuild-reentry":
-        return f"Clearance-side rerestored rebuilt re-entry for {label} is recovering strongly enough that stronger rerestored posture may be re-re-restored soon ({score:.2f})."
-    if status == "reversing":
-        return f"The post-reset rerestored rebuilt re-entry recovery attempt for {label} is changing direction, so stronger posture stays blocked ({score:.2f})."
-    if status == "blocked":
-        return primary_target.get(
-            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reason",
-            f"Local target instability is still preventing positive confirmation-side rerestored rebuilt re-entry re-re-restore for {label}.",
-        )
-    if recovering_confirmation_hotspots:
-        hotspot = recovering_confirmation_hotspots[0]
-        return (
-            f"Confirmation-side rerestored rebuilt re-entry recovery is strongest around {hotspot.get('label', 'recent hotspots')}, "
-            "so those classes are closest to re-re-restoring stronger rerestored confirmation posture."
-        )
-    if recovering_clearance_hotspots:
-        hotspot = recovering_clearance_hotspots[0]
-        return (
-            f"Clearance-side rerestored rebuilt re-entry recovery is strongest around {hotspot.get('label', 'recent hotspots')}, "
-            "so those classes are closest to re-re-restoring stronger rerestored clearance posture."
-        )
-    return "No rerestored rebuilt re-entry recovery attempt is active enough yet to re-re-restore stronger posture."
 
 
 def _closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_summary(
@@ -16422,43 +16463,12 @@ def _closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_summary(
     recovering_confirmation_hotspots: list[dict],
     recovering_clearance_hotspots: list[dict],
 ) -> str:
-    label = _target_label(primary_target) or "The current target"
-    status = primary_target.get(
-        "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status",
-        "none",
+    return _tier_summary_base(
+        primary_target,
+        recovering_confirmation_hotspots,
+        recovering_clearance_hotspots,
+        spec=_RERERESTORE_SUMMARY_SPEC,
     )
-    if status == "pending-confirmation-rebuild-reentry-rererestore":
-        return (
-            f"Fresh confirmation-side evidence is returning after rerestored rebuilt re-entry softened or reset for {label}, "
-            "but stronger rerestored posture still needs more fresh follow-through before it is re-re-restored."
-        )
-    if status == "pending-clearance-rebuild-reentry-rererestore":
-        return (
-            f"Fresh clearance-side evidence is returning after rerestored rebuilt re-entry softened or reset for {label}, "
-            "but stronger rerestored posture still needs more fresh follow-through before it is re-re-restored."
-        )
-    if status == "rererestored-confirmation-rebuild-reentry":
-        return f"Fresh confirmation-side follow-through for {label} has re-re-restored stronger rerestored rebuilt re-entry posture."
-    if status == "rererestored-clearance-rebuild-reentry":
-        return f"Fresh clearance-side pressure for {label} has re-re-restored stronger rerestored rebuilt re-entry posture."
-    if status == "blocked":
-        return primary_target.get(
-            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_reason",
-            f"Local target instability is still preventing positive confirmation-side rerestored rebuilt re-entry re-re-restore for {label}.",
-        )
-    if recovering_confirmation_hotspots:
-        hotspot = recovering_confirmation_hotspots[0]
-        return (
-            f"Confirmation-side rerestored rebuilt re-entry is closest to being re-re-restored around {hotspot.get('label', 'recent hotspots')}, "
-            "but it still needs one more layer of fresh confirmation follow-through."
-        )
-    if recovering_clearance_hotspots:
-        hotspot = recovering_clearance_hotspots[0]
-        return (
-            f"Clearance-side rerestored rebuilt re-entry is closest to being re-re-restored around {hotspot.get('label', 'recent hotspots')}, "
-            "but it still needs one more layer of fresh clearance follow-through."
-        )
-    return "No rerestored rebuilt re-entry re-re-restore control is changing the current closure-forecast posture right now."
 
 
 def _apply_reset_reentry_rebuild_reentry_restore_rerestore_refresh_recovery_and_rererestore(
