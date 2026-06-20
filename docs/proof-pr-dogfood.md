@@ -12,10 +12,11 @@ environment and render the proof block from a generated receipt:
 ```bash
 python3 -m venv /tmp/gra-proof-pr-venv
 /tmp/gra-proof-pr-venv/bin/python -m pip install \
-  git+https://github.com/saagpatel/proof-pr.git@v0.2.11
+  git+https://github.com/saagpatel/proof-pr.git@v0.2.12
 /tmp/gra-proof-pr-venv/bin/proof-pr init \
   --cwd . \
   --tier T1 \
+  --example "Test-only maintenance" \
   --summary "Short PR summary" \
   --output /tmp/gra-proof-pr.json
 /tmp/gra-proof-pr-venv/bin/proof-pr collect \

@@ -16,7 +16,13 @@
     "tool": "proof-pr",
     "version": "0.1.3",
     "agent": "codex",
-    "mode": "local"
+    "mode": "local",
+    "example_pattern": {
+      "pattern": "Workflow dogfood",
+      "example": "examples/pr-087-github-repo-auditor-dogfood.json",
+      "tier": "T3",
+      "source": "explicit"
+    }
   },
   "risk": {
     "tier": "T3",
