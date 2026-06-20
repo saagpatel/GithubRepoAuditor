@@ -22,7 +22,7 @@ def build_resolution_trend_payload(
     *,
     apply_chain: dict[str, Any],
     summary_context: dict[str, Any],
-    decision_memory_map: dict[str, Any],
+    decision_memory_map: dict[str, dict],
     class_transition_health_summary: Callable[..., Any],
     class_transition_resolution_summary: Callable[..., Any],
     closure_forecast_hysteresis_summary: Callable[..., Any],
