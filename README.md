@@ -9,7 +9,7 @@
 
 > Know the truth about every project you've ever started — because `git log` across a crowded repo portfolio doesn't tell you which ones are worth finishing.
 
-📐 **Case study — [Operator OS: a multi-agent control plane over a repo portfolio](CASE-STUDY.md).** How this auditor's truth layer anchors six local services and two coordinated coding agents (Claude Code + Codex), with real portfolio metrics and a [90-second demo plan](DEMO-PLAN.md).
+**Case study — [Operator OS: a multi-agent control plane over a repo portfolio](CASE-STUDY.md).** How this auditor's truth layer anchors six local services and two coordinated coding agents (Claude Code + Codex), with real portfolio metrics and a [90-second demo plan](DEMO-PLAN.md).
 
 GitHub Repo Auditor is a portfolio audit and operator tool for developers with a lot of repositories. It clones every repo on your GitHub account, runs 12 analyzers across completeness and interest dimensions, assigns letter grades and achievement badges, preserves historical state, and generates actionable dashboards you can actually use to decide what to work on next. Built for developers who ship fast, start often, and need a system to manage the sprawl.
 
@@ -212,8 +212,8 @@ Expected outputs include `output/demo/demo-report.json`,
 `output/demo/operator-control-center-demo.json`,
 `output/demo/operator-control-center-demo.md`,
 `output/demo/portfolio-truth-latest.json`,
-`output/demo/weekly-command-center-sample-user-2026-04-12.json`,
-`output/demo/security-burndown-sample-user-2026-04-12.json`,
+`output/demo/weekly-command-center-<username>-<date>.json`,
+`output/demo/security-burndown-<username>-<date>.json`,
 `output/demo/pending-proposals.json`, and `output/demo/portfolio-warehouse.db`.
 
 To browse the same fixture in the local web UI:
@@ -393,7 +393,7 @@ That command generates stable sample `standard` and `template` workbooks, valida
 After that manual desktop Excel check, record the outcome back into the gate artifacts:
 
 ```bash
-make workbook-signoff ARGS="--reviewer <name> --outcome passed --check excel-open-no-repair=passed --check visible-tabs-present=passed --check normal-zoom-readable=passed --check chart-placement-clean=passed --check filters-work=passed"
+make workbook-signoff ARGS="--reviewer yourname --outcome passed --check excel-open-no-repair=passed --check visible-tabs-present=passed --check normal-zoom-readable=passed --check chart-placement-clean=passed --check filters-work=passed"
 ```
 
 ## Managed Campaigns and Governance

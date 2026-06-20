@@ -14,6 +14,8 @@ output/PORTFOLIO.md
 !output/.gitkeep
 config/notion-config.json
 HANDOFF.md
+proof-pr.json
+sprint*.png
 .claude/
 .serena/
 __pycache__/
