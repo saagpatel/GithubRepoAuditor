@@ -9,10 +9,10 @@ permissions:
 
 jobs:
   proof:
-    uses: saagpatel/proof-pr/.github/workflows/proof-pr-receipt.yml@v0.2.2
+    uses: saagpatel/proof-pr/.github/workflows/proof-pr-receipt.yml@v0.2.3
     with:
       receipt_path: proof-pr.json
-      proof_pr_ref: v0.2.2
+      proof_pr_ref: v0.2.3
       check_public_git_metadata: true
       public_git_metadata_mode: introduced
       artifact_name: github-repo-auditor-proof-pr
