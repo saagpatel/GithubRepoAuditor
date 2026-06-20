@@ -9,7 +9,8 @@
     "base_ref": "main",
     "base_sha": "b69bd828a240572594ed4a8afec159e546fccefa",
     "head_ref": "chore/proof-pr-dogfood",
-    "head_sha": "pending-pr-head"
+    "head_sha": "pending-pr-head",
+    "head_sha_status": "pending_commit"
   },
   "producer": {
     "tool": "proof-pr",
