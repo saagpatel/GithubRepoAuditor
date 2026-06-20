@@ -59,6 +59,11 @@ serve = [
     "jinja2>=3.1",
     "python-multipart>=0.0.9",
 ]
+hosting = [
+    # Optional: a shared Redis/Upstash backend for the hosted report cache and
+    # per-IP throttle. Without it, the in-memory backend is used (single-instance).
+    "redis>=5.0",
+]
 build = [
     "shiv>=1.0",
     "build>=1.0",

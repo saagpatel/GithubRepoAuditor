@@ -18,10 +18,11 @@ import os
 from typing import Any
 
 import requests
-from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 
 from src.api_only import audit_user_api_only
 from src.github_client import GitHubClient, GitHubClientError
+from src.serve.hosting import RateLimiter, ReportCache
 from src.serve.runner import validate_username
 
 router = APIRouter(prefix="/api", tags=["report"])
@@ -34,6 +35,10 @@ MAX_REPOS_CAP = 30
 # (the dependency is overridden) and acceptable locally (public, unauthenticated
 # requests still work, just at a lower rate limit).
 TOKEN_ENV_VAR = "GHRA_GITHUB_TOKEN"
+
+# When set, trust X-Forwarded-For for the throttle key (a trusted proxy is in
+# front). Default off — XFF is spoofable, so we key on the direct peer instead.
+TRUST_FORWARDED_ENV_VAR = "GHRA_TRUST_FORWARDED_FOR"
 
 # Comma-separated allowed CORS origins for the browser frontend. Defaults to the
 # local Next.js dev server; set to the deployed origin (or "*") in production.
@@ -54,10 +59,45 @@ def get_github_client() -> GitHubClient:
 
     A fresh client (and ``requests.Session``) is built per request on purpose:
     the route runs in FastAPI's threadpool, so a shared Session would be touched
-    by concurrent worker threads. Connection-pool reuse and a shared server-side
-    client land in Phase 2 step 3 alongside the per-IP throttle that bounds load.
+    by concurrent worker threads. Connection-pool reuse via a shared server-side
+    client is a future optimization; the report cache and per-IP throttle below
+    already bound how often this client actually reaches GitHub.
     """
     return GitHubClient(token=os.environ.get(TOKEN_ENV_VAR))
+
+
+def get_report_cache(request: Request) -> ReportCache:
+    """Return the app-wide report cache (built once in the app factory)."""
+    return request.app.state.report_cache
+
+
+def get_rate_limiter(request: Request) -> RateLimiter:
+    """Return the app-wide per-IP rate limiter (built once in the app factory)."""
+    return request.app.state.rate_limiter
+
+
+def _trust_forwarded_for() -> bool:
+    return os.environ.get(TRUST_FORWARDED_ENV_VAR, "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+
+
+def client_ip(request: Request) -> str:
+    """Best-effort client IP used as the throttle key.
+
+    X-Forwarded-For is client-spoofable, so honoring it blindly would let a
+    caller pick a fresh throttle bucket per request. We only trust it when
+    GHRA_TRUST_FORWARDED_FOR is set — i.e. a known proxy that overwrites the
+    header sits in front. Otherwise we use the direct peer address. (When the
+    ASGI transport supplies no client, all such requests share one bucket.)
+    """
+    if _trust_forwarded_for():
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
 
 
 def _is_rate_limited(status: int | None, response: requests.Response | None) -> bool:
@@ -90,17 +130,30 @@ def _http_exception(exc: requests.HTTPError, username: str) -> HTTPException:
 
 @router.get("/report/{username}")
 def report(
+    request: Request,
     username: str = Path(..., description="GitHub username or org name"),
     max_repos: int | None = Query(
         None, ge=1, description="Cap repos scored (clamped to the server limit)"
     ),
     client: GitHubClient = Depends(get_github_client),
+    cache: ReportCache = Depends(get_report_cache),
+    limiter: RateLimiter = Depends(get_rate_limiter),
 ) -> dict[str, Any]:
     """Score a user's portfolio clone-free and return the report as JSON."""
+    # Throttle first — cheap, and it covers cache hits and garbage input alike.
+    if not limiter.allow(client_ip(request)):
+        raise HTTPException(
+            status_code=429, detail="Rate limit exceeded; try again later"
+        )
+
     try:
         safe_username = validate_username(username)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    cached = cache.get(safe_username)
+    if cached is not None:
+        return cached
 
     capped = MAX_REPOS_CAP if max_repos is None else min(max_repos, MAX_REPOS_CAP)
 
@@ -113,4 +166,6 @@ def report(
         # errors surface as a clean 502 rather than an unstructured 500.
         raise HTTPException(status_code=502, detail="Upstream GitHub error") from exc
 
-    return result.to_dict()
+    payload = result.to_dict()
+    cache.put(safe_username, payload)
+    return payload

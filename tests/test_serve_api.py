@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -22,9 +23,8 @@ from src.serve.app import create_app  # noqa: E402
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
-@pytest.fixture()
-def client(tmp_path) -> TestClient:
-    """TestClient with the GitHub client dependency stubbed to a sentinel.
+def _make_client(tmp_path) -> TestClient:
+    """Build a TestClient with the GitHub client dependency stubbed to a sentinel.
 
     The endpoint's network work is exercised through a patched
     ``audit_user_api_only`` in each test, so the dependency only needs to avoid
@@ -33,6 +33,11 @@ def client(tmp_path) -> TestClient:
     app = create_app(output_dir=tmp_path)
     app.dependency_overrides[get_github_client] = lambda: object()
     return TestClient(app)
+
+
+@pytest.fixture()
+def client(tmp_path) -> TestClient:
+    return _make_client(tmp_path)
 
 
 def _http_error(
@@ -171,3 +176,58 @@ def test_cors_origins_reads_env(monkeypatch) -> None:
     assert cors_origins() == ["https://a.example", "https://b.example"]
     monkeypatch.delenv("GHRA_CORS_ORIGINS", raising=False)
     assert cors_origins() == ["http://localhost:3000", "http://127.0.0.1:3000"]
+
+
+# ---------------------------------------------------------------------------
+# Caching + throttle (hosting guards)
+# ---------------------------------------------------------------------------
+def test_cache_hit_skips_second_scan(client: TestClient) -> None:
+    report = ApiOnlyReport(username="octocat", audits=[])
+    with patch("src.serve.api.audit_user_api_only", return_value=report) as mock_audit:
+        first = client.get("/api/report/octocat")
+        second = client.get("/api/report/octocat")
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json() == second.json()
+    # The second identical request is served from cache — no re-scan.
+    assert mock_audit.call_count == 1
+
+
+def test_rate_limit_returns_429_past_limit(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("GHRA_RATE_LIMIT", "2")
+    monkeypatch.setenv("GHRA_RATE_WINDOW_SECONDS", "3600")
+    local_client = _make_client(tmp_path)
+
+    report = ApiOnlyReport(username="octocat", audits=[])
+    with patch("src.serve.api.audit_user_api_only", return_value=report) as mock_audit:
+        codes = [local_client.get("/api/report/octocat").status_code for _ in range(3)]
+    assert codes == [200, 200, 429]
+    # The 2nd request was a cache hit but still consumed throttle budget, so the
+    # scan ran exactly once across the two allowed requests.
+    assert mock_audit.call_count == 1
+
+
+class _FakeRequest:
+    """Minimal Request stand-in for client_ip unit tests."""
+
+    def __init__(self, headers: dict[str, str], host: str | None) -> None:
+        self.headers = headers
+        self.client = SimpleNamespace(host=host) if host is not None else None
+
+
+def test_client_ip_ignores_forwarded_by_default(monkeypatch) -> None:
+    from src.serve.api import client_ip
+
+    monkeypatch.delenv("GHRA_TRUST_FORWARDED_FOR", raising=False)
+    req = _FakeRequest({"x-forwarded-for": "9.9.9.9"}, host="1.2.3.4")
+    # Spoofable XFF is ignored — keyed on the direct peer.
+    assert client_ip(req) == "1.2.3.4"  # type: ignore[arg-type]
+
+
+def test_client_ip_honors_forwarded_when_trusted(monkeypatch) -> None:
+    from src.serve.api import client_ip
+
+    monkeypatch.setenv("GHRA_TRUST_FORWARDED_FOR", "true")
+    req = _FakeRequest({"x-forwarded-for": "9.9.9.9, 1.2.3.4"}, host="1.2.3.4")
+    assert client_ip(req) == "9.9.9.9"  # type: ignore[arg-type]
