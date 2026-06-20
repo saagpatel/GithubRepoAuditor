@@ -10,6 +10,7 @@ def create_app(output_dir: Path | None = None) -> "FastAPI":  # noqa: F821
     from fastapi import FastAPI
     from fastapi.staticfiles import StaticFiles
 
+    from src.serve.api import router as api_router
     from src.serve.routes import router
 
     app = FastAPI(
@@ -24,11 +25,14 @@ def create_app(output_dir: Path | None = None) -> "FastAPI":  # noqa: F821
     static_dir = Path(__file__).parent / "static"
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
+    app.include_router(api_router)
     app.include_router(router)
     return app
 
 
-def run_serve(port: int = 8080, host: str = "127.0.0.1", output_dir: Path | None = None) -> None:
+def run_serve(
+    port: int = 8080, host: str = "127.0.0.1", output_dir: Path | None = None
+) -> None:
     """Launch uvicorn with the audit serve app."""
     import uvicorn
 
