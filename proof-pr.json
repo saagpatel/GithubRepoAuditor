@@ -116,6 +116,23 @@
       "status": "not_applicable",
       "required": false,
       "summary": "No UI, workbook, dashboard, or visual artifact changed."
+    },
+    {
+      "id": "public-git-metadata",
+      "kind": "security",
+      "command": [
+        "proof-pr",
+        "check-public-git-metadata",
+        "--ref",
+        "HEAD",
+        "--base-ref",
+        "origin/main",
+        "--summary-format",
+        "text"
+      ],
+      "status": "passed",
+      "required": true,
+      "summary": "Public git metadata checked in introduced mode for origin/main..HEAD; legacy history and tags were not in scope; findings=0."
     }
   ],
   "security": {
