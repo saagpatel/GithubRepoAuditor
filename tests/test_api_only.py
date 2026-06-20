@@ -2,14 +2,70 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
+from unittest.mock import patch
+
+import requests
 
 from src.api_only import (
     API_ONLY_MODE,
     ApiOnlyReport,
+    _list_user_repos,
     audit_user_api_only,
     score_repos_api_only,
 )
 from src.models import RepoMetadata
+
+
+class _RepoListClient:
+    """Stub exposing only the repo-list surface (.token + .list_repos)."""
+
+    def __init__(self, token: str | None, rest_repos: list[dict]) -> None:
+        self.token = token
+        self._rest_repos = rest_repos
+        self.list_repos_calls = 0
+
+    def list_repos(self, username: str) -> list[dict]:
+        self.list_repos_calls += 1
+        return self._rest_repos
+
+
+def test_list_user_repos_prefers_graphql_with_token() -> None:
+    client = _RepoListClient(token="t", rest_repos=[{"name": "rest"}])
+    gql = [{"name": "graphql"}]
+    with patch("src.api_only.bulk_fetch_repos", return_value=gql) as mock_gql:
+        result = _list_user_repos("octocat", client)  # type: ignore[arg-type]
+    assert result == gql
+    assert client.list_repos_calls == 0
+    mock_gql.assert_called_once()
+
+
+def test_list_user_repos_uses_rest_without_token() -> None:
+    client = _RepoListClient(token=None, rest_repos=[{"name": "rest"}])
+    with patch("src.api_only.bulk_fetch_repos") as mock_gql:
+        result = _list_user_repos("octocat", client)  # type: ignore[arg-type]
+    assert result == [{"name": "rest"}]
+    assert client.list_repos_calls == 1
+    mock_gql.assert_not_called()
+
+
+def test_list_user_repos_falls_back_when_graphql_user_null() -> None:
+    # GraphQL returns user: null → mapping raises TypeError → fall back to REST.
+    client = _RepoListClient(token="t", rest_repos=[{"name": "rest"}])
+    with patch("src.api_only.bulk_fetch_repos", side_effect=TypeError("user is None")):
+        result = _list_user_repos("ghost", client)  # type: ignore[arg-type]
+    assert result == [{"name": "rest"}]
+    assert client.list_repos_calls == 1
+
+
+def test_list_user_repos_falls_back_on_graphql_http_error() -> None:
+    client = _RepoListClient(token="t", rest_repos=[{"name": "rest"}])
+    with patch(
+        "src.api_only.bulk_fetch_repos",
+        side_effect=requests.ConnectionError("boom"),
+    ):
+        result = _list_user_repos("octocat", client)  # type: ignore[arg-type]
+    assert result == [{"name": "rest"}]
+    assert client.list_repos_calls == 1
 
 
 def _meta(

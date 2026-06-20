@@ -19,8 +19,11 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
+import requests
+
 from src.analyzers import run_all_analyzers
 from src.api_checkout import materialize_api_workspace
+from src.graphql_client import bulk_fetch_repos
 from src.models import RepoAudit, RepoMetadata
 from src.scorer import score_repo
 
@@ -137,6 +140,31 @@ class ApiOnlyReport:
         }
 
 
+def _list_user_repos(username: str, client: GitHubClient) -> list[dict]:
+    """List a user's repos, preferring GraphQL when a token is available.
+
+    GraphQL fetches the whole repo list (and per-repo language byte breakdowns)
+    in one paginated query, so it's both cheaper on the rate limit and higher
+    fidelity than REST. It requires auth, so without a token — or if the query
+    fails / returns no user — we fall back to REST ``list_repos``, which also
+    yields a clean 404 for an unknown user (GraphQL returns ``user: null``).
+    """
+    token = getattr(client, "token", None)
+    if token:
+        try:
+            repos = bulk_fetch_repos(username, token, on_progress=lambda *_: None)
+        except (requests.RequestException, KeyError, TypeError) as exc:
+            logger.warning(
+                "GraphQL repo-list failed for %s (%s); falling back to REST",
+                username,
+                exc,
+            )
+        else:
+            if repos:
+                return repos
+    return client.list_repos(username)
+
+
 def audit_user_api_only(
     username: str,
     client: GitHubClient,
@@ -145,14 +173,15 @@ def audit_user_api_only(
     fast: bool = True,
 ) -> ApiOnlyReport:
     """List a user's repos and score them clone-free via the GitHub API."""
-    raw = client.list_repos(username)
+    raw = _list_user_repos(username, client)
     if max_repos is not None:
         raw = raw[:max_repos]
 
-    # API-only fidelity tradeoff: scored from the repo-list payload's primary
-    # `language` without spending a get_languages() call per repo, so
-    # `metadata.languages` (byte breakdown) stays empty — language-fraction
-    # signals are intentionally absent, not silently wrong.
-    repos = [RepoMetadata.from_api_response(data) for data in raw]
+    # GraphQL supplies a `_languages` byte breakdown per repo; REST does not, so
+    # `metadata.languages` is populated only on the GraphQL path. Either way the
+    # primary `language` field drives scoring; the breakdown sharpens it.
+    repos = [
+        RepoMetadata.from_api_response(data, data.get("_languages")) for data in raw
+    ]
     audits = score_repos_api_only(repos, client, fast=fast)
     return ApiOnlyReport(username=username, audits=audits)
