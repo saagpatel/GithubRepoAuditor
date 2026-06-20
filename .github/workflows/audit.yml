@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       username:
-        description: GitHub username to audit
+        description: GitHub username to audit (defaults to saagpatel)
         required: false
         default: ''
 
@@ -47,7 +47,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.AUDIT_TOKEN }}
         run: |
           mkdir -p output/history
-          USERNAME="${{ github.event.inputs.username }}"
+          USERNAME="${{ github.event.inputs.username || 'saagpatel' }}"
           if ls output/audit-report-*.json >/dev/null 2>&1 && [ -f output/.audit-fingerprints.json ]; then
             audit "$USERNAME" --incremental --html --badges --diff --excel-mode standard
           else
@@ -56,7 +56,7 @@ jobs:
 
       - name: Build control-center artifact
         run: |
-          USERNAME="${{ github.event.inputs.username }}"
+          USERNAME="${{ github.event.inputs.username || 'saagpatel' }}"
           audit "$USERNAME" --control-center
 
       - name: Inspect canonical scheduled handoff issue
@@ -64,7 +64,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          USERNAME="${{ github.event.inputs.username }}"
+          USERNAME="${{ github.event.inputs.username || 'saagpatel' }}"
           TITLE="Scheduled Audit Handoff: $USERNAME"
           python3 - <<'PY'
           import json
