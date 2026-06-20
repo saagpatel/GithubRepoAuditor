@@ -370,9 +370,29 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     assert gamma.identity.section_marker == "iOS Projects"
     assert gamma.derived.stack == ["Swift"]
 
-    assert result.snapshot.schema_version == "0.6.0"
+    assert result.snapshot.schema_version == "0.7.0"
     assert result.snapshot.source_summary["attention_state_counts"]["active-product"] == 1
     assert result.snapshot.source_summary["attention_state_counts"]["parked"] == 1
+
+    # Derived rollups are emitted so downstream consumers (command-center) read
+    # them instead of re-deriving the auditor's risk/security logic.
+    snapshot_dict = result.snapshot.to_dict()
+    rollups = snapshot_dict["rollups"]
+    assert set(rollups["risk_tier_counts"]) == {"elevated", "moderate", "baseline", "deferred"}
+    assert sum(rollups["risk_tier_counts"].values()) == len(result.snapshot.projects)
+    assert set(rollups["security"]) == {
+        "scanned_count",
+        "repos_with_open_high_critical",
+        "total_open_high",
+        "total_open_critical",
+    }
+    assert set(rollups["decision"]) == {"decision_needed_count", "default_attention_count"}
+    assert (
+        rollups["decision"]["default_attention_count"]
+        >= rollups["decision"]["decision_needed_count"]
+    )
+    # Per-project open_high_critical is emitted in the security block.
+    assert "open_high_critical" in snapshot_dict["projects"][0]["security"]
 
 
 def test_attention_state_classifier_separates_activity_from_operator_attention() -> None:

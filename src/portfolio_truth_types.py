@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = "0.6.0"
+SCHEMA_VERSION = "0.7.0"
 
 # The published "latest" portfolio-truth artifact. The producer
 # (portfolio_truth_publish) writes it; every reader resolves it through
@@ -32,7 +32,13 @@ VALID_ATTENTION_STATES = {
     "evidence-history",
     "manual-only",
 }
-VALID_LIFECYCLE_STATES = {"active", "maintenance", "dormant", "experimental", "archived"}
+VALID_LIFECYCLE_STATES = {
+    "active",
+    "maintenance",
+    "dormant",
+    "experimental",
+    "archived",
+}
 VALID_CATEGORY_TAGS = {
     "commercial",
     "it-work",
@@ -129,7 +135,9 @@ class DerivedFields:
 
     def to_dict(self) -> dict[str, Any]:
         data = dataclasses.asdict(self)
-        data["last_meaningful_activity_at"] = _serialize_datetime(self.last_meaningful_activity_at)
+        data["last_meaningful_activity_at"] = _serialize_datetime(
+            self.last_meaningful_activity_at
+        )
         return data
 
 
@@ -183,7 +191,9 @@ class SecurityFields:
         return self.dependabot_high + self.dependabot_critical
 
     def to_dict(self) -> dict[str, Any]:
-        return dataclasses.asdict(self)
+        data = dataclasses.asdict(self)
+        data["open_high_critical"] = self.open_high_critical
+        return data
 
 
 @dataclass(frozen=True)
@@ -211,6 +221,71 @@ class PortfolioTruthProject:
 
 
 @dataclass(frozen=True)
+class PortfolioTruthRollups:
+    """Portfolio-level aggregates derived from the project list, emitted so
+    downstream consumers (command-center, dashboards) read them instead of
+    re-deriving the auditor's risk/security logic, which is the #1 drift risk."""
+
+    risk_tier_counts: dict[str, int]
+    security: dict[str, int]
+    decision: dict[str, int]
+
+    @classmethod
+    def from_projects(
+        cls, projects: list[PortfolioTruthProject]
+    ) -> PortfolioTruthRollups:
+        risk_tier_counts = {
+            "elevated": 0,
+            "moderate": 0,
+            "baseline": 0,
+            "deferred": 0,
+        }
+        scanned_count = 0
+        repos_with_open_high_critical = 0
+        total_open_high = 0
+        total_open_critical = 0
+        decision_needed_count = 0
+        default_attention_count = 0
+        for project in projects:
+            tier = project.risk.risk_tier
+            if tier in risk_tier_counts:
+                risk_tier_counts[tier] += 1
+            security = project.security
+            if security.alerts_available:
+                scanned_count += 1
+                if security.open_high_critical > 0:
+                    repos_with_open_high_critical += 1
+                total_open_high += security.dependabot_high
+                total_open_critical += security.dependabot_critical
+            attention = project.derived.attention_state
+            if attention == "decision-needed":
+                decision_needed_count += 1
+                default_attention_count += 1
+            elif attention in ("active-product", "active-infra"):
+                default_attention_count += 1
+        return cls(
+            risk_tier_counts=risk_tier_counts,
+            security={
+                "scanned_count": scanned_count,
+                "repos_with_open_high_critical": repos_with_open_high_critical,
+                "total_open_high": total_open_high,
+                "total_open_critical": total_open_critical,
+            },
+            decision={
+                "decision_needed_count": decision_needed_count,
+                "default_attention_count": default_attention_count,
+            },
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "risk_tier_counts": dict(self.risk_tier_counts),
+            "security": dict(self.security),
+            "decision": dict(self.decision),
+        }
+
+
+@dataclass(frozen=True)
 class PortfolioTruthSnapshot:
     schema_version: str
     generated_at: datetime
@@ -219,6 +294,12 @@ class PortfolioTruthSnapshot:
     precedence_matrix: dict[str, list[str]]
     warnings: list[str]
     projects: list[PortfolioTruthProject]
+    rollups: PortfolioTruthRollups = field(init=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self, "rollups", PortfolioTruthRollups.from_projects(self.projects)
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -229,4 +310,5 @@ class PortfolioTruthSnapshot:
             "precedence_matrix": self.precedence_matrix,
             "warnings": list(self.warnings),
             "projects": [project.to_dict() for project in self.projects],
+            "rollups": self.rollups.to_dict(),
         }
