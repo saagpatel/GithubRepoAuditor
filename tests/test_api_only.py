@@ -10,10 +10,50 @@ from src.api_only import (
     API_ONLY_MODE,
     ApiOnlyReport,
     _list_user_repos,
+    _select_repos,
     audit_user_api_only,
     score_repos_api_only,
 )
 from src.models import RepoMetadata
+
+
+def _meta_ranked(
+    name: str,
+    *,
+    fork: bool = False,
+    archived: bool = False,
+    pushed_year: int = 2024,
+    stars: int = 0,
+) -> RepoMetadata:
+    m = _meta(name=name, full_name=f"octocat/{name}")
+    m.fork = fork
+    m.archived = archived
+    m.pushed_at = datetime(pushed_year, 1, 1, tzinfo=timezone.utc)
+    m.stars = stars
+    return m
+
+
+def test_select_repos_returns_all_when_under_limit() -> None:
+    repos = [_meta_ranked("a"), _meta_ranked("b")]
+    assert _select_repos(repos, 5) == repos
+
+
+def test_select_repos_ranks_original_active_work_first() -> None:
+    fork = _meta_ranked("fork", fork=True, pushed_year=2026, stars=999)
+    archived = _meta_ranked("archived", archived=True, pushed_year=2026, stars=999)
+    recent = _meta_ranked("recent", pushed_year=2025, stars=1)
+    older = _meta_ranked("older", pushed_year=2020, stars=500)
+    picked = _select_repos([fork, archived, recent, older], 2)
+    # Non-fork non-archived win regardless of stars; recency breaks the tie.
+    assert [r.name for r in picked] == ["recent", "older"]
+
+
+def test_select_repos_handles_missing_pushed_at() -> None:
+    a = _meta_ranked("a", pushed_year=2025)
+    b = _meta_ranked("b")
+    b.pushed_at = None  # must not crash the sort
+    picked = _select_repos([a, b], 1)
+    assert picked[0].name == "a"
 
 
 class _RepoListClient:

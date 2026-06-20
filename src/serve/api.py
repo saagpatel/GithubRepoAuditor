@@ -29,9 +29,9 @@ from src.serve.waitlist import WaitlistStore, is_valid_email
 
 router = APIRouter(prefix="/api", tags=["report"])
 
-# Bound the interactive scan: a public free endpoint must not score an account
-# with hundreds of repos in one request. Requests above this clamp down.
-MAX_REPOS_CAP = 30
+# Bound the interactive scan: score the top-ranked repos (by recency/stars) so a
+# prolific account stays fast and the report leads with the user's best work.
+MAX_REPOS_CAP = 20
 
 # Env var for the shared server-side GitHub App / PAT token. Absent in tests
 # (the dependency is overridden) and acceptable locally (public, unauthenticated
