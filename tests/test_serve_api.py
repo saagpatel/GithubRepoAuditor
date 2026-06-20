@@ -146,11 +146,13 @@ def test_github_client_error_returns_502(client: TestClient) -> None:
 # ---------------------------------------------------------------------------
 # Cost bound
 # ---------------------------------------------------------------------------
-def test_max_repos_clamped_to_cap(client: TestClient) -> None:
+def test_scan_is_capped_at_max_repos(client: TestClient) -> None:
     from src.serve.api import MAX_REPOS_CAP
 
     report = ApiOnlyReport(username="octocat", audits=[])
     with patch("src.serve.api.audit_user_api_only", return_value=report) as mock_audit:
+        # No per-request repo knob — a stray query param is ignored and the
+        # server always bounds the scan at MAX_REPOS_CAP.
         resp = client.get("/api/report/octocat?max_repos=9999")
 
     assert resp.status_code == 200

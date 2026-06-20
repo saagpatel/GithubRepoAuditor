@@ -18,7 +18,7 @@ import os
 from typing import Any
 
 import requests
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Path, Request
 
 from src.api_only import audit_user_api_only
 from src.github_client import GitHubClient, GitHubClientError
@@ -132,14 +132,15 @@ def _http_exception(exc: requests.HTTPError, username: str) -> HTTPException:
 def report(
     request: Request,
     username: str = Path(..., description="GitHub username or org name"),
-    max_repos: int | None = Query(
-        None, ge=1, description="Cap repos scored (clamped to the server limit)"
-    ),
     client: GitHubClient = Depends(get_github_client),
     cache: ReportCache = Depends(get_report_cache),
     limiter: RateLimiter = Depends(get_rate_limiter),
 ) -> dict[str, Any]:
-    """Score a user's portfolio clone-free and return the report as JSON."""
+    """Score a user's portfolio clone-free and return the report as JSON.
+
+    Always scans up to ``MAX_REPOS_CAP`` repos; there is no per-request repo
+    knob, so a username fully determines the cached report.
+    """
     # Throttle first — cheap, and it covers cache hits and garbage input alike.
     if not limiter.allow(client_ip(request)):
         raise HTTPException(
@@ -155,10 +156,10 @@ def report(
     if cached is not None:
         return cached
 
-    capped = MAX_REPOS_CAP if max_repos is None else min(max_repos, MAX_REPOS_CAP)
-
     try:
-        result = audit_user_api_only(safe_username, client, max_repos=capped, fast=True)
+        result = audit_user_api_only(
+            safe_username, client, max_repos=MAX_REPOS_CAP, fast=True
+        )
     except requests.HTTPError as exc:
         raise _http_exception(exc, safe_username) from exc
     except (requests.RequestException, GitHubClientError) as exc:
