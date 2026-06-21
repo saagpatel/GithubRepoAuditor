@@ -23,6 +23,10 @@ from src.serve.app import create_app  # noqa: E402
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+def _sentinel_github_client() -> object:
+    return object()
+
+
 def _make_client(tmp_path) -> TestClient:
     """Build a TestClient with the GitHub client dependency stubbed to a sentinel.
 
@@ -31,7 +35,7 @@ def _make_client(tmp_path) -> TestClient:
     constructing a real client (which would read env / open a session).
     """
     app = create_app(output_dir=tmp_path)
-    app.dependency_overrides[get_github_client] = lambda: object()
+    app.dependency_overrides[get_github_client] = _sentinel_github_client
     return TestClient(app)
 
 

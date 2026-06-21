@@ -89,9 +89,10 @@ def materialize_api_checkout(
 ) -> Path:
     """Build a sparse skeleton of one repo under ``dest`` from the GitHub API.
 
-    Returns ``dest``. If the repo tree is unavailable (empty repo, missing ref,
-    or an API error), ``dest`` is created empty so downstream analyzers score it
-    as a near-empty repo rather than crashing.
+    Returns ``dest``. If the repo tree is expectedly unavailable (empty repo,
+    missing ref, private repo, gone), ``dest`` is created empty so downstream
+    analyzers score it as a near-empty repo rather than crashing. Transient,
+    rate-limit, and server errors propagate to the API boundary.
     """
     dest = Path(dest)
     dest.mkdir(parents=True, exist_ok=True)

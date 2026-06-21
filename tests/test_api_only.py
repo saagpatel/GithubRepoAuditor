@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timezone
 from unittest.mock import patch
 
+import pytest
 import requests
 
 from src.api_only import (
@@ -214,6 +215,21 @@ def test_bare_repo_is_detected_as_having_no_tests():
     dims = {r.dimension: r.score for r in audit.analyzer_results}
     assert dims["testing"] == 0.0
     assert "no-tests" in audit.flags
+
+
+def test_score_repos_api_only_propagates_tree_http_errors():
+    response = requests.Response()
+    response.status_code = 500
+    error = requests.HTTPError(response=response)
+
+    class _FailingTreeClient(_FakeClient):
+        def get_repo_tree(self, owner: str, repo: str, ref: str) -> dict:
+            raise error
+
+    client = _FailingTreeClient(_rich_tree())
+
+    with pytest.raises(requests.HTTPError):
+        score_repos_api_only([_meta()], client)
 
 
 def test_audit_user_api_only_lists_then_scores():

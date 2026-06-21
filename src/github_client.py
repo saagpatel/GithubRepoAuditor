@@ -6,6 +6,7 @@ import re
 import sys
 import time
 from collections.abc import Callable
+from urllib.parse import quote
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -25,7 +26,7 @@ _CONTEXTUAL_SCORECARD_HIGH_RULES = {
 REST_API_VERSION = "2026-03-10"
 EXPECTED_SECURITY_ENDPOINT_UNAVAILABLE_STATUSES = {403, 404}
 # Statuses that mean "no readable tree" (missing/private repo, empty repo, gone,
-# legal hold) — silent fail-soft. Anything else (auth, rate-limit, 5xx) is logged.
+# legal hold) — silent fail-soft. Anything else (auth, rate-limit, 5xx) propagates.
 EXPECTED_TREE_UNAVAILABLE_STATUSES = {404, 409, 410, 451}
 # Contents API: 404 = missing file (expected). Other statuses are logged.
 EXPECTED_CONTENT_UNAVAILABLE_STATUSES = {404}
@@ -702,18 +703,23 @@ class GitHubClient:
         structure / testing / CI / docs presence signals for API-only scoring.
         Fails soft (``available=False``) when the tree is unreadable (missing or
         private repo, empty repo, gone). Unexpected statuses (auth, rate-limit,
-        5xx) are logged so a bad token never silently scores every repo as empty.
+        5xx) propagate so hosted reports can return 429/502 instead of caching
+        an inaccurate empty skeleton.
         """
-        url = f"{API_BASE}/repos/{owner}/{repo}/git/trees/{ref}"
+        encoded_ref = quote(ref, safe="")
+        url = f"{API_BASE}/repos/{owner}/{repo}/git/trees/{encoded_ref}"
         try:
             data = self._fetch_json(url, params={"recursive": "1"})
         except requests.HTTPError as exc:
             status = self._http_error_status(exc)
-            if status not in EXPECTED_TREE_UNAVAILABLE_STATUSES:
-                logger.warning(
-                    "Failed to fetch tree for %s/%s (HTTP %s)", owner, repo, status
-                )
-            return {"available": False, "files": [], "dirs": [], "truncated": False}
+            if status in EXPECTED_TREE_UNAVAILABLE_STATUSES:
+                return {
+                    "available": False,
+                    "files": [],
+                    "dirs": [],
+                    "truncated": False,
+                }
+            raise
 
         entries = data.get("tree", []) if isinstance(data, dict) else []
         files = [
@@ -870,11 +876,9 @@ class GitHubClient:
         except requests.HTTPError as exc:
             status = self._http_error_status(exc)
             logger.warning(
-                "Failed to update issue %s for %s/%s: %s",
+                "Failed to update issue %s (HTTP %s)",
                 issue_number,
-                owner,
-                repo,
-                exc,
+                status,
             )
             return {
                 "ok": False,

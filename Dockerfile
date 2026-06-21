@@ -18,9 +18,9 @@ RUN uv sync --frozen --no-install-project --no-dev --extra serve --extra hosting
 COPY src ./src
 
 EXPOSE 8080
-# --forwarded-allow-ips=* so uvicorn rewrites the client address from the
-# platform proxy's X-Forwarded-For, making the per-IP throttle see real clients.
+# Do not trust spoofable forwarded headers by default. Deployments behind a
+# known proxy can opt in with GHRA_TRUST_FORWARDED_FOR and a platform-specific
+# Uvicorn forwarded-allow-ips override.
 CMD ["uv", "run", "--no-sync", "python", "-m", "uvicorn", \
      "--factory", "src.serve.app:create_app", \
-     "--host", "0.0.0.0", "--port", "8080", \
-     "--forwarded-allow-ips", "*"]
+     "--host", "0.0.0.0", "--port", "8080"]

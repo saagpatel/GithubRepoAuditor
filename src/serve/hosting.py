@@ -36,13 +36,15 @@ REDIS_URL_ENV_VAR = "GHRA_REDIS_URL"
 class KVStore(Protocol):
     """Minimal string KV interface backing both the cache and the throttle."""
 
-    def get(self, key: str) -> str | None: ...
+    def get(self, key: str) -> str | None:
+        raise NotImplementedError
 
-    def set(self, key: str, value: str, ttl_seconds: int) -> None: ...
+    def set(self, key: str, value: str, ttl_seconds: int) -> None:
+        raise NotImplementedError
 
     def incr(self, key: str, ttl_seconds: int) -> int:
         """Increment a counter, setting its TTL on first creation; return count."""
-        ...
+        raise NotImplementedError
 
 
 class InMemoryKVStore:

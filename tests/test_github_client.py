@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 
+import pytest
 import requests
 
 from src.github_client import REST_API_VERSION, GitHubClient
@@ -348,6 +349,20 @@ class TestGitHubClientTreeAndContents:
         assert "/repos/o/r/git/trees/main" in seen["url"]
         assert seen["params"] == {"recursive": "1"}
 
+    def test_get_repo_tree_encodes_branch_ref_path_segment(self, monkeypatch):
+        client = GitHubClient()
+        seen: dict = {}
+
+        def _fake(url, params=None):
+            seen["url"] = url
+            return {"tree": [], "truncated": False}
+
+        monkeypatch.setattr(client, "_fetch_json", _fake)
+
+        client.get_repo_tree("o", "r", "release/1.x")
+
+        assert "/repos/o/r/git/trees/release%2F1.x" in seen["url"]
+
     def test_get_repo_tree_fails_soft_on_http_error(self, monkeypatch):
         client = GitHubClient()
         response = requests.Response()
@@ -426,9 +441,7 @@ class TestGitHubClientTreeAndContents:
 
         assert client.get_file_content("o", "r", "huge.bin", max_bytes=1_000_000) is None
 
-    def test_get_repo_tree_logs_unexpected_status_but_fails_soft(
-        self, monkeypatch, caplog
-    ):
+    def test_get_repo_tree_propagates_unexpected_status(self, monkeypatch):
         client = GitHubClient()
         response = requests.Response()
         response.status_code = 500
@@ -437,11 +450,8 @@ class TestGitHubClientTreeAndContents:
             client, "_fetch_json", lambda *a, **k: (_ for _ in ()).throw(error)
         )
 
-        with caplog.at_level("WARNING"):
-            tree = client.get_repo_tree("o", "r", "main")
-
-        assert tree["available"] is False
-        assert "Failed to fetch tree" in caplog.text
+        with pytest.raises(requests.HTTPError):
+            client.get_repo_tree("o", "r", "main")
 
     def test_get_repo_tree_empty_repo_409_is_silent(self, monkeypatch, caplog):
         client = GitHubClient()

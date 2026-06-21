@@ -10,7 +10,6 @@ fresh connection per call, so it is safe under FastAPI's threadpool.
 from __future__ import annotations
 
 import os
-import re
 import sqlite3
 import threading
 from contextlib import closing
@@ -21,24 +20,32 @@ from typing import Protocol, runtime_checkable
 WAITLIST_DB_ENV_VAR = "GHRA_WAITLIST_DB"
 DEFAULT_WAITLIST_DB = "waitlist.db"
 
-# Pragmatic email shape check — this gates a waitlist, not authentication, so a
-# structural match (local@domain.tld, no spaces) is the right strictness.
-_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+# Pragmatic email shape check — this gates a waitlist, not authentication.
 MAX_EMAIL_LEN = 254  # RFC 5321 maximum.
 
 
 def is_valid_email(email: str) -> bool:
     candidate = email.strip()
-    return len(candidate) <= MAX_EMAIL_LEN and bool(_EMAIL_RE.match(candidate))
+    if not candidate or len(candidate) > MAX_EMAIL_LEN:
+        return False
+    if any(char.isspace() for char in candidate):
+        return False
+    local, separator, domain = candidate.partition("@")
+    if separator != "@" or "@" in domain:
+        return False
+    if not local or not domain or "." not in domain:
+        return False
+    return all(part for part in domain.split("."))
 
 
 @runtime_checkable
 class WaitlistStore(Protocol):
     def add(self, email: str, source: str | None = None) -> bool:
         """Record an email; return True if newly added, False if already present."""
-        ...
+        raise NotImplementedError
 
-    def count(self) -> int: ...
+    def count(self) -> int:
+        raise NotImplementedError
 
 
 class SqliteWaitlistStore:

@@ -124,8 +124,14 @@ def score_repos_api_only(
                 github_client=scan_client,
                 security_offline=security_offline,
             )
+        except requests.HTTPError:
+            raise
+        except requests.RequestException:
+            raise
         except Exception as exc:  # noqa: BLE001 — one bad repo must not abort the scan
-            logger.warning("API-only scoring failed for %s: %s", repo.name, exc)
+            logger.warning(
+                "API-only scoring failed for one repo (%s)", type(exc).__name__
+            )
             return None
 
     workers = max(1, min(max_workers, len(repos)))
@@ -170,9 +176,8 @@ def _list_user_repos(username: str, client: GitHubClient) -> list[dict]:
             repos = bulk_fetch_repos(username, token, on_progress=lambda *_: None)
         except (requests.RequestException, KeyError, TypeError) as exc:
             logger.warning(
-                "GraphQL repo-list failed for %s (%s); falling back to REST",
-                username,
-                exc,
+                "GraphQL repo-list failed (%s); falling back to REST",
+                type(exc).__name__,
             )
         else:
             if repos:

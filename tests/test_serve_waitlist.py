@@ -19,7 +19,17 @@ def test_valid_emails(email: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "email", ["", "no-at-sign", "a@b", "a b@c.com", "@example.com", "a@.com"]
+    "email",
+    [
+        "",
+        "no-at-sign",
+        "a@b",
+        "a b@c.com",
+        "a@@example.com",
+        "@example.com",
+        "a@.com",
+        "a@example..com",
+    ],
 )
 def test_invalid_emails(email: str) -> None:
     assert is_valid_email(email) is False
