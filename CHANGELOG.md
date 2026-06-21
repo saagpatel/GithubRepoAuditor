@@ -3,6 +3,12 @@
 All notable changes to this project are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
+> **Versioning note:** The `0.x.0` entries below (0.1.0 through 0.19.0) reflect
+> the internal development history prior to the first public PyPI release. The
+> public PyPI line starts at `0.1.0` (tag `v0.1.0`, released 2026-05-18) and
+> follows `0.1.x` for patches. Do not conflate the internal `0.x.0` series with
+> PyPI release versions.
+
 ---
 
 ## [Unreleased]

@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       username:
-        description: GitHub username to audit
+        description: GitHub username to audit (defaults to saagpatel)
         required: false
-        default: saagpatel
+        default: ''
 
 permissions:
   contents: read
