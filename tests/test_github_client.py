@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import base64
+
+import pytest
 import requests
 
 from src.github_client import REST_API_VERSION, GitHubClient
@@ -41,10 +44,16 @@ class TestGitHubClientHardening:
         repos = client.list_repos("octocat")
 
         assert repos == [{"name": "private-repo", "private": True}]
-        assert any("/list_repos/octocat/owner-private" in call[0] for call in cache.get_calls)
-        assert any("/list_repos/octocat/owner-private" in call[0] for call in cache.put_calls)
+        assert any(
+            "/list_repos/octocat/owner-private" in call[0] for call in cache.get_calls
+        )
+        assert any(
+            "/list_repos/octocat/owner-private" in call[0] for call in cache.put_calls
+        )
 
-    def test_public_and_private_repo_list_cache_entries_do_not_collide(self, monkeypatch):
+    def test_public_and_private_repo_list_cache_entries_do_not_collide(
+        self, monkeypatch
+    ):
         cache = _MemoryCache()
 
         owner_client = GitHubClient(token="secret", cache=cache)
@@ -66,8 +75,13 @@ class TestGitHubClientHardening:
 
         assert owner_result == [{"name": "private-repo", "private": True}]
         assert anon_result == [{"name": "public-repo", "private": False}]
-        assert any("/list_repos/octocat/owner-private" in call[0] for call in cache.put_calls)
-        assert any("/list_repos/octocat/public-anonymous" in call[0] for call in cache.put_calls)
+        assert any(
+            "/list_repos/octocat/owner-private" in call[0] for call in cache.put_calls
+        )
+        assert any(
+            "/list_repos/octocat/public-anonymous" in call[0]
+            for call in cache.put_calls
+        )
 
     def test_security_endpoints_return_counts_when_available(self, monkeypatch):
         client = GitHubClient()
@@ -79,7 +93,10 @@ class TestGitHubClientHardening:
                 return [
                     {"number": 1, "rule": {"security_severity_level": "critical"}},
                     {"number": 2, "rule": {"id": "CodeReviewID", "severity": "error"}},
-                    {"number": 5, "rule": {"id": "ConcreteRuleID", "severity": "error"}},
+                    {
+                        "number": 5,
+                        "rule": {"id": "ConcreteRuleID", "severity": "error"},
+                    },
                     {"number": 3, "rule": {"severity": "medium"}},
                     {"number": 4, "rule": {"severity": "note"}},
                 ]
@@ -111,13 +128,17 @@ class TestGitHubClientHardening:
         response.status_code = 404
         error = requests.HTTPError(response=response)
 
-        monkeypatch.setattr(client, "_fetch_json", lambda *a, **k: (_ for _ in ()).throw(error))
+        monkeypatch.setattr(
+            client, "_fetch_json", lambda *a, **k: (_ for _ in ()).throw(error)
+        )
 
         assert client.get_secret_scanning_alert_count("o", "r")["available"] is False
         assert client.get_code_scanning_alert_count("o", "r")["http_status"] == 404
         assert client.get_sbom_exportability("o", "r")["available"] is False
 
-    def test_security_alert_endpoint_403_and_404_are_not_warnings(self, monkeypatch, caplog):
+    def test_security_alert_endpoint_403_and_404_are_not_warnings(
+        self, monkeypatch, caplog
+    ):
         client = GitHubClient()
 
         def _raise(status_code):
@@ -128,7 +149,9 @@ class TestGitHubClientHardening:
         monkeypatch.setattr(client, "_fetch_json", lambda *a, **k: _raise(403))
 
         with caplog.at_level("WARNING"):
-            assert client.get_secret_scanning_alert_count("o", "r")["http_status"] == 403
+            assert (
+                client.get_secret_scanning_alert_count("o", "r")["http_status"] == 403
+            )
 
         assert "secret scanning alerts" not in caplog.text
 
@@ -147,7 +170,9 @@ class TestGitHubClientHardening:
         response = requests.Response()
         response.status_code = 500
         error = requests.HTTPError(response=response)
-        monkeypatch.setattr(client, "_fetch_json", lambda *a, **k: (_ for _ in ()).throw(error))
+        monkeypatch.setattr(
+            client, "_fetch_json", lambda *a, **k: (_ for _ in ()).throw(error)
+        )
 
         with caplog.at_level("WARNING"):
             assert client.get_code_scanning_alert_count("o", "r")["http_status"] == 500
@@ -156,16 +181,35 @@ class TestGitHubClientHardening:
 
     def test_get_repo_topics_reads_names_payload(self, monkeypatch):
         client = GitHubClient()
-        monkeypatch.setattr(client, "_fetch_json", lambda *a, **k: {"names": ["python", "ghra-showcase"]})
+        monkeypatch.setattr(
+            client,
+            "_fetch_json",
+            lambda *a, **k: {"names": ["python", "ghra-showcase"]},
+        )
         topics = client.get_repo_topics("o", "r")
         assert topics["available"] is True
         assert topics["topics"] == ["python", "ghra-showcase"]
 
-    def test_update_repo_custom_property_values_skips_missing_definitions(self, monkeypatch):
+    def test_update_repo_custom_property_values_skips_missing_definitions(
+        self, monkeypatch
+    ):
         client = GitHubClient()
-        monkeypatch.setattr(client, "list_org_custom_properties", lambda owner: {"available": True, "properties": []})
-        monkeypatch.setattr(client, "get_repo_custom_property_values", lambda owner, repo: {"available": True, "values": {"portfolio_call": "old"}})
-        result = client.update_repo_custom_property_values("o", "r", {"portfolio_call": "new"})
+        monkeypatch.setattr(
+            client,
+            "list_org_custom_properties",
+            lambda owner: {"available": True, "properties": []},
+        )
+        monkeypatch.setattr(
+            client,
+            "get_repo_custom_property_values",
+            lambda owner, repo: {
+                "available": True,
+                "values": {"portfolio_call": "old"},
+            },
+        )
+        result = client.update_repo_custom_property_values(
+            "o", "r", {"portfolio_call": "new"}
+        )
         assert result["status"] == "skipped"
         assert result["before"] == {"portfolio_call": "old"}
 
@@ -218,7 +262,11 @@ class TestGitHubClientHardening:
                             {
                                 "id": "PVTI_1",
                                 "isArchived": False,
-                                "content": {"id": "ISSUE_1", "number": 12, "url": "https://github.com/o/r/issues/12"},
+                                "content": {
+                                    "id": "ISSUE_1",
+                                    "number": 12,
+                                    "url": "https://github.com/o/r/issues/12",
+                                },
                             }
                         ],
                         "pageInfo": {"hasNextPage": False, "endCursor": None},
@@ -232,12 +280,18 @@ class TestGitHubClientHardening:
         assert result["available"] is True
         assert result["item"]["id"] == "PVTI_1"
 
-    def test_add_and_archive_project_v2_item_return_normalized_payloads(self, monkeypatch):
+    def test_add_and_archive_project_v2_item_return_normalized_payloads(
+        self, monkeypatch
+    ):
         client = GitHubClient()
         responses = iter(
             [
                 {"addProjectV2ItemById": {"item": {"id": "PVTI_1"}}},
-                {"archiveProjectV2Item": {"item": {"id": "PVTI_1", "isArchived": True}}},
+                {
+                    "archiveProjectV2Item": {
+                        "item": {"id": "PVTI_1", "isArchived": True}
+                    }
+                },
             ]
         )
         monkeypatch.setattr(client, "_graphql_query", lambda *_a, **_k: next(responses))
@@ -248,3 +302,183 @@ class TestGitHubClientHardening:
         assert created["ok"] is True
         assert created["item_id"] == "PVTI_1"
         assert archived["status"] == "archived"
+
+
+class TestGitHubClientTreeAndContents:
+    """Git Trees API + Contents API support for clone-free (API-only) scoring."""
+
+    def test_get_repo_tree_returns_files_and_dirs(self, monkeypatch):
+        client = GitHubClient()
+        payload = {
+            "tree": [
+                {"path": "README.md", "type": "blob"},
+                {"path": "src", "type": "tree"},
+                {"path": "src/main.py", "type": "blob"},
+                {"path": "tests", "type": "tree"},
+                {"path": "tests/test_main.py", "type": "blob"},
+            ],
+            "truncated": False,
+        }
+        monkeypatch.setattr(client, "_fetch_json", lambda url, params=None: payload)
+
+        tree = client.get_repo_tree("o", "r", "main")
+
+        assert tree["available"] is True
+        assert tree["truncated"] is False
+        assert "README.md" in tree["files"]
+        assert "src/main.py" in tree["files"]
+        assert "tests/test_main.py" in tree["files"]
+        assert "src" in tree["dirs"]
+        assert "tests" in tree["dirs"]
+        # tree entries are NOT files
+        assert "src" not in tree["files"]
+
+    def test_get_repo_tree_requests_recursive(self, monkeypatch):
+        client = GitHubClient()
+        seen: dict = {}
+
+        def _fake(url, params=None):
+            seen["url"] = url
+            seen["params"] = params
+            return {"tree": [], "truncated": False}
+
+        monkeypatch.setattr(client, "_fetch_json", _fake)
+
+        client.get_repo_tree("o", "r", "main")
+
+        assert "/repos/o/r/git/trees/main" in seen["url"]
+        assert seen["params"] == {"recursive": "1"}
+
+    def test_get_repo_tree_encodes_branch_ref_path_segment(self, monkeypatch):
+        client = GitHubClient()
+        seen: dict = {}
+
+        def _fake(url, params=None):
+            seen["url"] = url
+            return {"tree": [], "truncated": False}
+
+        monkeypatch.setattr(client, "_fetch_json", _fake)
+
+        client.get_repo_tree("o", "r", "release/1.x")
+
+        assert "/repos/o/r/git/trees/release%2F1.x" in seen["url"]
+
+    def test_get_repo_tree_fails_soft_on_http_error(self, monkeypatch):
+        client = GitHubClient()
+        response = requests.Response()
+        response.status_code = 404
+        error = requests.HTTPError(response=response)
+        monkeypatch.setattr(
+            client, "_fetch_json", lambda *a, **k: (_ for _ in ()).throw(error)
+        )
+
+        tree = client.get_repo_tree("o", "r", "main")
+
+        assert tree["available"] is False
+        assert tree["files"] == []
+        assert tree["dirs"] == []
+
+    def test_get_repo_tree_flags_truncation(self, monkeypatch):
+        client = GitHubClient()
+        monkeypatch.setattr(
+            client,
+            "_fetch_json",
+            lambda url, params=None: {
+                "tree": [{"path": "a.py", "type": "blob"}],
+                "truncated": True,
+            },
+        )
+
+        tree = client.get_repo_tree("o", "r", "main")
+
+        assert tree["truncated"] is True
+        assert tree["available"] is True
+
+    def test_get_file_content_decodes_base64(self, monkeypatch):
+        client = GitHubClient()
+        raw = b"# Title\nbody text\n"
+        encoded = base64.b64encode(raw).decode("ascii")
+        monkeypatch.setattr(
+            client,
+            "_fetch_json",
+            lambda url, params=None: {
+                "type": "file",
+                "encoding": "base64",
+                "content": encoded,
+                "size": len(raw),
+            },
+        )
+
+        content = client.get_file_content("o", "r", "README.md")
+
+        assert content == "# Title\nbody text\n"
+
+    def test_get_file_content_returns_none_on_404(self, monkeypatch):
+        client = GitHubClient()
+        response = requests.Response()
+        response.status_code = 404
+        error = requests.HTTPError(response=response)
+        monkeypatch.setattr(
+            client, "_fetch_json", lambda *a, **k: (_ for _ in ()).throw(error)
+        )
+
+        assert client.get_file_content("o", "r", "missing.txt") is None
+
+    def test_get_file_content_skips_oversize_files(self, monkeypatch):
+        client = GitHubClient()
+        # Contents API returns content="" for files >1MB; we must not treat that
+        # as a real (empty) file. Skip anything over the byte cap.
+        monkeypatch.setattr(
+            client,
+            "_fetch_json",
+            lambda url, params=None: {
+                "type": "file",
+                "encoding": "base64",
+                "content": "",
+                "size": 5_000_000,
+            },
+        )
+
+        assert client.get_file_content("o", "r", "huge.bin", max_bytes=1_000_000) is None
+
+    def test_get_repo_tree_propagates_unexpected_status(self, monkeypatch):
+        client = GitHubClient()
+        response = requests.Response()
+        response.status_code = 500
+        error = requests.HTTPError(response=response)
+        monkeypatch.setattr(
+            client, "_fetch_json", lambda *a, **k: (_ for _ in ()).throw(error)
+        )
+
+        with pytest.raises(requests.HTTPError):
+            client.get_repo_tree("o", "r", "main")
+
+    def test_get_repo_tree_empty_repo_409_is_silent(self, monkeypatch, caplog):
+        client = GitHubClient()
+        response = requests.Response()
+        response.status_code = 409
+        error = requests.HTTPError(response=response)
+        monkeypatch.setattr(
+            client, "_fetch_json", lambda *a, **k: (_ for _ in ()).throw(error)
+        )
+
+        with caplog.at_level("WARNING"):
+            tree = client.get_repo_tree("o", "r", "main")
+
+        assert tree["available"] is False
+        assert "Failed to fetch tree" not in caplog.text
+
+    def test_get_file_content_logs_unexpected_status(self, monkeypatch, caplog):
+        client = GitHubClient()
+        response = requests.Response()
+        response.status_code = 500
+        error = requests.HTTPError(response=response)
+        monkeypatch.setattr(
+            client, "_fetch_json", lambda *a, **k: (_ for _ in ()).throw(error)
+        )
+
+        with caplog.at_level("WARNING"):
+            result = client.get_file_content("o", "r", "README.md")
+
+        assert result is None
+        assert "Failed to fetch README.md" in caplog.text

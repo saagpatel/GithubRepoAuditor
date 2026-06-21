@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import base64
 import logging
 import re
 import sys
 import time
 from collections.abc import Callable
+from urllib.parse import quote
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -23,6 +25,11 @@ _CONTEXTUAL_SCORECARD_HIGH_RULES = {
 }
 REST_API_VERSION = "2026-03-10"
 EXPECTED_SECURITY_ENDPOINT_UNAVAILABLE_STATUSES = {403, 404}
+# Statuses that mean "no readable tree" (missing/private repo, empty repo, gone,
+# legal hold) — silent fail-soft. Anything else (auth, rate-limit, 5xx) propagates.
+EXPECTED_TREE_UNAVAILABLE_STATUSES = {404, 409, 410, 451}
+# Contents API: 404 = missing file (expected). Other statuses are logged.
+EXPECTED_CONTENT_UNAVAILABLE_STATUSES = {404}
 
 
 class GitHubClientError(Exception):
@@ -104,7 +111,9 @@ class GitHubClient:
         json_body: dict | list | None = None,
     ) -> requests.Response:
         """Make a non-GET request with the same rate-limit handling."""
-        response = self.session.request(method, url, params=params, json=json_body, timeout=30)
+        response = self.session.request(
+            method, url, params=params, json=json_body, timeout=30
+        )
         self._check_rate_limit(response)
         response.raise_for_status()
         return response
@@ -172,7 +181,9 @@ class GitHubClient:
 
         return data
 
-    def _fetch_json_with_202_retry(self, url: str, params: dict | None = None) -> object:
+    def _fetch_json_with_202_retry(
+        self, url: str, params: dict | None = None
+    ) -> object:
         """Fetch JSON with 202 retry, checking cache first."""
         if self.cache:
             cached = self.cache.get(url, params)
@@ -216,9 +227,13 @@ class GitHubClient:
         Single API call returns presence of all health files.
         """
         try:
-            return self._fetch_json(f"{API_BASE}/repos/{owner}/{repo}/community/profile")
+            return self._fetch_json(
+                f"{API_BASE}/repos/{owner}/{repo}/community/profile"
+            )
         except requests.HTTPError as exc:
-            logger.warning("Failed to fetch community profile for %s/%s: %s", owner, repo, exc)
+            logger.warning(
+                "Failed to fetch community profile for %s/%s: %s", owner, repo, exc
+            )
             return {}
 
     def get_participation_stats(self, owner: str, repo: str) -> dict:
@@ -231,7 +246,9 @@ class GitHubClient:
                 f"{API_BASE}/repos/{owner}/{repo}/stats/participation"
             )
         except requests.HTTPError as exc:
-            logger.warning("Failed to fetch participation for %s/%s: %s", owner, repo, exc)
+            logger.warning(
+                "Failed to fetch participation for %s/%s: %s", owner, repo, exc
+            )
             return {}
 
     def get_authenticated_user(self) -> str | None:
@@ -260,7 +277,9 @@ class GitHubClient:
     def list_repos(self, username: str) -> list[dict]:
         """Fetch all repos for a user. Uses /user/repos for the authenticated user."""
         # Check cache for the complete repo list
-        cache_key = f"{API_BASE}/list_repos/{username}/{self._repo_list_cache_scope(username)}"
+        cache_key = (
+            f"{API_BASE}/list_repos/{username}/{self._repo_list_cache_scope(username)}"
+        )
         if self.cache:
             cached = self.cache.get(cache_key)
             if cached is not None:
@@ -294,7 +313,9 @@ class GitHubClient:
             logger.warning("Failed to fetch languages for %s/%s: %s", owner, repo, exc)
             return {}
 
-    def get_releases(self, owner: str, repo: str, per_page: int = 10) -> tuple[list[dict], bool]:
+    def get_releases(
+        self, owner: str, repo: str, per_page: int = 10
+    ) -> tuple[list[dict], bool]:
         """Fetch releases for a repo.
 
         Returns a (releases, available) tuple.
@@ -311,7 +332,9 @@ class GitHubClient:
         except requests.HTTPError as exc:
             status = self._http_error_status(exc)
             if status == 404:
-                logger.debug("Releases endpoint unavailable for %s/%s (404)", owner, repo)
+                logger.debug(
+                    "Releases endpoint unavailable for %s/%s (404)", owner, repo
+                )
                 return [], False
             logger.warning("Failed to fetch releases for %s/%s: %s", owner, repo, exc)
             return [], True
@@ -377,7 +400,9 @@ class GitHubClient:
             }
         except requests.HTTPError as exc:
             status = self._http_error_status(exc)
-            logger.warning("Failed to fetch repo security metadata for %s/%s: %s", owner, repo, exc)
+            logger.warning(
+                "Failed to fetch repo security metadata for %s/%s: %s", owner, repo, exc
+            )
             return {
                 "available": False,
                 "http_status": status,
@@ -425,9 +450,7 @@ class GitHubClient:
             for alert in alerts:
                 rule = alert.get("rule", {}) if isinstance(alert, dict) else {}
                 raw = (
-                    rule.get("security_severity_level")
-                    or rule.get("severity")
-                    or ""
+                    rule.get("security_severity_level") or rule.get("severity") or ""
                 ).lower()
                 rule_id = str(rule.get("id") or "")
                 if raw == "critical":
@@ -472,7 +495,9 @@ class GitHubClient:
     def get_sbom_exportability(self, owner: str, repo: str) -> dict:
         """Check whether the SBOM export endpoint is available for a repo."""
         try:
-            data = self._fetch_json(f"{API_BASE}/repos/{owner}/{repo}/dependency-graph/sbom")
+            data = self._fetch_json(
+                f"{API_BASE}/repos/{owner}/{repo}/dependency-graph/sbom"
+            )
             payload = data if isinstance(data, dict) else {}
             packages = payload.get("sbom", {}).get("packages", [])
             return {
@@ -482,7 +507,9 @@ class GitHubClient:
             }
         except requests.HTTPError as exc:
             status = self._http_error_status(exc)
-            logger.warning("Failed to fetch SBOM exportability for %s/%s: %s", owner, repo, exc)
+            logger.warning(
+                "Failed to fetch SBOM exportability for %s/%s: %s", owner, repo, exc
+            )
             return {
                 "available": False,
                 "http_status": status,
@@ -531,7 +558,9 @@ class GitHubClient:
                 logger.warning("Failed to fetch SBOM for %s/%s: %s", owner, repo, exc)
             return {"available": False, "http_status": status, "reason": str(exc)}
         except requests.RequestException as exc:
-            logger.warning("Network error fetching SBOM for %s/%s: %s", owner, repo, exc)
+            logger.warning(
+                "Network error fetching SBOM for %s/%s: %s", owner, repo, exc
+            )
             return {"available": False, "http_status": None, "reason": str(exc)}
 
         payload = data if isinstance(data, dict) else {}
@@ -662,6 +691,95 @@ class GitHubClient:
                 return None
             raise
 
+    def get_repo_tree(
+        self,
+        owner: str,
+        repo: str,
+        ref: str,
+    ) -> dict:
+        """List every file and directory path in a repo via the Git Trees API.
+
+        A single recursive call returns the whole tree, powering clone-free
+        structure / testing / CI / docs presence signals for API-only scoring.
+        Fails soft (``available=False``) when the tree is unreadable (missing or
+        private repo, empty repo, gone). Unexpected statuses (auth, rate-limit,
+        5xx) propagate so hosted reports can return 429/502 instead of caching
+        an inaccurate empty skeleton.
+        """
+        encoded_ref = quote(ref, safe="")
+        url = f"{API_BASE}/repos/{owner}/{repo}/git/trees/{encoded_ref}"
+        try:
+            data = self._fetch_json(url, params={"recursive": "1"})
+        except requests.HTTPError as exc:
+            status = self._http_error_status(exc)
+            if status in EXPECTED_TREE_UNAVAILABLE_STATUSES:
+                return {
+                    "available": False,
+                    "files": [],
+                    "dirs": [],
+                    "truncated": False,
+                }
+            raise
+
+        entries = data.get("tree", []) if isinstance(data, dict) else []
+        files = [
+            e["path"] for e in entries if e.get("type") == "blob" and e.get("path")
+        ]
+        dirs = [e["path"] for e in entries if e.get("type") == "tree" and e.get("path")]
+        truncated = (
+            bool(data.get("truncated", False)) if isinstance(data, dict) else False
+        )
+        return {
+            "available": True,
+            "files": files,
+            "dirs": dirs,
+            "truncated": truncated,
+        }
+
+    def get_file_content(
+        self,
+        owner: str,
+        repo: str,
+        path: str,
+        *,
+        ref: str | None = None,
+        max_bytes: int = 1_000_000,
+    ) -> str | None:
+        """Fetch and base64-decode a single file's text via the Contents API.
+
+        Returns ``None`` when the file is missing (404), larger than
+        ``max_bytes`` (the Contents API returns empty content above ~1MB and
+        directs callers to the blob API), non-base64, or not valid UTF-8 text.
+        """
+        url = f"{API_BASE}/repos/{owner}/{repo}/contents/{path}"
+        params: dict = {}
+        if ref is not None:
+            params["ref"] = ref
+        try:
+            data = self._fetch_json(url, params=params or None)
+        except requests.HTTPError as exc:
+            status = self._http_error_status(exc)
+            if status not in EXPECTED_CONTENT_UNAVAILABLE_STATUSES:
+                logger.warning(
+                    "Failed to fetch %s from %s/%s (HTTP %s)", path, owner, repo, status
+                )
+            return None
+
+        if not isinstance(data, dict) or data.get("type") != "file":
+            return None
+        if int(data.get("size", 0)) > max_bytes:
+            return None
+        if data.get("encoding") != "base64":
+            return None
+        try:
+            decoded = base64.b64decode(data.get("content") or "")
+        except ValueError:
+            return None
+        try:
+            return decoded.decode("utf-8")
+        except UnicodeDecodeError:
+            return None
+
     def update_repo_file(
         self,
         owner: str,
@@ -690,14 +808,18 @@ class GitHubClient:
             }
         except requests.HTTPError as exc:
             status = self._http_error_status(exc)
-            logger.warning("Failed to update file %s in %s/%s: %s", path, owner, repo, exc)
+            logger.warning(
+                "Failed to update file %s in %s/%s: %s", path, owner, repo, exc
+            )
             return {
                 "ok": False,
                 "http_status": status,
                 "sha": "",
             }
 
-    def list_repo_issues(self, owner: str, repo: str, state: str = "open") -> list[dict]:
+    def list_repo_issues(
+        self, owner: str, repo: str, state: str = "open"
+    ) -> list[dict]:
         """List repository issues for managed issue reconciliation."""
         try:
             return self._paginate(
@@ -733,7 +855,9 @@ class GitHubClient:
                 "node_id": None,
             }
 
-    def update_issue(self, owner: str, repo: str, issue_number: int, payload: dict) -> dict:
+    def update_issue(
+        self, owner: str, repo: str, issue_number: int, payload: dict
+    ) -> dict:
         """Update an existing managed issue."""
         try:
             response = self._request_method(
@@ -752,7 +876,9 @@ class GitHubClient:
         except requests.HTTPError as exc:
             status = self._http_error_status(exc)
             logger.warning(
-                "Failed to update issue %s for %s/%s: %s", issue_number, owner, repo, exc
+                "Failed to update issue %s (HTTP %s)",
+                issue_number,
+                status,
             )
             return {
                 "ok": False,
@@ -764,7 +890,9 @@ class GitHubClient:
     def get_repo_custom_property_values(self, owner: str, repo: str) -> dict:
         """Get current repository custom property values when available."""
         try:
-            data = self._fetch_json(f"{API_BASE}/repos/{owner}/{repo}/properties/values")
+            data = self._fetch_json(
+                f"{API_BASE}/repos/{owner}/{repo}/properties/values"
+            )
             values = {}
             if isinstance(data, list):
                 for item in data:
@@ -775,7 +903,9 @@ class GitHubClient:
             }
         except requests.HTTPError as exc:
             status = self._http_error_status(exc)
-            logger.warning("Failed to fetch custom properties for %s/%s: %s", owner, repo, exc)
+            logger.warning(
+                "Failed to fetch custom properties for %s/%s: %s", owner, repo, exc
+            )
             return {
                 "available": False,
                 "http_status": status,
@@ -792,7 +922,9 @@ class GitHubClient:
             }
         except requests.HTTPError as exc:
             status = self._http_error_status(exc)
-            logger.warning("Failed to list custom property schema for %s: %s", owner, exc)
+            logger.warning(
+                "Failed to list custom property schema for %s: %s", owner, exc
+            )
             return {
                 "available": False,
                 "http_status": status,
@@ -818,7 +950,9 @@ class GitHubClient:
             for item in schema.get("properties", [])
             if item.get("property_name")
         }
-        to_update = {name: value for name, value in properties.items() if name in allowed}
+        to_update = {
+            name: value for name, value in properties.items() if name in allowed
+        }
         before = self.get_repo_custom_property_values(owner, repo)
         if not to_update:
             return {
@@ -831,7 +965,8 @@ class GitHubClient:
 
         payload = {
             "properties": [
-                {"property_name": name, "value": value} for name, value in to_update.items()
+                {"property_name": name, "value": value}
+                for name, value in to_update.items()
             ]
         }
         try:
@@ -851,7 +986,9 @@ class GitHubClient:
             }
         except requests.HTTPError as exc:
             status = self._http_error_status(exc)
-            logger.warning("Failed to update custom properties for %s/%s: %s", owner, repo, exc)
+            logger.warning(
+                "Failed to update custom properties for %s/%s: %s", owner, repo, exc
+            )
             return {
                 "ok": False,
                 "status": "failed",
@@ -920,10 +1057,15 @@ class GitHubClient:
         }
         """
         try:
-            data = self._graphql_query(query, {"login": owner, "number": int(project_number)})
+            data = self._graphql_query(
+                query, {"login": owner, "number": int(project_number)}
+            )
         except (requests.HTTPError, GitHubClientError) as exc:
             logger.warning(
-                "Failed to resolve GitHub Project %s #%s: %s", owner, project_number, exc
+                "Failed to resolve GitHub Project %s #%s: %s",
+                owner,
+                project_number,
+                exc,
             )
             return {
                 "available": False,
@@ -932,9 +1074,9 @@ class GitHubClient:
                 "fields": {},
             }
 
-        project = (data.get("user") or {}).get("projectV2") or (data.get("organization") or {}).get(
-            "projectV2"
-        )
+        project = (data.get("user") or {}).get("projectV2") or (
+            data.get("organization") or {}
+        ).get("projectV2")
         if not isinstance(project, dict):
             return {
                 "available": False,
@@ -1006,7 +1148,9 @@ class GitHubClient:
         after: str | None = None
         try:
             while True:
-                data = self._graphql_query(query, {"projectId": project_id, "after": after})
+                data = self._graphql_query(
+                    query, {"projectId": project_id, "after": after}
+                )
                 items = ((data.get("node") or {}).get("items") or {}).get("nodes") or []
                 for item in items:
                     content = (item or {}).get("content") or {}
@@ -1021,13 +1165,17 @@ class GitHubClient:
                                 "issue_url": content.get("url", ""),
                             },
                         }
-                page_info = ((data.get("node") or {}).get("items") or {}).get("pageInfo") or {}
+                page_info = ((data.get("node") or {}).get("items") or {}).get(
+                    "pageInfo"
+                ) or {}
                 if not page_info.get("hasNextPage"):
                     break
                 after = page_info.get("endCursor")
         except (requests.HTTPError, GitHubClientError) as exc:
             logger.warning(
-                "Failed to inspect GitHub Project item for issue %s: %s", issue_node_id, exc
+                "Failed to inspect GitHub Project item for issue %s: %s",
+                issue_node_id,
+                exc,
             )
             return {"available": False, "item": None}
         return {"available": True, "item": None}
@@ -1063,7 +1211,9 @@ class GitHubClient:
         after: str | None = None
         try:
             while True:
-                data = self._graphql_query(query, {"projectId": project_id, "after": after})
+                data = self._graphql_query(
+                    query, {"projectId": project_id, "after": after}
+                )
                 items = ((data.get("node") or {}).get("items") or {}).get("nodes") or []
                 for item in items:
                     if (item or {}).get("id") == item_id:
@@ -1078,7 +1228,9 @@ class GitHubClient:
                                 "issue_url": content.get("url", ""),
                             },
                         }
-                page_info = ((data.get("node") or {}).get("items") or {}).get("pageInfo") or {}
+                page_info = ((data.get("node") or {}).get("items") or {}).get(
+                    "pageInfo"
+                ) or {}
                 if not page_info.get("hasNextPage"):
                     break
                 after = page_info.get("endCursor")
@@ -1110,7 +1262,10 @@ class GitHubClient:
             }
         except (requests.HTTPError, GitHubClientError) as exc:
             logger.warning(
-                "Failed to add issue %s to project %s: %s", issue_node_id, project_id, exc
+                "Failed to add issue %s to project %s: %s",
+                issue_node_id,
+                project_id,
+                exc,
             )
             return {"ok": False, "status": "failed", "item_id": ""}
 
@@ -1175,7 +1330,10 @@ class GitHubClient:
             return {"ok": True, "status": "updated"}
         except (requests.HTTPError, GitHubClientError) as exc:
             logger.warning(
-                "Failed to update project field %s on item %s: %s", field_id, item_id, exc
+                "Failed to update project field %s on item %s: %s",
+                field_id,
+                item_id,
+                exc,
             )
             return {"ok": False, "status": "failed"}
 
@@ -1215,7 +1373,9 @@ class GitHubClient:
             )
             return data if isinstance(data, list) else []
         except requests.HTTPError as exc:
-            logger.warning("Failed to fetch commit activity for %s/%s: %s", owner, repo, exc)
+            logger.warning(
+                "Failed to fetch commit activity for %s/%s: %s", owner, repo, exc
+            )
             return []
 
     def get_contributor_stats(self, owner: str, repo: str) -> list[dict]:
@@ -1229,7 +1389,9 @@ class GitHubClient:
             )
             return data if isinstance(data, list) else []
         except requests.HTTPError as exc:
-            logger.warning("Failed to fetch contributor stats for %s/%s: %s", owner, repo, exc)
+            logger.warning(
+                "Failed to fetch contributor stats for %s/%s: %s", owner, repo, exc
+            )
             return []
 
     def get_repo_metadata(

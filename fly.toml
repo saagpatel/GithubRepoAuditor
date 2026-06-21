@@ -1,0 +1,39 @@
+# Fly.io config for the hosted report API. Rename `app` to your Fly app.
+# Secrets (GHRA_GITHUB_TOKEN, GHRA_REDIS_URL, GHRA_CORS_ORIGINS) are set with
+# `fly secrets set …`, NOT here. See DEPLOY.md.
+app = "ghra-report-api"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  GHRA_REPORT_TTL_SECONDS = "3600"
+  GHRA_RATE_LIMIT = "20"
+  GHRA_RATE_WINDOW_SECONDS = "3600"
+  # Persisted on the mounted volume below (survives restarts/redeploys).
+  GHRA_WAITLIST_DB = "/data/waitlist.db"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/api/health"
+
+# Persistent volume for the SQLite waitlist. Create it once with:
+#   fly volumes create ghra_data --region iad --size 1
+[mounts]
+  source = "ghra_data"
+  destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

@@ -1,0 +1,17 @@
+# The API image needs only pyproject/uv.lock + src/. Everything else is noise.
+.git
+.github
+.venv
+__pycache__
+**/__pycache__
+*.pyc
+.pytest_cache
+.mypy_cache
+.ruff_cache
+output
+*.db
+tests
+docs
+web
+node_modules
+*.md
