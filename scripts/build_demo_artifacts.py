@@ -251,6 +251,7 @@ def _build_pcc_truth_snapshot(
             risk_tier = "moderate"
         security = _security_fields(audit)
         high_crit = security["dependabot_critical"] + security["dependabot_high"]
+        security["open_high_critical"] = high_crit
         attention_state = _attention_state(audit, risk_tier, high_crit)
         projects.append(
             {
@@ -326,7 +327,7 @@ def _build_pcc_truth_snapshot(
         )
 
     return {
-        "schema_version": "demo-pcc-v1",
+        "schema_version": "0.7.0",
         "generated_at": generated_at,
         "workspace_root": "fixtures/demo",
         "projects": projects,

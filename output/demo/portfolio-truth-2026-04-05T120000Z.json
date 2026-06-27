@@ -1,5 +1,5 @@
 {
-  "schema_version": "demo-pcc-v1",
+  "schema_version": "0.7.0",
   "generated_at": "2026-04-05T12:00:00+00:00",
   "workspace_root": "fixtures/demo",
   "projects": [
@@ -72,7 +72,8 @@
         "dependabot_low": 0,
         "secret_scanning_open": 0,
         "code_scanning_critical": 0,
-        "code_scanning_high": 0
+        "code_scanning_high": 0,
+        "open_high_critical": 0
       },
       "advisory": {
         "legacy_status": "shipped",
@@ -152,7 +153,8 @@
         "dependabot_low": 1,
         "secret_scanning_open": 0,
         "code_scanning_critical": 0,
-        "code_scanning_high": 0
+        "code_scanning_high": 0,
+        "open_high_critical": 1
       },
       "advisory": {
         "legacy_status": "functional",
@@ -232,7 +234,8 @@
         "dependabot_low": 0,
         "secret_scanning_open": 0,
         "code_scanning_critical": 0,
-        "code_scanning_high": 1
+        "code_scanning_high": 1,
+        "open_high_critical": 3
       },
       "advisory": {
         "legacy_status": "wip",

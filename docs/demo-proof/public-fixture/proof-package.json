@@ -12,14 +12,14 @@
     "commands": [
       "make demo",
       "python scripts/validate_proof_package.py docs/demo-proof/public-fixture/proof-package.json",
-      "pnpm demo:desktop"
+      "pnpm demo:desktop:fixture"
     ]
   },
   "source_state": {
     "source_data_mode": "fixture",
     "fixture": "../../../fixtures/demo/sample-report.json",
     "generated_output_dir": "../../../output/demo",
-    "source_truth_schema": "demo-pcc-v1",
+    "source_truth_schema": "0.7.0",
     "freshness_window_hours": null
   },
   "claims": [
@@ -72,15 +72,22 @@
     },
     {
       "id": "visual-capture",
-      "statement": "Final public screenshots or video frames still need a frame-level privacy review after capture.",
-      "status": "partial",
+      "statement": "Public-safe Portfolio Command Center frames were captured from the fixture-backed desktop shell and React tab surfaces.",
+      "status": "passed",
       "evidence": [
-        "summary"
+        "summary",
+        "verification-notes",
+        "screenshot-ops-shell",
+        "screenshot-portfolio",
+        "screenshot-risk-security",
+        "screenshot-burndown",
+        "screenshot-trends",
+        "screenshot-weekly-digest"
       ]
     }
   ],
   "verification": {
-    "overall": "partial",
+    "overall": "passed",
     "checks": [
       {
         "name": "manifest references fixture input and generated output paths",
@@ -88,13 +95,12 @@
       },
       {
         "name": "visual capture from Portfolio Command Center",
-        "status": "partial"
+        "status": "passed"
       }
     ],
     "missing_receipts": [],
     "known_gaps": [
-      "This package proves the data path and recording boundary. It does not include captured public screenshots yet.",
-      "Portfolio Command Center must be pointed at output/demo during recording."
+      "The fixture date is intentionally static, so screenshots show the app stale-data banner when viewed after the fixture date."
     ]
   },
   "safety": {
@@ -221,6 +227,62 @@
       "kind": "sqlite",
       "path": "../../../output/demo/portfolio-warehouse.db",
       "description": "Generated demo warehouse snapshot.",
+      "required": true
+    },
+    {
+      "id": "verification-notes",
+      "kind": "verification-notes",
+      "path": "VERIFICATION-NOTES.md",
+      "description": "Commands run, capture method, and public-safety review notes.",
+      "required": true
+    },
+    {
+      "id": "website-content",
+      "kind": "website-copy",
+      "path": "WEBSITE-CONTENT.md",
+      "description": "Website-ready Operator OS demo content block and what-stays-private copy.",
+      "required": true
+    },
+    {
+      "id": "screenshot-ops-shell",
+      "kind": "screenshot",
+      "path": "screenshots/00-ops-tauri-window.png",
+      "description": "Tauri desktop shell pointed at fixture output.",
+      "required": true
+    },
+    {
+      "id": "screenshot-portfolio",
+      "kind": "screenshot",
+      "path": "screenshots/01-portfolio.png",
+      "description": "Portfolio tab rendered from fixture truth.",
+      "required": true
+    },
+    {
+      "id": "screenshot-risk-security",
+      "kind": "screenshot",
+      "path": "screenshots/02-risk-security.png",
+      "description": "Risk and Security tab rendered from fixture truth.",
+      "required": true
+    },
+    {
+      "id": "screenshot-burndown",
+      "kind": "screenshot",
+      "path": "screenshots/03-burndown.png",
+      "description": "Burndown tab rendered from fixture security burndown.",
+      "required": true
+    },
+    {
+      "id": "screenshot-trends",
+      "kind": "screenshot",
+      "path": "screenshots/04-trends.png",
+      "description": "Trends tab rendered from fixture truth history.",
+      "required": true
+    },
+    {
+      "id": "screenshot-weekly-digest",
+      "kind": "screenshot",
+      "path": "screenshots/05-weekly-digest.png",
+      "description": "Weekly Digest tab rendered from fixture digest.",
       "required": true
     }
   ]
