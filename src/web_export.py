@@ -1319,7 +1319,9 @@ def _governance_section(report_data: dict) -> str:
 def _tech_radar_section(data: dict, trend_data: list[dict] | None) -> str:
     from src.history import load_language_trends
 
-    trends = load_language_trends()
+    trends = data.get("language_trends")
+    if trends is None:
+        trends = load_language_trends()
 
     if not trends:
         # Fall back to current language distribution

@@ -1,7 +1,48 @@
 {
-  "schema_version": "demo-pcc-v1",
+  "schema_version": "0.7.0",
   "generated_at": "2026-04-05T12:00:00+00:00",
   "workspace_root": "fixtures/demo",
+  "source_summary": {
+    "workspace_root": "fixtures/demo",
+    "project_count": 3,
+    "catalog_errors": [],
+    "catalog_warnings": [],
+    "legacy_registry_rows": 3,
+    "notion_context_rows": 0,
+    "context_quality_counts": {
+      "full": 1,
+      "minimum-viable": 2
+    },
+    "registry_status_counts": {
+      "active": 1,
+      "recent": 1,
+      "parked": 1
+    },
+    "attention_state_counts": {
+      "active-product": 1,
+      "decision-needed": 2
+    },
+    "duplicate_display_names": [],
+    "unresolved_duplicate_display_names": []
+  },
+  "precedence_matrix": {
+    "identity": [
+      "fixture"
+    ],
+    "declared": [
+      "fixture"
+    ],
+    "derived": [
+      "fixture report"
+    ],
+    "risk": [
+      "fixture report"
+    ],
+    "security": [
+      "fixture report"
+    ]
+  },
+  "warnings": [],
   "projects": [
     {
       "identity": {
@@ -72,7 +113,8 @@
         "dependabot_low": 0,
         "secret_scanning_open": 0,
         "code_scanning_critical": 0,
-        "code_scanning_high": 0
+        "code_scanning_high": 0,
+        "open_high_critical": 0
       },
       "advisory": {
         "legacy_status": "shipped",
@@ -152,7 +194,8 @@
         "dependabot_low": 1,
         "secret_scanning_open": 0,
         "code_scanning_critical": 0,
-        "code_scanning_high": 0
+        "code_scanning_high": 0,
+        "open_high_critical": 1
       },
       "advisory": {
         "legacy_status": "functional",
@@ -232,7 +275,8 @@
         "dependabot_low": 0,
         "secret_scanning_open": 0,
         "code_scanning_critical": 0,
-        "code_scanning_high": 1
+        "code_scanning_high": 1,
+        "open_high_critical": 3
       },
       "advisory": {
         "legacy_status": "wip",
@@ -241,5 +285,23 @@
         "legacy_tool_provenance": "sample"
       }
     }
-  ]
+  ],
+  "rollups": {
+    "risk_tier_counts": {
+      "elevated": 0,
+      "moderate": 2,
+      "baseline": 1,
+      "deferred": 0
+    },
+    "security": {
+      "scanned_count": 3,
+      "repos_with_open_high_critical": 2,
+      "total_open_high": 3,
+      "total_open_critical": 1
+    },
+    "decision": {
+      "decision_needed_count": 2,
+      "default_attention_count": 3
+    }
+  }
 }

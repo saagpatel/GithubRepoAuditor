@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from collections import Counter
 from dataclasses import dataclass
@@ -180,6 +181,7 @@ def build_portfolio_truth_snapshot(
     catalog_path: Path | None = None,
     legacy_registry_path: Path | None = None,
     include_notion: bool = True,
+    notion_context_fallback: dict[str, dict[str, str]] | None = None,
     now: datetime | None = None,
     release_count_by_name: dict[str, int] | None = None,
     security_alerts_by_name: dict[str, dict] | None = None,
@@ -188,6 +190,18 @@ def build_portfolio_truth_snapshot(
     catalog_data = load_portfolio_catalog(catalog_path)
     legacy_rows = load_legacy_registry_rows(legacy_registry_path)
     notion_context = load_safe_notion_project_context() if include_notion else {}
+    notion_context_carried_forward = False
+    if include_notion and not notion_context and notion_context_fallback:
+        # Live Notion was unavailable; carry forward the prior published context so
+        # a headless refresh updates risk/activity signals without dropping advisory
+        # data to zero. The caller opts in via publish_portfolio_truth(allow_empty_notion=True).
+        notion_context = notion_context_fallback
+        notion_context_carried_forward = True
+        logger.warning(
+            "Live Notion context unavailable; carrying forward %d project rows "
+            "from the prior portfolio-truth artifact.",
+            len(notion_context),
+        )
 
     workspace_projects = discover_workspace_projects(
         workspace_root,
@@ -217,6 +231,7 @@ def build_portfolio_truth_snapshot(
         "catalog_warnings": list(catalog_data.get("warnings") or []),
         "legacy_registry_rows": len(legacy_rows),
         "notion_context_rows": len(notion_context),
+        "notion_context_carried_forward": notion_context_carried_forward,
         "context_quality_counts": dict(
             Counter(project.derived.context_quality for project in projects)
         ),
@@ -249,6 +264,46 @@ def build_portfolio_truth_snapshot(
     return PortfolioTruthBuildResult(
         snapshot=snapshot, catalog_data=catalog_data, legacy_rows=legacy_rows
     )
+
+
+def load_prior_notion_context(latest_path: Path) -> dict[str, dict[str, str]]:
+    """Reconstruct a Notion project-context map from a previously published
+    portfolio-truth artifact, keyed identically to live Notion context
+    (``_normalize(display_name)`` -> ``{portfolio_call, momentum, current_state}``).
+
+    Used to carry advisory context forward on a headless refresh when a live
+    Notion token is unavailable, rather than overwriting local truth with zero
+    rows. Only projects that actually carried Notion advisory are returned, so
+    the resulting row count reflects real carried context. Returns an empty map
+    when the artifact is missing or malformed.
+    """
+    try:
+        data = json.loads(latest_path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}
+    projects = data.get("projects")
+    if not isinstance(projects, list):
+        return {}
+    context: dict[str, dict[str, str]] = {}
+    for project in projects:
+        if not isinstance(project, dict):
+            continue
+        identity = project.get("identity")
+        advisory = project.get("advisory")
+        if not isinstance(identity, dict) or not isinstance(advisory, dict):
+            continue
+        display_name = str(identity.get("display_name", "")).strip()
+        portfolio_call = str(advisory.get("notion_portfolio_call", "")).strip()
+        momentum = str(advisory.get("notion_momentum", "")).strip()
+        current_state = str(advisory.get("notion_current_state", "")).strip()
+        if not display_name or not (portfolio_call or momentum or current_state):
+            continue
+        context[_normalize(display_name)] = {
+            "portfolio_call": portfolio_call,
+            "momentum": momentum,
+            "current_state": current_state,
+        }
+    return context
 
 
 def _duplicate_display_names(projects: list[PortfolioTruthProject]) -> list[str]:

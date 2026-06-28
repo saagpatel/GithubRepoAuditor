@@ -553,5 +553,23 @@
         "next_best_action_rationale": null
       }
     }
+  ],
+  "language_trends": [
+    {
+      "language": "Python",
+      "current_count": 2,
+      "category": "Hold",
+      "repos_per_run": [
+        2
+      ]
+    },
+    {
+      "language": "TypeScript",
+      "current_count": 1,
+      "category": "Hold",
+      "repos_per_run": [
+        1
+      ]
+    }
   ]
 }
