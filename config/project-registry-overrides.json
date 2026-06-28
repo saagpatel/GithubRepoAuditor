@@ -7,6 +7,7 @@
 		"netmapper": "NetworkMapper",
 		"notion_os": "Notion",
 		"mcpaudit-web": "MCPAudit",
+		"operant-mcp": "operant-public",
 		"portfolio-code-health": "portfolio-health",
 		"screenshotselect": "ScreenshottoDataSelect",
 		"interruptionresume": "Interruption Resume Studio"
@@ -48,6 +49,7 @@
 		"MCP Audit": "MCPAudit",
 		"Notion": "Notion",
 		"Notion Operating System": "Notion",
+		"OPERANT": "operant-public",
 		"OrbitMechanics": "OrbitMechanic",
 		"OrbitForge (staging)": "OrbitForge",
 		"Personal Ops": "operator-os-docs",

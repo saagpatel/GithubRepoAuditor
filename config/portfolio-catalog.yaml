@@ -225,6 +225,19 @@ repos:
     review_cadence: weekly
     intended_disposition: maintain
     tool_provenance: claude-code
+  operant-public:
+    owner: d
+    purpose: operating-agent calibration benchmark with shipped public MCP access
+    lifecycle_state: active
+    criticality: high
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: infrastructure
+    tool_provenance: claude-code
+    maturity_program: maintain
+    target_maturity: operating
+    doctor_standard: full
+    notes: Canonical operating project is OPERANT / saagpatel/operant; local checkout remains operant-public. operant-mcp is the shipped MCP distribution slice, not a separate active project.
   PageDiffBookmark:
     owner: d
     lifecycle_state: active
