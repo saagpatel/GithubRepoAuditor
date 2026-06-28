@@ -1096,6 +1096,289 @@ def test_publish_refuses_to_drop_existing_notion_context(
     assert json.loads(latest_path.read_text())["source_summary"]["notion_context_rows"] == 137
 
 
+def test_load_prior_notion_context_rebuilds_from_artifact(tmp_path: Path) -> None:
+    from src.portfolio_truth_reconcile import load_prior_notion_context
+    from src.registry_parser import _normalize
+
+    latest_path = tmp_path / "portfolio-truth-latest.json"
+    latest_path.write_text(
+        json.dumps(
+            {
+                "source_summary": {"notion_context_rows": 2},
+                "projects": [
+                    {
+                        "identity": {"display_name": "CryptForge"},
+                        "advisory": {
+                            "notion_portfolio_call": "Finish",
+                            "notion_momentum": "Post-Build Review Done",
+                            "notion_current_state": "Parked",
+                        },
+                    },
+                    {
+                        "identity": {"display_name": "NoNotion"},
+                        "advisory": {
+                            "notion_portfolio_call": "",
+                            "notion_momentum": "",
+                            "notion_current_state": "",
+                        },
+                    },
+                ],
+            }
+        )
+        + "\n"
+    )
+
+    context = load_prior_notion_context(latest_path)
+
+    assert context[_normalize("CryptForge")] == {
+        "portfolio_call": "Finish",
+        "momentum": "Post-Build Review Done",
+        "current_state": "Parked",
+    }
+    assert _normalize("NoNotion") not in context
+    assert len(context) == 1
+
+
+def test_load_prior_notion_context_missing_or_malformed_returns_empty(tmp_path: Path) -> None:
+    from src.portfolio_truth_reconcile import load_prior_notion_context
+
+    assert load_prior_notion_context(tmp_path / "absent.json") == {}
+    malformed = tmp_path / "malformed.json"
+    malformed.write_text("{ not json")
+    assert load_prior_notion_context(malformed) == {}
+
+
+def test_publish_allow_empty_notion_carries_forward_prior_context(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    registry_output = portfolio_workspace / "project-registry.md"
+    report_output = portfolio_workspace / "PORTFOLIO-AUDIT-REPORT.md"
+
+    # Live Notion unavailable (token lost) - the exact condition that breaks the nightly job.
+    monkeypatch.setattr(
+        "src.portfolio_truth_sources.load_notion_project_context",
+        lambda _config_dir: None,
+    )
+    monkeypatch.setattr(
+        "src.portfolio_truth_publish._notion_project_context_configured",
+        lambda: True,
+    )
+
+    # Discover a real workspace project name to seed prior advisory against.
+    discovered = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+    )
+    target_name = discovered.snapshot.projects[0].identity.display_name
+
+    # Seed the prior artifact with the per-project advisory a tokened run produced.
+    latest_path = output_dir / "portfolio-truth-latest.json"
+    latest_path.write_text(
+        json.dumps(
+            {
+                "source_summary": {"notion_context_rows": 1},
+                "projects": [
+                    {
+                        "identity": {"display_name": target_name},
+                        "advisory": {
+                            "notion_portfolio_call": "Ship",
+                            "notion_momentum": "Active",
+                            "notion_current_state": "Building",
+                        },
+                    }
+                ],
+            }
+        )
+        + "\n"
+    )
+
+    result = publish_portfolio_truth(
+        workspace_root=portfolio_workspace,
+        output_dir=output_dir,
+        registry_output=registry_output,
+        portfolio_report_output=report_output,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=True,
+        allow_empty_notion=True,
+    )
+
+    published = json.loads(result.latest_path.read_text())
+    summary = published["source_summary"]
+    assert summary["notion_context_rows"] == 1
+    assert summary["notion_context_carried_forward"] is True
+    target = next(
+        item for item in published["projects"] if item["identity"]["display_name"] == target_name
+    )
+    assert target["advisory"]["notion_portfolio_call"] == "Ship"
+    assert target["advisory"]["notion_current_state"] == "Building"
+
+
+def test_publish_without_allow_empty_notion_still_guards(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Opt-in: with the flag off, the data-safety guard must still fire.
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    (output_dir / "portfolio-truth-latest.json").write_text(
+        json.dumps({"source_summary": {"notion_context_rows": 137}}) + "\n"
+    )
+    monkeypatch.setattr(
+        "src.portfolio_truth_sources.load_notion_project_context",
+        lambda _config_dir: None,
+    )
+    monkeypatch.setattr(
+        "src.portfolio_truth_publish._notion_project_context_configured",
+        lambda: True,
+    )
+
+    with pytest.raises(RuntimeError, match="0 Notion context rows"):
+        publish_portfolio_truth(
+            workspace_root=portfolio_workspace,
+            output_dir=output_dir,
+            registry_output=portfolio_workspace / "project-registry.md",
+            portfolio_report_output=portfolio_workspace / "PORTFOLIO-AUDIT-REPORT.md",
+            catalog_path=portfolio_catalog,
+            legacy_registry_path=legacy_registry,
+            include_notion=True,
+            allow_empty_notion=False,
+        )
+
+
+def test_report_subcommand_parses_allow_empty_notion_flag() -> None:
+    # The nightly job runs `audit report <user> --portfolio-truth`; the new flag
+    # must be accepted on that exact path and default to opt-in off.
+    from src.cli import build_subcommand_parser
+
+    parser = build_subcommand_parser()
+    enabled = parser.parse_args(
+        ["report", "testuser", "--portfolio-truth", "--portfolio-truth-allow-empty-notion"]
+    )
+    assert enabled.portfolio_truth_allow_empty_notion is True
+    default = parser.parse_args(["report", "testuser", "--portfolio-truth"])
+    assert default.portfolio_truth_allow_empty_notion is False
+
+
+def test_cli_portfolio_truth_allow_empty_notion_carries_forward(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    discovered = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+    )
+    target_name = discovered.snapshot.projects[0].identity.display_name
+
+    (output_dir / "portfolio-truth-latest.json").write_text(
+        json.dumps(
+            {
+                "source_summary": {"notion_context_rows": 1},
+                "projects": [
+                    {
+                        "identity": {"display_name": target_name},
+                        "advisory": {
+                            "notion_portfolio_call": "Ship",
+                            "notion_momentum": "Active",
+                            "notion_current_state": "Building",
+                        },
+                    }
+                ],
+            }
+        )
+        + "\n"
+    )
+    monkeypatch.setattr(
+        "src.portfolio_truth_sources.load_notion_project_context",
+        lambda _config_dir: None,
+    )
+    monkeypatch.setattr(
+        "src.portfolio_truth_publish._notion_project_context_configured",
+        lambda: True,
+    )
+    argv = [
+        "audit",
+        "testuser",
+        "--portfolio-truth",
+        "--portfolio-truth-allow-empty-notion",
+        "--workspace-root",
+        str(portfolio_workspace),
+        "--output-dir",
+        str(output_dir),
+        "--catalog",
+        str(portfolio_catalog),
+        "--registry",
+        str(legacy_registry),
+    ]
+    monkeypatch.setattr("sys.argv", argv)
+
+    # Must NOT raise SystemExit from the Notion-drop guard - carry-forward keeps rows > 0.
+    main()
+
+    published = json.loads((output_dir / "portfolio-truth-latest.json").read_text())
+    assert published["source_summary"]["notion_context_rows"] == 1
+    assert published["source_summary"]["notion_context_carried_forward"] is True
+
+
+def test_publish_allow_empty_notion_without_prior_context_publishes_zero(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Flag set, but nothing to carry forward (prior has a count yet no per-project
+    # advisory): the operator opted into empty-Notion publishing, so the guard must
+    # not block and the run publishes with zero carried rows.
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    (output_dir / "portfolio-truth-latest.json").write_text(
+        json.dumps({"source_summary": {"notion_context_rows": 137}, "projects": []}) + "\n"
+    )
+    monkeypatch.setattr(
+        "src.portfolio_truth_sources.load_notion_project_context",
+        lambda _config_dir: None,
+    )
+    monkeypatch.setattr(
+        "src.portfolio_truth_publish._notion_project_context_configured",
+        lambda: True,
+    )
+
+    result = publish_portfolio_truth(
+        workspace_root=portfolio_workspace,
+        output_dir=output_dir,
+        registry_output=portfolio_workspace / "project-registry.md",
+        portfolio_report_output=portfolio_workspace / "PORTFOLIO-AUDIT-REPORT.md",
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=True,
+        allow_empty_notion=True,
+    )
+
+    published = json.loads(result.latest_path.read_text())
+    assert published["source_summary"]["notion_context_rows"] == 0
+    assert published["source_summary"]["notion_context_carried_forward"] is False
+
+
 def test_context_recovery_plan_freezes_and_filters_targets(
     portfolio_workspace: Path,
     portfolio_catalog: Path,
