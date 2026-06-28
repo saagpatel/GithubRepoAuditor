@@ -5,7 +5,10 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from src.portfolio_truth_reconcile import build_portfolio_truth_snapshot
+from src.portfolio_truth_reconcile import (
+    build_portfolio_truth_snapshot,
+    load_prior_notion_context,
+)
 from src.portfolio_truth_render import render_portfolio_report_markdown, render_registry_markdown
 from src.portfolio_truth_types import truth_latest_path
 from src.portfolio_truth_validate import (
@@ -82,6 +85,7 @@ def publish_portfolio_truth(
     catalog_path: Path | None = None,
     legacy_registry_path: Path | None = None,
     include_notion: bool = True,
+    allow_empty_notion: bool = False,
     release_count_by_name: dict[str, int] | None = None,
     security_alerts_by_name: dict[str, dict] | None = None,
 ) -> PortfolioTruthPublishResult:
@@ -91,11 +95,16 @@ def publish_portfolio_truth(
         registry_output=registry_output,
         portfolio_report_output=portfolio_report_output,
     )
+    latest_path = truth_latest_path(output_dir)
+    notion_context_fallback = (
+        load_prior_notion_context(latest_path) if allow_empty_notion else None
+    )
     build_result = build_portfolio_truth_snapshot(
         workspace_root=workspace_root,
         catalog_path=catalog_path,
         legacy_registry_path=legacy_registry_path,
         include_notion=include_notion,
+        notion_context_fallback=notion_context_fallback,
         release_count_by_name=release_count_by_name,
         security_alerts_by_name=security_alerts_by_name,
     )
@@ -103,11 +112,11 @@ def publish_portfolio_truth(
 
     snapshot_stamp = build_result.snapshot.generated_at.strftime("%Y-%m-%dT%H%M%SZ")
     snapshot_path = output_dir / f"portfolio-truth-{snapshot_stamp}.json"
-    latest_path = truth_latest_path(output_dir)
     _guard_against_notion_context_drop(
         build_result.snapshot.source_summary,
         latest_path=latest_path,
         include_notion=include_notion,
+        allow_empty_notion=allow_empty_notion,
     )
     latest_name = latest_path.name
     snapshot_json = json.dumps(build_result.snapshot.to_dict(), indent=2) + "\n"
@@ -200,8 +209,13 @@ def _guard_against_notion_context_drop(
     *,
     latest_path: Path,
     include_notion: bool,
+    allow_empty_notion: bool = False,
 ) -> None:
     """Avoid overwriting local truth when Notion bootstrap silently disappears."""
+    if allow_empty_notion:
+        # Operator explicitly opted into publishing without live Notion (a headless or
+        # scheduled refresh); prior advisory is carried forward where available.
+        return
     if not include_notion or not _notion_project_context_configured():
         return
     current_rows = _int_value(source_summary.get("notion_context_rows"))
