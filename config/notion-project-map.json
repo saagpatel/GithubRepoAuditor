@@ -5,6 +5,12 @@
 	"portfolio-index": {
 		"localProjectId": "378c21f1-caf0-814e-b127-ddbfe578e1e5"
 	},
+	"portfolio-mcp": {
+		"localProjectId": "38dc21f1-caf0-8157-9f5c-d6425a4b32b9"
+	},
+	"agent-session-replay": {
+		"localProjectId": "38dc21f1-caf0-81fc-9366-d7d2bdae7815"
+	},
 	"bridge-db": {
 		"localProjectId": "34cc21f1-caf0-81cd-9650-cf2253d7afd4"
 	},
@@ -31,6 +37,9 @@
 	},
 	"MCP Audit": {
 		"localProjectId": "332c21f1-caf0-8150-a80f-d23b2b9e601d"
+	},
+	"mcp-trust": {
+		"localProjectId": "384c21f1-caf0-817f-82ec-c57870863b24"
 	},
 	"Notion": {
 		"localProjectId": "332c21f1-caf0-81c5-85fb-d7451163ab6b"

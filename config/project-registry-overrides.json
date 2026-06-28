@@ -6,6 +6,7 @@
 		"bhv": "BrowserHistoryVisualizer",
 		"netmapper": "NetworkMapper",
 		"notion_os": "Notion",
+		"mcpaudit-web": "MCPAudit",
 		"screenshotselect": "ScreenshottoDataSelect",
 		"interruptionresume": "Interruption Resume Studio"
 	},
