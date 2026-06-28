@@ -434,6 +434,16 @@ def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         "--portfolio-truth", action="store_true", help="Generate canonical portfolio truth snapshot"
     )
     p.add_argument(
+        "--portfolio-truth-allow-empty-notion",
+        action="store_true",
+        help=(
+            "When live Notion context is unavailable, carry forward the previously "
+            "published Notion context instead of refusing to publish. For headless or "
+            "scheduled refreshes that update risk/activity signals without dropping "
+            "advisory context to zero."
+        ),
+    )
+    p.add_argument(
         "--portfolio-context-recovery",
         action="store_true",
         help="Build active/recent weak-context recovery plan",
@@ -672,6 +682,16 @@ def build_parser() -> argparse.ArgumentParser:
             "Overlay the security.* GHAS alert counts on each project from the latest "
             "output/ghas-alerts-<username>-*.json file, feeding the active-high-severity-alerts "
             "risk factor (requires a prior `audit report --ghas-alerts` run)"
+        ),
+    )
+    parser.add_argument(
+        "--portfolio-truth-allow-empty-notion",
+        action="store_true",
+        help=(
+            "When live Notion context is unavailable, carry forward the previously "
+            "published Notion context instead of refusing to publish. For headless or "
+            "scheduled refreshes that update risk/activity signals without dropping "
+            "advisory context to zero."
         ),
     )
     parser.add_argument(
@@ -5390,6 +5410,7 @@ def _run_portfolio_truth_mode(args) -> None:
             catalog_path=Path(args.catalog) if args.catalog else None,
             legacy_registry_path=legacy_registry_path,
             include_notion=True,
+            allow_empty_notion=getattr(args, "portfolio_truth_allow_empty_notion", False),
             release_count_by_name=release_count_by_name,
             security_alerts_by_name=security_alerts_by_name,
         )

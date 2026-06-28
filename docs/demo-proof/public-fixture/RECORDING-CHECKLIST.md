@@ -5,8 +5,8 @@ Use this checklist for a public-safe Portfolio Command Center recording.
 ## Preflight
 
 - [ ] Run `make demo` from `GithubRepoAuditor`.
-- [ ] Run `pnpm demo:desktop` from `PortfolioCommandCenter`.
-- [ ] Point Portfolio Command Center at `GithubRepoAuditor/output/demo`.
+- [ ] Run `pnpm demo:desktop:fixture` from `PortfolioCommandCenter`.
+- [ ] Confirm Portfolio Command Center is pointed at the fixture output directory.
 - [ ] Confirm the visible data is fixture data, not the private live portfolio.
 - [ ] Hide terminals, path bars, desktop clutter, account menus, and notification banners.
 
@@ -30,3 +30,9 @@ Use this checklist for a public-safe Portfolio Command Center recording.
 - real security advisory details;
 - Notion, email, calendar, Slack, bridge-db, or SecondBrain content;
 - terminal scrollback, env vars, tokens, cookies, or config files.
+
+## Existing Public-Safe Frames
+
+Use the included `screenshots/` frames as still-image evidence or as the visual
+source for a website case-study block. If recording new video, treat these
+frames as the reference for what safe output looks like.

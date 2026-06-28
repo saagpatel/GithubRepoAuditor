@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 import json
 from datetime import datetime, timezone
 from typing import Any
@@ -101,6 +102,21 @@ def _demo_diff_data() -> dict:
     }
 
 
+def _demo_language_trends(report_data: dict[str, Any]) -> list[dict[str, Any]]:
+    language_distribution = dict(report_data.get("language_distribution", {}))
+    return [
+        {
+            "language": language,
+            "current_count": count,
+            "category": "Hold",
+            "repos_per_run": [count],
+        }
+        for language, count in sorted(
+            language_distribution.items(), key=lambda item: (-item[1], item[0])
+        )
+    ]
+
+
 def main() -> None:
     (
         control_center_artifact_payload,
@@ -119,6 +135,7 @@ def main() -> None:
         audit["score_explanation"] = build_score_explanation(audit)
     report_data["run_change_counts"] = build_run_change_counts(diff_data)
     report_data["run_change_summary"] = build_run_change_summary(diff_data)
+    report_data["language_trends"] = _demo_language_trends(report_data)
 
     report_path = OUTPUT_DIR / "demo-report.json"
     report_path.write_text(json.dumps(report_data, indent=2))
@@ -251,6 +268,7 @@ def _build_pcc_truth_snapshot(
             risk_tier = "moderate"
         security = _security_fields(audit)
         high_crit = security["dependabot_critical"] + security["dependabot_high"]
+        security["open_high_critical"] = high_crit
         attention_state = _attention_state(audit, risk_tier, high_crit)
         projects.append(
             {
@@ -325,11 +343,86 @@ def _build_pcc_truth_snapshot(
             }
         )
 
+    risk_tier_counts = Counter(project["risk"]["risk_tier"] for project in projects)
+    attention_state_counts = Counter(
+        project["derived"]["attention_state"] for project in projects
+    )
+    context_quality_counts = Counter(
+        project["derived"]["context_quality"] for project in projects
+    )
+    registry_status_counts = Counter(
+        project["derived"]["registry_status"] for project in projects
+    )
+    scanned_count = sum(
+        1 for project in projects if project["security"]["alerts_available"]
+    )
+    total_open_high = sum(
+        project["security"]["dependabot_high"] for project in projects
+    )
+    total_open_critical = sum(
+        project["security"]["dependabot_critical"] for project in projects
+    )
+    repos_with_open_high_critical = sum(
+        1
+        for project in projects
+        if project["security"]["open_high_critical"] > 0
+    )
+    decision_needed_count = sum(
+        1
+        for project in projects
+        if project["derived"]["attention_state"] == "decision-needed"
+    )
+    default_attention_count = sum(
+        1
+        for project in projects
+        if project["derived"]["attention_state"]
+        in {"decision-needed", "active-product", "active-infra"}
+    )
+
     return {
-        "schema_version": "demo-pcc-v1",
+        "schema_version": "0.7.0",
         "generated_at": generated_at,
         "workspace_root": "fixtures/demo",
+        "source_summary": {
+            "workspace_root": "fixtures/demo",
+            "project_count": len(projects),
+            "catalog_errors": [],
+            "catalog_warnings": [],
+            "legacy_registry_rows": len(projects),
+            "notion_context_rows": 0,
+            "context_quality_counts": dict(context_quality_counts),
+            "registry_status_counts": dict(registry_status_counts),
+            "attention_state_counts": dict(attention_state_counts),
+            "duplicate_display_names": [],
+            "unresolved_duplicate_display_names": [],
+        },
+        "precedence_matrix": {
+            "identity": ["fixture"],
+            "declared": ["fixture"],
+            "derived": ["fixture report"],
+            "risk": ["fixture report"],
+            "security": ["fixture report"],
+        },
+        "warnings": [],
         "projects": projects,
+        "rollups": {
+            "risk_tier_counts": {
+                "elevated": risk_tier_counts.get("elevated", 0),
+                "moderate": risk_tier_counts.get("moderate", 0),
+                "baseline": risk_tier_counts.get("baseline", 0),
+                "deferred": risk_tier_counts.get("deferred", 0),
+            },
+            "security": {
+                "scanned_count": scanned_count,
+                "repos_with_open_high_critical": repos_with_open_high_critical,
+                "total_open_high": total_open_high,
+                "total_open_critical": total_open_critical,
+            },
+            "decision": {
+                "decision_needed_count": decision_needed_count,
+                "default_attention_count": default_attention_count,
+            },
+        },
     }
 
 
