@@ -8,6 +8,9 @@
 	"portfolio-mcp": {
 		"localProjectId": "38dc21f1-caf0-8157-9f5c-d6425a4b32b9"
 	},
+	"portfolio-health": {
+		"localProjectId": "378c21f1-caf0-81ea-a12a-db8ee770df83"
+	},
 	"agent-session-replay": {
 		"localProjectId": "38dc21f1-caf0-81fc-9366-d7d2bdae7815"
 	},
