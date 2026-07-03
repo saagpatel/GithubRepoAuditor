@@ -9,6 +9,10 @@ from src.portfolio_truth_types import PortfolioTruthProject, PortfolioTruthSnaps
 # the digest cap the per-repo security callout list at the same depth so the two
 # human-facing surfaces stay consistent.
 MAX_SECURITY_ATTENTION_ITEMS = 5
+GENERATED_MARKDOWN_PROVENANCE_MARKER = (
+    "<!-- generated-by: GithubRepoAuditor portfolio_truth_render; "
+    "source: portfolio-truth-latest.json; do-not-edit: true -->"
+)
 
 
 def _security_overview(projects: list[PortfolioTruthProject]) -> dict[str, int]:
@@ -59,6 +63,8 @@ def render_registry_markdown(snapshot: PortfolioTruthSnapshot) -> str:
     grouped = _group_projects(snapshot.projects)
     project_labels = registry_project_labels(snapshot.projects)
     lines = [
+        GENERATED_MARKDOWN_PROVENANCE_MARKER,
+        "",
         "# Project Registry",
         "",
         f"> Master index for Cowork automated tasks. Last generated: {generated_date}.",
@@ -108,6 +114,8 @@ def render_portfolio_report_markdown(
     risk_tier_counts = Counter(project.risk.risk_tier for project in snapshot.projects)
     security_overview = _security_overview(snapshot.projects)
     lines = [
+        GENERATED_MARKDOWN_PROVENANCE_MARKER,
+        "",
         "# Portfolio Audit Report",
         "",
         f"> Generated: {generated} | Projects in truth snapshot: {len(snapshot.projects)}",
