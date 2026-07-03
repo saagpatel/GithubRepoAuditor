@@ -185,6 +185,7 @@ def build_portfolio_truth_snapshot(
     now: datetime | None = None,
     release_count_by_name: dict[str, int] | None = None,
     security_alerts_by_name: dict[str, dict] | None = None,
+    repo_status_by_name: dict[str, dict] | None = None,
 ) -> PortfolioTruthBuildResult:
     now = now or datetime.now(timezone.utc)
     catalog_data = load_portfolio_catalog(catalog_path)
@@ -217,6 +218,7 @@ def build_portfolio_truth_snapshot(
             now=now,
             release_count_by_name=release_count_by_name,
             security_alerts_by_name=security_alerts_by_name,
+            repo_status_by_name=repo_status_by_name,
         )
         for raw_project in workspace_projects
     ]
@@ -240,6 +242,11 @@ def build_portfolio_truth_snapshot(
         ),
         "attention_state_counts": dict(
             Counter(project.derived.attention_state for project in projects)
+        ),
+        "github_archived_count": sum(
+            1
+            for project in projects
+            if project.provenance.get("github.archived", {}).get("detail") == "true"
         ),
         "duplicate_display_names": _duplicate_display_names(projects),
         "unresolved_duplicate_display_names": _unresolved_duplicate_display_names(projects),
@@ -370,6 +377,14 @@ def _select_security_entry(
     return lookup.get(repo_name) or lookup.get(display_name)
 
 
+def _select_repo_status_entry(
+    lookup: dict[str, dict], repo_full_name: str | None, display_name: str
+) -> dict | None:
+    """Join GitHub repo metadata by remote repo name, then local display name."""
+    repo_name = (repo_full_name or "").rsplit("/", 1)[-1]
+    return lookup.get(repo_name) or lookup.get(display_name)
+
+
 def _build_truth_project(
     raw_project: dict[str, Any],
     *,
@@ -379,6 +394,7 @@ def _build_truth_project(
     now: datetime,
     release_count_by_name: dict[str, int] | None = None,
     security_alerts_by_name: dict[str, dict] | None = None,
+    repo_status_by_name: dict[str, dict] | None = None,
 ) -> PortfolioTruthProject:
     relative_path = raw_project["path"]
     group_entry = group_entry_for_path(relative_path, catalog_data)
@@ -453,9 +469,24 @@ def _build_truth_project(
         "detail": raw_project["context_quality"],
     }
 
+    status_entry = _select_repo_status_entry(
+        repo_status_by_name or {},
+        raw_project.get("repo_full_name"),
+        raw_project["name"],
+    )
+    github_archived = bool(status_entry and status_entry.get("archived") is True)
+    if status_entry is not None:
+        provenance["github.archived"] = {
+            "source": str(status_entry.get("source") or "audit_report"),
+            "detail": str(github_archived).lower(),
+        }
+
     last_activity = raw_project["last_meaningful_activity_at"]
     activity_status = _activity_status_for(
-        last_activity, declared_values["lifecycle_state"], now=now
+        last_activity,
+        declared_values["lifecycle_state"],
+        now=now,
+        github_archived=github_archived,
     )
     registry_status = _registry_status_for(activity_status)
 
@@ -473,6 +504,7 @@ def _build_truth_project(
             ),
         },
         context_quality=context_quality,
+        archived=github_archived,
         registry_status=registry_status,
     )
     provenance["declared.operating_path"] = {
@@ -525,6 +557,7 @@ def _build_truth_project(
         category=declared_values["category"],
         path_override=path_entry.get("path_override", ""),
         risk_entry=risk_entry,
+        github_archived=github_archived,
     )
 
     declared = DeclaredFields(
@@ -584,6 +617,10 @@ def _build_truth_project(
             path_entry.get(
                 "path_rationale", "Operating path currently requires investigate override."
             )
+        )
+    if github_archived and declared_values["lifecycle_state"] != "archived":
+        warnings.append(
+            "GitHub metadata marks this repo archived/read-only; portfolio truth reconciled it as archived attention."
         )
 
     # ── Strict local-filesystem signals (Sprint 8.2) ─────────────────────────
@@ -776,8 +813,9 @@ def _activity_status_for(
     lifecycle_state: str,
     *,
     now: datetime,
+    github_archived: bool = False,
 ) -> str:
-    if lifecycle_state == "archived":
+    if github_archived or lifecycle_state == "archived":
         return "archived"
     if last_activity is None:
         return "stale"
@@ -804,8 +842,14 @@ def _attention_state_for(
     category: str,
     path_override: str,
     risk_entry: dict[str, Any],
+    github_archived: bool = False,
 ) -> str:
-    if registry_status == "archived" or lifecycle_state == "archived" or operating_path == "archive":
+    if (
+        github_archived
+        or registry_status == "archived"
+        or lifecycle_state == "archived"
+        or operating_path == "archive"
+    ):
         return "archived"
     if (
         operating_path == "experiment"
