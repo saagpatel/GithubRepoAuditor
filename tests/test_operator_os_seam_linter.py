@@ -294,6 +294,45 @@ def test_identity_resolution_bridge_canonical_key_disagreement_fails(
     assert result.findings[0].violation == "bridge canonical_key disagrees with alias map"
 
 
+def test_cli_identity_resolution_is_opt_in(tmp_path: Path) -> None:
+    truth, markdown = _passing_paths(tmp_path)
+    bridge_db = tmp_path / "bridge.db"
+    _write_bridge_db(bridge_db, session_cost_names=["085"])
+
+    code = main(
+        [
+            "--truth",
+            str(truth),
+            "--markdown",
+            str(markdown[0]),
+            "--markdown",
+            str(markdown[1]),
+            "--bridge-db",
+            str(bridge_db),
+            "--json",
+        ]
+    )
+
+    assert code == 0
+
+    code = main(
+        [
+            "--truth",
+            str(truth),
+            "--markdown",
+            str(markdown[0]),
+            "--markdown",
+            str(markdown[1]),
+            "--identity-resolution",
+            "--bridge-db",
+            str(bridge_db),
+            "--json",
+        ]
+    )
+
+    assert code == 1
+
+
 def test_cli_exits_nonzero_and_writes_worklist_on_failure(tmp_path: Path) -> None:
     truth, markdown = _passing_paths(tmp_path)
     _write_truth(truth, schema_version="0.6.0")

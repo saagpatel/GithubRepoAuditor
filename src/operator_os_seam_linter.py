@@ -103,7 +103,6 @@ def lint_operator_os_seams(
         findings.extend(
             _check_identity_resolution(
                 truth,
-                truth_path=truth_path,
                 bridge_db_path=bridge_db_path,
                 notification_db_path=notification_db_path,
                 notion_snapshot_path=notion_snapshot_path,
@@ -164,9 +163,9 @@ def main(argv: list[str] | None = None) -> int:
         markdown_paths=markdown_paths,
         expected_schema_version=args.expected_schema_version,
         max_staleness_hours=args.max_staleness_hours,
-        bridge_db_path=args.bridge_db,
-        notification_db_path=args.notification_db,
-        notion_snapshot_path=args.notion_snapshot,
+        bridge_db_path=args.bridge_db if args.identity_resolution else None,
+        notification_db_path=args.notification_db if args.identity_resolution else None,
+        notion_snapshot_path=args.notion_snapshot if args.identity_resolution else None,
     )
     payload = result.to_dict()
     if args.worklist_output:
@@ -190,6 +189,11 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--truth", type=Path, default=None)
     parser.add_argument("--markdown", action="append", default=[])
     parser.add_argument("--worklist-output", type=Path, default=None)
+    parser.add_argument(
+        "--identity-resolution",
+        action="store_true",
+        help="Also audit cross-store project identity dialects in local operator stores.",
+    )
     parser.add_argument("--bridge-db", type=Path, default=DEFAULT_BRIDGE_DB_PATH)
     parser.add_argument("--notification-db", type=Path, default=DEFAULT_NOTIFICATION_DB_PATH)
     parser.add_argument("--notion-snapshot", type=Path, default=DEFAULT_NOTION_SNAPSHOT_PATH)
@@ -323,7 +327,6 @@ def _check_schema_pin(
 def _check_identity_resolution(
     truth: dict[str, Any],
     *,
-    truth_path: Path,
     bridge_db_path: Path | None,
     notification_db_path: Path | None,
     notion_snapshot_path: Path | None,
