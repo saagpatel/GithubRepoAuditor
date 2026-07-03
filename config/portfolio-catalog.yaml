@@ -930,7 +930,7 @@ repos:
     notes: Active through the June 10-22, 2026 Fable window; staged harness/config changes are operator-installed only, then archive or park the campaign workspace after final index review.
   portfolio-index:
     owner: d
-    purpose: public-safe static portfolio index for hiring-manager review
+    purpose: public-safe workshop site (saagarpatel.dev) for personal AI systems, local-first tools, and field notes; workshop framing per repo AGENTS.md, not a hiring page
     lifecycle_state: active
     review_cadence: monthly
     intended_disposition: maintain
