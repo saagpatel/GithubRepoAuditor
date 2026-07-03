@@ -1102,31 +1102,37 @@ repos:
     lifecycle_state: active
     review_cadence: weekly
     intended_disposition: finish
+    maturity_program: finish
   egress-guard-oss:
     owner: d
     lifecycle_state: active
     review_cadence: weekly
     intended_disposition: finish
+    maturity_program: finish
   proof-pr:
     owner: d
     lifecycle_state: active
     review_cadence: weekly
     intended_disposition: finish
+    maturity_program: finish
   devils-advocate:
     owner: d
     lifecycle_state: active
     review_cadence: weekly
     intended_disposition: finish
+    maturity_program: finish
   agent-permission-diff-bot:
     owner: d
     lifecycle_state: active
     review_cadence: weekly
     intended_disposition: finish
+    maturity_program: finish
   mcpaudit-web:
     owner: d
     lifecycle_state: active
     review_cadence: weekly
     intended_disposition: finish
+    maturity_program: finish
   # --- 2026-07-02 decision sweep: keep -> maintain ---
   shadow-mcp:
     owner: d
@@ -1175,6 +1181,17 @@ repos:
     review_cadence: monthly
     intended_disposition: maintain
     category: fun
+  continuity:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: infrastructure
+  fable-second-sprint:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: experiment
   # --- 2026-07-02 decision sweep: done/superseded -> archive ---
   sae-synth-spike:
     owner: d
