@@ -88,6 +88,7 @@ def publish_portfolio_truth(
     allow_empty_notion: bool = False,
     release_count_by_name: dict[str, int] | None = None,
     security_alerts_by_name: dict[str, dict] | None = None,
+    repo_status_by_name: dict[str, dict] | None = None,
 ) -> PortfolioTruthPublishResult:
     validate_publish_targets(
         workspace_root=workspace_root,
@@ -107,6 +108,7 @@ def publish_portfolio_truth(
         notion_context_fallback=notion_context_fallback,
         release_count_by_name=release_count_by_name,
         security_alerts_by_name=security_alerts_by_name,
+        repo_status_by_name=repo_status_by_name,
     )
     validate_truth_snapshot(build_result.snapshot)
 

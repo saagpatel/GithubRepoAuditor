@@ -5284,6 +5284,85 @@ def _load_release_count_by_name(*, output_dir: Path, username: str) -> dict[str,
     return result
 
 
+def _latest_audit_report_path(*, output_dir: Path, username: str) -> Path | None:
+    audit_files = sorted(
+        output_dir.glob(f"audit-report-{username}-*.json"),
+        key=lambda p: p.stat().st_mtime,
+    )
+    return audit_files[-1] if audit_files else None
+
+
+def _repo_status_entries_from_metadata(
+    repo_metadata: list[dict], *, source: str
+) -> dict[str, dict]:
+    result: dict[str, dict] = {}
+    for metadata in repo_metadata:
+        name = str(metadata.get("name") or "").strip()
+        full_name = str(metadata.get("full_name") or "").strip()
+        archived = metadata.get("archived")
+        if not name or not isinstance(archived, bool):
+            continue
+        entry = {"archived": archived, "full_name": full_name, "source": source}
+        result[name] = entry
+        repo_name = full_name.rsplit("/", 1)[-1] if full_name else ""
+        if repo_name:
+            result.setdefault(repo_name, entry)
+    return result
+
+
+def _load_live_repo_status_by_name(
+    *,
+    username: str,
+    token: str | None,
+    cache: ResponseCache | None,
+) -> dict[str, dict] | None:
+    """Fetch current GitHub repo archived flags using the existing REST client."""
+    import logging
+
+    _log = logging.getLogger(__name__)
+    try:
+        repos = GitHubClient(token=token, cache=cache).list_repos(username)
+    except Exception as exc:  # noqa: BLE001
+        _log.warning(
+            "--portfolio-truth: could not fetch live GitHub repo status for %s: %s — "
+            "falling back to latest audit report metadata",
+            username,
+            exc,
+        )
+        return None
+    return _repo_status_entries_from_metadata(repos, source="github_api")
+
+
+def _load_repo_status_from_audit_by_name(
+    *, output_dir: Path, username: str
+) -> dict[str, dict] | None:
+    """Load GitHub repo status metadata from the latest audit report JSON."""
+    import logging
+
+    _log = logging.getLogger(__name__)
+    audit_path = _latest_audit_report_path(output_dir=output_dir, username=username)
+    if audit_path is None:
+        return None
+
+    try:
+        with audit_path.open() as fh:
+            data = json.load(fh)
+    except Exception as exc:  # noqa: BLE001
+        _log.warning(
+            "--portfolio-truth: could not read repo status overlay from %s: %s — skipping",
+            audit_path,
+            exc,
+        )
+        return None
+
+    repo_metadata: list[dict] = []
+    for audit in data.get("audits") or []:
+        metadata = audit.get("metadata") or {}
+        if isinstance(metadata, dict):
+            repo_metadata.append(metadata)
+    return _repo_status_entries_from_metadata(repo_metadata, source="audit_report")
+
+
 def _load_security_alerts_by_name(*, output_dir: Path, username: str) -> dict[str, dict] | None:
     """Load per-repo GHAS alert counts from the latest output/ghas-alerts-<username>-*.json.
 
@@ -5346,15 +5425,15 @@ def _warn_if_warehouse_report_stale(output_dir: Path, username: str) -> None:
     """
     from datetime import date
 
-    reports = sorted(output_dir.glob(f"audit-report-{username}-*.json"))
-    if not reports:
+    report_path = _latest_audit_report_path(output_dir=output_dir, username=username)
+    if report_path is None:
         print_warning(
             f"No audit-report-{username}-*.json in {output_dir}: Notion's Repo Auditor "
             f"signal reads that warehouse report and this --portfolio-truth run did not "
             f"create one. Run `audit report {username}` to generate it (F2)."
         )
         return
-    match = re.search(r"(\d{4}-\d{2}-\d{2})", reports[-1].name)
+    match = re.search(r"(\d{4}-\d{2}-\d{2})", report_path.name)
     if not match:
         return
     try:
@@ -5364,7 +5443,7 @@ def _warn_if_warehouse_report_stale(output_dir: Path, username: str) -> None:
     age = (date.today() - report_date).days
     if age > WAREHOUSE_REPORT_STALE_DAYS:
         print_warning(
-            f"Newest warehouse report {reports[-1].name} is {age}d old: Notion's Repo "
+            f"Newest warehouse report {report_path.name} is {age}d old: Notion's Repo "
             f"Auditor signal reads it and is now stale. Run `audit report {username}` to "
             f"refresh the warehouse report (F2 — both artifacts kept live by decision)."
         )
@@ -5400,6 +5479,16 @@ def _run_portfolio_truth_mode(args) -> None:
             output_dir=output_dir,
             username=args.username,
         )
+    repo_status_by_name = _load_live_repo_status_by_name(
+        username=args.username,
+        token=getattr(args, "token", None),
+        cache=None if getattr(args, "no_cache", False) else ResponseCache(),
+    )
+    if repo_status_by_name is None:
+        repo_status_by_name = _load_repo_status_from_audit_by_name(
+            output_dir=output_dir,
+            username=args.username,
+        )
 
     try:
         result = publish_portfolio_truth(
@@ -5413,6 +5502,7 @@ def _run_portfolio_truth_mode(args) -> None:
             allow_empty_notion=getattr(args, "portfolio_truth_allow_empty_notion", False),
             release_count_by_name=release_count_by_name,
             security_alerts_by_name=security_alerts_by_name,
+            repo_status_by_name=repo_status_by_name,
         )
     except PortfolioTruthPublishError as exc:
         raise SystemExit(str(exc)) from exc

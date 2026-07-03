@@ -472,6 +472,54 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
     )
 
 
+def test_github_archived_status_reconciles_to_archived_attention(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    now = datetime.fromtimestamp(1_700_200_000, tz=timezone.utc)
+    baseline = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=now,
+    )
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=now,
+        repo_status_by_name={
+            "Alpha": {
+                "full_name": "d/Alpha",
+                "archived": True,
+            }
+        },
+    )
+
+    projects = {project.identity.display_name: project for project in result.snapshot.projects}
+    alpha = projects["Alpha"]
+
+    assert alpha.declared.lifecycle_state == "active"
+    assert alpha.declared.operating_path == "maintain"
+    assert alpha.derived.path_confidence == "low"
+    assert alpha.derived.activity_status == "archived"
+    assert alpha.derived.registry_status == "archived"
+    assert alpha.derived.attention_state == "archived"
+    assert alpha.provenance["github.archived"] == {
+        "source": "audit_report",
+        "detail": "true",
+    }
+    assert result.snapshot.source_summary["github_archived_count"] == 1
+    assert baseline.snapshot.source_summary["attention_state_counts"]["active-product"] == 1
+    assert result.snapshot.source_summary["attention_state_counts"].get("active-product", 0) == 0
+    assert result.snapshot.source_summary["attention_state_counts"].get(
+        "decision-needed", 0
+    ) == baseline.snapshot.source_summary["attention_state_counts"].get("decision-needed", 0)
+
+
 def test_build_security_fields_maps_ghas_entry() -> None:
     from src.portfolio_truth_reconcile import _build_security_fields
 
