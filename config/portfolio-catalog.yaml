@@ -1096,3 +1096,118 @@ repos:
     intended_disposition: archive
     category: commercial
     tool_provenance: gpt
+  # --- 2026-07-02 decision sweep: ship/accelerate -> finish ---
+  agent-session-replay:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: finish
+  egress-guard-oss:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: finish
+  proof-pr:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: finish
+  devils-advocate:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: finish
+  agent-permission-diff-bot:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: finish
+  mcpaudit-web:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: finish
+  # --- 2026-07-02 decision sweep: keep -> maintain ---
+  shadow-mcp:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+  portfolio-mcp:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: infrastructure
+  harness-scorecard:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+  ccq:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+  plumbline:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+  agent-flight-recorder:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+  agent-flight-recorder-local:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+  reliquary:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+  CivicTwin:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: fun
+  # --- 2026-07-02 decision sweep: done/superseded -> archive ---
+  sae-synth-spike:
+    owner: d
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
+  mcp-permission-audit-deprecation:
+    owner: d
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
+  awesome-mcp-servers:
+    owner: d
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
+  portfolio-hooks:
+    owner: d
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
+  ccq-archive:
+    owner: d
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
+  trust-receipt-generator:
+    owner: d
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
+  personal-ops-sendwindow-tests:
+    owner: d
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
