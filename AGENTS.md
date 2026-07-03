@@ -18,10 +18,12 @@ The current machine-readable truth surface is `output/portfolio-truth-latest.jso
 
 ## How To Run
 
-Refresh the local portfolio truth snapshot:
+Refresh and verify the local portfolio truth snapshot:
 
 ```sh
 uv run python -m src.cli report saagpatel --portfolio-truth
+jq '{generated_at,total:(.projects|length),counts:.source_summary.attention_state_counts}' output/portfolio-truth-latest.json
+uv run operator-os-seam-linter --truth output/portfolio-truth-latest.json --json
 ```
 
 Useful checks for repo changes:
@@ -32,6 +34,10 @@ uv run pytest -q
 ```
 
 Use narrower tests when the change is scoped and the full suite would be disproportionate.
+
+The seam-linter checks truth freshness, schema pinning, and generated Markdown
+provenance markers. Its identity-resolution check is intentionally deferred until
+the dialect census produces the alias map.
 
 ## Known Risks
 

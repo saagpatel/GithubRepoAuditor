@@ -348,11 +348,20 @@ For day-to-day operations, `--control-center` is now the clean read-only entrypo
 
 The portfolio truth layer now has its own dedicated generation path. `--portfolio-truth` scans the configured local projects workspace, produces `output/portfolio-truth-latest.json` plus dated historical truth snapshots, and regenerates the configured project-registry and portfolio-audit Markdown compatibility outputs from that same truth contract instead of treating either markdown file as canonical.
 
-For current live portfolio counts, query the canonical snapshot instead of copying numbers into handoff or demo docs:
+After regenerating portfolio truth, verify the canonical snapshot instead of copying numbers into handoff or demo docs:
 
 ```bash
+uv run python -m src.cli report saagpatel --portfolio-truth
 jq '{generated_at,total:(.projects|length),counts:.source_summary.attention_state_counts}' output/portfolio-truth-latest.json
+uv run operator-os-seam-linter --truth output/portfolio-truth-latest.json --json
 ```
+
+The Operator-OS seam-linter is the small conformance check for that truth layer.
+It verifies the latest truth artifact freshness, schema pin, and generated
+Markdown provenance markers.
+
+Identity-resolution enforcement remains a named v0.1 extension point and should
+not be enabled until the dialect census and alias map exist.
 
 Phase 104 added a second standalone workspace mode: `--portfolio-context-recovery`. That mode freezes the active/recent weak-context cohort from the live truth snapshot, writes dry-run recovery plan artifacts into `output/`, skips dirty or temporary repos automatically, and can apply bounded minimum-context upgrades plus repo-level catalog seeds before regenerating the truth snapshot and compatibility outputs.
 
