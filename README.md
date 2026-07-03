@@ -360,8 +360,17 @@ The Operator-OS seam-linter is the small conformance check for that truth layer.
 It verifies the latest truth artifact freshness, schema pin, and generated
 Markdown provenance markers.
 
-Identity-resolution enforcement remains a named v0.1 extension point and should
-not be enabled until the dialect census and alias map exist.
+Identity-resolution enforcement is opt-in. Use it without a window for backlog
+audits, and with `--identity-since` after producer fixes when you need a current
+regression gate:
+
+```bash
+uv run operator-os-seam-linter --identity-resolution --identity-since 2026-07-03T13:02:06Z --truth output/portfolio-truth-latest.json --json
+```
+
+The since window applies only to timestamped local stores: bridge-db activity,
+session-costs, and notification-hub durable events. Untimestamped Notion
+snapshot rows are skipped in since-window mode.
 
 Phase 104 added a second standalone workspace mode: `--portfolio-context-recovery`. That mode freezes the active/recent weak-context cohort from the live truth snapshot, writes dry-run recovery plan artifacts into `output/`, skips dirty or temporary repos automatically, and can apply bounded minimum-context upgrades plus repo-level catalog seeds before regenerating the truth snapshot and compatibility outputs.
 

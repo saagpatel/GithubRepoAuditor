@@ -79,6 +79,7 @@ def lint_operator_os_seams(
     bridge_db_path: Path | None = None,
     notification_db_path: Path | None = None,
     notion_snapshot_path: Path | None = None,
+    identity_since: datetime | None = None,
     now: datetime | None = None,
 ) -> SeamLintResult:
     generated_at = _aware(now or datetime.now(UTC))
@@ -106,6 +107,7 @@ def lint_operator_os_seams(
                 bridge_db_path=bridge_db_path,
                 notification_db_path=notification_db_path,
                 notion_snapshot_path=notion_snapshot_path,
+                identity_since=identity_since,
             )
         )
     findings.extend(_check_generated_markdown(markdown_paths))
@@ -166,6 +168,9 @@ def main(argv: list[str] | None = None) -> int:
         bridge_db_path=args.bridge_db if args.identity_resolution else None,
         notification_db_path=args.notification_db if args.identity_resolution else None,
         notion_snapshot_path=args.notion_snapshot if args.identity_resolution else None,
+        identity_since=_parse_datetime(args.identity_since)
+        if args.identity_since is not None
+        else None,
     )
     payload = result.to_dict()
     if args.worklist_output:
@@ -197,6 +202,14 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--bridge-db", type=Path, default=DEFAULT_BRIDGE_DB_PATH)
     parser.add_argument("--notification-db", type=Path, default=DEFAULT_NOTIFICATION_DB_PATH)
     parser.add_argument("--notion-snapshot", type=Path, default=DEFAULT_NOTION_SNAPSHOT_PATH)
+    parser.add_argument(
+        "--identity-since",
+        help=(
+            "Only audit timestamped local-store identities emitted at or after "
+            "this ISO-8601 timestamp. Applies to bridge-db activity, "
+            "session-costs, and notification-hub durable events."
+        ),
+    )
     parser.add_argument("--expected-schema-version", default=SCHEMA_VERSION)
     parser.add_argument("--max-staleness-hours", type=int, default=DEFAULT_MAX_STALENESS_HOURS)
     parser.add_argument("--json", action="store_true")
@@ -330,6 +343,7 @@ def _check_identity_resolution(
     bridge_db_path: Path | None,
     notification_db_path: Path | None,
     notion_snapshot_path: Path | None,
+    identity_since: datetime | None,
 ) -> list[SeamLintFinding]:
     resolver = _build_identity_resolver(truth)
     findings: list[SeamLintFinding] = []
@@ -339,6 +353,7 @@ def _check_identity_resolution(
         bridge_db_path=bridge_db_path,
         notification_db_path=notification_db_path,
         notion_snapshot_path=notion_snapshot_path,
+        identity_since=identity_since,
     ):
         checked += 1
         raw = identity["value"]
@@ -458,21 +473,40 @@ def _read_emitted_identities(
     bridge_db_path: Path | None,
     notification_db_path: Path | None,
     notion_snapshot_path: Path | None,
+    identity_since: datetime | None,
 ) -> list[dict[str, str]]:
     identities: list[dict[str, str]] = []
-    identities.extend(_read_bridge_identities(bridge_db_path))
-    identities.extend(_read_notification_identities(notification_db_path))
-    identities.extend(_read_session_cost_identities(bridge_db_path))
-    identities.extend(_read_notion_title_identities(notion_snapshot_path))
+    identities.extend(
+        _read_bridge_identities(bridge_db_path, identity_since=identity_since)
+    )
+    identities.extend(
+        _read_notification_identities(
+            notification_db_path,
+            identity_since=identity_since,
+        )
+    )
+    identities.extend(
+        _read_session_cost_identities(bridge_db_path, identity_since=identity_since)
+    )
+    if identity_since is None:
+        identities.extend(_read_notion_title_identities(notion_snapshot_path))
     return identities
 
 
-def _read_bridge_identities(path: Path | None) -> list[dict[str, str]]:
+def _read_bridge_identities(
+    path: Path | None, *, identity_since: datetime | None
+) -> list[dict[str, str]]:
     if path is None or not path.exists():
         return []
+    where = ""
+    params: tuple[Any, ...] = ()
+    if identity_since is not None:
+        where = " WHERE datetime(timestamp) >= datetime(?)"
+        params = (_sqlite_datetime(identity_since),)
     rows = _sqlite_rows(
         path,
-        "SELECT DISTINCT project_name, canonical_key FROM activity_log",
+        "SELECT DISTINCT project_name, canonical_key FROM activity_log" + where,
+        params,
     )
     identities: list[dict[str, str]] = []
     for project_name, canonical_key in rows:
@@ -497,12 +531,20 @@ def _read_bridge_identities(path: Path | None) -> list[dict[str, str]]:
     return identities
 
 
-def _read_session_cost_identities(path: Path | None) -> list[dict[str, str]]:
+def _read_session_cost_identities(
+    path: Path | None, *, identity_since: datetime | None
+) -> list[dict[str, str]]:
     if path is None or not path.exists():
         return []
+    where = ""
+    params: tuple[Any, ...] = ()
+    if identity_since is not None:
+        where = " WHERE datetime(started_at) >= datetime(?)"
+        params = (_sqlite_datetime(identity_since),)
     rows = _sqlite_rows(
         path,
-        "SELECT DISTINCT project_name FROM session_costs",
+        "SELECT DISTINCT project_name FROM session_costs" + where,
+        params,
     )
     return [
         {
@@ -515,13 +557,24 @@ def _read_session_cost_identities(path: Path | None) -> list[dict[str, str]]:
     ]
 
 
-def _read_notification_identities(path: Path | None) -> list[dict[str, str]]:
+def _read_notification_identities(
+    path: Path | None, *, identity_since: datetime | None
+) -> list[dict[str, str]]:
     if path is None or not path.exists():
         return []
     if _sqlite_table_exists(path, "notification_feed"):
         rows = _sqlite_rows(path, "SELECT DISTINCT project FROM notification_feed")
     elif _sqlite_table_exists(path, "durable_events"):
-        rows = _sqlite_rows(path, "SELECT DISTINCT project FROM durable_events")
+        where = ""
+        params: tuple[Any, ...] = ()
+        if identity_since is not None:
+            where = " WHERE datetime(created_at) >= datetime(?)"
+            params = (_sqlite_datetime(identity_since),)
+        rows = _sqlite_rows(
+            path,
+            "SELECT DISTINCT project FROM durable_events" + where,
+            params,
+        )
     else:
         rows = []
     return [
@@ -555,11 +608,13 @@ def _read_notion_title_identities(path: Path | None) -> list[dict[str, str]]:
     ]
 
 
-def _sqlite_rows(path: Path, query: str) -> list[tuple[Any, ...]]:
+def _sqlite_rows(
+    path: Path, query: str, params: tuple[Any, ...] = ()
+) -> list[tuple[Any, ...]]:
     try:
         uri = f"file:{path}?mode=ro"
         with sqlite3.connect(uri, uri=True) as conn:
-            return list(conn.execute(query).fetchall())
+            return list(conn.execute(query, params).fetchall())
     except sqlite3.Error:
         return []
 
@@ -584,6 +639,10 @@ def _is_silent_unresolved_identity(value: object) -> bool:
         return True
     text = str(value).strip()
     return not text or text.lower() == "none" or bool(HEX_FRAGMENT_RE.fullmatch(text))
+
+
+def _sqlite_datetime(value: datetime) -> str:
+    return _aware(value).isoformat()
 
 
 def _repo_name(repo_full_name: str) -> str:

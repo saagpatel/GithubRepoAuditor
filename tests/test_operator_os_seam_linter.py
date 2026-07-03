@@ -73,30 +73,44 @@ def _write_identity_truth(path: Path) -> None:
 def _write_bridge_db(
     path: Path,
     *,
-    activity_rows: list[tuple[str, str | None]] | None = None,
+    activity_rows: list[tuple[str, str | None] | tuple[str, str | None, str]]
+    | None = None,
     session_cost_names: list[str | None] | None = None,
+    session_cost_rows: list[tuple[str | None, str]] | None = None,
 ) -> None:
     with sqlite3.connect(path) as conn:
         conn.execute(
-            "CREATE TABLE activity_log (project_name TEXT NOT NULL, canonical_key TEXT)"
+            "CREATE TABLE activity_log (project_name TEXT NOT NULL, canonical_key TEXT, timestamp TEXT)"
         )
-        conn.execute("CREATE TABLE session_costs (project_name TEXT)")
+        conn.execute("CREATE TABLE session_costs (project_name TEXT, started_at TEXT)")
+        for row in activity_rows or []:
+            project_name, canonical_key, *rest = row
+            timestamp = rest[0] if rest else "2026-07-03T12:00:00+00:00"
+            conn.execute(
+                "INSERT INTO activity_log (project_name, canonical_key, timestamp) VALUES (?, ?, ?)",
+                (project_name, canonical_key, timestamp),
+            )
+        cost_rows = session_cost_rows or [
+            (name, "2026-07-03T12:00:00+00:00")
+            for name in (session_cost_names or [])
+        ]
         conn.executemany(
-            "INSERT INTO activity_log (project_name, canonical_key) VALUES (?, ?)",
-            activity_rows or [],
-        )
-        conn.executemany(
-            "INSERT INTO session_costs (project_name) VALUES (?)",
-            [(name,) for name in (session_cost_names or [])],
+            "INSERT INTO session_costs (project_name, started_at) VALUES (?, ?)",
+            cost_rows,
         )
 
 
-def _write_notification_db(path: Path, projects: list[str | None]) -> None:
+def _write_notification_db(
+    path: Path,
+    projects: list[str | None],
+    *,
+    created_at: str = "2026-07-03T12:00:00+00:00",
+) -> None:
     with sqlite3.connect(path) as conn:
-        conn.execute("CREATE TABLE durable_events (project TEXT)")
+        conn.execute("CREATE TABLE durable_events (project TEXT, created_at TEXT)")
         conn.executemany(
-            "INSERT INTO durable_events (project) VALUES (?)",
-            [(project,) for project in projects],
+            "INSERT INTO durable_events (project, created_at) VALUES (?, ?)",
+            [(project, created_at) for project in projects],
         )
 
 
@@ -294,6 +308,101 @@ def test_identity_resolution_bridge_canonical_key_disagreement_fails(
     assert result.findings[0].violation == "bridge canonical_key disagrees with alias map"
 
 
+def test_identity_resolution_since_ignores_old_timestamped_rows(tmp_path: Path) -> None:
+    truth, markdown = _passing_paths(tmp_path)
+    _write_identity_truth(truth)
+    bridge_db = tmp_path / "bridge.db"
+    notification_db = tmp_path / "notification.sqlite3"
+    _write_bridge_db(
+        bridge_db,
+        activity_rows=[
+            ("old-minted-bridge", None, "2026-07-03T11:59:00Z"),
+        ],
+        session_cost_rows=[
+            ("085", "2026-07-03T11:59:00+00:00"),
+        ],
+    )
+    _write_notification_db(
+        notification_db,
+        ["old-minted-notification"],
+        created_at="2026-07-03T11:59:00+00:00",
+    )
+
+    result = lint_operator_os_seams(
+        truth_path=truth,
+        markdown_paths=markdown,
+        bridge_db_path=bridge_db,
+        notification_db_path=notification_db,
+        identity_since=datetime(2026, 7, 3, 12, 0, tzinfo=UTC),
+        now=NOW,
+    )
+
+    assert result.passed
+
+
+def test_identity_resolution_since_skips_untimestamped_notion_snapshot(
+    tmp_path: Path,
+) -> None:
+    truth, markdown = _passing_paths(tmp_path)
+    _write_identity_truth(truth)
+    notion_snapshot = tmp_path / "notion.json"
+    _write_notion_snapshot(notion_snapshot, ["new-minted-non-windowable-row"])
+
+    result = lint_operator_os_seams(
+        truth_path=truth,
+        markdown_paths=markdown,
+        notion_snapshot_path=notion_snapshot,
+        identity_since=datetime(2026, 7, 3, 12, 0, tzinfo=UTC),
+        now=NOW,
+    )
+
+    assert result.passed
+
+
+def test_identity_resolution_since_includes_new_timestamped_rows(tmp_path: Path) -> None:
+    truth, markdown = _passing_paths(tmp_path)
+    _write_identity_truth(truth)
+    bridge_db = tmp_path / "bridge.db"
+    notification_db = tmp_path / "notification.sqlite3"
+    _write_bridge_db(
+        bridge_db,
+        activity_rows=[
+            ("old-minted-bridge", None, "2026-07-03T11:59:00Z"),
+            ("new-minted-bridge", None, "2026-07-03T12:00:00Z"),
+        ],
+        session_cost_rows=[
+            ("085", "2026-07-03T11:59:00+00:00"),
+            ("08f", "2026-07-03T12:00:00+00:00"),
+        ],
+    )
+    _write_notification_db(
+        notification_db,
+        ["new-minted-notification"],
+        created_at="2026-07-03T12:00:01+00:00",
+    )
+
+    result = lint_operator_os_seams(
+        truth_path=truth,
+        markdown_paths=markdown,
+        bridge_db_path=bridge_db,
+        notification_db_path=notification_db,
+        identity_since=datetime(2026, 7, 3, 12, 0, tzinfo=UTC),
+        now=NOW,
+    )
+
+    assert not result.passed
+    assert [finding.violation for finding in result.findings] == [
+        "minted identity dialect",
+        "minted identity dialect",
+        "silent unresolved identity",
+    ]
+    details = "\n".join(finding.detail for finding in result.findings)
+    assert "new-minted-bridge" in details
+    assert "new-minted-notification" in details
+    assert "old-minted-bridge" not in details
+    assert "085" not in details
+
+
 def test_cli_identity_resolution_is_opt_in(tmp_path: Path) -> None:
     truth, markdown = _passing_paths(tmp_path)
     bridge_db = tmp_path / "bridge.db"
@@ -331,6 +440,43 @@ def test_cli_identity_resolution_is_opt_in(tmp_path: Path) -> None:
     )
 
     assert code == 1
+
+
+def test_cli_identity_since_filters_timestamped_identity_rows(tmp_path: Path) -> None:
+    truth, markdown = _passing_paths(tmp_path)
+    _write_identity_truth(truth)
+    bridge_db = tmp_path / "bridge.db"
+    notification_db = tmp_path / "notification.sqlite3"
+    notion_snapshot = tmp_path / "notion.json"
+    _write_bridge_db(
+        bridge_db,
+        session_cost_rows=[
+            ("085", "2026-07-03T11:59:00Z"),
+        ],
+    )
+
+    code = main(
+        [
+            "--truth",
+            str(truth),
+            "--markdown",
+            str(markdown[0]),
+            "--markdown",
+            str(markdown[1]),
+            "--identity-resolution",
+            "--identity-since",
+            "2026-07-03T12:00:00Z",
+            "--bridge-db",
+            str(bridge_db),
+            "--notification-db",
+            str(notification_db),
+            "--notion-snapshot",
+            str(notion_snapshot),
+            "--json",
+        ]
+    )
+
+    assert code == 0
 
 
 def test_cli_exits_nonzero_and_writes_worklist_on_failure(tmp_path: Path) -> None:

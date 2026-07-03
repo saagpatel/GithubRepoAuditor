@@ -36,8 +36,16 @@ uv run pytest -q
 Use narrower tests when the change is scoped and the full suite would be disproportionate.
 
 The seam-linter checks truth freshness, schema pinning, and generated Markdown
-provenance markers. Its identity-resolution check is intentionally deferred until
-the dialect census produces the alias map.
+provenance markers. Its identity-resolution check is opt-in:
+
+```sh
+uv run operator-os-seam-linter --identity-resolution --identity-since 2026-07-03T13:02:06Z --truth output/portfolio-truth-latest.json --json
+```
+
+Use `--identity-since` for regression-gate checks after producer fixes. It
+filters timestamped local stores only: bridge-db activity, session-costs, and
+notification-hub durable events. Untimestamped Notion snapshot rows are skipped
+in since-window mode.
 
 ## Known Risks
 
