@@ -1550,6 +1550,12 @@ def _build_security_gate_subparser(subparsers: argparse._SubParsersAction) -> No
         action="store_true",
         help="Print machine-readable JSON instead of Markdown",
     )
+    p.add_argument(
+        "--max-age-hours",
+        type=int,
+        default=None,
+        help="Fail as stale when portfolio-truth generated_at is older than this many hours",
+    )
 
 
 def build_subcommand_parser() -> argparse.ArgumentParser:
@@ -7191,7 +7197,10 @@ def _run_security_gate_mode(args) -> None:
         print_info(f"{truth_path} is not a portfolio-truth object.")
         raise SystemExit(1)
 
-    report = build_security_gate_report(portfolio_truth)
+    report = build_security_gate_report(
+        portfolio_truth,
+        max_age_hours=getattr(args, "max_age_hours", None),
+    )
     if getattr(args, "json", False):
         print(json.dumps(report.to_dict(), indent=2))
     else:

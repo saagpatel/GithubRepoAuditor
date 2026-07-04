@@ -66,6 +66,10 @@ Run `audit security-gate --output-dir output` after generating portfolio truth w
 `output/portfolio-truth-latest.json` and exits nonzero when any scanned repo has open
 high/critical Dependabot alerts.
 
+Use `--max-age-hours N` when the caller needs freshness enforcement. For example,
+`audit security-gate --output-dir output --max-age-hours 168` fails as `STALE` when
+the portfolio truth snapshot is more than seven days old.
+
 The gate is deliberately strict: a snapshot with no scanned security overlay is
 reported as `UNKNOWN`, not clear. This prevents a missing GHAS overlay from looking
 like a clean portfolio.
