@@ -2182,6 +2182,7 @@ def _write_control_center_artifacts(
         write_weekly_command_center_artifacts,
     )
 
+    _filter_control_center_snapshot_for_default_view(snapshot)
     json_path, md_path = _latest_control_center_paths(output_dir, username, generated_at)
     snapshot.setdefault("operator_summary", {})["control_center_reference"] = str(json_path)
     portfolio_truth_path, portfolio_truth = load_latest_portfolio_truth(output_dir)
@@ -4758,11 +4759,27 @@ def _should_print_control_center_item(item: dict) -> bool:
     intended = str(catalog.get("intended_disposition") or "").strip().lower()
     program = str(catalog.get("maturity_program") or "").strip().lower()
     operating_path = str(item.get("operating_path") or catalog.get("operating_path") or "").strip().lower()
+    if lifecycle in {"archived", "archive"}:
+        return False
+    if intended == "archive" or program == "archive" or operating_path == "archive":
+        return False
     if lifecycle in {"experiment", "experimental"}:
         return False
     if intended == "experiment" or program == "experiment" or operating_path == "experiment":
         return False
     return True
+
+
+def _filter_control_center_snapshot_for_default_view(snapshot: dict) -> dict:
+    queue = snapshot.get("operator_queue")
+    if not isinstance(queue, list):
+        return snapshot
+    snapshot["operator_queue"] = [
+        item
+        for item in queue
+        if isinstance(item, dict) and _should_print_control_center_item(item)
+    ]
+    return snapshot
 
 
 def _fetch_repo_metadata(args, client: GitHubClient) -> tuple[list[RepoMetadata], list[dict]]:

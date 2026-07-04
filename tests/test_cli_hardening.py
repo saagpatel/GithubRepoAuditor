@@ -591,6 +591,46 @@ def test_control_center_default_print_hides_experiment_items() -> None:
     )
 
 
+def test_control_center_default_view_hides_archive_items() -> None:
+    assert not cli._should_print_control_center_item(
+        {
+            "repo": "archive-repo",
+            "operating_path": "archive",
+            "portfolio_catalog": {
+                "lifecycle_state": "archived",
+                "intended_disposition": "archive",
+                "maturity_program": "archive",
+            },
+        }
+    )
+
+
+def test_control_center_artifact_filter_drops_archive_queue_items() -> None:
+    snapshot = {
+        "operator_summary": {},
+        "operator_queue": [
+            {
+                "repo": "active-repo",
+                "operating_path": "maintain",
+                "portfolio_catalog": {"lifecycle_state": "active"},
+            },
+            {
+                "repo": "archive-repo",
+                "operating_path": "archive",
+                "portfolio_catalog": {
+                    "lifecycle_state": "archived",
+                    "intended_disposition": "archive",
+                    "maturity_program": "archive",
+                },
+            },
+        ],
+    }
+
+    cli._filter_control_center_snapshot_for_default_view(snapshot)
+
+    assert [item["repo"] for item in snapshot["operator_queue"]] == ["active-repo"]
+
+
 def test_main_control_center_requires_latest_report(monkeypatch):
     args = _make_args(control_center=True)
 
