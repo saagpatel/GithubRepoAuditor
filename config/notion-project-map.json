@@ -20,6 +20,9 @@
 	"personal-ops": {
 		"localProjectId": "35bc21f1-caf0-81cb-9426-dd264ef668b2"
 	},
+	"cost-tracker": {
+		"localProjectId": "378c21f1-caf0-8162-8bc1-eed47cbe9ca3"
+	},
 	"cross-system-smoke": {
 		"localProjectId": "378c21f1-caf0-81ec-b2db-f8a73ab0fb28"
 	},

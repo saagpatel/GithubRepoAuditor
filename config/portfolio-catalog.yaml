@@ -1096,3 +1096,170 @@ repos:
     intended_disposition: archive
     category: commercial
     tool_provenance: gpt
+  # --- 2026-07-04 portfolio working-set reconciliation: finish contracts ---
+  agent-session-replay:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: finish
+    maturity_program: finish
+  egress-guard-oss:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: finish
+    maturity_program: finish
+  proof-pr:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: finish
+    maturity_program: finish
+  devils-advocate:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: finish
+    maturity_program: finish
+  agent-permission-diff-bot:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: finish
+    maturity_program: finish
+  mcpaudit-web:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: finish
+    maturity_program: finish
+  # --- 2026-07-04 portfolio working-set reconciliation: maintain contracts ---
+  shadow-mcp:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+  portfolio-mcp:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: infrastructure
+  harness-scorecard:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+  ccq:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+  plumbline:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+  agent-flight-recorder:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+  agent-flight-recorder-local:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+  reliquary:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+  CivicTwin:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: fun
+  continuity:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: infrastructure
+  peer-agent-tools:
+    owner: d
+    purpose: local peer-agent dispatch and preflight tooling for branch-lease safety and verified agent handoffs
+    lifecycle_state: active
+    criticality: high
+    review_cadence: weekly
+    intended_disposition: maintain
+    maturity_program: maintain
+    target_maturity: operating
+    category: infrastructure
+    tool_provenance: codex
+  # --- 2026-07-04 portfolio working-set reconciliation: experiment contracts ---
+  agent-guestbook-inbox:
+    owner: d
+    lifecycle_state: experimental
+    review_cadence: monthly
+    intended_disposition: experiment
+    maturity_program: experiment
+    category: infrastructure
+  doctrine-pilot-sandbox:
+    owner: d
+    lifecycle_state: experimental
+    review_cadence: monthly
+    intended_disposition: experiment
+    maturity_program: experiment
+    category: infrastructure
+  mcp-kit:
+    owner: d
+    lifecycle_state: experimental
+    review_cadence: monthly
+    intended_disposition: experiment
+    maturity_program: experiment
+    category: infrastructure
+  portfolio-supercharge-handoff:
+    owner: d
+    lifecycle_state: experimental
+    review_cadence: monthly
+    intended_disposition: experiment
+    maturity_program: experiment
+    category: infrastructure
+  # --- 2026-07-04 portfolio working-set reconciliation: archive contracts ---
+  sae-synth-spike:
+    owner: d
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
+  mcp-permission-audit-deprecation:
+    owner: d
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
+  awesome-mcp-servers:
+    owner: d
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
+  portfolio-hooks:
+    owner: d
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
+  ccq-archive:
+    owner: d
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
+  trust-receipt-generator:
+    owner: d
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
+  personal-ops-sendwindow-tests:
+    owner: d
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
