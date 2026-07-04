@@ -13,6 +13,7 @@ from src.portfolio_catalog import (
     group_entry_for_path,
     load_portfolio_catalog,
 )
+from src.portfolio_context_contract import has_substantive_readme_support
 from src.portfolio_pathing import build_operating_path_entry
 from src.portfolio_risk import build_risk_entry
 from src.portfolio_truth_sources import (
@@ -50,7 +51,7 @@ PRECEDENCE_MATRIX: dict[str, list[str]] = {
     "declared.tool_provenance": ["catalog_repo", "catalog_group", "inference", "legacy_registry"],
     "declared.notes": ["catalog_repo", "catalog_group", "legacy_registry"],
     "derived.stack": ["workspace", "legacy_registry"],
-    "derived.context_quality": ["workspace"],
+    "derived.context_quality": ["workspace", "catalog_repo", "catalog_group"],
     "derived.context_files": ["workspace"],
     "derived.primary_context_file": ["workspace"],
     "derived.project_summary_present": ["workspace"],
@@ -166,6 +167,32 @@ def _derive_readme_char_count(project_path: Path | None, has_git: bool) -> int:
         if candidate.is_file() and candidate.name.lower().startswith("readme"):
             return len(candidate.read_text(errors="replace"))
     return 0
+
+
+def _catalog_supported_context_quality(
+    raw_context_quality: str,
+    *,
+    raw_project: dict[str, Any],
+    declared_values: dict[str, Any],
+    readme_char_count: int,
+) -> str:
+    if raw_context_quality != "minimum-viable":
+        return raw_context_quality
+    if declared_values.get("lifecycle_state") != "active":
+        return raw_context_quality
+    if declared_values.get("criticality") != "high":
+        return raw_context_quality
+    if declared_values.get("intended_disposition") != "maintain":
+        return raw_context_quality
+    if declared_values.get("category") != "infrastructure":
+        return raw_context_quality
+    if not has_substantive_readme_support(
+        str(raw_project.get("primary_context_file") or ""),
+        list(raw_project.get("context_files") or []),
+        readme_char_count,
+    ):
+        return raw_context_quality
+    return "standard"
 
 
 @dataclass(frozen=True)
@@ -463,10 +490,23 @@ def _build_truth_project(
         "automation_eligible": bool(repo_entry.get("automation_eligible", False)),
     }
 
-    context_quality = raw_project["context_quality"]
+    project_path: Path | None = raw_project.get("project_path")
+    has_git = bool(raw_project["has_git"])
+    derived_readme_char_count = _derive_readme_char_count(project_path, has_git)
+    raw_context_quality = raw_project["context_quality"]
+    context_quality = _catalog_supported_context_quality(
+        raw_context_quality,
+        raw_project=raw_project,
+        declared_values=declared_values,
+        readme_char_count=derived_readme_char_count,
+    )
     provenance["derived.context_quality"] = {
-        "source": "workspace",
-        "detail": raw_project["context_quality"],
+        "source": "workspace+catalog" if context_quality != raw_context_quality else "workspace",
+        "detail": (
+            f"{raw_context_quality}->{context_quality}"
+            if context_quality != raw_context_quality
+            else raw_context_quality
+        ),
     }
 
     status_entry = _select_repo_status_entry(
@@ -624,12 +664,9 @@ def _build_truth_project(
         )
 
     # ── Strict local-filesystem signals (Sprint 8.2) ─────────────────────────
-    project_path: Path | None = raw_project.get("project_path")
-    has_git = bool(raw_project["has_git"])
     derived_has_tests = _derive_has_tests(project_path, has_git)
     derived_has_ci = _derive_has_ci(project_path, has_git)
     derived_has_license = _derive_has_license(project_path, has_git)
-    derived_readme_char_count = _derive_readme_char_count(project_path, has_git)
     derived_release_count: int | None = None
     if release_count_by_name is not None:
         derived_release_count = release_count_by_name.get(raw_project["name"])

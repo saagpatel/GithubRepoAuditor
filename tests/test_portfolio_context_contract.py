@@ -1,6 +1,9 @@
 from pathlib import Path
 
-from src.portfolio_context_contract import analyze_project_context
+from src.portfolio_context_contract import (
+    analyze_project_context,
+    has_substantive_readme_support,
+)
 
 # A generic Codex-OS-style AGENTS.md stub: no Portfolio-Context sections, no run guidance.
 _GENERIC_AGENTS = (
@@ -53,6 +56,69 @@ def test_context_quality_not_none_for_readme_only_repo(tmp_path):
     result = analyze_project_context(tmp_path, ["README.md"])
     assert result.context_quality != "none"  # README content now counts
     assert result.run_instructions_present is True
+
+
+def test_substantive_readme_support_does_not_promote_raw_context_quality(tmp_path):
+    agents = (
+        "# AGENTS.md\n\n"
+        "## What This Project Is\n\nA local operating tool for agent coordination.\n\n"
+        "## Current State\n\nActive infrastructure with verified local checks.\n\n"
+        "## Stack\n\nPython and shell scripts.\n\n"
+        "## How To Run\n\nRun `pytest tests` before publishing changes.\n\n"
+        "## Known Risks\n\nLocal machine paths can drift.\n\n"
+        "## Next Recommended Move\n\nKeep the verification surface green.\n"
+    )
+    readme = (
+        "# Project\n\n"
+        "This README is intentionally substantive and separate from the primary "
+        "agent guidance. "
+        + ("It explains operator workflows, boundaries, commands, and examples. " * 40)
+    )
+    _write(tmp_path, "AGENTS.md", agents)
+    _write(tmp_path, "README.md", readme)
+    result = analyze_project_context(tmp_path, ["AGENTS.md", "README.md"])
+    assert result.context_quality == "minimum-viable"
+    assert (
+        has_substantive_readme_support(
+            result.primary_context_file,
+            ["AGENTS.md", "README.md"],
+            len(readme),
+        )
+        is True
+    )
+
+
+def test_short_readme_support_does_not_promote_complete_primary(tmp_path):
+    agents = (
+        "# AGENTS.md\n\n"
+        "## What This Project Is\n\nA local operating tool for agent coordination.\n\n"
+        "## Current State\n\nActive infrastructure with verified local checks.\n\n"
+        "## Stack\n\nPython and shell scripts.\n\n"
+        "## How To Run\n\nRun `pytest tests` before publishing changes.\n\n"
+        "## Known Risks\n\nLocal machine paths can drift.\n\n"
+        "## Next Recommended Move\n\nKeep the verification surface green.\n"
+    )
+    _write(tmp_path, "AGENTS.md", agents)
+    _write(tmp_path, "README.md", "# Project\n\nA short companion README.\n")
+    result = analyze_project_context(tmp_path, ["AGENTS.md", "README.md"])
+    assert result.context_quality == "minimum-viable"
+
+
+def test_readme_only_context_stays_minimum_viable_without_separate_primary(tmp_path):
+    readme = (
+        "# Project\n\n"
+        "This README is intentionally long and complete. "
+        + ("It documents the project thoroughly. " * 45)
+        + "\n\n## Overview\n\nA durable local operator tool for coordinating active work.\n\n"
+        + "\n\n## Current State\n\nActive and verified.\n\n"
+        "## Stack\n\nPython, pytest, shell scripts, and local JSON state files.\n\n"
+        "## Usage\n\nRun `pytest tests`.\n\n"
+        "## Known Risks\n\nLocal paths can drift.\n\n"
+        "## Next Steps\n\nKeep checks green.\n"
+    )
+    _write(tmp_path, "README.md", readme)
+    result = analyze_project_context(tmp_path, ["README.md"])
+    assert result.context_quality == "minimum-viable"
 
 
 def test_explicit_readme_text_override_is_honored(tmp_path):
