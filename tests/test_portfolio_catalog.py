@@ -195,6 +195,54 @@ def test_catalog_entry_matches_path_before_full_name_and_bare_name():
     assert entry["matched_by"] == "path"
 
 
+def test_catalog_entry_matches_unambiguous_path_basename():
+    catalog = {
+        "repos": {
+            "_machine/machine-control-tower": {
+                "owner": "d",
+                "catalog_key": "_machine/machine-control-tower",
+                "matched_by": "full-name",
+                "has_explicit_entry": True,
+            },
+        }
+    }
+
+    entry = catalog_entry_for_repo(
+        {"name": "machine-control-tower", "full_name": "user/machine-control-tower"},
+        catalog,
+    )
+
+    assert entry["owner"] == "d"
+    assert entry["matched_by"] == "path-basename"
+
+
+def test_catalog_entry_does_not_guess_ambiguous_path_basename():
+    catalog = {
+        "repos": {
+            "alpha/shared": {
+                "owner": "alpha",
+                "catalog_key": "alpha/shared",
+                "matched_by": "full-name",
+                "has_explicit_entry": True,
+            },
+            "beta/shared": {
+                "owner": "beta",
+                "catalog_key": "beta/shared",
+                "matched_by": "full-name",
+                "has_explicit_entry": True,
+            },
+        }
+    }
+
+    entry = catalog_entry_for_repo(
+        {"name": "shared", "full_name": "user/shared"},
+        catalog,
+    )
+
+    assert entry["has_explicit_entry"] is False
+    assert entry["matched_by"] == ""
+
+
 def test_group_entry_matches_path_prefix():
     catalog = {
         "groups": {

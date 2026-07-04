@@ -544,6 +544,63 @@ programs:
     assert item["scorecard"]["status"] == "on-track"
 
 
+def test_control_center_snapshot_repairs_missing_path_basename_catalog_context(
+    tmp_path,
+    sample_metadata,
+) -> None:
+    catalog_path = tmp_path / "portfolio-catalog.yaml"
+    catalog_path.write_text(
+        """
+repos:
+  _machine/test-repo:
+    owner: d
+    lifecycle_state: active
+    criticality: high
+    review_cadence: weekly
+    intended_disposition: maintain
+    maturity_program: maintain
+    target_maturity: operating
+    category: infrastructure
+"""
+    )
+    audit = RepoAudit(
+        metadata=sample_metadata,
+        analyzer_results=[AnalyzerResult("testing", 0.7, 1.0, [], {})],
+        overall_score=0.7,
+        completeness_tier="functional",
+        flags=[],
+        lenses={"ship_readiness": {"score": 0.7}},
+        security_posture={"score": 0.8},
+        portfolio_catalog={
+            "has_explicit_entry": False,
+            "catalog_line": "No portfolio catalog contract is recorded yet.",
+            "intent_alignment": "missing-contract",
+        },
+    )
+    report = AuditReport.from_audits("testuser", [audit], [], 1)
+    report.operator_queue = [
+        {
+            "repo": "test-repo",
+            "lane": "urgent",
+            "title": "Review test-repo",
+            "portfolio_catalog": dict(audit.portfolio_catalog),
+        }
+    ]
+    snapshot = {"operator_summary": {}, "operator_queue": [dict(report.operator_queue[0])]}
+
+    updated = cli._enrich_control_center_snapshot_from_report(
+        report.to_dict(),
+        snapshot,
+        _make_args(catalog=catalog_path),
+    )
+
+    item = updated["operator_queue"][0]
+    assert item["portfolio_catalog"]["catalog_key"] == "_machine/test-repo"
+    assert item["portfolio_catalog"]["matched_by"] == "path-basename"
+    assert item["portfolio_catalog"]["has_explicit_entry"] is True
+    assert item["intent_alignment"] != "missing-contract"
+
+
 def test_main_doctor_writes_artifact_and_exits_cleanly(monkeypatch, tmp_path, capsys):
     args = _make_args(doctor=True, output_dir=str(tmp_path))
     artifact_path = tmp_path / "diagnostics-testuser-2026-03-29.json"
