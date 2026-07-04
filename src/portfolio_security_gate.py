@@ -8,6 +8,7 @@ alerts?  Missing security overlay data is treated as unknown, not healthy.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 
 
@@ -38,6 +39,9 @@ class SecurityGateReport:
     total_open_critical: int
     total_open_high: int
     flagged_repos: tuple[SecurityGateItem, ...]
+    max_age_hours: int | None = None
+    source_age_hours: float | None = None
+    freshness_error: str | None = None
 
     @property
     def repos_with_open_high_critical(self) -> int:
@@ -45,12 +49,28 @@ class SecurityGateReport:
 
     @property
     def passed(self) -> bool:
-        return self.scanned_count > 0 and self.repos_with_open_high_critical == 0
+        return (
+            self.scanned_count > 0
+            and self.repos_with_open_high_critical == 0
+            and not self.is_stale
+        )
+
+    @property
+    def is_stale(self) -> bool:
+        if self.max_age_hours is None:
+            return False
+        if self.freshness_error:
+            return True
+        if self.source_age_hours is None:
+            return True
+        return self.source_age_hours > self.max_age_hours
 
     @property
     def status(self) -> str:
         if self.scanned_count <= 0:
             return "unknown"
+        if self.is_stale:
+            return "stale"
         if self.repos_with_open_high_critical > 0:
             return "fail"
         return "pass"
@@ -64,6 +84,9 @@ class SecurityGateReport:
             "repos_with_open_high_critical": self.repos_with_open_high_critical,
             "total_open_critical": self.total_open_critical,
             "total_open_high": self.total_open_high,
+            "max_age_hours": self.max_age_hours,
+            "source_age_hours": self.source_age_hours,
+            "freshness_error": self.freshness_error,
             "flagged_repos": [item.to_dict() for item in self.flagged_repos],
         }
 
@@ -83,12 +106,37 @@ def _int(value: Any) -> int:
         return 0
 
 
-def build_security_gate_report(portfolio_truth: dict[str, Any]) -> SecurityGateReport:
+def _source_age_hours(generated_at: str, now: datetime) -> tuple[float | None, str | None]:
+    if not generated_at or generated_at == "unknown":
+        return None, "missing generated_at"
+    try:
+        parsed = datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
+    except ValueError:
+        return None, f"invalid generated_at: {generated_at}"
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    age_hours = (now.astimezone(timezone.utc) - parsed.astimezone(timezone.utc)).total_seconds()
+    return round(age_hours / 3600, 3), None
+
+
+def build_security_gate_report(
+    portfolio_truth: dict[str, Any],
+    *,
+    max_age_hours: int | None = None,
+    now: datetime | None = None,
+) -> SecurityGateReport:
     projects = portfolio_truth.get("projects") or []
     scanned_count = 0
     total_critical = 0
     total_high = 0
     flagged: list[SecurityGateItem] = []
+    generated_at = _text(portfolio_truth.get("generated_at")) or "unknown"
+    source_age_hours = freshness_error = None
+    if max_age_hours is not None:
+        source_age_hours, freshness_error = _source_age_hours(
+            generated_at,
+            now or datetime.now(timezone.utc),
+        )
 
     for project in projects:
         if not isinstance(project, dict):
@@ -123,11 +171,14 @@ def build_security_gate_report(portfolio_truth: dict[str, Any]) -> SecurityGateR
 
     flagged.sort(key=lambda item: (-item.critical, -item.high, item.repo.lower()))
     return SecurityGateReport(
-        generated_at=_text(portfolio_truth.get("generated_at")) or "unknown",
+        generated_at=generated_at,
         scanned_count=scanned_count,
         total_open_critical=total_critical,
         total_open_high=total_high,
         flagged_repos=tuple(flagged),
+        max_age_hours=max_age_hours,
+        source_age_hours=source_age_hours,
+        freshness_error=freshness_error,
     )
 
 
@@ -149,6 +200,14 @@ def render_security_gate_markdown(report: SecurityGateReport) -> str:
             "Security overlay was not present in the snapshot. Re-run portfolio truth with "
             "`--portfolio-truth-include-security` before treating the portfolio as clear."
         )
+    elif report.status == "stale":
+        if report.freshness_error:
+            lines.append(f"Portfolio truth freshness could not be verified: {report.freshness_error}.")
+        else:
+            lines.append(
+                f"Portfolio truth is {report.source_age_hours:.1f}h old, beyond the "
+                f"{report.max_age_hours}h freshness threshold."
+            )
     elif report.passed:
         lines.append("All scanned repos are clear of open high/critical Dependabot alerts.")
     else:
