@@ -53,6 +53,19 @@ in since-window mode.
 - Do not let generated reports, old dashboards, or historical registry files override the latest portfolio truth snapshot.
 - Do not read or emit secrets, `.env` values, keychains, OAuth stores, raw private transcripts, raw logs, browser profiles, or credential-bearing configs while auditing repos.
 
+## Review guidelines
+
+Focus Codex review on portfolio truth correctness, attention-state and maturity
+contract drift, generated-vs-canonical source confusion, identity-resolution
+fallbacks, since-window filters, seam-linter coverage, and misleading reports
+or dashboards. Treat changes that make archived, parked, experiment, or
+active-product status look healthier or more current than the source evidence
+as merge-relevant.
+
+For docs-only PRs, comment only when a doc claims current portfolio state,
+published readiness, generated report truth, or operator guidance that is not
+backed by the latest canonical truth path or reviewed commands.
+
 ## Next Recommended Move
 
 When repairing portfolio context, keep the attention contract tight: improve default-attention repos only when the work supports a real publish, park, archive, security, release, dirty-worktree, owner, active-product, bridge/Notion/sync, or cost decision.
