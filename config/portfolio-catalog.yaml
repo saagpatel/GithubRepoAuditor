@@ -225,6 +225,19 @@ repos:
     review_cadence: weekly
     intended_disposition: maintain
     tool_provenance: claude-code
+  saagpatel/operant:
+    owner: d
+    purpose: operating-agent calibration benchmark for evaluating agent decision quality and orchestration judgment
+    lifecycle_state: active
+    criticality: high
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: infrastructure
+    tool_provenance: claude-code
+    maturity_program: maintain
+    target_maturity: operating
+    doctor_standard: full
+    notes: Canonical GitHub repo identity for OPERANT; keep this aligned with the local operant-public checkout contract.
   operant-public:
     owner: d
     purpose: operating-agent calibration benchmark with shipped public MCP access
