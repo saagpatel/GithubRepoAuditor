@@ -79,6 +79,7 @@ Documentation = "https://github.com/saagpatel/GithubRepoAuditor#readme"
 
 [project.scripts]
 audit = "src.cli:main"
+operator-os-seam-linter = "src.operator_os_seam_linter:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
