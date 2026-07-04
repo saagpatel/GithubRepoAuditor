@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -787,7 +788,7 @@ def _select_with_legacy(
         return value
     legacy_value = str(legacy.get(field, "") or "").strip()
     if field == "notes":
-        legacy_value = _strip_generated_note_purpose_prefix(
+        legacy_value = _strip_generated_registry_note_decorations(
             legacy_value, repo_entry=repo_entry, group_entry=group_entry
         )
     if legacy_value:
@@ -799,7 +800,19 @@ def _select_with_legacy(
     return ""
 
 
-def _strip_generated_note_purpose_prefix(
+_GENERATED_SECURITY_NOTE_RE = re.compile(r"^(?:\[security: [^\]]+\]\s*)+", re.IGNORECASE)
+_GENERATED_PATH_NOTE_PREFIXES = (
+    "Stable path is ",
+    "No stable operating path is declared yet.",
+)
+_GENERATED_PATH_NOTE_MARKERS = (
+    "Declared maturity program and intended disposition point at different paths.",
+    "Context quality is still too weak for path guidance to stand on its own.",
+    "Treat this repo as investigate until path confidence improves.",
+)
+
+
+def _strip_generated_registry_note_decorations(
     notes: str,
     *,
     repo_entry: dict[str, Any],
@@ -807,11 +820,17 @@ def _strip_generated_note_purpose_prefix(
 ) -> str:
     """Keep generated registry markdown idempotent when used as legacy input."""
     value = notes.strip()
+    value = _GENERATED_SECURITY_NOTE_RE.sub("", value).strip()
+
     purpose = str(repo_entry.get("purpose") or group_entry.get("purpose") or "").strip()
-    if not purpose:
-        return value
-    while value == purpose or value.startswith(f"{purpose} "):
-        value = value[len(purpose) :].strip()
+    if purpose:
+        while value == purpose or value.startswith(f"{purpose} "):
+            value = value[len(purpose) :].strip()
+
+    if value.startswith(_GENERATED_PATH_NOTE_PREFIXES) or any(
+        marker in value for marker in _GENERATED_PATH_NOTE_MARKERS
+    ):
+        return ""
     return value
 
 

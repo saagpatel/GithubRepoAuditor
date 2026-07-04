@@ -1045,6 +1045,7 @@ repos:
     lifecycle_state: archived
     review_cadence: quarterly
     intended_disposition: archive
+    maturity_program: archive
     category: commercial
     tool_provenance: gpt
   Nexus:

@@ -1281,6 +1281,59 @@ repos:
     assert alpha.declared.notes == "handoff note"
 
 
+def test_generated_registry_notes_drop_security_and_path_boilerplate(
+    portfolio_workspace: Path,
+    tmp_path: Path,
+) -> None:
+    archived = portfolio_workspace / "FreeLanceInvoice"
+    archived.mkdir()
+    _write(archived / "README.md", "# FreeLanceInvoice\n\nArchived invoice project.\n")
+
+    catalog_path = tmp_path / "portfolio-catalog.yaml"
+    catalog_path.write_text(
+        """
+repos:
+  FreeLanceInvoice:
+    owner: d
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
+    maturity_program: archive
+    category: commercial
+    tool_provenance: gpt
+"""
+    )
+    legacy_registry_path = tmp_path / "project-registry.md"
+    legacy_registry_path.write_text(
+        """
+# Project Registry
+
+## Standalone Projects (Root Level)
+
+| Project | Status | Tool | Context Quality | Stack | Context Files | Category | Notes |
+|---------|--------|------|-----------------|-------|---------------|----------|-------|
+| FreeLanceInvoice | archived | gpt | weak | Python | README.md | commercial | [security: 1 critical / 2 high open Dependabot alerts] [security: 1 critical / 2 high open Dependabot alerts] Stable path is Archive from intended disposition. Declared maturity program and intended disposition point at different paths. Context quality is still too weak for path guidance to stand on its own. Treat this repo as investigate until path confidence improves. |
+"""
+    )
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=catalog_path,
+        legacy_registry_path=legacy_registry_path,
+        include_notion=False,
+    )
+
+    invoice = next(
+        project
+        for project in result.snapshot.projects
+        if project.identity.display_name == "FreeLanceInvoice"
+    )
+    assert invoice.declared.maturity_program == "archive"
+    assert invoice.declared.notes == ""
+    assert invoice.provenance["declared.maturity_program"]["source"] == "catalog_repo"
+    assert invoice.provenance["declared.notes"]["source"] != "legacy_registry"
+
+
 def test_publish_failure_leaves_live_files_untouched(
     portfolio_workspace: Path,
     portfolio_catalog: Path,
