@@ -244,5 +244,8 @@
 	},
 	"GhostRoutes": {
 		"localProjectId": "32dc21f1-caf0-813a-9ca9-ef7062c11bf8"
+	},
+	"SecondBrain": {
+		"localProjectId": "362c21f1-caf0-8147-8bbf-fa0fd3ae1480"
 	}
 }
