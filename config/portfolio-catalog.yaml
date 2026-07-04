@@ -1227,6 +1227,14 @@ repos:
     intended_disposition: experiment
     maturity_program: experiment
     category: infrastructure
+  fable-second-sprint:
+    owner: d
+    lifecycle_state: experimental
+    review_cadence: ad-hoc
+    intended_disposition: experiment
+    maturity_program: experiment
+    category: vanity
+    notes: Keep out of default attention unless the operator explicitly reactivates this lane.
   # --- 2026-07-04 portfolio working-set reconciliation: archive contracts ---
   sae-synth-spike:
     owner: d
