@@ -557,6 +557,7 @@ def _build_follow_through_with_queue(resolution_trend: dict, queue: list[dict]) 
     status_counts["resolved"] += resolution_trend.get("confirmed_resolved_count", 0)
     follow_through_checkpoint_summary = _follow_through_checkpoint_summary(
         status_counts,
+        checkpoint_counts,
         top_unattempted_items,
         top_stale_follow_through_items,
     )
@@ -820,6 +821,7 @@ def _project_queue_follow_through(
             if (snapshot.get("items", {}).get(key) or {}).get("lane") in ATTENTION_LANES
         )
         follow_through_age_runs = appearance_count
+        quiet_maintain_monitor = _is_quiet_maintain_monitor(item)
         follow_through_status = _queue_item_follow_through_status(
             item,
             memory,
@@ -848,6 +850,7 @@ def _project_queue_follow_through(
             follow_through_status=follow_through_status,
             follow_through_checkpoint_status=follow_through_checkpoint_status,
             follow_through_age_runs=follow_through_age_runs,
+            quiet_maintain_monitor=quiet_maintain_monitor,
         )
         follow_through_escalation_reason = _follow_through_escalation_reason(
             item,
@@ -1037,6 +1040,60 @@ def _project_queue_follow_through(
             follow_through_recovery_freshness_status=follow_through_recovery_freshness_status,
             follow_through_recovery_decay_status=follow_through_recovery_decay_status,
         )
+        if quiet_maintain_monitor:
+            neutral_recovery_reason = (
+                f"{_target_label(item)} is an aligned on-track maintain monitor, "
+                "so no recovery follow-through is needed."
+            )
+            neutral_recovery_summary = (
+                f"{_target_label(item)} is already quiet under the maintain contract."
+            )
+            follow_through_recovery_age_runs = 0
+            follow_through_recovery_status = "none"
+            follow_through_recovery_reason = neutral_recovery_reason
+            follow_through_recovery_summary = neutral_recovery_summary
+            follow_through_recovery_persistence_age_runs = 0
+            follow_through_recovery_persistence_status = "none"
+            follow_through_recovery_persistence_reason = neutral_recovery_reason
+            follow_through_recovery_persistence_summary = neutral_recovery_summary
+            follow_through_relapse_churn_status = "none"
+            follow_through_relapse_churn_reason = neutral_recovery_reason
+            follow_through_relapse_churn_summary = neutral_recovery_summary
+            follow_through_recovery_freshness_age_runs = 0
+            follow_through_recovery_freshness_status = "none"
+            follow_through_recovery_freshness_reason = neutral_recovery_reason
+            follow_through_recovery_freshness_summary = neutral_recovery_summary
+            follow_through_recovery_decay_status = "none"
+            follow_through_recovery_decay_reason = neutral_recovery_reason
+            follow_through_recovery_decay_summary = neutral_recovery_summary
+            follow_through_recovery_memory_reset_status = "none"
+            follow_through_recovery_memory_reset_reason = neutral_recovery_reason
+            follow_through_recovery_memory_reset_summary = neutral_recovery_summary
+            follow_through_recovery_rebuild_strength_age_runs = 0
+            follow_through_recovery_rebuild_strength_status = "none"
+            follow_through_recovery_rebuild_strength_reason = neutral_recovery_reason
+            follow_through_recovery_rebuild_strength_summary = neutral_recovery_summary
+            follow_through_recovery_reacquisition_status = "none"
+            follow_through_recovery_reacquisition_reason = neutral_recovery_reason
+            follow_through_recovery_reacquisition_summary = neutral_recovery_summary
+            follow_through_recovery_reacquisition_durability_age_runs = 0
+            follow_through_recovery_reacquisition_durability_status = "none"
+            follow_through_recovery_reacquisition_durability_reason = neutral_recovery_reason
+            follow_through_recovery_reacquisition_durability_summary = neutral_recovery_summary
+            follow_through_recovery_reacquisition_consolidation_status = "none"
+            follow_through_recovery_reacquisition_consolidation_reason = neutral_recovery_reason
+            follow_through_recovery_reacquisition_consolidation_summary = neutral_recovery_summary
+            follow_through_reacquisition_softening_decay_age_runs = 0
+            follow_through_reacquisition_softening_decay_status = "none"
+            follow_through_reacquisition_softening_decay_reason = neutral_recovery_reason
+            follow_through_reacquisition_softening_decay_summary = neutral_recovery_summary
+            follow_through_reacquisition_confidence_retirement_status = "none"
+            follow_through_reacquisition_confidence_retirement_reason = neutral_recovery_reason
+            follow_through_reacquisition_confidence_retirement_summary = neutral_recovery_summary
+            follow_through_reacquisition_revalidation_recovery_age_runs = 0
+            follow_through_reacquisition_revalidation_recovery_status = "none"
+            follow_through_reacquisition_revalidation_recovery_reason = neutral_recovery_reason
+            follow_through_reacquisition_revalidation_recovery_summary = neutral_recovery_summary
         follow_through_summary = _follow_through_item_summary(
             item,
             memory,
@@ -1135,6 +1192,8 @@ def _queue_item_follow_through_status(
     )
     if not item.get("source_run_id") and not has_intervention and not previous_match:
         return "unknown"
+    if _is_quiet_maintain_monitor(item):
+        return "resolved"
     if has_intervention and (
         lane == "deferred"
         or (
@@ -1161,6 +1220,29 @@ def _queue_item_follow_through_status(
     if last_outcome in {"improved", "quieted"}:
         return "waiting-on-evidence"
     return "unknown"
+
+
+def _is_quiet_maintain_monitor(item: dict) -> bool:
+    if item.get("lane") != "deferred":
+        return False
+    raw_catalog_entry = item.get("portfolio_catalog")
+    catalog_entry = raw_catalog_entry if isinstance(raw_catalog_entry, dict) else {}
+    raw_scorecard = item.get("scorecard")
+    scorecard = raw_scorecard if isinstance(raw_scorecard, dict) else {}
+    if not scorecard:
+        raw_catalog_scorecard = catalog_entry.get("scorecard")
+        scorecard = raw_catalog_scorecard if isinstance(raw_catalog_scorecard, dict) else {}
+    summary = str(item.get("summary") or "").lower()
+    material_change_text = "material changes" in summary and "no material changes" not in summary
+    return (
+        str(item.get("intent_alignment") or catalog_entry.get("intent_alignment") or "").lower()
+        == "aligned"
+        and str(catalog_entry.get("intended_disposition") or "").lower() == "maintain"
+        and str(scorecard.get("status") or "").lower() == "on-track"
+        and not scorecard.get("failed_rule_keys")
+        and not scorecard.get("top_gaps")
+        and not material_change_text
+    )
 
 
 def _has_follow_through_intervention(event: dict | None) -> bool:
@@ -1218,6 +1300,8 @@ def _follow_through_next_checkpoint(
     follow_through_status: str,
 ) -> str:
     recommended_action = item.get("recommended_action") or "Review the latest state."
+    if _is_quiet_maintain_monitor(item):
+        return "No stronger follow-through needed while the maintain scorecard stays on track and no material changes surface."
     if follow_through_status == "untouched":
         return f"Take the recommended action next and record a visible follow-up after: {recommended_action}"
     if follow_through_status == "attempted":
@@ -1267,9 +1351,12 @@ def _follow_through_escalation_status(
     follow_through_status: str,
     follow_through_checkpoint_status: str,
     follow_through_age_runs: int,
+    quiet_maintain_monitor: bool = False,
 ) -> str:
     if follow_through_status == "unknown":
         return "unknown"
+    if quiet_maintain_monitor:
+        return "none"
     if follow_through_status == "resolved":
         return "none" if follow_through_age_runs <= 1 else "resolved-watch"
     if (
@@ -3346,6 +3433,23 @@ def _follow_through_summary(
         return f"{status_counts.get('waiting-on-evidence', 0)} item(s) have recent follow-up recorded and are now waiting for later evidence to confirm movement."
     if status_counts.get("attempted", 0):
         return f"{status_counts.get('attempted', 0)} item(s) show recorded follow-up, but the underlying pressure is still visible in the current queue."
+    if (
+        checkpoint_counts.get("satisfied", 0)
+        and not checkpoint_counts.get("due-soon", 0)
+        and not checkpoint_counts.get("overdue", 0)
+        and not escalation_counts.get("watch", 0)
+        and not escalation_counts.get("nudge", 0)
+        and not escalation_counts.get("escalate-now", 0)
+        and not escalation_counts.get("resolved-watch", 0)
+        and not recovery_counts.get("recovering", 0)
+        and not recovery_counts.get("retiring-watch", 0)
+        and not recovery_counts.get("relapsing", 0)
+        and not recovery_freshness_counts.get("fresh", 0)
+        and not recovery_freshness_counts.get("holding-fresh", 0)
+        and not recovery_freshness_counts.get("mixed-age", 0)
+        and not recovery_freshness_counts.get("stale", 0)
+    ):
+        return "The current operator queue is quiet; maintain monitors can stay deferred while their scorecards remain on track."
     if status_counts.get("resolved", 0):
         return f"{status_counts.get('resolved', 0)} item(s) now look calmer or resolved after recent follow-through, but they still need one more confirming read before they fully disappear from memory."
     if legacy_summary:
@@ -3359,6 +3463,7 @@ def _follow_through_summary(
 
 def _follow_through_checkpoint_summary(
     status_counts: dict[str, int],
+    checkpoint_counts: dict[str, int],
     top_unattempted_items: list[dict],
     top_stale_follow_through_items: list[dict],
 ) -> str:
@@ -3374,6 +3479,12 @@ def _follow_through_checkpoint_summary(
         return "Recent follow-up is in flight, so the next checkpoint is whether the next run confirms quieter pressure."
     if status_counts.get("attempted", 0):
         return "Follow-up is recorded, but the next checkpoint is whether the pressure actually drops on the next run."
+    if (
+        checkpoint_counts.get("satisfied", 0)
+        and not checkpoint_counts.get("due-soon", 0)
+        and not checkpoint_counts.get("overdue", 0)
+    ):
+        return "No stronger follow-through checkpoint is needed while the current queue stays satisfied."
     if status_counts.get("resolved", 0):
         return "Some items already look calmer, so the next checkpoint is whether that calmer state holds for another run."
     return "Use the next run or linked artifact to confirm whether the current recommendation actually moved."
