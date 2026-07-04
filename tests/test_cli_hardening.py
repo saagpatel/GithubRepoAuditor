@@ -570,6 +570,27 @@ def test_main_control_center_suppresses_queue_when_portfolio_truth_is_newer(
     assert "Act now on StaleRepo" not in combined
 
 
+def test_control_center_default_print_hides_experiment_items() -> None:
+    assert cli._should_print_control_center_item(
+        {
+            "repo": "active-repo",
+            "operating_path": "maintain",
+            "portfolio_catalog": {"lifecycle_state": "active"},
+        }
+    )
+    assert not cli._should_print_control_center_item(
+        {
+            "repo": "experiment-repo",
+            "operating_path": "experiment",
+            "portfolio_catalog": {
+                "lifecycle_state": "experimental",
+                "intended_disposition": "experiment",
+                "maturity_program": "experiment",
+            },
+        }
+    )
+
+
 def test_main_control_center_requires_latest_report(monkeypatch):
     args = _make_args(control_center=True)
 
