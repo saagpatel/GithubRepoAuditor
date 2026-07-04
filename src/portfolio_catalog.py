@@ -367,6 +367,21 @@ def catalog_entry_for_repo(
             "matched_by": "bare-name",
         }
 
+    basename_matches = [
+        entry
+        for key, entry in repos.items()
+        if "/" in key and key.rsplit("/", 1)[-1] == normalized_repo_name
+    ]
+    if normalized_repo_name and len(basename_matches) == 1:
+        return {
+            **basename_matches[0],
+            "repo": repo_name,
+            "repo_full_name": full_name,
+            "catalog_default_maturity_program": default_program,
+            "catalog_default_target_maturity": default_target,
+            "matched_by": "path-basename",
+        }
+
     return {
         "repo": repo_name,
         "repo_full_name": full_name,
