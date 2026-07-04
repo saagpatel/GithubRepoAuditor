@@ -109,6 +109,7 @@ FULL_SIGNAL_FILES = frozenset(
         "HANDOFF.md",
     }
 )
+SUBSTANTIVE_README_MIN_CHARS = 2_000
 
 
 @dataclass(frozen=True)
@@ -253,6 +254,18 @@ def temporary_project_reason(project_key: str, display_name: str) -> str:
 
 def friendly_missing_fields(analysis: ContextAnalysis) -> list[str]:
     return list(analysis.missing_fields)
+
+
+def has_substantive_readme_support(
+    primary_context_file: str, context_files: list[str], readme_char_count: int
+) -> bool:
+    context_file_names = {Path(item).name for item in context_files}
+    return (
+        primary_context_file in context_file_names
+        and primary_context_file != "README.md"
+        and "README.md" in context_file_names
+        and readme_char_count >= SUBSTANTIVE_README_MIN_CHARS
+    )
 
 
 def _read_small_text(path: Path) -> str:
