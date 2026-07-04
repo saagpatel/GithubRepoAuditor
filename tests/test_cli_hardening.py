@@ -537,6 +537,39 @@ def test_main_control_center_writes_artifacts_without_audit(monkeypatch, tmp_pat
     assert "Move into Action Sync only when the local weekly story is already" in combined
 
 
+def test_main_control_center_suppresses_queue_when_portfolio_truth_is_newer(
+    monkeypatch,
+    tmp_path,
+    sample_metadata,
+    capsys,
+):
+    args = _make_args(control_center=True, output_dir=str(tmp_path))
+    report_path = tmp_path / "audit-report-testuser-2026-03-29.json"
+    report_data = _make_report_dict(sample_metadata)
+    report_data["generated_at"] = "2026-03-29T12:00:00+00:00"
+    report_data["operator_summary"] = {
+        "headline": "Urgent stale pressure is active.",
+        "what_to_do_next": "Act now on StaleRepo.",
+    }
+    report_data["operator_queue"] = [{"repo": "StaleRepo"}]
+    report_path.write_text("{}")
+    (tmp_path / "portfolio-truth-latest.json").write_text(
+        json.dumps({"generated_at": "2026-03-30T12:00:00+00:00", "projects": []})
+    )
+
+    monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
+    monkeypatch.setattr(cli, "_load_latest_report", lambda _output_dir: (report_path, report_data))
+    monkeypatch.setattr("src.history.find_previous", lambda *_args, **_kwargs: None)
+
+    cli.main()
+
+    captured = capsys.readouterr()
+    combined = captured.out + captured.err
+    assert "Refresh the audit report before acting on control-center queue pressure." in combined
+    assert "Portfolio truth is newer than the audit report" in combined
+    assert "Act now on StaleRepo" not in combined
+
+
 def test_main_control_center_requires_latest_report(monkeypatch):
     args = _make_args(control_center=True)
 

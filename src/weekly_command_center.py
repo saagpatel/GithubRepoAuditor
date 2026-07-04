@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +28,44 @@ def _mapping(value: Any) -> dict[str, Any]:
     if hasattr(value, "to_dict"):
         return value.to_dict()
     return {}
+
+
+def _parse_datetime(value: Any) -> datetime | None:
+    text = _safe_text(value)
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _source_freshness(report_data: dict[str, Any], portfolio_truth: dict[str, Any]) -> dict[str, Any]:
+    report_generated_at = _parse_datetime(report_data.get("generated_at"))
+    truth_generated_at = _parse_datetime(portfolio_truth.get("generated_at"))
+    status = "current"
+    summary = "Control-center source report and portfolio truth are aligned enough to read together."
+    if truth_generated_at and report_generated_at and truth_generated_at > report_generated_at:
+        status = "portfolio-truth-newer"
+        summary = (
+            "Portfolio truth is newer than the audit report feeding the control-center queue; "
+            "refresh the audit report before acting on queue pressure."
+        )
+    elif truth_generated_at and not report_generated_at:
+        status = "unknown-report-age"
+        summary = (
+            "Portfolio truth is available, but the audit report timestamp is missing; "
+            "refresh the audit report before treating queue pressure as current."
+        )
+    return {
+        "status": status,
+        "summary": summary,
+        "report_generated_at": report_generated_at.isoformat() if report_generated_at else "",
+        "portfolio_truth_generated_at": truth_generated_at.isoformat() if truth_generated_at else "",
+    }
 
 
 def _weekly_pack_source(report_data: dict[str, Any], snapshot: dict[str, Any]) -> dict[str, Any]:
@@ -95,6 +133,8 @@ def build_weekly_command_center_digest(
         _safe_text(decision_quality.get("decision_quality_status")) or "insufficient-data"
     )
     truth = portfolio_truth or {}
+    freshness = _source_freshness(report_data, truth)
+    source_is_stale = freshness["status"] != "current"
     truth_summary = _build_truth_summary(truth)
     decision_queue = build_decision_queue(truth)
     decision_queue_summary = summarize_decision_queue(decision_queue)
@@ -103,6 +143,49 @@ def build_weekly_command_center_digest(
         operator_summary.get("why_it_matters")
     )
     queue_pressure_summary = operator_why or _safe_text(weekly_pack.get("queue_pressure_summary"))
+
+    headline = (
+        "Refresh the audit report before acting on control-center queue pressure."
+        if source_is_stale
+        else _safe_text(operator_summary.get("headline"))
+        or _safe_text(weekly_story.get("headline"))
+        or "No weekly headline is recorded yet."
+    )
+    decision = (
+        "Refresh the audit report, then rerun the read-only control center before choosing a repo action."
+        if source_is_stale
+        else operator_decision
+        or _safe_text(weekly_story.get("decision"))
+        or "Continue the normal operator review loop."
+    )
+    why_this_week = (
+        freshness["summary"]
+        if source_is_stale
+        else operator_why
+        or _safe_text(weekly_story.get("why_this_week"))
+        or "No weekly rationale is recorded yet."
+    )
+    section_digest = (
+        [
+            {
+                "id": "source-freshness",
+                "label": "Source Freshness",
+                "state": "refresh-needed",
+                "headline": freshness["summary"],
+                "next_step": (
+                    "Refresh the audit report, then rerun the read-only control center."
+                ),
+                "reason_codes": [freshness["status"]],
+            }
+        ]
+        if source_is_stale
+        else _build_section_digest(
+            weekly_story,
+            operator_decision=operator_decision,
+            operator_why=operator_why,
+        )
+    )
+    top_repo_briefings = [] if source_is_stale else repo_briefings[:MAX_REPO_BRIEFINGS]
 
     return {
         "contract_version": CONTRACT_VERSION,
@@ -113,18 +196,13 @@ def build_weekly_command_center_digest(
         "report_reference": report_reference or _safe_text(report_data.get("latest_report_path")),
         "control_center_reference": control_center_reference,
         "portfolio_truth_reference": portfolio_truth_reference,
-        "headline": _safe_text(operator_summary.get("headline"))
-        or _safe_text(weekly_story.get("headline"))
-        or "No weekly headline is recorded yet.",
-        "decision": operator_decision
-        or _safe_text(weekly_story.get("decision"))
-        or "Continue the normal operator review loop.",
-        "why_this_week": operator_why
-        or _safe_text(weekly_story.get("why_this_week"))
-        or "No weekly rationale is recorded yet.",
+        "source_freshness": freshness,
+        "headline": headline,
+        "decision": decision,
+        "why_this_week": why_this_week,
         "next_step": _safe_text(weekly_story.get("next_step"))
         or "Open the workbook first, then use the read-only control center.",
-        "queue_pressure_summary": queue_pressure_summary,
+        "queue_pressure_summary": freshness["summary"] if source_is_stale else queue_pressure_summary,
         "operating_paths_summary": _safe_text(weekly_pack.get("operating_paths_summary")),
         "decision_quality": {
             "status": decision_quality_status,
@@ -155,11 +233,7 @@ def build_weekly_command_center_digest(
             **_build_security_summary(truth),
             "top_alerts": _build_security_attention_items(truth),
         },
-        "section_digest": _build_section_digest(
-            weekly_story,
-            operator_decision=operator_decision,
-            operator_why=operator_why,
-        ),
+        "section_digest": section_digest,
         "top_repo_briefings": [
             {
                 "repo": _safe_text(item.get("repo")) or "Repo",
@@ -170,7 +244,7 @@ def build_weekly_command_center_digest(
                 "operating_path_line": _safe_text(item.get("operating_path_line")),
                 "operator_focus_line": _safe_text(item.get("operator_focus_line")),
             }
-            for item in repo_briefings[:MAX_REPO_BRIEFINGS]
+            for item in top_repo_briefings
         ],
         "report_only_guardrail": (
             "This digest is descriptive only. It may highlight path, trust, and pressure, "
@@ -181,6 +255,7 @@ def build_weekly_command_center_digest(
 
 def render_weekly_command_center_markdown(digest: dict[str, Any]) -> str:
     decision_quality = _mapping(digest.get("decision_quality"))
+    source_freshness = _mapping(digest.get("source_freshness"))
     portfolio_truth = _mapping(digest.get("portfolio_truth"))
     risk_posture = _mapping(digest.get("risk_posture"))
     tier_counts = _mapping(risk_posture.get("risk_tier_counts"))
@@ -195,6 +270,7 @@ def render_weekly_command_center_markdown(digest: dict[str, Any]) -> str:
         f"- Decision: {_safe_text(digest.get('decision'))}",
         f"- Why This Week: {_safe_text(digest.get('why_this_week'))}",
         f"- Next Step: {_safe_text(digest.get('next_step'))}",
+        f"- Source Freshness: `{_safe_text(source_freshness.get('status')) or 'unknown'}` — {_safe_text(source_freshness.get('summary')) or 'No source freshness summary is recorded yet.'}",
         f"- Decision Quality: `{_safe_text(decision_quality.get('status'))}` — {_safe_text(decision_quality.get('summary'))}",
         f"- Operating Paths: {_safe_text(digest.get('operating_paths_summary')) or 'No operating-path summary is recorded yet.'}",
         f"- Portfolio Truth: {portfolio_truth.get('project_count', 0)} projects, {portfolio_truth.get('active_project_count', 0)} active registry entries, {portfolio_truth.get('default_attention_count', 0)} default attention, {portfolio_truth.get('decision_queue_count', 0)} decision queue",

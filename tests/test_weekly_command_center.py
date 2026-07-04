@@ -8,6 +8,7 @@ from src.weekly_command_center import (
 
 def _make_portfolio_truth() -> dict:
     return {
+        "generated_at": "2026-04-14T12:00:00+00:00",
         "projects": [
             {
                 "identity": {"display_name": "GithubRepoAuditor"},
@@ -275,6 +276,45 @@ def test_build_weekly_command_center_digest_prefers_control_center_snapshot_focu
     )
     assert "codexkit" in operator_focus["headline"]
     assert digest["top_repo_briefings"][0]["repo"] == "codexkit"
+
+
+def test_build_weekly_command_center_digest_blocks_stale_queue_when_truth_is_newer() -> None:
+    portfolio_truth = _make_portfolio_truth()
+    portfolio_truth["generated_at"] = "2026-04-15T12:00:00+00:00"
+    report_data = {
+        "username": "testuser",
+        "generated_at": "2026-04-14T12:00:00+00:00",
+        "operator_summary": {
+            "headline": "Urgent queue pressure is active.",
+            "what_to_do_next": "Act now on StaleRepo.",
+            "trend_summary": "StaleRepo is the top pressure item.",
+            "decision_quality_v1": {},
+        },
+        "operator_queue": [{"repo": "StaleRepo"}],
+        "audits": [],
+    }
+    snapshot = {
+        "operator_summary": report_data["operator_summary"],
+        "operator_queue": report_data["operator_queue"],
+    }
+
+    digest = build_weekly_command_center_digest(
+        report_data,
+        snapshot,
+        portfolio_truth=portfolio_truth,
+        generated_at="2026-04-14T12:00:00+00:00",
+    )
+
+    assert digest["source_freshness"]["status"] == "portfolio-truth-newer"
+    assert "Refresh the audit report" in digest["headline"]
+    assert "Refresh the audit report" in digest["decision"]
+    assert "StaleRepo" not in digest["decision"]
+    assert "StaleRepo" not in digest["queue_pressure_summary"]
+    assert digest["top_repo_briefings"] == []
+
+    rendered_md = render_weekly_command_center_markdown(digest)
+    assert "Source Freshness: `portfolio-truth-newer`" in rendered_md
+    assert "StaleRepo" not in rendered_md
 
 
 def _sec(available: bool, critical: int = 0, high: int = 0) -> dict:
