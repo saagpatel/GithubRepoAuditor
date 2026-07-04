@@ -121,6 +121,24 @@ def test_readme_only_context_stays_minimum_viable_without_separate_primary(tmp_p
     assert result.context_quality == "minimum-viable"
 
 
+def test_substantive_readme_support_requires_top_level_primary_context(tmp_path):
+    readme = "# Project\n\n" + ("README-level operator workflow detail. " * 80)
+    _write(tmp_path, "README.md", readme)
+    (tmp_path / "docs").mkdir()
+    _write(tmp_path / "docs", "AGENTS.md", "# Nested guidance\n")
+
+    result = analyze_project_context(tmp_path, ["docs/AGENTS.md", "README.md"])
+
+    assert (
+        has_substantive_readme_support(
+            result.primary_context_file,
+            ["docs/AGENTS.md", "README.md"],
+            len(readme),
+        )
+        is False
+    )
+
+
 def test_explicit_readme_text_override_is_honored(tmp_path):
     # The dormant readme_text param now works as an explicit override (no disk read needed).
     _write(tmp_path, "AGENTS.md", _GENERIC_AGENTS)
