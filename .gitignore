@@ -27,6 +27,7 @@ dist/
 build/
 .venv/
 .playwright-mcp/
+.local/
 
 # pytest coverage artifact
 .coverage
