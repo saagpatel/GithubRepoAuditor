@@ -174,6 +174,7 @@ def _catalog_supported_context_quality(
     *,
     raw_project: dict[str, Any],
     declared_values: dict[str, Any],
+    provenance: dict[str, dict[str, str]],
     readme_char_count: int,
 ) -> str:
     if raw_context_quality != "minimum-viable":
@@ -185,6 +186,11 @@ def _catalog_supported_context_quality(
     if declared_values.get("intended_disposition") != "maintain":
         return raw_context_quality
     if declared_values.get("category") != "infrastructure":
+        return raw_context_quality
+    if provenance.get("declared.category", {}).get("source") not in {
+        "catalog_repo",
+        "catalog_group",
+    }:
         return raw_context_quality
     if not has_substantive_readme_support(
         str(raw_project.get("primary_context_file") or ""),
@@ -498,6 +504,7 @@ def _build_truth_project(
         raw_context_quality,
         raw_project=raw_project,
         declared_values=declared_values,
+        provenance=provenance,
         readme_char_count=derived_readme_char_count,
     )
     provenance["derived.context_quality"] = {

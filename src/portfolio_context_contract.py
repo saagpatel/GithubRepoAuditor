@@ -129,7 +129,7 @@ class ContextAnalysis:
 # Utility: prefers CLAUDE.md over AGENTS.md when both present.
 # Called internally by analyze_project_context() in this module.
 def choose_primary_context_file(context_files: list[str]) -> str:
-    normalized = {Path(item).name for item in context_files}
+    normalized = _top_level_context_file_names(context_files)
     if "CLAUDE.md" in normalized:
         return "CLAUDE.md"
     return "AGENTS.md"
@@ -139,7 +139,7 @@ def analyze_project_context(
     project_path: Path, context_files: list[str], *, readme_text: str = ""
 ) -> ContextAnalysis:
     primary_context_file = choose_primary_context_file(context_files)
-    context_file_names = {Path(item).name for item in context_files}
+    context_file_names = _top_level_context_file_names(context_files)
     primary_exists = primary_context_file in context_file_names
     primary_text = ""
     if primary_exists:
@@ -259,13 +259,21 @@ def friendly_missing_fields(analysis: ContextAnalysis) -> list[str]:
 def has_substantive_readme_support(
     primary_context_file: str, context_files: list[str], readme_char_count: int
 ) -> bool:
-    context_file_names = {Path(item).name for item in context_files}
+    context_file_names = _top_level_context_file_names(context_files)
     return (
         primary_context_file in context_file_names
         and primary_context_file != "README.md"
         and "README.md" in context_file_names
         and readme_char_count >= SUBSTANTIVE_README_MIN_CHARS
     )
+
+
+def _top_level_context_file_names(context_files: list[str]) -> set[str]:
+    return {
+        path.name
+        for item in context_files
+        if (path := Path(item)).parent in {Path("."), Path("")}
+    }
 
 
 def _read_small_text(path: Path) -> str:

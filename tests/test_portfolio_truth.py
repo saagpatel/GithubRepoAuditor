@@ -873,6 +873,58 @@ repos:
     assert product.provenance["derived.context_quality"]["source"] == "workspace"
 
 
+def test_legacy_registry_infra_category_does_not_promote_context_quality(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    project = workspace / "LegacyInfra"
+    project.mkdir()
+    subprocess.run(["git", "init"], cwd=project, capture_output=True, check=True)
+    _write(project / "AGENTS.md", _complete_agent_context("LegacyInfra"))
+    _write(project / "README.md", _substantive_readme("LegacyInfra"))
+    _write(project / "pyproject.toml", "[project]\nname = \"legacy-infra\"\n")
+    catalog_path = tmp_path / "portfolio-catalog.yaml"
+    catalog_path.write_text(
+        """
+repos:
+  LegacyInfra:
+    owner: d
+    lifecycle_state: active
+    criticality: high
+    review_cadence: weekly
+    intended_disposition: maintain
+"""
+    )
+    legacy_registry_path = tmp_path / "project-registry.md"
+    legacy_registry_path.write_text(
+        """
+# Project Registry
+
+## Standalone Projects
+
+| Project | Status | Tool | Context Quality | Stack | Context Files | Category | Notes |
+|---------|--------|------|-----------------|-------|---------------|----------|-------|
+| LegacyInfra | active | codex | minimum-viable | Python | AGENTS.md | infrastructure | legacy category only |
+"""
+    )
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=workspace,
+        catalog_path=catalog_path,
+        legacy_registry_path=legacy_registry_path,
+        include_notion=False,
+    )
+
+    infra = next(
+        project for project in result.snapshot.projects if project.identity.project_key == "LegacyInfra"
+    )
+    assert infra.declared.category == "infrastructure"
+    assert infra.provenance["declared.category"]["source"] == "legacy_registry"
+    assert infra.derived.context_quality == "minimum-viable"
+    assert infra.provenance["derived.context_quality"]["source"] == "workspace"
+
+
 def test_rendered_registry_round_trips_through_parser(
     portfolio_workspace: Path,
     portfolio_catalog: Path,
