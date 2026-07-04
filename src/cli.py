@@ -2213,6 +2213,37 @@ def _write_control_center_artifacts(
     return json_path, md_path, weekly_json, weekly_md, payload
 
 
+def _enrich_control_center_snapshot_from_report(
+    report_data: dict,
+    snapshot: dict,
+    args,
+) -> dict:
+    report = _report_from_dict(
+        {
+            **report_data,
+            "operator_summary": snapshot.get("operator_summary", {}),
+            "operator_queue": snapshot.get("operator_queue", []),
+        }
+    )
+    if any(audit.portfolio_catalog for audit in report.audits):
+        audit_lookup = {audit.metadata.name: audit.portfolio_catalog for audit in report.audits}
+        for item in report.operator_queue:
+            repo_name = str(item.get("repo") or item.get("repo_name") or "").strip()
+            catalog_entry = audit_lookup.get(repo_name, {})
+            if catalog_entry:
+                item["portfolio_catalog"] = dict(catalog_entry)
+                item["catalog_line"] = catalog_entry.get("catalog_line", "")
+                item["intent_alignment"] = catalog_entry.get("intent_alignment", "missing-contract")
+                item["intent_alignment_reason"] = catalog_entry.get("intent_alignment_reason", "")
+    else:
+        report = _apply_portfolio_catalog(report, args)
+    report = _apply_scorecards(report, args)
+    report = _apply_operating_paths(report)
+    snapshot["operator_summary"] = report.operator_summary
+    snapshot["operator_queue"] = report.operator_queue
+    return snapshot
+
+
 def _write_approval_receipt(
     output_dir: Path,
     username: str,
@@ -2385,6 +2416,7 @@ def _run_control_center_mode(args, parser) -> None:
         output_dir=output_dir,
         triage_view=args.triage_view,
     )
+    snapshot = _enrich_control_center_snapshot_from_report(normalized, snapshot, args)
     artifact_generated_at = _report_artifact_datetime(
         report_path,
         _parse_iso_dt(normalized.get("generated_at")) or datetime.now(timezone.utc),
@@ -2584,6 +2616,7 @@ def _run_acknowledgment_capture_mode(args, parser) -> None:
         build_acknowledgment_record,
         find_matching_change,
         find_sibling_changes,
+        load_acknowledgments,
         save_acknowledgment,
     )
     from src.recurring_review import MATERIALITY_THRESHOLDS, evaluate_material_changes
@@ -2615,10 +2648,12 @@ def _run_acknowledgment_capture_mode(args, parser) -> None:
         diff_data=diff_dict,
         thresholds=MATERIALITY_THRESHOLDS["standard"],
     )
+    acknowledgments = load_acknowledgments(output_dir, args.username)
     matched = find_matching_change(
         repo_name=args.acknowledge_target,
         change_kind=args.acknowledge_kind,
         material_changes=material_changes,
+        acknowledgments=acknowledgments,
     )
     if not matched:
         parser.error(

@@ -459,6 +459,91 @@ programs:
     assert updated.operator_queue[0]["scorecard_line"].startswith("Scorecard: Maintain")
 
 
+def test_control_center_snapshot_rehydrates_portfolio_context(
+    tmp_path,
+    sample_metadata,
+) -> None:
+    catalog_path = tmp_path / "portfolio-catalog.yaml"
+    catalog_path.write_text(
+        """
+repos:
+  test-repo:
+    owner: d
+    lifecycle_state: active
+    review_cadence: monthly
+    intended_disposition: maintain
+    maturity_program: maintain
+    target_maturity: operating
+"""
+    )
+    scorecards_path = tmp_path / "scorecards.yaml"
+    scorecards_path.write_text(
+        """
+programs:
+  maintain:
+    label: Maintain
+    target_maturity: operating
+    rules:
+      - key: testing
+        label: Testing
+        check: dimension_at_least
+        dimension: testing
+        threshold: 0.80
+        partial_threshold: 0.60
+        weight: 1.0
+"""
+    )
+    audit = RepoAudit(
+        metadata=sample_metadata,
+        analyzer_results=[AnalyzerResult("testing", 1.0, 1.0, [], {})],
+        overall_score=0.9,
+        completeness_tier="shipped",
+        flags=[],
+        lenses={"ship_readiness": {"score": 0.9}},
+        security_posture={"score": 1.0},
+        portfolio_catalog={
+            "has_explicit_entry": True,
+            "intended_disposition": "maintain",
+            "maturity_program": "maintain",
+            "target_maturity": "operating",
+            "operating_path": "maintain",
+            "path_confidence": "high",
+            "intent_alignment": "aligned",
+            "intent_alignment_reason": "The repo is holding a maintain posture.",
+            "catalog_line": "d | lifecycle active | disposition maintain | program maintain",
+        },
+    )
+    report = AuditReport.from_audits("testuser", [audit], [], 1)
+    report.operator_summary = {"headline": "Review current movement."}
+    report.operator_queue = [
+        {
+            "repo": "test-repo",
+            "lane": "urgent",
+            "title": "Review test-repo",
+            "portfolio_catalog": {
+                "path_confidence": "low",
+                "intent_alignment": "needs-review",
+            },
+        }
+    ]
+    snapshot = {
+        "operator_summary": dict(report.operator_summary),
+        "operator_queue": [dict(report.operator_queue[0])],
+    }
+
+    updated = cli._enrich_control_center_snapshot_from_report(
+        report.to_dict(),
+        snapshot,
+        _make_args(catalog=catalog_path, scorecards=scorecards_path),
+    )
+
+    item = updated["operator_queue"][0]
+    assert item["portfolio_catalog"]["intent_alignment"] == "aligned"
+    assert item["portfolio_catalog"]["path_confidence"] == "high"
+    assert item["portfolio_catalog"]["operating_path"] == "maintain"
+    assert item["scorecard"]["status"] == "on-track"
+
+
 def test_main_doctor_writes_artifact_and_exits_cleanly(monkeypatch, tmp_path, capsys):
     args = _make_args(doctor=True, output_dir=str(tmp_path))
     artifact_path = tmp_path / "diagnostics-testuser-2026-03-29.json"

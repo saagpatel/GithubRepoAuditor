@@ -185,6 +185,32 @@ def test_is_change_acknowledged_rejects_unrelated_change():
     assert is_change_acknowledged(other, [ack]) is False
 
 
+def test_find_matching_change_skips_already_acknowledged_change():
+    first = _make_change(
+        change_type="lens-delta",
+        title="RepoA shifted on maintenance risk",
+        details={"lens": "maintenance_risk", "delta": -0.1},
+    )
+    second = {
+        **_make_change(
+            change_type="lens-delta",
+            title="RepoA shifted on momentum",
+            details={"lens": "momentum", "delta": 0.1},
+        ),
+        "change_key": "key-lens-delta-RepoA-momentum",
+    }
+    ack = build_acknowledgment_record(first, reviewer="alice", note="reviewed")
+
+    match = find_matching_change(
+        repo_name="RepoA",
+        change_kind="lens-delta",
+        material_changes=[first, second],
+        acknowledgments=[ack],
+    )
+
+    assert match == second
+
+
 def test_is_change_acknowledged_handles_empty_acknowledgments():
     change = _make_change()
     assert is_change_acknowledged(change, []) is False

@@ -125,11 +125,14 @@ def find_matching_change(
     repo_name: str,
     change_kind: str,
     material_changes: list[dict],
+    acknowledgments: list[dict] | None = None,
 ) -> dict | None:
     for change in material_changes:
         if change.get("change_type") != change_kind:
             continue
         if change.get("repo_name") != repo_name:
+            continue
+        if is_change_acknowledged(change, acknowledgments or []):
             continue
         return change
     return None
