@@ -53,11 +53,13 @@ def test_makefile_includes_operator_entrypoints():
     makefile = (ROOT / "Makefile").read_text()
     for target in ("install:", "install-dev:", "doctor:", "audit:", "control-center:", "workbook-gate:", "workbook-signoff:", "test:"):
         assert target in makefile
-    assert "audit $(USERNAME) --doctor $(ARGS)" in makefile
-    assert "audit $(USERNAME) --excel-mode standard $(ARGS)" in makefile
-    assert "audit $(USERNAME) --control-center $(ARGS)" in makefile
+    assert "CLI := uv run python -m src.cli" in makefile
+    assert "$(CLI) $(USERNAME) --doctor $(ARGS)" in makefile
+    assert "$(CLI) $(USERNAME) --excel-mode standard $(ARGS)" in makefile
+    assert "$(CLI) $(USERNAME) --control-center $(ARGS)" in makefile
     assert "$(PYTHON) -m src.workbook_gate $(ARGS)" in makefile
     assert "$(PYTHON) -m src.workbook_gate --record-signoff $(ARGS)" in makefile
+    assert "$(CLI) --help" in makefile
 
 
 def test_example_audit_config_is_parseable():

@@ -1,6 +1,7 @@
 .PHONY: install install-dev doctor audit control-center demo benchmark workbook-gate workbook-signoff test lint format type-check run clean release-gate build shiv dist-check release publish-pypi
 
 PYTHON := python3
+CLI := uv run python -m src.cli
 USERNAME ?= saagpatel
 ARGS ?=
 
@@ -11,13 +12,13 @@ install-dev:
 	$(PYTHON) -m pip install -e ".[dev,config]"
 
 doctor:
-	audit $(USERNAME) --doctor $(ARGS)
+	$(CLI) $(USERNAME) --doctor $(ARGS)
 
 audit:
-	audit $(USERNAME) --excel-mode standard $(ARGS)
+	$(CLI) $(USERNAME) --excel-mode standard $(ARGS)
 
 control-center:
-	audit $(USERNAME) --control-center $(ARGS)
+	$(CLI) $(USERNAME) --control-center $(ARGS)
 
 demo:
 	$(PYTHON) scripts/build_demo_artifacts.py
@@ -44,7 +45,7 @@ type-check:
 	mypy src/ --ignore-missing-imports
 
 run:
-	audit --help
+	$(CLI) --help
 
 release-gate:
 	@echo "=== Running release gate: mutation testing ==="
