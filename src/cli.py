@@ -81,6 +81,7 @@ Subcommand form (preferred):
   audit triage <github-username> --approval-center
   audit report <github-username> --portfolio-truth
   audit report <github-username> --campaign security-review --writeback-target github
+  audit security-gate --output-dir output
   audit serve  [--port 8080]
 
 Legacy flat form (deprecated, still supported):
@@ -1527,6 +1528,30 @@ def _build_security_burndown_subparser(subparsers: argparse._SubParsersAction) -
     )
 
 
+def _build_security_gate_subparser(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
+    """Subcommand: `audit security-gate` — fail on portfolio high/critical drift."""
+    p = subparsers.add_parser(
+        "security-gate",
+        help="Fail if portfolio truth has open high/critical Dependabot alerts",
+        description=(
+            "Read output/portfolio-truth-latest.json and fail if any scanned repo has\n"
+            "open high/critical Dependabot alerts. Missing security overlay data is\n"
+            "reported as unknown and exits nonzero."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument(
+        "--output-dir",
+        default="output",
+        help="Directory containing portfolio-truth-latest.json (default: output/)",
+    )
+    p.add_argument(
+        "--json",
+        action="store_true",
+        help="Print machine-readable JSON instead of Markdown",
+    )
+
+
 def build_subcommand_parser() -> argparse.ArgumentParser:
     """Return the subcommand-aware parser used by main().
 
@@ -1556,6 +1581,7 @@ def build_subcommand_parser() -> argparse.ArgumentParser:
     _build_report_subparser(subparsers)
     _build_serve_subparser(subparsers)
     _build_security_burndown_subparser(subparsers)
+    _build_security_gate_subparser(subparsers)
     return parser
 
 
@@ -6974,7 +7000,7 @@ def _infer_subcommand_from_flags(args: argparse.Namespace) -> str:
 
 
 _KNOWN_SUBCOMMANDS: frozenset[str] = frozenset(
-    {"run", "triage", "report", "serve", "security-burndown"}
+    {"run", "triage", "report", "serve", "security-burndown", "security-gate"}
 )
 
 
@@ -7139,6 +7165,41 @@ def _run_security_burndown_mode(args) -> None:
     print_info(f"Burndown JSON written to {json_path}")
 
 
+def _run_security_gate_mode(args) -> None:
+    """Dispatch for `audit security-gate`."""
+    from src.portfolio_security_gate import (
+        build_security_gate_report,
+        render_security_gate_markdown,
+    )
+
+    truth_path = Path(args.output_dir) / TRUTH_LATEST_FILENAME
+    if not truth_path.exists():
+        print_info(
+            f"{TRUTH_LATEST_FILENAME} not found in {truth_path.parent}. "
+            "Run `audit report <username> --portfolio-truth --portfolio-truth-include-security` first."
+        )
+        raise SystemExit(1)
+
+    try:
+        with truth_path.open(encoding="utf-8") as fh:
+            portfolio_truth = json.load(fh)
+    except Exception as exc:  # noqa: BLE001
+        print_info(f"Could not read {truth_path}: {exc}")
+        raise SystemExit(1)
+
+    if not isinstance(portfolio_truth, dict):
+        print_info(f"{truth_path} is not a portfolio-truth object.")
+        raise SystemExit(1)
+
+    report = build_security_gate_report(portfolio_truth)
+    if getattr(args, "json", False):
+        print(json.dumps(report.to_dict(), indent=2))
+    else:
+        print(render_security_gate_markdown(report))
+    if not report.passed:
+        raise SystemExit(1)
+
+
 # ── Main entry point ──────────────────────────────────────────────────
 def main() -> None:
     raw_argv = sys.argv[1:]
@@ -7153,10 +7214,14 @@ def main() -> None:
     subcommand_parser = build_subcommand_parser()
     legacy_parser = build_parser()
 
-    # ── Subcommand: security-burndown (own parser — no legacy equivalent) ──
+    # ── Subcommands with no legacy equivalent ───────────────────────────────
     if argv and argv[0] == "security-burndown":
         sb_args = subcommand_parser.parse_args(argv)
         _run_security_burndown_mode(sb_args)
+        return
+    if argv and argv[0] == "security-gate":
+        sg_args = subcommand_parser.parse_args(argv)
+        _run_security_gate_mode(sg_args)
         return
 
     if argv and argv[0] in _KNOWN_SUBCOMMANDS:

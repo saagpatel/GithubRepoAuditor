@@ -59,6 +59,17 @@ Failure behavior: a 403 or 404 on any endpoint records `available: false` for th
 
 Output lands in `output/ghas-alerts-<user>-<date>.json`. Excel and control-center surfacing is wired via S2.4.
 
+## Portfolio Security Gate
+
+Run `audit security-gate --output-dir output` after generating portfolio truth with
+`--portfolio-truth-include-security`. The gate reads
+`output/portfolio-truth-latest.json` and exits nonzero when any scanned repo has open
+high/critical Dependabot alerts.
+
+The gate is deliberately strict: a snapshot with no scanned security overlay is
+reported as `UNKNOWN`, not clear. This prevents a missing GHAS overlay from looking
+like a clean portfolio.
+
 ## OSSF Scorecard
 
 Pass `--ossf-scorecard` to enrich each repo with pre-computed OSSF Scorecard data.
