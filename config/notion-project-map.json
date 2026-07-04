@@ -17,6 +17,12 @@
 	"bridge-db": {
 		"localProjectId": "34cc21f1-caf0-81cd-9650-cf2253d7afd4"
 	},
+	"harness-scorecard": {
+		"localProjectId": "393c21f1-caf0-8195-9642-d3e8ef0036ee"
+	},
+	"peer-agent-tools": {
+		"localProjectId": "393c21f1-caf0-8160-a9c4-d7d37780835f"
+	},
 	"personal-ops": {
 		"localProjectId": "332c21f1-caf0-810d-bf15-e5486454ff81"
 	},
