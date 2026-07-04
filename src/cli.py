@@ -4720,7 +4720,8 @@ def _print_control_center_summary(snapshot: dict) -> None:
         ("deferred", "Safe to Defer"),
     ]
     for lane, label in lane_labels:
-        items = [item for item in queue if item.get("lane") == lane]
+        lane_items = [item for item in queue if item.get("lane") == lane]
+        items = [item for item in lane_items if _should_print_control_center_item(item)]
         if not items:
             continue
         print(f"\n{label}")
@@ -4737,6 +4738,9 @@ def _print_control_center_summary(snapshot: dict) -> None:
                     "    Intent alignment: "
                     f"{item.get('intent_alignment')} ({item.get('intent_alignment_reason', 'No alignment reason is recorded yet.')})"
                 )
+        omitted_count = len(lane_items) - len(items)
+        if omitted_count > 0:
+            print(f"    ({omitted_count} experiment/manual-only item(s) hidden from default view.)")
     if recent_changes:
         print("\nRecently Changed")
         for item in recent_changes[:5]:
@@ -4746,6 +4750,19 @@ def _print_control_center_summary(snapshot: dict) -> None:
             print(
                 f"  - {item.get('generated_at', '')[:10]} {subject}: {item.get('summary', item.get('kind', 'change'))}"
             )
+
+
+def _should_print_control_center_item(item: dict) -> bool:
+    catalog = item.get("portfolio_catalog") or {}
+    lifecycle = str(catalog.get("lifecycle_state") or "").strip().lower()
+    intended = str(catalog.get("intended_disposition") or "").strip().lower()
+    program = str(catalog.get("maturity_program") or "").strip().lower()
+    operating_path = str(item.get("operating_path") or catalog.get("operating_path") or "").strip().lower()
+    if lifecycle in {"experiment", "experimental"}:
+        return False
+    if intended == "experiment" or program == "experiment" or operating_path == "experiment":
+        return False
+    return True
 
 
 def _fetch_repo_metadata(args, client: GitHubClient) -> tuple[list[RepoMetadata], list[dict]]:
