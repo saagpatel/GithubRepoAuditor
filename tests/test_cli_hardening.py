@@ -459,6 +459,60 @@ programs:
     assert updated.operator_queue[0]["scorecard_line"].startswith("Scorecard: Maintain")
 
 
+def test_apply_scorecards_refreshes_maintain_intent_alignment(sample_metadata, tmp_path):
+    scorecards_path = tmp_path / "scorecards.yaml"
+    scorecards_path.write_text(
+        """
+programs:
+  maintain:
+    label: Maintain
+    target_maturity: operating
+    rules:
+      - key: testing
+        label: Testing
+        check: dimension_at_least
+        dimension: testing
+        threshold: 0.80
+        partial_threshold: 0.60
+        weight: 1.0
+"""
+    )
+
+    audit = RepoAudit(
+        metadata=sample_metadata,
+        analyzer_results=[AnalyzerResult("testing", 1.0, 1.0, [], {})],
+        overall_score=1.0,
+        completeness_tier="",
+        flags=[],
+        lenses={"ship_readiness": {"score": 1.0}},
+        security_posture={"score": 1.0},
+        portfolio_catalog={
+            "has_explicit_entry": True,
+            "intended_disposition": "maintain",
+            "maturity_program": "maintain",
+            "target_maturity": "operating",
+            "intent_alignment": "needs-review",
+            "intent_alignment_reason": "Stale pre-scorecard alignment.",
+            "operator_focus": "Act Now",
+        },
+    )
+    report = AuditReport.from_audits("testuser", [audit], [], 1)
+    report.operator_queue = [
+        {
+            "repo": "test-repo",
+            "title": "Review test-repo",
+            "intent_alignment": "needs-review",
+        }
+    ]
+
+    updated = cli._apply_scorecards(report, _make_args(scorecards=scorecards_path))
+
+    assert updated.audits[0].scorecard["status"] == "on-track"
+    assert updated.audits[0].portfolio_catalog["intent_alignment"] == "aligned"
+    assert "scorecard" in updated.audits[0].portfolio_catalog["intent_alignment_reason"]
+    assert updated.operator_queue[0]["intent_alignment"] == "aligned"
+
+
 def test_control_center_snapshot_rehydrates_portfolio_context(
     tmp_path,
     sample_metadata,

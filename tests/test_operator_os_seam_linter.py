@@ -48,6 +48,12 @@ def _passing_paths(tmp_path: Path) -> tuple[Path, list[Path]]:
     return truth, [registry, report]
 
 
+def _refresh_truth_for_cli(path: Path) -> None:
+    payload = json.loads(path.read_text())
+    payload["generated_at"] = datetime.now(UTC).isoformat()
+    path.write_text(json.dumps(payload))
+
+
 def _write_identity_truth(path: Path) -> None:
     _write_truth(
         path,
@@ -405,6 +411,7 @@ def test_identity_resolution_since_includes_new_timestamped_rows(tmp_path: Path)
 
 def test_cli_identity_resolution_is_opt_in(tmp_path: Path) -> None:
     truth, markdown = _passing_paths(tmp_path)
+    _refresh_truth_for_cli(truth)
     bridge_db = tmp_path / "bridge.db"
     _write_bridge_db(bridge_db, session_cost_names=["085"])
 
@@ -445,6 +452,7 @@ def test_cli_identity_resolution_is_opt_in(tmp_path: Path) -> None:
 def test_cli_identity_since_filters_timestamped_identity_rows(tmp_path: Path) -> None:
     truth, markdown = _passing_paths(tmp_path)
     _write_identity_truth(truth)
+    _refresh_truth_for_cli(truth)
     bridge_db = tmp_path / "bridge.db"
     notification_db = tmp_path / "notification.sqlite3"
     notion_snapshot = tmp_path / "notion.json"

@@ -304,6 +304,28 @@ def test_evaluate_intent_alignment_uses_disposition_and_focus():
     )
 
 
+def test_evaluate_intent_alignment_trusts_on_track_maintain_scorecard():
+    maintain_entry = {
+        "has_explicit_entry": True,
+        "intended_disposition": "maintain",
+        "scorecard": {
+            "status": "on-track",
+            "maturity_level": "leading",
+            "target_maturity": "operating",
+        },
+    }
+
+    alignment, reason = evaluate_intent_alignment(
+        maintain_entry,
+        completeness_tier="",
+        archived=False,
+        operator_focus="Act Now",
+    )
+
+    assert alignment == "aligned"
+    assert "scorecard" in reason
+
+
 def test_catalog_line_and_summaries_cover_missing_contracts():
     audits = [
         {
