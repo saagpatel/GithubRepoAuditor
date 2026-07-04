@@ -27,6 +27,46 @@ from pathlib import Path
 
 SCHEMA_VERSION = "1.0"
 NOTION_PROJECTION_POLICY_SCHEMA_VERSION = "notion_projection_policy.v2"
+IDENTITY_ALIAS_MAP_DEPRECATES_AFTER = "2026-09-30"
+
+# Migration-only alias map for Operator-OS identity dialects found by the
+# 2026-07-03 dialect census. Canonical values are repo_full_name, not
+# project_key; do not grow this into a permanent second identity system.
+IDENTITY_ALIAS_MAP: dict[str, str] = {
+    "OPERANT": "saagpatel/operant",
+    "CryptForge": "saagpatel/CryptForge",
+    "Fun:GamePrjs/ CryptForge": "saagpatel/CryptForge",
+    "Devil-s-Advocate": "saagpatel/devils-advocate",
+    "devils-advocate": "saagpatel/devils-advocate",
+    "GithubRepoAuditor": "saagpatel/GithubRepoAuditor",
+    "github-repo-auditor": "saagpatel/GithubRepoAuditor",
+    "MCPAudit": "saagpatel/MCPAudit",
+    "mcpaudit-web": "saagpatel/MCPAudit",
+    "Notion": "saagpatel/Notion",
+    "notion_os": "saagpatel/Notion",
+    "fable-outputs": "saagpatel/fable-outputs",
+    "fable-second-sprint": "saagpatel/fable-second-sprint",
+    "portfolio-mcp": "saagpatel/portfolio-mcp",
+    "mcp-trust": "saagpatel/mcp-trust",
+    "agent-bridge": "saagpatel/agent-bridge",
+    "bridge-db": "saagpatel/bridge-db",
+    "cost-tracker": "saagpatel/cost-tracker",
+    "notification-hub": "saagpatel/notification-hub",
+    "portfolio-code-health": "saagpatel/portfolio-code-health",
+    "portfolio-index": "saagpatel/portfolio-index",
+    "AIWorkFlow": "saagpatel/AIWorkFlow",
+    "ApplyKit": "saagpatel/ApplyKit",
+    "Signal & Noise": "saagpatel/SignalAndNoise",
+    "Signal---Noise": "saagpatel/SignalAndNoise",
+}
+
+BRIDGE_CANONICAL_KEY_DISAGREEMENTS: dict[str, str] = {
+    "operant-public": "Bridge canonical_key should reconcile to OPERANT/saagpatel/operant.",
+    "portfolio-health": (
+        "Bridge canonical_key should reconcile to "
+        "portfolio-code-health/saagpatel/portfolio-code-health."
+    ),
+}
 
 # Built-in fallbacks, mirrored by config/project-registry-overrides.json.
 # Hard normalization failures: drifted identifier -> canonical project_key.
