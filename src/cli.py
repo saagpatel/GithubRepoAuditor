@@ -2388,7 +2388,7 @@ def _run_control_center_mode(args, parser) -> None:
         report_path,
         _parse_iso_dt(normalized.get("generated_at")) or datetime.now(timezone.utc),
     )
-    json_artifact, md_artifact, weekly_json, weekly_md, _payload = _write_control_center_artifacts(
+    json_artifact, md_artifact, weekly_json, weekly_md, payload = _write_control_center_artifacts(
         normalized,
         snapshot,
         output_dir,
@@ -2397,7 +2397,17 @@ def _run_control_center_mode(args, parser) -> None:
         report_reference=str(report_path),
         diff_dict=diff_dict,
     )
-    _print_control_center_summary(snapshot)
+    weekly_digest = payload.get("weekly_command_center_digest_v1", {})
+    source_freshness = weekly_digest.get("source_freshness", {})
+    if source_freshness.get("status") and source_freshness.get("status") != "current":
+        print_info(weekly_digest.get("headline") or "Refresh the audit report before acting.")
+        print_info(
+            source_freshness.get("summary")
+            or "Control-center source freshness could not be proven."
+        )
+        print_info(weekly_digest.get("decision") or "Refresh the audit report, then rerun.")
+    else:
+        _print_control_center_summary(snapshot)
     print_info(f"Control center JSON: {json_artifact}")
     print_info(f"Control center Markdown: {md_artifact}")
     print_info(f"Weekly command center JSON: {weekly_json}")
