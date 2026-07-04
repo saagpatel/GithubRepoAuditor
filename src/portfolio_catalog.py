@@ -489,6 +489,9 @@ def evaluate_intent_alignment(
     disposition = _safe_text(entry.get("intended_disposition")).lower()
     tier = _safe_text(completeness_tier).lower()
     focus = _safe_text(operator_focus)
+    raw_scorecard = entry.get("scorecard")
+    scorecard = raw_scorecard if isinstance(raw_scorecard, dict) else {}
+    scorecard_status = _safe_text(scorecard.get("status")).lower()
 
     if disposition == "archive" and (archived or tier in {"abandoned", "skeleton"}):
         return (
@@ -510,6 +513,11 @@ def evaluate_intent_alignment(
         return (
             "aligned",
             "The repo is holding a maintain posture without urgent or revalidation pressure.",
+        )
+    if disposition == "maintain" and scorecard_status == "on-track":
+        return (
+            "aligned",
+            "The repo is meeting its maintain scorecard target.",
         )
     if disposition == "finish" and tier in {"wip", "functional"} and focus != "Revalidate":
         return ("aligned", "The repo still looks finishable rather than fully off-track.")
