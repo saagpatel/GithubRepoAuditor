@@ -62,6 +62,13 @@ or dashboards. Treat changes that make archived, parked, experiment, or
 active-product status look healthier or more current than the source evidence
 as merge-relevant.
 
+Treat exact output contracts and mutation boundaries as first-class review
+surfaces. CLI JSON keys, workbook columns, Markdown provenance markers, operator
+queue fields, writeback targets, dry-run behavior, and GitHub/Notion mutation
+paths must not drift silently. Any change that turns a read-only/dry-run path
+into an external write, or reports stale/generated state as current canonical
+truth, is merge-relevant.
+
 For docs-only PRs, comment only when a doc claims current portfolio state,
 published readiness, generated report truth, or operator guidance that is not
 backed by the latest canonical truth path or reviewed commands.
