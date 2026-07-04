@@ -1306,6 +1306,67 @@ def test_project_queue_follow_through_marks_overdue_untouched_items_for_escalati
     assert "resurfaced now" in item["follow_through_escalation_summary"]
 
 
+def test_project_queue_follow_through_keeps_aligned_on_track_maintain_items_quiet():
+    queue = [
+        {
+            "item_id": "review-target:RepoD:No material changes crossed the current threshold.",
+            "lane": "deferred",
+            "age_days": 0,
+            "repo": "RepoD",
+            "title": "Review RepoD",
+            "summary": "No material changes crossed the current threshold.",
+            "recommended_action": "Safe to defer.",
+            "source_run_id": "testuser:2026-03-29T12:00:00+00:00",
+            "intent_alignment": "aligned",
+            "portfolio_catalog": {
+                "intended_disposition": "maintain",
+                "intent_alignment": "aligned",
+            },
+            "scorecard": {
+                "status": "on-track",
+                "failed_rule_keys": [],
+                "top_gaps": [],
+            },
+        }
+    ]
+    key = operator_control_center._queue_identity(queue[0])
+    recent_runs = [
+        {"items": {key: queue[0]}, "has_attention": False},
+        {"items": {key: {"lane": "deferred", "age_days": 0}}, "has_attention": False},
+        {"items": {key: {"lane": "deferred", "age_days": 0}}, "has_attention": False},
+        {"items": {key: {"lane": "deferred", "age_days": 0}}, "has_attention": False},
+        {"items": {key: {"lane": "deferred", "age_days": 0}}, "has_attention": False},
+    ]
+
+    enriched = operator_follow_through._project_queue_follow_through(
+        queue,
+        recent_runs=recent_runs,
+        resolution_trend={"decision_memory_map": {}},
+        current_generated_at="2026-03-29T12:00:00+00:00",
+    )
+
+    item = enriched[0]
+    assert item["follow_through_status"] == "resolved"
+    assert item["follow_through_checkpoint_status"] == "satisfied"
+    assert item["follow_through_escalation_status"] == "none"
+    assert item["follow_through_recovery_status"] == "none"
+    assert item["follow_through_recovery_freshness_status"] == "none"
+    assert item["follow_through_recovery_reacquisition_status"] == "none"
+    assert "No stronger follow-through needed" in item["follow_through_next_checkpoint"]
+    assert "stale" not in item["follow_through_summary"]
+
+    follow_through = operator_follow_through._build_follow_through_with_queue(
+        {"confirmed_resolved_count": 182, "quiet_streak_runs": 5},
+        enriched,
+    )
+
+    assert "current operator queue is quiet" in follow_through["follow_through_summary"]
+    assert "182 item" not in follow_through["follow_through_summary"]
+    assert "No stronger follow-through checkpoint" in follow_through[
+        "follow_through_checkpoint_summary"
+    ]
+
+
 def test_project_queue_follow_through_keeps_recent_waiting_items_on_watch():
     queue = [
         {

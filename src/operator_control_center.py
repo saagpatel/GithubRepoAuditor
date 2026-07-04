@@ -590,6 +590,7 @@ def build_operator_snapshot(
         ),
         evidence_events=evidence_bundle.get("events") or [],
     )
+    queue = _operator_resolution_trend._attach_portfolio_catalog_context(queue, report_data)
     resolution_trend = _operator_resolution_trend._build_resolution_trend(
         queue,
         history,
@@ -612,7 +613,6 @@ def build_operator_snapshot(
         resolution_trend=resolution_trend,
         current_generated_at=report_data.get("generated_at", ""),
     )
-    queue = _operator_resolution_trend._attach_portfolio_catalog_context(queue, report_data)
     from src.action_sync_automation import build_action_sync_automation_bundle
     from src.action_sync_outcomes import load_action_sync_outcomes_bundle
     from src.action_sync_packets import build_action_sync_packets_bundle
