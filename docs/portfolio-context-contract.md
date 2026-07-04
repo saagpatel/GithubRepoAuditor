@@ -100,10 +100,15 @@ Accepted aliases include:
 - `boilerplate`
   - primary context exists, but one or more required minimum fields are still missing
 - `minimum-viable`
-  - all six required fields are present in the primary context file
+  - all six required fields are present in the primary context file, or are
+    present across the primary context file and top-level README fallback
 - `standard`
   - minimum-viable plus at least one supporting handoff-style artifact such as `HANDOFF.md`,
     `IMPLEMENTATION-ROADMAP.md`, `STATUS.md`, `PLAN.md`, or `RESUMPTION-PROMPT.md`
+  - during portfolio-truth reconciliation only, catalog-backed active infrastructure with
+    high criticality and `maintain` disposition can also qualify when a separate substantive
+    top-level `README.md` supports a complete `AGENTS.md` or `CLAUDE.md`. Raw context-file
+    classification stays conservative so broad README presence does not inflate weak repos.
 - `full`
   - standard plus multiple supporting artifacts, including at least one high-signal handoff or
     discovery doc

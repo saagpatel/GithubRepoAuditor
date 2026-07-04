@@ -762,6 +762,117 @@ Promote it to standard by adding a supporting handoff document.
     assert _classify_context_quality(project, ["AGENTS.md"]) == "minimum-viable"
 
 
+def _complete_agent_context(project_name: str) -> str:
+    return f"""# {project_name}
+
+## What This Project Is
+
+{project_name} is local infrastructure used to coordinate operator workflows.
+
+## Current State
+
+Active and maintained, with the core workflow already running locally.
+
+## Stack
+
+Python, shell scripts, and local JSON artifacts.
+
+## How To Run
+
+Run `pytest tests` before publishing changes.
+
+## Known Risks
+
+Local paths and machine-specific dependencies can drift.
+
+## Next Recommended Move
+
+Keep the verification surface green and refresh context when workflows change.
+"""
+
+
+def _substantive_readme(project_name: str) -> str:
+    return (
+        f"# {project_name}\n\n"
+        f"{project_name} is a durable operator infrastructure repo with separate "
+        "agent guidance and README-level workflow documentation.\n\n"
+        + ("It documents commands, boundaries, recovery paths, examples, and operator usage. " * 35)
+    )
+
+
+def test_catalog_backed_high_criticality_infra_readme_support_promotes_to_standard(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    project = workspace / "InfraRepo"
+    project.mkdir()
+    subprocess.run(["git", "init"], cwd=project, capture_output=True, check=True)
+    _write(project / "AGENTS.md", _complete_agent_context("InfraRepo"))
+    _write(project / "README.md", _substantive_readme("InfraRepo"))
+    _write(project / "pyproject.toml", "[project]\nname = \"infra-repo\"\n")
+    catalog_path = tmp_path / "portfolio-catalog.yaml"
+    catalog_path.write_text(
+        """
+repos:
+  InfraRepo:
+    owner: d
+    lifecycle_state: active
+    criticality: high
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: infrastructure
+"""
+    )
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=workspace,
+        catalog_path=catalog_path,
+        include_notion=False,
+    )
+
+    infra = next(project for project in result.snapshot.projects if project.identity.project_key == "InfraRepo")
+    assert infra.derived.context_quality == "standard"
+    assert infra.provenance["derived.context_quality"]["source"] == "workspace+catalog"
+    assert infra.provenance["derived.context_quality"]["detail"] == "minimum-viable->standard"
+
+
+def test_substantive_readme_support_does_not_promote_non_infra_repo(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    project = workspace / "ProductRepo"
+    project.mkdir()
+    subprocess.run(["git", "init"], cwd=project, capture_output=True, check=True)
+    _write(project / "AGENTS.md", _complete_agent_context("ProductRepo"))
+    _write(project / "README.md", _substantive_readme("ProductRepo"))
+    _write(project / "package.json", '{"dependencies":{"react":"19.0.0"}}')
+    catalog_path = tmp_path / "portfolio-catalog.yaml"
+    catalog_path.write_text(
+        """
+repos:
+  ProductRepo:
+    owner: d
+    lifecycle_state: active
+    criticality: high
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: commercial
+"""
+    )
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=workspace,
+        catalog_path=catalog_path,
+        include_notion=False,
+    )
+
+    product = next(
+        project for project in result.snapshot.projects if project.identity.project_key == "ProductRepo"
+    )
+    assert product.derived.context_quality == "minimum-viable"
+    assert product.provenance["derived.context_quality"]["source"] == "workspace"
+
+
 def test_rendered_registry_round_trips_through_parser(
     portfolio_workspace: Path,
     portfolio_catalog: Path,
