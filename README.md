@@ -348,6 +348,8 @@ For day-to-day operations, `--control-center` is now the clean read-only entrypo
 
 The portfolio truth layer now has its own dedicated generation path. `--portfolio-truth` scans the configured local projects workspace, produces `output/portfolio-truth-latest.json` plus dated historical truth snapshots, and regenerates the configured project-registry and portfolio-audit Markdown compatibility outputs from that same truth contract instead of treating either markdown file as canonical.
 
+For quick operator edits, it is acceptable to update `project-registry.md` or `PORTFOLIO-AUDIT-REPORT.md` directly and treat those Markdown files as the current portfolio truth until the next full regeneration.
+
 After regenerating portfolio truth, verify the canonical snapshot instead of copying numbers into handoff or demo docs:
 
 ```bash
