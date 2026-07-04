@@ -1234,6 +1234,53 @@ def test_publish_is_noop_for_unchanged_compatibility_outputs(
     assert report_output.stat().st_mtime_ns == report_mtime
 
 
+def test_generated_registry_notes_do_not_accumulate_purpose_prefix(
+    portfolio_workspace: Path,
+    tmp_path: Path,
+) -> None:
+    catalog_path = tmp_path / "portfolio-catalog.yaml"
+    catalog_path.write_text(
+        """
+repos:
+  Alpha:
+    owner: d
+    purpose: flagship workbook-first flow
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: commercial
+    tool_provenance: codex
+"""
+    )
+    legacy_registry_path = tmp_path / "project-registry.md"
+    legacy_registry_path.write_text(
+        """
+# Project Registry
+
+## Standalone Projects (Root Level)
+
+| Project | Status | Tool | Context Quality | Stack | Context Files | Category | Notes |
+|---------|--------|------|-----------------|-------|---------------|----------|-------|
+| Alpha | active | codex | full | Next.js | CLAUDE.md | commercial | flagship workbook-first flow flagship workbook-first flow handoff note |
+"""
+    )
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=catalog_path,
+        legacy_registry_path=legacy_registry_path,
+        include_notion=False,
+    )
+
+    alpha = next(
+        project
+        for project in result.snapshot.projects
+        if project.identity.display_name == "Alpha"
+    )
+    assert alpha.declared.purpose == "flagship workbook-first flow"
+    assert alpha.declared.notes == "handoff note"
+
+
 def test_publish_failure_leaves_live_files_untouched(
     portfolio_workspace: Path,
     portfolio_catalog: Path,

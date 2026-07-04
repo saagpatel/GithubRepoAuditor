@@ -786,6 +786,10 @@ def _select_with_legacy(
     if value:
         return value
     legacy_value = str(legacy.get(field, "") or "").strip()
+    if field == "notes":
+        legacy_value = _strip_generated_note_purpose_prefix(
+            legacy_value, repo_entry=repo_entry, group_entry=group_entry
+        )
     if legacy_value:
         provenance[f"declared.{field}"] = {
             "source": "legacy_registry",
@@ -793,6 +797,22 @@ def _select_with_legacy(
         }
         return legacy_value
     return ""
+
+
+def _strip_generated_note_purpose_prefix(
+    notes: str,
+    *,
+    repo_entry: dict[str, Any],
+    group_entry: dict[str, Any],
+) -> str:
+    """Keep generated registry markdown idempotent when used as legacy input."""
+    value = notes.strip()
+    purpose = str(repo_entry.get("purpose") or group_entry.get("purpose") or "").strip()
+    if not purpose:
+        return value
+    while value == purpose or value.startswith(f"{purpose} "):
+        value = value[len(purpose) :].strip()
+    return value
 
 
 def _select_tool_provenance(
