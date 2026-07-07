@@ -333,6 +333,48 @@ def test_identity_resolution_minted_dialect_fails(tmp_path: Path) -> None:
     assert result.findings[0].violation == "minted identity dialect"
 
 
+def test_identity_resolution_notion_projection_only_rows_pass(tmp_path: Path) -> None:
+    # Notion projection-only rows are intentionally not portfolio projects and
+    # must not flag as minted dialects.
+    truth, markdown = _passing_paths(tmp_path)
+    _write_identity_truth(truth)
+    notion_snapshot = tmp_path / "notion.json"
+    _write_notion_snapshot(notion_snapshot, ["app", "RAG Knowledge Base"])
+    result = lint_operator_os_seams(
+        truth_path=truth,
+        markdown_paths=markdown,
+        notion_snapshot_path=notion_snapshot,
+        now=NOW,
+    )
+    assert result.passed, [f.detail for f in result.findings]
+
+
+def test_identity_resolution_notion_title_alias_resolves(tmp_path: Path) -> None:
+    # A Notion title variant resolves to its real project via the title-alias map.
+    truth, markdown = _passing_paths(tmp_path)
+    _write_truth(
+        truth,
+        projects=[
+            {
+                "identity": {
+                    "project_key": "OrbitForge",
+                    "display_name": "OrbitForge",
+                    "repo_full_name": "saagpatel/OrbitForge",
+                }
+            },
+        ],
+    )
+    notion_snapshot = tmp_path / "notion.json"
+    _write_notion_snapshot(notion_snapshot, ["OrbitForge (staging)"])
+    result = lint_operator_os_seams(
+        truth_path=truth,
+        markdown_paths=markdown,
+        notion_snapshot_path=notion_snapshot,
+        now=NOW,
+    )
+    assert result.passed, [f.detail for f in result.findings]
+
+
 def test_identity_resolution_hex_fragment_fails(tmp_path: Path) -> None:
     truth, markdown = _passing_paths(tmp_path)
     _write_identity_truth(truth)

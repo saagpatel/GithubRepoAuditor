@@ -142,6 +142,7 @@ DEFAULT_NOTION_PROJECTION_ONLY_ROWS: dict[str, str] = {
     "claude-code-harness": "local agent harness projection; outside repo-root truth",
     "Sandbox Local Portfolio Project": "actuation sandbox fixture row",
     "SecondBrain": "knowledge vault under /Users/d/Documents; not a /Users/d/Projects repo",
+    "RAG Knowledge Base": "notion planning row; not a portfolio-truth repo",
 }
 
 DEFAULT_NOTION_TRUTH_SHADOW_ROWS: dict[str, str] = {
