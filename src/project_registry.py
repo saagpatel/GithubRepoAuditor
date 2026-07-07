@@ -58,6 +58,17 @@ IDENTITY_ALIAS_MAP: dict[str, str] = {
     "ApplyKit": "saagpatel/ApplyKit",
     "Signal & Noise": "saagpatel/SignalAndNoise",
     "Signal---Noise": "saagpatel/SignalAndNoise",
+    # 2026-07-07 Lane C identity-migration drift: genuine project dialects
+    # (operant lab/run activity, a session-scoped portfolio-index variant, the
+    # public-repo alias, an evals sub-run, and the repo-style spelling of the
+    # repo-less personal-ops). Noise (tmp dirs, prompt fragments, ephemeral run
+    # ids) is deliberately excluded and tracked as emitter hygiene.
+    "o2-fable-runpack": "saagpatel/operant",
+    "operant-public-lab-runs": "saagpatel/operant",
+    "portfolio-index-session24": "saagpatel/portfolio-index",
+    "GithubRepoAuditor-public": "saagpatel/GithubRepoAuditor",
+    "evals-agent-eval": "saagpatel/evals",
+    "saagpatel/personal-ops": "supp:personal-ops",
 }
 
 BRIDGE_CANONICAL_KEY_DISAGREEMENTS: dict[str, str] = {
@@ -166,6 +177,23 @@ def _repo_base(repo_full_name: str | None) -> str:
 
 def _strip_alias_prefix(alias: str) -> str:
     return alias.split(":", 1)[1] if ":" in alias else alias
+
+
+def supp_key_for(project_key: str | None) -> str | None:
+    """Canonical ``supp:`` key for a repo-less project's ``project_key``.
+
+    Repo-backed projects use ``repo_full_name``; every other project uses this
+    stable key per the signed IDENTITY-DECISION-RECORD. An already-``supp:``
+    -prefixed key passes through unchanged; otherwise the *full* key is prefixed
+    (never truncated to a leaf segment) so two path-shaped keys sharing a
+    trailing segment cannot collide onto one identity. Single source of truth
+    for the supp: rule, shared by the registry emitter and the seam linter.
+    """
+    if not project_key:
+        return None
+    if project_key.startswith("supp:"):
+        return project_key
+    return f"supp:{project_key}"
 
 
 def load_overrides_config(
@@ -347,9 +375,7 @@ class _Entry:
         """
         if self.repo_full_name:
             return None
-        if self.canonical_key.startswith("supp:"):
-            return self.canonical_key
-        return f"supp:{self.canonical_key}"
+        return supp_key_for(self.canonical_key)
 
     def to_dict(self) -> dict:
         out = {

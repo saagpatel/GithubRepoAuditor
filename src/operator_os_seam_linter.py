@@ -13,9 +13,11 @@ from src.portfolio_truth_render import GENERATED_MARKDOWN_PROVENANCE_MARKER
 from src.portfolio_truth_types import SCHEMA_VERSION, truth_latest_path
 from src.project_registry import (
     BRIDGE_CANONICAL_KEY_DISAGREEMENTS,
+    DEFAULT_SUPPLEMENTARY,
     IDENTITY_ALIAS_MAP,
     IDENTITY_ALIAS_MAP_DEPRECATES_AFTER,
     normalize,
+    supp_key_for,
 )
 
 DEFAULT_MAX_STALENESS_HOURS = 30
@@ -446,15 +448,35 @@ def _build_identity_resolver(truth: dict[str, Any]) -> dict[str, str]:
         if not isinstance(identity, dict):
             continue
         canonical = identity.get("repo_full_name")
-        if not isinstance(canonical, str) or "/" not in canonical:
+        if isinstance(canonical, str) and "/" in canonical:
+            for value in (
+                identity.get("display_name"),
+                identity.get("repo_full_name"),
+                _repo_name(canonical),
+            ):
+                _add_identity_alias(resolver, value, canonical)
+            _add_identity_alias(
+                resolver, _flatten_project_key(identity.get("project_key")), canonical
+            )
+        else:
+            # Repo-less project: its canonical key is supp:<project_key> per the
+            # signed IDENTITY-DECISION-RECORD. Register its name / key / supp
+            # forms so the linter stops flagging repo-less operator-OS projects
+            # as minted dialects (consumer half of the supp_key emission).
+            project_key = identity.get("project_key")
+            supp = supp_key_for(project_key if isinstance(project_key, str) else None)
+            if supp:
+                for value in (identity.get("display_name"), project_key, supp):
+                    _add_identity_alias(resolver, value, supp)
+    # Supplementary registry projects (repo-less operator-OS projects the
+    # auditor's portfolio-truth does not track, e.g. personal-ops, SecondBrain)
+    # carry a supp: canonical_key. Seed them so they resolve like any project.
+    for supp_entry in DEFAULT_SUPPLEMENTARY:
+        canonical = supp_entry.get("canonical_key")
+        if not isinstance(canonical, str) or not canonical:
             continue
-        for value in (
-            identity.get("display_name"),
-            identity.get("repo_full_name"),
-            _repo_name(canonical),
-        ):
+        for value in (supp_entry.get("display_name"), canonical):
             _add_identity_alias(resolver, value, canonical)
-        _add_identity_alias(resolver, _flatten_project_key(identity.get("project_key")), canonical)
     return resolver
 
 
