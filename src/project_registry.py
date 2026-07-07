@@ -332,11 +332,31 @@ class _Entry:
         if _strip_alias_prefix(prefixed) != self.display_name:
             self.aliases.add(prefixed)
 
+    def _supp_key(self) -> str | None:
+        """Post-migration canonical key for a repo-less project.
+
+        Per the signed IDENTITY-DECISION-RECORD, ``repo_full_name`` is the
+        canonical key when a project has a GitHub remote; a repo-less project
+        gets a stable ``supp:<canonical_key>`` key instead. Returns ``None``
+        for repo-backed entries (they resolve via ``repo_full_name``).
+        Hardcoded supplementary entries already carry a ``supp:``
+        ``canonical_key`` and pass through unchanged; auditor-discovered
+        repo-less entries prefix the *full* ``canonical_key`` (a path-shaped
+        ``project_key``) so the supp: key stays 1:1 with the already-unique
+        canonical_key and two projects sharing a leaf segment cannot collide.
+        """
+        if self.repo_full_name:
+            return None
+        if self.canonical_key.startswith("supp:"):
+            return self.canonical_key
+        return f"supp:{self.canonical_key}"
+
     def to_dict(self) -> dict:
         out = {
             "canonical_key": self.canonical_key,
             "display_name": self.display_name,
             "repo_full_name": self.repo_full_name,
+            "supp_key": self._supp_key(),
             "group_key": self.group_key,
             "lifecycle_state": self.lifecycle_state,
             "source": self.source,
