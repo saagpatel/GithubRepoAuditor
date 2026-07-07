@@ -554,10 +554,18 @@ repos:
     tool_provenance: claude-code
   Signal & Noise:
     owner: d
+    purpose: public Signal & Noise portfolio surface
     lifecycle_state: active
-    review_cadence: weekly
+    criticality: medium
+    review_cadence: monthly
     intended_disposition: maintain
+    category: vanity
     tool_provenance: claude-code
+    maturity_program: maintain
+    target_maturity: operating
+    automation_eligible: false
+    aliases:
+      - signal-noise
   SpecCompanion:
     owner: d
     lifecycle_state: active
@@ -1004,18 +1012,6 @@ repos:
     review_cadence: weekly
     intended_disposition: maintain
     category: vanity
-  signal-noise:
-    owner: d
-    purpose: public Signal & Noise portfolio surface
-    lifecycle_state: active
-    criticality: medium
-    review_cadence: monthly
-    intended_disposition: maintain
-    category: vanity
-    tool_provenance: codex
-    maturity_program: maintain
-    target_maturity: operating
-    automation_eligible: false
   BattleGrid:
     owner: d
     lifecycle_state: active

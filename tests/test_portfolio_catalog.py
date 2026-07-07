@@ -62,6 +62,38 @@ groups:
     assert catalog["repos"]["repob"]["doctor_standard"] == ""
 
 
+def test_load_portfolio_catalog_indexes_repo_aliases(tmp_path: Path):
+    path = tmp_path / "portfolio-catalog.yaml"
+    path.write_text(
+        """
+repos:
+  Signal & Noise:
+    owner: d
+    purpose: public portfolio surface
+    lifecycle_state: active
+    criticality: medium
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: vanity
+    aliases:
+      - signal-noise
+""",
+        encoding="utf-8",
+    )
+
+    catalog = load_portfolio_catalog(path)
+    entry = catalog_entry_for_repo(
+        {"name": "signal-noise", "full_name": "saagpatel/signal-noise", "path": "signal-noise"},
+        catalog,
+    )
+
+    assert catalog["errors"] == []
+    assert entry["has_explicit_entry"] is True
+    assert entry["catalog_key"] == "Signal & Noise"
+    assert entry["owner"] == "d"
+    assert entry["matched_by"] == "path"
+
+
 def test_load_portfolio_catalog_normalizes_doctor_standard(tmp_path: Path):
     path = tmp_path / "portfolio-catalog.yaml"
     path.write_text(
