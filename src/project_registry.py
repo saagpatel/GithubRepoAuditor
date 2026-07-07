@@ -58,6 +58,17 @@ IDENTITY_ALIAS_MAP: dict[str, str] = {
     "ApplyKit": "saagpatel/ApplyKit",
     "Signal & Noise": "saagpatel/SignalAndNoise",
     "Signal---Noise": "saagpatel/SignalAndNoise",
+    # 2026-07-07 Lane C identity-migration drift: genuine project dialects
+    # (operant lab/run activity, a session-scoped portfolio-index variant, the
+    # public-repo alias, an evals sub-run, and the repo-style spelling of the
+    # repo-less personal-ops). Noise (tmp dirs, prompt fragments, ephemeral run
+    # ids) is deliberately excluded and tracked as emitter hygiene.
+    "o2-fable-runpack": "saagpatel/operant",
+    "operant-public-lab-runs": "saagpatel/operant",
+    "portfolio-index-session24": "saagpatel/portfolio-index",
+    "GithubRepoAuditor-public": "saagpatel/GithubRepoAuditor",
+    "evals-agent-eval": "saagpatel/evals",
+    "saagpatel/personal-ops": "supp:personal-ops",
 }
 
 BRIDGE_CANONICAL_KEY_DISAGREEMENTS: dict[str, str] = {
@@ -131,6 +142,7 @@ DEFAULT_NOTION_PROJECTION_ONLY_ROWS: dict[str, str] = {
     "claude-code-harness": "local agent harness projection; outside repo-root truth",
     "Sandbox Local Portfolio Project": "actuation sandbox fixture row",
     "SecondBrain": "knowledge vault under /Users/d/Documents; not a /Users/d/Projects repo",
+    "RAG Knowledge Base": "notion planning row; not a portfolio-truth repo",
 }
 
 DEFAULT_NOTION_TRUTH_SHADOW_ROWS: dict[str, str] = {
@@ -166,6 +178,23 @@ def _repo_base(repo_full_name: str | None) -> str:
 
 def _strip_alias_prefix(alias: str) -> str:
     return alias.split(":", 1)[1] if ":" in alias else alias
+
+
+def supp_key_for(project_key: str | None) -> str | None:
+    """Canonical ``supp:`` key for a repo-less project's ``project_key``.
+
+    Repo-backed projects use ``repo_full_name``; every other project uses this
+    stable key per the signed IDENTITY-DECISION-RECORD. An already-``supp:``
+    -prefixed key passes through unchanged; otherwise the *full* key is prefixed
+    (never truncated to a leaf segment) so two path-shaped keys sharing a
+    trailing segment cannot collide onto one identity. Single source of truth
+    for the supp: rule, shared by the registry emitter and the seam linter.
+    """
+    if not project_key:
+        return None
+    if project_key.startswith("supp:"):
+        return project_key
+    return f"supp:{project_key}"
 
 
 def load_overrides_config(
@@ -332,11 +361,29 @@ class _Entry:
         if _strip_alias_prefix(prefixed) != self.display_name:
             self.aliases.add(prefixed)
 
+    def _supp_key(self) -> str | None:
+        """Post-migration canonical key for a repo-less project.
+
+        Per the signed IDENTITY-DECISION-RECORD, ``repo_full_name`` is the
+        canonical key when a project has a GitHub remote; a repo-less project
+        gets a stable ``supp:<canonical_key>`` key instead. Returns ``None``
+        for repo-backed entries (they resolve via ``repo_full_name``).
+        Hardcoded supplementary entries already carry a ``supp:``
+        ``canonical_key`` and pass through unchanged; auditor-discovered
+        repo-less entries prefix the *full* ``canonical_key`` (a path-shaped
+        ``project_key``) so the supp: key stays 1:1 with the already-unique
+        canonical_key and two projects sharing a leaf segment cannot collide.
+        """
+        if self.repo_full_name:
+            return None
+        return supp_key_for(self.canonical_key)
+
     def to_dict(self) -> dict:
         out = {
             "canonical_key": self.canonical_key,
             "display_name": self.display_name,
             "repo_full_name": self.repo_full_name,
+            "supp_key": self._supp_key(),
             "group_key": self.group_key,
             "lifecycle_state": self.lifecycle_state,
             "source": self.source,

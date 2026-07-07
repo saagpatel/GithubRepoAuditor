@@ -76,6 +76,42 @@ def test_build_includes_supplementary_projects_from_defaults():
     assert registry["entry_count"] == len(SNAPSHOT["projects"]) + 2
 
 
+def test_supp_key_is_emitted_for_repo_less_entries_only():
+    # A repo-backed and a repo-less auditor project side by side.
+    snapshot = _snapshot(
+        _ident("MCPAudit", "MCPAudit", "saagpatel/MCPAudit"),
+        _ident("fable-os-divergence", "fable-os-divergence", repo=None),
+    )
+    registry = build_project_registry(snapshot, overrides_config_path=None)
+    by_key = {e["canonical_key"]: e for e in registry["entries"]}
+
+    # Repo-backed: canonical key is repo_full_name, so supp_key is None.
+    assert by_key["MCPAudit"]["supp_key"] is None
+
+    # Repo-less auditor entry: gets a stable supp:<slug> key.
+    assert by_key["fable-os-divergence"]["supp_key"] == "supp:fable-os-divergence"
+
+    # Hardcoded supplementary entry already carries a supp: canonical_key and
+    # passes through unchanged (not double-prefixed).
+    assert by_key["supp:personal-ops"]["supp_key"] == "supp:personal-ops"
+
+
+def test_supp_key_preserves_full_canonical_key_no_leaf_collision():
+    # Two repo-less projects sharing a leaf segment must NOT collapse onto one
+    # supp: key. The full path-shaped canonical_key is preserved for uniqueness.
+    snapshot = _snapshot(
+        _ident("team-a/2026-07-03", "report-a", None),
+        _ident("team-b/2026-07-03", "report-b", None),
+    )
+    registry = build_project_registry(snapshot, overrides_config_path=None)
+    by_key = {e["canonical_key"]: e for e in registry["entries"]}
+    a = by_key["team-a/2026-07-03"]["supp_key"]
+    b = by_key["team-b/2026-07-03"]["supp_key"]
+    assert a == "supp:team-a/2026-07-03"
+    assert b == "supp:team-b/2026-07-03"
+    assert a != b  # no leaf-segment collision
+
+
 def test_resolve_joins_spelling_variants():
     registry = build_project_registry(SNAPSHOT, overrides_config_path=None)
     index = build_index(registry)
