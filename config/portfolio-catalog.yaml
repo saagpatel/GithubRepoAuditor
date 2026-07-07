@@ -554,10 +554,18 @@ repos:
     tool_provenance: claude-code
   Signal & Noise:
     owner: d
+    purpose: public Signal & Noise portfolio surface
     lifecycle_state: active
-    review_cadence: weekly
+    criticality: medium
+    review_cadence: monthly
     intended_disposition: maintain
+    category: vanity
     tool_provenance: claude-code
+    maturity_program: maintain
+    target_maturity: operating
+    automation_eligible: false
+    aliases:
+      - signal-noise
   SpecCompanion:
     owner: d
     lifecycle_state: active
@@ -954,6 +962,32 @@ repos:
     target_maturity: functional
     automation_eligible: false
     notes: Active through the June 10-22, 2026 Fable window; staged harness/config changes are operator-installed only, then archive or park the campaign workspace after final index review.
+  fable-os-divergence:
+    owner: d
+    purpose: Fable campaign workspace for agent-OS divergence analysis and follow-up checklists
+    lifecycle_state: experimental
+    criticality: medium
+    review_cadence: ad-hoc
+    intended_disposition: experiment
+    category: infrastructure
+    tool_provenance: claude-ai
+    maturity_program: experiment
+    target_maturity: functional
+    automation_eligible: false
+    notes: Campaign evidence and next-step planning workspace; keep out of default portfolio attention unless a publish/park/archive decision is active.
+  fable-site-rebuild:
+    owner: d
+    purpose: control room for rebuilding the public portfolio site around the Fable site-rebuild campaign
+    lifecycle_state: experimental
+    criticality: medium
+    review_cadence: ad-hoc
+    intended_disposition: experiment
+    category: infrastructure
+    tool_provenance: claude-ai
+    maturity_program: experiment
+    target_maturity: functional
+    automation_eligible: false
+    notes: Not a product repo; the product surface is portfolio-index. Keep this workspace out of default attention except when the site-rebuild campaign is actively being dispatched.
   portfolio-index:
     owner: d
     purpose: public-safe static portfolio index for hiring-manager review

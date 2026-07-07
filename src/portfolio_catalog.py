@@ -293,6 +293,10 @@ def _normalize_repo_entries(
             "matched_by": "full-name" if "/" in key else "bare-name",
             "has_explicit_entry": True,
         }
+        aliases = raw_value.get("aliases") or []
+        if aliases and not isinstance(aliases, list):
+            errors.append(f"Portfolio catalog entry '{key}' aliases must be a list.")
+            aliases = []
         for field_name, allowed in (
             ("lifecycle_state", VALID_LIFECYCLE_STATES),
             ("criticality", VALID_CRITICALITY),
@@ -316,6 +320,17 @@ def _normalize_repo_entries(
             seen_bare_names.add(bare_key)
 
         normalized_entries[_normalize_key(key)] = normalized
+        for raw_alias in aliases:
+            alias = _safe_text(raw_alias)
+            if not alias:
+                continue
+            normalized_alias = _normalize_key(alias)
+            if normalized_alias in normalized_entries:
+                warnings.append(
+                    f"Portfolio catalog alias '{alias}' for '{key}' duplicates an existing repo key."
+                )
+                continue
+            normalized_entries[normalized_alias] = normalized
 
     return normalized_entries
 
