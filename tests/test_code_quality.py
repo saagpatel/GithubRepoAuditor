@@ -298,20 +298,23 @@ class TestVendoredDetection:
     ) -> None:
         broken = tmp_path / "broken.bin"
         broken.write_text("small\n")
+        original_is_file = Path.is_file
         original_stat = Path.stat
 
-        calls_by_path: dict[Path, int] = {}
+        def fake_is_file(path: Path) -> bool:
+            if path == broken:
+                return True
+            return original_is_file(path)
 
         def fake_stat(path: Path, *args, **kwargs):
-            calls_by_path[path] = calls_by_path.get(path, 0) + 1
-            if path == broken and calls_by_path[path] > 1:
+            if path == broken:
                 raise OSError("cannot stat")
             return original_stat(path, *args, **kwargs)
 
+        monkeypatch.setattr(Path, "is_file", fake_is_file)
         monkeypatch.setattr(Path, "stat", fake_stat)
 
         assert _detect_vendored(tmp_path) == []
-        assert calls_by_path[broken] == 2
 
 
 class TestCommitMessageHelpers:
