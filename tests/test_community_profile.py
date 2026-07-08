@@ -157,6 +157,6 @@ def test_all_api_templates_present_with_changelog_reaches_full_score(
     }
     assert result.findings == [
         "Health files: readme, license, code_of_conduct, contributing, security, "
-        "issue_template, pull_request_template, changelog",
+        + "issue_template, pull_request_template, changelog",
         "GitHub health score: 100%",
     ]
