@@ -1,9 +1,16 @@
 from __future__ import annotations
 
+import pytest
+
 from src.analyzers.interest import (
     InterestAnalyzer,
+    _burst_coefficient,
+    _count_assets,
+    _estimate_loc,
+    _score_ambition,
     _score_commit_bursts,
     _score_description,
+    _score_readme_storytelling,
     _score_recency,
 )
 from src.models import RepoMetadata
@@ -42,6 +49,33 @@ class TestDescriptionScoring:
         ))
         assert score >= 0.15
 
+    def test_analyze_reports_rich_project_description(self, tmp_repo):
+        result = InterestAnalyzer().analyze(
+            tmp_repo,
+            _meta(
+                name="weather",
+                description=(
+                    "A detailed local weather analysis dashboard with alerts, "
+                    "maps, climate comparisons, and historical trend summaries"
+                ),
+            ),
+        )
+        assert result.details["description_score"] == pytest.approx(0.15)
+        assert "Rich project description" in result.findings
+
+    def test_analyze_reports_basic_description(self, tmp_repo):
+        result = InterestAnalyzer().analyze(
+            tmp_repo,
+            _meta(name="weather", description="Weather tracker app"),
+        )
+        assert result.details["description_score"] == 0.05
+        assert "Basic description" in result.findings
+
+    def test_analyze_reports_no_description(self, tmp_repo):
+        result = InterestAnalyzer().analyze(tmp_repo, _meta(description=None))
+        assert result.details["description_score"] == 0.0
+        assert "No description" in result.findings
+
 
 class TestCommitBursts:
     def test_empty_weeks(self):
@@ -59,6 +93,57 @@ class TestCommitBursts:
 
     def test_single_week(self):
         assert _score_commit_bursts([10]) == 0.0
+
+    def test_inactive_weeks_only_do_not_score(self):
+        assert _score_commit_bursts([0, 0, 7, 0]) == 0.0
+
+    def test_medium_high_variance_scores_ten_points(self):
+        assert _score_commit_bursts([1, 1, 1, 5]) == 0.10
+
+    def test_moderate_variance_scores_five_points(self):
+        assert _score_commit_bursts([1, 1, 2, 3]) == 0.05
+
+
+class TestBurstCoefficient:
+    def test_empty_and_short_series_return_zero(self):
+        assert _burst_coefficient([]) == 0.0
+        assert _burst_coefficient([0, 0, 9]) == 0.0
+
+    def test_computes_rounded_coefficient_for_active_weeks(self):
+        assert _burst_coefficient([0, 1, 1, 2, 3]) == 0.55
+
+    def test_zero_mean_branch_is_unreachable_after_positive_week_filter(self):
+        # The production filter keeps only w > 0, so any remaining active week
+        # makes the mean positive and this still returns the short-series guard.
+        assert _burst_coefficient([0, 0, 0, 0]) == 0.0
+
+
+class TestAnalyzeCommitBursts:
+    class _GitHubClientStub:
+        def __init__(self, owner_weeks):
+            self.owner_weeks = owner_weeks
+
+        def get_participation_stats(self, owner, repo):
+            assert (owner, repo) == ("user", "test")
+            return {"owner": self.owner_weeks}
+
+    def test_analyze_reports_passionate_burst_pattern(self, tmp_repo):
+        result = InterestAnalyzer().analyze(
+            tmp_repo,
+            _meta(),
+            github_client=self._GitHubClientStub([1, 1, 50, 2, 1, 1]),
+        )
+        assert result.details["burst_coefficient"] > 1.0
+        assert "Passionate burst development pattern" in result.findings
+
+    def test_analyze_reports_some_development_bursts(self, tmp_repo):
+        result = InterestAnalyzer().analyze(
+            tmp_repo,
+            _meta(),
+            github_client=self._GitHubClientStub([1, 1, 2, 3]),
+        )
+        assert result.details["burst_coefficient"] == 0.55
+        assert "Some development bursts" in result.findings
 
 
 class TestRecencyBonus:
@@ -102,6 +187,24 @@ class TestTechNovelty:
         assert details["tech_novelty"] == 0.0
 
 
+class TestTopicScoring:
+    def test_three_topics_receive_full_topic_score(self, tmp_repo):
+        result = InterestAnalyzer().analyze(
+            tmp_repo,
+            _meta(topics=["portfolio", "automation", "analytics"]),
+        )
+        assert result.details["topic_count"] == 3
+        assert result.score >= 0.10
+        assert "Topics: portfolio, automation, analytics" in result.findings
+
+
+class TestExternalValidation:
+    def test_stars_and_forks_add_validation_findings(self, tmp_repo):
+        result = InterestAnalyzer().analyze(tmp_repo, _meta(stars=3, forks=2))
+        assert "Stars: 3" in result.findings
+        assert "Forks: 2" in result.findings
+
+
 class TestProjectAmbition:
     def test_large_repo_with_assets(self, tmp_repo):
         # Add some code and assets
@@ -111,6 +214,56 @@ class TestProjectAmbition:
         meta = _meta()
         result = InterestAnalyzer().analyze(tmp_repo, meta)
         assert result.details["ambition"]["asset_count"] >= 2
+
+    def test_large_loc_repo_gets_ambition_bonus(self, tmp_repo):
+        baseline_loc = _estimate_loc(tmp_repo)
+        (tmp_repo / "main.py").write_text("\n".join(f"line_{i} = {i}" for i in range(1001)))
+        score, details = _score_ambition(tmp_repo, _meta())
+        assert details["estimated_loc"] == baseline_loc + 1001
+        assert score >= 0.10
+
+    def test_loc_estimate_stops_after_max_files(self, tmp_repo):
+        repo = tmp_repo / "many-files"
+        repo.mkdir()
+        for index in range(205):
+            (repo / f"file_{index:03}.py").write_text("x = 1\n")
+        assert _estimate_loc(repo) == 200
+
+    def test_loc_estimate_skips_dotfiles_and_node_modules(self, tmp_repo):
+        repo = tmp_repo / "skip-paths"
+        repo.mkdir()
+        (repo / ".hidden").mkdir()
+        (repo / ".hidden" / "ignored.py").write_text("x = 1\n" * 50)
+        (repo / "node_modules").mkdir()
+        (repo / "node_modules" / "ignored.js").write_text("x = 1\n" * 50)
+        (repo / "visible.py").write_text("a = 1\nb = 2\nc = 3\n")
+        assert _estimate_loc(repo) == 3
+
+    def test_loc_estimate_continues_after_oserror(self, tmp_repo, monkeypatch):
+        repo = tmp_repo / "oserror"
+        repo.mkdir()
+        bad_file = repo / "bad.py"
+        good_file = repo / "good.py"
+        bad_file.write_text("unreadable\n")
+        good_file.write_text("a = 1\nb = 2\n")
+        original_read_text = type(bad_file).read_text
+
+        def raise_for_bad_files(path, *args, **kwargs):
+            if path == bad_file:
+                raise OSError("cannot read")
+            return original_read_text(path, *args, **kwargs)
+
+        monkeypatch.setattr(type(bad_file), "read_text", raise_for_bad_files)
+        assert _estimate_loc(repo) == 2
+
+    def test_asset_count_stops_after_max_scan(self, tmp_repo):
+        class FakeRepo:
+            def rglob(self, pattern):
+                assert pattern == "*"
+                yield from [tmp_repo / f"{index:03}.txt" for index in range(501)]
+                yield tmp_repo / "late.png"
+
+        assert _count_assets(FakeRepo()) == 0
 
 
 class TestReadmeStorytelling:
@@ -127,3 +280,18 @@ class TestReadmeStorytelling:
         (tmp_repo / "README.md").write_text("# Short\n\nBrief.\n")
         result = InterestAnalyzer().analyze(tmp_repo, _meta())
         assert result.details["readme_storytelling"] == 0.0
+
+    def test_missing_readme_scores_zero(self, tmp_repo):
+        repo = tmp_repo / "no-readme"
+        repo.mkdir()
+        assert _score_readme_storytelling(repo) == 0.0
+
+    def test_readme_oserror_scores_zero(self, tmp_repo, monkeypatch):
+        readme = tmp_repo / "README.md"
+        readme.write_text("# Present but unreadable\n")
+
+        def raise_oserror(*args, **kwargs):
+            raise OSError("cannot read")
+
+        monkeypatch.setattr(type(readme), "read_text", raise_oserror)
+        assert _score_readme_storytelling(tmp_repo) == 0.0
