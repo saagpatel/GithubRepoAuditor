@@ -257,13 +257,42 @@ class TestProjectAmbition:
         assert _estimate_loc(repo) == 2
 
     def test_asset_count_stops_after_max_scan(self, tmp_repo):
+        repo = tmp_repo / "many-assets"
+        repo.mkdir()
+        scanned_files = []
+        for index in range(500):
+            path = repo / f"{index:03}.txt"
+            path.write_text("not an asset\n")
+            scanned_files.append(path)
+        late_asset = repo / "late.png"
+        late_asset.write_bytes(b"PNG")
+
         class FakeRepo:
             def rglob(self, pattern):
                 assert pattern == "*"
-                yield from [tmp_repo / f"{index:03}.txt" for index in range(501)]
-                yield tmp_repo / "late.png"
+                yield from scanned_files
+                yield late_asset
 
         assert _count_assets(FakeRepo()) == 0
+
+    def test_asset_count_counts_asset_within_max_scan(self, tmp_repo):
+        repo = tmp_repo / "early-asset"
+        repo.mkdir()
+        scanned_files = []
+        for index in range(10):
+            path = repo / f"{index:03}.txt"
+            path.write_text("not an asset\n")
+            scanned_files.append(path)
+        early_asset = repo / "early.png"
+        early_asset.write_bytes(b"PNG")
+
+        class FakeRepo:
+            def rglob(self, pattern):
+                assert pattern == "*"
+                yield from scanned_files
+                yield early_asset
+
+        assert _count_assets(FakeRepo()) == 1
 
 
 class TestReadmeStorytelling:
