@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import sqlite3
+from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 
-from src.analyzer_cache import invalidate_repo, lookup, stats, store
+from src.analyzer_cache import _deep_equal, _diff_summary, invalidate_repo, lookup, reconcile, stats, store
 from src.analyzers import ALL_ANALYZERS, run_all_analyzers, run_with_cache
 from src.analyzers.dependencies import DependenciesAnalyzer
 from src.analyzers.readme import ReadmeAnalyzer
@@ -47,6 +48,17 @@ def _sample_metadata(name: str = "my-repo") -> RepoMetadata:
         clone_url="",
         topics=[],
     )
+
+
+class _FakeAnalyzer:
+    def __init__(self, name: str, inputs_hash: str | Exception):
+        self.name = name
+        self._inputs_hash = inputs_hash
+
+    def cache_inputs_hash(self, repo_path, metadata):
+        if isinstance(self._inputs_hash, Exception):
+            raise self._inputs_hash
+        return self._inputs_hash
 
 
 # ── lookup / store round-trip ──────────────────────────────────────────
@@ -147,6 +159,168 @@ class TestLookupStore:
         hit = lookup(conn, "repo", "abc123", "readme", "hashval")
         assert hit["score"] == 0.9
         assert hit["findings"] == ["v2"]
+
+    def test_lookup_returns_none_when_cached_json_is_invalid(self):
+        conn = _fresh_db()
+        conn.execute(
+            """
+            INSERT INTO analyzer_cache
+                (repo_name, commit_sha, analyzer_name, inputs_hash, result_json, computed_at, schema_version)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "repo",
+                "abc123",
+                "readme",
+                "hashval",
+                "{not valid json",
+                datetime.now(timezone.utc).isoformat(),
+                1,
+            ),
+        )
+        conn.commit()
+
+        assert lookup(conn, "repo", "abc123", "readme", "hashval") is None
+
+    def test_store_swallows_non_serializable_payload(self):
+        conn = _fresh_db()
+        store(conn, "repo", "abc123", "readme", "hashval", {"bad": {object()}})
+
+        assert lookup(conn, "repo", "abc123", "readme", "hashval") is None
+
+
+# ── reconcile diff helpers ────────────────────────────────────────────
+
+
+class TestReconcileDiffHelpers:
+    def test_deep_equal_rejects_different_non_numeric_types(self):
+        assert _deep_equal("a", ["a"]) is False
+
+    def test_deep_equal_rejects_lists_with_different_lengths(self):
+        assert _deep_equal([1, 2], [1, 2, 3]) is False
+
+    def test_diff_summary_marks_added_and_removed_keys(self):
+        summary = _diff_summary({"oldkey": 1, "shared": 2}, {"newkey": 1, "shared": 2})
+
+        assert "+newkey" in summary
+        assert "-oldkey" in summary
+
+
+# ── reconcile edge behavior ───────────────────────────────────────────
+
+
+class TestReconcileEdges:
+    def test_skips_repo_without_metadata(self, tmp_path: Path):
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        conn = _fresh_db()
+
+        def _fresh(path, metadata, conn=None):
+            raise AssertionError("reconcile should skip repos with no metadata")
+
+        report = reconcile({"repo": repo}, {}, conn, _fresh)
+
+        assert report == {
+            "checked": 0,
+            "matched": 0,
+            "divergent": [],
+            "missing_from_cache": [],
+            "ok": True,
+        }
+
+    def test_uses_pushed_at_as_sha_when_commit_map_is_missing(self, tmp_path: Path, monkeypatch):
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        meta = _sample_metadata("repo")
+        conn = _fresh_db()
+        analyzer = _FakeAnalyzer("edge", "hashval")
+        result = AnalyzerResult("edge", 1.0, 1.0, ["ok"], {"source": "fresh"})
+        store(conn, "repo", meta.pushed_at.isoformat(), "edge", "hashval", asdict(result))
+
+        def _fresh(path, metadata, conn=None):
+            return [result]
+
+        monkeypatch.setattr("src.analyzers.ALL_ANALYZERS", [analyzer])
+        report = reconcile({"repo": repo}, {"repo": meta}, conn, _fresh)
+
+        assert report["checked"] == 1
+        assert report["matched"] == 1
+        assert report["divergent"] == []
+        assert report["missing_from_cache"] == []
+        assert report["ok"] is True
+
+    def test_skips_repo_when_sha_cannot_be_derived(self, tmp_path: Path):
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        meta = RepoMetadata(**{**vars(_sample_metadata("repo")), "pushed_at": None})
+        conn = _fresh_db()
+
+        def _fresh(path, metadata, conn=None):
+            raise AssertionError("reconcile should skip repos with no stable sha")
+
+        report = reconcile({"repo": repo}, {"repo": meta}, conn, _fresh)
+
+        assert report["checked"] == 0
+        assert report["matched"] == 0
+        assert report["divergent"] == []
+        assert report["missing_from_cache"] == []
+        assert report["ok"] is True
+
+    def test_fresh_run_exception_skips_repo_and_continues(self, tmp_path: Path, monkeypatch):
+        bad_repo = tmp_path / "bad"
+        good_repo = tmp_path / "good"
+        bad_repo.mkdir()
+        good_repo.mkdir()
+        bad_meta = _sample_metadata("bad")
+        good_meta = _sample_metadata("good")
+        conn = _fresh_db()
+        analyzer = _FakeAnalyzer("edge", "hashval")
+        result = AnalyzerResult("edge", 0.7, 1.0, ["fresh"], {})
+
+        def _fresh(path, metadata, conn=None):
+            if metadata.name == "bad":
+                raise RuntimeError("boom")
+            return [result]
+
+        monkeypatch.setattr("src.analyzers.ALL_ANALYZERS", [analyzer])
+        report = reconcile(
+            {"bad": bad_repo, "good": good_repo},
+            {"bad": bad_meta, "good": good_meta},
+            conn,
+            _fresh,
+            commit_sha_map={"bad": "bad-sha", "good": "good-sha"},
+        )
+
+        assert report["checked"] == 1
+        assert report["matched"] == 0
+        assert report["divergent"] == []
+        assert report["missing_from_cache"] == [{"repo": "good", "analyzer": "edge"}]
+        assert report["ok"] is True
+
+    def test_cache_inputs_hash_exception_skips_analyzer_pair(self, tmp_path: Path, monkeypatch):
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        meta = _sample_metadata("repo")
+        conn = _fresh_db()
+        analyzer = _FakeAnalyzer("edge", RuntimeError("hash failed"))
+
+        def _fresh(path, metadata, conn=None):
+            return [AnalyzerResult("edge", 0.5, 1.0, ["fresh"], {})]
+
+        monkeypatch.setattr("src.analyzers.ALL_ANALYZERS", [analyzer])
+        report = reconcile(
+            {"repo": repo},
+            {"repo": meta},
+            conn,
+            _fresh,
+            commit_sha_map={"repo": "sha"},
+        )
+
+        assert report["checked"] == 0
+        assert report["matched"] == 0
+        assert report["divergent"] == []
+        assert report["missing_from_cache"] == []
+        assert report["ok"] is True
 
 
 # ── invalidate_repo ────────────────────────────────────────────────────
