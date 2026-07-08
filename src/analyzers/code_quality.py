@@ -299,7 +299,7 @@ def _classify_commits(messages: list[str]) -> dict:
     for msg in messages:
         if CONVENTIONAL_PATTERN.match(msg):
             conventional_count += 1
-            type_ = msg.split(":")[0].split("(")[0].strip()
+            type_ = msg.split(":")[0].split("(")[0].strip().removesuffix("!")
             types[type_] += 1
         if re.search(r"#\d+", msg):
             issue_refs += 1

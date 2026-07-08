@@ -335,7 +335,6 @@ class TestCommitMessageHelpers:
             "2/5 descriptive commits",
         )
 
-    @pytest.mark.xfail(reason="bang commits without scope are classified as type 'fix!' instead of 'fix'")
     def test_classify_commits_reports_ratios_types_and_issue_refs(self) -> None:
         messages = [
             "feat(ui): add summary panel #12",
