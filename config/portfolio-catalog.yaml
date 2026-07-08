@@ -975,6 +975,45 @@ repos:
     target_maturity: functional
     automation_eligible: false
     notes: Campaign evidence and next-step planning workspace; keep out of default portfolio attention unless a publish/park/archive decision is active.
+  fable-corpus-campaign:
+    owner: d
+    purpose: Fable campaign control room for converting expiring model capacity into durable corpus assets
+    lifecycle_state: experimental
+    criticality: medium
+    review_cadence: ad-hoc
+    intended_disposition: experiment
+    category: infrastructure
+    tool_provenance: claude-ai
+    maturity_program: experiment
+    target_maturity: functional
+    automation_eligible: false
+    notes: Campaign packet/output workspace for Fable corpus runs; keep out of default portfolio attention unless an operator publish/park/archive decision is active.
+  fable-estate-campaign:
+    owner: d
+    purpose: Fable campaign control room for operator-estate rulings and design outputs
+    lifecycle_state: experimental
+    criticality: medium
+    review_cadence: ad-hoc
+    intended_disposition: experiment
+    category: infrastructure
+    tool_provenance: claude-ai
+    maturity_program: experiment
+    target_maturity: functional
+    automation_eligible: false
+    notes: Campaign evidence, packets, outputs, and execution plans; keep out of default portfolio attention unless an operator publish/park/archive decision is active.
+  fable-rigor-campaign:
+    owner: d
+    purpose: Fable campaign control room for rigor framework, stress tests, and corpus acceptance work
+    lifecycle_state: experimental
+    criticality: medium
+    review_cadence: ad-hoc
+    intended_disposition: experiment
+    category: infrastructure
+    tool_provenance: claude-ai
+    maturity_program: experiment
+    target_maturity: functional
+    automation_eligible: false
+    notes: Campaign packets, research, and outputs for Fable rigor work; keep out of default portfolio attention unless an operator publish/park/archive decision is active.
   fable-site-rebuild:
     owner: d
     purpose: control room for rebuilding the public portfolio site around the Fable site-rebuild campaign
