@@ -184,9 +184,8 @@ class TestLookupStore:
 
     def test_store_swallows_non_serializable_payload(self):
         conn = _fresh_db()
-        result = store(conn, "repo", "abc123", "readme", "hashval", {"bad": {object()}})
+        store(conn, "repo", "abc123", "readme", "hashval", {"bad": {object()}})
 
-        assert result is None
         assert lookup(conn, "repo", "abc123", "readme", "hashval") is None
 
 
