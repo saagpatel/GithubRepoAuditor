@@ -284,12 +284,18 @@ class TestVendoredDetection:
         assert "bower_components/ committed" in issues
         assert any(issue.startswith("Large file:") and issue.endswith("(976KB)") for issue in issues)
 
-    def test_detect_vendored_skips_hidden_and_stat_error_files(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    def test_detect_vendored_skips_hidden_files(
+        self, tmp_path: Path
     ) -> None:
         hidden = tmp_path / ".hidden"
         hidden.mkdir()
         (hidden / "large.bin").write_bytes(b"x" * 1_000_001)
+
+        assert _detect_vendored(tmp_path) == []
+
+    def test_detect_vendored_skips_stat_error_files(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         broken = tmp_path / "broken.bin"
         broken.write_text("small\n")
         original_stat = Path.stat
@@ -305,6 +311,7 @@ class TestVendoredDetection:
         monkeypatch.setattr(Path, "stat", fake_stat)
 
         assert _detect_vendored(tmp_path) == []
+        assert calls_by_path[broken] == 2
 
 
 class TestCommitMessageHelpers:
