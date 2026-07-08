@@ -112,7 +112,7 @@ def test_local_fallbacks_add_files_and_directories_when_api_reports_missing(
         "missing": ["readme", "license"],
     }
     assert result.findings == [
-        "Health files: security, code_of_conduct, issue_template, "
+        "Health files: security, code_of_conduct, issue_template, " +
         "pull_request_template, contributing, changelog",
         "Missing: readme, license",
         "GitHub health score: 10%",
