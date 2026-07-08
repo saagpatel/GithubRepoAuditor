@@ -5,8 +5,6 @@ from __future__ import annotations
 import sys
 import types
 
-import pytest
-
 from src.analyzers.dependencies import DependenciesAnalyzer, _count_dependencies
 
 
