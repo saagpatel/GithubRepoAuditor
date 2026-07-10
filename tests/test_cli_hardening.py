@@ -769,14 +769,16 @@ def test_main_control_center_suppresses_queue_when_portfolio_truth_is_newer(
 
 
 def test_control_center_default_print_hides_experiment_items() -> None:
-    assert cli._should_print_control_center_item(
+    from src.operator_control_center_artifacts import should_print_control_center_item
+
+    assert should_print_control_center_item(
         {
             "repo": "active-repo",
             "operating_path": "maintain",
             "portfolio_catalog": {"lifecycle_state": "active"},
         }
     )
-    assert not cli._should_print_control_center_item(
+    assert not should_print_control_center_item(
         {
             "repo": "experiment-repo",
             "operating_path": "experiment",
@@ -790,7 +792,9 @@ def test_control_center_default_print_hides_experiment_items() -> None:
 
 
 def test_control_center_default_view_hides_archive_items() -> None:
-    assert not cli._should_print_control_center_item(
+    from src.operator_control_center_artifacts import should_print_control_center_item
+
+    assert not should_print_control_center_item(
         {
             "repo": "archive-repo",
             "operating_path": "archive",
