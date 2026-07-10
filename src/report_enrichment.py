@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from src.portfolio_truth_types import truth_latest_path
+from src.report_contracts import RiskLookupEntry, RiskPosture, TopElevatedEntry
 from src.terminology import ACTION_SYNC_CANONICAL_LABELS
 from src.weekly_packaging import finalize_weekly_pack
 from src.weekly_scheduling_overlay import apply_weekly_scheduling_overlay
@@ -149,7 +150,7 @@ def _metadata(audit: Any) -> dict[str, Any]:
     return metadata
 
 
-def build_risk_lookup(output_dir: Path | None) -> dict[str, dict[str, str]]:
+def build_risk_lookup(output_dir: Path | None) -> dict[str, RiskLookupEntry]:
     """Canonical per-repo risk reader: display_name -> {risk_tier, risk_summary}.
 
     Single source of truth for risk data loaded from portfolio-truth-latest.json.
@@ -166,14 +167,14 @@ def build_risk_lookup(output_dir: Path | None) -> dict[str, dict[str, str]]:
         truth = json.loads(truth_path.read_text())
     except Exception:
         return {}
-    lookup: dict[str, dict[str, str]] = {}
+    lookup: dict[str, RiskLookupEntry] = {}
     for project in truth.get("projects") or []:
         identity = project.get("identity") or {}
         name = str(identity.get("display_name") or "")
         if not name:
             continue
         risk = project.get("risk") or {}
-        entry = {
+        entry: RiskLookupEntry = {
             "risk_tier": str(risk.get("risk_tier") or "baseline"),
             "risk_summary": str(risk.get("risk_summary") or ""),
         }
@@ -189,13 +190,13 @@ def build_risk_lookup(output_dir: Path | None) -> dict[str, dict[str, str]]:
     return lookup
 
 
-def _extract_risk_posture(output_dir: Path | None) -> dict[str, Any]:
+def _extract_risk_posture(output_dir: Path | None) -> RiskPosture | dict[str, Any]:
     """Aggregate risk tier summary, derived from build_risk_lookup. Returns {} if unavailable."""
     lookup = build_risk_lookup(output_dir)
     if not lookup:
         return {}
     tier_counts: dict[str, int] = {}
-    top_elevated: list[dict[str, Any]] = []
+    top_elevated: list[TopElevatedEntry] = []
     seen: set[int] = set()
     for name, entry in lookup.items():
         # build_risk_lookup aliases each project under both its display_name and its

@@ -2,6 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from src.report_contracts import (
+    WeeklyStoryEvidenceItem,
+    WeeklyStorySection,
+    WeeklyStoryV1,
+)
 from src.terminology import ACTION_SYNC_CANONICAL_LABELS
 
 NO_FOLLOW_THROUGH_CHECKPOINT = (
@@ -64,8 +69,8 @@ def _build_story_evidence_item(
     *,
     safe_posture: str = "read-only",
     command_hint: str | None = None,
-) -> dict[str, Any]:
-    item: dict[str, Any] = {
+) -> WeeklyStoryEvidenceItem:
+    item: WeeklyStoryEvidenceItem = {
         "label": label,
         "summary": str(summary),
         "kind": kind,
@@ -170,8 +175,8 @@ def _campaign_evidence_items(
     label_prefix: str | None = None,
     command_keys: tuple[str, ...] = (),
     extra_formatter: Any | None = None,
-) -> list[dict[str, Any]]:
-    evidence_items: list[dict[str, Any]] = []
+) -> list[WeeklyStoryEvidenceItem]:
+    evidence_items: list[WeeklyStoryEvidenceItem] = []
     for item in items[:3]:
         label = str(item.get(label_key) or item.get(fallback_label_key) or "Campaign")
         if label_prefix:
@@ -194,8 +199,8 @@ def _campaign_evidence_items(
 
 def _approval_evidence_items(
     items: list[dict[str, Any]], *, label_prefix: str | None = None
-) -> list[dict[str, Any]]:
-    evidence_items: list[dict[str, Any]] = []
+) -> list[WeeklyStoryEvidenceItem]:
+    evidence_items: list[WeeklyStoryEvidenceItem] = []
     for item in items[:3]:
         label = str(item.get("label") or item.get("subject_key") or "Approval")
         if label_prefix:
@@ -222,7 +227,7 @@ def _approval_evidence_items(
 
 def _repo_evidence_items(
     items: list[dict[str, Any]], *, label_prefix: str | None = None
-) -> list[dict[str, Any]]:
+) -> list[WeeklyStoryEvidenceItem]:
     return [
         _build_story_evidence_item(
             f"{label_prefix}: {item.get('repo') or 'Repo'}"
@@ -247,7 +252,7 @@ def _determine_section_state(
     return "idle"
 
 
-def _build_weekly_story_v1(weekly_pack: dict[str, Any]) -> dict[str, Any]:
+def _build_weekly_story_v1(weekly_pack: dict[str, Any]) -> WeeklyStoryV1:
     weekly_priority_evidence_items = list(
         weekly_pack.get("weekly_priority_evidence_items") or []
     )
@@ -279,7 +284,7 @@ def _build_weekly_story_v1(weekly_pack: dict[str, Any]) -> dict[str, Any]:
             ),
         ]
 
-    sections = [
+    sections: list[WeeklyStorySection] = [
         {
             "id": "weekly-priority",
             "label": "Weekly Priority",
