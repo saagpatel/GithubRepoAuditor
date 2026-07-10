@@ -56,6 +56,29 @@ CLASS_PENDING_DEBT_WINDOW_RUNS = HISTORY_WINDOW_RUNS
 
 CLASS_MEMORY_RECENCY_WEIGHTS = (1.0, 1.0, 0.7, 0.7, 0.4, 0.4, 0.4, 0.2, 0.2, 0.2)
 
+
+def target_class_key(item: dict) -> str:
+    return f"{item.get('lane', '')}:{item.get('kind', '') or 'unknown'}"
+
+
+def normalized_closure_forecast_direction(direction: str, score: float) -> str:
+    if direction in {"supporting-confirmation", "supporting-clearance", "neutral"}:
+        return direction
+    if score >= 0.20:
+        return "supporting-confirmation"
+    if score <= -0.20:
+        return "supporting-clearance"
+    return "neutral"
+
+
+def target_specific_normalization_noise(target: dict, history_meta: dict) -> bool:
+    return (
+        history_meta.get("recent_reopened", False)
+        or history_meta.get("recent_policy_flip_count", 0) > 0
+        or target.get("trust_recovery_status") == "blocked"
+    )
+
+
 GENERIC_RECOMMENDATION_PHRASES = (
     "continue the normal audit/control-center loop",
     "continue the normal operator loop",
@@ -65,7 +88,10 @@ GENERIC_RECOMMENDATION_PHRASES = (
     "open the repo queue details",
 )
 
-GENERIC_MONITOR_PHRASES = ("keep the operator loop light", "keep the operator loop lightweight")
+GENERIC_MONITOR_PHRASES = (
+    "keep the operator loop light",
+    "keep the operator loop lightweight",
+)
 
 GENERIC_BASELINE_PHRASES = (
     "run the next full audit to refresh the baseline",
@@ -82,7 +108,9 @@ def is_generic_recommendation(action: str) -> bool:
 
 def is_generic_monitor_guidance(action: str) -> bool:
     normalized = (action or "").strip().lower()
-    return bool(normalized) and any(phrase in normalized for phrase in GENERIC_MONITOR_PHRASES)
+    return bool(normalized) and any(
+        phrase in normalized for phrase in GENERIC_MONITOR_PHRASES
+    )
 
 
 def is_generic_baseline_guidance(
@@ -91,4 +119,6 @@ def is_generic_baseline_guidance(
     normalized = (action or "").strip().lower()
     if normalized and any(phrase in normalized for phrase in GENERIC_BASELINE_PHRASES):
         return True
-    return not normalized and bool(watch_guidance and watch_guidance.get("full_refresh_due"))
+    return not normalized and bool(
+        watch_guidance and watch_guidance.get("full_refresh_due")
+    )

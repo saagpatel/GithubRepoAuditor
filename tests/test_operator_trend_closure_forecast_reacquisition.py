@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from src.operator_trend_closure_forecast_freshness_controls import closure_forecast_event_has_evidence
+from src.operator_trend_closure_forecast_freshness_controls import (
+    closure_forecast_event_has_evidence,
+)
 from src.operator_trend_closure_forecast_reacquisition_controls import (
     apply_closure_forecast_reacquisition_control,
     apply_reacquisition_persistence_and_churn_control,
@@ -35,8 +37,12 @@ def _normalized_closure_forecast_direction(direction: str, score: float) -> str:
 
 
 def _closure_forecast_direction_majority(directions: list[str]) -> str:
-    confirmation = sum(1 for direction in directions if direction == "supporting-confirmation")
-    clearance = sum(1 for direction in directions if direction == "supporting-clearance")
+    confirmation = sum(
+        1 for direction in directions if direction == "supporting-confirmation"
+    )
+    clearance = sum(
+        1 for direction in directions if direction == "supporting-clearance"
+    )
     if confirmation > clearance:
         return "supporting-confirmation"
     if clearance > confirmation:
@@ -44,7 +50,9 @@ def _closure_forecast_direction_majority(directions: list[str]) -> str:
     return "neutral"
 
 
-def _closure_forecast_direction_reversing(current_direction: str, earlier_majority: str) -> bool:
+def _closure_forecast_direction_reversing(
+    current_direction: str, earlier_majority: str
+) -> bool:
     if current_direction == "neutral" or earlier_majority == "neutral":
         return False
     return current_direction != earlier_majority
@@ -60,7 +68,9 @@ def _recent_closure_forecast_weakened_side(events: list[dict]) -> str:
 
 
 def _target_specific_normalization_noise(target: dict, history_meta: dict) -> bool:
-    return bool(target.get("local_noise") or history_meta.get("current_transition_reversed"))
+    return bool(
+        target.get("local_noise") or history_meta.get("current_transition_reversed")
+    )
 
 
 def _clamp_round(value: float, lower: float, upper: float) -> float:
@@ -69,7 +79,11 @@ def _clamp_round(value: float, lower: float, upper: float) -> float:
 
 def _class_direction_flip_count(directions: list[str]) -> int:
     non_neutral = [direction for direction in directions if direction != "neutral"]
-    return sum(1 for previous, current in zip(non_neutral, non_neutral[1:]) if current != previous)
+    return sum(
+        1
+        for previous, current in zip(non_neutral, non_neutral[1:])
+        if current != previous
+    )
 
 
 def _closure_forecast_refresh_path_label(event: dict) -> str:
@@ -91,7 +105,9 @@ def _closure_forecast_reacquisition_path_label(event: dict) -> str:
     return event.get("transition_closure_likely_outcome", "hold") or "hold"
 
 
-def test_closure_forecast_refresh_recovery_for_target_detects_reacquired_confirmation() -> None:
+def test_closure_forecast_refresh_recovery_for_target_detects_reacquired_confirmation() -> (
+    None
+):
     target = {
         "lane": "urgent",
         "kind": "config",
@@ -122,14 +138,13 @@ def test_closure_forecast_refresh_recovery_for_target_detects_reacquired_confirm
         events,
         {},
         target_class_key=_target_class_key,
-        closure_forecast_event_has_evidence=lambda event: closure_forecast_event_has_evidence(
-            event,
-            normalized_closure_forecast_direction=_normalized_closure_forecast_direction,
-        ),
+        closure_forecast_event_has_evidence=closure_forecast_event_has_evidence,
         normalized_closure_forecast_direction=_normalized_closure_forecast_direction,
-        closure_forecast_refresh_signal_from_event=lambda event: closure_forecast_refresh_signal_from_event(
-            event,
-            normalized_closure_forecast_direction=_normalized_closure_forecast_direction,
+        closure_forecast_refresh_signal_from_event=lambda event: (
+            closure_forecast_refresh_signal_from_event(
+                event,
+                normalized_closure_forecast_direction=_normalized_closure_forecast_direction,
+            )
         ),
         clamp_round=_clamp_round,
         closure_forecast_direction_majority=_closure_forecast_direction_majority,
@@ -140,11 +155,19 @@ def test_closure_forecast_refresh_recovery_for_target_detects_reacquired_confirm
         class_closure_forecast_refresh_window_runs=4,
     )
 
-    assert refresh_meta["closure_forecast_refresh_recovery_status"] == "reacquiring-confirmation"
-    assert refresh_meta["closure_forecast_reacquisition_status"] == "reacquired-confirmation"
+    assert (
+        refresh_meta["closure_forecast_refresh_recovery_status"]
+        == "reacquiring-confirmation"
+    )
+    assert (
+        refresh_meta["closure_forecast_reacquisition_status"]
+        == "reacquired-confirmation"
+    )
 
 
-def test_apply_closure_forecast_reacquisition_control_confirms_clearance_resolution() -> None:
+def test_apply_closure_forecast_reacquisition_control_confirms_clearance_resolution() -> (
+    None
+):
     updates = apply_closure_forecast_reacquisition_control(
         {
             "class_reweight_transition_status": "pending-caution",
@@ -182,7 +205,9 @@ def test_apply_closure_forecast_reacquisition_control_confirms_clearance_resolut
     assert updates[3] == "none"
 
 
-def test_closure_forecast_reacquisition_persistence_for_target_detects_sustained_confirmation() -> None:
+def test_closure_forecast_reacquisition_persistence_for_target_detects_sustained_confirmation() -> (
+    None
+):
     target = {
         "lane": "urgent",
         "kind": "config",
@@ -228,11 +253,16 @@ def test_closure_forecast_reacquisition_persistence_for_target_detects_sustained
         class_reacquisition_persistence_window_runs=4,
     )
 
-    assert persistence_meta["closure_forecast_reacquisition_persistence_status"] == "sustained-confirmation"
+    assert (
+        persistence_meta["closure_forecast_reacquisition_persistence_status"]
+        == "sustained-confirmation"
+    )
     assert persistence_meta["closure_forecast_reacquisition_age_runs"] == 3
 
 
-def test_apply_reacquisition_persistence_and_churn_control_softens_churning_clearance() -> None:
+def test_apply_reacquisition_persistence_and_churn_control_softens_churning_clearance() -> (
+    None
+):
     updates = apply_reacquisition_persistence_and_churn_control(
         {
             "closure_forecast_reacquisition_status": "reacquired-clearance",
@@ -354,6 +384,14 @@ def test_closure_forecast_reacquisition_hotspots_and_summary_prefer_live_risk() 
     assert "blocked:setup" in summary
 
 
-def test_closure_forecast_reacquisition_side_from_status_maps_hysteresis_labels() -> None:
-    assert closure_forecast_reacquisition_side_from_status("confirmed-confirmation") == "confirmation"
-    assert closure_forecast_reacquisition_side_from_status("holding-clearance") == "clearance"
+def test_closure_forecast_reacquisition_side_from_status_maps_hysteresis_labels() -> (
+    None
+):
+    assert (
+        closure_forecast_reacquisition_side_from_status("confirmed-confirmation")
+        == "confirmation"
+    )
+    assert (
+        closure_forecast_reacquisition_side_from_status("holding-clearance")
+        == "clearance"
+    )

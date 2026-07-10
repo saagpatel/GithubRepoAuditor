@@ -40,34 +40,19 @@ from src.operator_trend_closure_forecast_core import (
     target_closure_forecast_history as _target_closure_forecast_history_helper,
 )
 from src.operator_trend_closure_forecast_freshness_controls import (
-    apply_closure_forecast_decay_control as _apply_closure_forecast_decay_control_helper,
+    apply_closure_forecast_decay_control as _apply_closure_forecast_decay_control,
 )
 from src.operator_trend_closure_forecast_freshness_controls import (
-    closure_forecast_event_has_evidence as _closure_forecast_event_has_evidence_helper,
+    closure_forecast_event_has_evidence as _closure_forecast_event_has_evidence,
 )
 from src.operator_trend_closure_forecast_freshness_controls import (
-    closure_forecast_event_is_clearance_like as _closure_forecast_event_is_clearance_like_helper,
+    closure_forecast_freshness_for_target as _closure_forecast_freshness_for_target,
 )
 from src.operator_trend_closure_forecast_freshness_controls import (
-    closure_forecast_event_is_confirmation_like as _closure_forecast_event_is_confirmation_like_helper,
+    closure_forecast_freshness_hotspots as _closure_forecast_freshness_hotspots,
 )
 from src.operator_trend_closure_forecast_freshness_controls import (
-    closure_forecast_event_signal_label as _closure_forecast_event_signal_label_helper,
-)
-from src.operator_trend_closure_forecast_freshness_controls import (
-    closure_forecast_freshness_for_target as _closure_forecast_freshness_for_target_helper,
-)
-from src.operator_trend_closure_forecast_freshness_controls import (
-    closure_forecast_freshness_hotspots as _closure_forecast_freshness_hotspots_helper,
-)
-from src.operator_trend_closure_forecast_freshness_controls import (
-    closure_forecast_freshness_reason as _closure_forecast_freshness_reason_helper,
-)
-from src.operator_trend_closure_forecast_freshness_controls import (
-    closure_forecast_freshness_status as _closure_forecast_freshness_status_helper,
-)
-from src.operator_trend_closure_forecast_freshness_controls import (
-    recent_closure_forecast_signal_mix as _recent_closure_forecast_signal_mix_helper,
+    closure_forecast_freshness_status as _closure_forecast_freshness_status,
 )
 from src.operator_trend_closure_forecast_reacquisition_controls import (
     apply_closure_forecast_reacquisition_control as _apply_closure_forecast_reacquisition_control_helper,
@@ -409,6 +394,15 @@ from src.operator_trend_run_context import (
 )
 from src.operator_trend_summary_context import (
     build_trend_summary_context as _build_trend_summary_context_helper,
+)
+from src.operator_trend_support import (
+    normalized_closure_forecast_direction as _normalized_closure_forecast_direction,
+)
+from src.operator_trend_support import (
+    target_class_key as _target_class_key,
+)
+from src.operator_trend_support import (
+    target_specific_normalization_noise as _target_specific_normalization_noise,
 )
 from src.operator_trend_support import (
     ATTENTION_LANES,
@@ -16686,55 +16680,6 @@ def _target_closure_forecast_history(
     )
 
 
-def _closure_forecast_freshness_for_target(
-    target: dict, closure_forecast_events: list[dict]
-) -> dict:
-    return _closure_forecast_freshness_for_target_helper(
-        target,
-        closure_forecast_events,
-        target_class_key=_target_class_key,
-        closure_forecast_event_has_evidence=_closure_forecast_event_has_evidence,
-        closure_forecast_event_signal_label=_closure_forecast_event_signal_label,
-        closure_forecast_event_is_confirmation_like=_closure_forecast_event_is_confirmation_like,
-        closure_forecast_event_is_clearance_like=_closure_forecast_event_is_clearance_like,
-        class_memory_recency_weights=CLASS_MEMORY_RECENCY_WEIGHTS,
-        history_window_runs=HISTORY_WINDOW_RUNS,
-        class_closure_forecast_freshness_window_runs=CLASS_CLOSURE_FORECAST_FRESHNESS_WINDOW_RUNS,
-        freshness_status=_closure_forecast_freshness_status,
-        freshness_reason=_closure_forecast_freshness_reason,
-        recent_signal_mix=_recent_closure_forecast_signal_mix,
-    )
-
-
-def _closure_forecast_event_has_evidence(event: dict) -> bool:
-    return _closure_forecast_event_has_evidence_helper(
-        event,
-        normalized_closure_forecast_direction=_normalized_closure_forecast_direction,
-    )
-
-
-def _closure_forecast_event_is_confirmation_like(event: dict) -> bool:
-    return _closure_forecast_event_is_confirmation_like_helper(
-        event,
-        normalized_closure_forecast_direction=_normalized_closure_forecast_direction,
-    )
-
-
-def _closure_forecast_event_is_clearance_like(event: dict) -> bool:
-    return _closure_forecast_event_is_clearance_like_helper(
-        event,
-        normalized_closure_forecast_direction=_normalized_closure_forecast_direction,
-    )
-
-
-def _closure_forecast_event_signal_label(event: dict) -> str:
-    return _closure_forecast_event_signal_label_helper(
-        event,
-        closure_forecast_event_is_confirmation_like=_closure_forecast_event_is_confirmation_like,
-        closure_forecast_event_is_clearance_like=_closure_forecast_event_is_clearance_like,
-    )
-
-
 def _closure_forecast_reacquisition_freshness_for_target(
     target: dict,
     closure_forecast_events: list[dict],
@@ -16813,47 +16758,6 @@ def _recent_reacquisition_signal_mix(
     )
 
 
-def _closure_forecast_freshness_status(
-    weighted_forecast_evidence_count: float,
-    recent_window_weight_share: float,
-) -> str:
-    return _closure_forecast_freshness_status_helper(
-        weighted_forecast_evidence_count,
-        recent_window_weight_share,
-    )
-
-
-def _closure_forecast_freshness_reason(
-    freshness_status: str,
-    weighted_forecast_evidence_count: float,
-    recent_window_weight_share: float,
-    decayed_confirmation_rate: float,
-    decayed_clearance_rate: float,
-) -> str:
-    return _closure_forecast_freshness_reason_helper(
-        freshness_status,
-        weighted_forecast_evidence_count,
-        recent_window_weight_share,
-        decayed_confirmation_rate,
-        decayed_clearance_rate,
-        class_closure_forecast_freshness_window_runs=CLASS_CLOSURE_FORECAST_FRESHNESS_WINDOW_RUNS,
-    )
-
-
-def _recent_closure_forecast_signal_mix(
-    weighted_forecast_evidence_count: float,
-    weighted_confirmation_like: float,
-    weighted_clearance_like: float,
-    recent_window_weight_share: float,
-) -> str:
-    return _recent_closure_forecast_signal_mix_helper(
-        weighted_forecast_evidence_count,
-        weighted_confirmation_like,
-        weighted_clearance_like,
-        recent_window_weight_share,
-    )
-
-
 def _closure_forecast_signal_from_event(event: dict) -> float:
     score = float(event.get("closure_forecast_reweight_score", 0.0) or 0.0)
     direction = _normalized_closure_forecast_direction(
@@ -16865,16 +16769,6 @@ def _closure_forecast_signal_from_event(event: dict) -> float:
     if direction == "supporting-clearance":
         return -abs(score) if abs(score) >= 0.05 else -0.05
     return _clamp_round(score, lower=-0.19, upper=0.19)
-
-
-def _normalized_closure_forecast_direction(direction: str, score: float) -> str:
-    if direction in {"supporting-confirmation", "supporting-clearance", "neutral"}:
-        return direction
-    if score >= 0.20:
-        return "supporting-confirmation"
-    if score <= -0.20:
-        return "supporting-clearance"
-    return "neutral"
 
 
 def _closure_forecast_direction_majority(directions: list[str]) -> str:
@@ -17220,52 +17114,6 @@ def _apply_closure_forecast_hysteresis_control(
     )
 
 
-def _apply_closure_forecast_decay_control(
-    target: dict,
-    *,
-    freshness_meta: dict,
-    transition_history_meta: dict,
-    trust_policy: str,
-    trust_policy_reason: str,
-    transition_status: str,
-    transition_reason: str,
-    resolution_status: str,
-    resolution_reason: str,
-    closure_likely_outcome: str,
-    closure_hysteresis_status: str,
-    closure_hysteresis_reason: str,
-    pending_debt_status: str,
-    pending_debt_reason: str,
-    policy_debt_status: str,
-    policy_debt_reason: str,
-    class_normalization_status: str,
-    class_normalization_reason: str,
-) -> tuple[
-    str, str, str, str, str, str, str, str, str, str, str, str, str, str, str, str, str
-]:
-    return _apply_closure_forecast_decay_control_helper(
-        target,
-        freshness_meta=freshness_meta,
-        transition_history_meta=transition_history_meta,
-        trust_policy=trust_policy,
-        trust_policy_reason=trust_policy_reason,
-        transition_status=transition_status,
-        transition_reason=transition_reason,
-        resolution_status=resolution_status,
-        resolution_reason=resolution_reason,
-        closure_likely_outcome=closure_likely_outcome,
-        closure_hysteresis_status=closure_hysteresis_status,
-        closure_hysteresis_reason=closure_hysteresis_reason,
-        pending_debt_status=pending_debt_status,
-        pending_debt_reason=pending_debt_reason,
-        policy_debt_status=policy_debt_status,
-        policy_debt_reason=policy_debt_reason,
-        class_normalization_status=class_normalization_status,
-        class_normalization_reason=class_normalization_reason,
-        target_specific_normalization_noise=_target_specific_normalization_noise,
-    )
-
-
 def _closure_forecast_refresh_recovery_for_target(
     target: dict,
     closure_forecast_events: list[dict],
@@ -17530,16 +17378,6 @@ def _closure_forecast_hysteresis_summary(
             "so those classes can hold stronger clearance forecasts only when that pressure keeps persisting."
         )
     return "No closure-forecast hysteresis adjustment is changing the live pending forecast right now."
-
-
-def _closure_forecast_freshness_hotspots(
-    resolution_targets: list[dict], *, mode: str
-) -> list[dict]:
-    return _closure_forecast_freshness_hotspots_helper(
-        resolution_targets,
-        mode=mode,
-        target_class_key=_target_class_key,
-    )
 
 
 def _closure_forecast_freshness_summary(
@@ -19397,14 +19235,6 @@ def _class_normalization_candidate(history_meta: dict) -> bool:
     )
 
 
-def _target_specific_normalization_noise(target: dict, history_meta: dict) -> bool:
-    return (
-        history_meta.get("recent_reopened", False)
-        or history_meta.get("recent_policy_flip_count", 0) > 0
-        or target.get("trust_recovery_status") == "blocked"
-    )
-
-
 def _policy_debt_for_target(target: dict, history_meta: dict) -> tuple[str, str]:
     exception_count = history_meta.get("exception_count", 0)
     retired_count = history_meta.get("retired_count", 0)
@@ -20028,10 +19858,6 @@ def _trust_policy_exception_for_target(
 
 def _soften_trust_policy(policy: str, *, floor: str) -> str:
     return _soften_trust_policy_helper(policy, floor=floor)
-
-
-def _target_class_key(item: dict) -> str:
-    return f"{item.get('lane', '')}:{item.get('kind', '') or 'unknown'}"
 
 
 def _target_label(item: dict) -> str:
