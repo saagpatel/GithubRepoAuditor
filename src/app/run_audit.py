@@ -83,7 +83,7 @@ Legacy flat form (deprecated, still supported):
   audit <github-username> --html
   audit <github-username> --control-center
   audit <github-username> --campaign security-review --writeback-target all --github-projects"""
-_KNOWN_SUBCOMMANDS: frozenset[str] = frozenset(
+_unused_known_subcommands: frozenset[str] = frozenset(
     {"run", "triage", "report", "serve", "security-burndown", "security-gate"}
 )
 
