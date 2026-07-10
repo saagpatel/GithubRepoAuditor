@@ -890,5 +890,3 @@ def _print_control_center_summary(snapshot: dict) -> None:
             print(
                 f"  - {item.get('generated_at', '')[:10]} {subject}: {item.get('summary', item.get('kind', 'change'))}"
             )
-
-
