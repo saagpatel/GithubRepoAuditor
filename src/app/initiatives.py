@@ -106,7 +106,9 @@ def run_list_initiatives_mode(args) -> None:
                 try:
                     status_detail = f"at-risk (deadline ≤ {(date.fromisoformat(initiative.deadline) - date.today()).days}d)"
                 except ValueError:
-                    pass
+                    print_warning(
+                        f"Invalid initiative deadline for {initiative.repo_name!r}: {initiative.deadline!r}"
+                    )
             elif status == "on-track":
                 status_detail = "on-track"
             print_info(f"{initiative.repo_name:<30} {target_label:<12} {current_label:<12} {initiative.deadline:<12} {status_detail}")
