@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from src.cli_mode_validation import validate_cli_mode_args
-from src.cli_output import print_info, print_warning
+from src.cli_output import print_info
 from src.app.run_audit import (
     _run_main_audit_cycle,
     _run_watch_mode,
@@ -55,6 +55,7 @@ from src.app.portfolio_analysis import (
     _run_tier_recalibration_report_mode,
 )
 from src.app.improvement_application import _run_apply_improvements_mode
+from src.app.semantic_search import run_semantic_search_mode
 
 
 # Emitted at most once per process when legacy flat invocation is used.
@@ -1759,40 +1760,6 @@ def _run_portfolio_context_recovery_mode(args) -> None:
 
 
 
-def _run_semantic_search_mode(args: object, query: str) -> None:
-    """Run a standalone semantic search against the existing warehouse index."""
-    from src.semantic_index import SemanticIndex, _run_search
-    from src.warehouse import WAREHOUSE_FILENAME
-
-    output_dir = Path(getattr(args, "output_dir", "output"))
-    warehouse_path = output_dir / WAREHOUSE_FILENAME
-    if not warehouse_path.exists():
-        print_warning(
-            f"Warehouse not found at {warehouse_path}. "
-            "Run an audit with --reindex first to build the semantic index."
-        )
-        return
-
-    embedder_name: str = getattr(args, "embedder", "voyage")
-    idx = SemanticIndex.from_embedder_name(warehouse_path, embedder_name)
-    if idx is None:
-        print_warning(
-            "Semantic search unavailable — embedder not configured. "
-            "Set VOYAGE_API_KEY or use --embedder local."
-        )
-        return
-
-    results = _run_search(idx, query, k=5)
-    if not results:
-        print_info("No results found in semantic index. Run --reindex first.")
-        return
-
-    print_info(f'Semantic search: "{query}"\n')
-    for i, r in enumerate(results, 1):
-        print_info(f"  {i}. {r.repo_name}  (distance={r.score:.4f})")
-        print_info(f"     {r.snippet}")
-
-
 # ── Serve mode ───────────────────────────────────────────────────────────────
 def _run_serve_mode(args: object) -> None:
     from src.app.serve_mode import run_serve_mode
@@ -2193,7 +2160,7 @@ def main() -> None:
     # ── Semantic search standalone mode (no audit needed) ─────────────
     query = getattr(args, "semantic_search", None) or getattr(args, "ask", None)
     if query:
-        _run_semantic_search_mode(args, query)
+        run_semantic_search_mode(args, query)
         return
 
     _run_main_audit_cycle(args, config_inspection)
