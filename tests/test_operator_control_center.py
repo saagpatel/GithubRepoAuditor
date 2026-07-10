@@ -7,6 +7,7 @@ import src.operator_control_center as operator_control_center
 import src.operator_follow_through as operator_follow_through
 import src.operator_resolution_trend as operator_resolution_trend
 import src.operator_snapshot_packaging as operator_snapshot_packaging
+import src.operator_trend_closure_forecast_reset_controls as reset_controls
 
 build_operator_snapshot = operator_control_center.build_operator_snapshot
 normalize_review_state = operator_control_center.normalize_review_state
@@ -8100,7 +8101,7 @@ def test_operator_snapshot_softens_rebuilt_clearance_when_rebuild_churn_is_high(
 
 
 def test_rebuild_freshness_softens_mixed_age_sustained_confirmation_rebuild():
-    updates = operator_resolution_trend._apply_reset_reentry_rebuild_freshness_reset_control(
+    updates = reset_controls.apply_reset_reentry_rebuild_freshness_reset_control(
         {
             "closure_forecast_reset_reentry_rebuild_churn_status": "none",
         },
@@ -8137,7 +8138,7 @@ def test_rebuild_freshness_softens_mixed_age_sustained_confirmation_rebuild():
 
 
 def test_rebuild_freshness_resets_stale_clearance_and_restores_pending_posture():
-    updates = operator_resolution_trend._apply_reset_reentry_rebuild_freshness_reset_control(
+    updates = reset_controls.apply_reset_reentry_rebuild_freshness_reset_control(
         {
             "closure_forecast_reset_reentry_rebuild_churn_status": "none",
         },
@@ -8316,7 +8317,7 @@ def test_rebuild_reentry_churn_softens_clearance_back_toward_hold():
 
 
 def test_rebuild_reentry_refresh_sets_pending_confirmation_restore_until_fully_restored():
-    updates = operator_resolution_trend._apply_reset_reentry_rebuild_reentry_refresh_restore_control(
+    updates = reset_controls.apply_reset_reentry_rebuild_reentry_refresh_restore_control(
         {
             "closure_forecast_reset_reentry_rebuild_reentry_freshness_status": "mixed-age",
             "decayed_reentered_rebuild_clearance_rate": 0.12,
@@ -8353,7 +8354,7 @@ def test_rebuild_reentry_refresh_sets_pending_confirmation_restore_until_fully_r
 
 
 def test_rebuild_reentry_refresh_restores_clearance_and_earlier_clear_when_fully_earned():
-    updates = operator_resolution_trend._apply_reset_reentry_rebuild_reentry_refresh_restore_control(
+    updates = reset_controls.apply_reset_reentry_rebuild_reentry_refresh_restore_control(
         {
             "closure_forecast_reset_reentry_rebuild_reentry_freshness_status": "fresh",
             "closure_forecast_stability_status": "stable",
@@ -8652,7 +8653,7 @@ def test_rebuild_reentry_restore_refresh_rerestored_clearance_reenables_clear_po
 
 
 def test_rererestore_refresh_pending_confirmation_rerererestore_holds_weaker_posture():
-    updates = operator_resolution_trend._apply_reset_reentry_rebuild_reentry_restore_rererestore_refresh_rerererestore_control(
+    updates = reset_controls.apply_reset_reentry_rebuild_reentry_restore_rererestore_refresh_rerererestore_control(
         {
             "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status": "mixed-age",
             "decayed_rererestored_rebuild_reentry_clearance_rate": 0.18,
@@ -8707,7 +8708,7 @@ def test_rererestore_refresh_pending_confirmation_rerererestore_holds_weaker_pos
 
 
 def test_rererestore_refresh_rerererestored_clearance_reenables_clear_posture():
-    updates = operator_resolution_trend._apply_reset_reentry_rebuild_reentry_restore_rererestore_refresh_rerererestore_control(
+    updates = reset_controls.apply_reset_reentry_rebuild_reentry_restore_rererestore_refresh_rerererestore_control(
         {
             "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status": "fresh",
             "decayed_rererestored_rebuild_reentry_clearance_rate": 0.61,
@@ -8771,7 +8772,7 @@ def test_rererestore_refresh_rerererestored_clearance_reenables_clear_posture():
 
 
 def test_rerererestore_persistence_holding_confirmation_keeps_stronger_posture():
-    updates = operator_resolution_trend._apply_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_and_churn_control(
+    updates = reset_controls.apply_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_and_churn_control(
         {
             "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status": "fresh",
         },
@@ -8812,7 +8813,7 @@ def test_rerererestore_persistence_holding_confirmation_keeps_stronger_posture()
 
 
 def test_rerererestore_churn_softens_clearance_posture():
-    updates = operator_resolution_trend._apply_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_and_churn_control(
+    updates = reset_controls.apply_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_and_churn_control(
         {
             "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status": "mixed-age",
         },

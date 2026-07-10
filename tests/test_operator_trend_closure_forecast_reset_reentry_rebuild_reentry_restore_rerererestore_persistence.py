@@ -8,40 +8,40 @@ from src.operator_trend_closure_forecast_reset_controls import (
 )
 
 
-def _target_class_key(item: dict) -> str:
-    return f"{item.get('lane', '')}:{item.get('kind', '') or 'unknown'}"
-
-
-def _target_label(item: dict) -> str:
-    return item.get("title", "") or item.get("kind", "") or "target"
-
-
 def test_rerererestore_persistence_for_target_translates_status_and_text() -> None:
-    meta = (
-        closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_for_target(
-            {
-                "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status": (
-                    "pending-confirmation-rebuild-reentry-rerererestore"
-                ),
-            },
-            [],
-            {},
-            closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_for_target=(
-                lambda _target, _events, _history: {
-                    "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 2,
-                    "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": 0.31,
-                    "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": (
-                        "holding-confirmation-rebuild-reentry-rererestore"
-                    ),
-                    "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": (
-                        "Confirmation-side re-re-restored posture has stayed aligned."
-                    ),
-                    "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": (
-                        "rererestored-confirmation-rebuild-reentry"
-                    ),
-                }
+    # This wrapper translates rerererestore-vocab target/events down a tier and delegates
+    # to the real rererestore persistence builder (no longer an injected stand-in), then
+    # translates the result back up. Two aligned confirmation runs -- one with `key`/
+    # `generated_at` matching the target's queue_identity so
+    # ordered_reset_reentry_events_for_target's current_index==0 shortcut fires -- drive
+    # the shared base builder's "holding" branch, hand-verified against the real code path.
+    target = {
+        "lane": "urgent",
+        "kind": "review",
+        "item_id": "T1",
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status": (
+            "rerererestored-confirmation-rebuild-reentry"
+        ),
+    }
+    events = [
+        {
+            "class_key": "urgent:review",
+            "key": "T1",
+            "generated_at": "",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status": (
+                "rerererestored-confirmation-rebuild-reentry"
             ),
-        )
+        },
+        {
+            "class_key": "urgent:review",
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_status": (
+                "rerererestored-confirmation-rebuild-reentry"
+            ),
+        },
+    ]
+
+    meta = closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_for_target(
+        target, events, {}
     )
 
     assert (
@@ -50,14 +50,17 @@ def test_rerererestore_persistence_for_target_translates_status_and_text() -> No
         ]
         == "holding-confirmation-rebuild-reentry-rerererestore"
     )
-    assert "re-re-re-restored posture" in meta[
-        "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason"
-    ]
+    assert (
+        "re-re-re-restored posture"
+        in meta[
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason"
+        ]
+    )
     assert (
         meta[
             "recent_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_path"
         ]
-        == "rerererestored-confirmation-rebuild-reentry"
+        == "rerererestored-confirmation-rebuild-reentry -> rerererestored-confirmation-rebuild-reentry"
     )
 
 
@@ -93,23 +96,18 @@ def test_rerererestore_hotspots_and_summary_use_labels() -> None:
         closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_hotspots(
             targets,
             mode="just-rerererestored",
-            target_class_key=_target_class_key,
         )
     )
     holding_hotspots = (
         closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_hotspots(
             targets,
             mode="holding",
-            target_class_key=_target_class_key,
         )
     )
-    summary = (
-        closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_summary(
-            targets[0],
-            just_hotspots,
-            holding_hotspots,
-            target_label=_target_label,
-        )
+    summary = closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_summary(
+        targets[0],
+        just_hotspots,
+        holding_hotspots,
     )
 
     assert just_hotspots[0]["label"] == "blocked:setup"
@@ -118,27 +116,16 @@ def test_rerererestore_hotspots_and_summary_use_labels() -> None:
 
 
 def test_rerererestore_apply_returns_empty_defaults_without_targets() -> None:
-    summary = apply_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_and_churn(
-        [],
-        [],
-        current_generated_at="2026-04-17T00:00:00Z",
-        confidence_calibration={},
-        recommendation_bucket=lambda _target: "focus",
-        class_closure_forecast_events=lambda *_args, **_kwargs: [],
-        class_transition_events=lambda *_args, **_kwargs: [],
-        target_class_transition_history=lambda _target, _events: {},
-        closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_for_target=(
-            lambda _target, _events, _history: {}
-        ),
-        closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_for_target=(
-            lambda _target, _events, _history: {}
-        ),
-        apply_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_and_churn_control=(
-            lambda *_args, **_kwargs: {}
-        ),
-        target_class_key=_target_class_key,
-        target_label=_target_label,
-        class_reset_reentry_rebuild_reentry_restore_rerererestore_window_runs=4,
+    summary = (
+        apply_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_and_churn(
+            [],
+            [],
+            current_generated_at="2026-04-17T00:00:00Z",
+            confidence_calibration={},
+            class_closure_forecast_events=lambda *_args, **_kwargs: [],
+            class_transition_events=lambda *_args, **_kwargs: [],
+            target_class_transition_history=lambda _target, _events: {},
+        )
     )
 
     assert (
