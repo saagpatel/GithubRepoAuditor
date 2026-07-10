@@ -1050,20 +1050,18 @@ def test_main_approve_governance_captures_local_approval(monkeypatch, tmp_path, 
 
     monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
     monkeypatch.setattr(
-        cli,
-        "_utcnow",
+        "src.app.approval_center._utcnow",
         lambda: datetime(2026, 4, 17, tzinfo=timezone.utc),
     )
     monkeypatch.setattr(
-        cli,
-        "_refresh_latest_report_state",
+        "src.app.approval_center.refresh_latest_report_state",
         lambda _output_dir, _args: (tmp_path / "audit-report-testuser-2026-03-29.json", {}, report),
     )
-    monkeypatch.setattr(cli, "_refresh_shared_artifacts_from_report", lambda *_a, **_k: {})
-    monkeypatch.setattr(cli, "_write_approval_center_artifacts", _write_approval_center_artifacts)
-    monkeypatch.setattr("src.approval_ledger.load_approval_ledger_bundle", _load_approval_ledger_bundle)
+    monkeypatch.setattr("src.app.approval_center.refresh_shared_artifacts_from_report", lambda *_a, **_k: {})
+    monkeypatch.setattr("src.app.approval_center.write_approval_center_artifacts", _write_approval_center_artifacts)
+    monkeypatch.setattr("src.app.approval_center.load_approval_ledger_bundle", _load_approval_ledger_bundle)
     monkeypatch.setattr(
-        "src.approval_ledger.build_approval_record",
+        "src.app.approval_center.build_approval_record",
         lambda ledger_record, *, reviewer, note="": {
             "approval_id": ledger_record["approval_id"],
             "approval_subject_type": ledger_record["approval_subject_type"],
@@ -1075,7 +1073,7 @@ def test_main_approve_governance_captures_local_approval(monkeypatch, tmp_path, 
             "approval_note": note,
         },
     )
-    monkeypatch.setattr("src.warehouse.save_approval_record", _save_approval_record)
+    monkeypatch.setattr("src.app.approval_center.save_approval_record", _save_approval_record)
 
     cli.main()
 

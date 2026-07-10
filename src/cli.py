@@ -2135,7 +2135,7 @@ def _run_approval_center_mode(args, parser) -> None:
     run_approval_center_mode(args, parser)
 
 
-def _run_approval_capture_mode(args, parser) -> None:
+def _legacy_run_approval_capture_mode(args, parser) -> None:
     from src.approval_ledger import (
         build_approval_followup_record,
         build_approval_record,
@@ -2244,6 +2244,12 @@ def _run_approval_capture_mode(args, parser) -> None:
         print_info(f"Approval follow-up receipt Markdown: {receipt_md}")
     print_info(f"Approval center JSON: {approval_json}")
     print_info(f"Approval center Markdown: {approval_md}")
+
+
+def _run_approval_capture_mode(args, parser) -> None:
+    from src.app.approval_center import run_approval_capture_mode
+
+    run_approval_capture_mode(args, parser)
 
 
 def _run_acknowledgment_capture_mode(args, parser) -> None:
