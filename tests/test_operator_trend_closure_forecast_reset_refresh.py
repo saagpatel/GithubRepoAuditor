@@ -5,54 +5,12 @@ from src.operator_trend_closure_forecast_reset_controls import (
     closure_forecast_reset_refresh_hotspots,
     closure_forecast_reset_refresh_recovery_for_target,
     closure_forecast_reset_refresh_recovery_summary,
-    closure_forecast_reset_side_from_status,
 )
 
 
-def _target_class_key(item: dict) -> str:
-    return f"{item.get('lane', '')}:{item.get('kind', '') or 'unknown'}"
-
-
-def _target_label(item: dict) -> str:
-    return item.get("title", "") or item.get("kind", "") or "target"
-
-
-def _normalized_closure_forecast_direction(direction: str, score: float) -> str:
-    normalized = (direction or "neutral").strip().lower()
-    if normalized in {"supporting-confirmation", "supporting-clearance", "neutral"}:
-        return normalized
-    if score >= 0.05:
-        return "supporting-confirmation"
-    if score <= -0.05:
-        return "supporting-clearance"
-    return "neutral"
-
-
-def _closure_forecast_direction_majority(directions: list[str]) -> str:
-    confirmation = sum(1 for direction in directions if direction == "supporting-confirmation")
-    clearance = sum(1 for direction in directions if direction == "supporting-clearance")
-    if confirmation > clearance:
-        return "supporting-confirmation"
-    if clearance > confirmation:
-        return "supporting-clearance"
-    return "neutral"
-
-
-def _closure_forecast_direction_reversing(current_direction: str, earlier_majority: str) -> bool:
-    if current_direction == "neutral" or earlier_majority == "neutral":
-        return False
-    return current_direction != earlier_majority
-
-
-def _target_specific_normalization_noise(target: dict, history_meta: dict) -> bool:
-    return bool(target.get("local_noise") or history_meta.get("current_transition_reversed"))
-
-
-def _clamp_round(value: float, lower: float, upper: float) -> float:
-    return round(max(lower, min(upper, value)), 2)
-
-
-def test_closure_forecast_reset_refresh_recovery_for_target_detects_confirmation_reentry() -> None:
+def test_closure_forecast_reset_refresh_recovery_for_target_detects_confirmation_reentry() -> (
+    None
+):
     target = {
         "lane": "urgent",
         "kind": "config",
@@ -85,25 +43,22 @@ def test_closure_forecast_reset_refresh_recovery_for_target_detects_confirmation
     ]
 
     refresh_meta = closure_forecast_reset_refresh_recovery_for_target(
-        target,
-        events,
-        {},
-        target_class_key=_target_class_key,
-        closure_forecast_reset_side_from_status=closure_forecast_reset_side_from_status,
-        normalized_closure_forecast_direction=_normalized_closure_forecast_direction,
-        clamp_round=_clamp_round,
-        closure_forecast_direction_majority=_closure_forecast_direction_majority,
-        target_specific_normalization_noise=_target_specific_normalization_noise,
-        closure_forecast_direction_reversing=_closure_forecast_direction_reversing,
-        closure_forecast_reset_refresh_path_label=lambda event: "path",
-        class_reset_reentry_window_runs=4,
+        target, events, {}
     )
 
-    assert refresh_meta["closure_forecast_reset_refresh_recovery_status"] == "reentering-confirmation"
-    assert refresh_meta["closure_forecast_reset_reentry_status"] == "reentered-confirmation"
+    assert (
+        refresh_meta["closure_forecast_reset_refresh_recovery_status"]
+        == "reentering-confirmation"
+    )
+    assert (
+        refresh_meta["closure_forecast_reset_reentry_status"]
+        == "reentered-confirmation"
+    )
 
 
-def test_apply_reset_refresh_reentry_control_softens_confirmation_when_blocked() -> None:
+def test_apply_reset_refresh_reentry_control_softens_confirmation_when_blocked() -> (
+    None
+):
     updates = apply_reset_refresh_reentry_control(
         {
             "closure_forecast_reacquisition_age_runs": 2,
@@ -133,10 +88,15 @@ def test_apply_reset_refresh_reentry_control_softens_confirmation_when_blocked()
 
     assert updates["transition_closure_likely_outcome"] == "hold"
     assert updates["closure_forecast_hysteresis_status"] == "pending-confirmation"
-    assert updates["closure_forecast_reacquisition_status"] == "pending-confirmation-reacquisition"
+    assert (
+        updates["closure_forecast_reacquisition_status"]
+        == "pending-confirmation-reacquisition"
+    )
 
 
-def test_closure_forecast_reset_refresh_hotspots_and_summary_track_active_classes() -> None:
+def test_closure_forecast_reset_refresh_hotspots_and_summary_track_active_classes() -> (
+    None
+):
     hotspots = closure_forecast_reset_refresh_hotspots(
         [
             {
@@ -155,7 +115,6 @@ def test_closure_forecast_reset_refresh_hotspots_and_summary_track_active_classe
             },
         ],
         mode="clearance",
-        target_class_key=_target_class_key,
     )
 
     summary = closure_forecast_reset_refresh_recovery_summary(
@@ -166,7 +125,6 @@ def test_closure_forecast_reset_refresh_hotspots_and_summary_track_active_classe
         },
         recovering_confirmation_hotspots=[],
         recovering_clearance_hotspots=hotspots,
-        target_label=_target_label,
     )
 
     assert hotspots[0]["label"] == "blocked:setup"
