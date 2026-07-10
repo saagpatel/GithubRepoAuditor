@@ -88,6 +88,6 @@ def write_control_center_artifacts(
     }
     safe_payload = redact_sensitive_data(payload)
     safe_snapshot = redact_sensitive_data(snapshot)
-    json_path.write_text(json.dumps(safe_payload, indent=2))
-    md_path.write_text(render_control_center_markdown(safe_snapshot, username, generated_at.isoformat()))
+    json_path.write_text(json.dumps(safe_payload, indent=2))  # lgtm [py/clear-text-storage-sensitive-data] redacted above
+    md_path.write_text(render_control_center_markdown(safe_snapshot, username, generated_at.isoformat()))  # lgtm [py/clear-text-storage-sensitive-data] redacted above
     return json_path, md_path, weekly_json, weekly_md, payload

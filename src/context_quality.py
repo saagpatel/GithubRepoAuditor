@@ -3,12 +3,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import Any
 
 from src.catalog_validator import score_catalog_entry
-
-if TYPE_CHECKING:
-    from src.models import RepoAudit
 
 # Weights must sum to 1.0.
 _WEIGHTS = {
@@ -40,7 +37,7 @@ def compute_context_quality_score(
     return round(max(0.0, min(1.0, score)), 4)
 
 
-def context_quality_score_for_audit(audit: "RepoAudit") -> float:
+def context_quality_score_for_audit(audit: Any) -> float:
     """Compute the composite context_quality_score for a RepoAudit."""
     by_dim = {r.dimension: r for r in audit.analyzer_results}
     desc_conf = (

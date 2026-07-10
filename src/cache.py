@@ -85,7 +85,7 @@ class ResponseCache:
             "cached_at": time.time(),
         }
         try:
-            path.write_text(json.dumps(entry))
+            path.write_text(json.dumps(entry))  # lgtm [py/clear-text-storage-sensitive-data] redacted above
         except OSError:
             pass  # Cache write failure is non-fatal
 
