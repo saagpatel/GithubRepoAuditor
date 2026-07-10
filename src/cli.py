@@ -40,7 +40,7 @@ from src.cli_mode_validation import validate_cli_mode_args
 from src.cli_output import create_progress, print_info, print_status, print_warning
 from src.cloner import clone_workspace
 from src.github_client import GitHubClient
-from src.models import AnalyzerResult, AuditReport, RepoAudit, RepoMetadata
+from src.models import AuditReport, RepoAudit, RepoMetadata
 from src.operator_approval_artifacts import (
     write_approval_center_artifacts as _write_approval_center_artifacts,
     write_approval_receipt as _write_approval_receipt,
@@ -54,7 +54,9 @@ from src.portfolio_truth_types import TRUTH_LATEST_FILENAME, truth_latest_path
 from src.recurring_review import FULL_REFRESH_DAYS
 from src.report_enrichment import build_run_change_counts, build_run_change_summary
 from src.report_state import (
+    audit_from_dict as _audit_from_dict,
     load_latest_report as _load_latest_report,
+    parse_iso_datetime as _parse_iso_dt,
     report_artifact_datetime as _report_artifact_datetime,
 )
 from src.report_operating_paths import apply_operating_paths as _apply_operating_paths
@@ -1707,69 +1709,6 @@ def _resolve_repo_names(repos_arg: list[str]) -> list[str]:
 
 def _normalize_profile_name(profile_name: str | None) -> str:
     return normalize_scoring_profile(profile_name)
-
-
-def _parse_iso_dt(value: str | None) -> datetime | None:
-    if not value:
-        return None
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
-
-
-# ── JSON deserialization helpers ──────────────────────────────────────
-def _audit_from_dict(data: dict) -> RepoAudit:
-    meta_data = data.get("metadata", {})
-    metadata = RepoMetadata(
-        name=meta_data["name"],
-        full_name=meta_data["full_name"],
-        description=meta_data.get("description"),
-        language=meta_data.get("language"),
-        languages=meta_data.get("languages", {}),
-        private=meta_data["private"],
-        fork=meta_data["fork"],
-        archived=meta_data["archived"],
-        created_at=_parse_iso_dt(meta_data.get("created_at")),  # type: ignore[arg-type]
-        updated_at=_parse_iso_dt(meta_data.get("updated_at")),  # type: ignore[arg-type]
-        pushed_at=_parse_iso_dt(meta_data.get("pushed_at")),
-        default_branch=meta_data.get("default_branch", "main"),
-        stars=meta_data.get("stars", 0),
-        forks=meta_data.get("forks", 0),
-        open_issues=meta_data.get("open_issues", 0),
-        size_kb=meta_data.get("size_kb", 0),
-        html_url=meta_data.get("html_url", ""),
-        clone_url=meta_data.get("clone_url", ""),
-        topics=meta_data.get("topics", []),
-    )
-    analyzer_results = [
-        AnalyzerResult(
-            dimension=result["dimension"],
-            score=result["score"],
-            max_score=result["max_score"],
-            findings=result["findings"],
-            details=result.get("details", {}),
-        )
-        for result in data.get("analyzer_results", [])
-    ]
-    return RepoAudit(
-        metadata=metadata,
-        analyzer_results=analyzer_results,
-        overall_score=data.get("overall_score", 0),
-        completeness_tier=data.get("completeness_tier", "abandoned"),
-        interest_score=data.get("interest_score", 0),
-        interest_tier=data.get("interest_tier", "mundane"),
-        grade=data.get("grade", "F"),
-        interest_grade=data.get("interest_grade", "F"),
-        badges=data.get("badges", []),
-        next_badges=data.get("next_badges", []),
-        flags=data.get("flags", []),
-        lenses=data.get("lenses", {}),
-        hotspots=data.get("hotspots", []),
-        action_candidates=data.get("action_candidates", []),
-        security_posture=data.get("security_posture", {}),
-        score_explanation=data.get("score_explanation", {}),
-        portfolio_catalog=data.get("portfolio_catalog", {}),
-        scorecard=data.get("scorecard", {}),
-        ossf_scorecard=data.get("ossf_scorecard", {}),
-    )
 
 
 def _report_from_dict(data: dict) -> AuditReport:
