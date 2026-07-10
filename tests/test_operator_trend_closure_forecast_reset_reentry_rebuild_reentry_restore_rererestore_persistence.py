@@ -6,6 +6,36 @@ from src.operator_trend_closure_forecast_reset_controls import (
     closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_for_target,
     closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_summary,
 )
+from src.operator_trend_support import current_closure_forecast_event_for_target
+
+
+def test_rererestore_persistence_uses_synthesized_current_event() -> None:
+    target = {
+        "lane": "urgent",
+        "kind": "review",
+        "item_id": "T-synthesized",
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status": (
+            "rererestored-confirmation-rebuild-reentry"
+        ),
+    }
+
+    event = current_closure_forecast_event_for_target(target)
+    meta = closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_for_target(
+        target, [], {}
+    )
+
+    assert (
+        event[
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status"
+        ]
+        == "rererestored-confirmation-rebuild-reentry"
+    )
+    assert (
+        meta[
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status"
+        ]
+        == "just-rererestored"
+    )
 
 
 def test_rererestore_persistence_for_target_keeps_status_and_text() -> None:

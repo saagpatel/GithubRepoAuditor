@@ -674,43 +674,43 @@
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_reason": "Re-re-restored rebuilt re-entry is wobbling and may lose its stronger posture soon.",
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_score": 0.2,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status": "watch",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": "hold -> rererestored-confirmation-rebuild-reentry -> rererestoring-confirmation-rebuild-reentry"
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": "rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry -> rererestoring-confirmation-rebuild-reentry"
     },
     "clearance-hold": {
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_reason": "",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_score": 0.0,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": "hold -> rererestored-clearance-rebuild-reentry -> rererestored-clearance-rebuild-reentry"
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_reason": "Re-re-restored rebuilt re-entry is wobbling and may lose its stronger posture soon.",
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_score": 0.2,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status": "watch",
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": "rererestored-confirmation-rebuild-reentry -> rererestored-clearance-rebuild-reentry -> rererestored-clearance-rebuild-reentry"
     },
     "empty": {
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_reason": "",
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": "hold"
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": "rererestored-confirmation-rebuild-reentry"
     },
     "reversing": {
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_reason": "",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_score": 0.0,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_score": 0.1,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": "hold -> rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry"
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": "rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry"
     },
     "single-event": {
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_reason": "",
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": "hold -> rererestored-confirmation-rebuild-reentry"
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": "rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry"
     },
     "sparse": {
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_reason": "Re-re-restored rebuilt re-entry is wobbling and may lose its stronger posture soon.",
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_score": 0.2,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status": "watch",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": "hold -> hold -> rererestored-confirmation-rebuild-reentry -> rererestoring-confirmation-rebuild-reentry"
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": "rererestored-confirmation-rebuild-reentry -> hold -> rererestored-confirmation-rebuild-reentry -> rererestoring-confirmation-rebuild-reentry"
     },
     "sustained-confirmation": {
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_reason": "",
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": "hold -> rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry"
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": "rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry"
     }
   },
   "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_summary": {
@@ -892,53 +892,53 @@
   },
   "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_for_target": {
     "clamp-divergence": {
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 0,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": "",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": 0.31,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": "hold -> rererestored-confirmation-rebuild-reentry -> rererestoring-confirmation-rebuild-reentry"
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 3,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": "Confirmation-side re-re-restored posture is now holding with enough follow-through to trust the stronger rerestored forecast more.",
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": 0.33,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": "sustained-confirmation-rebuild-reentry-rererestore",
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": "rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry -> rererestoring-confirmation-rebuild-reentry"
     },
     "clearance-hold": {
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 0,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": "",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": -0.55,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": "hold -> rererestored-clearance-rebuild-reentry -> rererestored-clearance-rebuild-reentry"
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 1,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": "Stronger rerestored rebuilt re-entry posture has been re-re-restored, but it has not yet proved it can hold.",
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": -0.22,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": "just-rererestored",
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": "rererestored-confirmation-rebuild-reentry -> rererestored-clearance-rebuild-reentry -> rererestored-clearance-rebuild-reentry"
     },
     "empty": {
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 0,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": "",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": 0.0,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": "hold"
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 1,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": "Stronger rerestored rebuilt re-entry posture has been re-re-restored, but it has not yet proved it can hold.",
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": 0.35,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": "just-rererestored",
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": "rererestored-confirmation-rebuild-reentry"
     },
     "reversing": {
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 0,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 3,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": "The re-re-restored rebuilt re-entry posture is already weakening, so it is being softened again.",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": 0.27,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": 0.2,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": "reversing",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": "hold -> rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry"
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": "rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry"
     },
     "single-event": {
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 0,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": "Re-re-restored rebuilt re-entry is still too lightly exercised to say whether the stronger posture can hold.",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": 0.55,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": "insufficient-data",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": "hold -> rererestored-confirmation-rebuild-reentry"
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 2,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": "Confirmation-side re-re-restored posture has stayed aligned long enough to keep the stronger rerestored forecast in place.",
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": 0.44,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": "holding-confirmation-rebuild-reentry-rererestore",
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": "rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry"
     },
     "sparse": {
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 0,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": "",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": 0.31,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": "hold -> hold -> rererestored-confirmation-rebuild-reentry -> rererestoring-confirmation-rebuild-reentry"
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 1,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": "Stronger rerestored rebuilt re-entry posture has been re-re-restored, but it has not yet proved it can hold.",
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": 0.33,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": "just-rererestored",
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": "rererestored-confirmation-rebuild-reentry -> hold -> rererestored-confirmation-rebuild-reentry -> rererestoring-confirmation-rebuild-reentry"
     },
     "sustained-confirmation": {
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 0,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": "",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": 0.55,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": "hold -> rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry"
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 4,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": "Confirmation-side re-re-restored posture is now holding with enough follow-through to trust the stronger rerestored forecast more.",
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": 0.48,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": "sustained-confirmation-rebuild-reentry-rererestore",
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": "rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry"
     }
   },
   "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_summary": {
@@ -963,7 +963,7 @@
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status": "none",
       "recent_rererestore_reset_side": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path": "hold -> rererestored-confirmation-rebuild-reentry -> hold"
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path": "rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry -> hold"
     },
     "clearance-hold": {
       "aligned_fresh_runs_after_latest_rererestore_reset": 0,
@@ -972,7 +972,7 @@
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status": "none",
       "recent_rererestore_reset_side": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path": "hold -> rererestored-clearance-rebuild-reentry -> rererestored-clearance-rebuild-reentry"
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path": "rererestored-confirmation-rebuild-reentry -> rererestored-clearance-rebuild-reentry -> rererestored-clearance-rebuild-reentry"
     },
     "empty": {
       "aligned_fresh_runs_after_latest_rererestore_reset": 0,
@@ -981,7 +981,7 @@
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status": "none",
       "recent_rererestore_reset_side": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path": "hold"
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path": "rererestored-confirmation-rebuild-reentry"
     },
     "reversing": {
       "aligned_fresh_runs_after_latest_rererestore_reset": 0,
@@ -990,7 +990,7 @@
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status": "none",
       "recent_rererestore_reset_side": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path": "hold -> rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry"
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path": "rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry"
     },
     "single-event": {
       "aligned_fresh_runs_after_latest_rererestore_reset": 0,
@@ -999,7 +999,7 @@
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status": "none",
       "recent_rererestore_reset_side": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path": "hold -> rererestored-confirmation-rebuild-reentry"
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path": "rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry"
     },
     "sparse": {
       "aligned_fresh_runs_after_latest_rererestore_reset": 0,
@@ -1008,7 +1008,7 @@
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status": "none",
       "recent_rererestore_reset_side": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path": "hold -> hold -> rererestored-confirmation-rebuild-reentry -> hold"
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path": "rererestored-confirmation-rebuild-reentry -> hold -> rererestored-confirmation-rebuild-reentry -> hold"
     },
     "sustained-confirmation": {
       "aligned_fresh_runs_after_latest_rererestore_reset": 0,
@@ -1017,7 +1017,7 @@
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status": "none",
       "recent_rererestore_reset_side": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path": "hold -> rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry"
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path": "rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry"
     }
   },
   "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_summary": {

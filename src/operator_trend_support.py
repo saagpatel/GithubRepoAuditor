@@ -550,6 +550,10 @@ def current_closure_forecast_event_for_target(target: dict) -> dict:
             "closure_forecast_reset_reentry_rebuild_reentry_restore_rerestore_status",
             "none",
         ),
+        "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status": target.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_status",
+            "none",
+        ),
     }
 
 
