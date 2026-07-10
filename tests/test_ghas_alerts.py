@@ -427,9 +427,9 @@ class TestCliIntegration:
         """When --vuln-check is active, the GHAS block is also triggered (implied flag)."""
         from pathlib import Path as _Path
 
-        cli_source = (_Path(__file__).parent.parent / "src" / "cli.py").read_text()
-        # Look for the condition that gates GHAS on either flag
-        assert "ghas_alerts" in cli_source
-        assert "vuln_check" in cli_source
+        audit_flow_source = (_Path(__file__).parent.parent / "src" / "app" / "run_audit.py").read_text()
+        # Look for the condition that gates GHAS on either flag in the audit flow.
+        assert "ghas_alerts" in audit_flow_source
+        assert "vuln_check" in audit_flow_source
         # The block condition should include both flags joined by OR
-        assert 'getattr(args, "ghas_alerts"' in cli_source or "args.ghas_alerts" in cli_source
+        assert 'getattr(args, "ghas_alerts"' in audit_flow_source or "args.ghas_alerts" in audit_flow_source

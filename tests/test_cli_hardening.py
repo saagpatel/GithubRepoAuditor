@@ -9,8 +9,11 @@ from pathlib import Path
 import pytest
 
 from src import cli
+from src.app import auto_apply, run_audit
 from src.baseline_context import build_baseline_context
 from src.models import AnalyzerResult, AuditReport, RepoAudit
+from src.report_scorecards import apply_scorecards
+from src.report_state import report_from_dict
 
 
 def _make_args(**overrides) -> Namespace:
@@ -90,34 +93,34 @@ def _make_args(**overrides) -> Namespace:
 
 def test_analysis_worker_count_defaults_to_reliable_single_worker(monkeypatch):
     monkeypatch.delenv("GITHUB_REPO_AUDITOR_ANALYSIS_WORKERS", raising=False)
-    assert cli._analysis_worker_count(_make_args()) == 1
+    assert run_audit._analysis_worker_count(_make_args()) == 1
 
 
 def test_analysis_worker_count_uses_bounded_cli_value():
-    assert cli._analysis_worker_count(_make_args(analysis_workers=2)) == 2
-    assert cli._analysis_worker_count(_make_args(analysis_workers=99)) == cli.MAX_ANALYSIS_WORKERS
+    assert run_audit._analysis_worker_count(_make_args(analysis_workers=2)) == 2
+    assert run_audit._analysis_worker_count(_make_args(analysis_workers=99)) == run_audit.MAX_ANALYSIS_WORKERS
 
 
 def test_analysis_worker_count_reads_env_when_flag_missing(monkeypatch):
     monkeypatch.setenv("GITHUB_REPO_AUDITOR_ANALYSIS_WORKERS", "3")
-    assert cli._analysis_worker_count(_make_args(analysis_workers=None)) == 3
+    assert run_audit._analysis_worker_count(_make_args(analysis_workers=None)) == 3
 
 
 def test_analysis_progress_is_disabled_when_stderr_is_not_tty(monkeypatch):
     monkeypatch.setattr(cli.sys.stderr, "isatty", lambda: False)
-    assert cli._use_analysis_progress(4) is False
+    assert run_audit._use_analysis_progress(4) is False
 
 
 def test_analysis_progress_is_enabled_for_parallel_tty(monkeypatch):
     monkeypatch.setattr(cli.sys.stderr, "isatty", lambda: True)
-    assert cli._use_analysis_progress(4) is True
-    assert cli._use_analysis_progress(1) is False
+    assert run_audit._use_analysis_progress(4) is True
+    assert run_audit._use_analysis_progress(1) is False
 
 
 def test_analyzer_cache_is_single_worker_only():
-    assert cli._use_analyzer_cache(_make_args(no_analyzer_cache=False), 1) is True
-    assert cli._use_analyzer_cache(_make_args(no_analyzer_cache=False), 2) is False
-    assert cli._use_analyzer_cache(_make_args(no_analyzer_cache=True), 1) is False
+    assert run_audit._use_analyzer_cache(_make_args(no_analyzer_cache=False), 1) is True
+    assert run_audit._use_analyzer_cache(_make_args(no_analyzer_cache=False), 2) is False
+    assert run_audit._use_analyzer_cache(_make_args(no_analyzer_cache=True), 1) is False
 
 
 class FakeParser:
@@ -238,9 +241,9 @@ def test_main_forwards_scoring_profile_to_targeted_audit(monkeypatch, sample_met
     captured: dict[str, object] = {}
 
     monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
-    monkeypatch.setattr(cli, "_load_scoring_profile", lambda name: ({"readme": 1.5}, "focus"))
-    monkeypatch.setattr(cli, "_fetch_repo_metadata", lambda *_: ([sample_metadata], []))
-    monkeypatch.setattr(cli, "_run_targeted_audit", lambda *a, **k: captured.update(k))
+    monkeypatch.setattr(run_audit, "_load_scoring_profile", lambda name: ({"readme": 1.5}, "focus"))
+    monkeypatch.setattr(run_audit, "_fetch_repo_metadata", lambda *_: ([sample_metadata], []))
+    monkeypatch.setattr(run_audit, "_run_targeted_audit", lambda *a, **k: captured.update(k))
 
     cli.main()
 
@@ -374,9 +377,9 @@ def test_main_forwards_scoring_profile_to_incremental_audit(monkeypatch, sample_
     captured: dict[str, object] = {}
 
     monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
-    monkeypatch.setattr(cli, "_load_scoring_profile", lambda name: ({"readme": 1.5}, "focus"))
-    monkeypatch.setattr(cli, "_fetch_repo_metadata", lambda *_: ([sample_metadata], []))
-    monkeypatch.setattr(cli, "_run_incremental_audit", lambda *a, **k: captured.update(k))
+    monkeypatch.setattr(run_audit, "_load_scoring_profile", lambda name: ({"readme": 1.5}, "focus"))
+    monkeypatch.setattr(run_audit, "_fetch_repo_metadata", lambda *_: ([sample_metadata], []))
+    monkeypatch.setattr(run_audit, "_run_incremental_audit", lambda *a, **k: captured.update(k))
 
     cli.main()
 
@@ -402,9 +405,9 @@ def test_main_watch_uses_chosen_watch_plan(monkeypatch, sample_metadata, tmp_pat
     monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
     monkeypatch.setattr("src.recurring_review.choose_watch_plan", lambda *_a, **_k: watch_plan)
     monkeypatch.setattr("src.watch.run_watch_loop", lambda audit_fn, interval=0: audit_fn())
-    monkeypatch.setattr(cli, "_load_scoring_profile", lambda name: (None, "default"))
-    monkeypatch.setattr(cli, "_fetch_repo_metadata", lambda *_: ([sample_metadata], []))
-    monkeypatch.setattr(cli, "_run_incremental_audit", lambda *a, **k: captured.update(k))
+    monkeypatch.setattr(run_audit, "_load_scoring_profile", lambda name: (None, "default"))
+    monkeypatch.setattr(run_audit, "_fetch_repo_metadata", lambda *_: ([sample_metadata], []))
+    monkeypatch.setattr(run_audit, "_run_incremental_audit", lambda *a, **k: captured.update(k))
 
     cli.main()
 
@@ -452,7 +455,7 @@ programs:
     report = AuditReport.from_audits("testuser", [audit], [], 1)
     report.operator_queue = [{"repo": "test-repo", "title": "Review test-repo"}]
 
-    updated = cli._apply_scorecards(report, _make_args(scorecards=scorecards_path))
+    updated = apply_scorecards(report, _make_args(scorecards=scorecards_path))
 
     assert updated.audits[0].scorecard["program"] == "maintain"
     assert updated.scorecards_summary["status_counts"]["below-target"] == 1
@@ -505,7 +508,7 @@ programs:
         }
     ]
 
-    updated = cli._apply_scorecards(report, _make_args(scorecards=scorecards_path))
+    updated = apply_scorecards(report, _make_args(scorecards=scorecards_path))
 
     assert updated.audits[0].scorecard["status"] == "on-track"
     assert updated.audits[0].portfolio_catalog["intent_alignment"] == "aligned"
@@ -678,7 +681,7 @@ def test_main_doctor_writes_artifact_and_exits_cleanly(monkeypatch, tmp_path, ca
 
 def test_main_approval_center_writes_artifacts_without_apply(monkeypatch, tmp_path, sample_metadata, capsys):
     args = _make_args(approval_center=True, output_dir=str(tmp_path))
-    report = cli._report_from_dict(_make_report_dict(sample_metadata))
+    report = report_from_dict(_make_report_dict(sample_metadata))
     approval_json = tmp_path / "approval-center-testuser-2026-03-29.json"
     approval_md = tmp_path / "approval-center-testuser-2026-03-29.md"
 
@@ -868,7 +871,7 @@ def test_auto_apply_dry_run_prints_automation_trust_bar(
     report_data["operator_summary"] = {
         "decision_quality_v1": {"decision_quality_status": "trusted"}
     }
-    report = cli._report_from_dict(report_data)
+    report = report_from_dict(report_data)
     truth_path = tmp_path / "portfolio-truth-latest.json"
     truth_path.write_text(
         json.dumps(
@@ -895,8 +898,8 @@ def test_auto_apply_dry_run_prints_automation_trust_bar(
     )
 
     monkeypatch.setattr(
-        cli,
-        "_refresh_latest_report_state",
+        auto_apply,
+        "refresh_latest_report_state",
         lambda _output_dir, _args: (tmp_path / "audit-report-testuser-2026-03-29.json", {}, report),
     )
     monkeypatch.setattr(
@@ -904,7 +907,7 @@ def test_auto_apply_dry_run_prints_automation_trust_bar(
         lambda *_args, **_kwargs: {"approval_ledger": []},
     )
 
-    cli._run_auto_apply_approved_mode(args, tmp_path)
+    auto_apply.run_auto_apply_approved_mode(args, tmp_path)
 
     captured = capsys.readouterr()
     combined = captured.out + captured.err
@@ -942,7 +945,7 @@ def test_auto_apply_dry_run_does_not_call_github_writeback(
             {"campaign_type": "promotion-push", "automation_posture": "approval-first"}
         ],
     }
-    report = cli._report_from_dict(report_data)
+    report = report_from_dict(report_data)
     (tmp_path / "portfolio-truth-latest.json").write_text(
         json.dumps(
             {
@@ -957,8 +960,8 @@ def test_auto_apply_dry_run_does_not_call_github_writeback(
         )
     )
     monkeypatch.setattr(
-        cli,
-        "_refresh_latest_report_state",
+        auto_apply,
+        "refresh_latest_report_state",
         lambda _output_dir, _args: (tmp_path / "audit-report-testuser-2026-03-29.json", {}, report),
     )
     monkeypatch.setattr(
@@ -1000,7 +1003,7 @@ def test_auto_apply_dry_run_does_not_call_github_writeback(
 
     monkeypatch.setattr("src.ops_writeback.apply_github_writeback", _apply_github_writeback)
 
-    cli._run_auto_apply_approved_mode(args, tmp_path)
+    auto_apply.run_auto_apply_approved_mode(args, tmp_path)
 
     captured = capsys.readouterr()
     normalized = " ".join((captured.out + captured.err).split())
@@ -1016,7 +1019,7 @@ def test_main_approve_governance_captures_local_approval(monkeypatch, tmp_path, 
         approval_note="looks good",
         output_dir=str(tmp_path),
     )
-    report = cli._report_from_dict(_make_report_dict(sample_metadata))
+    report = report_from_dict(_make_report_dict(sample_metadata))
     approval_json = tmp_path / "approval-center-testuser-2026-03-29.json"
     approval_md = tmp_path / "approval-center-testuser-2026-03-29.md"
     saved: dict[str, object] = {}
@@ -1221,9 +1224,9 @@ def test_main_preflight_off_skips_auto_preflight(monkeypatch, sample_metadata):
     captured: dict[str, object] = {}
 
     monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
-    monkeypatch.setattr(cli, "_load_scoring_profile", lambda name: (None, "default"))
-    monkeypatch.setattr(cli, "_fetch_repo_metadata", lambda *_: ([sample_metadata], []))
-    monkeypatch.setattr(cli, "_run_targeted_audit", lambda *a, **k: captured.update(k))
+    monkeypatch.setattr(run_audit, "_load_scoring_profile", lambda name: (None, "default"))
+    monkeypatch.setattr(run_audit, "_fetch_repo_metadata", lambda *_: ([sample_metadata], []))
+    monkeypatch.setattr(run_audit, "_run_targeted_audit", lambda *a, **k: captured.update(k))
 
     cli.main()
 
@@ -1239,7 +1242,7 @@ def test_print_output_summary_emits_normal_audit_hint(capsys, sample_metadata):
     )
     report = AuditReport.from_audits("testuser", [audit], [], 1)
 
-    cli._print_output_summary(
+    run_audit._print_output_summary(
         "Audited 1 repos for testuser",
         report,
         {
@@ -1285,7 +1288,7 @@ def test_print_output_summary_emits_post_apply_monitoring_hints(capsys, sample_m
         "summary": "Security Review should win ties inside the preview-ready group because recent outcome history is proven.",
     }
 
-    cli._print_output_summary(
+    run_audit._print_output_summary(
         "Audited 1 repos for testuser",
         report,
         {
@@ -1321,7 +1324,7 @@ def test_incremental_noop_regenerates_from_latest_report(monkeypatch, tmp_path, 
     report_data = _make_report_dict(sample_metadata)
     report_data["audits"][0]["metadata"]["name"] = sample_metadata.name
 
-    monkeypatch.setattr(cli, "_load_latest_report", lambda _output_dir: (report_path, report_data))
+    monkeypatch.setattr(run_audit, "_load_latest_report", lambda _output_dir: (report_path, report_data))
     monkeypatch.setattr(
         "src.history.load_fingerprints",
         lambda *_args, **_kwargs: {sample_metadata.name: {"pushed_at": sample_metadata.pushed_at.isoformat()}},
@@ -1341,11 +1344,11 @@ def test_incremental_noop_regenerates_from_latest_report(monkeypatch, tmp_path, 
             }
         )
 
-    monkeypatch.setattr(cli, "_regenerate_outputs_from_latest_report", _record_regen)
+    monkeypatch.setattr(run_audit, "_regenerate_outputs_from_latest_report", _record_regen)
 
-    cli._run_incremental_audit(
+    run_audit._run_incremental_audit(
         args,
-        cli.GitHubClient(token=None, cache=None),
+        run_audit.GitHubClient(token=None, cache=None),
         tmp_path / "output",
         all_repos=[sample_metadata],
         errors=[],
@@ -1378,12 +1381,12 @@ def test_targeted_audit_uses_full_filtered_portfolio_for_baseline(monkeypatch, t
         return {}
 
     monkeypatch.setattr(
-        cli,
+        run_audit,
         "_portfolio_lang_freq_for_filtered_baseline",
         _record_baseline,
     )
     monkeypatch.setattr(
-        cli,
+        run_audit,
         "_analyze_repos",
         lambda repos, **kwargs: [
             RepoAudit(
@@ -1394,7 +1397,7 @@ def test_targeted_audit_uses_full_filtered_portfolio_for_baseline(monkeypatch, t
             )
         ],
     )
-    monkeypatch.setattr(cli, "_write_report_outputs", lambda *a, **k: {
+    monkeypatch.setattr(run_audit, "_write_report_outputs", lambda *a, **k: {
         "json_path": tmp_path / "audit-report.json",
         "md_path": tmp_path / "audit.md",
         "excel_path": tmp_path / "audit.xlsx",
@@ -1410,12 +1413,12 @@ def test_targeted_audit_uses_full_filtered_portfolio_for_baseline(monkeypatch, t
         "review_pack_info": "",
         "cache_info": "",
     })
-    monkeypatch.setattr(cli, "_print_output_summary", lambda *a, **k: None)
-    monkeypatch.setattr(cli, "_apply_requested_reconciliation", lambda *a, **k: None)
+    monkeypatch.setattr(run_audit, "_print_output_summary", lambda *a, **k: None)
+    monkeypatch.setattr(run_audit, "_apply_requested_reconciliation", lambda *a, **k: None)
 
-    cli._run_targeted_audit(
+    run_audit._run_targeted_audit(
         args,
-        cli.GitHubClient(token=None, cache=None),
+        run_audit.GitHubClient(token=None, cache=None),
         tmp_path / "output",
         all_repos=[sample_metadata, other_repo],
         errors=[],
@@ -1443,7 +1446,7 @@ def test_incremental_audit_delegates_changed_repos_to_targeted_path(monkeypatch,
     report_data["audits"][0]["metadata"]["name"] = changed_repo.name
     captured: dict[str, object] = {}
 
-    monkeypatch.setattr(cli, "_load_latest_report", lambda _output_dir: (report_path, report_data))
+    monkeypatch.setattr(run_audit, "_load_latest_report", lambda _output_dir: (report_path, report_data))
     monkeypatch.setattr(
         "src.history.load_fingerprints",
         lambda *_args, **_kwargs: {
@@ -1451,11 +1454,11 @@ def test_incremental_audit_delegates_changed_repos_to_targeted_path(monkeypatch,
             sample_metadata.name: {"pushed_at": sample_metadata.pushed_at.isoformat()},
         },
     )
-    monkeypatch.setattr(cli, "_run_targeted_audit", lambda *a, **k: captured.update({"repos": a[0].repos, **k}))
+    monkeypatch.setattr(run_audit, "_run_targeted_audit", lambda *a, **k: captured.update({"repos": a[0].repos, **k}))
 
-    cli._run_incremental_audit(
+    run_audit._run_incremental_audit(
         args,
-        cli.GitHubClient(token=None, cache=None),
+        run_audit.GitHubClient(token=None, cache=None),
         tmp_path / "output",
         all_repos=[changed_repo, sample_metadata],
         errors=[],
@@ -1474,11 +1477,11 @@ def test_targeted_audit_blocks_without_baseline_context(monkeypatch, tmp_path, s
     report_data.pop("baseline_signature", None)
     called = {"analyze": False}
 
-    monkeypatch.setattr(cli, "_analyze_repos", lambda *a, **k: called.update({"analyze": True}) or [])
+    monkeypatch.setattr(run_audit, "_analyze_repos", lambda *a, **k: called.update({"analyze": True}) or [])
 
-    cli._run_targeted_audit(
+    run_audit._run_targeted_audit(
         args,
-        cli.GitHubClient(token=None, cache=None),
+        run_audit.GitHubClient(token=None, cache=None),
         tmp_path / "output",
         all_repos=[sample_metadata],
         errors=[],
@@ -1495,11 +1498,11 @@ def test_targeted_audit_blocks_on_incompatible_baseline_context(monkeypatch, tmp
     report_data = _make_report_dict(sample_metadata, skip_forks=False)
     called = {"analyze": False}
 
-    monkeypatch.setattr(cli, "_analyze_repos", lambda *a, **k: called.update({"analyze": True}) or [])
+    monkeypatch.setattr(run_audit, "_analyze_repos", lambda *a, **k: called.update({"analyze": True}) or [])
 
-    cli._run_targeted_audit(
+    run_audit._run_targeted_audit(
         args,
-        cli.GitHubClient(token=None, cache=None),
+        run_audit.GitHubClient(token=None, cache=None),
         tmp_path / "output",
         all_repos=[sample_metadata],
         errors=[],
@@ -1516,7 +1519,7 @@ def test_report_from_dict_keeps_legacy_reports_readable(sample_metadata):
     report_data.pop("baseline_context", None)
     report_data.pop("baseline_signature", None)
 
-    report = cli._report_from_dict(report_data)
+    report = report_from_dict(report_data)
 
     assert report.baseline_context == {}
     assert report.baseline_signature == ""
@@ -1579,7 +1582,7 @@ def test_report_from_dict_preserves_action_sync_packet_outcome_tuning_and_automa
         "recommended_command": "audit testuser --campaign security-review --writeback-target all",
     }
 
-    report = cli._report_from_dict(report_data)
+    report = report_from_dict(report_data)
 
     assert report.action_sync_packets[0]["campaign_type"] == "security-review"
     assert report.apply_readiness_summary["summary"] == "Preview Security Review next."
@@ -1628,9 +1631,9 @@ def test_regenerate_outputs_from_latest_report_uses_existing_json(monkeypatch, t
             "cache_info": "",
         }
 
-    monkeypatch.setattr(cli, "_write_report_outputs", _record_write)
+    monkeypatch.setattr(run_audit, "_write_report_outputs", _record_write)
 
-    cli._regenerate_outputs_from_latest_report(
+    run_audit._regenerate_outputs_from_latest_report(
         args,
         tmp_path / "output",
         client=None,
@@ -1654,13 +1657,13 @@ def test_write_report_outputs_forwards_analyst_view_args(monkeypatch, tmp_path, 
         portfolio_profile="shipping",
         collection="showcase",
     )
-    report = cli._report_from_dict(_make_report_dict(sample_metadata))
+    report = report_from_dict(_make_report_dict(sample_metadata))
     json_path = tmp_path / "audit-report-testuser-2026-03-29.json"
 
-    monkeypatch.setattr(cli, "write_json_report", lambda *_: json_path)
-    monkeypatch.setattr(cli, "write_markdown_report", lambda *a, **k: tmp_path / "audit.md")
-    monkeypatch.setattr(cli, "write_pcc_export", lambda *a, **k: tmp_path / "audit-pcc.json")
-    monkeypatch.setattr(cli, "write_raw_metadata", lambda *a, **k: tmp_path / "raw.json")
+    monkeypatch.setattr(run_audit, "write_json_report", lambda *_: json_path)
+    monkeypatch.setattr(run_audit, "write_markdown_report", lambda *a, **k: tmp_path / "audit.md")
+    monkeypatch.setattr(run_audit, "write_pcc_export", lambda *a, **k: tmp_path / "audit-pcc.json")
+    monkeypatch.setattr(run_audit, "write_raw_metadata", lambda *a, **k: tmp_path / "raw.json")
     monkeypatch.setattr("src.history.load_trend_data", lambda: [])
     monkeypatch.setattr("src.history.load_repo_score_history", lambda: {})
     monkeypatch.setattr("src.history.find_previous", lambda *_: None)
@@ -1689,7 +1692,7 @@ def test_write_report_outputs_forwards_analyst_view_args(monkeypatch, tmp_path, 
     monkeypatch.setattr("src.web_export.export_html_dashboard", _record_html)
     monkeypatch.setattr("src.review_pack.export_review_pack", _record_review_pack)
 
-    outputs = cli._write_report_outputs(report, args, tmp_path)
+    outputs = run_audit._write_report_outputs(report, args, tmp_path)
 
     assert html_calls["portfolio_profile"] == "shipping"
     assert html_calls["collection"] == "showcase"
@@ -1710,9 +1713,9 @@ def test_analyze_repos_forwards_security_flags_to_scorer(monkeypatch, sample_met
         def __exit__(self, exc_type, exc, tb):
             return False
 
-    monkeypatch.setattr(cli, "clone_workspace", lambda *a, **k: _CloneContext())
-    monkeypatch.setattr(cli, "create_progress", lambda: None)
-    monkeypatch.setattr(cli, "run_all_analyzers", lambda *a, **k: [])
+    monkeypatch.setattr(run_audit, "clone_workspace", lambda *a, **k: _CloneContext())
+    monkeypatch.setattr(run_audit, "create_progress", lambda: None)
+    monkeypatch.setattr(run_audit, "run_all_analyzers", lambda *a, **k: [])
 
     def _record_score_repo(*a, **kwargs):
         captured.append(kwargs)
@@ -1723,12 +1726,12 @@ def test_analyze_repos_forwards_security_flags_to_scorer(monkeypatch, sample_met
             completeness_tier="functional",
         )
 
-    monkeypatch.setattr(cli, "score_repo", _record_score_repo)
+    monkeypatch.setattr(run_audit, "score_repo", _record_score_repo)
 
-    cli._analyze_repos(
+    run_audit._analyze_repos(
         [sample_metadata],
         args=args,
-        client=cli.GitHubClient(token=None, cache=None),
+        client=run_audit.GitHubClient(token=None, cache=None),
         portfolio_lang_freq={},
         custom_weights=None,
     )
