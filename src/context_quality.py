@@ -3,6 +3,13 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+from src.catalog_validator import score_catalog_entry
+
+if TYPE_CHECKING:
+    from src.models import RepoAudit
+
 # Weights must sum to 1.0.
 _WEIGHTS = {
     "description_confidence": 0.30,
@@ -31,3 +38,27 @@ def compute_context_quality_score(
         + _WEIGHTS["completeness_score"] * complete
     )
     return round(max(0.0, min(1.0, score)), 4)
+
+
+def context_quality_score_for_audit(audit: "RepoAudit") -> float:
+    """Compute the composite context_quality_score for a RepoAudit."""
+    by_dim = {r.dimension: r for r in audit.analyzer_results}
+    desc_conf = (
+        (by_dim["description"].details or {}).get("description_confidence")
+        if "description" in by_dim
+        else None
+    )
+    readme_stale = (
+        (by_dim["readme"].details or {}).get("readme_stale_by_age")
+        if "readme" in by_dim
+        else None
+    )
+    catalog_comp = score_catalog_entry(audit.portfolio_catalog)
+    completeness_score = (
+        (by_dim["completeness"].score / by_dim["completeness"].max_score)
+        if "completeness" in by_dim and by_dim["completeness"].max_score
+        else None
+    )
+    return compute_context_quality_score(
+        desc_conf, readme_stale, catalog_comp, completeness_score
+    )
