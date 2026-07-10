@@ -43,9 +43,6 @@ from src.operator_trend_closure_forecast_freshness_controls import (
     apply_closure_forecast_decay_control as _apply_closure_forecast_decay_control,
 )
 from src.operator_trend_closure_forecast_freshness_controls import (
-    closure_forecast_event_has_evidence as _closure_forecast_event_has_evidence,
-)
-from src.operator_trend_closure_forecast_freshness_controls import (
     closure_forecast_freshness_for_target as _closure_forecast_freshness_for_target,
 )
 from src.operator_trend_closure_forecast_freshness_controls import (
@@ -55,88 +52,52 @@ from src.operator_trend_closure_forecast_freshness_controls import (
     closure_forecast_freshness_status as _closure_forecast_freshness_status,
 )
 from src.operator_trend_closure_forecast_reacquisition_controls import (
-    apply_closure_forecast_reacquisition_control as _apply_closure_forecast_reacquisition_control_helper,
+    apply_closure_forecast_reacquisition_control as _apply_closure_forecast_reacquisition_control,
 )
 from src.operator_trend_closure_forecast_reacquisition_controls import (
-    apply_reacquisition_freshness_reset_control as _apply_reacquisition_freshness_reset_control_helper,
+    apply_reacquisition_freshness_reset_control as _apply_reacquisition_freshness_reset_control,
 )
 from src.operator_trend_closure_forecast_reacquisition_controls import (
-    apply_reacquisition_persistence_and_churn_control as _apply_reacquisition_persistence_and_churn_control_helper,
+    apply_reacquisition_persistence_and_churn_control as _apply_reacquisition_persistence_and_churn_control,
 )
 from src.operator_trend_closure_forecast_reacquisition_controls import (
-    closure_forecast_persistence_reset_summary as _closure_forecast_persistence_reset_summary_helper,
+    closure_forecast_persistence_reset_summary as _closure_forecast_persistence_reset_summary,
 )
 from src.operator_trend_closure_forecast_reacquisition_controls import (
-    closure_forecast_reacquisition_freshness_for_target as _closure_forecast_reacquisition_freshness_for_target_helper,
+    closure_forecast_reacquisition_freshness_for_target as _closure_forecast_reacquisition_freshness_for_target,
 )
 from src.operator_trend_closure_forecast_reacquisition_controls import (
-    closure_forecast_reacquisition_freshness_hotspots as _closure_forecast_reacquisition_freshness_hotspots_helper,
+    closure_forecast_reacquisition_freshness_hotspots as _closure_forecast_reacquisition_freshness_hotspots,
 )
 from src.operator_trend_closure_forecast_reacquisition_controls import (
-    closure_forecast_reacquisition_freshness_reason as _closure_forecast_reacquisition_freshness_reason_helper,
+    closure_forecast_reacquisition_freshness_summary as _closure_forecast_reacquisition_freshness_summary,
 )
 from src.operator_trend_closure_forecast_reacquisition_controls import (
-    closure_forecast_reacquisition_freshness_summary as _closure_forecast_reacquisition_freshness_summary_helper,
+    closure_forecast_reacquisition_hotspots as _closure_forecast_reacquisition_hotspots,
 )
 from src.operator_trend_closure_forecast_reacquisition_controls import (
-    closure_forecast_reacquisition_hotspots as _closure_forecast_reacquisition_hotspots_helper,
+    closure_forecast_reacquisition_persistence_for_target as _closure_forecast_reacquisition_persistence_for_target,
 )
 from src.operator_trend_closure_forecast_reacquisition_controls import (
-    closure_forecast_reacquisition_path_label as _closure_forecast_reacquisition_path_label_helper,
+    closure_forecast_reacquisition_persistence_summary as _closure_forecast_reacquisition_persistence_summary,
 )
 from src.operator_trend_closure_forecast_reacquisition_controls import (
-    closure_forecast_reacquisition_persistence_for_target as _closure_forecast_reacquisition_persistence_for_target_helper,
+    closure_forecast_reacquisition_summary as _closure_forecast_reacquisition_summary,
 )
 from src.operator_trend_closure_forecast_reacquisition_controls import (
-    closure_forecast_reacquisition_persistence_summary as _closure_forecast_reacquisition_persistence_summary_helper,
+    closure_forecast_recovery_churn_for_target as _closure_forecast_recovery_churn_for_target,
 )
 from src.operator_trend_closure_forecast_reacquisition_controls import (
-    closure_forecast_reacquisition_side_from_event as _closure_forecast_reacquisition_side_from_event_helper,
+    closure_forecast_recovery_churn_summary as _closure_forecast_recovery_churn_summary,
 )
 from src.operator_trend_closure_forecast_reacquisition_controls import (
-    closure_forecast_reacquisition_side_from_status as _closure_forecast_reacquisition_side_from_status_helper,
+    closure_forecast_refresh_hotspots as _closure_forecast_refresh_hotspots,
 )
 from src.operator_trend_closure_forecast_reacquisition_controls import (
-    closure_forecast_reacquisition_summary as _closure_forecast_reacquisition_summary_helper,
+    closure_forecast_refresh_recovery_for_target as _closure_forecast_refresh_recovery_for_target,
 )
 from src.operator_trend_closure_forecast_reacquisition_controls import (
-    closure_forecast_recovery_churn_for_target as _closure_forecast_recovery_churn_for_target_helper,
-)
-from src.operator_trend_closure_forecast_reacquisition_controls import (
-    closure_forecast_recovery_churn_summary as _closure_forecast_recovery_churn_summary_helper,
-)
-from src.operator_trend_closure_forecast_reacquisition_controls import (
-    closure_forecast_refresh_hotspots as _closure_forecast_refresh_hotspots_helper,
-)
-from src.operator_trend_closure_forecast_reacquisition_controls import (
-    closure_forecast_refresh_path_label as _closure_forecast_refresh_path_label_helper,
-)
-from src.operator_trend_closure_forecast_reacquisition_controls import (
-    closure_forecast_refresh_recovery_for_target as _closure_forecast_refresh_recovery_for_target_helper,
-)
-from src.operator_trend_closure_forecast_reacquisition_controls import (
-    closure_forecast_refresh_recovery_summary as _closure_forecast_refresh_recovery_summary_helper,
-)
-from src.operator_trend_closure_forecast_reacquisition_controls import (
-    closure_forecast_refresh_signal_from_event as _closure_forecast_refresh_signal_from_event_helper,
-)
-from src.operator_trend_closure_forecast_reacquisition_controls import (
-    reacquisition_event_has_evidence as _reacquisition_event_has_evidence_helper,
-)
-from src.operator_trend_closure_forecast_reacquisition_controls import (
-    reacquisition_event_is_clearance_like as _reacquisition_event_is_clearance_like_helper,
-)
-from src.operator_trend_closure_forecast_reacquisition_controls import (
-    reacquisition_event_is_confirmation_like as _reacquisition_event_is_confirmation_like_helper,
-)
-from src.operator_trend_closure_forecast_reacquisition_controls import (
-    reacquisition_event_signal_label as _reacquisition_event_signal_label_helper,
-)
-from src.operator_trend_closure_forecast_reacquisition_controls import (
-    recent_closure_forecast_weakened_side as _recent_closure_forecast_weakened_side_helper,
-)
-from src.operator_trend_closure_forecast_reacquisition_controls import (
-    recent_reacquisition_signal_mix as _recent_reacquisition_signal_mix_helper,
+    closure_forecast_refresh_recovery_summary as _closure_forecast_refresh_recovery_summary,
 )
 from src.operator_trend_closure_forecast_reset_controls import (
     apply_reset_reentry_freshness_reset_control as _apply_reset_reentry_freshness_reset_control_helper,
@@ -396,10 +357,25 @@ from src.operator_trend_summary_context import (
     build_trend_summary_context as _build_trend_summary_context_helper,
 )
 from src.operator_trend_support import (
+    class_direction_flip_count as _class_direction_flip_count,
+)
+from src.operator_trend_support import (
+    clamp_round as _clamp_round,
+)
+from src.operator_trend_support import (
+    closure_forecast_direction_majority as _closure_forecast_direction_majority,
+)
+from src.operator_trend_support import (
+    closure_forecast_direction_reversing as _closure_forecast_direction_reversing,
+)
+from src.operator_trend_support import (
     normalized_closure_forecast_direction as _normalized_closure_forecast_direction,
 )
 from src.operator_trend_support import (
     target_class_key as _target_class_key,
+)
+from src.operator_trend_support import (
+    target_label as _target_label,
 )
 from src.operator_trend_support import (
     target_specific_normalization_noise as _target_specific_normalization_noise,
@@ -16680,84 +16656,6 @@ def _target_closure_forecast_history(
     )
 
 
-def _closure_forecast_reacquisition_freshness_for_target(
-    target: dict,
-    closure_forecast_events: list[dict],
-) -> dict:
-    return _closure_forecast_reacquisition_freshness_for_target_helper(
-        target,
-        closure_forecast_events,
-        target_class_key=_target_class_key,
-        reacquisition_event_has_evidence=_reacquisition_event_has_evidence,
-        reacquisition_event_signal_label=_reacquisition_event_signal_label,
-        closure_forecast_reacquisition_side_from_status=_closure_forecast_reacquisition_side_from_status,
-        closure_forecast_reacquisition_side_from_event=_closure_forecast_reacquisition_side_from_event,
-        class_memory_recency_weights=CLASS_MEMORY_RECENCY_WEIGHTS,
-        history_window_runs=HISTORY_WINDOW_RUNS,
-        class_reacquisition_freshness_window_runs=CLASS_REACQUISITION_FRESHNESS_WINDOW_RUNS,
-        freshness_status=_closure_forecast_freshness_status,
-        freshness_reason=_closure_forecast_reacquisition_freshness_reason,
-        recent_signal_mix=_recent_reacquisition_signal_mix,
-        reacquisition_event_is_confirmation_like=_reacquisition_event_is_confirmation_like,
-        reacquisition_event_is_clearance_like=_reacquisition_event_is_clearance_like,
-    )
-
-
-def _reacquisition_event_has_evidence(event: dict) -> bool:
-    return _reacquisition_event_has_evidence_helper(
-        event,
-        reacquisition_event_is_confirmation_like=_reacquisition_event_is_confirmation_like,
-        reacquisition_event_is_clearance_like=_reacquisition_event_is_clearance_like,
-    )
-
-
-def _reacquisition_event_is_confirmation_like(event: dict) -> bool:
-    return _reacquisition_event_is_confirmation_like_helper(event)
-
-
-def _reacquisition_event_is_clearance_like(event: dict) -> bool:
-    return _reacquisition_event_is_clearance_like_helper(event)
-
-
-def _reacquisition_event_signal_label(event: dict) -> str:
-    return _reacquisition_event_signal_label_helper(
-        event,
-        reacquisition_event_is_confirmation_like=_reacquisition_event_is_confirmation_like,
-        reacquisition_event_is_clearance_like=_reacquisition_event_is_clearance_like,
-    )
-
-
-def _closure_forecast_reacquisition_freshness_reason(
-    freshness_status: str,
-    weighted_reacquisition_evidence_count: float,
-    recent_window_weight_share: float,
-    decayed_confirmation_rate: float,
-    decayed_clearance_rate: float,
-) -> str:
-    return _closure_forecast_reacquisition_freshness_reason_helper(
-        freshness_status,
-        weighted_reacquisition_evidence_count,
-        recent_window_weight_share,
-        decayed_confirmation_rate,
-        decayed_clearance_rate,
-        class_reacquisition_freshness_window_runs=CLASS_REACQUISITION_FRESHNESS_WINDOW_RUNS,
-    )
-
-
-def _recent_reacquisition_signal_mix(
-    weighted_reacquisition_evidence_count: float,
-    weighted_confirmation_like: float,
-    weighted_clearance_like: float,
-    recent_window_weight_share: float,
-) -> str:
-    return _recent_reacquisition_signal_mix_helper(
-        weighted_reacquisition_evidence_count,
-        weighted_confirmation_like,
-        weighted_clearance_like,
-        recent_window_weight_share,
-    )
-
-
 def _closure_forecast_signal_from_event(event: dict) -> float:
     score = float(event.get("closure_forecast_reweight_score", 0.0) or 0.0)
     direction = _normalized_closure_forecast_direction(
@@ -16769,28 +16667,6 @@ def _closure_forecast_signal_from_event(event: dict) -> float:
     if direction == "supporting-clearance":
         return -abs(score) if abs(score) >= 0.05 else -0.05
     return _clamp_round(score, lower=-0.19, upper=0.19)
-
-
-def _closure_forecast_direction_majority(directions: list[str]) -> str:
-    confirmation_count = sum(
-        1 for direction in directions if direction == "supporting-confirmation"
-    )
-    clearance_count = sum(
-        1 for direction in directions if direction == "supporting-clearance"
-    )
-    if confirmation_count > clearance_count:
-        return "supporting-confirmation"
-    if clearance_count > confirmation_count:
-        return "supporting-clearance"
-    return "neutral"
-
-
-def _closure_forecast_direction_reversing(
-    current_direction: str, earlier_majority: str
-) -> bool:
-    if current_direction == "neutral" or earlier_majority == "neutral":
-        return False
-    return current_direction != earlier_majority
 
 
 def _apply_closure_forecast_hysteresis_control(
@@ -17114,92 +16990,6 @@ def _apply_closure_forecast_hysteresis_control(
     )
 
 
-def _closure_forecast_refresh_recovery_for_target(
-    target: dict,
-    closure_forecast_events: list[dict],
-    transition_history_meta: dict,
-) -> dict:
-    return _closure_forecast_refresh_recovery_for_target_helper(
-        target,
-        closure_forecast_events,
-        transition_history_meta,
-        target_class_key=_target_class_key,
-        closure_forecast_event_has_evidence=_closure_forecast_event_has_evidence,
-        normalized_closure_forecast_direction=_normalized_closure_forecast_direction,
-        closure_forecast_refresh_signal_from_event=_closure_forecast_refresh_signal_from_event,
-        clamp_round=lambda value, lower, upper: _clamp_round(
-            value, lower=lower, upper=upper
-        ),
-        closure_forecast_direction_majority=_closure_forecast_direction_majority,
-        recent_closure_forecast_weakened_side=_recent_closure_forecast_weakened_side,
-        target_specific_normalization_noise=_target_specific_normalization_noise,
-        closure_forecast_direction_reversing=_closure_forecast_direction_reversing,
-        closure_forecast_refresh_path_label=_closure_forecast_refresh_path_label,
-        class_closure_forecast_refresh_window_runs=CLASS_CLOSURE_FORECAST_REFRESH_WINDOW_RUNS,
-    )
-
-
-def _closure_forecast_refresh_signal_from_event(event: dict) -> float:
-    return _closure_forecast_refresh_signal_from_event_helper(
-        event,
-        normalized_closure_forecast_direction=_normalized_closure_forecast_direction,
-    )
-
-
-def _recent_closure_forecast_weakened_side(events: list[dict]) -> str:
-    return _recent_closure_forecast_weakened_side_helper(events)
-
-
-def _closure_forecast_refresh_path_label(event: dict) -> str:
-    return _closure_forecast_refresh_path_label_helper(
-        event,
-        normalized_closure_forecast_direction=_normalized_closure_forecast_direction,
-    )
-
-
-def _apply_closure_forecast_reacquisition_control(
-    target: dict,
-    *,
-    refresh_meta: dict,
-    transition_history_meta: dict,
-    trust_policy: str,
-    trust_policy_reason: str,
-    transition_status: str,
-    transition_reason: str,
-    resolution_status: str,
-    resolution_reason: str,
-    pending_debt_status: str,
-    pending_debt_reason: str,
-    policy_debt_status: str,
-    policy_debt_reason: str,
-    class_normalization_status: str,
-    class_normalization_reason: str,
-    closure_likely_outcome: str,
-    closure_hysteresis_status: str,
-    closure_hysteresis_reason: str,
-) -> tuple[str, str, str, str, str, str, str, str, str, str, str, str, str, str, str]:
-    return _apply_closure_forecast_reacquisition_control_helper(
-        target,
-        refresh_meta=refresh_meta,
-        transition_history_meta=transition_history_meta,
-        trust_policy=trust_policy,
-        trust_policy_reason=trust_policy_reason,
-        transition_status=transition_status,
-        transition_reason=transition_reason,
-        resolution_status=resolution_status,
-        resolution_reason=resolution_reason,
-        pending_debt_status=pending_debt_status,
-        pending_debt_reason=pending_debt_reason,
-        policy_debt_status=policy_debt_status,
-        policy_debt_reason=policy_debt_reason,
-        class_normalization_status=class_normalization_status,
-        class_normalization_reason=class_normalization_reason,
-        closure_likely_outcome=closure_likely_outcome,
-        closure_hysteresis_status=closure_hysteresis_status,
-        closure_hysteresis_reason=closure_hysteresis_reason,
-    )
-
-
 def _closure_forecast_momentum_hotspots(
     resolution_targets: list[dict], *, mode: str
 ) -> list[dict]:
@@ -17449,271 +17239,6 @@ def _closure_forecast_decay_summary(
     return "No strong closure-forecast freshness trend is dominating the live hysteresis posture yet."
 
 
-def _closure_forecast_refresh_hotspots(
-    resolution_targets: list[dict], *, mode: str
-) -> list[dict]:
-    return _closure_forecast_refresh_hotspots_helper(
-        resolution_targets,
-        mode=mode,
-        target_class_key=_target_class_key,
-    )
-
-
-def _closure_forecast_refresh_recovery_summary(
-    primary_target: dict,
-    recovering_confirmation_hotspots: list[dict],
-    recovering_clearance_hotspots: list[dict],
-) -> str:
-    return _closure_forecast_refresh_recovery_summary_helper(
-        primary_target,
-        recovering_confirmation_hotspots,
-        recovering_clearance_hotspots,
-        target_label=_target_label,
-    )
-
-
-def _closure_forecast_reacquisition_summary(
-    primary_target: dict,
-    recovering_confirmation_hotspots: list[dict],
-    recovering_clearance_hotspots: list[dict],
-) -> str:
-    return _closure_forecast_reacquisition_summary_helper(
-        primary_target,
-        recovering_confirmation_hotspots,
-        recovering_clearance_hotspots,
-        target_label=_target_label,
-    )
-
-
-def _closure_forecast_reacquisition_side_from_event(event: dict) -> str:
-    return _closure_forecast_reacquisition_side_from_event_helper(event)
-
-
-def _closure_forecast_reacquisition_side_from_status(status: str) -> str:
-    return _closure_forecast_reacquisition_side_from_status_helper(status)
-
-
-def _closure_forecast_reacquisition_path_label(event: dict) -> str:
-    return _closure_forecast_reacquisition_path_label_helper(event)
-
-
-def _closure_forecast_reacquisition_persistence_for_target(
-    target: dict,
-    closure_forecast_events: list[dict],
-    transition_history_meta: dict,
-) -> dict:
-    return _closure_forecast_reacquisition_persistence_for_target_helper(
-        target,
-        closure_forecast_events,
-        transition_history_meta,
-        target_class_key=_target_class_key,
-        closure_forecast_reacquisition_side_from_event=_closure_forecast_reacquisition_side_from_event,
-        clamp_round=lambda value, lower, upper: _clamp_round(
-            value, lower=lower, upper=upper
-        ),
-        closure_forecast_direction_majority=_closure_forecast_direction_majority,
-        closure_forecast_direction_reversing=_closure_forecast_direction_reversing,
-        closure_forecast_reacquisition_path_label=_closure_forecast_reacquisition_path_label,
-        class_reacquisition_persistence_window_runs=CLASS_REACQUISITION_PERSISTENCE_WINDOW_RUNS,
-    )
-
-
-def _closure_forecast_recovery_churn_for_target(
-    target: dict,
-    closure_forecast_events: list[dict],
-    transition_history_meta: dict,
-) -> dict:
-    return _closure_forecast_recovery_churn_for_target_helper(
-        target,
-        closure_forecast_events,
-        transition_history_meta,
-        target_class_key=_target_class_key,
-        closure_forecast_reacquisition_side_from_event=_closure_forecast_reacquisition_side_from_event,
-        class_direction_flip_count=_class_direction_flip_count,
-        clamp_round=lambda value, lower, upper: _clamp_round(
-            value, lower=lower, upper=upper
-        ),
-        target_specific_normalization_noise=_target_specific_normalization_noise,
-        closure_forecast_reacquisition_path_label=_closure_forecast_reacquisition_path_label,
-        class_reacquisition_persistence_window_runs=CLASS_REACQUISITION_PERSISTENCE_WINDOW_RUNS,
-    )
-
-
-def _apply_reacquisition_persistence_and_churn_control(
-    target: dict,
-    *,
-    persistence_meta: dict,
-    churn_meta: dict,
-    transition_history_meta: dict,
-    trust_policy: str,
-    trust_policy_reason: str,
-    transition_status: str,
-    transition_reason: str,
-    resolution_status: str,
-    resolution_reason: str,
-    pending_debt_status: str,
-    pending_debt_reason: str,
-    policy_debt_status: str,
-    policy_debt_reason: str,
-    class_normalization_status: str,
-    class_normalization_reason: str,
-    closure_likely_outcome: str,
-    closure_hysteresis_status: str,
-    closure_hysteresis_reason: str,
-) -> tuple[str, str, str, str, str, str, str, str, str, str, str, str, str, str, str]:
-    return _apply_reacquisition_persistence_and_churn_control_helper(
-        target,
-        persistence_meta=persistence_meta,
-        churn_meta=churn_meta,
-        transition_history_meta=transition_history_meta,
-        trust_policy=trust_policy,
-        trust_policy_reason=trust_policy_reason,
-        transition_status=transition_status,
-        transition_reason=transition_reason,
-        resolution_status=resolution_status,
-        resolution_reason=resolution_reason,
-        pending_debt_status=pending_debt_status,
-        pending_debt_reason=pending_debt_reason,
-        policy_debt_status=policy_debt_status,
-        policy_debt_reason=policy_debt_reason,
-        class_normalization_status=class_normalization_status,
-        class_normalization_reason=class_normalization_reason,
-        closure_likely_outcome=closure_likely_outcome,
-        closure_hysteresis_status=closure_hysteresis_status,
-        closure_hysteresis_reason=closure_hysteresis_reason,
-    )
-
-
-def _apply_reacquisition_freshness_reset_control(
-    target: dict,
-    *,
-    freshness_meta: dict,
-    transition_history_meta: dict,
-    trust_policy: str,
-    trust_policy_reason: str,
-    transition_status: str,
-    transition_reason: str,
-    resolution_status: str,
-    resolution_reason: str,
-    pending_debt_status: str,
-    pending_debt_reason: str,
-    policy_debt_status: str,
-    policy_debt_reason: str,
-    class_normalization_status: str,
-    class_normalization_reason: str,
-    closure_likely_outcome: str,
-    closure_hysteresis_status: str,
-    closure_hysteresis_reason: str,
-    reacquisition_status: str,
-    reacquisition_reason: str,
-    persistence_age_runs: int,
-    persistence_score: float,
-    persistence_status: str,
-    persistence_reason: str,
-) -> dict:
-    return _apply_reacquisition_freshness_reset_control_helper(
-        target,
-        freshness_meta=freshness_meta,
-        transition_history_meta=transition_history_meta,
-        trust_policy=trust_policy,
-        trust_policy_reason=trust_policy_reason,
-        transition_status=transition_status,
-        transition_reason=transition_reason,
-        resolution_status=resolution_status,
-        resolution_reason=resolution_reason,
-        pending_debt_status=pending_debt_status,
-        pending_debt_reason=pending_debt_reason,
-        policy_debt_status=policy_debt_status,
-        policy_debt_reason=policy_debt_reason,
-        class_normalization_status=class_normalization_status,
-        class_normalization_reason=class_normalization_reason,
-        closure_likely_outcome=closure_likely_outcome,
-        closure_hysteresis_status=closure_hysteresis_status,
-        closure_hysteresis_reason=closure_hysteresis_reason,
-        reacquisition_status=reacquisition_status,
-        reacquisition_reason=reacquisition_reason,
-        persistence_age_runs=persistence_age_runs,
-        persistence_score=persistence_score,
-        persistence_status=persistence_status,
-        persistence_reason=persistence_reason,
-        closure_forecast_reacquisition_side_from_status=_closure_forecast_reacquisition_side_from_status,
-        closure_forecast_reacquisition_side_from_event=_closure_forecast_reacquisition_side_from_event,
-        target_specific_normalization_noise=_target_specific_normalization_noise,
-    )
-
-
-def _closure_forecast_reacquisition_hotspots(
-    resolution_targets: list[dict], *, mode: str
-) -> list[dict]:
-    return _closure_forecast_reacquisition_hotspots_helper(
-        resolution_targets,
-        mode=mode,
-        target_class_key=_target_class_key,
-    )
-
-
-def _closure_forecast_reacquisition_freshness_hotspots(
-    resolution_targets: list[dict],
-    *,
-    mode: str,
-) -> list[dict]:
-    return _closure_forecast_reacquisition_freshness_hotspots_helper(
-        resolution_targets,
-        mode=mode,
-        target_class_key=_target_class_key,
-    )
-
-
-def _closure_forecast_reacquisition_freshness_summary(
-    primary_target: dict,
-    stale_reacquisition_hotspots: list[dict],
-    fresh_reacquisition_signal_hotspots: list[dict],
-) -> str:
-    return _closure_forecast_reacquisition_freshness_summary_helper(
-        primary_target,
-        stale_reacquisition_hotspots,
-        fresh_reacquisition_signal_hotspots,
-        target_label=_target_label,
-    )
-
-
-def _closure_forecast_persistence_reset_summary(
-    primary_target: dict,
-    stale_reacquisition_hotspots: list[dict],
-    fresh_reacquisition_signal_hotspots: list[dict],
-) -> str:
-    return _closure_forecast_persistence_reset_summary_helper(
-        primary_target,
-        stale_reacquisition_hotspots,
-        fresh_reacquisition_signal_hotspots,
-        target_label=_target_label,
-    )
-
-
-def _closure_forecast_reacquisition_persistence_summary(
-    primary_target: dict,
-    just_reacquired_hotspots: list[dict],
-    holding_reacquisition_hotspots: list[dict],
-) -> str:
-    return _closure_forecast_reacquisition_persistence_summary_helper(
-        primary_target,
-        just_reacquired_hotspots,
-        holding_reacquisition_hotspots,
-        target_label=_target_label,
-    )
-
-
-def _closure_forecast_recovery_churn_summary(
-    primary_target: dict,
-    recovery_churn_hotspots: list[dict],
-) -> str:
-    return _closure_forecast_recovery_churn_summary_helper(
-        primary_target,
-        recovery_churn_hotspots,
-        target_label=_target_label,
-    )
-
-
 def _target_class_reweight_history(target: dict, reweight_events: list[dict]) -> dict:
     class_key = _target_class_key(target)
     matching_events = [
@@ -17799,17 +17324,6 @@ def _normalized_class_reweight_direction(direction: str, score: float) -> str:
     if score <= -0.20:
         return "supporting-caution"
     return "neutral"
-
-
-def _class_direction_flip_count(directions: list[str]) -> int:
-    non_neutral = [direction for direction in directions if direction != "neutral"]
-    if len(non_neutral) < 2:
-        return 0
-    return sum(
-        1
-        for previous, current in zip(non_neutral, non_neutral[1:])
-        if current != previous
-    )
 
 
 def _class_direction_majority(directions: list[str]) -> str:
@@ -18406,10 +17920,6 @@ def _class_transition_resolution_summary(
             "so those pending states should not linger indefinitely."
         )
     return "No pending class transition has just confirmed, cleared, or expired in the recent window."
-
-
-def _clamp_round(value: float, *, lower: float, upper: float) -> float:
-    return round(max(lower, min(upper, value)), 2)
 
 
 def _retirement_policy_events(
@@ -19858,11 +19368,6 @@ def _trust_policy_exception_for_target(
 
 def _soften_trust_policy(policy: str, *, floor: str) -> str:
     return _soften_trust_policy_helper(policy, floor=floor)
-
-
-def _target_label(item: dict) -> str:
-    repo = f"{item.get('repo')}: " if item.get("repo") else ""
-    return f"{repo}{item.get('title', '')}".strip(": ")
 
 
 def _recommendation_confidence(item: dict) -> tuple[float, str, list[str]]:

@@ -5740,6 +5740,12 @@ def test_operator_snapshot_reacquires_confirmation_forecast_after_decay(
         "src.operator_resolution_trend._target_specific_normalization_noise",
         lambda *_args, **_kwargs: False,
     )
+    # the satellite reads its own import of target_specific_normalization_noise,
+    # not the god module's reference, so patch it there too
+    monkeypatch.setattr(
+        "src.operator_trend_closure_forecast_reacquisition_controls.target_specific_normalization_noise",
+        lambda *_args, **_kwargs: False,
+    )
 
     summary = build_operator_snapshot(report, output_dir=tmp_path)["operator_summary"]
 
@@ -6152,6 +6158,12 @@ def test_operator_snapshot_keeps_confirmation_reacquisition_when_it_is_holding(
         "src.operator_resolution_trend._target_specific_normalization_noise",
         lambda *_args, **_kwargs: False,
     )
+    # the satellite reads its own import of target_specific_normalization_noise,
+    # not the god module's reference, so patch it there too
+    monkeypatch.setattr(
+        "src.operator_trend_closure_forecast_reacquisition_controls.target_specific_normalization_noise",
+        lambda *_args, **_kwargs: False,
+    )
 
     summary = build_operator_snapshot(report, output_dir=tmp_path)["operator_summary"]
 
@@ -6294,6 +6306,12 @@ def test_operator_snapshot_softens_reacquired_clearance_when_recovery_churns(
     )
     monkeypatch.setattr(
         "src.operator_resolution_trend._target_specific_normalization_noise",
+        lambda *_args, **_kwargs: False,
+    )
+    # the satellite reads its own import of target_specific_normalization_noise,
+    # not the god module's reference, so patch it there too
+    monkeypatch.setattr(
+        "src.operator_trend_closure_forecast_reacquisition_controls.target_specific_normalization_noise",
         lambda *_args, **_kwargs: False,
     )
 
@@ -6466,6 +6484,12 @@ def test_operator_snapshot_softens_sustained_reacquisition_when_freshness_turns_
     )
     monkeypatch.setattr(
         "src.operator_resolution_trend._target_specific_normalization_noise",
+        lambda *_args, **_kwargs: False,
+    )
+    # the satellite reads its own import of target_specific_normalization_noise,
+    # not the god module's reference, so patch it there too
+    monkeypatch.setattr(
+        "src.operator_trend_closure_forecast_reacquisition_controls.target_specific_normalization_noise",
         lambda *_args, **_kwargs: False,
     )
 
@@ -6667,6 +6691,12 @@ def test_operator_snapshot_resets_stale_reacquired_clearance_and_restores_pendin
     )
     monkeypatch.setattr(
         "src.operator_resolution_trend._target_specific_normalization_noise",
+        lambda *_args, **_kwargs: False,
+    )
+    # the satellite reads its own import of target_specific_normalization_noise,
+    # not the god module's reference, so patch it there too
+    monkeypatch.setattr(
+        "src.operator_trend_closure_forecast_reacquisition_controls.target_specific_normalization_noise",
         lambda *_args, **_kwargs: False,
     )
 
