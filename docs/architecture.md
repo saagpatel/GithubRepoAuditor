@@ -500,6 +500,28 @@ output/
 
 ## Design Intent
 
+The 2026-07-10 elegance review ratified four design rules for all future work. They exist to
+stop the three debts that phase-by-phase growth created: callable-threaded extractions,
+template-stamped control modules, and lazy-import cycles.
+
+1. **No new callable-threaded extractions.** When logic is extracted from a large module,
+   the shared primitives it needs move to a leaf support module (for the operator layer,
+   `src/operator_trend_support.py`) and are imported by the extracted module. Threading the
+   parent's helpers back in as `Callable` parameters is no longer an accepted way to avoid a
+   circular import — fix the dependency direction instead.
+2. **No new stamped control modules.** A new closure-forecast or trend control may not be
+   added by copying the seven-function template (`*_side_from_status` / `*_path_label` /
+   `*_recovery_for_target` / `apply_*_control` / `*_hotspots` / `*_summary` / `*_reason`)
+   into a new module. New controls wait for (or drive) the parametrized control core; until
+   that core exists, adding one requires an explicit maintainer decision recorded here.
+3. **No new function-level internal imports outside the CLI dispatch layer.** `src/cli.py`
+   may defer imports for startup latency. Everywhere else, a deferred `from src...` import
+   inside a function body marks a layering bug; fix the direction rather than hiding the
+   import.
+4. **Overlays merge or die.** An advisory overlay that survives two further phases is either
+   merged into the core it overlays or deleted. Overlay status is a transition state, not a
+   destination — this keeps "bounded overlay" from being a one-way ratchet on module count.
+
 ## Automation Guidance
 
 Phase 92 adds one bounded execution-guidance layer on top of the existing Action Sync and historical stack: `Automation Guidance`.
