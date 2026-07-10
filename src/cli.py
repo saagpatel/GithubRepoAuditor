@@ -42,6 +42,9 @@ from src.cloner import clone_workspace
 from src.control_center_report_state import (
     refresh_latest_report_state as _refresh_latest_report_state,
 )
+from src.control_center_snapshot import (
+    enrich_control_center_snapshot_from_report as _enrich_control_center_snapshot_from_report,
+)
 from src.github_client import GitHubClient
 from src.models import AuditReport, RepoAudit, RepoMetadata
 from src.operator_approval_artifacts import (
@@ -1858,7 +1861,7 @@ def _legacy_refresh_latest_report_state(
     return report_path, diff_dict or {}, report
 
 
-def _enrich_control_center_snapshot_from_report(
+def _legacy_enrich_control_center_snapshot_from_report(
     report_data: dict,
     snapshot: dict,
     args,
