@@ -1757,15 +1757,9 @@ def _run_doctor_mode(args, config_inspection) -> None:
 
 
 def _run_generate_manifest_mode(args, parser) -> None:
-    from src.repo_improver import generate_manifest, write_manifest
+    from src.app.report_only import run_generate_manifest_mode
 
-    output_dir = Path(args.output_dir)
-    _report_path, report_data = _load_latest_report(output_dir)
-    if not report_data:
-        parser.error("No existing audit report found in output directory")
-    manifest = generate_manifest(report_data)
-    manifest_path = write_manifest(manifest, output_dir)
-    print_info(f"Improvement manifest: {manifest_path} ({len(manifest)} repos)")
+    run_generate_manifest_mode(args, parser)
 
 
 def _run_campaign_from_ledger_mode(args) -> None:

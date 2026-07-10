@@ -1112,8 +1112,14 @@ def test_main_generate_manifest_writes_artifact(monkeypatch, tmp_path, sample_me
     report_data = _make_report_dict(sample_metadata)
 
     monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
-    monkeypatch.setattr(cli, "_load_latest_report", lambda _output_dir: (report_path, report_data))
-    monkeypatch.setattr("src.repo_improver.generate_manifest", lambda data: [{"repo": "testuser/test-repo"}])
+    monkeypatch.setattr(
+        "src.app.report_only.load_latest_report",
+        lambda _output_dir: (report_path, report_data),
+    )
+    monkeypatch.setattr(
+        "src.app.report_only.generate_manifest",
+        lambda data: [{"repo": "testuser/test-repo"}],
+    )
 
     def _write_manifest(manifest, output_dir):
         assert manifest == [{"repo": "testuser/test-repo"}]
@@ -1121,7 +1127,7 @@ def test_main_generate_manifest_writes_artifact(monkeypatch, tmp_path, sample_me
         manifest_path.write_text("[]")
         return manifest_path
 
-    monkeypatch.setattr("src.repo_improver.write_manifest", _write_manifest)
+    monkeypatch.setattr("src.app.report_only.write_manifest", _write_manifest)
 
     cli.main()
 
