@@ -2016,7 +2016,7 @@ def _legacy_refresh_shared_artifacts_from_report(
     }
 
 
-def _run_control_center_mode(args, parser) -> None:
+def _legacy_run_control_center_mode(args, parser) -> None:
     from src.diff import diff_reports
     from src.governance_activation import build_governance_summary
     from src.history import find_previous
@@ -2081,6 +2081,12 @@ def _run_control_center_mode(args, parser) -> None:
     print_info(f"Weekly command center JSON: {weekly_json}")
     print_info(f"Weekly command center Markdown: {weekly_md}")
     print_info(_control_center_next_step_hint())
+
+
+def _run_control_center_mode(args, parser) -> None:
+    from src.app.control_center import run_control_center_mode
+
+    run_control_center_mode(args, parser)
 
 
 def _legacy_run_approval_center_mode(args, parser) -> None:

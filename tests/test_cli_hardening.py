@@ -720,8 +720,11 @@ def test_main_control_center_writes_artifacts_without_audit(monkeypatch, tmp_pat
     report_path.write_text("{}")
 
     monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
-    monkeypatch.setattr(cli, "_load_latest_report", lambda _output_dir: (report_path, report_data))
-    monkeypatch.setattr("src.history.find_previous", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        "src.app.control_center.load_latest_report",
+        lambda _output_dir: (report_path, report_data),
+    )
+    monkeypatch.setattr("src.app.control_center.find_previous", lambda *_args, **_kwargs: None)
 
     cli.main()
 
@@ -756,8 +759,11 @@ def test_main_control_center_suppresses_queue_when_portfolio_truth_is_newer(
     )
 
     monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
-    monkeypatch.setattr(cli, "_load_latest_report", lambda _output_dir: (report_path, report_data))
-    monkeypatch.setattr("src.history.find_previous", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        "src.app.control_center.load_latest_report",
+        lambda _output_dir: (report_path, report_data),
+    )
+    monkeypatch.setattr("src.app.control_center.find_previous", lambda *_args, **_kwargs: None)
 
     cli.main()
 
@@ -839,7 +845,7 @@ def test_main_control_center_requires_latest_report(monkeypatch):
     args = _make_args(control_center=True)
 
     monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
-    monkeypatch.setattr(cli, "_load_latest_report", lambda _output_dir: (None, None))
+    monkeypatch.setattr("src.app.control_center.load_latest_report", lambda _output_dir: (None, None))
 
     with pytest.raises(SystemExit) as exc:
         cli.main()
