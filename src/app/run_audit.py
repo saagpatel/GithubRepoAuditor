@@ -50,7 +50,7 @@ from src.reporter import (
 )
 from src.scorer import score_repo
 from src.terminology import ACTION_SYNC_CANONICAL_LABELS
-_LEGACY_WARNING_EVENTS: set[str] = set()
+_unused_legacy_warning_events: set[str] = set()
 DEFAULT_ANALYSIS_WORKERS = 1
 MAX_ANALYSIS_WORKERS = 8
 DEFAULT_PORTFOLIO_WORKSPACE = Path.home() / "Projects"
