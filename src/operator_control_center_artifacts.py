@@ -6,6 +6,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+from src.cache import redact_sensitive_data
 from src.operator_artifact_paths import control_center_paths
 from src.operator_control_center import (
     control_center_artifact_payload,
@@ -85,6 +86,8 @@ def write_control_center_artifacts(
         "json_path": str(weekly_json),
         "markdown_path": str(weekly_md),
     }
-    json_path.write_text(json.dumps(payload, indent=2))
-    md_path.write_text(render_control_center_markdown(snapshot, username, generated_at.isoformat()))
+    safe_payload = redact_sensitive_data(payload)
+    safe_snapshot = redact_sensitive_data(snapshot)
+    json_path.write_text(json.dumps(safe_payload, indent=2))
+    md_path.write_text(render_control_center_markdown(safe_snapshot, username, generated_at.isoformat()))
     return json_path, md_path, weekly_json, weekly_md, payload

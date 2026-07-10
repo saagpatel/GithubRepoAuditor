@@ -53,6 +53,23 @@ class TestResponseCache:
         assert result1 == [{"sha": "abc"}]
         assert result2 == [{"sha": "def"}]
 
+    def test_put_redacts_credentials_without_changing_public_response_fields(self, tmp_path):
+        cache = ResponseCache(cache_dir=tmp_path / "cache", ttl=3600)
+        url = "https://api.github.com/repos/user/repo"
+
+        cache.put(
+            url,
+            {"access_token": "secret-param", "per_page": "10"},
+            {"name": "repo", "nested": {"client_secret": "secret-value"}},
+        )
+
+        entry = json.loads(cache._path(url, {"access_token": "secret-param", "per_page": "10"}).read_text())
+        assert entry["params"] == {"access_token": "[REDACTED]", "per_page": "10"}
+        assert entry["response"] == {
+            "name": "repo",
+            "nested": {"client_secret": "[REDACTED]"},
+        }
+
     def test_cache_creates_dir(self, tmp_path):
         cache_dir = tmp_path / "deep" / "nested" / "cache"
         ResponseCache(cache_dir=cache_dir, ttl=3600)

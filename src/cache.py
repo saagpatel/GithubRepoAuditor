@@ -4,9 +4,36 @@ import hashlib
 import json
 import time
 from pathlib import Path
+from typing import Any
 
 CACHE_DIR = Path("output/.cache")
 CACHE_TTL = 3600  # 1 hour
+_SENSITIVE_FIELD_FRAGMENTS = (
+    "api_key",
+    "apikey",
+    "authorization",
+    "credential",
+    "password",
+    "private_key",
+    "secret",
+    "token",
+)
+
+
+def redact_sensitive_data(value: Any) -> Any:
+    """Return a JSON-compatible copy with credential-shaped fields redacted."""
+    if isinstance(value, dict):
+        return {
+            key: "[REDACTED]"
+            if any(fragment in str(key).lower() for fragment in _SENSITIVE_FIELD_FRAGMENTS)
+            else redact_sensitive_data(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [redact_sensitive_data(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(redact_sensitive_data(item) for item in value)
+    return value
 
 
 class ResponseCache:
@@ -53,8 +80,8 @@ class ResponseCache:
         path = self._path(url, params)
         entry = {
             "url": url,
-            "params": params,
-            "response": response,
+            "params": redact_sensitive_data(params),
+            "response": redact_sensitive_data(response),
             "cached_at": time.time(),
         }
         try:

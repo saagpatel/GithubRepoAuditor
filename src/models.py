@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
-from src.context_quality import context_quality_score_for_audit
 
 
 def _parse_dt(value: str | None) -> Optional[datetime]:
@@ -113,6 +112,8 @@ class RepoAudit:
     ossf_scorecard: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
+        from src.context_quality import context_quality_score_for_audit
+
         return {
             "metadata": self.metadata.to_dict(),
             "analyzer_results": [r.to_dict() for r in self.analyzer_results],
