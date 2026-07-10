@@ -39,6 +39,9 @@ from src.cache import ResponseCache
 from src.cli_mode_validation import validate_cli_mode_args
 from src.cli_output import create_progress, print_info, print_status, print_warning
 from src.cloner import clone_workspace
+from src.control_center_report_state import (
+    refresh_latest_report_state as _refresh_latest_report_state,
+)
 from src.github_client import GitHubClient
 from src.models import AuditReport, RepoAudit, RepoMetadata
 from src.operator_approval_artifacts import (
@@ -1811,7 +1814,7 @@ def _legacy_report_from_dict(data: dict) -> AuditReport:
     )
 
 
-def _refresh_latest_report_state(
+def _legacy_refresh_latest_report_state(
     output_dir: Path,
     args,
 ) -> tuple[Path, dict, AuditReport]:
