@@ -18,6 +18,9 @@ _SENSITIVE_FIELD_FRAGMENTS = (
     "secret",
     "token",
 )
+_SENSITIVE_EXACT_FIELDS = {
+    "latest_trusted_baseline",
+}
 
 
 def redact_sensitive_data(value: Any) -> Any:
@@ -25,7 +28,8 @@ def redact_sensitive_data(value: Any) -> Any:
     if isinstance(value, dict):
         return {
             key: "[REDACTED]"
-            if any(fragment in str(key).lower() for fragment in _SENSITIVE_FIELD_FRAGMENTS)
+            if str(key).lower() in _SENSITIVE_EXACT_FIELDS
+            or any(fragment in str(key).lower() for fragment in _SENSITIVE_FIELD_FRAGMENTS)
             else redact_sensitive_data(item)
             for key, item in value.items()
         }
