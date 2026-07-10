@@ -822,7 +822,9 @@ def test_control_center_artifact_filter_drops_archive_queue_items() -> None:
         ],
     }
 
-    cli._filter_control_center_snapshot_for_default_view(snapshot)
+    from src.operator_control_center_artifacts import filter_snapshot_for_default_view
+
+    filter_snapshot_for_default_view(snapshot)
 
     assert [item["repo"] for item in snapshot["operator_queue"]] == ["active-repo"]
 

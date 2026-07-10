@@ -2246,7 +2246,7 @@ def test_git_default_branch_empty_when_origin_head_unset(tmp_path: Path) -> None
 
 
 # ── F2: warehouse-report staleness reminder ────────────────────────────────
-from src.cli import _warn_if_warehouse_report_stale  # noqa: E402
+from src.portfolio_truth_status import warn_if_warehouse_report_stale  # noqa: E402
 
 
 def _write_warehouse_report(d: Path, username: str, date_str: str) -> None:
@@ -2260,7 +2260,7 @@ class TestWarehouseStalenessReminder:
     def test_missing_report_warns(self, tmp_path: Path, capsys) -> None:
         import re
 
-        _warn_if_warehouse_report_stale(tmp_path, "saagpatel")
+        warn_if_warehouse_report_stale(tmp_path, "saagpatel")
         captured = capsys.readouterr()
         # print_warning word-wraps, so normalize whitespace before substring checks
         combined = re.sub(r"\s+", " ", captured.out + captured.err)
@@ -2269,7 +2269,7 @@ class TestWarehouseStalenessReminder:
 
     def test_stale_report_warns(self, tmp_path: Path, capsys) -> None:
         _write_warehouse_report(tmp_path, "saagpatel", "2020-01-01")
-        _warn_if_warehouse_report_stale(tmp_path, "saagpatel")
+        warn_if_warehouse_report_stale(tmp_path, "saagpatel")
         captured = capsys.readouterr()
         assert "stale" in (captured.out + captured.err).lower()
 
@@ -2277,7 +2277,7 @@ class TestWarehouseStalenessReminder:
         from datetime import date
 
         _write_warehouse_report(tmp_path, "saagpatel", date.today().isoformat())
-        _warn_if_warehouse_report_stale(tmp_path, "saagpatel")
+        warn_if_warehouse_report_stale(tmp_path, "saagpatel")
         captured = capsys.readouterr()
         combined = captured.out + captured.err
         assert "stale" not in combined.lower()

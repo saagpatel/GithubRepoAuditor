@@ -41,9 +41,25 @@ from src.cli_output import create_progress, print_info, print_status, print_warn
 from src.cloner import clone_workspace
 from src.github_client import GitHubClient
 from src.models import AnalyzerResult, AuditReport, RepoAudit, RepoMetadata
+from src.operator_approval_artifacts import (
+    write_approval_center_artifacts as _write_approval_center_artifacts,
+    write_approval_receipt as _write_approval_receipt,
+    write_followup_review_receipt as _write_followup_review_receipt,
+)
+from src.operator_control_center_artifacts import (
+    should_print_control_center_item as _should_print_control_center_item,
+    write_control_center_artifacts as _write_control_center_artifacts,
+)
 from src.portfolio_truth_types import TRUTH_LATEST_FILENAME, truth_latest_path
 from src.recurring_review import FULL_REFRESH_DAYS
 from src.report_enrichment import build_run_change_counts, build_run_change_summary
+from src.report_state import (
+    load_latest_report as _load_latest_report,
+    report_artifact_datetime as _report_artifact_datetime,
+)
+from src.report_operating_paths import apply_operating_paths as _apply_operating_paths
+from src.report_portfolio_catalog import apply_portfolio_catalog as _apply_portfolio_catalog
+from src.report_scorecards import apply_scorecards as _apply_scorecards
 from src.reporter import (
     write_json_report,
     write_markdown_report,
@@ -1854,248 +1870,6 @@ def _report_from_dict(data: dict) -> AuditReport:
     )
 
 
-def _apply_portfolio_catalog(report: AuditReport, args) -> AuditReport:
-    from src.portfolio_catalog import (
-        DEFAULT_CATALOG_PATH,
-        build_catalog_line,
-        build_intent_alignment_summary,
-        build_portfolio_catalog_summary,
-        catalog_entry_for_repo,
-        evaluate_intent_alignment,
-        load_portfolio_catalog,
-    )
-    from src.report_enrichment import build_operator_focus
-
-    catalog_path = getattr(args, "catalog", None) or DEFAULT_CATALOG_PATH
-    catalog_data = load_portfolio_catalog(Path(catalog_path))
-    queue_by_repo = {
-        str(item.get("repo") or item.get("repo_name") or "").strip(): item
-        for item in (report.operator_queue or [])
-        if str(item.get("repo") or item.get("repo_name") or "").strip()
-    }
-    for audit in report.audits:
-        metadata = audit.metadata.to_dict()
-        base_entry = catalog_entry_for_repo(metadata, catalog_data)
-        focus_source = queue_by_repo.get(audit.metadata.name, {})
-        operator_focus = build_operator_focus(focus_source)
-        intent_alignment, intent_alignment_reason = evaluate_intent_alignment(
-            base_entry,
-            completeness_tier=audit.completeness_tier,
-            archived=audit.metadata.archived,
-            operator_focus=operator_focus,
-        )
-        audit.portfolio_catalog = {
-            **base_entry,
-            "catalog_line": build_catalog_line(base_entry),
-            "intent_alignment": intent_alignment,
-            "intent_alignment_reason": intent_alignment_reason,
-            "intent_alignment_line": f"{intent_alignment}: {intent_alignment_reason}",
-            "operator_focus": operator_focus,
-        }
-
-    audit_lookup = {audit.metadata.name: audit.portfolio_catalog for audit in report.audits}
-    for item in report.operator_queue:
-        repo_name = str(item.get("repo") or item.get("repo_name") or "").strip()
-        catalog_entry = audit_lookup.get(repo_name, {})
-        if catalog_entry:
-            item["portfolio_catalog"] = dict(catalog_entry)
-            item["catalog_line"] = catalog_entry.get("catalog_line", "")
-            item["intent_alignment"] = catalog_entry.get("intent_alignment", "missing-contract")
-            item["intent_alignment_reason"] = catalog_entry.get("intent_alignment_reason", "")
-
-    report.portfolio_catalog_summary = build_portfolio_catalog_summary(
-        report.audits,
-        catalog_path=str(catalog_path),
-    )
-    report.portfolio_catalog_summary["catalog_exists"] = catalog_data.get("exists", False)
-    report.portfolio_catalog_summary["errors"] = catalog_data.get("errors", [])
-    report.portfolio_catalog_summary["warnings"] = catalog_data.get("warnings", [])
-    report.intent_alignment_summary = build_intent_alignment_summary(report.audits)
-    return report
-
-
-def _apply_scorecards(report: AuditReport, args) -> AuditReport:
-    from src.report_enrichment import build_maturity_gap_summary, build_scorecard_line
-    from src.portfolio_catalog import build_intent_alignment_summary, evaluate_intent_alignment
-    from src.scorecards import (
-        DEFAULT_SCORECARDS_PATH,
-        evaluate_scorecards_for_report,
-        load_scorecards,
-    )
-
-    scorecards_path = getattr(args, "scorecards", None) or DEFAULT_SCORECARDS_PATH
-    scorecards_data = load_scorecards(Path(scorecards_path))
-    repo_results, summary, programs = evaluate_scorecards_for_report(report, scorecards_data)
-    by_repo = {result.get("repo", ""): result for result in repo_results}
-    queue_by_repo = {
-        str(item.get("repo") or item.get("repo_name") or "").strip(): item
-        for item in (report.operator_queue or [])
-        if str(item.get("repo") or item.get("repo_name") or "").strip()
-    }
-    for audit in report.audits:
-        result = by_repo.get(audit.metadata.name, {})
-        audit.scorecard = dict(result)
-        if audit.portfolio_catalog:
-            audit.portfolio_catalog["scorecard"] = dict(result)
-            operator_focus = audit.portfolio_catalog.get("operator_focus", "")
-            if not operator_focus:
-                from src.report_enrichment import build_operator_focus
-
-                operator_focus = build_operator_focus(queue_by_repo.get(audit.metadata.name, {}))
-            intent_alignment, intent_alignment_reason = evaluate_intent_alignment(
-                audit.portfolio_catalog,
-                completeness_tier=audit.completeness_tier,
-                archived=audit.metadata.archived,
-                operator_focus=operator_focus,
-            )
-            audit.portfolio_catalog.update(
-                {
-                    "intent_alignment": intent_alignment,
-                    "intent_alignment_reason": intent_alignment_reason,
-                    "intent_alignment_line": f"{intent_alignment}: {intent_alignment_reason}",
-                    "operator_focus": operator_focus,
-                }
-            )
-    catalog_by_repo = {audit.metadata.name: audit.portfolio_catalog for audit in report.audits}
-    for item in report.operator_queue:
-        repo_name = str(item.get("repo") or item.get("repo_name") or "").strip()
-        result = by_repo.get(repo_name, {})
-        catalog_entry = catalog_by_repo.get(repo_name, {})
-        if catalog_entry:
-            item["portfolio_catalog"] = dict(catalog_entry)
-            item["intent_alignment"] = catalog_entry.get("intent_alignment", "")
-            item["intent_alignment_reason"] = catalog_entry.get("intent_alignment_reason", "")
-        if result:
-            item["scorecard"] = dict(result)
-            item["scorecard_line"] = build_scorecard_line(item)
-            item["maturity_gap_summary"] = build_maturity_gap_summary(item)
-    report.scorecards_summary = summary
-    report.scorecard_programs = programs
-    report.intent_alignment_summary = build_intent_alignment_summary(report.audits)
-    return report
-
-
-def _apply_operating_paths(report: AuditReport) -> AuditReport:
-    from src.portfolio_pathing import (
-        build_operating_path_entry,
-        build_operating_path_line,
-        build_operating_paths_summary,
-    )
-
-    for audit in report.audits:
-        catalog_entry = dict(audit.portfolio_catalog or {})
-        if not catalog_entry:
-            continue
-        path_entry = build_operating_path_entry(
-            catalog_entry,
-            intent_alignment=catalog_entry.get("intent_alignment", ""),
-            archived=audit.metadata.archived,
-            completeness_tier=audit.completeness_tier,
-            decision_quality_status=(report.operator_summary or {})
-            .get("decision_quality_v1", {})
-            .get(
-                "decision_quality_status",
-                "",
-            ),
-        )
-        path_line = build_operating_path_line(path_entry)
-        audit.portfolio_catalog = {
-            **path_entry,
-            "operating_path_line": path_line,
-            "operator_focus": catalog_entry.get("operator_focus", ""),
-        }
-        if audit.scorecard:
-            audit.portfolio_catalog["scorecard"] = dict(audit.scorecard)
-
-    audit_lookup = {audit.metadata.name: audit.portfolio_catalog for audit in report.audits}
-    for item in report.operator_queue:
-        repo_name = str(item.get("repo") or item.get("repo_name") or "").strip()
-        catalog_entry = audit_lookup.get(repo_name, {})
-        if not catalog_entry:
-            continue
-        item["portfolio_catalog"] = dict(catalog_entry)
-        item["operating_path"] = catalog_entry.get("operating_path", "")
-        item["path_override"] = catalog_entry.get("path_override", "")
-        item["path_confidence"] = catalog_entry.get("path_confidence", "")
-        item["path_rationale"] = catalog_entry.get("path_rationale", "")
-        item["operating_path_line"] = catalog_entry.get("operating_path_line", "")
-
-    report.operating_paths_summary = build_operating_paths_summary(report.audits)
-    return report
-
-
-def _load_latest_report(output_dir: Path) -> tuple[Path | None, dict | None]:
-    reports = sorted(
-        output_dir.glob("audit-report-*.json"),
-        key=lambda path: path.stat().st_mtime,
-        reverse=True,
-    )
-    if not reports:
-        return None, None
-    latest = reports[0]
-    return latest, json.loads(latest.read_text())
-
-
-def _latest_control_center_paths(
-    output_dir: Path, username: str, generated_at: datetime
-) -> tuple[Path, Path]:
-    stamp = _date_str(generated_at)
-    return (
-        output_dir / f"operator-control-center-{username}-{stamp}.json",
-        output_dir / f"operator-control-center-{username}-{stamp}.md",
-    )
-
-
-def _latest_weekly_command_center_paths(
-    output_dir: Path, username: str, generated_at: datetime
-) -> tuple[Path, Path]:
-    stamp = _date_str(generated_at)
-    return (
-        output_dir / f"weekly-command-center-{username}-{stamp}.json",
-        output_dir / f"weekly-command-center-{username}-{stamp}.md",
-    )
-
-
-def _latest_approval_center_paths(
-    output_dir: Path, username: str, generated_at: datetime
-) -> tuple[Path, Path]:
-    stamp = _date_str(generated_at)
-    return (
-        output_dir / f"approval-center-{username}-{stamp}.json",
-        output_dir / f"approval-center-{username}-{stamp}.md",
-    )
-
-
-def _latest_approval_receipt_paths(
-    output_dir: Path, username: str, generated_at: datetime
-) -> tuple[Path, Path]:
-    stamp = _date_str(generated_at)
-    return (
-        output_dir / f"approval-receipt-{username}-{stamp}.json",
-        output_dir / f"approval-receipt-{username}-{stamp}.md",
-    )
-
-
-def _latest_followup_review_receipt_paths(
-    output_dir: Path, username: str, generated_at: datetime
-) -> tuple[Path, Path]:
-    stamp = _date_str(generated_at)
-    return (
-        output_dir / f"approval-followup-receipt-{username}-{stamp}.json",
-        output_dir / f"approval-followup-receipt-{username}-{stamp}.md",
-    )
-
-
-def _report_artifact_datetime(report_path: Path | None, fallback: datetime) -> datetime:
-    if report_path:
-        stem = report_path.stem
-        if len(stem) >= 10:
-            parsed = _parse_iso_dt(f"{stem[-10:]}T00:00:00+00:00")
-            if parsed:
-                return parsed
-    return fallback
-
-
 def _refresh_latest_report_state(
     output_dir: Path,
     args,
@@ -2138,111 +1912,6 @@ def _refresh_latest_report_state(
         collection=args.collection,
     )
     return report_path, diff_dict or {}, report
-
-
-def _write_approval_center_artifacts(
-    report: AuditReport,
-    output_dir: Path,
-    *,
-    approval_view: str,
-) -> tuple[Path, Path, dict]:
-    from src.approval_ledger import load_approval_ledger_bundle, render_approval_center_markdown
-
-    report_data = report.to_dict()
-    bundle = load_approval_ledger_bundle(
-        output_dir,
-        report_data,
-        list(report.operator_queue or []),
-        approval_view=approval_view,
-    )
-    report.approval_ledger = bundle["approval_ledger"]
-    report.approval_workflow_summary = bundle["approval_workflow_summary"]
-    report.next_approval_review = bundle["next_approval_review"]
-    report.operator_queue = bundle.get("operator_queue", report.operator_queue)
-    report.operator_summary = {
-        **report.operator_summary,
-        "approval_ledger": bundle["approval_ledger"],
-        "approval_workflow_summary": bundle["approval_workflow_summary"],
-        "next_approval_review": bundle["next_approval_review"],
-        "top_ready_for_review_approvals": bundle["top_ready_for_review_approvals"],
-        "top_needs_reapproval_approvals": bundle["top_needs_reapproval_approvals"],
-        "top_overdue_approval_followups": bundle["top_overdue_approval_followups"],
-        "top_due_soon_approval_followups": bundle["top_due_soon_approval_followups"],
-        "top_approved_manual_approvals": bundle["top_approved_manual_approvals"],
-        "top_blocked_approvals": bundle["top_blocked_approvals"],
-    }
-    generated_at = report.generated_at
-    username = report.username
-    json_path, md_path = _latest_approval_center_paths(output_dir, username, generated_at)
-    payload = {
-        "username": username,
-        "generated_at": generated_at.isoformat(),
-        "approval_view": approval_view,
-        "approval_workflow_summary": bundle["approval_workflow_summary"],
-        "next_approval_review": bundle["next_approval_review"],
-        "approval_ledger": bundle["approval_ledger"],
-        "top_ready_for_review_approvals": bundle["top_ready_for_review_approvals"],
-        "top_needs_reapproval_approvals": bundle["top_needs_reapproval_approvals"],
-        "top_overdue_approval_followups": bundle["top_overdue_approval_followups"],
-        "top_due_soon_approval_followups": bundle["top_due_soon_approval_followups"],
-        "top_approved_manual_approvals": bundle["top_approved_manual_approvals"],
-        "top_blocked_approvals": bundle["top_blocked_approvals"],
-        "operator_summary": report.operator_summary,
-    }
-    json_path.write_text(json.dumps(payload, indent=2))
-    md_path.write_text(render_approval_center_markdown(payload))
-    return json_path, md_path, payload
-
-
-def _write_control_center_artifacts(
-    report_data: dict,
-    snapshot: dict,
-    output_dir: Path,
-    *,
-    username: str,
-    generated_at: datetime,
-    report_reference: str,
-    diff_dict: dict | None = None,
-) -> tuple[Path, Path, Path, Path, dict]:
-    from src.operator_control_center import (
-        control_center_artifact_payload,
-        render_control_center_markdown,
-    )
-    from src.weekly_command_center import (
-        build_weekly_command_center_digest,
-        load_latest_portfolio_truth,
-        write_weekly_command_center_artifacts,
-    )
-
-    _filter_control_center_snapshot_for_default_view(snapshot)
-    json_path, md_path = _latest_control_center_paths(output_dir, username, generated_at)
-    snapshot.setdefault("operator_summary", {})["control_center_reference"] = str(json_path)
-    portfolio_truth_path, portfolio_truth = load_latest_portfolio_truth(output_dir)
-    weekly_digest = build_weekly_command_center_digest(
-        report_data,
-        snapshot,
-        diff_data=diff_dict,
-        portfolio_truth=portfolio_truth,
-        portfolio_truth_reference=str(portfolio_truth_path) if portfolio_truth_path else "",
-        control_center_reference=str(json_path),
-        report_reference=report_reference,
-        generated_at=generated_at.isoformat(),
-    )
-    weekly_json, weekly_md = write_weekly_command_center_artifacts(
-        output_dir,
-        username=username,
-        generated_at=generated_at,
-        digest=weekly_digest,
-    )
-    payload = control_center_artifact_payload(report_data, snapshot)
-    payload["weekly_command_center_digest_v1"] = weekly_digest
-    payload["weekly_command_center_reference"] = {
-        "json_path": str(weekly_json),
-        "markdown_path": str(weekly_md),
-    }
-    json_path.write_text(json.dumps(payload, indent=2))
-    md_path.write_text(render_control_center_markdown(snapshot, username, generated_at.isoformat()))
-    return json_path, md_path, weekly_json, weekly_md, payload
 
 
 def _enrich_control_center_snapshot_from_report(
@@ -2311,63 +1980,6 @@ def _enrich_control_center_snapshot_from_report(
     snapshot["operator_summary"] = report.operator_summary
     snapshot["operator_queue"] = report.operator_queue
     return snapshot
-
-
-def _write_approval_receipt(
-    output_dir: Path,
-    username: str,
-    *,
-    generated_at: datetime,
-    receipt: dict,
-) -> tuple[Path, Path]:
-    json_path, md_path = _latest_approval_receipt_paths(output_dir, username, generated_at)
-    json_path.write_text(json.dumps(receipt, indent=2))
-    lines = [
-        f"# Approval Receipt: {username}",
-        "",
-        f"- Generated: `{generated_at.isoformat()}`",
-        f"- Subject: {receipt.get('label', 'Approval')}",
-        f"- State: {receipt.get('approval_state', 'approved')}",
-        f"- Reviewer: {receipt.get('approved_by', '') or 'local-operator'}",
-        f"- Approved At: `{receipt.get('approved_at', '')}`",
-        f"- Note: {receipt.get('approval_note', '') or '—'}",
-        f"- Summary: {receipt.get('summary', 'Local approval captured.')}",
-    ]
-    if receipt.get("approval_command"):
-        lines.append(f"- Approval Command: `{receipt.get('approval_command')}`")
-    if receipt.get("manual_apply_command"):
-        lines.append(f"- Manual Apply Command: `{receipt.get('manual_apply_command')}`")
-    md_path.write_text("\n".join(lines) + "\n")
-    return json_path, md_path
-
-
-def _write_followup_review_receipt(
-    output_dir: Path,
-    username: str,
-    *,
-    generated_at: datetime,
-    receipt: dict,
-) -> tuple[Path, Path]:
-    json_path, md_path = _latest_followup_review_receipt_paths(output_dir, username, generated_at)
-    json_path.write_text(json.dumps(receipt, indent=2))
-    lines = [
-        f"# Approval Follow-Up Receipt: {username}",
-        "",
-        f"- Generated: `{generated_at.isoformat()}`",
-        f"- Subject: {receipt.get('label', 'Approval')}",
-        f"- State: {receipt.get('approval_state', 'approved')} / {receipt.get('follow_up_state', 'not-applicable')}",
-        f"- Reviewer: {receipt.get('reviewed_by', '') or 'local-operator'}",
-        f"- Reviewed At: `{receipt.get('reviewed_at', '')}`",
-        f"- Next Follow-Up Due: `{receipt.get('next_follow_up_due_at', '') or '—'}`",
-        f"- Note: {receipt.get('review_note', '') or '—'}",
-        f"- Summary: {receipt.get('summary', 'Local follow-up review captured.')}",
-    ]
-    if receipt.get("follow_up_command"):
-        lines.append(f"- Follow-Up Command: `{receipt.get('follow_up_command')}`")
-    if receipt.get("manual_apply_command"):
-        lines.append(f"- Manual Apply Command: `{receipt.get('manual_apply_command')}`")
-    md_path.write_text("\n".join(lines) + "\n")
-    return json_path, md_path
 
 
 def _refresh_shared_artifacts_from_report(
@@ -2755,16 +2367,9 @@ def _run_acknowledgment_capture_mode(args, parser) -> None:
 
 
 def _run_doctor_mode(args, config_inspection) -> None:
-    from src.diagnostics import format_diagnostics_report, run_diagnostics, write_diagnostics_report
+    from src.app.doctor import run_doctor_mode
 
-    result = run_diagnostics(args, config_inspection=config_inspection, full=True)
-    output_dir = Path(args.output_dir)
-    artifact_path = write_diagnostics_report(result, output_dir, args.username)
-    print(format_diagnostics_report(result))
-    print_info(f"Diagnostics artifact: {artifact_path}")
-    print_info(_doctor_next_step_hint(args.username))
-    if result.blocking_errors:
-        raise SystemExit(1)
+    run_doctor_mode(args, config_inspection)
 
 
 def _run_generate_manifest_mode(args, parser) -> None:
@@ -3963,13 +3568,6 @@ def _run_watch_mode(args, config_inspection) -> None:
     run_watch_loop(_run_watch_once, interval=args.watch_interval)
 
 
-def _doctor_next_step_hint(username: str) -> str:
-    return (
-        f"Next step: run `audit {username} --html` for the standard workbook, then "
-        f"`audit {username} --control-center` for read-only weekly triage."
-    )
-
-
 def _control_center_next_step_hint() -> str:
     return (
         "Reading order: workbook Dashboard -> Run Changes -> Review Queue -> Repo Detail. "
@@ -4857,35 +4455,6 @@ def _print_control_center_summary(snapshot: dict) -> None:
             )
 
 
-def _should_print_control_center_item(item: dict) -> bool:
-    catalog = item.get("portfolio_catalog") or {}
-    lifecycle = str(catalog.get("lifecycle_state") or "").strip().lower()
-    intended = str(catalog.get("intended_disposition") or "").strip().lower()
-    program = str(catalog.get("maturity_program") or "").strip().lower()
-    operating_path = str(item.get("operating_path") or catalog.get("operating_path") or "").strip().lower()
-    if lifecycle in {"archived", "archive"}:
-        return False
-    if intended == "archive" or program == "archive" or operating_path == "archive":
-        return False
-    if lifecycle in {"experiment", "experimental"}:
-        return False
-    if intended == "experiment" or program == "experiment" or operating_path == "experiment":
-        return False
-    return True
-
-
-def _filter_control_center_snapshot_for_default_view(snapshot: dict) -> dict:
-    queue = snapshot.get("operator_queue")
-    if not isinstance(queue, list):
-        return snapshot
-    snapshot["operator_queue"] = [
-        item
-        for item in queue
-        if isinstance(item, dict) and _should_print_control_center_item(item)
-    ]
-    return snapshot
-
-
 def _fetch_repo_metadata(args, client: GitHubClient) -> tuple[list[RepoMetadata], list[dict]]:
     if args.graphql and args.token:
         from src.graphql_client import bulk_fetch_repos
@@ -5415,364 +4984,16 @@ def _run_auto_apply_approved_mode(args, output_dir: Path) -> None:
     print_info(f"Auto-apply complete: {total_applied} applied, {total_skipped} skipped.")
 
 
-def _load_release_count_by_name(*, output_dir: Path, username: str) -> dict[str, int] | None:
-    """Load release_count per project name from the latest audit report JSON.
-
-    Returns a dict mapping display_name -> release_count, or None if no audit
-    report is found (warning is logged).
-    """
-    import logging
-
-    _log = logging.getLogger(__name__)
-
-    audit_files = sorted(
-        output_dir.glob(f"audit-report-{username}-*.json"),
-        key=lambda p: p.stat().st_mtime,
-    )
-    if not audit_files:
-        _log.warning(
-            "--portfolio-truth-include-release-count requires a prior audit run; "
-            "no audit-report-%s-*.json found in %s — skipping release_count overlay",
-            username,
-            output_dir,
-        )
-        return None
-
-    audit_path = audit_files[-1]
-    try:
-        with audit_path.open() as fh:
-            data = json.load(fh)
-    except Exception as exc:  # noqa: BLE001
-        _log.warning(
-            "--portfolio-truth-include-release-count: could not read %s: %s — skipping",
-            audit_path,
-            exc,
-        )
-        return None
-
-    result: dict[str, int] = {}
-    for audit in data.get("audits") or []:
-        name = (audit.get("metadata") or {}).get("name")
-        if not name:
-            continue
-        for ar in audit.get("analyzer_results") or []:
-            if ar.get("dimension") == "activity":
-                rc = (ar.get("details") or {}).get("release_count")
-                if isinstance(rc, int):
-                    result[name] = rc
-                break
-    return result
-
-
-def _latest_audit_report_path(*, output_dir: Path, username: str) -> Path | None:
-    audit_files = sorted(
-        output_dir.glob(f"audit-report-{username}-*.json"),
-        key=lambda p: p.stat().st_mtime,
-    )
-    return audit_files[-1] if audit_files else None
-
-
-def _repo_status_entries_from_metadata(
-    repo_metadata: list[dict], *, source: str
-) -> dict[str, dict]:
-    result: dict[str, dict] = {}
-    for metadata in repo_metadata:
-        name = str(metadata.get("name") or "").strip()
-        full_name = str(metadata.get("full_name") or "").strip()
-        archived = metadata.get("archived")
-        if not name or not isinstance(archived, bool):
-            continue
-        entry = {"archived": archived, "full_name": full_name, "source": source}
-        result[name] = entry
-        repo_name = full_name.rsplit("/", 1)[-1] if full_name else ""
-        if repo_name:
-            result.setdefault(repo_name, entry)
-    return result
-
-
-def _load_live_repo_status_by_name(
-    *,
-    username: str,
-    token: str | None,
-    cache: ResponseCache | None,
-) -> dict[str, dict] | None:
-    """Fetch current GitHub repo archived flags using the existing REST client."""
-    import logging
-
-    _log = logging.getLogger(__name__)
-    try:
-        repos = GitHubClient(token=token, cache=cache).list_repos(username)
-    except Exception as exc:  # noqa: BLE001
-        _log.warning(
-            "--portfolio-truth: could not fetch live GitHub repo status for %s: %s — "
-            "falling back to latest audit report metadata",
-            username,
-            exc,
-        )
-        return None
-    return _repo_status_entries_from_metadata(repos, source="github_api")
-
-
-def _load_repo_status_from_audit_by_name(
-    *, output_dir: Path, username: str
-) -> dict[str, dict] | None:
-    """Load GitHub repo status metadata from the latest audit report JSON."""
-    import logging
-
-    _log = logging.getLogger(__name__)
-    audit_path = _latest_audit_report_path(output_dir=output_dir, username=username)
-    if audit_path is None:
-        return None
-
-    try:
-        with audit_path.open() as fh:
-            data = json.load(fh)
-    except Exception as exc:  # noqa: BLE001
-        _log.warning(
-            "--portfolio-truth: could not read repo status overlay from %s: %s — skipping",
-            audit_path,
-            exc,
-        )
-        return None
-
-    repo_metadata: list[dict] = []
-    for audit in data.get("audits") or []:
-        metadata = audit.get("metadata") or {}
-        if isinstance(metadata, dict):
-            repo_metadata.append(metadata)
-    return _repo_status_entries_from_metadata(repo_metadata, source="audit_report")
-
-
-def _load_security_alerts_by_name(*, output_dir: Path, username: str) -> dict[str, dict] | None:
-    """Load per-repo GHAS alert counts from the latest output/ghas-alerts-<username>-*.json.
-
-    The file is already keyed by display name in the shape SecurityFields expects
-    ({name: {"dependabot": {...}, "code_scanning": {...}, "secret_scanning": {...}}}),
-    so the overlay needs no transformation. Returns None (with a warning) if no GHAS
-    report is found — the security overlay is then skipped, leaving counts at zero.
-    """
-    import logging
-
-    _log = logging.getLogger(__name__)
-
-    ghas_files = sorted(
-        output_dir.glob(f"ghas-alerts-{username}-*.json"),
-        key=lambda p: p.stat().st_mtime,
-    )
-    if not ghas_files:
-        _log.warning(
-            "--portfolio-truth-include-security requires a prior `audit report --ghas-alerts` "
-            "run; no ghas-alerts-%s-*.json found in %s — skipping security overlay",
-            username,
-            output_dir,
-        )
-        return None
-
-    ghas_path = ghas_files[-1]
-    try:
-        with ghas_path.open() as fh:
-            data = json.load(fh)
-    except Exception as exc:  # noqa: BLE001
-        _log.warning(
-            "--portfolio-truth-include-security: could not read %s: %s — skipping",
-            ghas_path,
-            exc,
-        )
-        return None
-
-    if not isinstance(data, dict):
-        _log.warning(
-            "--portfolio-truth-include-security: %s is not a name-keyed object — skipping",
-            ghas_path,
-        )
-        return None
-    return {name: entry for name, entry in data.items() if isinstance(entry, dict)}
-
-
-WAREHOUSE_REPORT_STALE_DAYS = 7
-
-
-def _warn_if_warehouse_report_stale(output_dir: Path, username: str) -> None:
-    """Warn when the legacy warehouse report is missing or stale (F2).
-
-    Notion OS's external-signal-sync reads ``audit-report-<username>-*.json`` (the
-    3.7 warehouse report), but ``--portfolio-truth`` mode does NOT regenerate it —
-    the truth pipeline scans the workspace and never runs the GitHub audit that
-    produces warehouse data. Per the F2 "keep both artifacts live" decision, surface
-    the gap at generation time so the operator runs ``audit report <username>`` to
-    keep Notion's Repo Auditor signal fresh. Complements the cross-system-smoke C2
-    check, which catches the same drift at smoke time.
-    """
-    from datetime import date
-
-    report_path = _latest_audit_report_path(output_dir=output_dir, username=username)
-    if report_path is None:
-        print_warning(
-            f"No audit-report-{username}-*.json in {output_dir}: Notion's Repo Auditor "
-            f"signal reads that warehouse report and this --portfolio-truth run did not "
-            f"create one. Run `audit report {username}` to generate it (F2)."
-        )
-        return
-    match = re.search(r"(\d{4}-\d{2}-\d{2})", report_path.name)
-    if not match:
-        return
-    try:
-        report_date = date.fromisoformat(match.group(1))
-    except ValueError:
-        return
-    age = (date.today() - report_date).days
-    if age > WAREHOUSE_REPORT_STALE_DAYS:
-        print_warning(
-            f"Newest warehouse report {report_path.name} is {age}d old: Notion's Repo "
-            f"Auditor signal reads it and is now stale. Run `audit report {username}` to "
-            f"refresh the warehouse report (F2 — both artifacts kept live by decision)."
-        )
-
-
 def _run_portfolio_truth_mode(args) -> None:
-    from src.portfolio_truth_publish import PortfolioTruthPublishError, publish_portfolio_truth
+    from src.app.portfolio_truth import run_portfolio_truth_mode
 
-    output_dir = Path(args.output_dir)
-    workspace_root = Path(args.workspace_root)
-    registry_output = (
-        Path(args.registry_output)
-        if args.registry_output
-        else workspace_root / "project-registry.md"
-    )
-    portfolio_report_output = (
-        Path(args.portfolio_report_output)
-        if args.portfolio_report_output
-        else workspace_root / "PORTFOLIO-AUDIT-REPORT.md"
-    )
-    legacy_registry_path = Path(args.registry) if args.registry else registry_output
-
-    release_count_by_name: dict[str, int] | None = None
-    if getattr(args, "portfolio_truth_include_release_count", False):
-        release_count_by_name = _load_release_count_by_name(
-            output_dir=output_dir,
-            username=args.username,
-        )
-
-    security_alerts_by_name: dict[str, dict] | None = None
-    if getattr(args, "portfolio_truth_include_security", False):
-        security_alerts_by_name = _load_security_alerts_by_name(
-            output_dir=output_dir,
-            username=args.username,
-        )
-    repo_status_by_name = _load_live_repo_status_by_name(
-        username=args.username,
-        token=getattr(args, "token", None),
-        cache=None if getattr(args, "no_cache", False) else ResponseCache(),
-    )
-    if repo_status_by_name is None:
-        repo_status_by_name = _load_repo_status_from_audit_by_name(
-            output_dir=output_dir,
-            username=args.username,
-        )
-
-    try:
-        result = publish_portfolio_truth(
-            workspace_root=workspace_root,
-            output_dir=output_dir,
-            registry_output=registry_output,
-            portfolio_report_output=portfolio_report_output,
-            catalog_path=Path(args.catalog) if args.catalog else None,
-            legacy_registry_path=legacy_registry_path,
-            include_notion=True,
-            allow_empty_notion=getattr(args, "portfolio_truth_allow_empty_notion", False),
-            release_count_by_name=release_count_by_name,
-            security_alerts_by_name=security_alerts_by_name,
-            repo_status_by_name=repo_status_by_name,
-        )
-    except PortfolioTruthPublishError as exc:
-        raise SystemExit(str(exc)) from exc
-    print_info(f"Portfolio truth snapshot: {result.latest_path}")
-    print_info(f"Portfolio truth history snapshot: {result.snapshot_path}")
-    print_info(f"Project registry compatibility output: {result.registry_output}")
-    print_info(f"Portfolio audit compatibility output: {result.portfolio_report_output}")
-    print_info(
-        f"Portfolio truth generated for {result.project_count} projects "
-        f"(registry {'updated' if result.registry_changed else 'unchanged'}, "
-        f"report {'updated' if result.report_changed else 'unchanged'})"
-    )
-    _warn_if_warehouse_report_stale(output_dir, args.username)
+    run_portfolio_truth_mode(args)
 
 
 def _run_portfolio_context_recovery_mode(args) -> None:
-    from src.portfolio_context_recovery import (
-        apply_context_recovery_plan,
-        build_context_recovery_plan,
-        write_context_recovery_plan_artifacts,
-    )
-    from src.portfolio_truth_publish import publish_portfolio_truth
-    from src.portfolio_truth_reconcile import build_portfolio_truth_snapshot
+    from src.app.portfolio_truth import run_portfolio_context_recovery_mode
 
-    output_dir = Path(args.output_dir)
-    workspace_root = Path(args.workspace_root)
-    registry_output = (
-        Path(args.registry_output)
-        if args.registry_output
-        else workspace_root / "project-registry.md"
-    )
-    portfolio_report_output = (
-        Path(args.portfolio_report_output)
-        if args.portfolio_report_output
-        else workspace_root / "PORTFOLIO-AUDIT-REPORT.md"
-    )
-    legacy_registry_path = Path(args.registry) if args.registry else registry_output
-    catalog_path = Path(args.catalog) if args.catalog else None
-
-    build_result = build_portfolio_truth_snapshot(
-        workspace_root=workspace_root,
-        catalog_path=catalog_path,
-        legacy_registry_path=legacy_registry_path,
-        include_notion=True,
-    )
-    plan = build_context_recovery_plan(
-        build_result.snapshot,
-        workspace_root=workspace_root,
-        allow_dirty=bool(getattr(args, "allow_dirty_worktree", False)),
-    )
-    plan_json, plan_markdown = write_context_recovery_plan_artifacts(plan, output_dir=output_dir)
-    print_info(f"Context recovery plan JSON: {plan_json}")
-    print_info(f"Context recovery plan Markdown: {plan_markdown}")
-    eligible_count = sum(1 for project in plan.projects if project.status == "eligible")
-    skipped_count = sum(1 for project in plan.projects if project.status == "skipped")
-    excluded_count = sum(1 for project in plan.projects if project.status == "excluded")
-    print_info(
-        f"Frozen context-recovery cohort: {plan.target_project_count} targets "
-        f"({eligible_count} eligible, {skipped_count} skipped, {excluded_count} excluded)"
-    )
-
-    if not args.apply_context_recovery:
-        return
-
-    apply_result = apply_context_recovery_plan(
-        build_result.snapshot,
-        plan,
-        workspace_root=workspace_root,
-        catalog_path=catalog_path,
-        limit=args.context_recovery_limit,
-    )
-    if apply_result.failed_projects:
-        raise SystemExit("Context recovery failed for: " + ", ".join(apply_result.failed_projects))
-
-    truth_result = publish_portfolio_truth(
-        workspace_root=workspace_root,
-        output_dir=output_dir,
-        registry_output=registry_output,
-        portfolio_report_output=portfolio_report_output,
-        catalog_path=catalog_path,
-        legacy_registry_path=legacy_registry_path,
-        include_notion=True,
-    )
-    print_info(
-        f"Applied context recovery to {len(apply_result.updated_projects)} projects "
-        f"(skipped/excluded {len(apply_result.skipped_projects)})."
-    )
-    print_info(f"Portfolio truth snapshot: {truth_result.latest_path}")
-    print_info(f"Project registry compatibility output: {truth_result.registry_output}")
-    print_info(f"Portfolio audit compatibility output: {truth_result.portfolio_report_output}")
+    run_portfolio_context_recovery_mode(args)
 
 
 def _run_automation_proposals_mode(args) -> None:
@@ -7077,19 +6298,9 @@ def _run_semantic_search_mode(args: object, query: str) -> None:
 
 # ── Serve mode ───────────────────────────────────────────────────────────────
 def _run_serve_mode(args: object) -> None:
-    """Launch the local FastAPI + HTMX web UI (requires [serve] extra)."""
-    try:
-        from src.serve.app import run_serve
-    except ImportError:
-        import sys
+    from src.app.serve_mode import run_serve_mode
 
-        sys.exit("audit serve requires the [serve] extra.\nInstall with: pip install -e '.[serve]'")
-    output_dir = Path(getattr(args, "output_dir", "output"))
-    run_serve(
-        port=getattr(args, "port", 8080),
-        host=getattr(args, "host", "127.0.0.1"),
-        output_dir=output_dir,
-    )
+    run_serve_mode(args)
 
 
 # ── Subcommand inference for legacy flat invocation ───────────────────
@@ -7256,105 +6467,15 @@ def _rewrite_legacy_argv(argv: list[str]) -> tuple[list[str], bool]:
 
 
 def _run_security_burndown_mode(args) -> None:
-    """Dispatch for `audit security-burndown <username>`."""
-    import datetime
+    from src.app.security_modes import run_security_burndown_mode
 
-    from src.security_burndown import build_security_burndown, render_burndown_markdown
-
-    output_dir = Path(args.output_dir)
-    username = args.username
-
-    # Load latest ghas-alerts file (mirrors _load_security_alerts_by_name glob)
-    ghas_files = sorted(
-        output_dir.glob(f"ghas-alerts-{username}-*.json"),
-        key=lambda p: p.stat().st_mtime,
-    )
-    if not ghas_files:
-        print_info(
-            f"No ghas-alerts-{username}-*.json found in {output_dir}. "
-            "Run `audit report <username> --ghas-alerts` first."
-        )
-        raise SystemExit(1)
-
-    ghas_path = ghas_files[-1]
-    try:
-        with ghas_path.open() as fh:
-            ghas_data = json.load(fh)
-    except Exception as exc:  # noqa: BLE001
-        print_info(f"Could not read {ghas_path}: {exc}")
-        raise SystemExit(1)
-
-    if not isinstance(ghas_data, dict):
-        print_info(f"{ghas_path} is not a name-keyed object — cannot build burndown.")
-        raise SystemExit(1)
-
-    # Detect old counts-only files (no dependabot_details on any entry)
-    has_details = any(
-        isinstance(entry.get("dependabot_details"), list)
-        for entry in ghas_data.values()
-        if isinstance(entry, dict)
-    )
-    if not has_details:
-        print_info(
-            f"Warning: {ghas_path.name} contains counts only — no per-alert detail.\n"
-            "Re-run `audit report <username> --ghas-alerts` to capture detail, "
-            "then retry security-burndown."
-        )
-        raise SystemExit(0)
-
-    report = build_security_burndown(ghas_data)
-    markdown = render_burndown_markdown(report)
-
-    print(markdown)
-
-    today = datetime.date.today().isoformat()
-    out_path = output_dir / f"security-burndown-{username}-{today}.md"
-    out_path.write_text(markdown, encoding="utf-8")
-    print_info(f"Burndown written to {out_path}")
-
-    # JSON sidecar for structured consumers (e.g. PortfolioCommandCenter desktop
-    # shell), mirroring the per-project security overlay's JSON-first contract.
-    json_path = output_dir / f"security-burndown-{username}-{today}.json"
-    json_path.write_text(json.dumps(report.to_dict(), indent=2), encoding="utf-8")
-    print_info(f"Burndown JSON written to {json_path}")
+    run_security_burndown_mode(args)
 
 
 def _run_security_gate_mode(args) -> None:
-    """Dispatch for `audit security-gate`."""
-    from src.portfolio_security_gate import (
-        build_security_gate_report,
-        render_security_gate_markdown,
-    )
+    from src.app.security_modes import run_security_gate_mode
 
-    truth_path = Path(args.output_dir) / TRUTH_LATEST_FILENAME
-    if not truth_path.exists():
-        print_info(
-            f"{TRUTH_LATEST_FILENAME} not found in {truth_path.parent}. "
-            "Run `audit report <username> --portfolio-truth --portfolio-truth-include-security` first."
-        )
-        raise SystemExit(1)
-
-    try:
-        with truth_path.open(encoding="utf-8") as fh:
-            portfolio_truth = json.load(fh)
-    except Exception as exc:  # noqa: BLE001
-        print_info(f"Could not read {truth_path}: {exc}")
-        raise SystemExit(1)
-
-    if not isinstance(portfolio_truth, dict):
-        print_info(f"{truth_path} is not a portfolio-truth object.")
-        raise SystemExit(1)
-
-    report = build_security_gate_report(
-        portfolio_truth,
-        max_age_hours=getattr(args, "max_age_hours", None),
-    )
-    if getattr(args, "json", False):
-        print(json.dumps(report.to_dict(), indent=2))
-    else:
-        print(render_security_gate_markdown(report))
-    if not report.passed:
-        raise SystemExit(1)
+    run_security_gate_mode(args)
 
 
 # ── Main entry point ──────────────────────────────────────────────────
