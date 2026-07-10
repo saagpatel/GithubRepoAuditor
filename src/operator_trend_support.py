@@ -79,6 +79,48 @@ def target_specific_normalization_noise(target: dict, history_meta: dict) -> boo
     )
 
 
+def clamp_round(value: float, *, lower: float, upper: float) -> float:
+    return round(max(lower, min(upper, value)), 2)
+
+
+def closure_forecast_direction_majority(directions: list[str]) -> str:
+    confirmation_count = sum(
+        1 for direction in directions if direction == "supporting-confirmation"
+    )
+    clearance_count = sum(
+        1 for direction in directions if direction == "supporting-clearance"
+    )
+    if confirmation_count > clearance_count:
+        return "supporting-confirmation"
+    if clearance_count > confirmation_count:
+        return "supporting-clearance"
+    return "neutral"
+
+
+def closure_forecast_direction_reversing(
+    current_direction: str, earlier_majority: str
+) -> bool:
+    if current_direction == "neutral" or earlier_majority == "neutral":
+        return False
+    return current_direction != earlier_majority
+
+
+def class_direction_flip_count(directions: list[str]) -> int:
+    non_neutral = [direction for direction in directions if direction != "neutral"]
+    if len(non_neutral) < 2:
+        return 0
+    return sum(
+        1
+        for previous, current in zip(non_neutral, non_neutral[1:])
+        if current != previous
+    )
+
+
+def target_label(item: dict) -> str:
+    repo = f"{item.get('repo')}: " if item.get("repo") else ""
+    return f"{repo}{item.get('title', '')}".strip(": ")
+
+
 GENERIC_RECOMMENDATION_PHRASES = (
     "continue the normal audit/control-center loop",
     "continue the normal operator loop",

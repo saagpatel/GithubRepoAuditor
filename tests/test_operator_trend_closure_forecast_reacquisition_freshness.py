@@ -1,38 +1,17 @@
 from __future__ import annotations
 
-from src.operator_trend_closure_forecast_freshness_controls import closure_forecast_freshness_status
-from src.operator_trend_closure_forecast_reacquisition_controls import (
-    closure_forecast_reacquisition_side_from_event,
-    closure_forecast_reacquisition_side_from_status,
-)
 from src.operator_trend_closure_forecast_reacquisition_controls import (
     apply_reacquisition_freshness_reset_control,
     closure_forecast_persistence_reset_summary,
     closure_forecast_reacquisition_freshness_for_target,
     closure_forecast_reacquisition_freshness_hotspots,
-    closure_forecast_reacquisition_freshness_reason,
     closure_forecast_reacquisition_freshness_summary,
-    reacquisition_event_has_evidence,
-    reacquisition_event_is_clearance_like,
-    reacquisition_event_is_confirmation_like,
-    reacquisition_event_signal_label,
-    recent_reacquisition_signal_mix,
 )
 
 
-def _target_class_key(item: dict) -> str:
-    return f"{item.get('lane', '')}:{item.get('kind', '') or 'unknown'}"
-
-
-def _target_label(item: dict) -> str:
-    return item.get("title", "") or item.get("kind", "") or "target"
-
-
-def _target_specific_normalization_noise(target: dict, history_meta: dict) -> bool:
-    return bool(target.get("local_noise") or history_meta.get("current_transition_reversed"))
-
-
-def test_closure_forecast_reacquisition_freshness_for_target_reports_fresh_signal() -> None:
+def test_closure_forecast_reacquisition_freshness_for_target_reports_fresh_signal() -> (
+    None
+):
     target = {
         "lane": "urgent",
         "kind": "config",
@@ -59,41 +38,16 @@ def test_closure_forecast_reacquisition_freshness_for_target_reports_fresh_signa
         },
     ]
 
-    freshness_meta = closure_forecast_reacquisition_freshness_for_target(
-        target,
-        events,
-        target_class_key=_target_class_key,
-        reacquisition_event_has_evidence=lambda event: reacquisition_event_has_evidence(
-            event,
-            reacquisition_event_is_confirmation_like=reacquisition_event_is_confirmation_like,
-            reacquisition_event_is_clearance_like=reacquisition_event_is_clearance_like,
-        ),
-        reacquisition_event_signal_label=lambda event: reacquisition_event_signal_label(
-            event,
-            reacquisition_event_is_confirmation_like=reacquisition_event_is_confirmation_like,
-            reacquisition_event_is_clearance_like=reacquisition_event_is_clearance_like,
-        ),
-        closure_forecast_reacquisition_side_from_status=closure_forecast_reacquisition_side_from_status,
-        closure_forecast_reacquisition_side_from_event=closure_forecast_reacquisition_side_from_event,
-        class_memory_recency_weights=[1.0, 0.8, 0.6, 0.4],
-        history_window_runs=4,
-        class_reacquisition_freshness_window_runs=2,
-        freshness_status=closure_forecast_freshness_status,
-        freshness_reason=lambda *args: closure_forecast_reacquisition_freshness_reason(
-            *args,
-            class_reacquisition_freshness_window_runs=2,
-        ),
-        recent_signal_mix=recent_reacquisition_signal_mix,
-        reacquisition_event_is_confirmation_like=reacquisition_event_is_confirmation_like,
-        reacquisition_event_is_clearance_like=reacquisition_event_is_clearance_like,
-    )
+    freshness_meta = closure_forecast_reacquisition_freshness_for_target(target, events)
 
     assert freshness_meta["closure_forecast_reacquisition_freshness_status"] == "fresh"
-    assert freshness_meta["closure_forecast_reacquisition_memory_weight"] == 0.75
+    assert freshness_meta["closure_forecast_reacquisition_memory_weight"] == 0.74
     assert freshness_meta["has_fresh_aligned_recent_evidence"] is True
 
 
-def test_apply_reacquisition_freshness_reset_control_resets_clearance_when_aged_out() -> None:
+def test_apply_reacquisition_freshness_reset_control_resets_clearance_when_aged_out() -> (
+    None
+):
     updates = apply_reacquisition_freshness_reset_control(
         {
             "closure_forecast_recovery_churn_status": "churn",
@@ -126,9 +80,6 @@ def test_apply_reacquisition_freshness_reset_control_resets_clearance_when_aged_
         persistence_score=-0.4,
         persistence_status="sustained-clearance",
         persistence_reason="",
-        closure_forecast_reacquisition_side_from_status=closure_forecast_reacquisition_side_from_status,
-        closure_forecast_reacquisition_side_from_event=closure_forecast_reacquisition_side_from_event,
-        target_specific_normalization_noise=_target_specific_normalization_noise,
     )
 
     assert updates["closure_forecast_persistence_reset_status"] == "clearance-reset"
@@ -136,7 +87,9 @@ def test_apply_reacquisition_freshness_reset_control_resets_clearance_when_aged_
     assert updates["closure_forecast_reacquisition_status"] == "none"
 
 
-def test_closure_forecast_reacquisition_freshness_hotspots_and_summaries_track_dominant_classes() -> None:
+def test_closure_forecast_reacquisition_freshness_hotspots_and_summaries_track_dominant_classes() -> (
+    None
+):
     targets = [
         {
             "lane": "urgent",
@@ -159,18 +112,18 @@ def test_closure_forecast_reacquisition_freshness_hotspots_and_summaries_track_d
     stale_hotspots = closure_forecast_reacquisition_freshness_hotspots(
         targets,
         mode="stale",
-        target_class_key=_target_class_key,
     )
     fresh_hotspots = closure_forecast_reacquisition_freshness_hotspots(
         targets,
         mode="fresh",
-        target_class_key=_target_class_key,
     )
     freshness_summary = closure_forecast_reacquisition_freshness_summary(
-        {"title": "RepoC", "closure_forecast_reacquisition_freshness_status": "mixed-age"},
+        {
+            "title": "RepoC",
+            "closure_forecast_reacquisition_freshness_status": "mixed-age",
+        },
         stale_hotspots,
         fresh_hotspots,
-        target_label=_target_label,
     )
     reset_summary = closure_forecast_persistence_reset_summary(
         {
@@ -182,7 +135,6 @@ def test_closure_forecast_reacquisition_freshness_hotspots_and_summaries_track_d
         },
         stale_hotspots,
         fresh_hotspots,
-        target_label=_target_label,
     )
 
     assert stale_hotspots[0]["label"] == "blocked:setup"
