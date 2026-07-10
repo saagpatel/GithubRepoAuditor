@@ -695,11 +695,13 @@ def test_main_approval_center_writes_artifacts_without_apply(monkeypatch, tmp_pa
 
     monkeypatch.setattr(cli, "build_parser", lambda: FakeParser(args))
     monkeypatch.setattr(
-        cli,
-        "_refresh_latest_report_state",
+        "src.app.approval_center.refresh_latest_report_state",
         lambda _output_dir, _args: (tmp_path / "audit-report-testuser-2026-03-29.json", {}, report),
     )
-    monkeypatch.setattr(cli, "_write_approval_center_artifacts", _write_approval_center_artifacts)
+    monkeypatch.setattr(
+        "src.app.approval_center.write_approval_center_artifacts",
+        _write_approval_center_artifacts,
+    )
 
     cli.main()
 

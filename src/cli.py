@@ -2076,7 +2076,7 @@ def _run_control_center_mode(args, parser) -> None:
     print_info(_control_center_next_step_hint())
 
 
-def _run_approval_center_mode(args, parser) -> None:
+def _legacy_run_approval_center_mode(args, parser) -> None:
     report_output_dir = Path(args.output_dir)
     try:
         _report_path, _diff_dict, report = _refresh_latest_report_state(report_output_dir, args)
@@ -2101,10 +2101,10 @@ def _run_approval_center_mode(args, parser) -> None:
     print_info(f"Approval center Markdown: {approval_md}")
 
     # ── Post-process: update suppression hints ────────────────────────────────
-    _post_process_approval_center_prefs(payload, report_output_dir)
+    _legacy_post_process_approval_center_prefs(payload, report_output_dir)
 
 
-def _post_process_approval_center_prefs(payload: dict, output_dir: Path) -> None:
+def _legacy_post_process_approval_center_prefs(payload: dict, output_dir: Path) -> None:
     """Build rejection records from the approval ledger and update operator_prefs.json."""
     from src.operator_prefs import (
         load_rejection_events,
@@ -2124,6 +2124,12 @@ def _post_process_approval_center_prefs(payload: dict, output_dir: Path) -> None
         logging.getLogger(__name__).warning(
             "operator_prefs post-process failed (non-fatal): %s", exc
         )
+
+
+def _run_approval_center_mode(args, parser) -> None:
+    from src.app.approval_center import run_approval_center_mode
+
+    run_approval_center_mode(args, parser)
 
 
 def _run_approval_capture_mode(args, parser) -> None:
