@@ -98,7 +98,6 @@ class RepoAudit:
     interest_tier: str = "mundane"
     grade: str = "F"
     interest_grade: str = "F"
-    context_quality_score: float = 0.0
     badges: list[str] = field(default_factory=list)
     next_badges: list[dict] = field(default_factory=list)
     flags: list[str] = field(default_factory=list)
@@ -113,6 +112,8 @@ class RepoAudit:
     ossf_scorecard: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
+        from src.context_quality import context_quality_score_for_audit
+
         return {
             "metadata": self.metadata.to_dict(),
             "analyzer_results": [r.to_dict() for r in self.analyzer_results],
@@ -134,7 +135,7 @@ class RepoAudit:
             "portfolio_catalog": self.portfolio_catalog,
             "scorecard": self.scorecard,
             "ossf_scorecard": self.ossf_scorecard,
-            "context_quality_score": round(self.context_quality_score, 3),
+            "context_quality_score": round(context_quality_score_for_audit(self), 3),
         }
 
 

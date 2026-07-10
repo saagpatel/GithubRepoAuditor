@@ -3,41 +3,45 @@ from __future__ import annotations
 import hashlib
 import json
 import time
+from urllib.parse import parse_qsl, urlparse
 from pathlib import Path
 from typing import Any
 
 CACHE_DIR = Path("output/.cache")
 CACHE_TTL = 3600  # 1 hour
-_SENSITIVE_FIELD_FRAGMENTS = (
+_SENSITIVE_FIELD_NAMES = frozenset(
+    {
+        "access_token",
     "api_key",
     "apikey",
     "authorization",
-    "credential",
+        "client_secret",
+        "credential",
     "password",
     "private_key",
-    "secret",
-    "token",
+        "github_token",
+        "secret",
+        "token",
+    }
 )
-_SENSITIVE_EXACT_FIELDS = {
-    "latest_trusted_baseline",
-}
 
 
-def redact_sensitive_data(value: Any) -> Any:
-    """Return a JSON-compatible copy with credential-shaped fields redacted."""
+def contains_sensitive_data(value: Any) -> bool:
+    """Return whether JSON-compatible data contains a credential field."""
     if isinstance(value, dict):
-        return {
-            key: "[REDACTED]"
-            if str(key).lower() in _SENSITIVE_EXACT_FIELDS
-            or any(fragment in str(key).lower() for fragment in _SENSITIVE_FIELD_FRAGMENTS)
-            else redact_sensitive_data(item)
+        return any(
+            str(key).lower() in _SENSITIVE_FIELD_NAMES or contains_sensitive_data(item)
             for key, item in value.items()
-        }
+        )
     if isinstance(value, list):
-        return [redact_sensitive_data(item) for item in value]
+        return any(contains_sensitive_data(item) for item in value)
     if isinstance(value, tuple):
-        return tuple(redact_sensitive_data(item) for item in value)
-    return value
+        return any(contains_sensitive_data(item) for item in value)
+    return False
+
+
+def _url_has_sensitive_query(url: str) -> bool:
+    return any(name.lower() in _SENSITIVE_FIELD_NAMES for name, _value in parse_qsl(urlparse(url).query))
 
 
 class ResponseCache:
@@ -81,11 +85,13 @@ class ResponseCache:
         response: object,
     ) -> None:
         """Store response data with current timestamp."""
+        if _url_has_sensitive_query(url) or contains_sensitive_data(params) or contains_sensitive_data(response):
+            return
         path = self._path(url, params)
         entry = {
             "url": url,
-            "params": redact_sensitive_data(params),
-            "response": redact_sensitive_data(response),
+            "params": params,
+            "response": response,
             "cached_at": time.time(),
         }
         try:

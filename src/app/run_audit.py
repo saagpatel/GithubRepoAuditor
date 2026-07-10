@@ -50,7 +50,7 @@ from src.reporter import (
 )
 from src.scorer import score_repo
 from src.terminology import ACTION_SYNC_CANONICAL_LABELS
-_unused_legacy_warning_events: set[str] = set()
+_LEGACY_WARNING_EVENTS: set[str] = set()
 DEFAULT_ANALYSIS_WORKERS = 1
 MAX_ANALYSIS_WORKERS = 8
 DEFAULT_PORTFOLIO_WORKSPACE = Path.home() / "Projects"
@@ -83,7 +83,7 @@ Legacy flat form (deprecated, still supported):
   audit <github-username> --html
   audit <github-username> --control-center
   audit <github-username> --campaign security-review --writeback-target all --github-projects"""
-_unused_known_subcommands: frozenset[str] = frozenset(
+_KNOWN_SUBCOMMANDS: frozenset[str] = frozenset(
     {"run", "triage", "report", "serve", "security-burndown", "security-gate"}
 )
 

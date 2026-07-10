@@ -15,26 +15,16 @@ GENERIC_RECOMMENDATION_PHRASES = (
 
 
 def control_center_artifact_payload(report_data: dict, snapshot: dict) -> dict:
-    watch_state = dict(report_data.get("watch_state") or {})
-    watch_state.pop("latest_trusted_baseline", None)
-
-    operator_summary = dict(snapshot.get("operator_summary") or {})
-    operator_summary.pop("latest_trusted_baseline", None)
-    operator_watch_decision = dict(operator_summary.get("operator_watch_decision") or {})
-    operator_watch_decision.pop("latest_trusted_baseline", None)
-    if operator_watch_decision:
-        operator_summary["operator_watch_decision"] = operator_watch_decision
-
     return {
         "username": report_data.get("username", "unknown"),
         "generated_at": report_data.get("generated_at", ""),
         "report_reference": report_data.get("latest_report_path", ""),
-        "watch_state": watch_state,
+        "watch_state": report_data.get("watch_state", {}),
         "campaign_summary": report_data.get("campaign_summary", {}),
         "writeback_preview": report_data.get("writeback_preview", {}),
         "writeback_results": report_data.get("writeback_results", {}),
         "managed_state_drift": report_data.get("managed_state_drift", []),
-        "operator_summary": operator_summary,
+        "operator_summary": snapshot.get("operator_summary", {}),
         "operator_queue": snapshot.get("operator_queue", []),
         "portfolio_outcomes_summary": snapshot.get("portfolio_outcomes_summary", {}),
         "operator_effectiveness_summary": snapshot.get("operator_effectiveness_summary", {}),

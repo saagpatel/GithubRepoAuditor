@@ -53,7 +53,7 @@ class TestResponseCache:
         assert result1 == [{"sha": "abc"}]
         assert result2 == [{"sha": "def"}]
 
-    def test_put_redacts_credentials_without_changing_public_response_fields(self, tmp_path):
+    def test_put_skips_payloads_that_contain_credentials(self, tmp_path):
         cache = ResponseCache(cache_dir=tmp_path / "cache", ttl=3600)
         url = "https://api.github.com/repos/user/repo"
 
@@ -63,12 +63,16 @@ class TestResponseCache:
             {"name": "repo", "nested": {"client_secret": "secret-value"}},
         )
 
-        entry = json.loads(cache._path(url, {"access_token": "secret-param", "per_page": "10"}).read_text())
-        assert entry["params"] == {"access_token": "[REDACTED]", "per_page": "10"}
-        assert entry["response"] == {
-            "name": "repo",
-            "nested": {"client_secret": "[REDACTED]"},
-        }
+        assert not cache._path(url, {"access_token": "secret-param", "per_page": "10"}).exists()
+
+    def test_put_preserves_noncredential_secret_scanning_shape(self, tmp_path):
+        cache = ResponseCache(cache_dir=tmp_path / "cache", ttl=3600)
+        url = "https://api.github.com/repos/user/repo"
+        response = {"security_and_analysis": {"secret_scanning": {"status": "enabled"}}}
+
+        cache.put(url, None, response)
+
+        assert cache.get(url, None) == response
 
     def test_cache_creates_dir(self, tmp_path):
         cache_dir = tmp_path / "deep" / "nested" / "cache"
