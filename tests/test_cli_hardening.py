@@ -585,7 +585,9 @@ programs:
         "operator_queue": [dict(report.operator_queue[0])],
     }
 
-    updated = cli._enrich_control_center_snapshot_from_report(
+    from src.control_center_snapshot import enrich_control_center_snapshot_from_report
+
+    updated = enrich_control_center_snapshot_from_report(
         report.to_dict(),
         snapshot,
         _make_args(catalog=catalog_path, scorecards=scorecards_path),
@@ -642,7 +644,9 @@ repos:
     ]
     snapshot = {"operator_summary": {}, "operator_queue": [dict(report.operator_queue[0])]}
 
-    updated = cli._enrich_control_center_snapshot_from_report(
+    from src.control_center_snapshot import enrich_control_center_snapshot_from_report
+
+    updated = enrich_control_center_snapshot_from_report(
         report.to_dict(),
         snapshot,
         _make_args(catalog=catalog_path),
