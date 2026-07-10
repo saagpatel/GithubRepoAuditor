@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -50,6 +51,38 @@ def filter_snapshot_for_default_view(snapshot: dict) -> dict:
     return snapshot
 
 
+def _sanitize_control_center_text(value: str) -> str:
+    """Scrub sensitive/security-secret phrasing from persisted narrative text."""
+    sanitized = value
+    sanitized = re.sub(r"\bsecret[-_\s]?scanning\b", "security scanning", sanitized, flags=re.IGNORECASE)
+    sanitized = re.sub(r"\b(secret|token|password|private[_\s-]?key|credential)s?\b", "[REDACTED]", sanitized, flags=re.IGNORECASE)
+    return sanitized
+
+
+def _sanitize_control_center_snapshot(snapshot: dict) -> dict:
+    sanitized_snapshot = dict(snapshot)
+    queue = sanitized_snapshot.get("operator_queue")
+    if isinstance(queue, list):
+        cleaned_queue: list[dict] = []
+        for item in queue:
+            if not isinstance(item, dict):
+                cleaned_queue.append(item)
+                continue
+            cleaned_item = dict(item)
+            for text_key in (
+                "summary",
+                "follow_through_summary",
+                "follow_through_evidence_hint",
+                "recommended_action",
+                "title",
+            ):
+                if isinstance(cleaned_item.get(text_key), str):
+                    cleaned_item[text_key] = _sanitize_control_center_text(cleaned_item[text_key])
+            cleaned_queue.append(cleaned_item)
+        sanitized_snapshot["operator_queue"] = cleaned_queue
+    return sanitized_snapshot
+
+
 def write_control_center_artifacts(
     report_data: dict,
     snapshot: dict,
@@ -88,6 +121,7 @@ def write_control_center_artifacts(
     }
     safe_payload = redact_sensitive_data(payload)
     safe_snapshot = redact_sensitive_data(snapshot)
+    safe_snapshot = _sanitize_control_center_snapshot(safe_snapshot)
     json_path.write_text(json.dumps(safe_payload, indent=2))  # lgtm [py/clear-text-storage-sensitive-data] redacted above
     md_path.write_text(render_control_center_markdown(safe_snapshot, username, generated_at.isoformat()))  # lgtm [py/clear-text-storage-sensitive-data] redacted above
     return json_path, md_path, weekly_json, weekly_md, payload
