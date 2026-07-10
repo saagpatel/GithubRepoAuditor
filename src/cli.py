@@ -63,6 +63,7 @@ from src.report_state import (
 from src.report_operating_paths import apply_operating_paths as _apply_operating_paths
 from src.report_portfolio_catalog import apply_portfolio_catalog as _apply_portfolio_catalog
 from src.report_scorecards import apply_scorecards as _apply_scorecards
+from src.report_operator_state import enrich_report_with_operator_state as _enrich_report_with_operator_state
 from src.reporter import (
     write_json_report,
     write_markdown_report,
@@ -5351,7 +5352,7 @@ def _apply_ops_writeback(
     report.campaign_history = report.action_runs + historical_entries[:20]
 
 
-def _enrich_report_with_operator_state(
+def _legacy_enrich_report_with_operator_state(
     report: AuditReport,
     *,
     output_dir: Path,
