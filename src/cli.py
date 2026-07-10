@@ -2252,7 +2252,7 @@ def _run_approval_capture_mode(args, parser) -> None:
     run_approval_capture_mode(args, parser)
 
 
-def _run_acknowledgment_capture_mode(args, parser) -> None:
+def _legacy_run_acknowledgment_capture_mode(args, parser) -> None:
     from src.diff import diff_reports
     from src.history import find_previous
     from src.operator_acknowledgments import (
@@ -2326,6 +2326,12 @@ def _run_acknowledgment_capture_mode(args, parser) -> None:
 
     print_info(f"Acknowledgment store: {saved_path}")
     print_info("Run --control-center to confirm the item is filtered from the queue.")
+
+
+def _run_acknowledgment_capture_mode(args, parser) -> None:
+    from src.app.acknowledgments import run_acknowledgment_capture_mode
+
+    run_acknowledgment_capture_mode(args, parser)
 
 
 def _run_doctor_mode(args, config_inspection) -> None:
