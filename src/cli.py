@@ -57,6 +57,7 @@ from src.report_state import (
     audit_from_dict as _audit_from_dict,
     load_latest_report as _load_latest_report,
     parse_iso_datetime as _parse_iso_dt,
+    report_from_dict as _report_from_dict,
     report_artifact_datetime as _report_artifact_datetime,
 )
 from src.report_operating_paths import apply_operating_paths as _apply_operating_paths
@@ -1711,7 +1712,7 @@ def _normalize_profile_name(profile_name: str | None) -> str:
     return normalize_scoring_profile(profile_name)
 
 
-def _report_from_dict(data: dict) -> AuditReport:
+def _legacy_report_from_dict(data: dict) -> AuditReport:
     from src.registry_parser import RegistryReconciliation
 
     reconciliation = None
