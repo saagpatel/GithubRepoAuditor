@@ -83,8 +83,8 @@ def run_list_initiatives_mode(args) -> None:
                 name = project.get("identity", {}).get("display_name", "")
                 if name:
                     projects_by_name[name.lower()] = project
-        except (OSError, ValueError):
-            pass
+        except (OSError, ValueError) as exc:
+            print_warning(f"Unable to read/parse {pt_path}: {exc}")
     open_initiatives = [item for item in initiatives if item.closed_at is None]
     closed_initiatives = [item for item in initiatives if item.closed_at is not None]
     print_info("Initiative Tracker")
