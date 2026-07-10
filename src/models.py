@@ -37,7 +37,9 @@ class RepoMetadata:
     topics: list[str] = field(default_factory=list)
 
     @classmethod
-    def from_api_response(cls, data: dict, languages: dict[str, int] | None = None) -> RepoMetadata:
+    def from_api_response(
+        cls, data: dict, languages: dict[str, int] | None = None
+    ) -> RepoMetadata:
         """Build RepoMetadata from a GitHub API repo object."""
         return cls(
             name=data["name"],
@@ -285,7 +287,9 @@ class AuditReport:
         # Language distribution
         from collections import Counter
 
-        lang_dist = dict(Counter(a.metadata.language or "Unknown" for a in audits).most_common())
+        lang_dist = dict(
+            Counter(a.metadata.language or "Unknown" for a in audits).most_common()
+        )
 
         # Summary lists (top/bottom 5)
         sorted_by_score = sorted(audits, key=lambda a: a.overall_score, reverse=True)
@@ -328,7 +332,9 @@ class AuditReport:
 
         # Best work: top 5 by weighted combo
         best = sorted(
-            audits, key=lambda a: a.overall_score * 0.6 + a.interest_score * 0.4, reverse=True
+            audits,
+            key=lambda a: a.overall_score * 0.6 + a.interest_score * 0.4,
+            reverse=True,
         )
         best_work = [a.metadata.name for a in best[:5]]
         portfolio_lenses = portfolio_intelligence.build_portfolio_lens_summary(audits)
@@ -339,7 +345,9 @@ class AuditReport:
         implementation_hotspots_summary = (
             implementation_hotspots.build_implementation_hotspots_summary(audits)
         )
-        portfolio_security = portfolio_intelligence.build_portfolio_security_posture(audits)
+        portfolio_security = portfolio_intelligence.build_portfolio_security_posture(
+            audits
+        )
         security_governance_preview = (
             portfolio_intelligence.build_portfolio_security_governance_preview(audits)
         )
@@ -540,5 +548,7 @@ class AuditReport:
             },
             "audits": [a.to_dict() for a in self.audits],
             "errors": self.errors,
-            "reconciliation": self.reconciliation.to_dict() if self.reconciliation else None,
+            "reconciliation": self.reconciliation.to_dict()
+            if self.reconciliation
+            else None,
         }

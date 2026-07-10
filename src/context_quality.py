@@ -1,11 +1,12 @@
 # src/context_quality.py
 """Composite context_quality_score computation (Arc H H.4)."""
+
 from __future__ import annotations
 
 # Weights must sum to 1.0.
 _WEIGHTS = {
     "description_confidence": 0.30,
-    "readme_freshness": 0.25,      # inverted from readme_stale_by_age
+    "readme_freshness": 0.25,  # inverted from readme_stale_by_age
     "catalog_completeness": 0.25,
     "completeness_score": 0.20,
 }
