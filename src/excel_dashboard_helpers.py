@@ -774,7 +774,7 @@ def _write_dashboard_distribution_charts(
 
     grade_dist = {}
     for audit in audits:
-        grade = audit.get("grade", "F")
+        grade = audit.get("grade", "F").split(" ", 1)[0]
         grade_dist[grade] = grade_dist.get(grade, 0) + 1
     grade_label_col = 27
     grade_value_col = 28

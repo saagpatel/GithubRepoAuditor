@@ -52,6 +52,8 @@ ALL_REPOS_HEADERS = [
     "Size (KB)",
     "Trend",
     "Risk Tier",
+    "Scored Dimensions",
+    "Scored Weight Sum",
 ]
 
 ALL_REPOS_LONG_TEXT_HEADERS = ("Description", "Topics", "Badges")
@@ -60,7 +62,7 @@ ALL_REPOS_SCORE_COLUMN = 3
 ALL_REPOS_INTEREST_COLUMN = 4
 ALL_REPOS_TIER_COLUMN = 7
 ALL_REPOS_PATTERN_COLUMN = 12
-ALL_REPOS_TREND_COLUMN_OFFSET = 1
+ALL_REPOS_TREND_COLUMN_OFFSET = 3
 ALL_REPOS_LONG_TEXT_WIDTH = 60
 
 
@@ -144,6 +146,8 @@ def build_all_repo_rows(
                     metadata.get("size_kb", 0),
                     render_sparkline(trend_scores),
                     (risk_lookup or {}).get(str(repo_name), ""),
+                    ", ".join(audit.get("scored_dimensions", [])),
+                    round(audit.get("scored_weight_sum", 0), 3),
                 ],
             }
         )
