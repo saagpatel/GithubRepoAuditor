@@ -161,6 +161,103 @@ def test_schema_pin_passes(tmp_path: Path) -> None:
     assert result.passed
 
 
+def test_legacy_schema_remains_readable_during_migration(tmp_path: Path) -> None:
+    truth, markdown = _passing_paths(tmp_path)
+    _write_truth(truth, schema_version="0.7.0")
+
+    result = lint_operator_os_seams(truth_path=truth, markdown_paths=markdown, now=NOW)
+
+    assert result.passed
+
+
+def test_contract_shadow_marks_legacy_lineage_unknown_without_failing(
+    tmp_path: Path,
+) -> None:
+    truth, markdown = _passing_paths(tmp_path)
+    _write_truth(truth, schema_version="0.7.0")
+
+    result = lint_operator_os_seams(
+        truth_path=truth,
+        markdown_paths=markdown,
+        contract_shadow=True,
+        now=NOW,
+    )
+
+    assert result.passed
+    assert result.state == "unknown"
+    assert {finding.check for finding in result.findings} == {
+        "CL-PROD-001",
+        "CL-INP-001",
+        "CL-COUNT-001",
+    }
+
+
+def test_contract_shadow_fails_unreconciled_decision_counts(tmp_path: Path) -> None:
+    truth, markdown = _passing_paths(tmp_path)
+    payload = json.loads(truth.read_text())
+    payload.update(
+        {
+            "producer": {},
+            "inputs": {
+                "notion": {"mode": "unavailable"},
+                "catalog": {"sha256": None},
+            },
+            "source_summary": {"attention_state_counts": {"decision-needed": 1}},
+            "rollups": {"decision": {"decision_needed_count": 0}},
+        }
+    )
+    truth.write_text(json.dumps(payload))
+
+    result = lint_operator_os_seams(
+        truth_path=truth,
+        markdown_paths=markdown,
+        contract_shadow=True,
+        catalog_path=tmp_path / "missing-catalog.yaml",
+        now=NOW,
+    )
+
+    assert not result.passed
+    assert result.state == "fail"
+    assert any(finding.check == "CL-COUNT-001" for finding in result.findings)
+
+
+def test_contract_shadow_warns_for_carried_notion_older_than_48_hours(
+    tmp_path: Path,
+) -> None:
+    truth, markdown = _passing_paths(tmp_path)
+    payload = json.loads(truth.read_text())
+    payload.update(
+        {
+            "producer": {},
+            "inputs": {
+                "notion": {
+                    "mode": "carried-forward",
+                    "carried_from_generated_at": "2026-07-01T00:00:00+00:00",
+                },
+                "catalog": {"sha256": None},
+            },
+            "source_summary": {"attention_state_counts": {"decision-needed": 0}},
+            "rollups": {"decision": {"decision_needed_count": 0}},
+        }
+    )
+    truth.write_text(json.dumps(payload))
+
+    result = lint_operator_os_seams(
+        truth_path=truth,
+        markdown_paths=markdown,
+        contract_shadow=True,
+        catalog_path=tmp_path / "missing-catalog.yaml",
+        now=NOW,
+    )
+
+    assert result.passed
+    assert result.state == "warn"
+    assert any(
+        finding.check == "CL-FRESH-002" and finding.level == "warn"
+        for finding in result.findings
+    )
+
+
 def test_schema_pin_mismatch_fails(tmp_path: Path) -> None:
     truth, markdown = _passing_paths(tmp_path)
     _write_truth(truth, schema_version="0.6.0")

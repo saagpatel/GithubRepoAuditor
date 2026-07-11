@@ -1,0 +1,5 @@
+{
+  "fixture_id": "notion_carried_fresh",
+  "source": {"mode": "carried-forward", "age_hours": 12, "origin_known": true},
+  "expected": {"CL-FRESH-002": "pass"}
+}

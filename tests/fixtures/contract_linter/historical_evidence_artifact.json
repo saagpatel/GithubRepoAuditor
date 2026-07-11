@@ -1,0 +1,5 @@
+{
+  "fixture_id": "historical_evidence_artifact",
+  "artifact_role": "evidence-history",
+  "expected": {"CL-PROD-001": "pass"}
+}

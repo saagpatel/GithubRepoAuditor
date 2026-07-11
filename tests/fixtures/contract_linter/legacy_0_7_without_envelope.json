@@ -1,0 +1,5 @@
+{
+  "fixture_id": "legacy_0_7_without_envelope",
+  "schema_version": "0.7.0",
+  "expected": {"CL-PROD-001": "unknown", "CL-INP-001": "unknown"}
+}

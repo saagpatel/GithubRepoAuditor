@@ -1,0 +1,5 @@
+{
+  "fixture_id": "notion_carried_origin_unknown",
+  "source": {"mode": "unavailable", "age_hours": null, "origin_known": false},
+  "expected": {"CL-FRESH-002": "unknown"}
+}

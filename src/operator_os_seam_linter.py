@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sqlite3
@@ -10,7 +11,8 @@ from pathlib import Path
 from typing import Any
 
 from src.portfolio_truth_render import GENERATED_MARKDOWN_PROVENANCE_MARKER
-from src.portfolio_truth_types import SCHEMA_VERSION, truth_latest_path
+from src.portfolio_truth_types import LEGACY_SCHEMA_VERSIONS, SCHEMA_VERSION, truth_latest_path
+from src.portfolio_catalog import load_portfolio_catalog
 from src.project_registry import (
     BRIDGE_CANONICAL_KEY_DISAGREEMENTS,
     DEFAULT_NOTION_PROJECTION_ONLY_ROWS,
@@ -42,6 +44,7 @@ class SeamLintFinding:
     artifact: str
     violation: str
     detail: str
+    level: str = "fail"
 
     def to_dict(self) -> dict[str, str]:
         return {
@@ -49,6 +52,7 @@ class SeamLintFinding:
             "artifact": self.artifact,
             "violation": self.violation,
             "detail": self.detail,
+            "level": self.level,
         }
 
 
@@ -61,13 +65,24 @@ class SeamLintResult:
 
     @property
     def passed(self) -> bool:
-        return not self.findings
+        return not any(finding.level == "fail" for finding in self.findings)
+
+    @property
+    def state(self) -> str:
+        levels = {finding.level for finding in self.findings}
+        if "fail" in levels:
+            return "fail"
+        if "warn" in levels:
+            return "warn"
+        if "unknown" in levels:
+            return "unknown"
+        return "pass"
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "schema_version": "operator_os_seam_linter.v0",
             "generated_at": self.generated_at.isoformat(),
-            "state": "pass" if self.passed else "fail",
+            "state": self.state,
             "expected_schema_version": self.expected_schema_version,
             "max_staleness_hours": self.max_staleness_hours,
             "findings": [finding.to_dict() for finding in self.findings],
@@ -84,6 +99,8 @@ def lint_operator_os_seams(
     notification_db_path: Path | None = None,
     notion_snapshot_path: Path | None = None,
     identity_since: datetime | None = None,
+    contract_shadow: bool = False,
+    catalog_path: Path | None = None,
     now: datetime | None = None,
 ) -> SeamLintResult:
     generated_at = _aware(now or datetime.now(UTC))
@@ -114,6 +131,15 @@ def lint_operator_os_seams(
                 identity_since=identity_since,
             )
         )
+        if contract_shadow:
+            findings.extend(
+                _check_contract_shadow(
+                    truth,
+                    truth_path=truth_path,
+                    catalog_path=catalog_path,
+                    now=generated_at,
+                )
+            )
     findings.extend(_check_generated_markdown(markdown_paths))
     return SeamLintResult(
         generated_at=generated_at,
@@ -126,6 +152,8 @@ def lint_operator_os_seams(
 def build_worklist_payload(result: SeamLintResult) -> dict[str, Any]:
     items = []
     for finding in result.findings:
+        if finding.level != "fail":
+            continue
         items.append(
             {
                 "item_id": f"ghra_seam_linter:{finding.check}:{Path(finding.artifact).name}",
@@ -146,7 +174,7 @@ def build_worklist_payload(result: SeamLintResult) -> dict[str, Any]:
     return {
         "schema_version": WORKLIST_SCHEMA_VERSION,
         "generated_at": result.generated_at.isoformat(),
-        "state": "pass" if result.passed else "fail",
+        "state": result.state,
         "source": "GithubRepoAuditor",
         "items": items,
     }
@@ -175,6 +203,8 @@ def main(argv: list[str] | None = None) -> int:
         identity_since=_parse_datetime(args.identity_since)
         if args.identity_since is not None
         else None,
+        contract_shadow=args.contract_shadow,
+        catalog_path=args.catalog,
     )
     payload = result.to_dict()
     if args.worklist_output:
@@ -215,6 +245,12 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument("--expected-schema-version", default=SCHEMA_VERSION)
+    parser.add_argument("--contract-shadow", action="store_true")
+    parser.add_argument(
+        "--catalog",
+        type=Path,
+        default=Path("config") / "portfolio-catalog.yaml",
+    )
     parser.add_argument("--max-staleness-hours", type=int, default=DEFAULT_MAX_STALENESS_HOURS)
     parser.add_argument("--json", action="store_true")
     return parser
@@ -313,6 +349,217 @@ def _check_artifact_freshness(
     return []
 
 
+def _check_contract_shadow(
+    truth: dict[str, Any],
+    *,
+    truth_path: Path,
+    catalog_path: Path | None,
+    now: datetime,
+) -> list[SeamLintFinding]:
+    findings: list[SeamLintFinding] = []
+    schema_version = truth.get("schema_version")
+    legacy_schema = schema_version in LEGACY_SCHEMA_VERSIONS
+    if legacy_schema:
+        findings.append(
+            SeamLintFinding(
+                check="CL-PROD-001",
+                artifact=str(truth_path),
+                violation="producer lineage is unavailable in a legacy artifact",
+                detail=f"schema_version={schema_version}",
+                level="unknown",
+            )
+        )
+
+    producer = truth.get("producer")
+    if not legacy_schema and (not isinstance(producer, dict) or not producer):
+        findings.append(
+            SeamLintFinding(
+                check="CL-PROD-001",
+                artifact=str(truth_path),
+                violation="producer evidence is absent",
+                detail="Canonical claims require an identified producer; local artifacts remain usable as unknown.",
+                level="unknown",
+            )
+        )
+
+    inputs = truth.get("inputs")
+    catalog_input = inputs.get("catalog") if isinstance(inputs, dict) else None
+    if catalog_path is not None and catalog_path.is_file():
+        actual_hash = hashlib.sha256(catalog_path.read_bytes()).hexdigest()
+        declared_hash = (
+            catalog_input.get("sha256") if isinstance(catalog_input, dict) else None
+        )
+        if not declared_hash:
+            findings.append(
+                SeamLintFinding(
+                    check="CL-INP-001",
+                    artifact=str(truth_path),
+                    violation="catalog input hash is absent",
+                    detail=f"catalog={catalog_path}",
+                    level="unknown",
+                )
+            )
+        elif declared_hash != actual_hash:
+            findings.append(
+                SeamLintFinding(
+                    check="CL-INP-001",
+                    artifact=str(truth_path),
+                    violation="catalog input hash differs from current catalog",
+                    detail=f"declared={declared_hash}; actual={actual_hash}",
+                )
+            )
+        findings.extend(
+            _check_catalog_declaration_parity(
+                truth,
+                truth_path=truth_path,
+                catalog_path=catalog_path,
+            )
+        )
+    else:
+        findings.append(
+            SeamLintFinding(
+                check="CL-INP-001",
+                artifact=str(truth_path),
+                violation="current catalog is unavailable",
+                detail=f"catalog={catalog_path}",
+                level="unknown",
+            )
+        )
+
+    findings.extend(_check_rollup_integrity(truth, truth_path=truth_path))
+    findings.extend(_check_carried_freshness(truth, truth_path=truth_path, now=now))
+    return findings
+
+
+def _check_catalog_declaration_parity(
+    truth: dict[str, Any], *, truth_path: Path, catalog_path: Path
+) -> list[SeamLintFinding]:
+    catalog = load_portfolio_catalog(catalog_path)
+    repos = catalog.get("repos") if isinstance(catalog, dict) else None
+    if not isinstance(repos, dict):
+        return []
+    mismatches: dict[str, list[str]] = {}
+    for project in truth.get("projects", []):
+        if not isinstance(project, dict):
+            continue
+        identity = project.get("identity")
+        path = identity.get("path") if isinstance(identity, dict) else None
+        entry = repos.get(path) if isinstance(path, str) else None
+        if not isinstance(entry, dict):
+            continue
+        provenance = project.get("provenance")
+        if not isinstance(provenance, dict):
+            continue
+        for field in ("lifecycle_state", "intended_disposition", "owner"):
+            if not entry.get(field):
+                continue
+            source = provenance.get(f"declared.{field}")
+            if not isinstance(source, dict) or source.get("source") != "catalog_repo":
+                mismatches.setdefault(path, []).append(f"declared.{field}")
+    if not mismatches:
+        return []
+    sample = ", ".join(sorted(mismatches)[:10])
+    field_count = sum(len(fields) for fields in mismatches.values())
+    return [
+        SeamLintFinding(
+            check="CL-DECL-001",
+            artifact=str(truth_path),
+            violation="explicit catalog declarations are absent from artifact provenance",
+            detail=(
+                f"project_count={len(mismatches)}; field_count={field_count}; "
+                f"sample={sample}"
+            ),
+        )
+    ]
+
+
+def _check_rollup_integrity(
+    truth: dict[str, Any], *, truth_path: Path
+) -> list[SeamLintFinding]:
+    projects = [item for item in truth.get("projects", []) if isinstance(item, dict)]
+    decision_count = sum(
+        1
+        for project in projects
+        if isinstance(project.get("derived"), dict)
+        and project["derived"].get("attention_state") == "decision-needed"
+    )
+    summary = truth.get("source_summary")
+    counts = summary.get("attention_state_counts") if isinstance(summary, dict) else None
+    summary_count = counts.get("decision-needed", 0) if isinstance(counts, dict) else None
+    rollups = truth.get("rollups")
+    decision = rollups.get("decision") if isinstance(rollups, dict) else None
+    rollup_count = decision.get("decision_needed_count") if isinstance(decision, dict) else None
+    if summary_count is None or rollup_count is None:
+        return [
+            SeamLintFinding(
+                check="CL-COUNT-001",
+                artifact=str(truth_path),
+                violation="decision count coverage is incomplete",
+                detail=(
+                    f"projects={decision_count}; source_summary={summary_count}; "
+                    f"rollups={rollup_count}"
+                ),
+                level="unknown",
+            )
+        ]
+    if summary_count == decision_count and rollup_count == decision_count:
+        return []
+    return [
+        SeamLintFinding(
+            check="CL-COUNT-001",
+            artifact=str(truth_path),
+            violation="decision-needed counts do not reconcile",
+            detail=(
+                f"projects={decision_count}; source_summary={summary_count}; "
+                f"rollups={rollup_count}"
+            ),
+        )
+    ]
+
+
+def _check_carried_freshness(
+    truth: dict[str, Any], *, truth_path: Path, now: datetime
+) -> list[SeamLintFinding]:
+    inputs = truth.get("inputs")
+    notion = inputs.get("notion") if isinstance(inputs, dict) else None
+    if not isinstance(notion, dict) or notion.get("mode") != "carried-forward":
+        return []
+    origin = notion.get("carried_from_generated_at")
+    if not isinstance(origin, str) or not origin:
+        return [
+            SeamLintFinding(
+                check="CL-FRESH-002",
+                artifact=str(truth_path),
+                violation="carried-forward origin is unknown",
+                detail="Notion advisory freshness cannot be established.",
+                level="unknown",
+            )
+        ]
+    try:
+        age = now - _parse_datetime(origin)
+    except ValueError:
+        return [
+            SeamLintFinding(
+                check="CL-FRESH-002",
+                artifact=str(truth_path),
+                violation="carried-forward origin is invalid",
+                detail=f"carried_from_generated_at={origin}",
+                level="unknown",
+            )
+        ]
+    if age > timedelta(hours=48):
+        return [
+            SeamLintFinding(
+                check="CL-FRESH-002",
+                artifact=str(truth_path),
+                violation="carried-forward Notion advisory is stale",
+                detail=f"age_hours={age.total_seconds() / 3600:.2f}; warn_after=48",
+                level="warn",
+            )
+        ]
+    return []
+
+
 def _check_schema_pin(
     truth: dict[str, Any],
     *,
@@ -329,7 +576,7 @@ def _check_schema_pin(
                 detail="The truth artifact must declare its schema pin.",
             )
         ]
-    if declared != expected_schema_version:
+    if declared != expected_schema_version and declared not in LEGACY_SCHEMA_VERSIONS:
         return [
             SeamLintFinding(
                 check="schema_pin",

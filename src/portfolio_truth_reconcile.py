@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import hashlib
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -23,6 +24,7 @@ from src.portfolio_truth_sources import (
     load_safe_notion_project_context,
 )
 from src.portfolio_truth_types import (
+    DERIVATION_POLICY_VERSION,
     SCHEMA_VERSION,
     AdvisoryFields,
     DeclaredFields,
@@ -220,6 +222,8 @@ def build_portfolio_truth_snapshot(
     release_count_by_name: dict[str, int] | None = None,
     security_alerts_by_name: dict[str, dict] | None = None,
     repo_status_by_name: dict[str, dict] | None = None,
+    producer: dict[str, Any] | None = None,
+    prior_notion_generated_at: str | None = None,
 ) -> PortfolioTruthBuildResult:
     now = now or datetime.now(timezone.utc)
     catalog_data = load_portfolio_catalog(catalog_path)
@@ -301,10 +305,66 @@ def build_portfolio_truth_snapshot(
         precedence_matrix=PRECEDENCE_MATRIX,
         warnings=warnings,
         projects=projects,
+        derivation_policy_version=DERIVATION_POLICY_VERSION,
+        producer=producer or {},
+        inputs=_build_input_envelope(
+            workspace_root=workspace_root,
+            catalog_data=catalog_data,
+            now=now,
+            include_notion=include_notion,
+            notion_context_rows=len(notion_context),
+            notion_context_carried_forward=notion_context_carried_forward,
+            prior_notion_generated_at=prior_notion_generated_at,
+        ),
     )
     return PortfolioTruthBuildResult(
         snapshot=snapshot, catalog_data=catalog_data, legacy_rows=legacy_rows
     )
+
+
+def _build_input_envelope(
+    *,
+    workspace_root: Path,
+    catalog_data: dict[str, Any],
+    now: datetime,
+    include_notion: bool,
+    notion_context_rows: int,
+    notion_context_carried_forward: bool,
+    prior_notion_generated_at: str | None,
+) -> dict[str, Any]:
+    resolved_catalog = Path(str(catalog_data.get("path") or ""))
+    catalog_hash = (
+        hashlib.sha256(resolved_catalog.read_bytes()).hexdigest()
+        if resolved_catalog.is_file()
+        else None
+    )
+    if not include_notion or notion_context_rows == 0:
+        notion_mode = "unavailable"
+        notion_observed_at = None
+    elif notion_context_carried_forward:
+        notion_mode = "carried-forward" if prior_notion_generated_at else "unavailable"
+        notion_observed_at = prior_notion_generated_at
+    else:
+        notion_mode = "live"
+        notion_observed_at = now.isoformat()
+    return {
+        "catalog": {
+            "source_id": "portfolio-catalog",
+            "sha256": catalog_hash,
+            "observed_at": now.isoformat(),
+        },
+        "workspace": {
+            "source_id": "projects-root",
+            "observed_at": now.isoformat(),
+        },
+        "notion": {
+            "mode": notion_mode,
+            "observed_at": notion_observed_at,
+            "carried_from_generated_at": (
+                prior_notion_generated_at if notion_context_carried_forward else None
+            ),
+        },
+    }
 
 
 def load_prior_notion_context(latest_path: Path) -> dict[str, dict[str, str]]:

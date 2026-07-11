@@ -1,0 +1,16 @@
+{
+  "fixture_id": "stale_producer_catalog_miss",
+  "projects": [
+    {
+      "project_key": "declared-project",
+      "catalog_declared": true,
+      "artifact_catalog_provenance": false,
+      "attention_state": "decision-needed"
+    }
+  ],
+  "expected": {
+    "CL-PROD-001": "fail",
+    "CL-INP-001": "fail",
+    "CL-DECL-001": "fail"
+  }
+}
