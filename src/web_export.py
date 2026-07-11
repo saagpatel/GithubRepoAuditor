@@ -180,6 +180,8 @@ def _render_html(
             {
                 "name": entry["name"],
                 "grade": a.get("grade", "F"),
+                "scored_dimensions": a.get("scored_dimensions", []),
+                "scored_weight_sum": a.get("scored_weight_sum", 0),
                 "score": round(a.get("overall_score", 0), 3),
                 "interest": round(a.get("interest_score", 0), 3),
                 "tier": a.get("completeness_tier", ""),
@@ -243,7 +245,7 @@ def _render_html(
 
 # ── KPI and header sections ───────────────────────────────────────────
 def _header_section(username: str, date: str, repos: int, grade: str) -> str:
-    color = GRADE_COLORS_CSS.get(grade, "#6B7280")
+    color = GRADE_COLORS_CSS.get(grade.split(" ", 1)[0], "#6B7280")
     return f"""
     <header>
       <h1>Portfolio Dashboard: {escape(username)}</h1>
@@ -923,6 +925,7 @@ def _repo_table(
         explanation = a.get("score_explanation") or build_score_explanation(a) or {}
         name = m.get("name", "")
         grade = a.get("grade", "F")
+        grade_letter = grade.split(" ", 1)[0]
         score = a.get("overall_score", 0)
         interest = a.get("interest_score", 0)
         profile_score = entry["profile_score"]
@@ -930,7 +933,7 @@ def _repo_table(
         lang = m.get("language") or ""
         desc = (m.get("description") or "")[:60]
         collections = ", ".join(entry["collections"])
-        gc = GRADE_COLORS_CSS.get(grade, "#6B7280")
+        gc = GRADE_COLORS_CSS.get(grade_letter, "#6B7280")
         tc = TIER_COLORS_CSS.get(tier, "#6B7280")
 
         spark = ""
@@ -974,7 +977,7 @@ def _repo_table(
         rows.append(
             f'<tr data-tier="{escape(tier, quote=True)}" '
             f'data-risk="{escape(risk_tier, quote=True)}" '
-            f'data-grade="{escape(grade, quote=True)}" '
+            f'data-grade="{escape(grade_letter, quote=True)}" '
             f'data-name="{escape(name, quote=True)}" '
             f'data-collections="{escape(collections.lower(), quote=True)}" '
             f'data-overall="{score:.3f}" '
