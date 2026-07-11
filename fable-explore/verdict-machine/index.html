@@ -1,0 +1,738 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Verdict Machine — how a repo health verdict is actually computed</title>
+<meta name="description" content="An interactive teardown of GithubRepoAuditor's verdict cascade. Scrub a synthetic repo's signals and watch the real decision functions compute its attention lane and risk tier.">
+<style>
+  :root {
+    --surface: #fcfcfb;
+    --plane: #f9f9f7;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --ink-muted: #898781;
+    --hairline: #e1e0d9;
+    --ring: rgba(11, 11, 11, 0.10);
+    --accent: #2a78d6;
+    --accent-soft: #cde2fb;
+    --good: #0ca30c;
+    --warning: #fab219;
+    --serious: #ec835a;
+    --critical: #d03b3b;
+    --good-text: #006300;
+    --ord-1: #86b6ef;
+    --ord-2: #5598e7;
+    --ord-3: #2a78d6;
+    --ord-4: #1c5cab;
+    --ord-5: #0d366b;
+    --code-bg: #f4f3f0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --surface: #1a1a19;
+      --plane: #0d0d0d;
+      --ink: #ffffff;
+      --ink-2: #c3c2b7;
+      --ink-muted: #898781;
+      --hairline: #2c2c2a;
+      --ring: rgba(255, 255, 255, 0.10);
+      --accent: #3987e5;
+      --accent-soft: #10315c;
+      --good-text: #0ca30c;
+      --ord-1: #184f95;
+      --ord-2: #1c5cab;
+      --ord-3: #256abf;
+      --ord-4: #3987e5;
+      --ord-5: #6da7ec;
+      --code-bg: #232322;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--plane);
+    color: var(--ink);
+    font: 17px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 720px; margin: 0 auto; padding: 24px 20px 96px; }
+  h1 { font-size: 1.9rem; line-height: 1.2; margin: 24px 0 8px; letter-spacing: -0.02em; }
+  h2 { font-size: 1.3rem; margin: 48px 0 8px; letter-spacing: -0.01em; }
+  p { margin: 12px 0; color: var(--ink-2); }
+  p strong, li strong { color: var(--ink); }
+  .kicker { color: var(--ink-muted); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.12em; font-weight: 600; }
+  .lede { font-size: 1.05rem; }
+  a { color: var(--accent); }
+
+  /* --- verdict strip (sticky) --- */
+  .strip {
+    position: sticky; top: 0; z-index: 20;
+    background: var(--surface);
+    border: 1px solid var(--ring);
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin: 20px 0 8px;
+    display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: baseline;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .strip .cell { display: flex; gap: 7px; align-items: baseline; min-width: 0; }
+  .strip .lbl { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-muted); font-weight: 600; }
+  .strip .val { font-weight: 700; font-size: 0.95rem; white-space: nowrap; }
+
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: baseline; border: 1px solid var(--ring); }
+
+  /* --- panels --- */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--ring);
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin: 16px 0;
+  }
+  .panel h3 { margin: 0 0 4px; font-size: 1.02rem; }
+  .stageno { color: var(--ink-muted); font-weight: 600; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; }
+
+  /* --- controls --- */
+  label { user-select: none; }
+  .rowgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px 16px; margin: 10px 0; }
+  .check { display: flex; align-items: center; gap: 8px; font-size: 0.92rem; color: var(--ink-2); padding: 3px 0; }
+  .check input { width: 16px; height: 16px; accent-color: var(--accent); flex: none; }
+  select, .stepper input {
+    font: inherit; font-size: 0.9rem; color: var(--ink);
+    background: var(--plane); border: 1px solid var(--hairline); border-radius: 7px;
+    padding: 5px 8px;
+  }
+  .field { display: flex; flex-direction: column; gap: 3px; font-size: 0.8rem; color: var(--ink-muted); }
+  .field > span { font-weight: 600; letter-spacing: 0.02em; }
+
+  input[type="range"] { width: 100%; accent-color: var(--accent); margin: 6px 0 0; }
+  .scale { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+  .scale .mark { position: relative; }
+
+  .inline-num {
+    font-weight: 700; color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    border-bottom: 2px dotted var(--accent);
+  }
+
+  /* --- chips / verdict rendering --- */
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid var(--ring); border-radius: 999px;
+    padding: 2px 11px; font-size: 0.85rem; font-weight: 650;
+    background: var(--plane); white-space: nowrap;
+  }
+  .rulechips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 2px; }
+  .rule {
+    font-size: 0.78rem; border: 1px solid var(--hairline); border-radius: 6px;
+    padding: 2px 8px; color: var(--ink-muted); background: transparent;
+  }
+  .rule.fired { border-color: var(--accent); color: var(--ink); background: var(--accent-soft); font-weight: 600; }
+
+  .ladder { list-style: none; padding: 0; margin: 12px 0 4px; border-left: 2px solid var(--hairline); }
+  .ladder li { padding: 5px 0 5px 14px; color: var(--ink-muted); font-size: 0.9rem; position: relative; }
+  .ladder li.on { color: var(--ink); font-weight: 700; }
+  .ladder li.on::before {
+    content: ""; position: absolute; left: -2px; top: 6px; bottom: 6px; width: 2px; background: var(--accent);
+  }
+  .ladder .why { display: block; font-weight: 400; font-size: 0.8rem; color: var(--ink-2); }
+
+  .rationale {
+    border-left: 3px solid var(--accent); background: var(--plane);
+    padding: 8px 12px; border-radius: 0 8px 8px 0;
+    font-size: 0.88rem; color: var(--ink-2); margin: 10px 0 2px;
+    font-style: italic;
+  }
+  .rationale .src { display: block; font-style: normal; font-size: 0.7rem; color: var(--ink-muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.08em; }
+
+  .quality-meter { display: flex; gap: 3px; margin: 10px 0 4px; }
+  .quality-meter span {
+    flex: 1; height: 9px; border-radius: 3px; background: var(--hairline);
+  }
+  .qlabel { font-size: 0.8rem; color: var(--ink-muted); display: flex; justify-content: space-between; }
+
+  /* --- presets --- */
+  .presets { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+  .presets button {
+    font: inherit; font-size: 0.85rem; font-weight: 600;
+    color: var(--ink); background: var(--surface);
+    border: 1px solid var(--hairline); border-radius: 8px;
+    padding: 7px 13px; cursor: pointer;
+  }
+  .presets button:hover { border-color: var(--accent); color: var(--accent); }
+  .presets button.on { border-color: var(--accent); background: var(--accent-soft); }
+
+  /* --- source view --- */
+  details.src-view { margin: 12px 0 0; border: 1px solid var(--hairline); border-radius: 8px; overflow: hidden; }
+  details.src-view summary {
+    cursor: pointer; padding: 8px 12px; font-size: 0.82rem; font-weight: 600; color: var(--ink-2);
+    background: var(--plane); list-style: none;
+  }
+  details.src-view summary::before { content: "‹›"; letter-spacing: -0.1em; margin-right: 8px; color: var(--accent); font-weight: 800; }
+  details.src-view pre {
+    margin: 0; padding: 12px 14px; overflow-x: auto;
+    background: var(--code-bg); font-size: 0.72rem; line-height: 1.5;
+    color: var(--ink-2);
+  }
+  .provenance { font-size: 0.8rem; color: var(--ink-muted); }
+
+  footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--hairline); font-size: 0.85rem; color: var(--ink-muted); }
+  @media (max-width: 560px) {
+    .strip { gap: 6px 12px; }
+    body { font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <p class="kicker">Interactive teardown · synthetic repo, real logic</p>
+  <h1>The Verdict Machine</h1>
+  <p class="lede">
+    My portfolio auditor looks at ~170 repos and decides, for each one, whether it deserves
+    my attention. Not with a health score — with a <em>cascade of small, readable judgments</em>.
+    This page is that cascade, running live. Every decision below is computed by the auditor's
+    actual functions, ported line-for-line and <a href="#provenance">verified against the Python
+    source on 21,000+ generated cases</a>. Drag things. Watch the verdict argue with you.
+  </p>
+
+  <div class="presets" id="presets" role="group" aria-label="Preset repos"></div>
+
+  <div class="strip" aria-live="polite" id="strip"></div>
+
+  <!-- STAGE 1 -->
+  <section class="panel" id="stage-activity">
+    <p class="stageno">Stage 1 · Is it alive?</p>
+    <h3>One signal, and why it isn't enough</h3>
+    <p id="activity-sentence"></p>
+    <input type="range" id="in-days" min="0" max="365" step="1" value="3"
+           aria-label="Days since last meaningful activity">
+    <div class="scale"><span>0d</span><span>14d&nbsp;·&nbsp;active line</span><span>30d&nbsp;·&nbsp;recent line</span><span>365d</span></div>
+    <div class="rulechips" id="activity-rules"></div>
+    <div class="rowgrid" style="margin-top:12px">
+      <label class="check"><input type="checkbox" id="in-gh-archived"> Archived on GitHub</label>
+      <label class="field"><span>Declared lifecycle</span>
+        <select id="in-lifecycle">
+          <option value="">— none declared —</option>
+          <option value="experimental">experimental</option>
+          <option value="archived">archived</option>
+        </select>
+      </label>
+    </div>
+    <p id="registry-note" style="font-size:0.88rem"></p>
+    <p>
+      Here's the problem: <strong>this signal can't tell a ghost from a workhorse.</strong>
+      A repo with a signed binary, a beautiful README, and a screenshot that will be accurate
+      forever scores exactly the same as a dusty script — the surface was minted once, on the
+      project's best day. Commit recency is honest but nearly blind. So the auditor keeps going.
+    </p>
+    <details class="src-view"><summary>the actual decision — activityStatusFor</summary><pre id="src-activity"></pre></details>
+  </section>
+
+  <!-- STAGE 2 -->
+  <section class="panel" id="stage-context">
+    <p class="stageno">Stage 2 · Does it explain itself?</p>
+    <h3>The context contract</h3>
+    <p>
+      Every repo owes its future reader six answers. Not prose quality, not length — the
+      auditor checks that six specific sections <em>exist and say something</em>, in the
+      repo's context file or its README:
+    </p>
+    <div class="rowgrid">
+      <label class="check"><input type="checkbox" class="in-section" id="sec-project_summary" checked> What this is</label>
+      <label class="check"><input type="checkbox" class="in-section" id="sec-current_state" checked> Current state</label>
+      <label class="check"><input type="checkbox" class="in-section" id="sec-stack" checked> Stack</label>
+      <label class="check"><input type="checkbox" class="in-section" id="sec-run_instructions" checked> How to run</label>
+      <label class="check"><input type="checkbox" class="in-section" id="sec-known_risks" checked> Known risks</label>
+      <label class="check"><input type="checkbox" class="in-section" id="sec-next_recommended_move" checked> Next move</label>
+    </div>
+    <div class="rowgrid">
+      <label class="check"><input type="checkbox" id="in-primary" checked> Has a context file (AGENTS.md)</label>
+      <label class="check"><input type="checkbox" id="in-readme" checked> Has a non-empty README</label>
+    </div>
+    <label class="field" style="margin-top:6px"><span>Supporting files present</span></label>
+    <div class="rowgrid" id="support-files"></div>
+    <div class="quality-meter" id="quality-meter" aria-hidden="true"></div>
+    <div class="qlabel"><span>none</span><span>boilerplate</span><span>minimum-viable</span><span>standard</span><span>full</span></div>
+    <p id="context-sentence"></p>
+    <p style="font-size:0.9rem" id="context-missing"></p>
+    <p>
+      Notice what this is <em>not</em>: a truth check. The contract verifies the sections
+      exist — a Current State section that's beautifully written and wrong sails through.
+      Presence is cheap to verify honestly; truth needs cross-examination. (The auditor's
+      author knows. It's on the list.)
+    </p>
+    <details class="src-view"><summary>the actual decision — contextQualityFor</summary><pre id="src-context"></pre></details>
+  </section>
+
+  <!-- STAGE 3 -->
+  <section class="panel" id="stage-declared">
+    <p class="stageno">Stage 3 · What did the operator declare?</p>
+    <h3>Intent is a signal too</h3>
+    <p>
+      Observation only gets you so far — a quiet repo might be dying, or it might be
+      <em>done</em>. The difference is intent. The operator declares, per repo, which
+      path it's on and how much it matters:
+    </p>
+    <div class="rowgrid">
+      <label class="field"><span>Operating path</span>
+        <select id="in-path">
+          <option value="">— not declared —</option>
+          <option value="maintain">maintain — keep it healthy</option>
+          <option value="finish">finish — push to done</option>
+          <option value="archive">archive — wind it down</option>
+          <option value="experiment">experiment — allowed to be messy</option>
+        </select>
+      </label>
+      <label class="field"><span>Intended disposition</span>
+        <select id="in-disposition">
+          <option value="">— none —</option>
+          <option value="maintain">maintain</option>
+          <option value="finish">finish</option>
+          <option value="archive">archive</option>
+          <option value="experiment">experiment</option>
+        </select>
+      </label>
+      <label class="field"><span>Category</span>
+        <select id="in-category">
+          <option value="">— uncategorized —</option>
+          <option value="infrastructure">infrastructure</option>
+          <option value="commercial">commercial</option>
+          <option value="personal">personal</option>
+        </select>
+      </label>
+      <label class="field"><span>Criticality</span>
+        <select id="in-criticality">
+          <option value="">— unset —</option>
+          <option value="medium">medium</option>
+          <option value="high">high</option>
+          <option value="critical">critical</option>
+        </select>
+      </label>
+    </div>
+    <div class="rowgrid">
+      <label class="check"><input type="checkbox" id="in-explicit" checked> Has an explicit catalog entry (not inherited defaults)</label>
+      <label class="check"><input type="checkbox" id="in-strategic"> Strategic repo (owes a “doctor standard”)</label>
+      <label class="check"><input type="checkbox" id="in-doctor"> Doctor standard declared</label>
+    </div>
+    <div class="rowgrid">
+      <label class="field"><span>Open high-severity alerts</span><input type="number" id="in-high" min="0" max="99" value="0" class="stepper" style="width:80px"></label>
+      <label class="field"><span>Open critical alerts</span><input type="number" id="in-critical" min="0" max="99" value="0" class="stepper" style="width:80px"></label>
+    </div>
+  </section>
+
+  <!-- STAGE 4 -->
+  <section class="panel" id="stage-confidence">
+    <p class="stageno">Stage 4 · Should the system trust its own guidance?</p>
+    <h3>Confidence gates advice, not repos</h3>
+    <p>
+      This is my favorite move in the whole machine. Before the auditor routes your attention,
+      it asks whether it's <em>entitled to an opinion</em>. Concerns accumulate — and any hard
+      concern forces the verdict below to <strong>investigate</strong>: the system declaring
+      it can't responsibly advise you yet.
+    </p>
+    <div class="rulechips" id="concern-chips"></div>
+    <p id="confidence-sentence"></p>
+    <div class="rationale" id="path-rationale"></div>
+    <details class="src-view"><summary>the actual decision — buildOperatingPathEntry</summary><pre id="src-pathing"></pre></details>
+  </section>
+
+  <!-- STAGE 5 -->
+  <section class="panel" id="stage-risk">
+    <p class="stageno">Stage 5 · How risky is neglect?</p>
+    <h3>Factors, not scores — and permission to ignore</h3>
+    <p>
+      Risk here isn't a number. It's a list of named factors: three or more elevates,
+      a specific toxic pair elevates, one open critical CVE on an active repo force-elevates
+      on its own. And two whole classes of repo are <strong>deferred</strong> — the tier
+      that means <em>you're allowed to ignore this</em>, which is what makes 170 repos
+      governable at all.
+    </p>
+    <div class="rulechips" id="factor-chips"></div>
+    <p id="risk-sentence"></p>
+    <div class="rationale" id="risk-summary"></div>
+    <details class="src-view"><summary>the actual decision — buildRiskEntry</summary><pre id="src-risk"></pre></details>
+  </section>
+
+  <!-- STAGE 6 -->
+  <section class="panel" id="stage-attention">
+    <p class="stageno">Stage 6 · The verdict: where does it sit in my attention?</p>
+    <h3>A strict ladder, first match wins</h3>
+    <ul class="ladder" id="lane-ladder"></ul>
+    <p id="attention-sentence"></p>
+    <details class="src-view"><summary>the actual decision — attentionStateFor</summary><pre id="src-attention"></pre></details>
+  </section>
+
+  <h2>What the machine is actually saying</h2>
+  <p>
+    Poke at the presets again with the ladder in view. The polished ghost lands in
+    <strong>parked</strong> — not punished, just quietly moved out of your attention until the
+    commits move. The active repo with thin docs gets dragged into <strong>decision-needed</strong>
+    — not because the code is bad, but because the system refuses to pretend it understands a
+    repo that won't explain itself. That's the design stance throughout: <em>the auditor never
+    says "bad repo." It says "I can't advise you here yet," and routes your attention to where
+    a decision is actually owed.</em>
+  </p>
+  <p>
+    Every threshold you dragged across is an editorial choice — 14 days, six sections,
+    three factors. The machine's honesty doesn't come from the thresholds being right.
+    It comes from the thresholds being <em>visible</em>, so when a verdict surprises you,
+    you can argue with a specific line of code instead of a vibe.
+  </p>
+
+  <h2 id="provenance">Provenance</h2>
+  <p class="provenance">
+    The functions running on this page are line-for-line JavaScript ports of
+    <a href="https://github.com/saagpatel/GithubRepoAuditor">GithubRepoAuditor</a>'s decision
+    modules (<code>portfolio_truth_reconcile.py</code>, <code>portfolio_pathing.py</code>,
+    <code>portfolio_risk.py</code>, <code>portfolio_context_contract.py</code>), including the
+    rationale strings — verified by a golden-test harness that replays 21,000+ generated input
+    combinations through both implementations and diffs exact equality. One deliberate
+    abstraction: the “strategic repo” check is a boolean here, where the Python consults a
+    private repo list. The repo on this page is synthetic; no live portfolio data is shown.
+    The full source of each decision is inline above — expand any <em>the actual decision</em>
+    block.
+  </p>
+
+  <footer>
+    Part of the <a href="https://saagarpatel.dev">workshop</a>. Companion pieces:
+    <a href="https://saagarpatel.dev/notes/portfolio-truth">A Portfolio Is an Observability
+    Problem</a> · <a href="https://saagarpatel.dev/writing/ghost-in-the-tauri-repos">The Ghost
+    in the Tauri Repos</a>.
+  </footer>
+</main>
+
+<script src="verdict_core.js"></script>
+<script>
+"use strict";
+/* __PAGE_SCRIPT__ */
+(function () {
+  const C = window.VerdictCore;
+
+  // ---------- state ----------
+  const SUPPORT_FILES = C.constants.SUPPORTING_CONTEXT_FILES.slice().sort();
+  const state = {
+    lastActivityDays: 3,
+    githubArchived: false,
+    lifecycleState: "",
+    primaryExists: true,
+    hasReadme: true,
+    sections: {
+      project_summary: true, current_state: true, stack: true,
+      run_instructions: true, known_risks: true, next_recommended_move: true,
+    },
+    supportingFileNames: [],
+    declaredOperatingPath: "maintain",
+    intendedDisposition: "",
+    maturityProgram: "",
+    hasExplicitEntry: true,
+    category: "infrastructure",
+    criticality: "",
+    isStrategic: false,
+    doctorStandard: "",
+    securityHighAlerts: 0,
+    securityCriticalAlerts: 0,
+  };
+
+  const PRESETS = {
+    "The Ghost": {
+      desc: "polished, signed, silent",
+      s: {
+        lastActivityDays: 170, githubArchived: false, lifecycleState: "",
+        primaryExists: false, hasReadme: true,
+        sections: { project_summary: true, current_state: true, stack: true, run_instructions: true, known_risks: false, next_recommended_move: false },
+        supportingFileNames: [],
+        declaredOperatingPath: "", intendedDisposition: "", maturityProgram: "",
+        hasExplicitEntry: false, category: "", criticality: "",
+        isStrategic: false, doctorStandard: "", securityHighAlerts: 0, securityCriticalAlerts: 0,
+      },
+    },
+    "The Thin-Docs Trap": {
+      desc: "active code, silent README",
+      s: {
+        lastActivityDays: 2, githubArchived: false, lifecycleState: "",
+        primaryExists: true, hasReadme: true,
+        sections: { project_summary: true, current_state: false, stack: true, run_instructions: false, known_risks: false, next_recommended_move: false },
+        supportingFileNames: [],
+        declaredOperatingPath: "maintain", intendedDisposition: "", maturityProgram: "",
+        hasExplicitEntry: true, category: "infrastructure", criticality: "",
+        isStrategic: false, doctorStandard: "", securityHighAlerts: 0, securityCriticalAlerts: 0,
+      },
+    },
+    "The Honest Workhorse": {
+      desc: "boring and excellent",
+      s: {
+        lastActivityDays: 3, githubArchived: false, lifecycleState: "",
+        primaryExists: true, hasReadme: true,
+        sections: { project_summary: true, current_state: true, stack: true, run_instructions: true, known_risks: true, next_recommended_move: true },
+        supportingFileNames: ["HANDOFF.md", "ROADMAP.md"],
+        declaredOperatingPath: "maintain", intendedDisposition: "", maturityProgram: "",
+        hasExplicitEntry: true, category: "infrastructure", criticality: "high",
+        isStrategic: true, doctorStandard: "full", securityHighAlerts: 0, securityCriticalAlerts: 0,
+      },
+    },
+    "The Resting Archive": {
+      desc: "done, and says so",
+      s: {
+        lastActivityDays: 200, githubArchived: false, lifecycleState: "",
+        primaryExists: true, hasReadme: true,
+        sections: { project_summary: true, current_state: true, stack: true, run_instructions: true, known_risks: true, next_recommended_move: true },
+        supportingFileNames: ["STATUS.md"],
+        declaredOperatingPath: "archive", intendedDisposition: "", maturityProgram: "",
+        hasExplicitEntry: true, category: "personal", criticality: "",
+        isStrategic: false, doctorStandard: "", securityHighAlerts: 0, securityCriticalAlerts: 0,
+      },
+    },
+    "The Critical CVE": {
+      desc: "one alert changes everything",
+      s: {
+        lastActivityDays: 3, githubArchived: false, lifecycleState: "",
+        primaryExists: true, hasReadme: true,
+        sections: { project_summary: true, current_state: true, stack: true, run_instructions: true, known_risks: true, next_recommended_move: true },
+        supportingFileNames: ["HANDOFF.md", "ROADMAP.md"],
+        declaredOperatingPath: "maintain", intendedDisposition: "", maturityProgram: "",
+        hasExplicitEntry: true, category: "infrastructure", criticality: "high",
+        isStrategic: true, doctorStandard: "full", securityHighAlerts: 0, securityCriticalAlerts: 1,
+      },
+    },
+  };
+
+  // ---------- static builds ----------
+  const $ = (id) => document.getElementById(id);
+
+  const presetsEl = $("presets");
+  for (const name of Object.keys(PRESETS)) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.innerHTML = `${name}<br><span style="font-weight:400;font-size:0.72rem;color:var(--ink-muted)">${PRESETS[name].desc}</span>`;
+    b.addEventListener("click", () => { applyPreset(name); });
+    b.dataset.preset = name;
+    presetsEl.appendChild(b);
+  }
+
+  const supportEl = $("support-files");
+  for (const f of SUPPORT_FILES) {
+    const lab = document.createElement("label");
+    lab.className = "check";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.value = f;
+    cb.className = "in-support";
+    cb.addEventListener("change", readInputs);
+    lab.appendChild(cb);
+    lab.appendChild(document.createTextNode(" " + f));
+    supportEl.appendChild(lab);
+  }
+
+  // Source views: render the *running* functions, not copies.
+  const fnSource = (fn) => fn.toString();
+  $("src-activity").textContent = fnSource(C.activityStatusFor) + "\n\n" + fnSource(C.registryStatusFor);
+  $("src-context").textContent = fnSource(C.contextQualityFor);
+  $("src-pathing").textContent = fnSource(C.buildOperatingPathEntry);
+  $("src-attention").textContent = fnSource(C.attentionStateFor);
+  $("src-risk").textContent = fnSource(C.buildRiskEntry);
+
+  // ---------- input wiring ----------
+  const inputs = [
+    "in-days", "in-gh-archived", "in-lifecycle", "in-primary", "in-readme",
+    "in-path", "in-disposition", "in-category", "in-criticality",
+    "in-explicit", "in-strategic", "in-doctor", "in-high", "in-critical",
+  ];
+  for (const id of inputs) $(id).addEventListener("input", readInputs);
+  for (const el of document.querySelectorAll(".in-section")) el.addEventListener("change", readInputs);
+
+  function readInputs() {
+    state.lastActivityDays = Number($("in-days").value);
+    state.githubArchived = $("in-gh-archived").checked;
+    state.lifecycleState = $("in-lifecycle").value;
+    state.primaryExists = $("in-primary").checked;
+    state.hasReadme = $("in-readme").checked;
+    for (const key of Object.keys(state.sections)) {
+      state.sections[key] = $("sec-" + key).checked;
+    }
+    state.supportingFileNames = [...document.querySelectorAll(".in-support:checked")].map((el) => el.value);
+    state.declaredOperatingPath = $("in-path").value;
+    state.intendedDisposition = $("in-disposition").value;
+    state.category = $("in-category").value;
+    state.criticality = $("in-criticality").value;
+    state.hasExplicitEntry = $("in-explicit").checked;
+    state.isStrategic = $("in-strategic").checked;
+    state.doctorStandard = $("in-doctor").checked ? "full" : "";
+    state.securityHighAlerts = Number($("in-high").value) || 0;
+    state.securityCriticalAlerts = Number($("in-critical").value) || 0;
+    clearPresetHighlight();
+    render();
+  }
+
+  function writeInputs() {
+    $("in-days").value = state.lastActivityDays;
+    $("in-gh-archived").checked = state.githubArchived;
+    $("in-lifecycle").value = state.lifecycleState;
+    $("in-primary").checked = state.primaryExists;
+    $("in-readme").checked = state.hasReadme;
+    for (const key of Object.keys(state.sections)) $("sec-" + key).checked = state.sections[key];
+    for (const el of document.querySelectorAll(".in-support")) {
+      el.checked = state.supportingFileNames.includes(el.value);
+    }
+    $("in-path").value = state.declaredOperatingPath;
+    $("in-disposition").value = state.intendedDisposition;
+    $("in-category").value = state.category;
+    $("in-criticality").value = state.criticality;
+    $("in-explicit").checked = state.hasExplicitEntry;
+    $("in-strategic").checked = state.isStrategic;
+    $("in-doctor").checked = Boolean(state.doctorStandard);
+    $("in-high").value = state.securityHighAlerts;
+    $("in-critical").value = state.securityCriticalAlerts;
+  }
+
+  function applyPreset(name) {
+    Object.assign(state, JSON.parse(JSON.stringify(PRESETS[name].s)));
+    writeInputs();
+    render();
+    for (const b of presetsEl.querySelectorAll("button")) b.classList.toggle("on", b.dataset.preset === name);
+  }
+  function clearPresetHighlight() {
+    for (const b of presetsEl.querySelectorAll("button")) b.classList.remove("on");
+  }
+
+  // ---------- rendering ----------
+  const LANE_INFO = {
+    archived: ["archived", "var(--ink-muted)", "out of play — GitHub-archived, declared archived, or on the archive path"],
+    experiment: ["experiment", "var(--ord-2)", "allowed to be messy — judged by different rules"],
+    parked: ["parked", "var(--ink-muted)", "quiet and permitted to be — not asking for attention"],
+    "decision-needed": ["decision-needed", "var(--serious)", "the system can't advise here — a human decision is owed"],
+    "active-infra": ["active-infra", "var(--good)", "alive, maintained, categorized as infrastructure"],
+    "active-product": ["active-product", "var(--good)", "alive, maintained, categorized as commercial"],
+    "manual-only": ["manual-only", "var(--accent)", "alive but outside the automated lanes — operator-driven"],
+  };
+  const TIER_INFO = {
+    baseline: ["var(--good)", "✓"],
+    moderate: ["var(--warning)", "▲"],
+    elevated: ["var(--critical)", "●"],
+    deferred: ["var(--ink-muted)", "…"],
+  };
+  const QUALITY_ORDER = ["none", "boilerplate", "minimum-viable", "standard", "full"];
+  const ORD_VARS = ["--ord-1", "--ord-2", "--ord-3", "--ord-4", "--ord-5"];
+
+  function chip(text, color, icon) {
+    return `<span class="chip"><span class="dot" style="background:${color}"></span>${icon ? icon + " " : ""}${text}</span>`;
+  }
+
+  function render() {
+    const out = C.runCascade(state);
+    const { activity_status, registry_status, context, path_entry, risk_entry, attention_state } = out;
+
+    // strip
+    const lane = LANE_INFO[attention_state] || ["?", "var(--ink)"];
+    const tier = TIER_INFO[risk_entry.risk_tier] || ["var(--ink)", ""];
+    $("strip").innerHTML = [
+      `<div class="cell"><span class="lbl">Attention</span><span class="val"><span class="dot" style="background:${lane[1]}"></span>${attention_state}</span></div>`,
+      `<div class="cell"><span class="lbl">Risk</span><span class="val" style="color:${tier[0]}">${tier[1]} ${risk_entry.risk_tier}</span></div>`,
+      `<div class="cell"><span class="lbl">Context</span><span class="val">${context.context_quality}</span></div>`,
+      `<div class="cell"><span class="lbl">Activity</span><span class="val">${activity_status}</span></div>`,
+      `<div class="cell"><span class="lbl">Path confidence</span><span class="val">${path_entry.path_confidence}${path_entry.path_override ? " · " + path_entry.path_override : ""}</span></div>`,
+    ].join("");
+
+    // stage 1
+    const days = state.lastActivityDays;
+    $("activity-sentence").innerHTML =
+      `The last meaningful activity landed <span class="inline-num">${days} day${days === 1 ? "" : "s"}</span> ago` +
+      (state.githubArchived ? `, and the repo is archived on GitHub` : "") +
+      `, so the auditor calls it <strong>${activity_status}</strong>` +
+      (registry_status !== activity_status ? ` — which the registry re-frames as <strong>${registry_status}</strong>` : "") + `.`;
+    const aRules = [
+      ["archived on GitHub or declared archived → archived", activity_status === "archived"],
+      ["no activity signal at all → stale", !state.githubArchived && state.lifecycleState !== "archived" && days === null],
+      ["≤ 14 days → active", activity_status === "active"],
+      ["≤ 30 days → recent", activity_status === "recent"],
+      ["older → stale", activity_status === "stale"],
+    ];
+    $("activity-rules").innerHTML = aRules.map(([t, on]) => `<span class="rule${on ? " fired" : ""}">${t}</span>`).join("");
+    $("registry-note").innerHTML = registry_status === "parked" && activity_status === "stale"
+      ? `Note the vocabulary move: <strong>stale</strong> (an observation) becomes <strong>parked</strong> (an attention word). The system never scolds — it re-files.`
+      : `Registry status: <strong>${registry_status}</strong>.`;
+
+    // stage 2
+    const qIdx = QUALITY_ORDER.indexOf(context.context_quality);
+    const meter = $("quality-meter");
+    meter.innerHTML = QUALITY_ORDER.map((q, i) =>
+      `<span style="background:${i <= qIdx ? `var(${ORD_VARS[qIdx]})` : "var(--hairline)"}"></span>`).join("");
+    $("context-sentence").innerHTML =
+      `Verdict: context quality is <strong>${context.context_quality}</strong>.` +
+      (context.context_quality === "boilerplate"
+        ? ` The file exists, but the contract is unmet — and “boilerplate” is the auditor's quiet word for <em>this repo can't be trusted to describe itself yet</em>.`
+        : context.context_quality === "full" || context.context_quality === "standard"
+          ? ` All six answers are present, and supporting files (${context.supporting_context_files.join(", ") || "—"}) upgrade the tier.`
+          : context.context_quality === "minimum-viable"
+            ? ` All six answers are present — the floor for a repo that explains itself.`
+            : ` No context file, no README with content: the repo says nothing at all.`);
+    $("context-missing").innerHTML = context.missing_fields.length
+      ? `Missing: <em>${context.missing_fields.join(" · ")}</em> — the exact strings the auditor reports.`
+      : "";
+
+    // stage 4
+    const CONCERN_LABELS = {
+      "missing-operating-path": "no operating path declared",
+      "program-disposition-conflict": "program vs disposition conflict",
+      "missing-explicit-contract": "no explicit catalog entry",
+      "intent-needs-review": "intent needs review",
+      "weak-context": "weak context",
+      "archived-outside-archive-path": "looks archival, path isn't archive",
+      "repo-state-below-path-bar": "repo below its path's bar",
+    };
+    const allConcerns = Object.keys(CONCERN_LABELS);
+    $("concern-chips").innerHTML = allConcerns.map((c) =>
+      `<span class="rule${path_entry._concerns.includes(c) ? " fired" : ""}">${CONCERN_LABELS[c]}</span>`).join("");
+    $("confidence-sentence").innerHTML =
+      `Path confidence: <strong>${path_entry.path_confidence}</strong>` +
+      (path_entry.path_override ? ` → override: <strong>${path_entry.path_override}</strong>.` : ".") +
+      (path_entry.path_confidence === "high" ? " The system is willing to stand behind its guidance." : "");
+    $("path-rationale").innerHTML =
+      `“${path_entry.path_rationale}”<span class="src">verbatim rationale string from the pipeline</span>`;
+
+    // stage 5
+    const ladderRungs = [
+      ["archived", "GitHub-archived · registry archived · lifecycle archived · archive path"],
+      ["experiment", "path, disposition, or lifecycle says experiment"],
+      ["parked", "registry says parked (stale repos land here)"],
+      ["decision-needed", "investigate override · no operating path · security risk"],
+      ["active-infra", "active + maintain/finish + infrastructure"],
+      ["active-product", "active + maintain/finish + commercial"],
+      ["manual-only", "active, everything else"],
+    ];
+    $("lane-ladder").innerHTML = ladderRungs.map(([l, why]) =>
+      `<li class="${attention_state === l ? "on" : ""}">${l}<span class="why">${why}</span></li>`).join("");
+    $("attention-sentence").innerHTML =
+      `This repo lands in <strong>${attention_state}</strong> — ${LANE_INFO[attention_state][2]}.`;
+
+    // stage 6
+    const allFactors = Object.entries(C.constants.FACTOR_LABELS);
+    $("factor-chips").innerHTML = allFactors.map(([f, label]) =>
+      `<span class="rule${risk_entry.risk_factors.includes(f) ? " fired" : ""}">${label}</span>`).join("");
+    const tierColor = TIER_INFO[risk_entry.risk_tier][0];
+    let riskExplain = "";
+    if (risk_entry.risk_tier === "deferred") {
+      riskExplain = " Deferred: the tier that grants permission to ignore.";
+    } else if (risk_entry.risk_tier === "elevated") {
+      if (state.securityCriticalAlerts > 0 && ["active", "recent"].includes(activity_status)) {
+        riskExplain = " A single open critical alert on an active repo force-elevates — it cannot hide behind an otherwise clean record.";
+      } else if (risk_entry.risk_factors.includes("weak-context-active") && risk_entry.risk_factors.includes("investigate-override")) {
+        riskExplain = " Weak context + investigate override is the toxic pair — it elevates on its own, no third factor needed.";
+      } else {
+        riskExplain = " Three or more factors crossed the elevation line.";
+      }
+    }
+    $("risk-sentence").innerHTML =
+      `Risk tier: <strong style="color:${tierColor}">${TIER_INFO[risk_entry.risk_tier][1]} ${risk_entry.risk_tier}</strong>.${riskExplain}`;
+    $("risk-summary").innerHTML =
+      `“${risk_entry.risk_summary}”<span class="src">verbatim risk summary from the pipeline</span>`;
+  }
+
+  // ---------- boot ----------
+  applyPreset("The Honest Workhorse");
+})();
+</script>
+</body>
+</html>

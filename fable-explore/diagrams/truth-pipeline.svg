@@ -1,0 +1,188 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 1150" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" role="img" aria-labelledby="title desc">
+  <title id="title">How the portfolio truth pipeline flows</title>
+  <desc id="desc">Five sources feed a reconciliation cascade that derives activity, context quality, path confidence, risk tier, and attention lane per repo. Results publish into a single truth artifact with rollups, producer evidence, and an exclusions ledger. Four consumers read the artifact. A seam linter checks the artifact and its seams continuously.</desc>
+  <style>
+    :root { color-scheme: light dark; }
+    .bg { fill: #fcfcfb; }
+    .box { fill: #f9f9f7; stroke: rgba(11,11,11,0.18); stroke-width: 1; rx: 8; }
+    .band { fill: none; stroke: #e1e0d9; stroke-width: 1; stroke-dasharray: 4 4; rx: 12; }
+    .stage { fill: #f9f9f7; stroke: #2a78d6; stroke-width: 1.2; rx: 8; }
+    .artifact { fill: #cde2fb; stroke: #2a78d6; stroke-width: 1.4; rx: 10; }
+    .linter { fill: none; stroke: #ec835a; stroke-width: 1.4; stroke-dasharray: 6 4; rx: 12; }
+    .t { fill: #0b0b0b; font-size: 13px; font-weight: 600; }
+    .s { fill: #52514e; font-size: 10.5px; }
+    .k { fill: #898781; font-size: 10px; font-weight: 700; letter-spacing: 0.12em; }
+    .a { fill: #2a78d6; font-size: 10.5px; font-weight: 600; }
+    .w { fill: #b25c33; font-size: 10.5px; font-weight: 600; }
+    .edge { stroke: #898781; stroke-width: 1.2; fill: none; marker-end: url(#arrow); }
+    .edge-strong { stroke: #2a78d6; stroke-width: 1.6; fill: none; marker-end: url(#arrowb); }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #1a1a19; }
+      .box { fill: #232322; stroke: rgba(255,255,255,0.18); }
+      .band { stroke: #2c2c2a; }
+      .stage { fill: #232322; stroke: #3987e5; }
+      .artifact { fill: #10315c; stroke: #3987e5; }
+      .linter { stroke: #ec835a; }
+      .t { fill: #ffffff; }
+      .s { fill: #c3c2b7; }
+      .k { fill: #898781; }
+      .a { fill: #6da7ec; }
+      .w { fill: #ec835a; }
+      .edge { stroke: #898781; }
+      .edge-strong { stroke: #3987e5; }
+    }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L8,4 L0,8 z" fill="#898781"/>
+    </marker>
+    <marker id="arrowb" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L8,4 L0,8 z" fill="#2a78d6"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="860" height="1150"/>
+
+  <!-- ============ SOURCES ============ -->
+  <text class="k" x="40" y="42">SOURCES</text>
+  <rect class="band" x="30" y="52" width="800" height="132"/>
+
+  <rect class="box" x="46" y="68" width="148" height="100" rx="8"/>
+  <text class="t" x="58" y="90">Filesystem + git</text>
+  <text class="s" x="58" y="108">observed evidence:</text>
+  <text class="s" x="58" y="122">last commit, meaningful</text>
+  <text class="s" x="58" y="136">mtimes, tests, CI, license,</text>
+  <text class="s" x="58" y="150">context files, README</text>
+
+  <rect class="box" x="206" y="68" width="148" height="100" rx="8"/>
+  <text class="t" x="218" y="90">Catalog (YAML)</text>
+  <text class="s" x="218" y="108">declared intent:</text>
+  <text class="s" x="218" y="122">operating path, criticality,</text>
+  <text class="s" x="218" y="136">category, doctor standard,</text>
+  <text class="s" x="218" y="150">lifecycle, disposition</text>
+
+  <rect class="box" x="366" y="68" width="140" height="100" rx="8"/>
+  <text class="t" x="378" y="90">Legacy registry</text>
+  <text class="s" x="378" y="108">older declarations,</text>
+  <text class="s" x="378" y="122">consulted only when</text>
+  <text class="s" x="378" y="136">the catalog is silent</text>
+
+  <rect class="box" x="518" y="68" width="148" height="100" rx="8"/>
+  <text class="t" x="530" y="90">Notion snapshot</text>
+  <text class="s" x="530" y="108">advisory context;</text>
+  <text class="s" x="530" y="122">carried forward when</text>
+  <text class="s" x="530" y="136">unreachable, with real</text>
+  <text class="s" x="530" y="150">origin dates (lineage)</text>
+
+  <rect class="box" x="678" y="68" width="136" height="100" rx="8"/>
+  <text class="t" x="690" y="90">GitHub security</text>
+  <text class="s" x="690" y="108">open Dependabot</text>
+  <text class="s" x="690" y="122">high/critical counts,</text>
+  <text class="s" x="690" y="136">archived flag</text>
+
+  <!-- precedence note -->
+  <text class="a" x="206" y="204">precedence: catalog repo &gt; catalog group &gt; catalog default &gt; legacy registry &gt; notion</text>
+  <line class="edge" x1="430" y1="184" x2="430" y2="238"/>
+
+  <!-- ============ RECONCILE / CASCADE ============ -->
+  <text class="k" x="40" y="262">RECONCILE · THE VERDICT CASCADE (per repo)</text>
+  <rect class="band" x="30" y="272" width="800" height="420"/>
+
+  <rect class="stage" x="46" y="292" width="380" height="74" rx="8"/>
+  <text class="t" x="58" y="314">1 · Activity</text>
+  <text class="s" x="58" y="332">last commit (or meaningful mtime) → active ≤14d,</text>
+  <text class="s" x="58" y="346">recent ≤30d, else stale · archived short-circuits</text>
+  <text class="a" x="58" y="360">stale is re-filed as “parked”, not scolded</text>
+
+  <rect class="stage" x="446" y="292" width="368" height="74" rx="8"/>
+  <text class="t" x="458" y="314">2 · Context contract</text>
+  <text class="s" x="458" y="332">six required sections present? → none / boilerplate /</text>
+  <text class="s" x="458" y="346">minimum-viable / standard / full</text>
+  <text class="a" x="458" y="360">presence-based: cheap to verify honestly</text>
+
+  <rect class="stage" x="46" y="386" width="380" height="74" rx="8"/>
+  <text class="t" x="58" y="408">3 · Declared path</text>
+  <text class="s" x="58" y="426">explicit path → disposition → maturity program,</text>
+  <text class="s" x="58" y="440">first valid declaration wins, source recorded</text>
+  <text class="a" x="58" y="454">intent is a signal the filesystem can't supply</text>
+
+  <rect class="stage" x="446" y="386" width="368" height="74" rx="8"/>
+  <text class="t" x="458" y="408">4 · Path confidence</text>
+  <text class="s" x="458" y="426">concerns accumulate (weak context, conflicts, no</text>
+  <text class="s" x="458" y="440">contract…) · any hard concern → “investigate”</text>
+  <text class="a" x="458" y="454">confidence gates the advice, not the repo</text>
+
+  <rect class="stage" x="46" y="480" width="380" height="74" rx="8"/>
+  <text class="t" x="58" y="502">5 · Risk tier</text>
+  <text class="s" x="58" y="520">named factors, not scores · 3+ elevates · toxic pair</text>
+  <text class="s" x="58" y="534">elevates · critical CVE force-elevates · deferred exists</text>
+  <text class="a" x="58" y="548">“deferred” = permission to ignore</text>
+
+  <rect class="stage" x="446" y="480" width="368" height="74" rx="8"/>
+  <text class="t" x="458" y="502">6 · Attention lane</text>
+  <text class="s" x="458" y="520">strict ladder, first match wins: archived → experiment</text>
+  <text class="s" x="458" y="534">→ parked → decision-needed → active-infra/product</text>
+  <text class="a" x="458" y="548">→ manual-only (the default bucket)</text>
+
+  <line class="edge" x1="426" y1="329" x2="446" y2="329"/>
+  <path class="edge" d="M 630 366 C 630 376, 236 376, 236 386"/>
+  <line class="edge" x1="426" y1="423" x2="446" y2="423"/>
+  <path class="edge" d="M 630 460 C 630 470, 236 470, 236 480"/>
+  <line class="edge" x1="426" y1="517" x2="446" y2="517"/>
+
+  <rect class="box" x="46" y="574" width="768" height="44" rx="8"/>
+  <text class="t" x="58" y="592">Provenance, recorded at every step</text>
+  <text class="s" x="58" y="608">each field carries {source, detail} · 34 provenance fields per repo vs 7 of risk verdict</text>
+
+  <!-- preflight -->
+  <rect class="box" x="46" y="632" width="768" height="44" rx="8"/>
+  <text class="w" x="58" y="650">Producer preflight (scheduled runs)</text>
+  <text class="s" x="58" y="666">right repo · clean worktree · expected ref · HEAD matches: proven before publish, re-checked after the write; no evidence → publish refused</text>
+
+  <line class="edge-strong" x1="430" y1="692" x2="430" y2="736"/>
+
+  <!-- ============ ARTIFACT ============ -->
+  <text class="k" x="40" y="760">THE TRUTH ARTIFACT</text>
+  <rect class="artifact" x="180" y="772" width="500" height="112" rx="10"/>
+  <text class="t" x="200" y="798">portfolio-truth-latest.json</text>
+  <text class="s" x="200" y="818">~170 project records · schema-pinned · timestamped</text>
+  <text class="s" x="200" y="834">+ rollups computed here, at the source (consumers don't re-derive)</text>
+  <text class="s" x="200" y="850">+ producer evidence embedded · + exclusions ledger (what was skipped, why)</text>
+  <text class="s" x="200" y="866">+ history: every prior snapshot kept on disk</text>
+
+  <line class="edge-strong" x1="430" y1="884" x2="430" y2="928"/>
+
+  <!-- ============ CONSUMERS ============ -->
+  <text class="k" x="40" y="952">CONSUMERS (read-only)</text>
+  <rect class="band" x="30" y="962" width="800" height="120"/>
+
+  <rect class="box" x="46" y="980" width="180" height="84" rx="8"/>
+  <text class="t" x="58" y="1002">Weekly digest</text>
+  <text class="s" x="58" y="1020">command-center report:</text>
+  <text class="s" x="58" y="1034">risk posture, movement,</text>
+  <text class="s" x="58" y="1048">what needs attention</text>
+
+  <rect class="box" x="238" y="980" width="180" height="84" rx="8"/>
+  <text class="t" x="250" y="1002">Decision queue</text>
+  <text class="s" x="250" y="1020">capped list, evidence-</text>
+  <text class="s" x="250" y="1034">stamped, “don't refresh</text>
+  <text class="s" x="250" y="1048">docs unless it resolves this”</text>
+
+  <rect class="box" x="430" y="980" width="180" height="84" rx="8"/>
+  <text class="t" x="442" y="1002">Public site + MCP</text>
+  <text class="s" x="442" y="1020">allowlisted pilot-repo</text>
+  <text class="s" x="442" y="1034">profiles only; private</text>
+  <text class="s" x="442" y="1048">estate stays aggregate</text>
+
+  <rect class="box" x="622" y="980" width="192" height="84" rx="8"/>
+  <text class="t" x="634" y="1002">Command center app</text>
+  <text class="s" x="634" y="1020">desktop cockpit; reads only,</text>
+  <text class="s" x="634" y="1034">writes flow back through</text>
+  <text class="s" x="634" y="1048">the auditor's approval rails</text>
+
+  <!-- ============ SEAM LINTER (wrap) ============ -->
+  <rect class="linter" x="38" y="742" width="788" height="372"/>
+  <text class="w" x="52" y="1104">Seam linter: artifact freshness · rollup integrity · schema pins · identity resolution across the other systems' databases</text>
+
+  <text class="s" x="40" y="1136">GithubRepoAuditor truth pipeline · saagarpatel.dev · mechanisms only, no live portfolio data</text>
+</svg>

@@ -29,5 +29,8 @@ build/
 .playwright-mcp/
 .local/
 
+# Regenerable verdict-machine golden corpus
+fable-explore/verdict-machine/golden/goldens.json
+
 # pytest coverage artifact
 .coverage
