@@ -84,6 +84,7 @@ def run_list_initiatives_mode(args) -> None:
                 if name:
                     projects_by_name[name.lower()] = project
         except (OSError, ValueError):
+            # Listing remains useful without optional portfolio-truth tier context.
             pass
     open_initiatives = [item for item in initiatives if item.closed_at is None]
     closed_initiatives = [item for item in initiatives if item.closed_at is not None]
@@ -106,6 +107,7 @@ def run_list_initiatives_mode(args) -> None:
                 try:
                     status_detail = f"at-risk (deadline ≤ {(date.fromisoformat(initiative.deadline) - date.today()).days}d)"
                 except ValueError:
+                    # Preserve the generic status for malformed historical deadlines.
                     pass
             elif status == "on-track":
                 status_detail = "on-track"

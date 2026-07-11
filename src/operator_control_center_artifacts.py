@@ -88,6 +88,6 @@ def write_control_center_artifacts(
     }
     if contains_sensitive_data(payload) or contains_sensitive_data(snapshot):
         raise ValueError("control-center artifacts must not persist credential fields")
-    json_path.write_text(json.dumps(payload, indent=2))  # lgtm [py/clear-text-storage-sensitive-data] guarded above
-    md_path.write_text(render_control_center_markdown(snapshot, username, generated_at.isoformat()))  # lgtm [py/clear-text-storage-sensitive-data] guarded above
+    json_path.write_text(json.dumps(payload, indent=2))  # codeql[py/clear-text-storage-sensitive-data] guarded above
+    md_path.write_text(render_control_center_markdown(snapshot, username, generated_at.isoformat()))  # codeql[py/clear-text-storage-sensitive-data] guarded above
     return json_path, md_path, weekly_json, weekly_md, payload
