@@ -49,6 +49,7 @@ INTEREST_TIERS = [
 STALE_THRESHOLD_DAYS = 730  # 2 years
 
 GRADE_THRESHOLDS = [(0.80, "A"), (0.70, "B"), (0.55, "C"), (0.35, "D"), (0.0, "F")]
+PARTIAL_RUN_BASIS_THRESHOLD = 0.85
 
 def letter_grade(
     score: float, grade_thresholds: list[tuple[float, str]] | None = None
@@ -105,6 +106,8 @@ def score_repo(
             weight_sum += weight
 
     overall_score = weighted_sum / weight_sum if weight_sum > 0 else 0.0
+    scored_dimensions = [dimension for dimension in weights if dimension in score_map]
+    full_weight_sum = sum(weights.values())
 
     # Compute interest score (separate axis, from interest analyzer)
     interest_score = score_map.get("interest", 0.0)
@@ -166,6 +169,11 @@ def score_repo(
         tier = "skeleton"
         flags.append("readme-only")
 
+    base_grade = letter_grade(overall_score, grade_thresholds)
+    grade = base_grade
+    if weight_sum < full_weight_sum * PARTIAL_RUN_BASIS_THRESHOLD:
+        grade = f"{base_grade} on {len(scored_dimensions)}/{len(weights)} dimensions"
+
     audit = RepoAudit(
         metadata=metadata,
         analyzer_results=results,
@@ -173,7 +181,9 @@ def score_repo(
         interest_score=interest_score,
         completeness_tier=tier,
         interest_tier=interest_tier,
-        grade=letter_grade(overall_score, grade_thresholds),
+        grade=grade,
+        scored_dimensions=scored_dimensions,
+        scored_weight_sum=weight_sum,
         interest_grade=letter_grade(interest_score, grade_thresholds),
         flags=flags,
     )

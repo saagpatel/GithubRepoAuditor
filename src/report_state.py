@@ -57,6 +57,8 @@ def audit_from_dict(data: dict) -> RepoAudit:
         interest_score=data.get("interest_score", 0),
         interest_tier=data.get("interest_tier", "mundane"),
         grade=data.get("grade", "F"), interest_grade=data.get("interest_grade", "F"),
+        scored_dimensions=data.get("scored_dimensions", []),
+        scored_weight_sum=data.get("scored_weight_sum", 0),
         badges=data.get("badges", []), next_badges=data.get("next_badges", []),
         flags=data.get("flags", []), lenses=data.get("lenses", {}), hotspots=data.get("hotspots", []),
         action_candidates=data.get("action_candidates", []), security_posture=data.get("security_posture", {}),
