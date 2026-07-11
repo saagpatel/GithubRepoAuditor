@@ -7,6 +7,11 @@ from typing import Any
 
 from src.portfolio_automation import select_automation_candidates
 from src.portfolio_decision_queue import build_decision_queue, summarize_decision_queue
+from src.portfolio_truth_trends import (
+    DEFAULT_HISTORY_DIR,
+    DEFAULT_HISTORY_RUNS,
+    build_truth_movement,
+)
 from src.portfolio_truth_types import truth_latest_path
 from src.report_enrichment import build_weekly_review_pack
 
@@ -122,6 +127,8 @@ def build_weekly_command_center_digest(
     control_center_reference: str = "",
     report_reference: str = "",
     generated_at: str = "",
+    portfolio_truth_history_dir: Path | None = None,
+    history_window_runs: int = DEFAULT_HISTORY_RUNS,
 ) -> dict[str, Any]:
     weekly_pack = build_weekly_review_pack(_weekly_pack_source(report_data, snapshot), diff_data)
     weekly_story = _mapping(weekly_pack.get("weekly_story_v1"))
@@ -133,6 +140,10 @@ def build_weekly_command_center_digest(
         _safe_text(decision_quality.get("decision_quality_status")) or "insufficient-data"
     )
     truth = portfolio_truth or {}
+    movement = build_truth_movement(
+        portfolio_truth_history_dir or DEFAULT_HISTORY_DIR,
+        max_runs=history_window_runs,
+    )
     freshness = _source_freshness(report_data, truth)
     source_is_stale = freshness["status"] != "current"
     truth_summary = _build_truth_summary(truth)
@@ -215,6 +226,7 @@ def build_weekly_command_center_digest(
             "authority_cap": _safe_text(decision_quality.get("authority_cap")) or AUTHORITY_CAP,
         },
         "portfolio_truth": {**truth_summary, **decision_queue_summary},
+        "movement": movement,
         "decision_queue": decision_queue,
         "path_attention": _build_path_attention_items(truth),
         "automation_candidates": [
@@ -260,6 +272,7 @@ def render_weekly_command_center_markdown(digest: dict[str, Any]) -> str:
     risk_posture = _mapping(digest.get("risk_posture"))
     tier_counts = _mapping(risk_posture.get("risk_tier_counts"))
     security_posture = _mapping(digest.get("security_posture"))
+    movement = _mapping(digest.get("movement"))
     lines = [
         f"# Weekly Command Center: {_safe_text(digest.get('username')) or 'unknown'}",
         "",
@@ -277,8 +290,27 @@ def render_weekly_command_center_markdown(digest: dict[str, Any]) -> str:
         f"- Risk Posture: {risk_posture.get('elevated_count', 0)} elevated, {tier_counts.get('moderate', 0)} moderate, {tier_counts.get('baseline', 0)} baseline",
         f"- Security Posture: {security_posture.get('scanned_count', 0)} scanned, {security_posture.get('repos_with_open_high_critical', 0)} with open high/critical Dependabot alerts ({security_posture.get('total_open_critical', 0)} critical, {security_posture.get('total_open_high', 0)} high)",
         "",
-        "## Decision Queue",
+        "## Movement",
     ]
+
+    lines.append(f"- {_safe_text(movement.get('summary')) or 'No movement history is available.'}")
+    for repo in list(movement.get("repos") or []):
+        details: list[str] = []
+        for key, label in (
+            ("attention_lane_transitions", "attention"),
+            ("activity_status_transitions", "activity"),
+            ("risk_tier_changes", "risk"),
+        ):
+            for event in list(repo.get(key) or []):
+                date = _safe_text(event.get("date"))
+                details.append(
+                    f"{label} {event.get('from')}→{event.get('to')}"
+                    + (f" ({date})" if date else "")
+                )
+        if details:
+            lines.append(f"- **{repo.get('repo', 'Repo')}**: " + "; ".join(details))
+
+    lines.extend(["", "## Decision Queue"])
 
     decision_queue = list(digest.get("decision_queue") or [])
     if not decision_queue:
