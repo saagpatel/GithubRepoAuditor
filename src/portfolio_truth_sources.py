@@ -86,18 +86,36 @@ PROJECT_MARKERS = frozenset(
 #   nogoprjs     -> operator-flagged "no-go" projects, never pursued
 #   smoke-export -> generated AuraForge signed-smoke-export bundles (no real repo)
 IGNORE_PROJECT_DIR_TOKENS = frozenset({"nogoprjs", "smoke-export"})
+IGNORE_PROJECT_DIR_NAMES = frozenset({"codex backups"})
 # Transient / generated working directories matched by regex on the dir name —
 # e.g. a `<repo>-tmp-<timestamp>` clone left behind by a tooling run.
 IGNORE_PROJECT_DIR_PATTERNS: tuple[re.Pattern[str], ...] = (re.compile(r"-tmp-\d+$"),)
 ARCHIVE_REMOTE_BASENAME_TOKENS = frozenset({"private-archive", "scrubbed-import"})
 
 
+WORKSPACE_DISCOVERY_POLICY_VERSION = "workspace_discovery.v1"
+
+
+def workspace_exclusion_reason(name: str) -> str | None:
+    """Return the stable policy reason for a non-project directory name."""
+    lowered = name.lower()
+    if lowered in IGNORE_PROJECT_DIR_NAMES:
+        return "backup-container"
+    if any(token in lowered for token in IGNORE_PROJECT_DIR_TOKENS):
+        return "operator-excluded" if "nogoprjs" in lowered else "generated-evidence"
+    if any(pattern.search(name) for pattern in IGNORE_PROJECT_DIR_PATTERNS):
+        return "temporary-checkout"
+    return None
+
+
 def _is_ignored_project_dir(name: str) -> bool:
     """True if a directory name is a transient/non-project artifact to skip."""
-    lowered = name.lower()
-    if any(token in lowered for token in IGNORE_PROJECT_DIR_TOKENS):
-        return True
-    return any(pattern.search(name) for pattern in IGNORE_PROJECT_DIR_PATTERNS)
+    return workspace_exclusion_reason(name) is not None
+
+
+def _record_exclusion(counts: dict[str, int] | None, reason: str | None) -> None:
+    if counts is not None and reason is not None:
+        counts[reason] = counts.get(reason, 0) + 1
 
 
 def discover_workspace_projects(
@@ -105,6 +123,7 @@ def discover_workspace_projects(
     *,
     catalog_data: dict[str, Any],
     now: datetime | None = None,
+    exclusion_counts: dict[str, int] | None = None,
 ) -> list[dict[str, Any]]:
     discovered: list[dict[str, Any]] = []
     now = now or datetime.now(timezone.utc)
@@ -112,7 +131,9 @@ def discover_workspace_projects(
     for child in sorted(workspace_root.iterdir(), key=lambda item: item.name.lower()):
         if child.name.startswith(".") or not child.is_dir() or child.is_symlink():
             continue
-        if _is_ignored_project_dir(child.name):
+        exclusion_reason = workspace_exclusion_reason(child.name)
+        if exclusion_reason is not None:
+            _record_exclusion(exclusion_counts, exclusion_reason)
             continue
         if _is_project_dir(child):
             discovered.append(
@@ -121,7 +142,12 @@ def discover_workspace_projects(
             continue
         discovered.extend(
             _discover_nested_projects(
-                child, workspace_root, catalog_data=catalog_data, now=now, depth=2
+                child,
+                workspace_root,
+                catalog_data=catalog_data,
+                now=now,
+                depth=2,
+                exclusion_counts=exclusion_counts,
             )
         )
     return _dedupe_checkouts_by_origin(discovered)
@@ -175,6 +201,7 @@ def _discover_nested_projects(
     catalog_data: dict[str, Any],
     now: datetime,
     depth: int,
+    exclusion_counts: dict[str, int] | None = None,
 ) -> list[dict[str, Any]]:
     if depth <= 0:
         return []
@@ -183,7 +210,9 @@ def _discover_nested_projects(
     for child in sorted(root.iterdir(), key=lambda item: item.name.lower()):
         if child.name.startswith(".") or not child.is_dir() or child.is_symlink():
             continue
-        if _is_ignored_project_dir(child.name):
+        exclusion_reason = workspace_exclusion_reason(child.name)
+        if exclusion_reason is not None:
+            _record_exclusion(exclusion_counts, exclusion_reason)
             continue
         if _is_project_dir(child):
             discovered.append(
@@ -192,7 +221,12 @@ def _discover_nested_projects(
             continue
         discovered.extend(
             _discover_nested_projects(
-                child, workspace_root, catalog_data=catalog_data, now=now, depth=depth - 1
+                child,
+                workspace_root,
+                catalog_data=catalog_data,
+                now=now,
+                depth=depth - 1,
+                exclusion_counts=exclusion_counts,
             )
         )
     return discovered

@@ -189,6 +189,7 @@ def test_contract_shadow_marks_legacy_lineage_unknown_without_failing(
         "CL-PROD-001",
         "CL-INP-001",
         "CL-COUNT-001",
+        "CL-EXCL-001",
     }
 
 
@@ -256,6 +257,50 @@ def test_contract_shadow_warns_for_carried_notion_older_than_48_hours(
         finding.check == "CL-FRESH-002" and finding.level == "warn"
         for finding in result.findings
     )
+
+
+def test_contract_shadow_fails_when_excluded_backup_leaks_into_projects(
+    tmp_path: Path,
+) -> None:
+    truth, markdown = _passing_paths(tmp_path)
+    payload = json.loads(truth.read_text())
+    payload.update(
+        {
+            "producer": {},
+            "inputs": {
+                "notion": {"mode": "unavailable"},
+                "catalog": {"sha256": None},
+            },
+            "source_summary": {"attention_state_counts": {"decision-needed": 1}},
+            "rollups": {"decision": {"decision_needed_count": 1}},
+            "exclusions": {
+                "policy_version": "workspace_discovery.v1",
+                "counts": {},
+            },
+            "projects": [
+                {
+                    "identity": {
+                        "path": "Documents/Codex Backups/Wave 2R Post-Update"
+                    },
+                    "derived": {"attention_state": "decision-needed"},
+                }
+            ],
+        }
+    )
+    truth.write_text(json.dumps(payload))
+
+    result = lint_operator_os_seams(
+        truth_path=truth,
+        markdown_paths=markdown,
+        contract_shadow=True,
+        catalog_path=tmp_path / "missing-catalog.yaml",
+        now=NOW,
+    )
+
+    assert not result.passed
+    finding = next(item for item in result.findings if item.check == "CL-EXCL-001")
+    assert finding.level == "fail"
+    assert "Codex Backups" in finding.detail
 
 
 def test_schema_pin_mismatch_fails(tmp_path: Path) -> None:
