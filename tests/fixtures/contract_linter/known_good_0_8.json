@@ -1,0 +1,16 @@
+{
+  "fixture_id": "known_good_0_8",
+  "projects": [
+    {
+      "project_key": "declared-project",
+      "catalog_declared": true,
+      "artifact_catalog_provenance": true,
+      "attention_state": "active-product"
+    }
+  ],
+  "expected": {
+    "CL-PROD-001": "pass",
+    "CL-INP-001": "pass",
+    "CL-DECL-001": "pass"
+  }
+}

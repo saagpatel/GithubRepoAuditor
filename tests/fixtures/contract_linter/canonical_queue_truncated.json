@@ -1,0 +1,5 @@
+{
+  "fixture_id": "canonical_queue_truncated",
+  "queue": {"total": 6, "emitted": 5, "omitted": 1, "truncated": true},
+  "expected": {"CL-QUEUE-001": "pass"}
+}

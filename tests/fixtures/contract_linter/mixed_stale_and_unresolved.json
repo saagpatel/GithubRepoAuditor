@@ -1,0 +1,21 @@
+{
+  "fixture_id": "mixed_stale_and_unresolved",
+  "projects": [
+    {
+      "project_key": "stale-one",
+      "catalog_declared": true,
+      "artifact_catalog_provenance": false,
+      "attention_state": "decision-needed"
+    },
+    {
+      "project_key": "unresolved-one",
+      "catalog_declared": false,
+      "artifact_catalog_provenance": false,
+      "attention_state": "decision-needed"
+    }
+  ],
+  "expected": {
+    "CL-DECL-001:stale-one": "fail",
+    "CL-DECL-001:unresolved-one": "unknown"
+  }
+}

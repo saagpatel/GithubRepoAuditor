@@ -1,0 +1,5 @@
+{
+  "fixture_id": "notion_carried_stale",
+  "source": {"mode": "carried-forward", "age_hours": 49, "origin_known": true},
+  "expected": {"CL-FRESH-002": "warn"}
+}
