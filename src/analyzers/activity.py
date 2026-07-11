@@ -17,7 +17,6 @@ MONTHS_3_WEEKS = 13  # ~13 weeks in 3 months
 
 class ActivityAnalyzer(BaseAnalyzer):
     name = "activity"
-    weight = 0.15
 
     def analyze(
         self,

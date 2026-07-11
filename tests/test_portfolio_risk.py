@@ -6,7 +6,6 @@ def _baseline_kwargs(**overrides):
         display_name="SomeRepo",
         operating_path="maintain",
         path_override="",
-        path_confidence="high",
         context_quality="standard",
         activity_status="active",
         registry_status="active",

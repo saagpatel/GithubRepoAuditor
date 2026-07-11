@@ -21,7 +21,6 @@ TEST_PATTERNS = (
 
 class TestingAnalyzer(BaseAnalyzer):
     name = "testing"
-    weight = 0.15
 
     def analyze(
         self,

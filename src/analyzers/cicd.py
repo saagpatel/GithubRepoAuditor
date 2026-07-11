@@ -22,7 +22,6 @@ ALT_CI_DIRS = (".circleci",)
 
 class CicdAnalyzer(BaseAnalyzer):
     name = "cicd"
-    weight = 0.10
 
     def analyze(
         self,

@@ -52,7 +52,6 @@ DEPLOY_CONFIGS = (
 
 class DocumentationAnalyzer(BaseAnalyzer):
     name = "documentation"
-    weight = 0.05
 
     def analyze(
         self,
@@ -108,7 +107,6 @@ class DocumentationAnalyzer(BaseAnalyzer):
 
 class BuildReadinessAnalyzer(BaseAnalyzer):
     name = "build_readiness"
-    weight = 0.05
 
     def analyze(
         self,

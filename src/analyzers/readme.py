@@ -36,7 +36,6 @@ SETUP_HEADINGS = re.compile(
 
 class ReadmeAnalyzer(BaseAnalyzer):
     name = "readme"
-    weight = 0.15
 
     def cache_inputs_hash(
         self,

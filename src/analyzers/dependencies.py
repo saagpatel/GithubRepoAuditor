@@ -41,7 +41,6 @@ MANIFESTS = (
 
 class DependenciesAnalyzer(BaseAnalyzer):
     name = "dependencies"
-    weight = 0.10
 
     def cache_inputs_hash(
         self,

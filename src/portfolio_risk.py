@@ -56,7 +56,6 @@ def build_risk_entry(
     display_name: str,
     operating_path: str,
     path_override: str,
-    path_confidence: str,
     context_quality: str,
     activity_status: str,
     registry_status: str,
