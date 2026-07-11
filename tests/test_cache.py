@@ -53,6 +53,27 @@ class TestResponseCache:
         assert result1 == [{"sha": "abc"}]
         assert result2 == [{"sha": "def"}]
 
+    def test_put_skips_payloads_that_contain_credentials(self, tmp_path):
+        cache = ResponseCache(cache_dir=tmp_path / "cache", ttl=3600)
+        url = "https://api.github.com/repos/user/repo"
+
+        cache.put(
+            url,
+            {"access_token": "secret-param", "per_page": "10"},
+            {"name": "repo", "nested": {"client_secret": "secret-value"}},
+        )
+
+        assert not cache._path(url, {"access_token": "secret-param", "per_page": "10"}).exists()
+
+    def test_put_preserves_noncredential_secret_scanning_shape(self, tmp_path):
+        cache = ResponseCache(cache_dir=tmp_path / "cache", ttl=3600)
+        url = "https://api.github.com/repos/user/repo"
+        response = {"security_and_analysis": {"secret_scanning": {"status": "enabled"}}}
+
+        cache.put(url, None, response)
+
+        assert cache.get(url, None) == response
+
     def test_cache_creates_dir(self, tmp_path):
         cache_dir = tmp_path / "deep" / "nested" / "cache"
         ResponseCache(cache_dir=cache_dir, ttl=3600)

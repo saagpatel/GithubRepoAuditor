@@ -2,46 +2,39 @@ from __future__ import annotations
 
 from typing import Any
 
+from src.report_contracts import (
+    WeeklyStoryEvidenceItem,
+    WeeklyStorySection,
+    WeeklyStoryV1,
+)
 from src.terminology import ACTION_SYNC_CANONICAL_LABELS
 
-NO_FOLLOW_THROUGH_CHECKPOINT = "Use the next run or linked artifact to confirm whether the recommendation moved."
-NO_OPERATOR_FOCUS_SUMMARY = "No operator focus bucket is currently surfaced."
-NO_WHERE_TO_START_SUMMARY = "No meaningful implementation hotspot is currently surfaced."
-NO_OPERATOR_OUTCOMES_SUMMARY = (
-    "Not enough operator history is recorded yet to judge whether recent actions are improving portfolio outcomes."
+NO_FOLLOW_THROUGH_CHECKPOINT = (
+    "Use the next run or linked artifact to confirm whether the recommendation moved."
 )
+NO_OPERATOR_FOCUS_SUMMARY = "No operator focus bucket is currently surfaced."
+NO_WHERE_TO_START_SUMMARY = (
+    "No meaningful implementation hotspot is currently surfaced."
+)
+NO_OPERATOR_OUTCOMES_SUMMARY = "Not enough operator history is recorded yet to judge whether recent actions are improving portfolio outcomes."
 NO_ACTION_SYNC_SUMMARY = "No current campaign needs Action Sync yet, so the safest next move is to keep the story local."
 NO_ACTION_SYNC_STEP = "Stay local for now; no current campaign needs preview or apply."
-NO_ACTION_SYNC_LINE = (
-    "Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites."
+NO_ACTION_SYNC_LINE = "Action Sync: stay local until a campaign has meaningful actions and healthy writeback prerequisites."
+NO_APPLY_READINESS_SUMMARY = "No current campaign has a safe execution handoff yet, so the local story should stay local for now."
+NO_NEXT_APPLY_CANDIDATE = (
+    "Stay local for now; no current campaign has a safe execution handoff."
 )
-NO_APPLY_READINESS_SUMMARY = (
-    "No current campaign has a safe execution handoff yet, so the local story should stay local for now."
+NO_CAMPAIGN_OUTCOMES_SUMMARY = "No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local."
+NO_NEXT_MONITORING_STEP = (
+    "Stay local for now; no recent Action Sync apply needs post-apply follow-up yet."
 )
-NO_NEXT_APPLY_CANDIDATE = "Stay local for now; no current campaign has a safe execution handoff."
-NO_CAMPAIGN_OUTCOMES_SUMMARY = (
-    "No recent Action Sync apply needs post-apply monitoring yet, so the local weekly story can stay local."
-)
-NO_NEXT_MONITORING_STEP = "Stay local for now; no recent Action Sync apply needs post-apply follow-up yet."
-NO_CAMPAIGN_TUNING_SUMMARY = (
-    "Campaign tuning stays neutral until there is enough outcome history to bias tied recommendations."
-)
+NO_CAMPAIGN_TUNING_SUMMARY = "Campaign tuning stays neutral until there is enough outcome history to bias tied recommendations."
 NO_NEXT_TUNED_CAMPAIGN = "No current campaign needs a tie-break candidate yet."
-NO_HISTORICAL_PORTFOLIO_INTELLIGENCE_SUMMARY = (
-    "Historical portfolio intelligence is still thin, so the weekly story should stay grounded in the current run and recent operator queue."
-)
-NO_NEXT_HISTORICAL_FOCUS = (
-    "Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet."
-)
-NO_AUTOMATION_GUIDANCE_SUMMARY = (
-    "Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture."
-)
-NO_NEXT_SAFE_AUTOMATION_STEP = (
-    "Stay local for now; no current campaign has a stronger safe automation posture than manual review."
-)
-NO_AUTOMATION_GUIDANCE_LINE = (
-    "Automation Guidance: keep the next step human-led until a bounded safe posture is surfaced."
-)
+NO_HISTORICAL_PORTFOLIO_INTELLIGENCE_SUMMARY = "Historical portfolio intelligence is still thin, so the weekly story should stay grounded in the current run and recent operator queue."
+NO_NEXT_HISTORICAL_FOCUS = "Stay local for now; no repo has enough cross-run intervention evidence to demand a historical follow-up read yet."
+NO_AUTOMATION_GUIDANCE_SUMMARY = "Automation guidance stays quiet until a campaign has a clearly safe preview, follow-up, or manual-only posture."
+NO_NEXT_SAFE_AUTOMATION_STEP = "Stay local for now; no current campaign has a stronger safe automation posture than manual review."
+NO_AUTOMATION_GUIDANCE_LINE = "Automation Guidance: keep the next step human-led until a bounded safe posture is surfaced."
 NO_APPROVAL_WORKFLOW_SUMMARY = "No current approval needs review yet, so the approval workflow can stay local for now."
 NO_NEXT_APPROVAL_REVIEW = "Stay local for now; no current approval needs review."
 NO_APPROVAL_WORKFLOW_LINE = "Approval Workflow: no current approval needs review yet."
@@ -55,7 +48,9 @@ def _first_command_hint(*values: Any) -> str | None:
     return None
 
 
-def _safe_posture_for_command(command_hint: str | None, *, default: str = "read-only") -> str:
+def _safe_posture_for_command(
+    command_hint: str | None, *, default: str = "read-only"
+) -> str:
     if not command_hint:
         return default
     if "--writeback-apply" in command_hint:
@@ -74,8 +69,8 @@ def _build_story_evidence_item(
     *,
     safe_posture: str = "read-only",
     command_hint: str | None = None,
-) -> dict[str, Any]:
-    item: dict[str, Any] = {
+) -> WeeklyStoryEvidenceItem:
+    item: WeeklyStoryEvidenceItem = {
         "label": label,
         "summary": str(summary),
         "kind": kind,
@@ -139,7 +134,9 @@ def _build_repo_briefing_explainability(briefing: dict[str, Any]) -> dict[str, A
             "Action Sync",
             briefing.get("action_sync_line", NO_ACTION_SYNC_LINE),
             "action-sync",
-            safe_posture=_safe_posture_for_command(briefing.get("apply_packet_command")),
+            safe_posture=_safe_posture_for_command(
+                briefing.get("apply_packet_command")
+            ),
             command_hint=_first_command_hint(briefing.get("apply_packet_command")),
         ),
         _build_story_evidence_item(
@@ -157,8 +154,13 @@ def _build_repo_briefing_explainability(briefing: dict[str, Any]) -> dict[str, A
     ]
     return {
         **briefing,
-        "why_it_won": str(briefing.get("why_it_matters_line") or "No explanation summary is recorded yet."),
-        "next_step": str(briefing.get("what_to_do_next_line") or "No next action is recorded yet."),
+        "why_it_won": str(
+            briefing.get("why_it_matters_line")
+            or "No explanation summary is recorded yet."
+        ),
+        "next_step": str(
+            briefing.get("what_to_do_next_line") or "No next action is recorded yet."
+        ),
         "evidence_strip": evidence_strip,
     }
 
@@ -173,8 +175,8 @@ def _campaign_evidence_items(
     label_prefix: str | None = None,
     command_keys: tuple[str, ...] = (),
     extra_formatter: Any | None = None,
-) -> list[dict[str, Any]]:
-    evidence_items: list[dict[str, Any]] = []
+) -> list[WeeklyStoryEvidenceItem]:
+    evidence_items: list[WeeklyStoryEvidenceItem] = []
     for item in items[:3]:
         label = str(item.get(label_key) or item.get(fallback_label_key) or "Campaign")
         if label_prefix:
@@ -195,8 +197,10 @@ def _campaign_evidence_items(
     return evidence_items
 
 
-def _approval_evidence_items(items: list[dict[str, Any]], *, label_prefix: str | None = None) -> list[dict[str, Any]]:
-    evidence_items: list[dict[str, Any]] = []
+def _approval_evidence_items(
+    items: list[dict[str, Any]], *, label_prefix: str | None = None
+) -> list[WeeklyStoryEvidenceItem]:
+    evidence_items: list[WeeklyStoryEvidenceItem] = []
     for item in items[:3]:
         label = str(item.get("label") or item.get("subject_key") or "Approval")
         if label_prefix:
@@ -212,53 +216,75 @@ def _approval_evidence_items(items: list[dict[str, Any]], *, label_prefix: str |
                 label,
                 summary,
                 "approval-workflow",
-                safe_posture=_safe_posture_for_command(command_hint, default="approval-review"),
+                safe_posture=_safe_posture_for_command(
+                    command_hint, default="approval-review"
+                ),
                 command_hint=command_hint,
             )
         )
     return evidence_items
 
 
-def _repo_evidence_items(items: list[dict[str, Any]], *, label_prefix: str | None = None) -> list[dict[str, Any]]:
+def _repo_evidence_items(
+    items: list[dict[str, Any]], *, label_prefix: str | None = None
+) -> list[WeeklyStoryEvidenceItem]:
     return [
         _build_story_evidence_item(
-            f"{label_prefix}: {item.get('repo') or 'Repo'}" if label_prefix else str(item.get("repo") or "Repo"),
-            str(item.get("summary") or "No historical intelligence summary is recorded yet."),
+            f"{label_prefix}: {item.get('repo') or 'Repo'}"
+            if label_prefix
+            else str(item.get("repo") or "Repo"),
+            str(
+                item.get("summary")
+                or "No historical intelligence summary is recorded yet."
+            ),
             "historical-portfolio-intelligence",
         )
         for item in items[:3]
     ]
 
 
-def _determine_section_state(weekly_pack: dict[str, Any], options: list[tuple[str, str]]) -> str:
+def _determine_section_state(
+    weekly_pack: dict[str, Any], options: list[tuple[str, str]]
+) -> str:
     for key, state in options:
         if weekly_pack.get(key):
             return state
     return "idle"
 
 
-def _build_weekly_story_v1(weekly_pack: dict[str, Any]) -> dict[str, Any]:
-    weekly_priority_evidence_items = list(weekly_pack.get("weekly_priority_evidence_items") or [])
+def _build_weekly_story_v1(weekly_pack: dict[str, Any]) -> WeeklyStoryV1:
+    weekly_priority_evidence_items = list(
+        weekly_pack.get("weekly_priority_evidence_items") or []
+    )
     if not weekly_priority_evidence_items:
         weekly_priority_evidence_items = [
             _build_story_evidence_item(
                 "Trust / Actionability",
-                str(weekly_pack.get("trust_actionability_summary") or "No trust summary is recorded yet."),
+                str(
+                    weekly_pack.get("trust_actionability_summary")
+                    or "No trust summary is recorded yet."
+                ),
                 "weekly-priority",
             ),
             _build_story_evidence_item(
                 "Operator Focus",
-                str(weekly_pack.get("operator_focus_summary") or NO_OPERATOR_FOCUS_SUMMARY),
+                str(
+                    weekly_pack.get("operator_focus_summary")
+                    or NO_OPERATOR_FOCUS_SUMMARY
+                ),
                 "operator-focus",
             ),
             _build_story_evidence_item(
                 "Operator Outcomes",
-                str(weekly_pack.get("operator_outcomes_summary") or NO_OPERATOR_OUTCOMES_SUMMARY),
+                str(
+                    weekly_pack.get("operator_outcomes_summary")
+                    or NO_OPERATOR_OUTCOMES_SUMMARY
+                ),
                 "operator-outcomes",
             ),
         ]
 
-    sections = [
+    sections: list[WeeklyStorySection] = [
         {
             "id": "weekly-priority",
             "label": "Weekly Priority",
@@ -274,7 +300,10 @@ def _build_weekly_story_v1(weekly_pack: dict[str, Any]) -> dict[str, Any]:
                 or "Continue the normal operator review loop."
             ),
             "next_label": "Decision",
-            "reason_codes": list(weekly_pack.get("weekly_priority_reason_codes") or ["queue-pressure", "operator-priority"]),
+            "reason_codes": list(
+                weekly_pack.get("weekly_priority_reason_codes")
+                or ["queue-pressure", "operator-priority"]
+            ),
             "evidence_items": weekly_priority_evidence_items,
         },
         {
@@ -289,8 +318,12 @@ def _build_weekly_story_v1(weekly_pack: dict[str, Any]) -> dict[str, Any]:
                     ("top_preview_ready_campaigns", "preview-ready"),
                 ],
             ),
-            "headline": str(weekly_pack.get("action_sync_summary") or NO_ACTION_SYNC_SUMMARY),
-            "next_step": str(weekly_pack.get("next_action_sync_step") or NO_ACTION_SYNC_STEP),
+            "headline": str(
+                weekly_pack.get("action_sync_summary") or NO_ACTION_SYNC_SUMMARY
+            ),
+            "next_step": str(
+                weekly_pack.get("next_action_sync_step") or NO_ACTION_SYNC_STEP
+            ),
             "next_label": "Next Step",
             "reason_codes": ["action-sync", "readiness"],
             "evidence_items": (
@@ -299,14 +332,18 @@ def _build_weekly_story_v1(weekly_pack: dict[str, Any]) -> dict[str, Any]:
                     summary_key="reason",
                     kind="action-sync-readiness",
                     label_prefix="Apply Ready",
-                    extra_formatter=lambda item, summary: f"{summary} (target {item.get('recommended_target', 'none')})",
+                    extra_formatter=lambda item, summary: (
+                        f"{summary} (target {item.get('recommended_target', 'none')})"
+                    ),
                 )
                 + _campaign_evidence_items(
                     list(weekly_pack.get("top_preview_ready_campaigns") or []),
                     summary_key="reason",
                     kind="action-sync-readiness",
                     label_prefix="Preview Ready",
-                    extra_formatter=lambda item, summary: f"{summary} (target {item.get('recommended_target', 'none')})",
+                    extra_formatter=lambda item, summary: (
+                        f"{summary} (target {item.get('recommended_target', 'none')})"
+                    ),
                 )
                 + _campaign_evidence_items(
                     list(weekly_pack.get("top_drift_review_campaigns") or []),
@@ -333,8 +370,12 @@ def _build_weekly_story_v1(weekly_pack: dict[str, Any]) -> dict[str, Any]:
                     ("top_ready_to_apply_packets", "ready-to-apply"),
                 ],
             ),
-            "headline": str(weekly_pack.get("apply_readiness_summary") or NO_APPLY_READINESS_SUMMARY),
-            "next_step": str(weekly_pack.get("next_apply_candidate") or NO_NEXT_APPLY_CANDIDATE),
+            "headline": str(
+                weekly_pack.get("apply_readiness_summary") or NO_APPLY_READINESS_SUMMARY
+            ),
+            "next_step": str(
+                weekly_pack.get("next_apply_candidate") or NO_NEXT_APPLY_CANDIDATE
+            ),
             "next_label": "Next Candidate",
             "reason_codes": ["action-sync", "apply-packet"],
             "evidence_items": (
@@ -373,8 +414,13 @@ def _build_weekly_story_v1(weekly_pack: dict[str, Any]) -> dict[str, Any]:
                     ("top_holding_clean_campaigns", "holding-clean"),
                 ],
             ),
-            "headline": str(weekly_pack.get("campaign_outcomes_summary") or NO_CAMPAIGN_OUTCOMES_SUMMARY),
-            "next_step": str(weekly_pack.get("next_monitoring_step") or NO_NEXT_MONITORING_STEP),
+            "headline": str(
+                weekly_pack.get("campaign_outcomes_summary")
+                or NO_CAMPAIGN_OUTCOMES_SUMMARY
+            ),
+            "next_step": str(
+                weekly_pack.get("next_monitoring_step") or NO_NEXT_MONITORING_STEP
+            ),
             "next_label": "Next Step",
             "reason_codes": ["action-sync", "post-apply-monitoring"],
             "evidence_items": (
@@ -414,9 +460,13 @@ def _build_weekly_story_v1(weekly_pack: dict[str, Any]) -> dict[str, Any]:
                     ("top_thin_evidence_campaigns", "thin-evidence"),
                 ],
             ),
-            "headline": str(weekly_pack.get("campaign_tuning_summary") or NO_CAMPAIGN_TUNING_SUMMARY),
+            "headline": str(
+                weekly_pack.get("campaign_tuning_summary") or NO_CAMPAIGN_TUNING_SUMMARY
+            ),
             "next_step": str(
-                weekly_pack.get("next_tie_break_candidate") or weekly_pack.get("next_tuned_campaign") or NO_NEXT_TUNED_CAMPAIGN
+                weekly_pack.get("next_tie_break_candidate")
+                or weekly_pack.get("next_tuned_campaign")
+                or NO_NEXT_TUNED_CAMPAIGN
             ),
             "next_label": ACTION_SYNC_CANONICAL_LABELS["next_tie_break_candidate"],
             "reason_codes": ["action-sync", "campaign-tuning"],
@@ -453,12 +503,20 @@ def _build_weekly_story_v1(weekly_pack: dict[str, Any]) -> dict[str, Any]:
                     ("top_holding_repos", "holding-steady"),
                 ],
             ),
-            "headline": str(weekly_pack.get("historical_portfolio_intelligence") or NO_HISTORICAL_PORTFOLIO_INTELLIGENCE_SUMMARY),
-            "next_step": str(weekly_pack.get("next_historical_focus") or NO_NEXT_HISTORICAL_FOCUS),
+            "headline": str(
+                weekly_pack.get("historical_portfolio_intelligence")
+                or NO_HISTORICAL_PORTFOLIO_INTELLIGENCE_SUMMARY
+            ),
+            "next_step": str(
+                weekly_pack.get("next_historical_focus") or NO_NEXT_HISTORICAL_FOCUS
+            ),
             "next_label": "Next Focus",
             "reason_codes": ["historical-intelligence", "portfolio"],
             "evidence_items": (
-                _repo_evidence_items(list(weekly_pack.get("top_relapsing_repos") or []), label_prefix="Relapsing")
+                _repo_evidence_items(
+                    list(weekly_pack.get("top_relapsing_repos") or []),
+                    label_prefix="Relapsing",
+                )
                 + _repo_evidence_items(
                     list(weekly_pack.get("top_persistent_pressure_repos") or []),
                     label_prefix="Persistent Pressure",
@@ -467,7 +525,10 @@ def _build_weekly_story_v1(weekly_pack: dict[str, Any]) -> dict[str, Any]:
                     list(weekly_pack.get("top_improving_repos") or []),
                     label_prefix="Improving After Intervention",
                 )
-                + _repo_evidence_items(list(weekly_pack.get("top_holding_repos") or []), label_prefix="Holding Steady")
+                + _repo_evidence_items(
+                    list(weekly_pack.get("top_holding_repos") or []),
+                    label_prefix="Holding Steady",
+                )
             ),
         },
         {
@@ -483,8 +544,14 @@ def _build_weekly_story_v1(weekly_pack: dict[str, Any]) -> dict[str, Any]:
                     ("top_manual_only_campaigns", "manual-only"),
                 ],
             ),
-            "headline": str(weekly_pack.get("automation_guidance_summary") or NO_AUTOMATION_GUIDANCE_SUMMARY),
-            "next_step": str(weekly_pack.get("next_safe_automation_step") or NO_NEXT_SAFE_AUTOMATION_STEP),
+            "headline": str(
+                weekly_pack.get("automation_guidance_summary")
+                or NO_AUTOMATION_GUIDANCE_SUMMARY
+            ),
+            "next_step": str(
+                weekly_pack.get("next_safe_automation_step")
+                or NO_NEXT_SAFE_AUTOMATION_STEP
+            ),
             "next_label": "Next Step",
             "reason_codes": ["automation-guidance", "safe-posture"],
             "evidence_items": (
@@ -539,8 +606,13 @@ def _build_weekly_story_v1(weekly_pack: dict[str, Any]) -> dict[str, Any]:
                     ("top_blocked_approvals", "blocked"),
                 ],
             ),
-            "headline": str(weekly_pack.get("approval_workflow_summary") or NO_APPROVAL_WORKFLOW_SUMMARY),
-            "next_step": str(weekly_pack.get("next_approval_review") or NO_NEXT_APPROVAL_REVIEW),
+            "headline": str(
+                weekly_pack.get("approval_workflow_summary")
+                or NO_APPROVAL_WORKFLOW_SUMMARY
+            ),
+            "next_step": str(
+                weekly_pack.get("next_approval_review") or NO_NEXT_APPROVAL_REVIEW
+            ),
             "next_label": ACTION_SYNC_CANONICAL_LABELS["next_approval_review"],
             "reason_codes": ["approval-workflow", "local-only"],
             "evidence_items": (
@@ -564,7 +636,10 @@ def _build_weekly_story_v1(weekly_pack: dict[str, Any]) -> dict[str, Any]:
                     list(weekly_pack.get("top_approved_manual_approvals") or []),
                     label_prefix="Approved But Manual",
                 )
-                + _approval_evidence_items(list(weekly_pack.get("top_blocked_approvals") or []), label_prefix="Blocked")
+                + _approval_evidence_items(
+                    list(weekly_pack.get("top_blocked_approvals") or []),
+                    label_prefix="Blocked",
+                )
             ),
         },
         {
@@ -580,15 +655,23 @@ def _build_weekly_story_v1(weekly_pack: dict[str, Any]) -> dict[str, Any]:
                     ("top_revalidate_items", "revalidate"),
                 ],
             ),
-            "headline": str(weekly_pack.get("operator_focus_summary") or NO_OPERATOR_FOCUS_SUMMARY),
-            "next_step": str(weekly_pack.get("follow_through_checkpoint_summary") or NO_FOLLOW_THROUGH_CHECKPOINT),
+            "headline": str(
+                weekly_pack.get("operator_focus_summary") or NO_OPERATOR_FOCUS_SUMMARY
+            ),
+            "next_step": str(
+                weekly_pack.get("follow_through_checkpoint_summary")
+                or NO_FOLLOW_THROUGH_CHECKPOINT
+            ),
             "next_label": "Next Checkpoint",
             "reason_codes": ["operator-focus", "follow-through"],
             "evidence_items": (
                 [
                     _build_story_evidence_item(
                         str(item.get("repo") or item.get("title") or "Operator item"),
-                        str(item.get("operator_focus_summary") or NO_OPERATOR_FOCUS_SUMMARY),
+                        str(
+                            item.get("operator_focus_summary")
+                            or NO_OPERATOR_FOCUS_SUMMARY
+                        ),
                         "operator-focus",
                     )
                     for item in list(weekly_pack.get("top_act_now_items") or [])[:3]
@@ -596,15 +679,23 @@ def _build_weekly_story_v1(weekly_pack: dict[str, Any]) -> dict[str, Any]:
                 + [
                     _build_story_evidence_item(
                         str(item.get("repo") or item.get("title") or "Operator item"),
-                        str(item.get("operator_focus_summary") or NO_OPERATOR_FOCUS_SUMMARY),
+                        str(
+                            item.get("operator_focus_summary")
+                            or NO_OPERATOR_FOCUS_SUMMARY
+                        ),
                         "operator-focus",
                     )
-                    for item in list(weekly_pack.get("top_watch_closely_items") or [])[:3]
+                    for item in list(weekly_pack.get("top_watch_closely_items") or [])[
+                        :3
+                    ]
                 ]
                 + [
                     _build_story_evidence_item(
                         str(item.get("repo") or item.get("title") or "Operator item"),
-                        str(item.get("operator_focus_summary") or NO_OPERATOR_FOCUS_SUMMARY),
+                        str(
+                            item.get("operator_focus_summary")
+                            or NO_OPERATOR_FOCUS_SUMMARY
+                        ),
                         "operator-focus",
                     )
                     for item in list(weekly_pack.get("top_improving_items") or [])[:3]
@@ -612,7 +703,10 @@ def _build_weekly_story_v1(weekly_pack: dict[str, Any]) -> dict[str, Any]:
                 + [
                     _build_story_evidence_item(
                         str(item.get("repo") or item.get("title") or "Operator item"),
-                        str(item.get("operator_focus_summary") or NO_OPERATOR_FOCUS_SUMMARY),
+                        str(
+                            item.get("operator_focus_summary")
+                            or NO_OPERATOR_FOCUS_SUMMARY
+                        ),
                         "operator-focus",
                     )
                     for item in list(weekly_pack.get("top_fragile_items") or [])[:3]
@@ -620,7 +714,10 @@ def _build_weekly_story_v1(weekly_pack: dict[str, Any]) -> dict[str, Any]:
                 + [
                     _build_story_evidence_item(
                         str(item.get("repo") or item.get("title") or "Operator item"),
-                        str(item.get("operator_focus_summary") or NO_OPERATOR_FOCUS_SUMMARY),
+                        str(
+                            item.get("operator_focus_summary")
+                            or NO_OPERATOR_FOCUS_SUMMARY
+                        ),
                         "operator-focus",
                     )
                     for item in list(weekly_pack.get("top_revalidate_items") or [])[:3]
@@ -631,9 +728,18 @@ def _build_weekly_story_v1(weekly_pack: dict[str, Any]) -> dict[str, Any]:
 
     return {
         "version": 1,
-        "headline": str(weekly_pack.get("portfolio_headline") or "No weekly headline is recorded yet."),
-        "decision": str(weekly_pack.get("what_to_do_this_week") or "Continue the normal operator review loop."),
-        "why_this_week": str(weekly_pack.get("queue_pressure_summary") or "No queue-pressure summary is recorded yet."),
+        "headline": str(
+            weekly_pack.get("portfolio_headline")
+            or "No weekly headline is recorded yet."
+        ),
+        "decision": str(
+            weekly_pack.get("what_to_do_this_week")
+            or "Continue the normal operator review loop."
+        ),
+        "why_this_week": str(
+            weekly_pack.get("queue_pressure_summary")
+            or "No queue-pressure summary is recorded yet."
+        ),
         "next_step": str(
             weekly_pack.get("next_best_workflow_step")
             or "Open the standard workbook first, then use --control-center for read-only triage."
@@ -646,10 +752,12 @@ def _build_weekly_story_v1(weekly_pack: dict[str, Any]) -> dict[str, Any]:
 def finalize_weekly_pack(weekly_pack: dict[str, Any]) -> dict[str, Any]:
     finalized = dict(weekly_pack)
     finalized["top_attention"] = [
-        _build_attention_explainability(item) for item in list(finalized.get("top_attention") or [])
+        _build_attention_explainability(item)
+        for item in list(finalized.get("top_attention") or [])
     ]
     finalized["repo_briefings"] = [
-        _build_repo_briefing_explainability(item) for item in list(finalized.get("repo_briefings") or [])
+        _build_repo_briefing_explainability(item)
+        for item in list(finalized.get("repo_briefings") or [])
     ]
     finalized["weekly_story_v1"] = _build_weekly_story_v1(finalized)
     return finalized

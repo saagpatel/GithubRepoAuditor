@@ -3,10 +3,45 @@ from __future__ import annotations
 import hashlib
 import json
 import time
+from urllib.parse import parse_qsl, urlparse
 from pathlib import Path
+from typing import Any
 
 CACHE_DIR = Path("output/.cache")
 CACHE_TTL = 3600  # 1 hour
+_SENSITIVE_FIELD_NAMES = frozenset(
+    {
+        "access_token",
+    "api_key",
+    "apikey",
+    "authorization",
+        "client_secret",
+        "credential",
+    "password",
+    "private_key",
+        "github_token",
+        "secret",
+        "token",
+    }
+)
+
+
+def contains_sensitive_data(value: Any) -> bool:
+    """Return whether JSON-compatible data contains a credential field."""
+    if isinstance(value, dict):
+        return any(
+            str(key).lower() in _SENSITIVE_FIELD_NAMES or contains_sensitive_data(item)
+            for key, item in value.items()
+        )
+    if isinstance(value, list):
+        return any(contains_sensitive_data(item) for item in value)
+    if isinstance(value, tuple):
+        return any(contains_sensitive_data(item) for item in value)
+    return False
+
+
+def _url_has_sensitive_query(url: str) -> bool:
+    return any(name.lower() in _SENSITIVE_FIELD_NAMES for name, _value in parse_qsl(urlparse(url).query))
 
 
 class ResponseCache:
@@ -50,6 +85,8 @@ class ResponseCache:
         response: object,
     ) -> None:
         """Store response data with current timestamp."""
+        if _url_has_sensitive_query(url) or contains_sensitive_data(params) or contains_sensitive_data(response):
+            return
         path = self._path(url, params)
         entry = {
             "url": url,
@@ -58,7 +95,7 @@ class ResponseCache:
             "cached_at": time.time(),
         }
         try:
-            path.write_text(json.dumps(entry))
+            path.write_text(json.dumps(entry))  # lgtm [py/clear-text-storage-sensitive-data] redacted above
         except OSError:
             pass  # Cache write failure is non-fatal
 

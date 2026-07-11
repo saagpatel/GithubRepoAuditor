@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Optional
 
 
+
 def _parse_dt(value: str | None) -> Optional[datetime]:
     """Parse GitHub API datetime string to timezone-aware datetime."""
     if not value:
@@ -37,7 +38,9 @@ class RepoMetadata:
     topics: list[str] = field(default_factory=list)
 
     @classmethod
-    def from_api_response(cls, data: dict, languages: dict[str, int] | None = None) -> RepoMetadata:
+    def from_api_response(
+        cls, data: dict, languages: dict[str, int] | None = None
+    ) -> RepoMetadata:
         """Build RepoMetadata from a GitHub API repo object."""
         return cls(
             name=data["name"],
@@ -108,32 +111,9 @@ class RepoAudit:
     scorecard: dict = field(default_factory=dict)
     ossf_scorecard: dict = field(default_factory=dict)
 
-    def _context_quality_score(self) -> float:
-        from src.catalog_validator import score_catalog_entry
-        from src.context_quality import compute_context_quality_score
-
-        by_dim = {r.dimension: r for r in self.analyzer_results}
-        desc_conf = (
-            (by_dim["description"].details or {}).get("description_confidence")
-            if "description" in by_dim
-            else None
-        )
-        readme_stale = (
-            (by_dim["readme"].details or {}).get("readme_stale_by_age")
-            if "readme" in by_dim
-            else None
-        )
-        catalog_comp = score_catalog_entry(self.portfolio_catalog)
-        completeness_score = (
-            (by_dim["completeness"].score / by_dim["completeness"].max_score)
-            if "completeness" in by_dim and by_dim["completeness"].max_score
-            else None
-        )
-        return compute_context_quality_score(
-            desc_conf, readme_stale, catalog_comp, completeness_score
-        )
-
     def to_dict(self) -> dict:
+        from src.context_quality import context_quality_score_for_audit
+
         return {
             "metadata": self.metadata.to_dict(),
             "analyzer_results": [r.to_dict() for r in self.analyzer_results],
@@ -155,7 +135,7 @@ class RepoAudit:
             "portfolio_catalog": self.portfolio_catalog,
             "scorecard": self.scorecard,
             "ossf_scorecard": self.ossf_scorecard,
-            "context_quality_score": round(self._context_quality_score(), 3),
+            "context_quality_score": round(context_quality_score_for_audit(self), 3),
         }
 
 
@@ -285,7 +265,9 @@ class AuditReport:
         # Language distribution
         from collections import Counter
 
-        lang_dist = dict(Counter(a.metadata.language or "Unknown" for a in audits).most_common())
+        lang_dist = dict(
+            Counter(a.metadata.language or "Unknown" for a in audits).most_common()
+        )
 
         # Summary lists (top/bottom 5)
         sorted_by_score = sorted(audits, key=lambda a: a.overall_score, reverse=True)
@@ -328,7 +310,9 @@ class AuditReport:
 
         # Best work: top 5 by weighted combo
         best = sorted(
-            audits, key=lambda a: a.overall_score * 0.6 + a.interest_score * 0.4, reverse=True
+            audits,
+            key=lambda a: a.overall_score * 0.6 + a.interest_score * 0.4,
+            reverse=True,
         )
         best_work = [a.metadata.name for a in best[:5]]
         portfolio_lenses = portfolio_intelligence.build_portfolio_lens_summary(audits)
@@ -339,7 +323,9 @@ class AuditReport:
         implementation_hotspots_summary = (
             implementation_hotspots.build_implementation_hotspots_summary(audits)
         )
-        portfolio_security = portfolio_intelligence.build_portfolio_security_posture(audits)
+        portfolio_security = portfolio_intelligence.build_portfolio_security_posture(
+            audits
+        )
         security_governance_preview = (
             portfolio_intelligence.build_portfolio_security_governance_preview(audits)
         )
@@ -540,5 +526,7 @@ class AuditReport:
             },
             "audits": [a.to_dict() for a in self.audits],
             "errors": self.errors,
-            "reconciliation": self.reconciliation.to_dict() if self.reconciliation else None,
+            "reconciliation": self.reconciliation.to_dict()
+            if self.reconciliation
+            else None,
         }

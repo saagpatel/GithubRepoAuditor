@@ -1,74 +1,74 @@
 {
   "closure_forecast_reset_reentry_freshness_for_target": {
     "clamp-divergence": {
-      "closure_forecast_reset_reentry_freshness_reason": "stale:1.8:0.0",
-      "closure_forecast_reset_reentry_freshness_status": "stale",
-      "closure_forecast_reset_reentry_memory_weight": 0.0,
-      "decayed_reset_reentered_clearance_rate": 0.0,
-      "decayed_reset_reentered_confirmation_rate": 1.0,
-      "has_fresh_aligned_recent_evidence": false,
-      "recent_reset_reentry_signal_mix": "confirmation-leaning",
-      "recent_reset_reentry_signal_path": "confirmation -> confirmation"
-    },
-    "clearance-hold": {
-      "closure_forecast_reset_reentry_freshness_reason": "stale:1.8:0.0",
-      "closure_forecast_reset_reentry_freshness_status": "stale",
-      "closure_forecast_reset_reentry_memory_weight": 0.0,
-      "decayed_reset_reentered_clearance_rate": 1.0,
-      "decayed_reset_reentered_confirmation_rate": 0.0,
-      "has_fresh_aligned_recent_evidence": false,
-      "recent_reset_reentry_signal_mix": "clearance-leaning",
-      "recent_reset_reentry_signal_path": "clearance -> clearance"
-    },
-    "empty": {
-      "closure_forecast_reset_reentry_freshness_reason": "insufficient-data:0.0:0.0",
+      "closure_forecast_reset_reentry_freshness_reason": "Reset re-entry memory is still too lightly exercised to judge freshness, with 0.00 weighted reset re-entry run(s), 0% confirmation-like signal, and 0% clearance-like signal.",
       "closure_forecast_reset_reentry_freshness_status": "insufficient-data",
       "closure_forecast_reset_reentry_memory_weight": 0.0,
       "decayed_reset_reentered_clearance_rate": 0.0,
       "decayed_reset_reentered_confirmation_rate": 0.0,
       "has_fresh_aligned_recent_evidence": false,
-      "recent_reset_reentry_signal_mix": "balanced",
+      "recent_reset_reentry_signal_mix": "0.00 weighted reset re-entry run(s) with 0.00 confirmation-like, 0.00 clearance-like, and 0% of the signal from the freshest runs.",
+      "recent_reset_reentry_signal_path": ""
+    },
+    "clearance-hold": {
+      "closure_forecast_reset_reentry_freshness_reason": "Reset re-entry memory is still too lightly exercised to judge freshness, with 0.00 weighted reset re-entry run(s), 0% confirmation-like signal, and 0% clearance-like signal.",
+      "closure_forecast_reset_reentry_freshness_status": "insufficient-data",
+      "closure_forecast_reset_reentry_memory_weight": 0.0,
+      "decayed_reset_reentered_clearance_rate": 0.0,
+      "decayed_reset_reentered_confirmation_rate": 0.0,
+      "has_fresh_aligned_recent_evidence": false,
+      "recent_reset_reentry_signal_mix": "0.00 weighted reset re-entry run(s) with 0.00 confirmation-like, 0.00 clearance-like, and 0% of the signal from the freshest runs.",
+      "recent_reset_reentry_signal_path": ""
+    },
+    "empty": {
+      "closure_forecast_reset_reentry_freshness_reason": "Reset re-entry memory is still too lightly exercised to judge freshness, with 0.00 weighted reset re-entry run(s), 0% confirmation-like signal, and 0% clearance-like signal.",
+      "closure_forecast_reset_reentry_freshness_status": "insufficient-data",
+      "closure_forecast_reset_reentry_memory_weight": 0.0,
+      "decayed_reset_reentered_clearance_rate": 0.0,
+      "decayed_reset_reentered_confirmation_rate": 0.0,
+      "has_fresh_aligned_recent_evidence": false,
+      "recent_reset_reentry_signal_mix": "0.00 weighted reset re-entry run(s) with 0.00 confirmation-like, 0.00 clearance-like, and 0% of the signal from the freshest runs.",
       "recent_reset_reentry_signal_path": ""
     },
     "reversing": {
-      "closure_forecast_reset_reentry_freshness_reason": "stale:1.8:0.0",
-      "closure_forecast_reset_reentry_freshness_status": "stale",
+      "closure_forecast_reset_reentry_freshness_reason": "Reset re-entry memory is still too lightly exercised to judge freshness, with 0.00 weighted reset re-entry run(s), 0% confirmation-like signal, and 0% clearance-like signal.",
+      "closure_forecast_reset_reentry_freshness_status": "insufficient-data",
       "closure_forecast_reset_reentry_memory_weight": 0.0,
       "decayed_reset_reentered_clearance_rate": 0.0,
-      "decayed_reset_reentered_confirmation_rate": 1.0,
+      "decayed_reset_reentered_confirmation_rate": 0.0,
       "has_fresh_aligned_recent_evidence": false,
-      "recent_reset_reentry_signal_mix": "confirmation-leaning",
-      "recent_reset_reentry_signal_path": "confirmation -> confirmation"
+      "recent_reset_reentry_signal_mix": "0.00 weighted reset re-entry run(s) with 0.00 confirmation-like, 0.00 clearance-like, and 0% of the signal from the freshest runs.",
+      "recent_reset_reentry_signal_path": ""
     },
     "single-event": {
-      "closure_forecast_reset_reentry_freshness_reason": "stale:1.0:0.0",
-      "closure_forecast_reset_reentry_freshness_status": "stale",
+      "closure_forecast_reset_reentry_freshness_reason": "Reset re-entry memory is still too lightly exercised to judge freshness, with 0.00 weighted reset re-entry run(s), 0% confirmation-like signal, and 0% clearance-like signal.",
+      "closure_forecast_reset_reentry_freshness_status": "insufficient-data",
       "closure_forecast_reset_reentry_memory_weight": 0.0,
       "decayed_reset_reentered_clearance_rate": 0.0,
-      "decayed_reset_reentered_confirmation_rate": 1.0,
+      "decayed_reset_reentered_confirmation_rate": 0.0,
       "has_fresh_aligned_recent_evidence": false,
-      "recent_reset_reentry_signal_mix": "confirmation-leaning",
-      "recent_reset_reentry_signal_path": "confirmation"
+      "recent_reset_reentry_signal_mix": "0.00 weighted reset re-entry run(s) with 0.00 confirmation-like, 0.00 clearance-like, and 0% of the signal from the freshest runs.",
+      "recent_reset_reentry_signal_path": ""
     },
     "sparse": {
-      "closure_forecast_reset_reentry_freshness_reason": "stale:1.8:0.0",
-      "closure_forecast_reset_reentry_freshness_status": "stale",
+      "closure_forecast_reset_reentry_freshness_reason": "Reset re-entry memory is still too lightly exercised to judge freshness, with 0.00 weighted reset re-entry run(s), 0% confirmation-like signal, and 0% clearance-like signal.",
+      "closure_forecast_reset_reentry_freshness_status": "insufficient-data",
       "closure_forecast_reset_reentry_memory_weight": 0.0,
       "decayed_reset_reentered_clearance_rate": 0.0,
-      "decayed_reset_reentered_confirmation_rate": 1.0,
+      "decayed_reset_reentered_confirmation_rate": 0.0,
       "has_fresh_aligned_recent_evidence": false,
-      "recent_reset_reentry_signal_mix": "confirmation-leaning",
-      "recent_reset_reentry_signal_path": "confirmation -> confirmation"
+      "recent_reset_reentry_signal_mix": "0.00 weighted reset re-entry run(s) with 0.00 confirmation-like, 0.00 clearance-like, and 0% of the signal from the freshest runs.",
+      "recent_reset_reentry_signal_path": ""
     },
     "sustained-confirmation": {
-      "closure_forecast_reset_reentry_freshness_reason": "stale:2.4:0.0",
-      "closure_forecast_reset_reentry_freshness_status": "stale",
+      "closure_forecast_reset_reentry_freshness_reason": "Reset re-entry memory is still too lightly exercised to judge freshness, with 0.00 weighted reset re-entry run(s), 0% confirmation-like signal, and 0% clearance-like signal.",
+      "closure_forecast_reset_reentry_freshness_status": "insufficient-data",
       "closure_forecast_reset_reentry_memory_weight": 0.0,
       "decayed_reset_reentered_clearance_rate": 0.0,
-      "decayed_reset_reentered_confirmation_rate": 1.0,
+      "decayed_reset_reentered_confirmation_rate": 0.0,
       "has_fresh_aligned_recent_evidence": false,
-      "recent_reset_reentry_signal_mix": "confirmation-leaning",
-      "recent_reset_reentry_signal_path": "confirmation -> confirmation -> confirmation"
+      "recent_reset_reentry_signal_mix": "0.00 weighted reset re-entry run(s) with 0.00 confirmation-like, 0.00 clearance-like, and 0% of the signal from the freshest runs.",
+      "recent_reset_reentry_signal_path": ""
     }
   },
   "closure_forecast_reset_reentry_freshness_hotspots": {
@@ -87,46 +87,46 @@
   },
   "closure_forecast_reset_reentry_rebuild_churn_for_target": {
     "clamp-divergence": {
+      "closure_forecast_reset_reentry_rebuild_churn_reason": "",
+      "closure_forecast_reset_reentry_rebuild_churn_score": 0.1,
+      "closure_forecast_reset_reentry_rebuild_churn_status": "none",
+      "recent_reset_reentry_rebuild_churn_path": "rebuilt-confirmation-reentry -> rebuilt-confirmation-reentry -> rebuilding-confirmation-reentry"
+    },
+    "clearance-hold": {
       "closure_forecast_reset_reentry_rebuild_churn_reason": "Rebuilt reset re-entry is wobbling and may lose its restored strength soon.",
       "closure_forecast_reset_reentry_rebuild_churn_score": 0.2,
       "closure_forecast_reset_reentry_rebuild_churn_status": "watch",
-      "recent_reset_reentry_rebuild_churn_path": "strong-conf -> decrement-conf"
-    },
-    "clearance-hold": {
-      "closure_forecast_reset_reentry_rebuild_churn_reason": "",
-      "closure_forecast_reset_reentry_rebuild_churn_score": 0.0,
-      "closure_forecast_reset_reentry_rebuild_churn_status": "none",
-      "recent_reset_reentry_rebuild_churn_path": "sustained-clearance -> sustained-clearance"
+      "recent_reset_reentry_rebuild_churn_path": "rebuilt-confirmation-reentry -> rebuilt-clearance-reentry -> rebuilt-clearance-reentry"
     },
     "empty": {
       "closure_forecast_reset_reentry_rebuild_churn_reason": "",
       "closure_forecast_reset_reentry_rebuild_churn_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_churn_status": "none",
-      "recent_reset_reentry_rebuild_churn_path": ""
+      "recent_reset_reentry_rebuild_churn_path": "rebuilt-confirmation-reentry"
     },
     "reversing": {
-      "closure_forecast_reset_reentry_rebuild_churn_reason": "Local target instability is preventing positive confirmation-side rebuild persistence.",
+      "closure_forecast_reset_reentry_rebuild_churn_reason": "",
       "closure_forecast_reset_reentry_rebuild_churn_score": 0.0,
-      "closure_forecast_reset_reentry_rebuild_churn_status": "blocked",
-      "recent_reset_reentry_rebuild_churn_path": "rebuilt-confirmation-reentry -> strong-conf"
+      "closure_forecast_reset_reentry_rebuild_churn_status": "none",
+      "recent_reset_reentry_rebuild_churn_path": "rebuilt-confirmation-reentry -> rebuilt-confirmation-reentry -> rebuilt-confirmation-reentry"
     },
     "single-event": {
       "closure_forecast_reset_reentry_rebuild_churn_reason": "",
       "closure_forecast_reset_reentry_rebuild_churn_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_churn_status": "none",
-      "recent_reset_reentry_rebuild_churn_path": "strong-conf"
+      "recent_reset_reentry_rebuild_churn_path": "rebuilt-confirmation-reentry -> rebuilt-confirmation-reentry"
     },
     "sparse": {
-      "closure_forecast_reset_reentry_rebuild_churn_reason": "Rebuilt reset re-entry is wobbling and may lose its restored strength soon.",
-      "closure_forecast_reset_reentry_rebuild_churn_score": 0.2,
-      "closure_forecast_reset_reentry_rebuild_churn_status": "watch",
-      "recent_reset_reentry_rebuild_churn_path": "sparse-none -> strong-conf -> decrement-conf"
+      "closure_forecast_reset_reentry_rebuild_churn_reason": "",
+      "closure_forecast_reset_reentry_rebuild_churn_score": 0.1,
+      "closure_forecast_reset_reentry_rebuild_churn_status": "none",
+      "recent_reset_reentry_rebuild_churn_path": "rebuilt-confirmation-reentry -> hold -> rebuilt-confirmation-reentry -> rebuilding-confirmation-reentry"
     },
     "sustained-confirmation": {
       "closure_forecast_reset_reentry_rebuild_churn_reason": "",
       "closure_forecast_reset_reentry_rebuild_churn_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_churn_status": "none",
-      "recent_reset_reentry_rebuild_churn_path": "strong-conf -> strong-conf -> strong-conf"
+      "recent_reset_reentry_rebuild_churn_path": "rebuilt-confirmation-reentry -> rebuilt-confirmation-reentry -> rebuilt-confirmation-reentry -> rebuilt-confirmation-reentry"
     }
   },
   "closure_forecast_reset_reentry_rebuild_churn_summary": {
@@ -134,8 +134,8 @@
   },
   "closure_forecast_reset_reentry_rebuild_freshness_for_target": {
     "clamp-divergence": {
-      "closure_forecast_reset_reentry_rebuild_freshness_reason": "Recent rebuilt reset re-entry evidence is still current enough to keep the restored posture trusted, with 100% of the weighted signal coming from the latest 4 runs.",
-      "closure_forecast_reset_reentry_rebuild_freshness_status": "fresh",
+      "closure_forecast_reset_reentry_rebuild_freshness_reason": "Rebuilt reset re-entry memory is still too lightly exercised to judge freshness, with 1.00 weighted rebuilt run(s), 100% confirmation-like signal, and 0% clearance-like signal.",
+      "closure_forecast_reset_reentry_rebuild_freshness_status": "insufficient-data",
       "closure_forecast_reset_reentry_rebuild_memory_weight": 1.0,
       "decayed_rebuilt_clearance_reentry_rate": 0.0,
       "decayed_rebuilt_confirmation_reentry_rate": 1.0,
@@ -150,7 +150,7 @@
       "decayed_rebuilt_clearance_reentry_rate": 1.0,
       "decayed_rebuilt_confirmation_reentry_rate": 0.0,
       "has_fresh_aligned_recent_evidence": false,
-      "recent_reset_reentry_rebuild_signal_mix": "1.80 weighted rebuilt run(s) with 0.00 confirmation-like, 1.80 clearance-like, and 0% of the signal from the freshest runs.",
+      "recent_reset_reentry_rebuild_signal_mix": "2.00 weighted rebuilt run(s) with 0.00 confirmation-like, 2.00 clearance-like, and 0% of the signal from the freshest runs.",
       "recent_reset_reentry_rebuild_signal_path": "clearance-like -> clearance-like"
     },
     "empty": {
@@ -170,12 +170,12 @@
       "decayed_rebuilt_clearance_reentry_rate": 0.0,
       "decayed_rebuilt_confirmation_reentry_rate": 1.0,
       "has_fresh_aligned_recent_evidence": true,
-      "recent_reset_reentry_rebuild_signal_mix": "1.80 weighted rebuilt run(s) with 1.80 confirmation-like, 0.00 clearance-like, and 100% of the signal from the freshest runs.",
+      "recent_reset_reentry_rebuild_signal_mix": "2.00 weighted rebuilt run(s) with 2.00 confirmation-like, 0.00 clearance-like, and 100% of the signal from the freshest runs.",
       "recent_reset_reentry_rebuild_signal_path": "confirmation-like -> confirmation-like"
     },
     "single-event": {
-      "closure_forecast_reset_reentry_rebuild_freshness_reason": "Recent rebuilt reset re-entry evidence is still current enough to keep the restored posture trusted, with 100% of the weighted signal coming from the latest 4 runs.",
-      "closure_forecast_reset_reentry_rebuild_freshness_status": "fresh",
+      "closure_forecast_reset_reentry_rebuild_freshness_reason": "Rebuilt reset re-entry memory is still too lightly exercised to judge freshness, with 1.00 weighted rebuilt run(s), 100% confirmation-like signal, and 0% clearance-like signal.",
+      "closure_forecast_reset_reentry_rebuild_freshness_status": "insufficient-data",
       "closure_forecast_reset_reentry_rebuild_memory_weight": 1.0,
       "decayed_rebuilt_clearance_reentry_rate": 0.0,
       "decayed_rebuilt_confirmation_reentry_rate": 1.0,
@@ -184,8 +184,8 @@
       "recent_reset_reentry_rebuild_signal_path": "confirmation-like"
     },
     "sparse": {
-      "closure_forecast_reset_reentry_rebuild_freshness_reason": "Recent rebuilt reset re-entry evidence is still current enough to keep the restored posture trusted, with 100% of the weighted signal coming from the latest 4 runs.",
-      "closure_forecast_reset_reentry_rebuild_freshness_status": "fresh",
+      "closure_forecast_reset_reentry_rebuild_freshness_reason": "Rebuilt reset re-entry memory is still too lightly exercised to judge freshness, with 1.00 weighted rebuilt run(s), 100% confirmation-like signal, and 0% clearance-like signal.",
+      "closure_forecast_reset_reentry_rebuild_freshness_status": "insufficient-data",
       "closure_forecast_reset_reentry_rebuild_memory_weight": 1.0,
       "decayed_rebuilt_clearance_reentry_rate": 0.0,
       "decayed_rebuilt_confirmation_reentry_rate": 1.0,
@@ -200,7 +200,7 @@
       "decayed_rebuilt_clearance_reentry_rate": 0.0,
       "decayed_rebuilt_confirmation_reentry_rate": 1.0,
       "has_fresh_aligned_recent_evidence": true,
-      "recent_reset_reentry_rebuild_signal_mix": "2.40 weighted rebuilt run(s) with 2.40 confirmation-like, 0.00 clearance-like, and 100% of the signal from the freshest runs.",
+      "recent_reset_reentry_rebuild_signal_mix": "2.70 weighted rebuilt run(s) with 2.70 confirmation-like, 0.00 clearance-like, and 100% of the signal from the freshest runs.",
       "recent_reset_reentry_rebuild_signal_path": "confirmation-like -> confirmation-like -> confirmation-like"
     }
   },
@@ -339,53 +339,53 @@
   },
   "closure_forecast_reset_reentry_rebuild_persistence_for_target": {
     "clamp-divergence": {
-      "closure_forecast_reset_reentry_rebuild_age_runs": 2,
-      "closure_forecast_reset_reentry_rebuild_persistence_reason": "Confirmation-side rebuild has stayed aligned long enough to keep the restored forecast in place.",
-      "closure_forecast_reset_reentry_rebuild_persistence_score": 0.31,
-      "closure_forecast_reset_reentry_rebuild_persistence_status": "holding-confirmation-rebuild",
-      "recent_reset_reentry_rebuild_persistence_path": "strong-conf -> decrement-conf"
-    },
-    "clearance-hold": {
-      "closure_forecast_reset_reentry_rebuild_age_runs": 2,
-      "closure_forecast_reset_reentry_rebuild_persistence_reason": "Clearance-side rebuild has stayed aligned long enough to keep the restored caution in place.",
-      "closure_forecast_reset_reentry_rebuild_persistence_score": -0.55,
-      "closure_forecast_reset_reentry_rebuild_persistence_status": "holding-clearance-rebuild",
-      "recent_reset_reentry_rebuild_persistence_path": "sustained-clearance -> sustained-clearance"
-    },
-    "empty": {
-      "closure_forecast_reset_reentry_rebuild_age_runs": 0,
-      "closure_forecast_reset_reentry_rebuild_persistence_reason": "",
-      "closure_forecast_reset_reentry_rebuild_persistence_score": 0.0,
-      "closure_forecast_reset_reentry_rebuild_persistence_status": "none",
-      "recent_reset_reentry_rebuild_persistence_path": ""
-    },
-    "reversing": {
-      "closure_forecast_reset_reentry_rebuild_age_runs": 2,
-      "closure_forecast_reset_reentry_rebuild_persistence_reason": "The rebuilt posture is already weakening, so it is being softened again.",
-      "closure_forecast_reset_reentry_rebuild_persistence_score": 0.27,
-      "closure_forecast_reset_reentry_rebuild_persistence_status": "reversing",
-      "recent_reset_reentry_rebuild_persistence_path": "rebuilt-confirmation-reentry -> strong-conf"
-    },
-    "single-event": {
-      "closure_forecast_reset_reentry_rebuild_age_runs": 1,
-      "closure_forecast_reset_reentry_rebuild_persistence_reason": "Stronger reset re-entry posture has been rebuilt, but it has not yet proved it can hold.",
-      "closure_forecast_reset_reentry_rebuild_persistence_score": 0.55,
-      "closure_forecast_reset_reentry_rebuild_persistence_status": "just-rebuilt",
-      "recent_reset_reentry_rebuild_persistence_path": "strong-conf"
-    },
-    "sparse": {
-      "closure_forecast_reset_reentry_rebuild_age_runs": 0,
-      "closure_forecast_reset_reentry_rebuild_persistence_reason": "",
-      "closure_forecast_reset_reentry_rebuild_persistence_score": 0.31,
-      "closure_forecast_reset_reentry_rebuild_persistence_status": "none",
-      "recent_reset_reentry_rebuild_persistence_path": "sparse-none -> strong-conf -> decrement-conf"
-    },
-    "sustained-confirmation": {
       "closure_forecast_reset_reentry_rebuild_age_runs": 3,
       "closure_forecast_reset_reentry_rebuild_persistence_reason": "Confirmation-side rebuild is now holding with enough follow-through to trust the restored forecast more.",
-      "closure_forecast_reset_reentry_rebuild_persistence_score": 0.55,
+      "closure_forecast_reset_reentry_rebuild_persistence_score": 0.37,
       "closure_forecast_reset_reentry_rebuild_persistence_status": "sustained-confirmation-rebuild",
-      "recent_reset_reentry_rebuild_persistence_path": "strong-conf -> strong-conf -> strong-conf"
+      "recent_reset_reentry_rebuild_persistence_path": "rebuilt-confirmation-reentry -> rebuilt-confirmation-reentry -> rebuilding-confirmation-reentry"
+    },
+    "clearance-hold": {
+      "closure_forecast_reset_reentry_rebuild_age_runs": 1,
+      "closure_forecast_reset_reentry_rebuild_persistence_reason": "Stronger reset re-entry posture has been rebuilt, but it has not yet proved it can hold.",
+      "closure_forecast_reset_reentry_rebuild_persistence_score": -0.17,
+      "closure_forecast_reset_reentry_rebuild_persistence_status": "just-rebuilt",
+      "recent_reset_reentry_rebuild_persistence_path": "rebuilt-confirmation-reentry -> rebuilt-clearance-reentry -> rebuilt-clearance-reentry"
+    },
+    "empty": {
+      "closure_forecast_reset_reentry_rebuild_age_runs": 1,
+      "closure_forecast_reset_reentry_rebuild_persistence_reason": "Stronger reset re-entry posture has been rebuilt, but it has not yet proved it can hold.",
+      "closure_forecast_reset_reentry_rebuild_persistence_score": 0.45,
+      "closure_forecast_reset_reentry_rebuild_persistence_status": "just-rebuilt",
+      "recent_reset_reentry_rebuild_persistence_path": "rebuilt-confirmation-reentry"
+    },
+    "reversing": {
+      "closure_forecast_reset_reentry_rebuild_age_runs": 3,
+      "closure_forecast_reset_reentry_rebuild_persistence_reason": "The rebuilt posture is already weakening, so it is being softened again.",
+      "closure_forecast_reset_reentry_rebuild_persistence_score": 0.24,
+      "closure_forecast_reset_reentry_rebuild_persistence_status": "reversing",
+      "recent_reset_reentry_rebuild_persistence_path": "rebuilt-confirmation-reentry -> rebuilt-confirmation-reentry -> rebuilt-confirmation-reentry"
+    },
+    "single-event": {
+      "closure_forecast_reset_reentry_rebuild_age_runs": 2,
+      "closure_forecast_reset_reentry_rebuild_persistence_reason": "Confirmation-side rebuild has stayed aligned long enough to keep the restored forecast in place.",
+      "closure_forecast_reset_reentry_rebuild_persistence_score": 0.49,
+      "closure_forecast_reset_reentry_rebuild_persistence_status": "holding-confirmation-rebuild",
+      "recent_reset_reentry_rebuild_persistence_path": "rebuilt-confirmation-reentry -> rebuilt-confirmation-reentry"
+    },
+    "sparse": {
+      "closure_forecast_reset_reentry_rebuild_age_runs": 1,
+      "closure_forecast_reset_reentry_rebuild_persistence_reason": "Stronger reset re-entry posture has been rebuilt, but it has not yet proved it can hold.",
+      "closure_forecast_reset_reentry_rebuild_persistence_score": 0.37,
+      "closure_forecast_reset_reentry_rebuild_persistence_status": "just-rebuilt",
+      "recent_reset_reentry_rebuild_persistence_path": "rebuilt-confirmation-reentry -> hold -> rebuilt-confirmation-reentry -> rebuilding-confirmation-reentry"
+    },
+    "sustained-confirmation": {
+      "closure_forecast_reset_reentry_rebuild_age_runs": 4,
+      "closure_forecast_reset_reentry_rebuild_persistence_reason": "Confirmation-side rebuild is now holding with enough follow-through to trust the restored forecast more.",
+      "closure_forecast_reset_reentry_rebuild_persistence_score": 0.51,
+      "closure_forecast_reset_reentry_rebuild_persistence_status": "sustained-confirmation-rebuild",
+      "recent_reset_reentry_rebuild_persistence_path": "rebuilt-confirmation-reentry -> rebuilt-confirmation-reentry -> rebuilt-confirmation-reentry -> rebuilt-confirmation-reentry"
     }
   },
   "closure_forecast_reset_reentry_rebuild_persistence_summary": {
@@ -410,7 +410,7 @@
       "closure_forecast_reset_reentry_rebuild_reentry_restore_reason": "",
       "closure_forecast_reset_reentry_rebuild_reentry_restore_status": "none",
       "recent_rebuild_reentry_reset_side": "none",
-      "recent_reset_reentry_rebuild_reentry_refresh_path": "strong-conf -> decrement-conf"
+      "recent_reset_reentry_rebuild_reentry_refresh_path": "hold -> hold -> hold"
     },
     "clearance-hold": {
       "aligned_fresh_runs_after_latest_rebuild_reentry_reset": 0,
@@ -419,7 +419,7 @@
       "closure_forecast_reset_reentry_rebuild_reentry_restore_reason": "",
       "closure_forecast_reset_reentry_rebuild_reentry_restore_status": "none",
       "recent_rebuild_reentry_reset_side": "none",
-      "recent_reset_reentry_rebuild_reentry_refresh_path": "sustained-clearance -> sustained-clearance"
+      "recent_reset_reentry_rebuild_reentry_refresh_path": "hold -> hold -> hold"
     },
     "empty": {
       "aligned_fresh_runs_after_latest_rebuild_reentry_reset": 0,
@@ -428,7 +428,7 @@
       "closure_forecast_reset_reentry_rebuild_reentry_restore_reason": "",
       "closure_forecast_reset_reentry_rebuild_reentry_restore_status": "none",
       "recent_rebuild_reentry_reset_side": "none",
-      "recent_reset_reentry_rebuild_reentry_refresh_path": ""
+      "recent_reset_reentry_rebuild_reentry_refresh_path": "hold"
     },
     "reversing": {
       "aligned_fresh_runs_after_latest_rebuild_reentry_reset": 0,
@@ -437,7 +437,7 @@
       "closure_forecast_reset_reentry_rebuild_reentry_restore_reason": "",
       "closure_forecast_reset_reentry_rebuild_reentry_restore_status": "none",
       "recent_rebuild_reentry_reset_side": "none",
-      "recent_reset_reentry_rebuild_reentry_refresh_path": "rebuilt-confirmation-reentry -> strong-conf"
+      "recent_reset_reentry_rebuild_reentry_refresh_path": "hold -> hold -> hold"
     },
     "single-event": {
       "aligned_fresh_runs_after_latest_rebuild_reentry_reset": 0,
@@ -446,7 +446,7 @@
       "closure_forecast_reset_reentry_rebuild_reentry_restore_reason": "",
       "closure_forecast_reset_reentry_rebuild_reentry_restore_status": "none",
       "recent_rebuild_reentry_reset_side": "none",
-      "recent_reset_reentry_rebuild_reentry_refresh_path": "strong-conf"
+      "recent_reset_reentry_rebuild_reentry_refresh_path": "hold -> hold"
     },
     "sparse": {
       "aligned_fresh_runs_after_latest_rebuild_reentry_reset": 0,
@@ -455,7 +455,7 @@
       "closure_forecast_reset_reentry_rebuild_reentry_restore_reason": "",
       "closure_forecast_reset_reentry_rebuild_reentry_restore_status": "none",
       "recent_rebuild_reentry_reset_side": "none",
-      "recent_reset_reentry_rebuild_reentry_refresh_path": "sparse-none -> strong-conf -> decrement-conf"
+      "recent_reset_reentry_rebuild_reentry_refresh_path": "hold -> hold -> hold -> hold"
     },
     "sustained-confirmation": {
       "aligned_fresh_runs_after_latest_rebuild_reentry_reset": 0,
@@ -464,7 +464,7 @@
       "closure_forecast_reset_reentry_rebuild_reentry_restore_reason": "",
       "closure_forecast_reset_reentry_rebuild_reentry_restore_status": "none",
       "recent_rebuild_reentry_reset_side": "none",
-      "recent_reset_reentry_rebuild_reentry_refresh_path": "strong-conf -> strong-conf -> strong-conf"
+      "recent_reset_reentry_rebuild_reentry_refresh_path": "hold -> hold -> hold -> hold"
     }
   },
   "closure_forecast_reset_reentry_rebuild_reentry_refresh_recovery_summary": {
@@ -475,43 +475,43 @@
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason": "",
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rerererestore_churn_path": "strong-conf -> decrement-conf"
+      "recent_reset_reentry_rebuild_reentry_restore_rerererestore_churn_path": "hold -> hold -> hold"
     },
     "clearance-hold": {
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason": "",
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rerererestore_churn_path": "sustained-clearance -> sustained-clearance"
+      "recent_reset_reentry_rebuild_reentry_restore_rerererestore_churn_path": "hold -> hold -> hold"
     },
     "empty": {
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason": "",
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rerererestore_churn_path": ""
+      "recent_reset_reentry_rebuild_reentry_restore_rerererestore_churn_path": "hold"
     },
     "reversing": {
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason": "Local target instability is preventing positive confirmation-side re-re-re-restored hold.",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_score": 0.1,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status": "blocked",
-      "recent_reset_reentry_rebuild_reentry_restore_rerererestore_churn_path": "rebuilt-confirmation-reentry -> strong-conf"
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason": "",
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_score": 0.0,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status": "none",
+      "recent_reset_reentry_rebuild_reentry_restore_rerererestore_churn_path": "hold -> hold -> hold"
     },
     "single-event": {
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason": "",
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rerererestore_churn_path": "strong-conf"
+      "recent_reset_reentry_rebuild_reentry_restore_rerererestore_churn_path": "hold -> hold"
     },
     "sparse": {
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason": "",
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rerererestore_churn_path": "sparse-none -> strong-conf -> decrement-conf"
+      "recent_reset_reentry_rebuild_reentry_restore_rerererestore_churn_path": "hold -> hold -> hold -> hold"
     },
     "sustained-confirmation": {
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_reason": "",
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_status": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rerererestore_churn_path": "strong-conf -> strong-conf -> strong-conf"
+      "recent_reset_reentry_rebuild_reentry_restore_rerererestore_churn_path": "hold -> hold -> hold -> hold"
     }
   },
   "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_churn_summary": {
@@ -614,53 +614,53 @@
   },
   "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_for_target": {
     "clamp-divergence": {
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs": 2,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason": "Confirmation-side re-re-re-restored posture has stayed aligned long enough to keep the stronger rerestored forecast in place.",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score": 0.11,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status": "holding-confirmation-rebuild-reentry-rerererestore",
-      "recent_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_path": "strong-conf -> decrement-conf"
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs": 0,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason": "",
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score": 0.0,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status": "none",
+      "recent_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_path": "hold -> hold -> hold"
     },
     "clearance-hold": {
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs": 2,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason": "Clearance-side re-re-re-restored posture has stayed aligned long enough to keep the stronger rerestored caution in place.",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score": -0.2,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status": "holding-clearance-rebuild-reentry-rerererestore",
-      "recent_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_path": "sustained-clearance -> sustained-clearance"
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs": 0,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason": "",
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score": 0.0,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status": "none",
+      "recent_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_path": "hold -> hold -> hold"
     },
     "empty": {
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs": 0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason": "",
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_path": ""
+      "recent_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_path": "hold"
     },
     "reversing": {
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs": 2,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason": "The re-re-re-restored rebuilt re-entry posture is already weakening, so it is being softened again.",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score": 0.09,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status": "reversing",
-      "recent_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_path": "rebuilt-confirmation-reentry -> strong-conf"
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs": 0,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason": "",
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score": 0.0,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status": "none",
+      "recent_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_path": "hold -> hold -> hold"
     },
     "single-event": {
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs": 1,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason": "Re-re-re-restored rebuilt re-entry is still too lightly exercised to say whether the stronger posture can hold.",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score": 0.2,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status": "insufficient-data",
-      "recent_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_path": "strong-conf"
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs": 0,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason": "",
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score": 0.0,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status": "none",
+      "recent_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_path": "hold -> hold"
     },
     "sparse": {
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs": 0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason": "",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score": 0.11,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_path": "sparse-none -> strong-conf -> decrement-conf"
+      "recent_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_path": "hold -> hold -> hold -> hold"
     },
     "sustained-confirmation": {
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs": 3,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason": "Confirmation-side re-re-re-restored posture has stayed aligned long enough to keep the stronger rerestored forecast in place.",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score": 0.2,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status": "holding-confirmation-rebuild-reentry-rerererestore",
-      "recent_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_path": "strong-conf -> strong-conf -> strong-conf"
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_age_runs": 0,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_reason": "",
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_score": 0.0,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_status": "none",
+      "recent_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_path": "hold -> hold -> hold -> hold"
     }
   },
   "closure_forecast_reset_reentry_rebuild_reentry_restore_rerererestore_persistence_summary": {
@@ -674,43 +674,43 @@
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_reason": "Re-re-restored rebuilt re-entry is wobbling and may lose its stronger posture soon.",
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_score": 0.2,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status": "watch",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": "strong-conf -> decrement-conf"
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": "rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry -> rererestoring-confirmation-rebuild-reentry"
     },
     "clearance-hold": {
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_reason": "",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_score": 0.0,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": "sustained-clearance -> sustained-clearance"
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_reason": "Re-re-restored rebuilt re-entry is wobbling and may lose its stronger posture soon.",
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_score": 0.2,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status": "watch",
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": "rererestored-confirmation-rebuild-reentry -> rererestored-clearance-rebuild-reentry -> rererestored-clearance-rebuild-reentry"
     },
     "empty": {
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_reason": "",
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": ""
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": "rererestored-confirmation-rebuild-reentry"
     },
     "reversing": {
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_reason": "Local target instability is preventing positive confirmation-side re-re-restored hold.",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_score": 0.0,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status": "blocked",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": "rebuilt-confirmation-reentry -> strong-conf"
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_reason": "",
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_score": 0.1,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status": "none",
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": "rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry"
     },
     "single-event": {
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_reason": "",
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": "strong-conf"
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": "rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry"
     },
     "sparse": {
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_reason": "Re-re-restored rebuilt re-entry is wobbling and may lose its stronger posture soon.",
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_score": 0.2,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status": "watch",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": "sparse-none -> strong-conf -> decrement-conf"
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": "rererestored-confirmation-rebuild-reentry -> hold -> rererestored-confirmation-rebuild-reentry -> rererestoring-confirmation-rebuild-reentry"
     },
     "sustained-confirmation": {
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_reason": "",
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_status": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": "strong-conf -> strong-conf -> strong-conf"
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_churn_path": "rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry"
     }
   },
   "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_churn_summary": {
@@ -718,8 +718,8 @@
   },
   "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_for_target": {
     "clamp-divergence": {
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_reason": "Recent re-re-restored rebuilt re-entry evidence is still current enough to keep the stronger re-re-restored posture trusted, with 100% of the weighted signal coming from the latest 4 runs.",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status": "fresh",
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_reason": "Re-re-restored rebuilt re-entry memory is still too lightly exercised to judge freshness, with 1.00 weighted re-re-restored run(s), 100% confirmation-like signal, and 0% clearance-like signal.",
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status": "insufficient-data",
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_memory_weight": 1.0,
       "decayed_rererestored_rebuild_reentry_clearance_rate": 0.0,
       "decayed_rererestored_rebuild_reentry_confirmation_rate": 1.0,
@@ -733,7 +733,7 @@
       "decayed_rererestored_rebuild_reentry_clearance_rate": 1.0,
       "decayed_rererestored_rebuild_reentry_confirmation_rate": 0.0,
       "has_fresh_aligned_recent_evidence": false,
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_signal_mix": "1.80 weighted re-re-restored run(s) with 0.00 confirmation-like, 1.80 clearance-like, and 0% of the signal from the freshest runs."
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_signal_mix": "2.00 weighted re-re-restored run(s) with 0.00 confirmation-like, 2.00 clearance-like, and 0% of the signal from the freshest runs."
     },
     "empty": {
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_reason": "Re-re-restored rebuilt re-entry memory is still too lightly exercised to judge freshness, with 0.00 weighted re-re-restored run(s), 0% confirmation-like signal, and 0% clearance-like signal.",
@@ -751,11 +751,11 @@
       "decayed_rererestored_rebuild_reentry_clearance_rate": 0.0,
       "decayed_rererestored_rebuild_reentry_confirmation_rate": 1.0,
       "has_fresh_aligned_recent_evidence": true,
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_signal_mix": "1.80 weighted re-re-restored run(s) with 1.80 confirmation-like, 0.00 clearance-like, and 100% of the signal from the freshest runs."
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_signal_mix": "2.00 weighted re-re-restored run(s) with 2.00 confirmation-like, 0.00 clearance-like, and 100% of the signal from the freshest runs."
     },
     "single-event": {
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_reason": "Recent re-re-restored rebuilt re-entry evidence is still current enough to keep the stronger re-re-restored posture trusted, with 100% of the weighted signal coming from the latest 4 runs.",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status": "fresh",
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_reason": "Re-re-restored rebuilt re-entry memory is still too lightly exercised to judge freshness, with 1.00 weighted re-re-restored run(s), 100% confirmation-like signal, and 0% clearance-like signal.",
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status": "insufficient-data",
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_memory_weight": 1.0,
       "decayed_rererestored_rebuild_reentry_clearance_rate": 0.0,
       "decayed_rererestored_rebuild_reentry_confirmation_rate": 1.0,
@@ -763,8 +763,8 @@
       "recent_reset_reentry_rebuild_reentry_restore_rererestore_signal_mix": "1.00 weighted re-re-restored run(s) with 1.00 confirmation-like, 0.00 clearance-like, and 100% of the signal from the freshest runs."
     },
     "sparse": {
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_reason": "Recent re-re-restored rebuilt re-entry evidence is still current enough to keep the stronger re-re-restored posture trusted, with 100% of the weighted signal coming from the latest 4 runs.",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status": "fresh",
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_reason": "Re-re-restored rebuilt re-entry memory is still too lightly exercised to judge freshness, with 1.00 weighted re-re-restored run(s), 100% confirmation-like signal, and 0% clearance-like signal.",
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_status": "insufficient-data",
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_memory_weight": 1.0,
       "decayed_rererestored_rebuild_reentry_clearance_rate": 0.0,
       "decayed_rererestored_rebuild_reentry_confirmation_rate": 1.0,
@@ -778,7 +778,7 @@
       "decayed_rererestored_rebuild_reentry_clearance_rate": 0.0,
       "decayed_rererestored_rebuild_reentry_confirmation_rate": 1.0,
       "has_fresh_aligned_recent_evidence": true,
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_signal_mix": "2.40 weighted re-re-restored run(s) with 2.40 confirmation-like, 0.00 clearance-like, and 100% of the signal from the freshest runs."
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_signal_mix": "2.70 weighted re-re-restored run(s) with 2.70 confirmation-like, 0.00 clearance-like, and 100% of the signal from the freshest runs."
     }
   },
   "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_freshness_hotspots": {
@@ -892,53 +892,53 @@
   },
   "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_for_target": {
     "clamp-divergence": {
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 2,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": "Confirmation-side re-re-restored posture has stayed aligned long enough to keep the stronger rerestored forecast in place.",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": 0.31,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": "holding-confirmation-rebuild-reentry-rererestore",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": "strong-conf -> decrement-conf"
-    },
-    "clearance-hold": {
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 2,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": "Clearance-side re-re-restored posture has stayed aligned long enough to keep the stronger rerestored caution in place.",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": -0.55,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": "holding-clearance-rebuild-reentry-rererestore",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": "sustained-clearance -> sustained-clearance"
-    },
-    "empty": {
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 0,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": "",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": 0.0,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": ""
-    },
-    "reversing": {
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 2,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": "The re-re-restored rebuilt re-entry posture is already weakening, so it is being softened again.",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": 0.27,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": "reversing",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": "rebuilt-confirmation-reentry -> strong-conf"
-    },
-    "single-event": {
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 1,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": "Stronger rerestored rebuilt re-entry posture has been re-re-restored, but it has not yet proved it can hold.",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": 0.55,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": "just-rererestored",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": "strong-conf"
-    },
-    "sparse": {
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 0,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": "",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": 0.31,
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": "sparse-none -> strong-conf -> decrement-conf"
-    },
-    "sustained-confirmation": {
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 3,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": "Confirmation-side re-re-restored posture is now holding with enough follow-through to trust the stronger rerestored forecast more.",
-      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": 0.55,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": 0.33,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": "sustained-confirmation-rebuild-reentry-rererestore",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": "strong-conf -> strong-conf -> strong-conf"
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": "rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry -> rererestoring-confirmation-rebuild-reentry"
+    },
+    "clearance-hold": {
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 1,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": "Stronger rerestored rebuilt re-entry posture has been re-re-restored, but it has not yet proved it can hold.",
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": -0.22,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": "just-rererestored",
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": "rererestored-confirmation-rebuild-reentry -> rererestored-clearance-rebuild-reentry -> rererestored-clearance-rebuild-reentry"
+    },
+    "empty": {
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 1,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": "Stronger rerestored rebuilt re-entry posture has been re-re-restored, but it has not yet proved it can hold.",
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": 0.35,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": "just-rererestored",
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": "rererestored-confirmation-rebuild-reentry"
+    },
+    "reversing": {
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 3,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": "The re-re-restored rebuilt re-entry posture is already weakening, so it is being softened again.",
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": 0.2,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": "reversing",
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": "rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry"
+    },
+    "single-event": {
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 2,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": "Confirmation-side re-re-restored posture has stayed aligned long enough to keep the stronger rerestored forecast in place.",
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": 0.44,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": "holding-confirmation-rebuild-reentry-rererestore",
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": "rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry"
+    },
+    "sparse": {
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 1,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": "Stronger rerestored rebuilt re-entry posture has been re-re-restored, but it has not yet proved it can hold.",
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": 0.33,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": "just-rererestored",
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": "rererestored-confirmation-rebuild-reentry -> hold -> rererestored-confirmation-rebuild-reentry -> rererestoring-confirmation-rebuild-reentry"
+    },
+    "sustained-confirmation": {
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_age_runs": 4,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_reason": "Confirmation-side re-re-restored posture is now holding with enough follow-through to trust the stronger rerestored forecast more.",
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_score": 0.48,
+      "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_status": "sustained-confirmation-rebuild-reentry-rererestore",
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_persistence_path": "rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry"
     }
   },
   "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_persistence_summary": {
@@ -963,7 +963,7 @@
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status": "none",
       "recent_rererestore_reset_side": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path": "strong-conf -> decrement-conf"
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path": "rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry -> hold"
     },
     "clearance-hold": {
       "aligned_fresh_runs_after_latest_rererestore_reset": 0,
@@ -972,7 +972,7 @@
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status": "none",
       "recent_rererestore_reset_side": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path": "sustained-clearance -> sustained-clearance"
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path": "rererestored-confirmation-rebuild-reentry -> rererestored-clearance-rebuild-reentry -> rererestored-clearance-rebuild-reentry"
     },
     "empty": {
       "aligned_fresh_runs_after_latest_rererestore_reset": 0,
@@ -981,7 +981,7 @@
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status": "none",
       "recent_rererestore_reset_side": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path": ""
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path": "rererestored-confirmation-rebuild-reentry"
     },
     "reversing": {
       "aligned_fresh_runs_after_latest_rererestore_reset": 0,
@@ -990,7 +990,7 @@
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status": "none",
       "recent_rererestore_reset_side": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path": "rebuilt-confirmation-reentry -> strong-conf"
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path": "rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry"
     },
     "single-event": {
       "aligned_fresh_runs_after_latest_rererestore_reset": 0,
@@ -999,7 +999,7 @@
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status": "none",
       "recent_rererestore_reset_side": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path": "strong-conf"
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path": "rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry"
     },
     "sparse": {
       "aligned_fresh_runs_after_latest_rererestore_reset": 0,
@@ -1008,7 +1008,7 @@
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status": "none",
       "recent_rererestore_reset_side": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path": "sparse-none -> strong-conf -> decrement-conf"
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path": "rererestored-confirmation-rebuild-reentry -> hold -> rererestored-confirmation-rebuild-reentry -> hold"
     },
     "sustained-confirmation": {
       "aligned_fresh_runs_after_latest_rererestore_reset": 0,
@@ -1017,7 +1017,7 @@
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_score": 0.0,
       "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_status": "none",
       "recent_rererestore_reset_side": "none",
-      "recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path": "strong-conf -> strong-conf -> strong-conf"
+      "recent_reset_reentry_rebuild_reentry_restore_rererestore_refresh_path": "rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry -> rererestored-confirmation-rebuild-reentry"
     }
   },
   "closure_forecast_reset_reentry_rebuild_reentry_restore_rererestore_refresh_recovery_summary": {
@@ -1053,7 +1053,7 @@
       "closure_forecast_reset_reentry_rebuild_status": "none",
       "closure_forecast_reset_reentry_refresh_recovery_score": 0.0,
       "closure_forecast_reset_reentry_refresh_recovery_status": "none",
-      "recent_reset_reentry_refresh_path": "strong-conf -> decrement-conf",
+      "recent_reset_reentry_refresh_path": "rebuilt-confirmation-reentry -> rebuilt-confirmation-reentry -> rebuilding-confirmation-reentry",
       "recent_reset_reentry_side": "confirmation"
     },
     "clearance-hold": {
@@ -1062,7 +1062,7 @@
       "closure_forecast_reset_reentry_rebuild_status": "none",
       "closure_forecast_reset_reentry_refresh_recovery_score": 0.0,
       "closure_forecast_reset_reentry_refresh_recovery_status": "none",
-      "recent_reset_reentry_refresh_path": "sustained-clearance -> sustained-clearance",
+      "recent_reset_reentry_refresh_path": "rebuilt-confirmation-reentry -> rebuilt-clearance-reentry -> rebuilt-clearance-reentry",
       "recent_reset_reentry_side": "none"
     },
     "empty": {
@@ -1071,7 +1071,7 @@
       "closure_forecast_reset_reentry_rebuild_status": "none",
       "closure_forecast_reset_reentry_refresh_recovery_score": 0.0,
       "closure_forecast_reset_reentry_refresh_recovery_status": "none",
-      "recent_reset_reentry_refresh_path": "",
+      "recent_reset_reentry_refresh_path": "rebuilt-confirmation-reentry",
       "recent_reset_reentry_side": "none"
     },
     "reversing": {
@@ -1080,7 +1080,7 @@
       "closure_forecast_reset_reentry_rebuild_status": "none",
       "closure_forecast_reset_reentry_refresh_recovery_score": 0.0,
       "closure_forecast_reset_reentry_refresh_recovery_status": "none",
-      "recent_reset_reentry_refresh_path": "rebuilt-confirmation-reentry -> strong-conf",
+      "recent_reset_reentry_refresh_path": "rebuilt-confirmation-reentry -> rebuilt-confirmation-reentry -> rebuilt-confirmation-reentry",
       "recent_reset_reentry_side": "none"
     },
     "single-event": {
@@ -1089,7 +1089,7 @@
       "closure_forecast_reset_reentry_rebuild_status": "none",
       "closure_forecast_reset_reentry_refresh_recovery_score": 0.0,
       "closure_forecast_reset_reentry_refresh_recovery_status": "none",
-      "recent_reset_reentry_refresh_path": "strong-conf",
+      "recent_reset_reentry_refresh_path": "rebuilt-confirmation-reentry -> rebuilt-confirmation-reentry",
       "recent_reset_reentry_side": "none"
     },
     "sparse": {
@@ -1098,7 +1098,7 @@
       "closure_forecast_reset_reentry_rebuild_status": "none",
       "closure_forecast_reset_reentry_refresh_recovery_score": 0.0,
       "closure_forecast_reset_reentry_refresh_recovery_status": "none",
-      "recent_reset_reentry_refresh_path": "sparse-none -> strong-conf -> decrement-conf",
+      "recent_reset_reentry_refresh_path": "rebuilt-confirmation-reentry -> hold -> rebuilt-confirmation-reentry -> rebuilding-confirmation-reentry",
       "recent_reset_reentry_side": "confirmation"
     },
     "sustained-confirmation": {
@@ -1107,7 +1107,7 @@
       "closure_forecast_reset_reentry_rebuild_status": "none",
       "closure_forecast_reset_reentry_refresh_recovery_score": 0.0,
       "closure_forecast_reset_reentry_refresh_recovery_status": "none",
-      "recent_reset_reentry_refresh_path": "strong-conf -> strong-conf -> strong-conf",
+      "recent_reset_reentry_refresh_path": "rebuilt-confirmation-reentry -> rebuilt-confirmation-reentry -> rebuilt-confirmation-reentry -> rebuilt-confirmation-reentry",
       "recent_reset_reentry_side": "none"
     }
   },
@@ -1143,7 +1143,7 @@
       "closure_forecast_reset_reentry_status": "none",
       "closure_forecast_reset_refresh_recovery_score": 0.0,
       "closure_forecast_reset_refresh_recovery_status": "none",
-      "recent_reset_refresh_path": "strong-conf -> decrement-conf",
+      "recent_reset_refresh_path": "hold -> hold",
       "recent_reset_side": "none"
     },
     "clearance-hold": {
@@ -1152,7 +1152,7 @@
       "closure_forecast_reset_reentry_status": "none",
       "closure_forecast_reset_refresh_recovery_score": 0.0,
       "closure_forecast_reset_refresh_recovery_status": "none",
-      "recent_reset_refresh_path": "sustained-clearance -> sustained-clearance",
+      "recent_reset_refresh_path": "hold -> hold",
       "recent_reset_side": "none"
     },
     "empty": {
@@ -1170,7 +1170,7 @@
       "closure_forecast_reset_reentry_status": "none",
       "closure_forecast_reset_refresh_recovery_score": 0.0,
       "closure_forecast_reset_refresh_recovery_status": "none",
-      "recent_reset_refresh_path": "rebuilt-confirmation-reentry -> strong-conf",
+      "recent_reset_refresh_path": "hold -> hold",
       "recent_reset_side": "none"
     },
     "single-event": {
@@ -1179,7 +1179,7 @@
       "closure_forecast_reset_reentry_status": "none",
       "closure_forecast_reset_refresh_recovery_score": 0.0,
       "closure_forecast_reset_refresh_recovery_status": "none",
-      "recent_reset_refresh_path": "strong-conf",
+      "recent_reset_refresh_path": "hold",
       "recent_reset_side": "none"
     },
     "sparse": {
@@ -1188,7 +1188,7 @@
       "closure_forecast_reset_reentry_status": "none",
       "closure_forecast_reset_refresh_recovery_score": 0.0,
       "closure_forecast_reset_refresh_recovery_status": "none",
-      "recent_reset_refresh_path": "sparse-none -> strong-conf -> decrement-conf",
+      "recent_reset_refresh_path": "hold -> hold -> hold",
       "recent_reset_side": "none"
     },
     "sustained-confirmation": {
@@ -1197,7 +1197,7 @@
       "closure_forecast_reset_reentry_status": "none",
       "closure_forecast_reset_refresh_recovery_score": 0.0,
       "closure_forecast_reset_refresh_recovery_status": "none",
-      "recent_reset_refresh_path": "strong-conf -> strong-conf -> strong-conf",
+      "recent_reset_refresh_path": "hold -> hold -> hold",
       "recent_reset_side": "none"
     }
   },

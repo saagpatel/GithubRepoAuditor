@@ -1,12 +1,30 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Sequence
+from typing import Any
+
+from src.operator_trend_closure_forecast_freshness_controls import (
+    closure_forecast_event_has_evidence,
+    closure_forecast_freshness_status,
+)
+from src.operator_trend_support import (
+    CLASS_CLOSURE_FORECAST_REFRESH_WINDOW_RUNS,
+    CLASS_MEMORY_RECENCY_WEIGHTS,
+    CLASS_REACQUISITION_FRESHNESS_WINDOW_RUNS,
+    CLASS_REACQUISITION_PERSISTENCE_WINDOW_RUNS,
+    HISTORY_WINDOW_RUNS,
+    clamp_round,
+    class_direction_flip_count,
+    closure_forecast_direction_majority,
+    closure_forecast_direction_reversing,
+    normalized_closure_forecast_direction,
+    target_class_key,
+    target_label,
+    target_specific_normalization_noise,
+)
 
 
 def closure_forecast_refresh_signal_from_event(
     event: dict[str, Any],
-    *,
-    normalized_closure_forecast_direction: Callable[[str, float], str],
 ) -> float:
     score = float(event.get("closure_forecast_reweight_score", 0.0) or 0.0)
     direction = normalized_closure_forecast_direction(
@@ -18,7 +36,9 @@ def closure_forecast_refresh_signal_from_event(
         "mixed-age": 0.60,
         "stale": 0.25,
         "insufficient-data": 0.10,
-    }.get(str(event.get("closure_forecast_freshness_status", "insufficient-data")), 0.10)
+    }.get(
+        str(event.get("closure_forecast_freshness_status", "insufficient-data")), 0.10
+    )
     signal_strength = max(abs(score), 0.05) if direction != "neutral" else 0.0
     if direction == "supporting-confirmation":
         return signal_strength * freshness_factor
@@ -34,7 +54,9 @@ def recent_closure_forecast_weakened_side(events: list[dict[str, Any]]) -> str:
             event.get("closure_forecast_freshness_status", "insufficient-data")
             or "insufficient-data"
         )
-        hysteresis_status = str(event.get("closure_forecast_hysteresis_status", "none") or "none")
+        hysteresis_status = str(
+            event.get("closure_forecast_hysteresis_status", "none") or "none"
+        )
         if decay_status == "confirmation-decayed" or (
             freshness_status in {"stale", "insufficient-data"}
             and hysteresis_status in {"pending-confirmation", "confirmed-confirmation"}
@@ -50,15 +72,14 @@ def recent_closure_forecast_weakened_side(events: list[dict[str, Any]]) -> str:
 
 def closure_forecast_refresh_path_label(
     event: dict[str, Any],
-    *,
-    normalized_closure_forecast_direction: Callable[[str, float], str],
 ) -> str:
     direction = normalized_closure_forecast_direction(
         str(event.get("closure_forecast_reweight_direction", "neutral")),
         float(event.get("closure_forecast_reweight_score", 0.0) or 0.0),
     )
     freshness = str(
-        event.get("closure_forecast_freshness_status", "insufficient-data") or "insufficient-data"
+        event.get("closure_forecast_freshness_status", "insufficient-data")
+        or "insufficient-data"
     )
     if direction == "supporting-confirmation":
         return f"{freshness} confirmation"
@@ -71,23 +92,13 @@ def closure_forecast_refresh_recovery_for_target(
     target: dict[str, Any],
     closure_forecast_events: list[dict[str, Any]],
     transition_history_meta: dict[str, Any],
-    *,
-    target_class_key: Callable[[dict[str, Any]], str],
-    closure_forecast_event_has_evidence: Callable[[dict[str, Any]], bool],
-    normalized_closure_forecast_direction: Callable[[str, float], str],
-    closure_forecast_refresh_signal_from_event: Callable[[dict[str, Any]], float],
-    clamp_round: Callable[[float, float, float], float],
-    closure_forecast_direction_majority: Callable[[list[str]], str],
-    recent_closure_forecast_weakened_side: Callable[[list[dict[str, Any]]], str],
-    target_specific_normalization_noise: Callable[[dict[str, Any], dict[str, Any]], bool],
-    closure_forecast_direction_reversing: Callable[[str, str], bool],
-    closure_forecast_refresh_path_label: Callable[[dict[str, Any]], str],
-    class_closure_forecast_refresh_window_runs: int,
 ) -> dict[str, Any]:
     class_key = target_class_key(target)
     matching_events = [
-        event for event in closure_forecast_events if event.get("class_key") == class_key
-    ][:class_closure_forecast_refresh_window_runs]
+        event
+        for event in closure_forecast_events
+        if event.get("class_key") == class_key
+    ][:CLASS_CLOSURE_FORECAST_REFRESH_WINDOW_RUNS]
     relevant_events = [
         event for event in matching_events if closure_forecast_event_has_evidence(event)
     ]
@@ -101,19 +112,25 @@ def closure_forecast_refresh_recovery_for_target(
     weighted_total = 0.0
     weight_sum = 0.0
     for index, event in enumerate(matching_events):
-        weight = (1.0, 0.8, 0.6, 0.4)[min(index, class_closure_forecast_refresh_window_runs - 1)]
+        weight = (1.0, 0.8, 0.6, 0.4)[
+            min(index, CLASS_CLOSURE_FORECAST_REFRESH_WINDOW_RUNS - 1)
+        ]
         weighted_total += closure_forecast_refresh_signal_from_event(event) * weight
         weight_sum += weight
     refresh_recovery_score = clamp_round(
         weighted_total / max(weight_sum, 1.0),
-        -0.95,
-        0.95,
+        lower=-0.95,
+        upper=0.95,
     )
     current_direction = directions[0] if directions else "neutral"
     earlier_majority = closure_forecast_direction_majority(directions[1:])
     recent_weakened = recent_closure_forecast_weakened_side(matching_events)
-    freshness_status = str(target.get("closure_forecast_freshness_status", "insufficient-data"))
-    momentum_status = str(target.get("closure_forecast_momentum_status", "insufficient-data"))
+    freshness_status = str(
+        target.get("closure_forecast_freshness_status", "insufficient-data")
+    )
+    momentum_status = str(
+        target.get("closure_forecast_momentum_status", "insufficient-data")
+    )
     stability_status = str(target.get("closure_forecast_stability_status", "watch"))
     local_noise = target_specific_normalization_noise(target, transition_history_meta)
 
@@ -122,8 +139,14 @@ def closure_forecast_refresh_recovery_for_target(
     elif local_noise and current_direction == "supporting-confirmation":
         refresh_recovery_status = "blocked"
     elif (
-        (recent_weakened == "confirmation" and current_direction == "supporting-clearance")
-        or (recent_weakened == "clearance" and current_direction == "supporting-confirmation")
+        (
+            recent_weakened == "confirmation"
+            and current_direction == "supporting-clearance"
+        )
+        or (
+            recent_weakened == "clearance"
+            and current_direction == "supporting-confirmation"
+        )
         or closure_forecast_direction_reversing(current_direction, earlier_majority)
     ):
         refresh_recovery_status = "reversing"
@@ -162,9 +185,7 @@ def closure_forecast_refresh_recovery_for_target(
 
     if local_noise and current_direction == "supporting-confirmation":
         reacquisition_status = "blocked"
-        reacquisition_reason = (
-            "Local target instability is still preventing positive confirmation-side reacquisition."
-        )
+        reacquisition_reason = "Local target instability is still preventing positive confirmation-side reacquisition."
     elif (
         refresh_recovery_status == "reacquiring-confirmation"
         and freshness_status == "fresh"
@@ -188,7 +209,10 @@ def closure_forecast_refresh_recovery_for_target(
             "Fresh clearance-side pressure has stayed strong enough to earn back stronger "
             "clearance forecasting."
         )
-    elif refresh_recovery_status in {"recovering-confirmation", "reacquiring-confirmation"}:
+    elif refresh_recovery_status in {
+        "recovering-confirmation",
+        "reacquiring-confirmation",
+    }:
         reacquisition_status = "pending-confirmation-reacquisition"
         reacquisition_reason = (
             "Fresh confirmation-side forecast evidence is returning, but it has not fully "
@@ -216,7 +240,9 @@ def closure_forecast_refresh_recovery_for_target(
         "closure_forecast_reacquisition_status": reacquisition_status,
         "closure_forecast_reacquisition_reason": reacquisition_reason,
         "recent_closure_forecast_refresh_path": " -> ".join(
-            closure_forecast_refresh_path_label(event) for event in matching_events if event
+            closure_forecast_refresh_path_label(event)
+            for event in matching_events
+            if event
         ),
         "recent_weakened_side": recent_weakened,
     }
@@ -243,13 +269,23 @@ def apply_closure_forecast_reacquisition_control(
     closure_hysteresis_status: str,
     closure_hysteresis_reason: str,
 ) -> tuple[str, str, str, str, str, str, str, str, str, str, str, str, str, str, str]:
-    refresh_status = str(refresh_meta.get("closure_forecast_refresh_recovery_status", "none"))
-    reacquisition_status = str(refresh_meta.get("closure_forecast_reacquisition_status", "none"))
-    reacquisition_reason = str(refresh_meta.get("closure_forecast_reacquisition_reason", ""))
+    refresh_status = str(
+        refresh_meta.get("closure_forecast_refresh_recovery_status", "none")
+    )
+    reacquisition_status = str(
+        refresh_meta.get("closure_forecast_reacquisition_status", "none")
+    )
+    reacquisition_reason = str(
+        refresh_meta.get("closure_forecast_reacquisition_reason", "")
+    )
     recent_weakened_side = str(refresh_meta.get("recent_weakened_side", "none"))
-    freshness_status = str(target.get("closure_forecast_freshness_status", "insufficient-data"))
+    freshness_status = str(
+        target.get("closure_forecast_freshness_status", "insufficient-data")
+    )
     stability_status = str(target.get("closure_forecast_stability_status", "watch"))
-    decayed_clearance_rate = float(target.get("decayed_clearance_forecast_rate", 0.0) or 0.0)
+    decayed_clearance_rate = float(
+        target.get("decayed_clearance_forecast_rate", 0.0) or 0.0
+    )
     transition_age_runs = int(target.get("class_transition_age_runs", 0) or 0)
 
     if reacquisition_status == "reacquired-confirmation":
@@ -282,14 +318,18 @@ def apply_closure_forecast_reacquisition_control(
             transition_status = "none"
             transition_reason = clear_reason
             if target.get("class_reweight_transition_status") == "pending-support":
-                reverted_policy = target.get("pre_class_normalization_trust_policy", trust_policy)
+                reverted_policy = target.get(
+                    "pre_class_normalization_trust_policy", trust_policy
+                )
                 reverted_reason = target.get(
                     "pre_class_normalization_trust_policy_reason",
                     trust_policy_reason,
                 )
                 trust_policy = str(reverted_policy)
                 trust_policy_reason = (
-                    clear_reason if reverted_policy == "verify-first" else str(reverted_reason)
+                    clear_reason
+                    if reverted_policy == "verify-first"
+                    else str(reverted_reason)
                 )
                 class_normalization_status = "candidate"
                 class_normalization_reason = clear_reason
@@ -307,9 +347,10 @@ def apply_closure_forecast_reacquisition_control(
     elif refresh_status == "reversing":
         closure_hysteresis_reason = reacquisition_reason or closure_hysteresis_reason
 
-    if freshness_status in {"stale", "insufficient-data"} and reacquisition_status.startswith(
-        "reacquired"
-    ):
+    if freshness_status in {
+        "stale",
+        "insufficient-data",
+    } and reacquisition_status.startswith("reacquired"):
         if reacquisition_status == "reacquired-confirmation":
             closure_likely_outcome = "hold"
             closure_hysteresis_status = "pending-confirmation"
@@ -342,7 +383,6 @@ def closure_forecast_refresh_hotspots(
     resolution_targets: list[dict[str, Any]],
     *,
     mode: str,
-    target_class_key: Callable[[dict[str, Any]], str],
 ) -> list[dict[str, Any]]:
     grouped: dict[str, dict[str, Any]] = {}
     for target in resolution_targets:
@@ -413,12 +453,12 @@ def closure_forecast_refresh_recovery_summary(
     primary_target: dict[str, Any],
     recovering_confirmation_hotspots: list[dict[str, Any]],
     recovering_clearance_hotspots: list[dict[str, Any]],
-    *,
-    target_label: Callable[[dict[str, Any]], str],
 ) -> str:
     label = target_label(primary_target) or "The current target"
     status = str(primary_target.get("closure_forecast_refresh_recovery_status", "none"))
-    score = float(primary_target.get("closure_forecast_refresh_recovery_score", 0.0) or 0.0)
+    score = float(
+        primary_target.get("closure_forecast_refresh_recovery_score", 0.0) or 0.0
+    )
     if status == "recovering-confirmation":
         return (
             f"Fresh confirmation-side forecast evidence is returning for {label}, but it has "
@@ -470,8 +510,6 @@ def closure_forecast_reacquisition_summary(
     primary_target: dict[str, Any],
     recovering_confirmation_hotspots: list[dict[str, Any]],
     recovering_clearance_hotspots: list[dict[str, Any]],
-    *,
-    target_label: Callable[[dict[str, Any]], str],
 ) -> str:
     label = target_label(primary_target) or "The current target"
     status = str(primary_target.get("closure_forecast_reacquisition_status", "none"))
@@ -524,7 +562,9 @@ def closure_forecast_reacquisition_summary(
 
 
 def closure_forecast_reacquisition_side_from_event(event: dict[str, Any]) -> str:
-    reacquisition_status = str(event.get("closure_forecast_reacquisition_status", "none") or "none")
+    reacquisition_status = str(
+        event.get("closure_forecast_reacquisition_status", "none") or "none"
+    )
     if reacquisition_status in {
         "pending-confirmation-reacquisition",
         "reacquired-confirmation",
@@ -535,7 +575,9 @@ def closure_forecast_reacquisition_side_from_event(event: dict[str, Any]) -> str
         "reacquired-clearance",
     }:
         return "clearance"
-    refresh_status = str(event.get("closure_forecast_refresh_recovery_status", "none") or "none")
+    refresh_status = str(
+        event.get("closure_forecast_refresh_recovery_status", "none") or "none"
+    )
     if refresh_status in {"recovering-confirmation", "reacquiring-confirmation"}:
         return "confirmation"
     if refresh_status in {"recovering-clearance", "reacquiring-clearance"}:
@@ -565,7 +607,9 @@ def closure_forecast_reacquisition_path_label(event: dict[str, Any]) -> str:
     status = str(event.get("closure_forecast_reacquisition_status", "none") or "none")
     if status != "none":
         return status
-    likely_outcome = str(event.get("transition_closure_likely_outcome", "none") or "none")
+    likely_outcome = str(
+        event.get("transition_closure_likely_outcome", "none") or "none"
+    )
     if likely_outcome != "none":
         return likely_outcome
     return "hold"
@@ -575,20 +619,14 @@ def closure_forecast_reacquisition_persistence_for_target(
     target: dict[str, Any],
     closure_forecast_events: list[dict[str, Any]],
     transition_history_meta: dict[str, Any],
-    *,
-    target_class_key: Callable[[dict[str, Any]], str],
-    closure_forecast_reacquisition_side_from_event: Callable[[dict[str, Any]], str],
-    clamp_round: Callable[[float, float, float], float],
-    closure_forecast_direction_majority: Callable[[list[str]], str],
-    closure_forecast_direction_reversing: Callable[[str, str], bool],
-    closure_forecast_reacquisition_path_label: Callable[[dict[str, Any]], str],
-    class_reacquisition_persistence_window_runs: int,
 ) -> dict[str, Any]:
     del transition_history_meta
     class_key = target_class_key(target)
     matching_events = [
-        event for event in closure_forecast_events if event.get("class_key") == class_key
-    ][:class_reacquisition_persistence_window_runs]
+        event
+        for event in closure_forecast_events
+        if event.get("class_key") == class_key
+    ][:CLASS_REACQUISITION_PERSISTENCE_WINDOW_RUNS]
     relevant_events = [
         event
         for event in matching_events
@@ -609,9 +647,11 @@ def closure_forecast_reacquisition_persistence_for_target(
     weighted_total = 0.0
     weight_sum = 0.0
     sides: list[str] = []
-    for index, event in enumerate(relevant_events[:class_reacquisition_persistence_window_runs]):
+    for index, event in enumerate(
+        relevant_events[:CLASS_REACQUISITION_PERSISTENCE_WINDOW_RUNS]
+    ):
         weight = (1.0, 0.8, 0.6, 0.4)[
-            min(index, class_reacquisition_persistence_window_runs - 1)
+            min(index, CLASS_REACQUISITION_PERSISTENCE_WINDOW_RUNS - 1)
         ]
         event_side = closure_forecast_reacquisition_side_from_event(event)
         sign = 1.0 if event_side == "confirmation" else -1.0
@@ -622,15 +662,19 @@ def closure_forecast_reacquisition_persistence_for_target(
             "reacquired-clearance",
         }:
             magnitude += 0.15
-        momentum_status = str(event.get("closure_forecast_momentum_status", "insufficient-data"))
-        if (event_side == "confirmation" and momentum_status == "sustained-confirmation") or (
-            event_side == "clearance" and momentum_status == "sustained-clearance"
-        ):
+        momentum_status = str(
+            event.get("closure_forecast_momentum_status", "insufficient-data")
+        )
+        if (
+            event_side == "confirmation" and momentum_status == "sustained-confirmation"
+        ) or (event_side == "clearance" and momentum_status == "sustained-clearance"):
             magnitude += 0.10
         stability_status = str(event.get("closure_forecast_stability_status", "watch"))
         if stability_status == "stable":
             magnitude += 0.10
-        freshness_status = str(event.get("closure_forecast_freshness_status", "insufficient-data"))
+        freshness_status = str(
+            event.get("closure_forecast_freshness_status", "insufficient-data")
+        )
         if freshness_status == "fresh":
             magnitude += 0.10
         elif freshness_status == "mixed-age":
@@ -644,10 +688,18 @@ def closure_forecast_reacquisition_persistence_for_target(
         weighted_total += sign * magnitude * weight
         weight_sum += weight
 
-    persistence_score = clamp_round(weighted_total / max(weight_sum, 1.0), -0.95, 0.95)
-    current_momentum_status = str(target.get("closure_forecast_momentum_status", "insufficient-data"))
-    current_stability_status = str(target.get("closure_forecast_stability_status", "watch"))
-    current_freshness_status = str(target.get("closure_forecast_freshness_status", "insufficient-data"))
+    persistence_score = clamp_round(
+        weighted_total / max(weight_sum, 1.0), lower=-0.95, upper=0.95
+    )
+    current_momentum_status = str(
+        target.get("closure_forecast_momentum_status", "insufficient-data")
+    )
+    current_stability_status = str(
+        target.get("closure_forecast_stability_status", "watch")
+    )
+    current_freshness_status = str(
+        target.get("closure_forecast_freshness_status", "insufficient-data")
+    )
     earlier_majority = closure_forecast_direction_majority(sides[1:])
     current_direction = (
         "supporting-confirmation"
@@ -689,17 +741,23 @@ def closure_forecast_reacquisition_persistence_for_target(
         and current_stability_status != "oscillating"
     ):
         persistence_status = "sustained-clearance"
-    elif current_side == "confirmation" and persistence_age_runs >= 2 and persistence_score > 0:
+    elif (
+        current_side == "confirmation"
+        and persistence_age_runs >= 2
+        and persistence_score > 0
+    ):
         persistence_status = "holding-confirmation"
-    elif current_side == "clearance" and persistence_age_runs >= 2 and persistence_score < 0:
+    elif (
+        current_side == "clearance"
+        and persistence_age_runs >= 2
+        and persistence_score < 0
+    ):
         persistence_status = "holding-clearance"
     else:
         persistence_status = "none"
 
     if persistence_status == "just-reacquired":
-        persistence_reason = (
-            "Stronger closure-forecast posture has returned, but it has not yet proved it can hold."
-        )
+        persistence_reason = "Stronger closure-forecast posture has returned, but it has not yet proved it can hold."
     elif persistence_status == "holding-confirmation":
         persistence_reason = (
             "Confirmation-side recovery has stayed aligned long enough to keep the restored "
@@ -721,9 +779,7 @@ def closure_forecast_reacquisition_persistence_for_target(
             "the restored caution more."
         )
     elif persistence_status == "reversing":
-        persistence_reason = (
-            "The restored forecast posture is already weakening, so it is being softened again."
-        )
+        persistence_reason = "The restored forecast posture is already weakening, so it is being softened again."
     elif persistence_status == "insufficient-data":
         persistence_reason = (
             "Reacquisition is still too lightly exercised to say whether the restored forecast "
@@ -738,7 +794,9 @@ def closure_forecast_reacquisition_persistence_for_target(
         "closure_forecast_reacquisition_persistence_status": persistence_status,
         "closure_forecast_reacquisition_persistence_reason": persistence_reason,
         "recent_reacquisition_persistence_path": " -> ".join(
-            closure_forecast_reacquisition_path_label(event) for event in matching_events if event
+            closure_forecast_reacquisition_path_label(event)
+            for event in matching_events
+            if event
         ),
     }
 
@@ -747,19 +805,13 @@ def closure_forecast_recovery_churn_for_target(
     target: dict[str, Any],
     closure_forecast_events: list[dict[str, Any]],
     transition_history_meta: dict[str, Any],
-    *,
-    target_class_key: Callable[[dict[str, Any]], str],
-    closure_forecast_reacquisition_side_from_event: Callable[[dict[str, Any]], str],
-    class_direction_flip_count: Callable[[list[str]], int],
-    clamp_round: Callable[[float, float, float], float],
-    target_specific_normalization_noise: Callable[[dict[str, Any], dict[str, Any]], bool],
-    closure_forecast_reacquisition_path_label: Callable[[dict[str, Any]], str],
-    class_reacquisition_persistence_window_runs: int,
 ) -> dict[str, Any]:
     class_key = target_class_key(target)
     matching_events = [
-        event for event in closure_forecast_events if event.get("class_key") == class_key
-    ][:class_reacquisition_persistence_window_runs]
+        event
+        for event in closure_forecast_events
+        if event.get("class_key") == class_key
+    ][:CLASS_REACQUISITION_PERSISTENCE_WINDOW_RUNS]
     side_path = [
         closure_forecast_reacquisition_side_from_event(event)
         for event in matching_events
@@ -774,13 +826,17 @@ def closure_forecast_recovery_churn_for_target(
     else:
         flip_count = class_direction_flip_count(
             [
-                "supporting-confirmation" if side == "confirmation" else "supporting-clearance"
+                "supporting-confirmation"
+                if side == "confirmation"
+                else "supporting-clearance"
                 for side in side_path
             ]
         )
         churn_score = float(flip_count) * 0.20
         stability_status = str(target.get("closure_forecast_stability_status", "watch"))
-        momentum_status = str(target.get("closure_forecast_momentum_status", "insufficient-data"))
+        momentum_status = str(
+            target.get("closure_forecast_momentum_status", "insufficient-data")
+        )
         if stability_status == "oscillating":
             churn_score += 0.15
         if momentum_status == "reversing":
@@ -792,7 +848,8 @@ def closure_forecast_recovery_churn_for_target(
             for event in matching_events
         ]
         if any(
-            previous == "fresh" and current in {"mixed-age", "stale", "insufficient-data"}
+            previous == "fresh"
+            and current in {"mixed-age", "stale", "insufficient-data"}
             for previous, current in zip(freshness_path, freshness_path[1:])
         ):
             churn_score += 0.10
@@ -801,18 +858,20 @@ def closure_forecast_recovery_churn_for_target(
         if (
             len(side_path) >= 2
             and side_path[0] == side_path[1]
-            and matching_events[0].get("closure_forecast_freshness_status", "insufficient-data")
+            and matching_events[0].get(
+                "closure_forecast_freshness_status", "insufficient-data"
+            )
             == "fresh"
-            and matching_events[1].get("closure_forecast_freshness_status", "insufficient-data")
+            and matching_events[1].get(
+                "closure_forecast_freshness_status", "insufficient-data"
+            )
             == "fresh"
         ):
             churn_score -= 0.10
-        churn_score = clamp_round(churn_score, 0.0, 0.95)
+        churn_score = clamp_round(churn_score, lower=0.0, upper=0.95)
         if local_noise and current_side == "confirmation":
             churn_status = "blocked"
-            churn_reason = (
-                "Local target instability is preventing positive confirmation-side persistence."
-            )
+            churn_reason = "Local target instability is preventing positive confirmation-side persistence."
         elif churn_score >= 0.45 or flip_count >= 2:
             churn_status = "churn"
             churn_reason = (
@@ -821,7 +880,9 @@ def closure_forecast_recovery_churn_for_target(
             )
         elif churn_score >= 0.20:
             churn_status = "watch"
-            churn_reason = "Recovery is wobbling and may lose its restored strength soon."
+            churn_reason = (
+                "Recovery is wobbling and may lose its restored strength soon."
+            )
         else:
             churn_status = "none"
             churn_reason = ""
@@ -830,7 +891,9 @@ def closure_forecast_recovery_churn_for_target(
         "closure_forecast_recovery_churn_status": churn_status,
         "closure_forecast_recovery_churn_reason": churn_reason,
         "recent_recovery_churn_path": " -> ".join(
-            closure_forecast_reacquisition_path_label(event) for event in matching_events if event
+            closure_forecast_reacquisition_path_label(event)
+            for event in matching_events
+            if event
         ),
     }
 
@@ -858,17 +921,25 @@ def apply_reacquisition_persistence_and_churn_control(
     closure_hysteresis_reason: str,
 ) -> tuple[str, str, str, str, str, str, str, str, str, str, str, str, str, str, str]:
     persistence_status = str(
-        persistence_meta.get("closure_forecast_reacquisition_persistence_status", "none")
+        persistence_meta.get(
+            "closure_forecast_reacquisition_persistence_status", "none"
+        )
     )
     persistence_reason = str(
         persistence_meta.get("closure_forecast_reacquisition_persistence_reason", "")
     )
     churn_status = str(churn_meta.get("closure_forecast_recovery_churn_status", "none"))
     churn_reason = str(churn_meta.get("closure_forecast_recovery_churn_reason", ""))
-    current_reacquisition_status = str(target.get("closure_forecast_reacquisition_status", "none"))
-    current_freshness_status = str(target.get("closure_forecast_freshness_status", "insufficient-data"))
+    current_reacquisition_status = str(
+        target.get("closure_forecast_reacquisition_status", "none")
+    )
+    current_freshness_status = str(
+        target.get("closure_forecast_freshness_status", "insufficient-data")
+    )
     transition_age_runs = int(target.get("class_transition_age_runs", 0) or 0)
-    recent_pending_status = str(transition_history_meta.get("recent_pending_status", "none"))
+    recent_pending_status = str(
+        transition_history_meta.get("recent_pending_status", "none")
+    )
 
     if churn_status == "blocked":
         closure_likely_outcome = "hold"
@@ -1006,7 +1077,9 @@ def apply_reacquisition_persistence_and_churn_control(
                     )
                     trust_policy = str(reverted_policy)
                     trust_policy_reason = (
-                        restore_reason if reverted_policy == "verify-first" else str(reverted_reason)
+                        restore_reason
+                        if reverted_policy == "verify-first"
+                        else str(reverted_reason)
                     )
                     class_normalization_status = "candidate"
                     class_normalization_reason = restore_reason
@@ -1039,7 +1112,6 @@ def closure_forecast_reacquisition_hotspots(
     resolution_targets: list[dict[str, Any]],
     *,
     mode: str,
-    target_class_key: Callable[[dict[str, Any]], str],
 ) -> list[dict[str, Any]]:
     grouped: dict[str, dict[str, Any]] = {}
     for target in resolution_targets:
@@ -1078,7 +1150,9 @@ def closure_forecast_reacquisition_hotspots(
         existing = grouped.get(class_key)
         if existing is None or abs(
             float(current["closure_forecast_reacquisition_persistence_score"] or 0.0)
-        ) > abs(float(existing["closure_forecast_reacquisition_persistence_score"] or 0.0)):
+        ) > abs(
+            float(existing["closure_forecast_reacquisition_persistence_score"] or 0.0)
+        ):
             grouped[class_key] = current
 
     hotspots = list(grouped.values())
@@ -1086,12 +1160,20 @@ def closure_forecast_reacquisition_hotspots(
         hotspots = [
             item
             for item in hotspots
-            if item.get("closure_forecast_reacquisition_persistence_status") == "just-reacquired"
+            if item.get("closure_forecast_reacquisition_persistence_status")
+            == "just-reacquired"
         ]
         hotspots.sort(
             key=lambda item: (
                 -int(item.get("closure_forecast_reacquisition_age_runs", 0) or 0),
-                -abs(float(item.get("closure_forecast_reacquisition_persistence_score", 0.0) or 0.0)),
+                -abs(
+                    float(
+                        item.get(
+                            "closure_forecast_reacquisition_persistence_score", 0.0
+                        )
+                        or 0.0
+                    )
+                ),
                 str(item.get("label", "")),
             )
         )
@@ -1110,7 +1192,14 @@ def closure_forecast_reacquisition_hotspots(
         hotspots.sort(
             key=lambda item: (
                 -int(item.get("closure_forecast_reacquisition_age_runs", 0) or 0),
-                -abs(float(item.get("closure_forecast_reacquisition_persistence_score", 0.0) or 0.0)),
+                -abs(
+                    float(
+                        item.get(
+                            "closure_forecast_reacquisition_persistence_score", 0.0
+                        )
+                        or 0.0
+                    )
+                ),
                 str(item.get("label", "")),
             )
         )
@@ -1118,7 +1207,8 @@ def closure_forecast_reacquisition_hotspots(
         hotspots = [
             item
             for item in hotspots
-            if item.get("closure_forecast_recovery_churn_status") in {"watch", "churn", "blocked"}
+            if item.get("closure_forecast_recovery_churn_status")
+            in {"watch", "churn", "blocked"}
         ]
         hotspots.sort(
             key=lambda item: (
@@ -1134,13 +1224,18 @@ def closure_forecast_reacquisition_persistence_summary(
     primary_target: dict[str, Any],
     just_reacquired_hotspots: list[dict[str, Any]],
     holding_reacquisition_hotspots: list[dict[str, Any]],
-    *,
-    target_label: Callable[[dict[str, Any]], str],
 ) -> str:
     label = target_label(primary_target) or "The current target"
-    status = str(primary_target.get("closure_forecast_reacquisition_persistence_status", "none"))
-    age_runs = int(primary_target.get("closure_forecast_reacquisition_age_runs", 0) or 0)
-    score = float(primary_target.get("closure_forecast_reacquisition_persistence_score", 0.0) or 0.0)
+    status = str(
+        primary_target.get("closure_forecast_reacquisition_persistence_status", "none")
+    )
+    age_runs = int(
+        primary_target.get("closure_forecast_reacquisition_age_runs", 0) or 0
+    )
+    score = float(
+        primary_target.get("closure_forecast_reacquisition_persistence_score", 0.0)
+        or 0.0
+    )
     if status == "just-reacquired":
         return (
             f"{label} has only just re-earned stronger closure-forecast posture, so it is still "
@@ -1196,12 +1291,12 @@ def closure_forecast_reacquisition_persistence_summary(
 def closure_forecast_recovery_churn_summary(
     primary_target: dict[str, Any],
     recovery_churn_hotspots: list[dict[str, Any]],
-    *,
-    target_label: Callable[[dict[str, Any]], str],
 ) -> str:
     label = target_label(primary_target) or "The current target"
     status = str(primary_target.get("closure_forecast_recovery_churn_status", "none"))
-    score = float(primary_target.get("closure_forecast_recovery_churn_score", 0.0) or 0.0)
+    score = float(
+        primary_target.get("closure_forecast_recovery_churn_score", 0.0) or 0.0
+    )
     if status == "watch":
         return (
             f"Recovery for {label} is wobbling enough that restored forecast strength may "
@@ -1229,7 +1324,6 @@ def closure_forecast_recovery_churn_summary(
     return "No meaningful recovery churn is active right now."
 
 
-
 def reacquisition_event_is_confirmation_like(event: dict[str, Any]) -> bool:
     return (
         event.get("closure_forecast_reacquisition_status", "none")
@@ -1250,16 +1344,12 @@ def reacquisition_event_is_clearance_like(event: dict[str, Any]) -> bool:
         in {"holding-clearance", "sustained-clearance"}
         or event.get("closure_forecast_hysteresis_status", "none")
         in {"pending-clearance", "confirmed-clearance"}
-        or event.get("transition_closure_likely_outcome", "none") in {"clear-risk", "expire-risk"}
+        or event.get("transition_closure_likely_outcome", "none")
+        in {"clear-risk", "expire-risk"}
     )
 
 
-def reacquisition_event_has_evidence(
-    event: dict[str, Any],
-    *,
-    reacquisition_event_is_confirmation_like: Callable[[dict[str, Any]], bool],
-    reacquisition_event_is_clearance_like: Callable[[dict[str, Any]], bool],
-) -> bool:
+def reacquisition_event_has_evidence(event: dict[str, Any]) -> bool:
     return (
         reacquisition_event_is_confirmation_like(event)
         or reacquisition_event_is_clearance_like(event)
@@ -1268,12 +1358,7 @@ def reacquisition_event_has_evidence(
     )
 
 
-def reacquisition_event_signal_label(
-    event: dict[str, Any],
-    *,
-    reacquisition_event_is_confirmation_like: Callable[[dict[str, Any]], bool],
-    reacquisition_event_is_clearance_like: Callable[[dict[str, Any]], bool],
-) -> str:
+def reacquisition_event_signal_label(event: dict[str, Any]) -> str:
     if reacquisition_event_is_confirmation_like(event):
         return "confirmation-like"
     if reacquisition_event_is_clearance_like(event):
@@ -1287,14 +1372,12 @@ def closure_forecast_reacquisition_freshness_reason(
     recent_window_weight_share: float,
     decayed_confirmation_rate: float,
     decayed_clearance_rate: float,
-    *,
-    class_reacquisition_freshness_window_runs: int,
 ) -> str:
     if freshness_status == "fresh":
         return (
             "Recent reacquired closure-forecast evidence is still current enough to trust, with "
             f"{recent_window_weight_share:.0%} of the weighted signal coming from the latest "
-            f"{class_reacquisition_freshness_window_runs} runs."
+            f"{CLASS_REACQUISITION_FRESHNESS_WINDOW_RUNS} runs."
         )
     if freshness_status == "mixed-age":
         return (
@@ -1332,29 +1415,19 @@ def recent_reacquisition_signal_mix(
 def closure_forecast_reacquisition_freshness_for_target(
     target: dict[str, Any],
     closure_forecast_events: list[dict[str, Any]],
-    *,
-    target_class_key: Callable[[dict[str, Any]], str],
-    reacquisition_event_has_evidence: Callable[[dict[str, Any]], bool],
-    reacquisition_event_signal_label: Callable[[dict[str, Any]], str],
-    closure_forecast_reacquisition_side_from_status: Callable[[str], str],
-    closure_forecast_reacquisition_side_from_event: Callable[[dict[str, Any]], str],
-    class_memory_recency_weights: Sequence[float],
-    history_window_runs: int,
-    class_reacquisition_freshness_window_runs: int,
-    freshness_status: Callable[[float, float], str],
-    freshness_reason: Callable[[str, float, float, float, float], str],
-    recent_signal_mix: Callable[[float, float, float, float], str],
-    reacquisition_event_is_confirmation_like: Callable[[dict[str, Any]], bool],
-    reacquisition_event_is_clearance_like: Callable[[dict[str, Any]], bool],
 ) -> dict[str, Any]:
     class_key = target_class_key(target)
-    class_events = [event for event in closure_forecast_events if event.get("class_key") == class_key]
+    class_events = [
+        event
+        for event in closure_forecast_events
+        if event.get("class_key") == class_key
+    ]
     relevant_events: list[dict[str, Any]] = []
     for event in class_events:
         if not reacquisition_event_has_evidence(event):
             continue
         relevant_events.append(event)
-        if len(relevant_events) >= history_window_runs:
+        if len(relevant_events) >= HISTORY_WINDOW_RUNS:
             break
 
     weighted_reacquisition_evidence_count = 0.0
@@ -1363,7 +1436,7 @@ def closure_forecast_reacquisition_freshness_for_target(
     recent_reacquisition_weight = 0.0
     recent_signals = [
         reacquisition_event_signal_label(event)
-        for event in relevant_events[:class_reacquisition_freshness_window_runs]
+        for event in relevant_events[:CLASS_REACQUISITION_FRESHNESS_WINDOW_RUNS]
     ]
     current_side = closure_forecast_reacquisition_side_from_status(
         str(target.get("closure_forecast_reacquisition_persistence_status", "none"))
@@ -1383,10 +1456,13 @@ def closure_forecast_reacquisition_freshness_for_target(
         )
 
     for index, event in enumerate(relevant_events):
-        weight = class_memory_recency_weights[min(index, history_window_runs - 1)]
+        weight = CLASS_MEMORY_RECENCY_WEIGHTS[min(index, HISTORY_WINDOW_RUNS - 1)]
         weighted_reacquisition_evidence_count += weight
         event_side = closure_forecast_reacquisition_side_from_event(event)
-        if index < class_reacquisition_freshness_window_runs and event_side == current_side:
+        if (
+            index < CLASS_REACQUISITION_FRESHNESS_WINDOW_RUNS
+            and event_side == current_side
+        ):
             recent_reacquisition_weight += weight
         if reacquisition_event_is_confirmation_like(event):
             weighted_confirmation_like += weight
@@ -1397,7 +1473,7 @@ def closure_forecast_reacquisition_freshness_for_target(
         weighted_reacquisition_evidence_count,
         1.0,
     )
-    computed_freshness_status = freshness_status(
+    computed_freshness_status = closure_forecast_freshness_status(
         weighted_reacquisition_evidence_count,
         recent_window_weight_share,
     )
@@ -1411,17 +1487,19 @@ def closure_forecast_reacquisition_freshness_for_target(
     )
     return {
         "closure_forecast_reacquisition_freshness_status": computed_freshness_status,
-        "closure_forecast_reacquisition_freshness_reason": freshness_reason(
+        "closure_forecast_reacquisition_freshness_reason": closure_forecast_reacquisition_freshness_reason(
             computed_freshness_status,
             weighted_reacquisition_evidence_count,
             recent_window_weight_share,
             decayed_confirmation_rate,
             decayed_clearance_rate,
         ),
-        "closure_forecast_reacquisition_memory_weight": round(recent_window_weight_share, 2),
+        "closure_forecast_reacquisition_memory_weight": round(
+            recent_window_weight_share, 2
+        ),
         "decayed_reacquired_confirmation_rate": round(decayed_confirmation_rate, 2),
         "decayed_reacquired_clearance_rate": round(decayed_clearance_rate, 2),
-        "recent_reacquisition_signal_mix": recent_signal_mix(
+        "recent_reacquisition_signal_mix": recent_reacquisition_signal_mix(
             weighted_reacquisition_evidence_count,
             weighted_confirmation_like,
             weighted_clearance_like,
@@ -1429,7 +1507,8 @@ def closure_forecast_reacquisition_freshness_for_target(
         ),
         "recent_reacquisition_signal_path": " -> ".join(recent_signals),
         "has_fresh_aligned_recent_evidence": any(
-            event.get("closure_forecast_freshness_status", "insufficient-data") == "fresh"
+            event.get("closure_forecast_freshness_status", "insufficient-data")
+            == "fresh"
             and closure_forecast_reacquisition_side_from_event(event) == current_side
             for event in relevant_events[:2]
         ),
@@ -1462,9 +1541,6 @@ def apply_reacquisition_freshness_reset_control(
     persistence_score: float,
     persistence_status: str,
     persistence_reason: str,
-    closure_forecast_reacquisition_side_from_status: Callable[[str], str],
-    closure_forecast_reacquisition_side_from_event: Callable[[dict[str, Any]], str],
-    target_specific_normalization_noise: Callable[[dict[str, Any], dict[str, Any]], bool],
 ) -> dict[str, Any]:
     freshness_status = freshness_meta.get(
         "closure_forecast_reacquisition_freshness_status",
@@ -1516,14 +1592,18 @@ def apply_reacquisition_freshness_reset_control(
             restored_resolution_status = "none"
             restored_resolution_reason = ""
             if recent_pending_status == "pending-support":
-                reverted_policy = target.get("pre_class_normalization_trust_policy", trust_policy)
+                reverted_policy = target.get(
+                    "pre_class_normalization_trust_policy", trust_policy
+                )
                 reverted_reason = target.get(
                     "pre_class_normalization_trust_policy_reason",
                     trust_policy_reason,
                 )
                 next_trust_policy = str(reverted_policy)
                 next_trust_policy_reason = (
-                    reset_reason if reverted_policy == "verify-first" else str(reverted_reason)
+                    reset_reason
+                    if reverted_policy == "verify-first"
+                    else str(reverted_reason)
                 )
                 next_class_normalization_status = "candidate"
                 next_class_normalization_reason = reset_reason
@@ -1548,7 +1628,9 @@ def apply_reacquisition_freshness_reset_control(
         )
 
     if local_noise and current_side != "none":
-        blocked_reason = "Local target instability still overrides healthy reacquisition freshness."
+        blocked_reason = (
+            "Local target instability still overrides healthy reacquisition freshness."
+        )
         if closure_likely_outcome == "confirm-soon":
             closure_likely_outcome = "hold"
         elif closure_likely_outcome == "expire-risk":
@@ -1856,7 +1938,6 @@ def closure_forecast_reacquisition_freshness_hotspots(
     resolution_targets: list[dict[str, Any]],
     *,
     mode: str,
-    target_class_key: Callable[[dict[str, Any]], str],
 ) -> list[dict[str, Any]]:
     grouped: dict[str, dict[str, Any]] = {}
     for target in resolution_targets:
@@ -1878,7 +1959,9 @@ def closure_forecast_reacquisition_freshness_hotspots(
                 "decayed_reacquired_clearance_rate",
                 0.0,
             ),
-            "recent_reacquisition_signal_mix": target.get("recent_reacquisition_signal_mix", ""),
+            "recent_reacquisition_signal_mix": target.get(
+                "recent_reacquisition_signal_mix", ""
+            ),
             "recent_reacquisition_persistence_path": target.get(
                 "recent_reacquisition_persistence_path",
                 "",
@@ -1890,7 +1973,9 @@ def closure_forecast_reacquisition_freshness_hotspots(
             "reacquisition_event_count": len(
                 [
                     part
-                    for part in (target.get("recent_reacquisition_persistence_path", "") or "").split(" -> ")
+                    for part in (
+                        target.get("recent_reacquisition_persistence_path", "") or ""
+                    ).split(" -> ")
                     if part
                 ]
             ),
@@ -1928,8 +2013,6 @@ def closure_forecast_reacquisition_freshness_summary(
     primary_target: dict[str, Any],
     stale_reacquisition_hotspots: list[dict[str, Any]],
     fresh_reacquisition_signal_hotspots: list[dict[str, Any]],
-    *,
-    target_label: Callable[[dict[str, Any]], str],
 ) -> str:
     label = target_label(primary_target) or "The current target"
     freshness_status = primary_target.get(
@@ -1975,11 +2058,11 @@ def closure_forecast_persistence_reset_summary(
     primary_target: dict[str, Any],
     stale_reacquisition_hotspots: list[dict[str, Any]],
     fresh_reacquisition_signal_hotspots: list[dict[str, Any]],
-    *,
-    target_label: Callable[[dict[str, Any]], str],
 ) -> str:
     label = target_label(primary_target) or "The current target"
-    reset_status = primary_target.get("closure_forecast_persistence_reset_status", "none")
+    reset_status = primary_target.get(
+        "closure_forecast_persistence_reset_status", "none"
+    )
     freshness_status = primary_target.get(
         "closure_forecast_reacquisition_freshness_status",
         "insufficient-data",

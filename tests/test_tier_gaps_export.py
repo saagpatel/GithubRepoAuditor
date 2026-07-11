@@ -23,7 +23,8 @@ from unittest.mock import patch
 
 import pytest
 
-from src.cli import _print_tier_gaps_markdown, _run_tier_gaps_export_mode, build_subcommand_parser
+from src.app.portfolio_analysis import _print_tier_gaps_markdown, _run_tier_gaps_export_mode
+from src.cli import build_subcommand_parser
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 

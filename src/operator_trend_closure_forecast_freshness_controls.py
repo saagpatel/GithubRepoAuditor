@@ -1,32 +1,33 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Sequence
+from typing import Any
+
+from src.operator_trend_support import (
+    CLASS_CLOSURE_FORECAST_FRESHNESS_WINDOW_RUNS,
+    CLASS_MEMORY_RECENCY_WEIGHTS,
+    HISTORY_WINDOW_RUNS,
+    normalized_closure_forecast_direction,
+    target_class_key,
+    target_specific_normalization_noise,
+)
 
 
 def closure_forecast_freshness_for_target(
     target: dict[str, Any],
     closure_forecast_events: list[dict[str, Any]],
-    *,
-    target_class_key: Callable[[dict[str, Any]], str],
-    closure_forecast_event_has_evidence: Callable[[dict[str, Any]], bool],
-    closure_forecast_event_signal_label: Callable[[dict[str, Any]], str],
-    closure_forecast_event_is_confirmation_like: Callable[[dict[str, Any]], bool],
-    closure_forecast_event_is_clearance_like: Callable[[dict[str, Any]], bool],
-    class_memory_recency_weights: Sequence[float],
-    history_window_runs: int,
-    class_closure_forecast_freshness_window_runs: int,
-    freshness_status: Callable[[float, float], str],
-    freshness_reason: Callable[[str, float, float, float, float], str],
-    recent_signal_mix: Callable[[float, float, float, float], str],
 ) -> dict[str, Any]:
     class_key = target_class_key(target)
-    class_events = [event for event in closure_forecast_events if event.get("class_key") == class_key]
+    class_events = [
+        event
+        for event in closure_forecast_events
+        if event.get("class_key") == class_key
+    ]
     relevant_events: list[dict[str, Any]] = []
     for event in class_events:
         if not closure_forecast_event_has_evidence(event):
             continue
         relevant_events.append(event)
-        if len(relevant_events) >= history_window_runs:
+        if len(relevant_events) >= HISTORY_WINDOW_RUNS:
             break
 
     weighted_forecast_evidence_count = 0.0
@@ -35,28 +36,34 @@ def closure_forecast_freshness_for_target(
     recent_forecast_weight = 0.0
     recent_signals = [
         closure_forecast_event_signal_label(event)
-        for event in relevant_events[:class_closure_forecast_freshness_window_runs]
+        for event in relevant_events[:CLASS_CLOSURE_FORECAST_FRESHNESS_WINDOW_RUNS]
     ]
     for index, event in enumerate(relevant_events):
-        weight = class_memory_recency_weights[min(index, history_window_runs - 1)]
+        weight = CLASS_MEMORY_RECENCY_WEIGHTS[min(index, HISTORY_WINDOW_RUNS - 1)]
         weighted_forecast_evidence_count += weight
-        if index < class_closure_forecast_freshness_window_runs:
+        if index < CLASS_CLOSURE_FORECAST_FRESHNESS_WINDOW_RUNS:
             recent_forecast_weight += weight
         if closure_forecast_event_is_confirmation_like(event):
             weighted_confirmation_like += weight
         if closure_forecast_event_is_clearance_like(event):
             weighted_clearance_like += weight
 
-    recent_window_weight_share = recent_forecast_weight / max(weighted_forecast_evidence_count, 1.0)
-    computed_freshness_status = freshness_status(
+    recent_window_weight_share = recent_forecast_weight / max(
+        weighted_forecast_evidence_count, 1.0
+    )
+    computed_freshness_status = closure_forecast_freshness_status(
         weighted_forecast_evidence_count,
         recent_window_weight_share,
     )
-    decayed_confirmation_rate = weighted_confirmation_like / max(weighted_forecast_evidence_count, 1.0)
-    decayed_clearance_rate = weighted_clearance_like / max(weighted_forecast_evidence_count, 1.0)
+    decayed_confirmation_rate = weighted_confirmation_like / max(
+        weighted_forecast_evidence_count, 1.0
+    )
+    decayed_clearance_rate = weighted_clearance_like / max(
+        weighted_forecast_evidence_count, 1.0
+    )
     return {
         "closure_forecast_freshness_status": computed_freshness_status,
-        "closure_forecast_freshness_reason": freshness_reason(
+        "closure_forecast_freshness_reason": closure_forecast_freshness_reason(
             computed_freshness_status,
             weighted_forecast_evidence_count,
             recent_window_weight_share,
@@ -66,7 +73,7 @@ def closure_forecast_freshness_for_target(
         "closure_forecast_memory_weight": round(recent_window_weight_share, 2),
         "decayed_confirmation_forecast_rate": round(decayed_confirmation_rate, 2),
         "decayed_clearance_forecast_rate": round(decayed_clearance_rate, 2),
-        "recent_closure_forecast_signal_mix": recent_signal_mix(
+        "recent_closure_forecast_signal_mix": recent_closure_forecast_signal_mix(
             weighted_forecast_evidence_count,
             weighted_confirmation_like,
             weighted_clearance_like,
@@ -76,18 +83,16 @@ def closure_forecast_freshness_for_target(
     }
 
 
-def closure_forecast_event_has_evidence(
-    event: dict[str, Any],
-    *,
-    normalized_closure_forecast_direction: Callable[[str, float], str],
-) -> bool:
+def closure_forecast_event_has_evidence(event: dict[str, Any]) -> bool:
     score = float(event.get("closure_forecast_reweight_score", 0.0) or 0.0)
     direction = normalized_closure_forecast_direction(
         str(event.get("closure_forecast_reweight_direction", "neutral")),
         score,
     )
     likely_outcome = event.get("transition_closure_likely_outcome", "none") or "none"
-    hysteresis_status = event.get("closure_forecast_hysteresis_status", "none") or "none"
+    hysteresis_status = (
+        event.get("closure_forecast_hysteresis_status", "none") or "none"
+    )
     return (
         abs(score) >= 0.05
         or direction in {"supporting-confirmation", "supporting-clearance"}
@@ -102,11 +107,7 @@ def closure_forecast_event_has_evidence(
     )
 
 
-def closure_forecast_event_is_confirmation_like(
-    event: dict[str, Any],
-    *,
-    normalized_closure_forecast_direction: Callable[[str, float], str],
-) -> bool:
+def closure_forecast_event_is_confirmation_like(event: dict[str, Any]) -> bool:
     score = float(event.get("closure_forecast_reweight_score", 0.0) or 0.0)
     direction = normalized_closure_forecast_direction(
         str(event.get("closure_forecast_reweight_direction", "neutral")),
@@ -120,11 +121,7 @@ def closure_forecast_event_is_confirmation_like(
     )
 
 
-def closure_forecast_event_is_clearance_like(
-    event: dict[str, Any],
-    *,
-    normalized_closure_forecast_direction: Callable[[str, float], str],
-) -> bool:
+def closure_forecast_event_is_clearance_like(event: dict[str, Any]) -> bool:
     score = float(event.get("closure_forecast_reweight_score", 0.0) or 0.0)
     direction = normalized_closure_forecast_direction(
         str(event.get("closure_forecast_reweight_direction", "neutral")),
@@ -132,18 +129,14 @@ def closure_forecast_event_is_clearance_like(
     )
     return (
         direction == "supporting-clearance"
-        or event.get("transition_closure_likely_outcome", "none") in {"clear-risk", "expire-risk"}
+        or event.get("transition_closure_likely_outcome", "none")
+        in {"clear-risk", "expire-risk"}
         or event.get("closure_forecast_hysteresis_status", "none")
         in {"pending-clearance", "confirmed-clearance"}
     )
 
 
-def closure_forecast_event_signal_label(
-    event: dict[str, Any],
-    *,
-    closure_forecast_event_is_confirmation_like: Callable[[dict[str, Any]], bool],
-    closure_forecast_event_is_clearance_like: Callable[[dict[str, Any]], bool],
-) -> str:
+def closure_forecast_event_signal_label(event: dict[str, Any]) -> str:
     if closure_forecast_event_is_confirmation_like(event):
         return "confirmation-like"
     if closure_forecast_event_is_clearance_like(event):
@@ -170,13 +163,11 @@ def closure_forecast_freshness_reason(
     recent_window_weight_share: float,
     decayed_confirmation_rate: float,
     decayed_clearance_rate: float,
-    *,
-    class_closure_forecast_freshness_window_runs: int,
 ) -> str:
     if freshness_status == "fresh":
         return (
             "Recent closure-forecast evidence is still current enough to trust, with "
-            f"{recent_window_weight_share:.0%} of the weighted signal coming from the latest {class_closure_forecast_freshness_window_runs} runs."
+            f"{recent_window_weight_share:.0%} of the weighted signal coming from the latest {CLASS_CLOSURE_FORECAST_FRESHNESS_WINDOW_RUNS} runs."
         )
     if freshness_status == "mixed-age":
         return (
@@ -225,9 +216,12 @@ def apply_closure_forecast_decay_control(
     policy_debt_reason: str,
     class_normalization_status: str,
     class_normalization_reason: str,
-    target_specific_normalization_noise: Callable[[dict[str, Any], dict[str, Any]], bool],
-) -> tuple[str, str, str, str, str, str, str, str, str, str, str, str, str, str, str, str, str]:
-    freshness_status = freshness_meta.get("closure_forecast_freshness_status", "insufficient-data")
+) -> tuple[
+    str, str, str, str, str, str, str, str, str, str, str, str, str, str, str, str, str
+]:
+    freshness_status = freshness_meta.get(
+        "closure_forecast_freshness_status", "insufficient-data"
+    )
     decayed_clearance_rate = float(
         freshness_meta.get("decayed_clearance_forecast_rate", 0.0) or 0.0
     )
@@ -238,9 +232,12 @@ def apply_closure_forecast_decay_control(
 
     if local_noise and (
         direction == "supporting-confirmation"
-        or closure_hysteresis_status in {"pending-confirmation", "confirmed-confirmation"}
+        or closure_hysteresis_status
+        in {"pending-confirmation", "confirmed-confirmation"}
     ):
-        blocked_reason = "Local target instability still overrides closure-forecast freshness."
+        blocked_reason = (
+            "Local target instability still overrides closure-forecast freshness."
+        )
         if closure_likely_outcome == "confirm-soon":
             closure_likely_outcome = "hold"
         if closure_hysteresis_status == "confirmed-confirmation":
@@ -269,7 +266,10 @@ def apply_closure_forecast_decay_control(
     if (
         resolution_status == "cleared"
         and reweight_effect == "clear-risk-strengthened"
-        and (freshness_status not in {"fresh", "mixed-age"} or decayed_clearance_rate < 0.50)
+        and (
+            freshness_status not in {"fresh", "mixed-age"}
+            or decayed_clearance_rate < 0.50
+        )
         and recent_pending_status in {"pending-support", "pending-caution"}
     ):
         decay_reason = "The earlier forecast-driven clearance posture was pulled back because fresh unresolved pending-debt support is no longer strong enough."
@@ -281,7 +281,9 @@ def apply_closure_forecast_decay_control(
         closure_hysteresis_status = "none"
         closure_hysteresis_reason = decay_reason
         if recent_pending_status == "pending-support":
-            trust_policy = target.get("pre_class_normalization_trust_policy", trust_policy)
+            trust_policy = target.get(
+                "pre_class_normalization_trust_policy", trust_policy
+            )
             trust_policy_reason = target.get(
                 "pre_class_normalization_trust_policy_reason", trust_policy_reason
             )
@@ -357,7 +359,9 @@ def apply_closure_forecast_decay_control(
 
     if closure_hysteresis_status == "confirmed-clearance":
         decay_reason = "Stronger clearance wording was pulled back because fresh unresolved pending-debt support is no longer strong enough."
-        softened_outcome = "clear-risk" if closure_likely_outcome == "expire-risk" else "hold"
+        softened_outcome = (
+            "clear-risk" if closure_likely_outcome == "expire-risk" else "hold"
+        )
         return (
             "clearance-decayed",
             decay_reason,
@@ -402,7 +406,9 @@ def apply_closure_forecast_decay_control(
 
     if closure_hysteresis_status == "pending-clearance":
         decay_reason = "Older clearance-leaning forecast memory is no longer fresh enough to keep stronger carry-forward in place."
-        softened_outcome = "clear-risk" if closure_likely_outcome == "expire-risk" else "hold"
+        softened_outcome = (
+            "clear-risk" if closure_likely_outcome == "expire-risk" else "hold"
+        )
         return (
             "clearance-decayed",
             decay_reason,
@@ -448,7 +454,6 @@ def closure_forecast_freshness_hotspots(
     resolution_targets: list[dict[str, Any]],
     *,
     mode: str,
-    target_class_key: Callable[[dict[str, Any]], str],
 ) -> list[dict[str, Any]]:
     grouped: dict[str, dict[str, Any]] = {}
     for target in resolution_targets:
@@ -464,11 +469,15 @@ def closure_forecast_freshness_hotspots(
             "decayed_confirmation_forecast_rate": target.get(
                 "decayed_confirmation_forecast_rate", 0.0
             ),
-            "decayed_clearance_forecast_rate": target.get("decayed_clearance_forecast_rate", 0.0),
+            "decayed_clearance_forecast_rate": target.get(
+                "decayed_clearance_forecast_rate", 0.0
+            ),
             "recent_closure_forecast_signal_mix": target.get(
                 "recent_closure_forecast_signal_mix", ""
             ),
-            "recent_closure_forecast_path": target.get("recent_closure_forecast_path", ""),
+            "recent_closure_forecast_path": target.get(
+                "recent_closure_forecast_path", ""
+            ),
             "dominant_count": max(
                 float(target.get("decayed_confirmation_forecast_rate", 0.0) or 0.0),
                 float(target.get("decayed_clearance_forecast_rate", 0.0) or 0.0),
@@ -476,7 +485,9 @@ def closure_forecast_freshness_hotspots(
             "forecast_event_count": len(
                 [
                     part
-                    for part in (target.get("recent_closure_forecast_path", "") or "").split(" -> ")
+                    for part in (
+                        target.get("recent_closure_forecast_path", "") or ""
+                    ).split(" -> ")
                     if part
                 ]
             ),

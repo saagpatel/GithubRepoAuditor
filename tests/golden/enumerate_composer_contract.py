@@ -29,13 +29,22 @@ pins that convergence -- a regression that re-removed the floor would re-diverge
 fail. Any future change to these families must reproduce THIS golden byte-for-byte;
 an intentional behavior change shows up here as a reviewed diff, never a silent one.
 
-Fixed-harness validity: the injected callables below are deterministic stand-ins,
-not the production wiring (which threads ~15 helpers per composer). The golden's
-validity does NOT depend on production-identical callables -- it pins composer
-behavior under a FIXED harness, and the collapse must reproduce it under the SAME
-harness. The harness only has to be (a) held constant between generation and check
-(it is -- one enumerator) and (b) rich enough to exercise the real branches (the
-companion test guards a non-degenerate branch count and the magnitude-floor fix).
+2026-07-10: re-pinned under production collaborators after the no-callable-
+threading unwind (reset_controls satellite). Composers used to receive every
+dependency (side/path classifiers, clamp_round, window constants, ...) as an
+injected kwonly Callable/constant, and this enumerator swapped in deterministic
+stand-ins for them via kwargs -- a semantics artifact of the injection idiom
+itself, since production call sites never actually received those stand-ins.
+The composers now resolve those dependencies directly (sibling call within this
+module, or import from ``operator_trend_support`` /
+``operator_trend_closure_forecast_freshness_controls``), so there is no longer a
+kwarg to inject through, and determinism comes from the input corpus below
+instead of from fixed-harness substitution. This is a harness-semantics re-pin,
+not a production behavior change: the 34 composers whose output never depended
+on a stand-in (i.e. never referenced a classifier/path-label dependency that the
+old harness swapped) are byte-identical to the prior golden; only the 13 whose
+recorded output depended on a stand-in value changed, and each was hand-verified
+against the real function before the golden was refrozen.
 
 Regenerate only with an intentional, reviewed behavior change::
 
@@ -44,7 +53,6 @@ Regenerate only with an intentional, reviewed behavior change::
 
 from __future__ import annotations
 
-import functools
 import inspect
 import json
 from pathlib import Path
@@ -69,224 +77,6 @@ HOTSPOT_MODES: tuple[str, ...] = (
     "just-rerererestored",
     "stale",
 )
-
-
-# --------------------------------------------------------------------------- #
-# Fixed faithful callables (deterministic stand-ins for the injected helpers).
-# --------------------------------------------------------------------------- #
-def _clamp_round(value: float, lower: float, upper: float) -> float:
-    return round(max(lower, min(upper, value)), 2)
-
-
-def _side_from_event(event: dict[str, Any]) -> str:
-    # Mirrors the production discriminator shape: confirmation wins over clearance,
-    # scanning the event's status-bearing values in insertion order.
-    for value in event.values():
-        if isinstance(value, str):
-            if "confirmation" in value:
-                return "confirmation"
-            if "clearance" in value:
-                return "clearance"
-    return "none"
-
-
-def _side_from_status(status: str) -> str:
-    if "confirmation" in status:
-        return "confirmation"
-    if "clearance" in status:
-        return "clearance"
-    return "none"
-
-
-def _path_label(event: dict[str, Any]) -> str:
-    for value in event.values():
-        if isinstance(value, str) and "-" in value:
-            return value
-    return "hold"
-
-
-def _direction_majority(directions: list[str]) -> str:
-    confirmation = directions.count("supporting-confirmation")
-    clearance = directions.count("supporting-clearance")
-    if confirmation > clearance:
-        return "supporting-confirmation"
-    if clearance > confirmation:
-        return "supporting-clearance"
-    return "neutral"
-
-
-def _direction_reversing(current_direction: str, earlier_majority: str) -> bool:
-    if current_direction == "neutral" or earlier_majority == "neutral":
-        return False
-    return current_direction != earlier_majority
-
-
-def _flip_count(directions: list[str]) -> int:
-    return sum(
-        1
-        for previous, current in zip(directions, directions[1:])
-        if previous != current
-    )
-
-
-def _normalization_noise(target: dict[str, Any], history_meta: dict[str, Any]) -> bool:
-    return bool(
-        target.get("local_noise") or history_meta.get("current_transition_reversed")
-    )
-
-
-def _class_key(item: dict[str, Any]) -> str:
-    return f"{item.get('lane', '')}:{item.get('kind', '') or 'unknown'}"
-
-
-def _label(item: dict[str, Any]) -> str:
-    return item.get("title", "") or item.get("kind", "") or "target"
-
-
-def _ordered_events(
-    target: dict[str, Any], events: list[dict[str, Any]]
-) -> list[dict[str, Any]]:
-    key = _class_key(target)
-    return [event for event in events if event.get("class_key") == key]
-
-
-def _normalized_direction(direction: str, value: float) -> str:
-    return direction
-
-
-def _freshness_status(weighted_evidence: float, recent_share: float) -> str:
-    if weighted_evidence <= 0.0:
-        return "insufficient-data"
-    if recent_share >= 0.5:
-        return "fresh"
-    if recent_share >= 0.25:
-        return "mixed-age"
-    return "stale"
-
-
-def _freshness_reason(
-    freshness_status: str,
-    weighted_evidence: float,
-    recent_share: float,
-    decayed_confirmation: float,
-    decayed_clearance: float,
-) -> str:
-    return f"{freshness_status}:{round(weighted_evidence, 2)}:{round(recent_share, 2)}"
-
-
-def _signal_mix(
-    weighted_evidence: float,
-    weighted_confirmation: float,
-    weighted_clearance: float,
-    recent_share: float,
-) -> str:
-    if weighted_confirmation > weighted_clearance:
-        return "confirmation-leaning"
-    if weighted_clearance > weighted_confirmation:
-        return "clearance-leaning"
-    return "balanced"
-
-
-def _has_evidence(event: dict[str, Any]) -> bool:
-    return _side_from_event(event) != "none"
-
-
-def _is_confirmation_like(event: dict[str, Any]) -> bool:
-    return _side_from_event(event) == "confirmation"
-
-
-def _is_clearance_like(event: dict[str, Any]) -> bool:
-    return _side_from_event(event) == "clearance"
-
-
-def _signal_label(event: dict[str, Any]) -> str:
-    return _side_from_event(event)
-
-
-# --------------------------------------------------------------------------- #
-# Kwarg registry: resolve each injected callable/constant by parameter name.
-# Real module functions (str classifiers; the rererestore composers injected into
-# the rerererestore wrappers) are bound recursively for faithfulness.
-# --------------------------------------------------------------------------- #
-def _resolve_kwargs(
-    fn: object, *, skip: frozenset[str] = frozenset()
-) -> dict[str, Any]:
-    resolved: dict[str, Any] = {}
-    for name, param in inspect.signature(fn).parameters.items():
-        if param.kind is not inspect.Parameter.KEYWORD_ONLY or name in skip:
-            continue
-        resolved[name] = _resolve_one(name)
-    return resolved
-
-
-def _resolve_one(name: str) -> Any:
-    if name.endswith("window_runs"):
-        return 4
-    if name == "class_memory_recency_weights":
-        return (1.0, 0.8, 0.6, 0.4)
-
-    # Explicit fixed stand-ins take priority over real module functions of the same
-    # name (F3): e.g. `closure_forecast_reset_side_from_status` is a real str->str
-    # module fn injected into four composers, but the net must use the fixed
-    # `_side_from_status` stand-in so it never silently tracks the live function as
-    # the collapse refactors it.
-    if name.endswith(("side_from_event", "memory_side_from_event")):
-        return _side_from_event
-    if name.endswith(
-        (
-            "side_from_status",
-            "side_from_persistence_status",
-            "side_from_recovery_status",
-        )
-    ):
-        return _side_from_status
-    if name.endswith("path_label"):
-        return _path_label
-    if name == "clamp_round":
-        return _clamp_round
-    if name == "closure_forecast_direction_majority":
-        return _direction_majority
-    if name == "closure_forecast_direction_reversing":
-        return _direction_reversing
-    if name == "class_direction_flip_count":
-        return _flip_count
-    if name == "target_specific_normalization_noise":
-        return _normalization_noise
-    if name == "target_class_key":
-        return _class_key
-    if name == "target_label":
-        return _label
-    if name == "ordered_reset_reentry_events_for_target":
-        return _ordered_events
-    if name == "normalized_closure_forecast_direction":
-        return _normalized_direction
-    if name == "closure_forecast_freshness_status":
-        return _freshness_status
-    if name.endswith("freshness_reason"):
-        return _freshness_reason
-    if name == "recent_reset_reentry_signal_mix":
-        return _signal_mix
-    if name.endswith("event_has_evidence"):
-        return _has_evidence
-    if name.endswith("event_is_confirmation_like"):
-        return _is_confirmation_like
-    if name.endswith("event_is_clearance_like"):
-        return _is_clearance_like
-    if name.endswith("event_signal_label"):
-        return _signal_label
-
-    # Fallback: a kwarg that names a real module composer. The rerererestore wrappers
-    # inject the live rererestore `*_for_target` builder (no suffix stand-in matches
-    # it); bind it recursively under the same stand-in harness so the wrapper
-    # genuinely delegates to the real tier it wraps.
-    real = getattr(m, name, None)
-    if callable(real) and getattr(real, "__module__", None) == m.__name__:
-        sub = _resolve_kwargs(real)
-        return functools.partial(real, **sub) if sub else real
-
-    raise KeyError(
-        f"composer enumerator: no fixed stand-in for injected kwarg {name!r}"
-    )
 
 
 # --------------------------------------------------------------------------- #
@@ -452,9 +242,9 @@ def _summary_inputs() -> tuple[
     # presence reaches its real branch instead of a degenerate fallback whose output
     # the golden would otherwise pin as if correct.
     rich = _hotspot_targets()
-    primary = {**rich[0], "label": _class_key(rich[0])}
-    list_a = [{**rich[0], "label": _class_key(rich[0])}]
-    list_b = [{**rich[1], "label": _class_key(rich[1])}]
+    primary = {**rich[0], "label": m.target_class_key(rich[0])}
+    list_a = [{**rich[0], "label": m.target_class_key(rich[0])}]
+    list_b = [{**rich[1], "label": m.target_class_key(rich[1])}]
     return primary, list_a, list_b
 
 
@@ -511,32 +301,28 @@ def _drive(name: str, fn: object) -> dict[str, Any]:
     results: dict[str, Any] = {}
 
     if role == "for_target":
-        kwargs = _resolve_kwargs(fn)
         for label, target, events, history_meta in _for_target_scenarios():
             args = (
                 (target, events, history_meta)
                 if len(positional) == 3
                 else (target, events)
             )
-            results[label] = fn(*args, **kwargs)
+            results[label] = fn(*args)
     elif role == "hotspots":
-        kwargs = _resolve_kwargs(fn, skip=frozenset({"mode"}))
         targets = _hotspot_targets()
         for mode in HOTSPOT_MODES:
-            results[f"mode={mode}"] = fn(targets, mode=mode, **kwargs)
+            results[f"mode={mode}"] = fn(targets, mode=mode)
     elif role == "summary":
-        kwargs = _resolve_kwargs(fn)
         primary, list_a, list_b = _summary_inputs()
         args = (primary, list_a, list_b) if len(positional) == 3 else (primary, list_a)
-        results["summary"] = fn(*args, **kwargs)
+        results["summary"] = fn(*args)
     elif role == "path_label":
-        kwargs = _resolve_kwargs(fn)
         for label, event in {
             "confirmation": _event("c", "confirmation"),
             "clearance": _event("k", "clearance"),
             "none": _event("n", "none"),
         }.items():
-            results[label] = fn(event, **kwargs)
+            results[label] = fn(event)
     else:  # pragma: no cover - guards an unclassified composer shape
         raise KeyError(f"composer enumerator: unclassified composer {name!r}")
     return results
