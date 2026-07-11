@@ -10,6 +10,7 @@ from src.portfolio_truth_reconcile import (
     load_prior_notion_context,
 )
 from src.portfolio_truth_render import render_portfolio_report_markdown, render_registry_markdown
+from src.portfolio_truth_lineage import resolve_notion_origin
 from src.portfolio_truth_types import truth_latest_path
 from src.producer_preflight import ProducerEvidence, verify_evidence_still_current
 from src.portfolio_truth_validate import (
@@ -117,7 +118,7 @@ def publish_portfolio_truth(
     notion_context_fallback = (
         load_prior_notion_context(latest_path) if allow_empty_notion else None
     )
-    prior_notion_generated_at = _previous_generated_at(latest_path)
+    prior_notion_generated_at = resolve_notion_origin(latest_path)
     build_result = build_portfolio_truth_snapshot(
         workspace_root=workspace_root,
         catalog_path=catalog_path,
@@ -229,15 +230,6 @@ def _content_changed(path: Path, content: str) -> bool:
     if not path.exists():
         return True
     return path.read_text() != content
-
-
-def _previous_generated_at(latest_path: Path) -> str | None:
-    try:
-        payload = json.loads(latest_path.read_text())
-    except (FileNotFoundError, json.JSONDecodeError, OSError):
-        return None
-    value = payload.get("generated_at") if isinstance(payload, dict) else None
-    return value if isinstance(value, str) and value else None
 
 
 def _guard_against_notion_context_drop(
