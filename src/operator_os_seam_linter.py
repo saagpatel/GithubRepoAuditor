@@ -13,6 +13,10 @@ from typing import Any
 from src.portfolio_truth_render import GENERATED_MARKDOWN_PROVENANCE_MARKER
 from src.portfolio_truth_types import LEGACY_SCHEMA_VERSIONS, SCHEMA_VERSION, truth_latest_path
 from src.portfolio_catalog import load_portfolio_catalog
+from src.portfolio_truth_sources import (
+    WORKSPACE_DISCOVERY_POLICY_VERSION,
+    workspace_exclusion_reason,
+)
 from src.project_registry import (
     BRIDGE_CANONICAL_KEY_DISAGREEMENTS,
     DEFAULT_NOTION_PROJECTION_ONLY_ROWS,
@@ -427,6 +431,7 @@ def _check_contract_shadow(
         )
 
     findings.extend(_check_rollup_integrity(truth, truth_path=truth_path))
+    findings.extend(_check_exclusion_integrity(truth, truth_path=truth_path))
     findings.extend(_check_carried_freshness(truth, truth_path=truth_path, now=now))
     return findings
 
@@ -558,6 +563,59 @@ def _check_carried_freshness(
             )
         ]
     return []
+
+
+def _check_exclusion_integrity(
+    truth: dict[str, Any], *, truth_path: Path
+) -> list[SeamLintFinding]:
+    exclusions = truth.get("exclusions")
+    if not isinstance(exclusions, dict):
+        return [
+            SeamLintFinding(
+                check="CL-EXCL-001",
+                artifact=str(truth_path),
+                violation="workspace exclusion envelope is absent",
+                detail="Exclusion policy and counts cannot be verified.",
+                level="unknown",
+            )
+        ]
+    policy_version = exclusions.get("policy_version")
+    counts = exclusions.get("counts")
+    if policy_version != WORKSPACE_DISCOVERY_POLICY_VERSION or not isinstance(
+        counts, dict
+    ):
+        return [
+            SeamLintFinding(
+                check="CL-EXCL-001",
+                artifact=str(truth_path),
+                violation="workspace exclusion envelope is incompatible",
+                detail=(
+                    f"policy_version={policy_version!r}; "
+                    f"expected={WORKSPACE_DISCOVERY_POLICY_VERSION!r}"
+                ),
+            )
+        ]
+
+    leaked: list[str] = []
+    for project in truth.get("projects", []):
+        if not isinstance(project, dict):
+            continue
+        identity = project.get("identity")
+        path = identity.get("path") if isinstance(identity, dict) else None
+        if not isinstance(path, str):
+            continue
+        if any(workspace_exclusion_reason(part) for part in Path(path).parts):
+            leaked.append(path)
+    if not leaked:
+        return []
+    return [
+        SeamLintFinding(
+            check="CL-EXCL-001",
+            artifact=str(truth_path),
+            violation="excluded workspace paths leaked into portfolio projects",
+            detail=f"count={len(leaked)}; sample={', '.join(sorted(leaked)[:10])}",
+        )
+    ]
 
 
 def _check_schema_pin(

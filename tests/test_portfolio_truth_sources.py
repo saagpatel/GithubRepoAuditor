@@ -14,6 +14,7 @@ from src.portfolio_truth_sources import (
     _dedupe_checkouts_by_origin,
     _is_ignored_project_dir,
     discover_workspace_projects,
+    workspace_exclusion_reason,
 )
 
 
@@ -96,6 +97,8 @@ def test_ignore_predicate_matches_transient_dirs() -> None:
     assert _is_ignored_project_dir("NoGoPRJs")
     assert _is_ignored_project_dir("auraforge-signed-smoke-export")
     assert _is_ignored_project_dir("resume-evolver-tmp-1776063720")
+    assert _is_ignored_project_dir("Codex Backups")
+    assert workspace_exclusion_reason("Codex Backups") == "backup-container"
 
 
 def test_ignore_predicate_keeps_real_projects() -> None:
@@ -107,6 +110,8 @@ def test_ignore_predicate_keeps_real_projects() -> None:
         "resume-evolver",  # the real repo, sans -tmp-<ts> suffix
         "smoke-test-runner",  # "smoke" but not "smoke-export"
         "tmp-tools",  # "tmp" but not the -tmp-<digits> clone pattern
+        "CodexBackupTool",
+        "BackupBuddy",
     ):
         assert not _is_ignored_project_dir(name), name
 
@@ -121,10 +126,20 @@ def test_discovery_skips_ignored_subtrees(tmp_path) -> None:
     _project("NoGoPRJs", "app")  # nested under ignored container -> skipped
     _project("auraforge-signed-smoke-export", "foo-plan")  # ignored bundle -> skipped
     _project("resume-evolver-tmp-1776063720")  # top-level tmp clone -> skipped
+    _project("Documents", "Codex Backups", "Wave 2R Post-Update", "README-fixture")
+    _project("Documents", "RealNestedProject")
 
+    exclusion_counts: dict[str, int] = {}
     result = discover_workspace_projects(
         tmp_path,
         catalog_data={},
         now=datetime(2026, 6, 2, tzinfo=timezone.utc),
+        exclusion_counts=exclusion_counts,
     )
-    assert {p["name"] for p in result} == {"LegitProject"}
+    assert {p["name"] for p in result} == {"LegitProject", "RealNestedProject"}
+    assert exclusion_counts == {
+        "backup-container": 1,
+        "generated-evidence": 1,
+        "operator-excluded": 1,
+        "temporary-checkout": 1,
+    }

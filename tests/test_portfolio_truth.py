@@ -374,6 +374,10 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     assert result.snapshot.derivation_policy_version == "portfolio_attention.v2"
     assert result.snapshot.inputs["catalog"]["sha256"]
     assert result.snapshot.inputs["notion"]["mode"] == "unavailable"
+    assert result.snapshot.exclusions == {
+        "policy_version": "workspace_discovery.v1",
+        "counts": {},
+    }
     assert result.snapshot.source_summary["attention_state_counts"]["active-product"] == 1
     assert result.snapshot.source_summary["attention_state_counts"]["parked"] == 1
 

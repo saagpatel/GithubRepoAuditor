@@ -19,6 +19,7 @@ from src.portfolio_context_contract import has_substantive_readme_support
 from src.portfolio_pathing import build_operating_path_entry
 from src.portfolio_risk import build_risk_entry
 from src.portfolio_truth_sources import (
+    WORKSPACE_DISCOVERY_POLICY_VERSION,
     discover_workspace_projects,
     load_legacy_registry_rows,
     load_safe_notion_project_context,
@@ -242,10 +243,12 @@ def build_portfolio_truth_snapshot(
             len(notion_context),
         )
 
+    exclusion_counts: dict[str, int] = {}
     workspace_projects = discover_workspace_projects(
         workspace_root,
         catalog_data=catalog_data,
         now=now,
+        exclusion_counts=exclusion_counts,
     )
     projects = [
         _build_truth_project(
@@ -316,6 +319,10 @@ def build_portfolio_truth_snapshot(
             notion_context_carried_forward=notion_context_carried_forward,
             prior_notion_generated_at=prior_notion_generated_at,
         ),
+        exclusions={
+            "policy_version": WORKSPACE_DISCOVERY_POLICY_VERSION,
+            "counts": dict(sorted(exclusion_counts.items())),
+        },
     )
     return PortfolioTruthBuildResult(
         snapshot=snapshot, catalog_data=catalog_data, legacy_rows=legacy_rows
