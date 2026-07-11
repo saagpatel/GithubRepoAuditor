@@ -32,6 +32,42 @@ class ProducerEvidence:
             "verified_at": self.verified_at.isoformat(),
         }
 
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> ProducerEvidence:
+        required = {
+            "repository",
+            "commit",
+            "ref",
+            "checkout_role",
+            "worktree_clean",
+            "verified_at",
+        }
+        missing = sorted(required - payload.keys())
+        if missing:
+            raise ValueError(f"Producer evidence is missing fields: {missing}")
+        verified_at = str(payload["verified_at"])
+        if verified_at.endswith("Z"):
+            verified_at = f"{verified_at[:-1]}+00:00"
+        try:
+            parsed_verified_at = datetime.fromisoformat(verified_at)
+        except ValueError as exc:
+            raise ValueError("Producer evidence verified_at is not valid ISO-8601.") from exc
+        if parsed_verified_at.tzinfo is None:
+            raise ValueError("Producer evidence verified_at must include a timezone.")
+        commit = str(payload["commit"])
+        if len(commit) != 40 or any(char not in "0123456789abcdef" for char in commit):
+            raise ValueError("Producer evidence commit must be a lowercase 40-character SHA.")
+        if payload["worktree_clean"] is not True:
+            raise ValueError("Producer evidence must declare a clean worktree.")
+        return cls(
+            repository=str(payload["repository"]),
+            commit=commit,
+            ref=str(payload["ref"]),
+            checkout_role=str(payload["checkout_role"]),
+            worktree_clean=True,
+            verified_at=parsed_verified_at.astimezone(UTC),
+        )
+
 
 @dataclass(frozen=True)
 class ProducerPreflightResult:
@@ -101,6 +137,27 @@ def verify_evidence_still_current(repo_root: Path, evidence: ProducerEvidence) -
             "Producer HEAD changed after preflight: "
             f"verified={evidence.commit}; current={current}"
         )
+
+
+def load_producer_evidence(path: Path) -> ProducerEvidence:
+    try:
+        payload = json.loads(path.read_text())
+    except FileNotFoundError as exc:
+        raise ValueError(f"Producer evidence file does not exist: {path}") from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Producer evidence file is not valid JSON: {path}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError("Producer evidence root must be a JSON object.")
+    if payload.get("schema_version") != PREFLIGHT_SCHEMA_VERSION:
+        raise ValueError(
+            "Producer evidence schema mismatch: "
+            f"declared={payload.get('schema_version')!r}; expected={PREFLIGHT_SCHEMA_VERSION!r}"
+        )
+    if payload.get("state") != "pass":
+        raise ValueError(
+            f"Producer evidence did not pass preflight: state={payload.get('state')!r}"
+        )
+    return ProducerEvidence.from_dict(payload)
 
 
 def _origin_repository(repo_root: Path) -> str:
