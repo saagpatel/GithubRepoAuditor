@@ -7,10 +7,14 @@ truth entries that already carry a concrete decision signal.
 
 from __future__ import annotations
 
+import argparse
+import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 CONTRACT_VERSION = "decision_queue_v1"
+DIGEST_CONTRACT_VERSION = "portfolio_decision_digest_v1"
 MAX_DECISION_QUEUE_ITEMS = 5
 
 NON_DEFAULT_STATES = frozenset(
@@ -145,3 +149,94 @@ def summarize_decision_queue(items: list[dict[str, Any]]) -> dict[str, Any]:
         "decision_queue_count": len(items),
         "decision_queue_type_counts": type_counts,
     }
+
+
+def build_decision_digest(portfolio_truth: dict[str, Any]) -> dict[str, Any]:
+    """Build a deterministic, truth-native operator digest.
+
+    The digest deliberately contains only the decision queue. It does not
+    reintroduce stale-repo, weak-context, or prose-based "unshipped" watch
+    lists that the portfolio attention contract excludes from decisions.
+    """
+    decision_queue = build_decision_queue(portfolio_truth)
+    summary = summarize_decision_queue(decision_queue)
+    return {
+        "contract_version": DIGEST_CONTRACT_VERSION,
+        "source": {
+            "schema_version": _text(portfolio_truth.get("schema_version")) or "unknown",
+            "generated_at": _text(portfolio_truth.get("generated_at")) or "unknown",
+        },
+        "decision_queue": decision_queue,
+        "summary": summary,
+    }
+
+
+def render_decision_digest_markdown(digest: dict[str, Any]) -> str:
+    """Render the compact nightly decision digest as deterministic Markdown."""
+    source = _mapping(digest.get("source"))
+    generated_at = _text(source.get("generated_at")) or "unknown"
+    schema_version = _text(source.get("schema_version")) or "unknown"
+    date_label = generated_at[:10] if generated_at != "unknown" else "unknown"
+    decision_queue = [
+        item for item in digest.get("decision_queue") or [] if isinstance(item, dict)
+    ]
+    summary = _mapping(digest.get("summary"))
+    count = int(summary.get("decision_queue_count") or len(decision_queue))
+
+    lines = [
+        f"## Portfolio Decision Digest — {date_label}",
+        "",
+        "### Decision Queue",
+    ]
+    if not decision_queue:
+        lines.append("- No portfolio decisions clear the current evidence bar.")
+    else:
+        for item in decision_queue:
+            project = _text(item.get("project")) or "Unknown project"
+            decision_type = _text(item.get("decision_type")) or "unknown"
+            why_now = _text(item.get("why_now")) or "No current rationale recorded."
+            next_action = (
+                _text(item.get("recommended_action")) or "Resolve the current decision."
+            )
+            lines.append(
+                f"- **{project}** [{decision_type}]: {why_now} Next: {next_action}"
+            )
+
+    lines.extend(
+        [
+            "",
+            "### Source Freshness",
+            f"- PortfolioTruthV1 schema `{schema_version}`, generated `{generated_at}`.",
+            "",
+            "### Summary",
+            f"{count} decision{'s' if count != 1 else ''} | contract `{CONTRACT_VERSION}`",
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
+def _load_portfolio_truth(path: Path) -> dict[str, Any]:
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError("portfolio truth root must be an object")
+    return raw
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Render the DecisionQueueV1 digest from PortfolioTruthV1."
+    )
+    parser.add_argument("--truth", type=Path, required=True)
+    parser.add_argument("--format", choices=("json", "markdown"), default="markdown")
+    args = parser.parse_args(argv)
+
+    digest = build_decision_digest(_load_portfolio_truth(args.truth))
+    if args.format == "json":
+        print(json.dumps(digest, indent=2, sort_keys=True))
+    else:
+        print(render_decision_digest_markdown(digest), end="")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

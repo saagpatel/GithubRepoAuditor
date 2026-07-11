@@ -164,6 +164,17 @@ repos:
     lifecycle_state: active
     review_cadence: weekly
     intended_disposition: experiment
+  engraph:
+    owner: d
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
+    category: vanity
+    tool_provenance: claude-code
+    maturity_program: archive
+    target_maturity: operating
+    automation_eligible: false
+    notes: Settled portfolio-recovery exclusion; keep manual-only unless the operator explicitly reactivates it.
   EvolutionSandbox:
     owner: d
     lifecycle_state: active
@@ -183,6 +194,17 @@ repos:
     intended_disposition: maintain
     category: vanity
     tool_provenance: claude-code
+  reliability-vault:
+    owner: d
+    lifecycle_state: archived
+    review_cadence: quarterly
+    intended_disposition: archive
+    category: vanity
+    tool_provenance: unknown
+    maturity_program: archive
+    target_maturity: operating
+    automation_eligible: false
+    notes: Settled portfolio-recovery exclusion; keep manual-only unless the operator explicitly reactivates it.
   JSMTicketAnalyticsExport:
     owner: d
     lifecycle_state: active

@@ -148,6 +148,18 @@ def test_catalog_entry_for_repo_defaults_automation_eligible_false():
     assert entry["automation_eligible"] is False
 
 
+def test_live_catalog_keeps_settled_recovery_exclusions_archived() -> None:
+    catalog_path = Path(__file__).parents[1] / "config" / "portfolio-catalog.yaml"
+    catalog = load_portfolio_catalog(catalog_path)
+
+    for repo_name in ("engraph", "reliability-vault"):
+        entry = catalog["repos"][repo_name]
+        assert entry["lifecycle_state"] == "archived"
+        assert entry["intended_disposition"] == "archive"
+        assert entry["maturity_program"] == "archive"
+        assert entry["automation_eligible"] is False
+
+
 def test_catalog_entry_matches_full_name_then_bare_name():
     catalog = {
         "repos": {
