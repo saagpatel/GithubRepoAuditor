@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,7 @@ from src.portfolio_truth_status import (
     load_security_alerts_by_name,
     warn_if_warehouse_report_stale,
 )
+from src.producer_preflight import load_producer_evidence
 
 
 def run_portfolio_truth_mode(args: Any) -> None:
@@ -35,6 +37,16 @@ def run_portfolio_truth_mode(args: Any) -> None:
         else workspace_root / "PORTFOLIO-AUDIT-REPORT.md"
     )
     legacy_registry_path = Path(args.registry) if args.registry else registry_output
+    producer_evidence_path = os.environ.get("GHRA_PRODUCER_EVIDENCE")
+    producer_evidence = (
+        load_producer_evidence(Path(producer_evidence_path))
+        if producer_evidence_path
+        else None
+    )
+    producer_repo_root_value = os.environ.get("GHRA_PRODUCER_REPO_ROOT")
+    producer_repo_root = (
+        Path(producer_repo_root_value) if producer_repo_root_value else None
+    )
     release_count_by_name: dict[str, int] | None = None
     if getattr(args, "portfolio_truth_include_release_count", False):
         release_count_by_name = load_release_count_by_name(
@@ -70,8 +82,13 @@ def run_portfolio_truth_mode(args: Any) -> None:
             release_count_by_name=release_count_by_name,
             security_alerts_by_name=security_alerts_by_name,
             repo_status_by_name=repo_status_by_name,
+            producer_evidence=producer_evidence,
+            producer_repo_root=producer_repo_root,
+            require_producer_evidence=bool(
+                os.environ.get("GHRA_REQUIRE_PRODUCER_EVIDENCE") == "1"
+            ),
         )
-    except PortfolioTruthPublishError as exc:
+    except (PortfolioTruthPublishError, ValueError) as exc:
         raise SystemExit(str(exc)) from exc
     print_info(f"Portfolio truth snapshot: {result.latest_path}")
     print_info(f"Portfolio truth history snapshot: {result.snapshot_path}")

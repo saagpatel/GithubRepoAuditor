@@ -7,8 +7,10 @@ from pathlib import Path
 import pytest
 
 from src.producer_preflight import (
+    PREFLIGHT_SCHEMA_VERSION,
     ProducerEvidence,
     inspect_canonical_producer,
+    load_producer_evidence,
     verify_evidence_still_current,
 )
 
@@ -91,3 +93,42 @@ def test_evidence_rejects_head_change(tmp_path: Path) -> None:
     _git(repo, "commit", "-m", "move head")
     with pytest.raises(ValueError, match="HEAD changed after preflight"):
         verify_evidence_still_current(repo, evidence)
+
+
+def test_load_producer_evidence_accepts_passing_receipt(tmp_path: Path) -> None:
+    path = tmp_path / "producer.json"
+    path.write_text(
+        __import__("json").dumps(
+            {
+                "schema_version": PREFLIGHT_SCHEMA_VERSION,
+                "state": "pass",
+                "repository": "saagpatel/GithubRepoAuditor",
+                "commit": "a" * 40,
+                "ref": "refs/remotes/origin/main",
+                "checkout_role": "canonical-automation",
+                "worktree_clean": True,
+                "verified_at": "2026-07-10T12:00:00Z",
+                "checks": {},
+            }
+        )
+    )
+
+    evidence = load_producer_evidence(path)
+
+    assert evidence.commit == "a" * 40
+    assert evidence.verified_at.tzinfo is not None
+
+
+def test_load_producer_evidence_rejects_nonpassing_receipt(tmp_path: Path) -> None:
+    path = tmp_path / "producer.json"
+    path.write_text(
+        __import__("json").dumps(
+            {
+                "schema_version": PREFLIGHT_SCHEMA_VERSION,
+                "state": "fail",
+            }
+        )
+    )
+
+    with pytest.raises(ValueError, match="did not pass preflight"):
+        load_producer_evidence(path)

@@ -1617,6 +1617,78 @@ def test_report_subcommand_parses_allow_empty_notion_flag() -> None:
     assert default.portfolio_truth_allow_empty_notion is False
 
 
+def test_portfolio_truth_app_passes_validated_producer_receipt_to_publisher(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from types import SimpleNamespace
+
+    from src.app.portfolio_truth import run_portfolio_truth_mode
+    from src.producer_preflight import PREFLIGHT_SCHEMA_VERSION
+
+    receipt = tmp_path / "producer.json"
+    receipt.write_text(
+        json.dumps(
+            {
+                "schema_version": PREFLIGHT_SCHEMA_VERSION,
+                "state": "pass",
+                "repository": "saagpatel/GithubRepoAuditor",
+                "commit": "a" * 40,
+                "ref": "refs/remotes/origin/main",
+                "checkout_role": "canonical-automation",
+                "worktree_clean": True,
+                "verified_at": "2026-07-10T12:00:00Z",
+                "checks": {},
+            }
+        )
+    )
+    captured: dict[str, object] = {}
+
+    def fake_publish(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(
+            latest_path=tmp_path / "latest.json",
+            snapshot_path=tmp_path / "history.json",
+            registry_output=tmp_path / "registry.md",
+            portfolio_report_output=tmp_path / "report.md",
+            project_count=0,
+            registry_changed=False,
+            report_changed=False,
+        )
+
+    monkeypatch.setattr("src.app.portfolio_truth.publish_portfolio_truth", fake_publish)
+    monkeypatch.setattr(
+        "src.app.portfolio_truth.load_live_repo_status_by_name", lambda **_kwargs: {}
+    )
+    monkeypatch.setattr(
+        "src.app.portfolio_truth.warn_if_warehouse_report_stale", lambda *_args: None
+    )
+    monkeypatch.setenv("GHRA_REQUIRE_PRODUCER_EVIDENCE", "1")
+    monkeypatch.setenv("GHRA_PRODUCER_EVIDENCE", str(receipt))
+    monkeypatch.setenv("GHRA_PRODUCER_REPO_ROOT", str(tmp_path / "producer-repo"))
+    args = SimpleNamespace(
+        output_dir=str(tmp_path / "output"),
+        workspace_root=str(tmp_path),
+        registry_output=str(tmp_path / "registry.md"),
+        portfolio_report_output=str(tmp_path / "report.md"),
+        registry=None,
+        catalog=None,
+        username="testuser",
+        token=None,
+        no_cache=True,
+        portfolio_truth_include_release_count=False,
+        portfolio_truth_include_security=False,
+        portfolio_truth_allow_empty_notion=False,
+    )
+
+    run_portfolio_truth_mode(args)
+
+    evidence = captured["producer_evidence"]
+    assert evidence.commit == "a" * 40
+    assert captured["producer_repo_root"] == tmp_path / "producer-repo"
+    assert captured["require_producer_evidence"] is True
+
+
 def test_cli_portfolio_truth_allow_empty_notion_carries_forward(
     portfolio_workspace: Path,
     portfolio_catalog: Path,
