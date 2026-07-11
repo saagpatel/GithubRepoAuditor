@@ -1498,6 +1498,56 @@ def test_load_prior_notion_context_missing_or_malformed_returns_empty(tmp_path: 
     assert load_prior_notion_context(malformed) == {}
 
 
+def test_notion_origin_resolution_preserves_oldest_carried_observation(
+    tmp_path: Path,
+) -> None:
+    from src.portfolio_truth_lineage import resolve_notion_origin
+
+    oldest = "2026-07-10T09:00:10+00:00"
+    predecessor_generated = "2026-07-11T03:17:38+00:00"
+    predecessor = tmp_path / "portfolio-truth-2026-07-11T031738Z.json"
+    predecessor.write_text(
+        json.dumps(
+            {
+                "generated_at": predecessor_generated,
+                "inputs": {
+                    "notion": {
+                        "mode": "carried-forward",
+                        "observed_at": oldest,
+                        "carried_from_generated_at": oldest,
+                    }
+                },
+            }
+        )
+    )
+    latest = tmp_path / "portfolio-truth-latest.json"
+    latest.write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-07-11T03:36:36+00:00",
+                "inputs": {
+                    "notion": {
+                        "mode": "carried-forward",
+                        "observed_at": predecessor_generated,
+                        "carried_from_generated_at": predecessor_generated,
+                    }
+                },
+            }
+        )
+    )
+
+    assert resolve_notion_origin(latest) == oldest
+
+
+def test_notion_origin_resolution_uses_legacy_generation_time(tmp_path: Path) -> None:
+    from src.portfolio_truth_lineage import resolve_notion_origin
+
+    artifact = tmp_path / "portfolio-truth-latest.json"
+    artifact.write_text(json.dumps({"generated_at": "2026-07-10T09:00:10+00:00"}))
+
+    assert resolve_notion_origin(artifact) == "2026-07-10T09:00:10+00:00"
+
+
 def test_publish_allow_empty_notion_carries_forward_prior_context(
     portfolio_workspace: Path,
     portfolio_catalog: Path,

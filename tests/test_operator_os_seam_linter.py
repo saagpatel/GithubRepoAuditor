@@ -259,6 +259,58 @@ def test_contract_shadow_warns_for_carried_notion_older_than_48_hours(
     )
 
 
+def test_contract_shadow_fails_when_carry_forward_origin_advances(
+    tmp_path: Path,
+) -> None:
+    truth, markdown = _passing_paths(tmp_path)
+    predecessor_generated = "2026-07-02T00:00:00+00:00"
+    oldest = "2026-07-01T00:00:00+00:00"
+    (tmp_path / "portfolio-truth-2026-07-02T000000Z.json").write_text(
+        json.dumps(
+            {
+                "generated_at": predecessor_generated,
+                "inputs": {
+                    "notion": {
+                        "mode": "carried-forward",
+                        "observed_at": oldest,
+                        "carried_from_generated_at": oldest,
+                    }
+                },
+            }
+        )
+    )
+    payload = json.loads(truth.read_text())
+    payload.update(
+        {
+            "producer": {},
+            "inputs": {
+                "notion": {
+                    "mode": "carried-forward",
+                    "observed_at": predecessor_generated,
+                    "carried_from_generated_at": predecessor_generated,
+                },
+                "catalog": {"sha256": None},
+            },
+            "source_summary": {"attention_state_counts": {"decision-needed": 0}},
+            "rollups": {"decision": {"decision_needed_count": 0}},
+        }
+    )
+    truth.write_text(json.dumps(payload))
+
+    result = lint_operator_os_seams(
+        truth_path=truth,
+        markdown_paths=markdown,
+        contract_shadow=True,
+        catalog_path=tmp_path / "missing-catalog.yaml",
+        now=NOW,
+    )
+
+    finding = next(item for item in result.findings if item.check == "CL-FRESH-002")
+    assert finding.level == "fail"
+    assert "advanced" in finding.violation
+    assert oldest in finding.detail
+
+
 def test_contract_shadow_fails_when_excluded_backup_leaks_into_projects(
     tmp_path: Path,
 ) -> None:

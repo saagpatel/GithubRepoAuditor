@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from src.portfolio_truth_render import GENERATED_MARKDOWN_PROVENANCE_MARKER
+from src.portfolio_truth_lineage import resolve_notion_origin
 from src.portfolio_truth_types import LEGACY_SCHEMA_VERSIONS, SCHEMA_VERSION, truth_latest_path
 from src.portfolio_catalog import load_portfolio_catalog
 from src.portfolio_truth_sources import (
@@ -550,6 +551,16 @@ def _check_carried_freshness(
                 violation="carried-forward origin is invalid",
                 detail=f"carried_from_generated_at={origin}",
                 level="unknown",
+            )
+        ]
+    resolved_origin = resolve_notion_origin(truth_path)
+    if resolved_origin is not None and resolved_origin != origin:
+        return [
+            SeamLintFinding(
+                check="CL-FRESH-002",
+                artifact=str(truth_path),
+                violation="carried-forward origin advanced across artifact history",
+                detail=f"declared={origin}; resolved_origin={resolved_origin}",
             )
         ]
     if age > timedelta(hours=48):
