@@ -10,6 +10,7 @@ from src.portfolio_pathing import (
 )
 from src.portfolio_truth_render import registry_project_labels
 from src.portfolio_truth_types import (
+    DERIVATION_POLICY_VERSION,
     SCHEMA_VERSION,
     VALID_ACTIVITY_STATUS,
     VALID_ATTENTION_STATES,
@@ -26,6 +27,12 @@ from src.registry_parser import _normalize, parse_registry
 def validate_truth_snapshot(snapshot: PortfolioTruthSnapshot) -> None:
     if snapshot.schema_version != SCHEMA_VERSION:
         raise ValueError(f"Unexpected schema version: {snapshot.schema_version}")
+    if snapshot.derivation_policy_version != DERIVATION_POLICY_VERSION:
+        raise ValueError(
+            "Unexpected derivation policy version: "
+            f"{snapshot.derivation_policy_version}"
+        )
+    _validate_contract_envelope(snapshot)
     seen_keys: set[str] = set()
     for project in snapshot.projects:
         key = project.identity.project_key
@@ -89,6 +96,39 @@ def validate_truth_snapshot(snapshot: PortfolioTruthSnapshot) -> None:
         doctor_std = project.declared.doctor_standard
         if doctor_std and doctor_std not in VALID_DOCTOR_STANDARDS:
             raise ValueError(f"Invalid doctor standard for {key}: {doctor_std}")
+
+
+def _validate_contract_envelope(snapshot: PortfolioTruthSnapshot) -> None:
+    producer = snapshot.producer
+    if producer:
+        required = {
+            "repository",
+            "commit",
+            "ref",
+            "checkout_role",
+            "worktree_clean",
+            "verified_at",
+        }
+        missing = sorted(required - producer.keys())
+        if missing:
+            raise ValueError(f"Producer evidence is missing fields: {missing}")
+        commit = producer.get("commit")
+        if not isinstance(commit, str) or len(commit) != 40 or any(
+            char not in "0123456789abcdef" for char in commit
+        ):
+            raise ValueError("Producer commit must be a lowercase 40-character SHA.")
+        if producer.get("worktree_clean") is not True:
+            raise ValueError("Canonical producer evidence must declare a clean worktree.")
+    notion = snapshot.inputs.get("notion") if isinstance(snapshot.inputs, dict) else None
+    if not isinstance(notion, dict):
+        raise ValueError("Portfolio truth inputs.notion is required.")
+    mode = notion.get("mode")
+    if mode not in {"live", "carried-forward", "unavailable"}:
+        raise ValueError(f"Invalid Notion input mode: {mode}")
+    if mode == "carried-forward" and not notion.get("carried_from_generated_at"):
+        raise ValueError("Carried-forward Notion input requires an origin timestamp.")
+    if mode == "live" and notion.get("carried_from_generated_at") is not None:
+        raise ValueError("Live Notion input cannot declare a carried-forward origin.")
 
 
 def validate_publish_targets(

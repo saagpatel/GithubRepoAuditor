@@ -1,0 +1,5 @@
+{
+  "fixture_id": "notion_live",
+  "source": {"mode": "live", "age_hours": 0, "origin_known": true},
+  "expected": {"CL-FRESH-002": "pass"}
+}

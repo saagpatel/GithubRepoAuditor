@@ -6,7 +6,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = "0.7.0"
+SCHEMA_VERSION = "0.8.0"
+LEGACY_SCHEMA_VERSIONS = {"0.7.0"}
+DERIVATION_POLICY_VERSION = "portfolio_attention.v2"
 
 # The published "latest" portfolio-truth artifact. The producer
 # (portfolio_truth_publish) writes it; every reader resolves it through
@@ -294,6 +296,16 @@ class PortfolioTruthSnapshot:
     precedence_matrix: dict[str, list[str]]
     warnings: list[str]
     projects: list[PortfolioTruthProject]
+    derivation_policy_version: str = DERIVATION_POLICY_VERSION
+    producer: dict[str, Any] = field(default_factory=dict)
+    inputs: dict[str, Any] = field(default_factory=dict)
+    coverage: list[dict[str, Any]] = field(default_factory=list)
+    exclusions: dict[str, Any] = field(
+        default_factory=lambda: {
+            "policy_version": "workspace_discovery.v1",
+            "counts": {},
+        }
+    )
     rollups: PortfolioTruthRollups = field(init=False)
 
     def __post_init__(self) -> None:
@@ -305,6 +317,11 @@ class PortfolioTruthSnapshot:
         return {
             "schema_version": self.schema_version,
             "generated_at": _serialize_datetime(self.generated_at),
+            "derivation_policy_version": self.derivation_policy_version,
+            "producer": dict(self.producer),
+            "inputs": dict(self.inputs),
+            "coverage": list(self.coverage),
+            "exclusions": dict(self.exclusions),
             "workspace_root": self.workspace_root,
             "source_summary": self.source_summary,
             "precedence_matrix": self.precedence_matrix,

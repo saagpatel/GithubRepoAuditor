@@ -11,6 +11,7 @@ from src.portfolio_truth_reconcile import (
 )
 from src.portfolio_truth_render import render_portfolio_report_markdown, render_registry_markdown
 from src.portfolio_truth_types import truth_latest_path
+from src.producer_preflight import ProducerEvidence, verify_evidence_still_current
 from src.portfolio_truth_validate import (
     validate_portfolio_report_markdown,
     validate_publish_targets,
@@ -89,7 +90,23 @@ def publish_portfolio_truth(
     release_count_by_name: dict[str, int] | None = None,
     security_alerts_by_name: dict[str, dict] | None = None,
     repo_status_by_name: dict[str, dict] | None = None,
+    producer_evidence: ProducerEvidence | None = None,
+    producer_repo_root: Path | None = None,
+    require_producer_evidence: bool = False,
 ) -> PortfolioTruthPublishResult:
+    if require_producer_evidence and producer_evidence is None:
+        raise PortfolioTruthPublishError(
+            "Canonical publication requires validated producer evidence."
+        )
+    if producer_evidence is not None:
+        if producer_repo_root is None:
+            raise PortfolioTruthPublishError(
+                "producer_repo_root is required with producer evidence."
+            )
+        try:
+            verify_evidence_still_current(producer_repo_root, producer_evidence)
+        except ValueError as exc:
+            raise PortfolioTruthPublishError(str(exc)) from exc
     validate_publish_targets(
         workspace_root=workspace_root,
         output_dir=output_dir,
@@ -100,6 +117,7 @@ def publish_portfolio_truth(
     notion_context_fallback = (
         load_prior_notion_context(latest_path) if allow_empty_notion else None
     )
+    prior_notion_generated_at = _previous_generated_at(latest_path)
     build_result = build_portfolio_truth_snapshot(
         workspace_root=workspace_root,
         catalog_path=catalog_path,
@@ -109,8 +127,15 @@ def publish_portfolio_truth(
         release_count_by_name=release_count_by_name,
         security_alerts_by_name=security_alerts_by_name,
         repo_status_by_name=repo_status_by_name,
+        producer=producer_evidence.to_dict() if producer_evidence else {},
+        prior_notion_generated_at=prior_notion_generated_at,
     )
     validate_truth_snapshot(build_result.snapshot)
+    if producer_evidence is not None and producer_repo_root is not None:
+        try:
+            verify_evidence_still_current(producer_repo_root, producer_evidence)
+        except ValueError as exc:
+            raise PortfolioTruthPublishError(str(exc)) from exc
 
     snapshot_stamp = build_result.snapshot.generated_at.strftime("%Y-%m-%dT%H%M%SZ")
     snapshot_path = output_dir / f"portfolio-truth-{snapshot_stamp}.json"
@@ -204,6 +229,15 @@ def _content_changed(path: Path, content: str) -> bool:
     if not path.exists():
         return True
     return path.read_text() != content
+
+
+def _previous_generated_at(latest_path: Path) -> str | None:
+    try:
+        payload = json.loads(latest_path.read_text())
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return None
+    value = payload.get("generated_at") if isinstance(payload, dict) else None
+    return value if isinstance(value, str) and value else None
 
 
 def _guard_against_notion_context_drop(

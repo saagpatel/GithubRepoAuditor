@@ -80,6 +80,7 @@ Documentation = "https://github.com/saagpatel/GithubRepoAuditor#readme"
 [project.scripts]
 audit = "src.cli:main"
 operator-os-seam-linter = "src.operator_os_seam_linter:main"
+operator-os-producer-preflight = "src.producer_preflight:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -14,7 +14,7 @@ from src.portfolio_context_recovery import (
     apply_context_recovery_plan,
     build_context_recovery_plan,
 )
-from src.portfolio_truth_publish import publish_portfolio_truth
+from src.portfolio_truth_publish import PortfolioTruthPublishError, publish_portfolio_truth
 from src.portfolio_truth_reconcile import build_portfolio_truth_snapshot
 from src.portfolio_truth_render import (
     render_portfolio_report_markdown,
@@ -370,7 +370,10 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     assert gamma.identity.section_marker == "iOS Projects"
     assert gamma.derived.stack == ["Swift"]
 
-    assert result.snapshot.schema_version == "0.7.0"
+    assert result.snapshot.schema_version == "0.8.0"
+    assert result.snapshot.derivation_policy_version == "portfolio_attention.v2"
+    assert result.snapshot.inputs["catalog"]["sha256"]
+    assert result.snapshot.inputs["notion"]["mode"] == "unavailable"
     assert result.snapshot.source_summary["attention_state_counts"]["active-product"] == 1
     assert result.snapshot.source_summary["attention_state_counts"]["parked"] == 1
 
@@ -1366,6 +1369,38 @@ def test_publish_failure_leaves_live_files_untouched(
     assert registry_output.read_text() == "sentinel-registry\n"
     assert report_output.read_text() == "sentinel-report\n"
     assert not list(output_dir.glob("*.tmp"))
+
+
+def test_publish_requires_producer_evidence_before_touching_outputs(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+    tmp_path: Path,
+) -> None:
+    output_dir = tmp_path / "output"
+    registry_output = portfolio_workspace / "project-registry.md"
+    report_output = portfolio_workspace / "PORTFOLIO-AUDIT-REPORT.md"
+    registry_output.write_text("sentinel-registry\n")
+    report_output.write_text("sentinel-report\n")
+
+    with pytest.raises(
+        PortfolioTruthPublishError,
+        match="requires validated producer evidence",
+    ):
+        publish_portfolio_truth(
+            workspace_root=portfolio_workspace,
+            output_dir=output_dir,
+            registry_output=registry_output,
+            portfolio_report_output=report_output,
+            catalog_path=portfolio_catalog,
+            legacy_registry_path=legacy_registry,
+            include_notion=False,
+            require_producer_evidence=True,
+        )
+
+    assert registry_output.read_text() == "sentinel-registry\n"
+    assert report_output.read_text() == "sentinel-report\n"
+    assert not output_dir.exists()
 
 
 def test_publish_refuses_to_drop_existing_notion_context(
