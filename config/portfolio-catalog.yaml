@@ -1299,10 +1299,49 @@ repos:
     intended_disposition: maintain
   CivicTwin:
     owner: d
+    purpose: deterministic civic-grid decision simulator with guided response packages and scoring
     lifecycle_state: active
     review_cadence: monthly
     intended_disposition: maintain
     category: fun
+    tool_provenance: codex
+    notes: Session 2026-07-11 guided 48-hour replay passed after adding four-action response guidance; keep manual-only unless explicitly reactivated.
+  executable-atlas:
+    owner: d
+    purpose: executable infrastructure-fault atlas with guided explanations, expert compositions, and rollback evidence
+    lifecycle_state: experimental
+    criticality: medium
+    review_cadence: monthly
+    intended_disposition: experiment
+    category: infrastructure
+    tool_provenance: codex
+    maturity_program: experiment
+    target_maturity: functional
+    notes: Session 2026-07-11 full Guided and Expert dogfood passed; evidence-receipt/v1 feeds Sovereign Intelligence. Keep outside default attention unless explicitly reactivated.
+  Lazarus:
+    owner: d
+    purpose: guarded repository recovery tool that selects safe historical revisions and blocks sensitive-file restoration
+    lifecycle_state: maintenance
+    criticality: medium
+    review_cadence: monthly
+    intended_disposition: maintain
+    category: infrastructure
+    tool_provenance: codex
+    maturity_program: maintain
+    target_maturity: operating
+    notes: Session 2026-07-11 disposable real-repository recovery drill passed, including broken-main rejection, timeout handling, and force-tracked .env blocking.
+  sovereign-intelligence:
+    owner: d
+    purpose: local evidence-receipt intelligence workspace for repeated scenario comparison and decision support
+    lifecycle_state: experimental
+    criticality: medium
+    review_cadence: monthly
+    intended_disposition: experiment
+    category: infrastructure
+    tool_provenance: codex
+    maturity_program: experiment
+    target_maturity: functional
+    notes: Session 2026-07-11 one-week and 32-scenario repeated dogfood matrices passed; a private connector remains unjustified. Keep outside default attention unless explicitly reactivated.
   continuity:
     owner: d
     lifecycle_state: active
