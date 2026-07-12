@@ -58,7 +58,7 @@ def build_risk_entry(
     path_override: str,
     context_quality: str,
     activity_status: str,
-    registry_status: str,
+    archived: bool,
     criticality: str,
     doctor_standard: str,
     known_risks_present: bool,
@@ -67,7 +67,7 @@ def build_risk_entry(
     security_critical_alerts: int = 0,
 ) -> dict[str, Any]:
     # Short-circuit deferred: archived or archive-path
-    if registry_status == "archived" or operating_path == "archive":
+    if archived or operating_path == "archive":
         return dict(_DEFERRED_ARCHIVED)
 
     # Short-circuit deferred: stale and not on maintain path

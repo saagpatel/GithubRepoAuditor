@@ -8,7 +8,7 @@ def _baseline_kwargs(**overrides):
         path_override="",
         context_quality="standard",
         activity_status="active",
-        registry_status="active",
+        archived=False,
         criticality="medium",
         doctor_standard="",
         known_risks_present=True,
@@ -19,7 +19,7 @@ def _baseline_kwargs(**overrides):
 
 
 def test_risk_tier_deferred_for_archived_registry():
-    result = build_risk_entry(**_baseline_kwargs(registry_status="archived"))
+    result = build_risk_entry(**_baseline_kwargs(archived=True))
     assert result["risk_tier"] == "deferred"
     assert result["risk_factors"] == []
     assert result["doctor_gap"] is False

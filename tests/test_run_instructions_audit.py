@@ -29,8 +29,12 @@ def test_assign_bucket_truth_table():
     assert assign_bucket(True, True, True) == "agree_present"
     assert assign_bucket(False, False, False) == "agree_absent"
     # false negatives (tool said absent, verifier found it)
-    assert assign_bucket(False, True, True) == "fn_alias_gap"  # evidence in primary file
-    assert assign_bucket(False, True, False) == "fn_blind_spot"  # evidence only in README/other
+    assert (
+        assign_bucket(False, True, True) == "fn_alias_gap"
+    )  # evidence in primary file
+    assert (
+        assign_bucket(False, True, False) == "fn_blind_spot"
+    )  # evidence only in README/other
     # false positive (tool over-claimed)
     assert assign_bucket(True, False, False) == "fp_overclaim"
     assert assign_bucket(True, False, True) == "fp_overclaim"
@@ -46,11 +50,15 @@ def test_assign_drift_bucket():
     assert assign_drift_bucket(False, True, False) == "claim_changed_nodrift"
 
 
-def _project(key, quality, *, status="active", path=None):
+def _project(key, quality, *, archived=False, path=None):
     return {
-        "identity": {"project_key": key, "path": path or key, "display_name": key.split("/")[-1]},
+        "identity": {
+            "project_key": key,
+            "path": path or key,
+            "display_name": key.split("/")[-1],
+        },
         "derived": {
-            "registry_status": status,
+            "archived": archived,
             "context_quality": quality,
             "context_files": ["CLAUDE.md"],
             "run_instructions_present": False,
@@ -62,7 +70,7 @@ def test_select_pilot_stratifies_sorts_and_filters():
     projects = (
         [_project(f"b{i}", "boilerplate") for i in range(6)]
         + [_project("n1", "none"), _project("n2", "none")]
-        + [_project("arch", "full", status="archived")]
+        + [_project("arch", "full", archived=True)]
         + [_project("junk-security-fix", "full")]
         + [_project("z-full", "full"), _project("a-full", "full")]
     )
@@ -94,7 +102,9 @@ def test_build_record_resolves_path_and_all_six_claims():
     }
     record = build_record(project, os.path.expanduser("~/Projects"))
 
-    assert record["abs_path"] == os.path.expanduser("~/Projects/Fun:GamePrjs/BattleGrid")
+    assert record["abs_path"] == os.path.expanduser(
+        "~/Projects/Fun:GamePrjs/BattleGrid"
+    )
     assert record["primary_file_name"] == "AGENTS.md"  # no CLAUDE.md → AGENTS.md
     assert record["context_files"] == ["AGENTS.md", "README.md"]
     assert record["project_key"] == "Fun:GamePrjs/BattleGrid"
@@ -102,13 +112,18 @@ def test_build_record_resolves_path_and_all_six_claims():
     assert set(record["snapshot_claims"]) == set(CLAIM_FIELDS)
     assert record["snapshot_claims"]["run_instructions_present"] is False
     assert record["snapshot_claims"]["project_summary_present"] is True
-    assert record["snapshot_claims"]["known_risks_present"] is False  # absent in derived → False
+    assert (
+        record["snapshot_claims"]["known_risks_present"] is False
+    )  # absent in derived → False
 
 
 def test_build_record_prefers_claude_md():
     project = {
         "identity": {"project_key": "x", "path": "x", "display_name": "x"},
-        "derived": {"context_files": ["AGENTS.md", "CLAUDE.md"], "run_instructions_present": True},
+        "derived": {
+            "context_files": ["AGENTS.md", "CLAUDE.md"],
+            "run_instructions_present": True,
+        },
     }
     assert build_record(project, "/w")["primary_file_name"] == "CLAUDE.md"
 
@@ -149,7 +164,10 @@ def _git_commit_at(path, iso):
     }
     subprocess.run(["git", "init", "-q"], cwd=path, check=True)
     subprocess.run(
-        ["git", "commit", "-q", "--allow-empty", "-m", "x"], cwd=path, env=env, check=True
+        ["git", "commit", "-q", "--allow-empty", "-m", "x"],
+        cwd=path,
+        env=env,
+        check=True,
     )
 
 
@@ -171,7 +189,9 @@ def test_prepare_pilot_builds_records_and_reports_missing_dirs(tmp_path):
     workspace = tmp_path / "ws"
     real = workspace / "RealRepo"
     real.mkdir(parents=True)
-    (real / "CLAUDE.md").write_text("# R\n\n## Usage\n\nRun `npm run dev` to start the server.\n")
+    (real / "CLAUDE.md").write_text(
+        "# R\n\n## Usage\n\nRun `npm run dev` to start the server.\n"
+    )
 
     snapshot = {
         "workspace_root": str(workspace),
@@ -184,7 +204,7 @@ def test_prepare_pilot_builds_records_and_reports_missing_dirs(tmp_path):
                     "display_name": "RealRepo",
                 },
                 "derived": {
-                    "registry_status": "active",
+                    "archived": False,
                     "context_quality": "full",
                     "context_files": ["CLAUDE.md"],
                     "run_instructions_present": True,
@@ -197,7 +217,7 @@ def test_prepare_pilot_builds_records_and_reports_missing_dirs(tmp_path):
                     "display_name": "GhostRepo",
                 },
                 "derived": {
-                    "registry_status": "active",
+                    "archived": False,
                     "context_quality": "full",
                     "context_files": ["CLAUDE.md"],
                     "run_instructions_present": False,
@@ -216,7 +236,9 @@ def test_prepare_pilot_builds_records_and_reports_missing_dirs(tmp_path):
     record = result["records"][0]
     assert record["project_key"] == "RealRepo"
     # tool_today + snapshot_claims are now dicts over all 6 claims
-    assert record["tool_today"]["run_instructions_present"] is True  # live recompute on fixture
+    assert (
+        record["tool_today"]["run_instructions_present"] is True
+    )  # live recompute on fixture
     assert record["snapshot_claims"]["run_instructions_present"] is True
     assert set(record["tool_today"]) == set(CLAIM_FIELDS)
     assert record["drifted"] is False  # no git repo → not drifted

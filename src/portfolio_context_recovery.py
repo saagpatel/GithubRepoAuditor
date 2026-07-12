@@ -16,11 +16,17 @@ from src.portfolio_context_contract import (
     temporary_project_reason,
     upsert_managed_context_block,
 )
-from src.portfolio_truth_types import PortfolioTruthProject, PortfolioTruthSnapshot
+from src.portfolio_truth_types import (
+    PortfolioTruthProject,
+    PortfolioTruthSnapshot,
+    display_activity_status,
+)
 
 try:
     import yaml
-except ImportError:  # pragma: no cover - repo already depends on PyYAML for catalog tests
+except (
+    ImportError
+):  # pragma: no cover - repo already depends on PyYAML for catalog tests
     yaml = None
 
 
@@ -30,7 +36,7 @@ class ContextRecoveryTarget:
     project_key: str
     display_name: str
     relative_path: str
-    registry_status: str
+    activity_status: str
     context_quality: str
     primary_context_file: str
     target_path: str
@@ -89,7 +95,9 @@ def build_context_recovery_plan(
             status = "excluded"
         else:
             if not allow_dirty:
-                dirty_reason = _dirty_worktree_reason(project_path, project.identity.has_git)
+                dirty_reason = _dirty_worktree_reason(
+                    project_path, project.identity.has_git
+                )
                 if dirty_reason:
                     status = "skipped"
                     reason = dirty_reason
@@ -105,10 +113,14 @@ def build_context_recovery_plan(
                 project_key=project.identity.project_key,
                 display_name=project.identity.display_name,
                 relative_path=project.identity.path,
-                registry_status=project.derived.registry_status,
+                activity_status=display_activity_status(
+                    project.derived.activity_status, archived=project.derived.archived
+                ),
                 context_quality=project.derived.context_quality,
                 primary_context_file=project.derived.primary_context_file,
-                target_path=(project_path / project.derived.primary_context_file).as_posix(),
+                target_path=(
+                    project_path / project.derived.primary_context_file
+                ).as_posix(),
                 status=status,
                 missing_fields=_missing_fields_for_project(project),
                 reason=reason,
@@ -138,7 +150,9 @@ def write_context_recovery_plan_artifacts(
     return json_path, markdown_path
 
 
-def write_managed_context_block(project: PortfolioTruthProject, project_path: Path) -> None:
+def write_managed_context_block(
+    project: PortfolioTruthProject, project_path: Path
+) -> None:
     """Refresh the managed context block in a project's primary context file.
 
     The single source of truth for the read -> render -> upsert -> write sequence,
@@ -146,8 +160,12 @@ def write_managed_context_block(project: PortfolioTruthProject, project_path: Pa
     automation executor's context-PR path so the two render byte-identical blocks.
     """
     target_file = project_path / project.derived.primary_context_file
-    existing_text = target_file.read_text(errors="replace") if target_file.exists() else ""
-    managed_block = render_managed_context_block(_build_context_sections(project, project_path))
+    existing_text = (
+        target_file.read_text(errors="replace") if target_file.exists() else ""
+    )
+    managed_block = render_managed_context_block(
+        _build_context_sections(project, project_path)
+    )
     target_file.write_text(upsert_managed_context_block(existing_text, managed_block))
 
 
@@ -159,8 +177,12 @@ def apply_context_recovery_plan(
     catalog_path: Path | None = None,
     limit: int | None = None,
 ) -> ContextRecoveryApplyResult:
-    project_index = {project.identity.project_key: project for project in snapshot.projects}
-    eligible_targets = [target for target in plan.projects if target.status == "eligible"]
+    project_index = {
+        project.identity.project_key: project for project in snapshot.projects
+    }
+    eligible_targets = [
+        target for target in plan.projects if target.status == "eligible"
+    ]
     if limit is not None:
         eligible_targets = eligible_targets[:limit]
 
@@ -176,7 +198,9 @@ def apply_context_recovery_plan(
             write_managed_context_block(project, project_path)
             updated.append(target.project_key)
             if target.suggested_catalog_seed:
-                catalog_seeds[_catalog_repo_key(project)] = target.suggested_catalog_seed
+                catalog_seeds[_catalog_repo_key(project)] = (
+                    target.suggested_catalog_seed
+                )
         except Exception:
             failed.append(target.project_key)
 
@@ -223,7 +247,7 @@ def render_context_recovery_plan_markdown(plan: ContextRecoveryPlan) -> str:
         if target.reason:
             action = f"{target.status} ({target.reason})"
         lines.append(
-            f"| {target.priority_rank} | {target.display_name} | {target.registry_status} | {target.context_quality} | "
+            f"| {target.priority_rank} | {target.display_name} | {target.activity_status} | {target.context_quality} | "
             f"{action} | {', '.join(target.missing_fields) or '—'} |"
         )
     return "\n".join(lines) + "\n"
@@ -279,12 +303,18 @@ def _missing_fields_for_project(project: PortfolioTruthProject) -> list[str]:
                 "missing_fields": [
                     label
                     for present, label in (
-                        (project.derived.project_summary_present, "what the project is"),
+                        (
+                            project.derived.project_summary_present,
+                            "what the project is",
+                        ),
                         (project.derived.current_state_present, "current state"),
                         (project.derived.stack_present, "stack"),
                         (project.derived.run_instructions_present, "how to run"),
                         (project.derived.known_risks_present, "known risks"),
-                        (project.derived.next_recommended_move_present, "next recommended move"),
+                        (
+                            project.derived.next_recommended_move_present,
+                            "next recommended move",
+                        ),
                     )
                     if not present
                 ]
@@ -343,8 +373,12 @@ def _merge_catalog_seeds(catalog_path: Path, seeds: dict[str, dict[str, str]]) -
     catalog_path.write_text(yaml.safe_dump(data, sort_keys=False))
 
 
-def _build_context_sections(project: PortfolioTruthProject, project_path: Path) -> dict[str, str]:
-    primary_sections = _read_markdown_sections(project_path / project.derived.primary_context_file)
+def _build_context_sections(
+    project: PortfolioTruthProject, project_path: Path
+) -> dict[str, str]:
+    primary_sections = _read_markdown_sections(
+        project_path / project.derived.primary_context_file
+    )
     readme_sections = _read_markdown_sections(project_path / "README.md")
     summary = _first_nonempty(
         primary_sections.get("what this project is"),
@@ -446,7 +480,9 @@ def _split_markdown_sections(text: str) -> dict[str, str]:
             in_fenced_code = not in_fenced_code
             sections.setdefault(current, []).append(line)
             continue
-        match = None if in_fenced_code else re.match(r"^\s{0,3}#{1,6}\s+(.+?)\s*$", line)
+        match = (
+            None if in_fenced_code else re.match(r"^\s{0,3}#{1,6}\s+(.+?)\s*$", line)
+        )
         if match:
             current = _normalize_heading(match.group(1))
             sections.setdefault(current, [])
@@ -550,7 +586,9 @@ def _correct_run_instructions(text: str, project_path: Path) -> str:
     if not contradictions:
         return text
     corrected = _PRESCRIPTIVE_CMD_PATTERN.sub(
-        lambda m: f"{detected} {m.group(2)}" if m.group(1).lower() != detected else m.group(0),
+        lambda m: (
+            f"{detected} {m.group(2)}" if m.group(1).lower() != detected else m.group(0)
+        ),
         text,
     )
     corrected = _USE_ONLY_PATTERN.sub("", corrected)

@@ -26,7 +26,6 @@ def _project(
         "identity": {"display_name": name, "path": name},
         "derived": {
             "attention_state": attention_state,
-            "registry_status": "active",
             "activity_status": "active",
         },
         "risk": {
@@ -156,7 +155,9 @@ def test_cli_json_and_markdown_are_deterministic(
             {
                 "schema_version": "0.8.0",
                 "generated_at": "2026-07-11T09:00:10+00:00",
-                "projects": [_project("NeedsDecision", attention_state="decision-needed")],
+                "projects": [
+                    _project("NeedsDecision", attention_state="decision-needed")
+                ],
             }
         ),
         encoding="utf-8",

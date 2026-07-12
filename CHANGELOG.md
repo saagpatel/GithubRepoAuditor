@@ -14,6 +14,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ## [Unreleased]
 
 ### Changed
+- Portfolio truth schema bumped to `0.9.0`: `derived.registry_status` (a
+  `stale`->`parked` synonym table over `activity_status`) is removed.
+  `derived.archived` is now a first-class boolean lifecycle fact (sourced from
+  `github_archived` or a declared `archived` lifecycle state), orthogonal to
+  the pure-recency `activity_status` axis. The `stale`->`parked` display
+  relabel moved to a single render-layer function
+  (`portfolio_truth_types.display_activity_status`). Snapshot
+  `source_summary.registry_status_counts` is replaced by
+  `activity_status_counts` + `archived_count`. Risk tier, attention state, and
+  displayed status are unchanged for every repo; `0.8.0` is accepted as a
+  legacy schema version.
 - Hardened the local web UI runner and HTMX fragments against CodeQL-reported
   command-injection and reflected-XSS paths.
 - Added a CodeQL code-scanning workflow and documented the public security
