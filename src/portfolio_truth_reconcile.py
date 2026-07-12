@@ -667,7 +667,6 @@ def _build_truth_project(
         registry_status=registry_status,
         lifecycle_state=declared_values["lifecycle_state"],
         operating_path=path_entry.get("operating_path", ""),
-        intended_disposition=declared_values["intended_disposition"],
         category=declared_values["category"],
         path_override=path_entry.get("path_override", ""),
         risk_entry=risk_entry,
@@ -987,7 +986,6 @@ def _attention_state_for(
     registry_status: str,
     lifecycle_state: str,
     operating_path: str,
-    intended_disposition: str,
     category: str,
     path_override: str,
     risk_entry: dict[str, Any],
@@ -1002,7 +1000,6 @@ def _attention_state_for(
         return "archived"
     if (
         operating_path == "experiment"
-        or intended_disposition == "experiment"
         or lifecycle_state == "experimental"
     ):
         return "experiment"
