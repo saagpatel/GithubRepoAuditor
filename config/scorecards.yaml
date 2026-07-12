@@ -225,7 +225,7 @@ programs:
       - key: disposition
         label: Archive Disposition
         check: catalog_field_in
-        catalog_field: intended_disposition
+        catalog_field: operating_path
         values: [archive]
         weight: 1.0
       - key: readme

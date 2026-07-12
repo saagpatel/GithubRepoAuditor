@@ -4,11 +4,28 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-VALID_LIFECYCLE_STATES = {"active", "maintenance", "dormant", "experimental", "archived"}
+from src.portfolio_pathing import VALID_OPERATING_PATHS
+
+VALID_LIFECYCLE_STATES = {
+    "active",
+    "maintenance",
+    "dormant",
+    "experimental",
+    "archived",
+}
 VALID_CRITICALITY = {"low", "medium", "high", "critical"}
 VALID_REVIEW_CADENCE = {"weekly", "monthly", "quarterly", "ad-hoc"}
-VALID_INTENDED_DISPOSITIONS = {"maintain", "finish", "archive", "experiment"}
-VALID_CATEGORY_TAGS = {"commercial", "it-work", "vanity", "fun", "learning", "infrastructure"}
+# Deprecated vintage of VALID_OPERATING_PATHS (same value domain) — kept for one
+# release as the enum for the read-compat `intended_disposition` field.
+VALID_INTENDED_DISPOSITIONS = VALID_OPERATING_PATHS
+VALID_CATEGORY_TAGS = {
+    "commercial",
+    "it-work",
+    "vanity",
+    "fun",
+    "learning",
+    "infrastructure",
+}
 VALID_TOOL_PROVENANCE = {"claude-code", "codex", "gpt", "grok", "claude-ai", "unknown"}
 VALID_DOCTOR_STANDARDS = {"full", "basic"}
 VALID_AUTOMATION_ELIGIBLE = {"true", "false"}
@@ -26,6 +43,15 @@ def _normalize_key(key: str) -> str:
 def _normalize_enum(value: Any, allowed: set[str]) -> str:
     normalized = _safe_text(value).lower()
     return normalized if normalized in allowed else ""
+
+
+def _declared_operating_path(entry: dict[str, Any]) -> str:
+    """Read a normalized catalog entry's operating-path axis, preferring the
+    canonical `operating_path` field and falling back to the deprecated
+    `intended_disposition` vintage for entries that haven't migrated yet."""
+    return _safe_text(
+        entry.get("operating_path") or entry.get("intended_disposition")
+    ).lower()
 
 
 def load_portfolio_catalog(path: Path | None = None) -> dict[str, Any]:
@@ -48,7 +74,9 @@ def load_portfolio_catalog(path: Path | None = None) -> dict[str, Any]:
             "path": str(catalog_path),
             "exists": True,
             "errors": [],
-            "warnings": ["PyYAML is not installed, so the portfolio catalog was skipped."],
+            "warnings": [
+                "PyYAML is not installed, so the portfolio catalog was skipped."
+            ],
             "defaults": {},
             "groups": {},
             "repos": {},
@@ -81,8 +109,12 @@ def load_portfolio_catalog(path: Path | None = None) -> dict[str, Any]:
     errors: list[str] = []
     warnings: list[str] = []
     defaults = _normalize_defaults(loaded.get("defaults") or {}, errors)
-    groups = _normalize_group_entries(loaded.get("groups") or {}, defaults, errors, warnings)
-    repos = _normalize_repo_entries(loaded.get("repos") or {}, defaults, errors, warnings)
+    groups = _normalize_group_entries(
+        loaded.get("groups") or {}, defaults, errors, warnings
+    )
+    repos = _normalize_repo_entries(
+        loaded.get("repos") or {}, defaults, errors, warnings
+    )
     return {
         "path": str(catalog_path),
         "exists": True,
@@ -101,11 +133,17 @@ def _normalize_defaults(defaults: Any, errors: list[str]) -> dict[str, str]:
         return {}
 
     normalized = {
-        "lifecycle_state": _normalize_enum(defaults.get("lifecycle_state"), VALID_LIFECYCLE_STATES),
+        "lifecycle_state": _normalize_enum(
+            defaults.get("lifecycle_state"), VALID_LIFECYCLE_STATES
+        ),
         "criticality": _normalize_enum(defaults.get("criticality"), VALID_CRITICALITY),
-        "review_cadence": _normalize_enum(defaults.get("review_cadence"), VALID_REVIEW_CADENCE),
+        "review_cadence": _normalize_enum(
+            defaults.get("review_cadence"), VALID_REVIEW_CADENCE
+        ),
         "category": _normalize_enum(defaults.get("category"), VALID_CATEGORY_TAGS),
-        "tool_provenance": _normalize_enum(defaults.get("tool_provenance"), VALID_TOOL_PROVENANCE),
+        "tool_provenance": _normalize_enum(
+            defaults.get("tool_provenance"), VALID_TOOL_PROVENANCE
+        ),
         "maturity_program": _safe_text(defaults.get("maturity_program")).lower(),
         "target_maturity": _safe_text(defaults.get("target_maturity")).lower(),
     }
@@ -124,6 +162,31 @@ def _normalize_defaults(defaults: Any, errors: list[str]) -> dict[str, str]:
     return {key: value for key, value in normalized.items() if value}
 
 
+def _normalize_operating_path(
+    raw_value: dict[str, Any], *, label: str, warnings: list[str]
+) -> tuple[str, str]:
+    """Normalize the operating-path axis for one catalog entry.
+
+    Returns ``(operating_path, intended_disposition)``. `intended_disposition` is a
+    deprecated vintage of `operating_path` (same value domain), kept as a read-compat
+    fallback for one release — see portfolio_pathing.resolve_declared_operating_path.
+    A raw entry that still declares it is flagged with a deprecation warning, not an
+    error, so hand-edits that reintroduce the old field get caught at validation time.
+    """
+    operating_path = _normalize_enum(
+        raw_value.get("operating_path"), VALID_OPERATING_PATHS
+    )
+    intended_disposition = _normalize_enum(
+        raw_value.get("intended_disposition"), VALID_INTENDED_DISPOSITIONS
+    )
+    if raw_value.get("intended_disposition"):
+        warnings.append(
+            f"{label} still declares deprecated 'intended_disposition'; migrate to "
+            "'operating_path' (intended_disposition is slated for removal next release)."
+        )
+    return operating_path, intended_disposition
+
+
 def _normalize_group_entries(
     entries: Any,
     defaults: dict[str, str],
@@ -132,7 +195,9 @@ def _normalize_group_entries(
 ) -> dict[str, dict[str, Any]]:
     if not isinstance(entries, dict):
         if entries:
-            errors.append("Portfolio catalog groups must be a mapping keyed by group name.")
+            errors.append(
+                "Portfolio catalog groups must be a mapping keyed by group name."
+            )
         return {}
 
     normalized_entries: dict[str, dict[str, Any]] = {}
@@ -146,7 +211,9 @@ def _normalize_group_entries(
             errors.append(f"Portfolio catalog group '{key}' must be a mapping.")
             continue
 
-        raw_prefixes = raw_value.get("path_prefixes") or raw_value.get("match_paths") or []
+        raw_prefixes = (
+            raw_value.get("path_prefixes") or raw_value.get("match_paths") or []
+        )
         if isinstance(raw_prefixes, str):
             raw_prefixes = [raw_prefixes]
         if not isinstance(raw_prefixes, list):
@@ -173,6 +240,10 @@ def _normalize_group_entries(
             )
             continue
 
+        operating_path, intended_disposition = _normalize_operating_path(
+            raw_value, label=f"Portfolio catalog group '{key}'", warnings=warnings
+        )
+
         normalized = {
             "group_key": key,
             "label": _safe_text(raw_value.get("label")) or key,
@@ -190,13 +261,16 @@ def _normalize_group_entries(
                 raw_value.get("lifecycle_state"), VALID_LIFECYCLE_STATES
             )
             or defaults.get("lifecycle_state", ""),
-            "criticality": _normalize_enum(raw_value.get("criticality"), VALID_CRITICALITY)
+            "criticality": _normalize_enum(
+                raw_value.get("criticality"), VALID_CRITICALITY
+            )
             or defaults.get("criticality", ""),
-            "review_cadence": _normalize_enum(raw_value.get("review_cadence"), VALID_REVIEW_CADENCE)
+            "review_cadence": _normalize_enum(
+                raw_value.get("review_cadence"), VALID_REVIEW_CADENCE
+            )
             or defaults.get("review_cadence", ""),
-            "intended_disposition": _normalize_enum(
-                raw_value.get("intended_disposition"), VALID_INTENDED_DISPOSITIONS
-            ),
+            "operating_path": operating_path,
+            "intended_disposition": intended_disposition,
             "category": _normalize_enum(raw_value.get("category"), VALID_CATEGORY_TAGS)
             or defaults.get("category", ""),
             "tool_provenance": _normalize_enum(
@@ -217,6 +291,7 @@ def _normalize_group_entries(
             ("lifecycle_state", VALID_LIFECYCLE_STATES),
             ("criticality", VALID_CRITICALITY),
             ("review_cadence", VALID_REVIEW_CADENCE),
+            ("operating_path", VALID_OPERATING_PATHS),
             ("intended_disposition", VALID_INTENDED_DISPOSITIONS),
             ("category", VALID_CATEGORY_TAGS),
             ("tool_provenance", VALID_TOOL_PROVENANCE),
@@ -245,7 +320,9 @@ def _normalize_repo_entries(
 ) -> dict[str, dict[str, Any]]:
     if not isinstance(entries, dict):
         if entries:
-            errors.append("Portfolio catalog repos must be a mapping keyed by repo name.")
+            errors.append(
+                "Portfolio catalog repos must be a mapping keyed by repo name."
+            )
         return {}
 
     normalized_entries: dict[str, dict[str, Any]] = {}
@@ -258,6 +335,9 @@ def _normalize_repo_entries(
         if not isinstance(raw_value, dict):
             errors.append(f"Portfolio catalog entry '{key}' must be a mapping.")
             continue
+        operating_path, intended_disposition = _normalize_operating_path(
+            raw_value, label=f"Portfolio catalog entry '{key}'", warnings=warnings
+        )
         normalized = {
             "owner": _safe_text(raw_value.get("owner")),
             "team": _safe_text(raw_value.get("team")),
@@ -266,13 +346,16 @@ def _normalize_repo_entries(
                 raw_value.get("lifecycle_state"), VALID_LIFECYCLE_STATES
             )
             or defaults.get("lifecycle_state", ""),
-            "criticality": _normalize_enum(raw_value.get("criticality"), VALID_CRITICALITY)
+            "criticality": _normalize_enum(
+                raw_value.get("criticality"), VALID_CRITICALITY
+            )
             or defaults.get("criticality", ""),
-            "review_cadence": _normalize_enum(raw_value.get("review_cadence"), VALID_REVIEW_CADENCE)
+            "review_cadence": _normalize_enum(
+                raw_value.get("review_cadence"), VALID_REVIEW_CADENCE
+            )
             or defaults.get("review_cadence", ""),
-            "intended_disposition": _normalize_enum(
-                raw_value.get("intended_disposition"), VALID_INTENDED_DISPOSITIONS
-            ),
+            "operating_path": operating_path,
+            "intended_disposition": intended_disposition,
             "category": _normalize_enum(raw_value.get("category"), VALID_CATEGORY_TAGS)
             or defaults.get("category", ""),
             "tool_provenance": _normalize_enum(
@@ -287,7 +370,9 @@ def _normalize_repo_entries(
             "doctor_standard": _normalize_enum(
                 raw_value.get("doctor_standard"), VALID_DOCTOR_STANDARDS
             ),
-            "automation_eligible": _safe_text(raw_value.get("automation_eligible", "")).lower()
+            "automation_eligible": _safe_text(
+                raw_value.get("automation_eligible", "")
+            ).lower()
             == "true",
             "catalog_key": key,
             "matched_by": "full-name" if "/" in key else "bare-name",
@@ -301,6 +386,7 @@ def _normalize_repo_entries(
             ("lifecycle_state", VALID_LIFECYCLE_STATES),
             ("criticality", VALID_CRITICALITY),
             ("review_cadence", VALID_REVIEW_CADENCE),
+            ("operating_path", VALID_OPERATING_PATHS),
             ("intended_disposition", VALID_INTENDED_DISPOSITIONS),
             ("category", VALID_CATEGORY_TAGS),
             ("tool_provenance", VALID_TOOL_PROVENANCE),
@@ -406,6 +492,7 @@ def catalog_entry_for_repo(
         "lifecycle_state": "",
         "criticality": "",
         "review_cadence": "",
+        "operating_path": "",
         "intended_disposition": "",
         "category": "",
         "tool_provenance": "",
@@ -453,6 +540,7 @@ def group_entry_for_path(
         "lifecycle_state": "",
         "criticality": "",
         "review_cadence": "",
+        "operating_path": "",
         "intended_disposition": "",
         "category": "",
         "tool_provenance": "",
@@ -479,13 +567,16 @@ def build_catalog_line(entry: dict[str, Any]) -> str:
         segments.append(f"criticality {entry['criticality']}")
     if entry.get("review_cadence"):
         segments.append(f"cadence {entry['review_cadence']}")
-    if entry.get("intended_disposition"):
-        segments.append(f"disposition {entry['intended_disposition']}")
+    declared_path = _declared_operating_path(entry)
+    if declared_path:
+        segments.append(f"disposition {declared_path}")
     if entry.get("maturity_program"):
         segments.append(f"program {entry['maturity_program']}")
     if entry.get("target_maturity"):
         segments.append(f"target {entry['target_maturity']}")
-    return " | ".join(segments) if segments else "Portfolio catalog contract is present."
+    return (
+        " | ".join(segments) if segments else "Portfolio catalog contract is present."
+    )
 
 
 def evaluate_intent_alignment(
@@ -501,7 +592,7 @@ def evaluate_intent_alignment(
             "No explicit portfolio catalog contract is recorded for this repo yet.",
         )
 
-    disposition = _safe_text(entry.get("intended_disposition")).lower()
+    disposition = _declared_operating_path(entry)
     tier = _safe_text(completeness_tier).lower()
     focus = _safe_text(operator_focus)
     raw_scorecard = entry.get("scorecard")
@@ -534,8 +625,15 @@ def evaluate_intent_alignment(
             "aligned",
             "The repo is meeting its maintain scorecard target.",
         )
-    if disposition == "finish" and tier in {"wip", "functional"} and focus != "Revalidate":
-        return ("aligned", "The repo still looks finishable rather than fully off-track.")
+    if (
+        disposition == "finish"
+        and tier in {"wip", "functional"}
+        and focus != "Revalidate"
+    ):
+        return (
+            "aligned",
+            "The repo still looks finishable rather than fully off-track.",
+        )
 
     return (
         "needs-review",
@@ -543,7 +641,9 @@ def evaluate_intent_alignment(
     )
 
 
-def build_portfolio_catalog_summary(audits: list[Any], *, catalog_path: str = "") -> dict[str, Any]:
+def build_portfolio_catalog_summary(
+    audits: list[Any], *, catalog_path: str = ""
+) -> dict[str, Any]:
     lifecycle: Counter[str] = Counter()
     criticality: Counter[str] = Counter()
     cadence: Counter[str] = Counter()
@@ -566,8 +666,9 @@ def build_portfolio_catalog_summary(audits: list[Any], *, catalog_path: str = ""
             criticality[entry["criticality"]] += 1
         if entry.get("review_cadence"):
             cadence[entry["review_cadence"]] += 1
-        if entry.get("intended_disposition"):
-            disposition[entry["intended_disposition"]] += 1
+        declared_path = _declared_operating_path(entry)
+        if declared_path:
+            disposition[declared_path] += 1
         if entry.get("maturity_program"):
             disposition[f"program:{entry['maturity_program']}"] += 1
         if entry.get("team") or entry.get("owner"):

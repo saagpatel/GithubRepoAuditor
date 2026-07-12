@@ -17,7 +17,6 @@ from src.portfolio_truth_types import (
     VALID_CONTEXT_QUALITY,
     VALID_DOCTOR_STANDARDS,
     VALID_LIFECYCLE_STATES,
-    VALID_REGISTRY_STATUS,
     VALID_RISK_TIERS,
     PortfolioTruthSnapshot,
 )
@@ -40,7 +39,9 @@ def validate_truth_snapshot(snapshot: PortfolioTruthSnapshot) -> None:
             raise ValueError(f"Duplicate project key in truth snapshot: {key}")
         seen_keys.add(key)
         if Path(project.identity.path).is_absolute():
-            raise ValueError(f"Project path must stay workspace-relative: {project.identity.path}")
+            raise ValueError(
+                f"Project path must stay workspace-relative: {project.identity.path}"
+            )
         if project.derived.context_quality not in VALID_CONTEXT_QUALITY:
             raise ValueError(
                 f"Invalid context quality for {key}: {project.derived.context_quality}"
@@ -52,10 +53,6 @@ def validate_truth_snapshot(snapshot: PortfolioTruthSnapshot) -> None:
         if project.derived.activity_status not in VALID_ACTIVITY_STATUS:
             raise ValueError(
                 f"Invalid activity status for {key}: {project.derived.activity_status}"
-            )
-        if project.derived.registry_status not in VALID_REGISTRY_STATUS:
-            raise ValueError(
-                f"Invalid registry status for {key}: {project.derived.registry_status}"
             )
         if project.derived.attention_state not in VALID_ATTENTION_STATES:
             raise ValueError(
@@ -69,9 +66,11 @@ def validate_truth_snapshot(snapshot: PortfolioTruthSnapshot) -> None:
             project.derived.known_risks_present,
             project.derived.next_recommended_move_present,
         )
-        if project.derived.context_quality in {"minimum-viable", "standard", "full"} and not all(
-            completeness_flags
-        ):
+        if project.derived.context_quality in {
+            "minimum-viable",
+            "standard",
+            "full",
+        } and not all(completeness_flags):
             raise ValueError(
                 f"Context quality for {key} requires all minimum-viable fields to be present."
             )
@@ -113,13 +112,19 @@ def _validate_contract_envelope(snapshot: PortfolioTruthSnapshot) -> None:
         if missing:
             raise ValueError(f"Producer evidence is missing fields: {missing}")
         commit = producer.get("commit")
-        if not isinstance(commit, str) or len(commit) != 40 or any(
-            char not in "0123456789abcdef" for char in commit
+        if (
+            not isinstance(commit, str)
+            or len(commit) != 40
+            or any(char not in "0123456789abcdef" for char in commit)
         ):
             raise ValueError("Producer commit must be a lowercase 40-character SHA.")
         if producer.get("worktree_clean") is not True:
-            raise ValueError("Canonical producer evidence must declare a clean worktree.")
-    notion = snapshot.inputs.get("notion") if isinstance(snapshot.inputs, dict) else None
+            raise ValueError(
+                "Canonical producer evidence must declare a clean worktree."
+            )
+    notion = (
+        snapshot.inputs.get("notion") if isinstance(snapshot.inputs, dict) else None
+    )
     if not isinstance(notion, dict):
         raise ValueError("Portfolio truth inputs.notion is required.")
     mode = notion.get("mode")

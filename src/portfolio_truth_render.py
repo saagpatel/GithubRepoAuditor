@@ -3,7 +3,19 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from datetime import timezone
 
-from src.portfolio_truth_types import PortfolioTruthProject, PortfolioTruthSnapshot
+from src.portfolio_truth_types import (
+    PortfolioTruthProject,
+    PortfolioTruthSnapshot,
+    display_activity_status,
+)
+
+
+def _displayed_status(project: PortfolioTruthProject) -> str:
+    """Renderer-local shorthand over the ontology's single relabel authority."""
+    return display_activity_status(
+        project.derived.activity_status, archived=project.derived.archived
+    )
+
 
 # Mirrors the weekly digest's MAX_SECURITY_ATTENTION_ITEMS — the portfolio report and
 # the digest cap the per-repo security callout list at the same depth so the two
@@ -100,11 +112,18 @@ def render_portfolio_report_markdown(
 ) -> str:
     generated = snapshot.generated_at.astimezone(timezone.utc).strftime("%Y-%m-%d")
     grouped = _group_projects(snapshot.projects)
-    context_counts = Counter(project.derived.context_quality for project in snapshot.projects)
-    registry_counts = Counter(project.derived.registry_status for project in snapshot.projects)
-    attention_counts = Counter(project.derived.attention_state for project in snapshot.projects)
+    context_counts = Counter(
+        project.derived.context_quality for project in snapshot.projects
+    )
+    registry_counts = Counter(
+        _displayed_status(project) for project in snapshot.projects
+    )
+    attention_counts = Counter(
+        project.derived.attention_state for project in snapshot.projects
+    )
     operating_path_counts = Counter(
-        project.declared.operating_path or "unspecified" for project in snapshot.projects
+        project.declared.operating_path or "unspecified"
+        for project in snapshot.projects
     )
     override_counts = Counter(
         project.derived.path_override
@@ -165,7 +184,7 @@ def render_portfolio_report_markdown(
         lines.append(
             f"| {project.identity.display_name} | `{project.identity.path}` | {project.identity.section_marker} | "
             f"{project.declared.operating_path or '—'} | {path_status} | "
-            f"{project.declared.lifecycle_state or '—'} | {project.derived.registry_status} | "
+            f"{project.declared.lifecycle_state or '—'} | {_displayed_status(project)} | "
             f"{project.derived.attention_state} | {project.derived.context_quality} | "
             f"{project.declared.tool_provenance or 'unknown'} | {project.declared.category or 'unknown'} | {project.risk.risk_tier} |"
         )
@@ -192,10 +211,10 @@ def render_portfolio_report_markdown(
         lines.append(f"### {marker}")
         lines.append("")
         lines.append(
-            f"- Projects: `{len(projects)}` | Active `{sum(1 for item in projects if item.derived.registry_status == 'active')}`"
-            f" | Recent `{sum(1 for item in projects if item.derived.registry_status == 'recent')}`"
-            f" | Parked `{sum(1 for item in projects if item.derived.registry_status == 'parked')}`"
-            f" | Archived `{sum(1 for item in projects if item.derived.registry_status == 'archived')}`"
+            f"- Projects: `{len(projects)}` | Active `{sum(1 for item in projects if _displayed_status(item) == 'active')}`"
+            f" | Recent `{sum(1 for item in projects if _displayed_status(item) == 'recent')}`"
+            f" | Parked `{sum(1 for item in projects if _displayed_status(item) == 'parked')}`"
+            f" | Archived `{sum(1 for item in projects if _displayed_status(item) == 'archived')}`"
         )
         lines.append(
             f"- Default attention: active-product `{sum(1 for item in projects if item.derived.attention_state == 'active-product')}`, "
@@ -250,11 +269,11 @@ def render_portfolio_report_markdown(
     for project in snapshot.projects:
         if (
             project.advisory.legacy_status
-            and project.advisory.legacy_status != project.derived.registry_status
+            and project.advisory.legacy_status != _displayed_status(project)
         ):
             mismatch_count += 1
             lines.append(
-                f"- `{project.identity.display_name}` legacy status `{project.advisory.legacy_status}` differs from derived status `{project.derived.registry_status}`."
+                f"- `{project.identity.display_name}` legacy status `{project.advisory.legacy_status}` differs from derived status `{_displayed_status(project)}`."
             )
     if mismatch_count == 0:
         lines.append(
@@ -282,7 +301,8 @@ def _group_projects(
         grouped[project.identity.section_marker].append(project)
     ordered = dict(
         sorted(
-            grouped.items(), key=lambda item: (item[0] != "Standalone Projects", item[0].lower())
+            grouped.items(),
+            key=lambda item: (item[0] != "Standalone Projects", item[0].lower()),
         )
     )
     for marker, members in ordered.items():
@@ -291,7 +311,9 @@ def _group_projects(
 
 
 def registry_project_labels(projects: list[PortfolioTruthProject]) -> dict[str, str]:
-    duplicate_names = Counter(project.identity.display_name.strip() for project in projects)
+    duplicate_names = Counter(
+        project.identity.display_name.strip() for project in projects
+    )
     labels: dict[str, str] = {}
     for project in projects:
         display_name = project.identity.display_name.strip()
@@ -314,7 +336,7 @@ def _render_standalone_section(
     ]
     for project in projects:
         lines.append(
-            f"| {project_labels[project.identity.project_key]} | {project.derived.registry_status} | {project.declared.tool_provenance or 'unknown'} | "
+            f"| {project_labels[project.identity.project_key]} | {_displayed_status(project)} | {project.declared.tool_provenance or 'unknown'} | "
             f"{project.derived.context_quality} | {', '.join(project.derived.stack) or 'Unknown'} | "
             f"{', '.join(project.derived.context_files) or '—'} | {project.declared.category or 'unknown'} | {_note_text(project)} |"
         )
@@ -327,7 +349,9 @@ def _render_group_section(
     project_labels: dict[str, str],
 ) -> list[str]:
     count = len(projects)
-    title = marker if marker.endswith("Projects") or marker.endswith("/") else f"{marker}"
+    title = (
+        marker if marker.endswith("Projects") or marker.endswith("/") else f"{marker}"
+    )
     if marker.startswith("ITPRJsViaClaude/"):
         lines = [
             f"## {title} (IT Tools — {count} projects)",
@@ -337,7 +361,7 @@ def _render_group_section(
         ]
         for project in projects:
             lines.append(
-                f"| {project_labels[project.identity.project_key]} | {project.derived.registry_status} | {project.declared.tool_provenance or 'unknown'} | "
+                f"| {project_labels[project.identity.project_key]} | {_displayed_status(project)} | {project.declared.tool_provenance or 'unknown'} | "
                 f"{project.derived.context_quality} | {', '.join(project.derived.context_files) or '—'} | {_note_text(project)} |"
             )
         return lines
@@ -354,7 +378,7 @@ def _render_group_section(
     )
     for project in projects:
         lines.append(
-            f"| {project_labels[project.identity.project_key]} | {project.derived.registry_status} | {project.declared.tool_provenance or 'unknown'} | "
+            f"| {project_labels[project.identity.project_key]} | {_displayed_status(project)} | {project.declared.tool_provenance or 'unknown'} | "
             f"{project.derived.context_quality} | {_note_text(project)} |"
         )
     return lines
@@ -404,7 +428,7 @@ def _note_text(project: PortfolioTruthProject) -> str:
 
 def _render_summary_section(projects: list[PortfolioTruthProject]) -> list[str]:
     total = len(projects)
-    status_counts = Counter(project.derived.registry_status for project in projects)
+    status_counts = Counter(_displayed_status(project) for project in projects)
     context_counts = Counter(project.derived.context_quality for project in projects)
     security = _security_overview(projects)
     return [

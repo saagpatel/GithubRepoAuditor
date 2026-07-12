@@ -13,7 +13,7 @@ repos:
     lifecycle_state: active
     criticality: high
     review_cadence: weekly
-    intended_disposition: maintain
+    operating_path: maintain
     maturity_program: maintain
     target_maturity: strong
     notes: Keep this repo polished because it anchors the current product story.
@@ -23,7 +23,7 @@ repos:
     lifecycle_state: active
     criticality: medium
     review_cadence: monthly
-    intended_disposition: finish
+    operating_path: finish
     maturity_program: finish
     target_maturity: operating
   RepoC:
@@ -32,6 +32,6 @@ repos:
     lifecycle_state: experimental
     criticality: low
     review_cadence: ad-hoc
-    intended_disposition: experiment
+    operating_path: experiment
     maturity_program: experiment
     target_maturity: foundation

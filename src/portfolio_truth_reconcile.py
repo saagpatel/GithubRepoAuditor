@@ -35,6 +35,7 @@ from src.portfolio_truth_types import (
     PortfolioTruthSnapshot,
     RiskFields,
     SecurityFields,
+    display_activity_status,
 )
 from src.registry_parser import _normalize
 
@@ -52,7 +53,12 @@ PRECEDENCE_MATRIX: dict[str, list[str]] = {
     "declared.target_maturity": ["catalog_repo", "catalog_group", "catalog_defaults"],
     "declared.operating_path": ["normalized"],
     "declared.category": ["catalog_repo", "catalog_group", "legacy_registry"],
-    "declared.tool_provenance": ["catalog_repo", "catalog_group", "inference", "legacy_registry"],
+    "declared.tool_provenance": [
+        "catalog_repo",
+        "catalog_group",
+        "inference",
+        "legacy_registry",
+    ],
     "declared.notes": ["catalog_repo", "catalog_group", "legacy_registry"],
     "derived.stack": ["workspace", "legacy_registry"],
     "derived.context_quality": ["workspace", "catalog_repo", "catalog_group"],
@@ -66,7 +72,7 @@ PRECEDENCE_MATRIX: dict[str, list[str]] = {
     "derived.next_recommended_move_present": ["workspace"],
     "derived.last_meaningful_activity_at": ["git", "workspace"],
     "derived.activity_status": ["derived"],
-    "derived.registry_status": ["derived"],
+    "derived.archived": ["derived"],
     "derived.attention_state": ["derived"],
     "derived.path_override": ["normalized"],
     "derived.path_confidence": ["normalized"],
@@ -114,7 +120,9 @@ def _derive_has_tests(project_path: Path | None, has_git: bool) -> bool:
             match = next(
                 f
                 for f in project_path.rglob(pattern)
-                if f.is_file() and "node_modules" not in f.parts and ".git" not in f.parts
+                if f.is_file()
+                and "node_modules" not in f.parts
+                and ".git" not in f.parts
             )
             if match:
                 return True
@@ -134,7 +142,9 @@ def _derive_has_ci(project_path: Path | None, has_git: bool) -> bool:
     workflows_dir = project_path / ".github" / "workflows"
     if not workflows_dir.is_dir():
         return False
-    return any(f.suffix in (".yml", ".yaml") and f.is_file() for f in workflows_dir.iterdir())
+    return any(
+        f.suffix in (".yml", ".yaml") and f.is_file() for f in workflows_dir.iterdir()
+    )
 
 
 def _derive_has_license(project_path: Path | None, has_git: bool) -> bool:
@@ -264,7 +274,10 @@ def build_portfolio_truth_snapshot(
         for raw_project in workspace_projects
     ]
     projects.sort(
-        key=lambda item: (item.identity.section_marker.lower(), item.identity.display_name.lower())
+        key=lambda item: (
+            item.identity.section_marker.lower(),
+            item.identity.display_name.lower(),
+        )
     )
 
     source_summary = {
@@ -278,9 +291,10 @@ def build_portfolio_truth_snapshot(
         "context_quality_counts": dict(
             Counter(project.derived.context_quality for project in projects)
         ),
-        "registry_status_counts": dict(
-            Counter(project.derived.registry_status for project in projects)
+        "activity_status_counts": dict(
+            Counter(project.derived.activity_status for project in projects)
         ),
+        "archived_count": sum(1 for project in projects if project.derived.archived),
         "attention_state_counts": dict(
             Counter(project.derived.attention_state for project in projects)
         ),
@@ -290,9 +304,13 @@ def build_portfolio_truth_snapshot(
             if project.provenance.get("github.archived", {}).get("detail") == "true"
         ),
         "duplicate_display_names": _duplicate_display_names(projects),
-        "unresolved_duplicate_display_names": _unresolved_duplicate_display_names(projects),
+        "unresolved_duplicate_display_names": _unresolved_duplicate_display_names(
+            projects
+        ),
     }
-    warnings = list(catalog_data.get("errors") or []) + list(catalog_data.get("warnings") or [])
+    warnings = list(catalog_data.get("errors") or []) + list(
+        catalog_data.get("warnings") or []
+    )
     duplicate_display_names = source_summary["unresolved_duplicate_display_names"]
     if duplicate_display_names:
         warnings.append(
@@ -417,25 +435,33 @@ def load_prior_notion_context(latest_path: Path) -> dict[str, dict[str, str]]:
 def _duplicate_display_names(projects: list[PortfolioTruthProject]) -> list[str]:
     return sorted(
         name
-        for name, count in Counter(project.identity.display_name for project in projects).items()
+        for name, count in Counter(
+            project.identity.display_name for project in projects
+        ).items()
         if count > 1
     )
 
 
-def _unresolved_duplicate_display_names(projects: list[PortfolioTruthProject]) -> list[str]:
+def _unresolved_duplicate_display_names(
+    projects: list[PortfolioTruthProject],
+) -> list[str]:
     grouped: dict[str, list[PortfolioTruthProject]] = {}
     for project in projects:
         grouped.setdefault(project.identity.display_name, []).append(project)
     return sorted(
         name
         for name, members in grouped.items()
-        if len(members) > 1 and any(not _has_path_catalog_contract(project) for project in members)
+        if len(members) > 1
+        and any(not _has_path_catalog_contract(project) for project in members)
     )
 
 
 def _has_path_catalog_contract(project: PortfolioTruthProject) -> bool:
     for source in project.provenance.values():
-        if source.get("source") == "catalog_repo" and source.get("detail") == project.identity.path:
+        if (
+            source.get("source") == "catalog_repo"
+            and source.get("detail") == project.identity.path
+        ):
             return True
     return False
 
@@ -531,9 +557,21 @@ def _build_truth_project(
         "owner": _select_declared("owner", repo_entry, group_entry, provenance),
         "team": _select_declared("team", repo_entry, group_entry, provenance),
         "purpose": _select_declared("purpose", repo_entry, group_entry, provenance),
-        "lifecycle_state": _select_declared("lifecycle_state", repo_entry, group_entry, provenance),
-        "criticality": _select_declared("criticality", repo_entry, group_entry, provenance),
-        "review_cadence": _select_declared("review_cadence", repo_entry, group_entry, provenance),
+        "lifecycle_state": _select_declared(
+            "lifecycle_state", repo_entry, group_entry, provenance
+        ),
+        "criticality": _select_declared(
+            "criticality", repo_entry, group_entry, provenance
+        ),
+        "review_cadence": _select_declared(
+            "review_cadence", repo_entry, group_entry, provenance
+        ),
+        "operating_path": _select_declared(
+            "operating_path", repo_entry, group_entry, provenance
+        ),
+        # Deprecated vintage of operating_path, kept as a read-compat fallback for one
+        # release; resolve_declared_operating_path consumes both with operating_path
+        # taking precedence.
         "intended_disposition": _select_declared(
             "intended_disposition", repo_entry, group_entry, provenance
         ),
@@ -560,7 +598,9 @@ def _build_truth_project(
         "notes": _select_with_legacy(
             "notes", repo_entry, group_entry, legacy, raw_project, provenance
         ),
-        "doctor_standard": _select_declared("doctor_standard", repo_entry, group_entry, provenance),
+        "doctor_standard": _select_declared(
+            "doctor_standard", repo_entry, group_entry, provenance
+        ),
         "automation_eligible": bool(repo_entry.get("automation_eligible", False)),
     }
 
@@ -576,7 +616,9 @@ def _build_truth_project(
         readme_char_count=derived_readme_char_count,
     )
     provenance["derived.context_quality"] = {
-        "source": "workspace+catalog" if context_quality != raw_context_quality else "workspace",
+        "source": "workspace+catalog"
+        if context_quality != raw_context_quality
+        else "workspace",
         "detail": (
             f"{raw_context_quality}->{context_quality}"
             if context_quality != raw_context_quality
@@ -597,19 +639,16 @@ def _build_truth_project(
         }
 
     last_activity = raw_project["last_meaningful_activity_at"]
-    activity_status = _activity_status_for(
-        last_activity,
-        declared_values["lifecycle_state"],
-        now=now,
-        github_archived=github_archived,
-    )
-    registry_status = _registry_status_for(activity_status)
+    activity_status = _activity_status_for(last_activity, now=now)
+    # Lifecycle fact, not a recency observation — orthogonal to activity_status.
+    archived = github_archived or declared_values["lifecycle_state"] == "archived"
 
     path_entry = build_operating_path_entry(
         {
             **declared_values,
             "has_explicit_entry": bool(
-                repo_entry.get("has_explicit_entry") or group_entry.get("has_explicit_entry")
+                repo_entry.get("has_explicit_entry")
+                or group_entry.get("has_explicit_entry")
             ),
             "catalog_default_maturity_program": repo_entry.get(
                 "catalog_default_maturity_program", ""
@@ -619,8 +658,7 @@ def _build_truth_project(
             ),
         },
         context_quality=context_quality,
-        archived=github_archived,
-        registry_status=registry_status,
+        archived=archived,
     )
     provenance["declared.operating_path"] = {
         "source": "normalized",
@@ -655,7 +693,7 @@ def _build_truth_project(
         path_override=path_entry.get("path_override", ""),
         context_quality=context_quality,
         activity_status=activity_status,
-        registry_status=registry_status,
+        archived=archived,
         criticality=declared_values["criticality"],
         doctor_standard=declared_values["doctor_standard"],
         known_risks_present=bool(raw_project["known_risks_present"]),
@@ -664,13 +702,13 @@ def _build_truth_project(
         security_critical_alerts=security.dependabot_critical,
     )
     attention_state = _attention_state_for(
-        registry_status=registry_status,
+        activity_status=activity_status,
+        archived=archived,
         lifecycle_state=declared_values["lifecycle_state"],
         operating_path=path_entry.get("operating_path", ""),
         category=declared_values["category"],
         path_override=path_entry.get("path_override", ""),
         risk_entry=risk_entry,
-        github_archived=github_archived,
     )
 
     declared = DeclaredFields(
@@ -694,10 +732,22 @@ def _build_truth_project(
         "source": "git" if raw_project["has_git"] and last_activity else "workspace",
         "detail": "derived",
     }
-    provenance["derived.activity_status"] = {"source": "derived", "detail": activity_status}
-    provenance["derived.registry_status"] = {"source": "derived", "detail": registry_status}
-    provenance["derived.attention_state"] = {"source": "derived", "detail": attention_state}
-    provenance["derived.stack"] = {"source": "workspace", "detail": ", ".join(raw_project["stack"])}
+    provenance["derived.activity_status"] = {
+        "source": "derived",
+        "detail": activity_status,
+    }
+    provenance["derived.archived"] = {
+        "source": "derived",
+        "detail": str(archived).lower(),
+    }
+    provenance["derived.attention_state"] = {
+        "source": "derived",
+        "detail": attention_state,
+    }
+    provenance["derived.stack"] = {
+        "source": "workspace",
+        "detail": ", ".join(raw_project["stack"]),
+    }
     provenance["derived.context_files"] = {
         "source": "workspace",
         "detail": str(len(raw_project["context_files"])),
@@ -719,16 +769,22 @@ def _build_truth_project(
             "detail": str(bool(raw_project[field])).lower(),
         }
 
-    if legacy and legacy.get("status") and legacy["status"] != registry_status:
+    displayed_status = display_activity_status(activity_status, archived=archived)
+    if legacy and legacy.get("status") and legacy["status"] != displayed_status:
         warnings.append(
-            f"Legacy registry status '{legacy['status']}' differs from derived registry status '{registry_status}'."
+            f"Legacy registry status '{legacy['status']}' differs from derived registry status '{displayed_status}'."
         )
-    if not repo_entry.get("has_explicit_entry") and not group_entry.get("has_explicit_entry"):
-        warnings.append("No explicit catalog contract is recorded for this project yet.")
+    if not repo_entry.get("has_explicit_entry") and not group_entry.get(
+        "has_explicit_entry"
+    ):
+        warnings.append(
+            "No explicit catalog contract is recorded for this project yet."
+        )
     if path_entry.get("path_override") == "investigate":
         warnings.append(
             path_entry.get(
-                "path_rationale", "Operating path currently requires investigate override."
+                "path_rationale",
+                "Operating path currently requires investigate override.",
             )
         )
     if github_archived and declared_values["lifecycle_state"] != "archived":
@@ -755,10 +811,12 @@ def _build_truth_project(
         stack_present=bool(raw_project["stack_present"]),
         run_instructions_present=bool(raw_project["run_instructions_present"]),
         known_risks_present=bool(raw_project["known_risks_present"]),
-        next_recommended_move_present=bool(raw_project["next_recommended_move_present"]),
+        next_recommended_move_present=bool(
+            raw_project["next_recommended_move_present"]
+        ),
         last_meaningful_activity_at=last_activity,
         activity_status=activity_status,
-        registry_status=registry_status,
+        archived=archived,
         attention_state=attention_state,
         path_override=path_entry.get("path_override", ""),
         path_confidence=path_entry.get("path_confidence", "legacy"),
@@ -787,7 +845,10 @@ def _build_truth_project(
         path_risk=risk_entry["path_risk"],
         security_risk=risk_entry["security_risk"],
     )
-    provenance["risk.risk_tier"] = {"source": "derived", "detail": risk_entry["risk_tier"]}
+    provenance["risk.risk_tier"] = {
+        "source": "derived",
+        "detail": risk_entry["risk_tier"],
+    }
     provenance["risk.doctor_gap"] = {
         "source": "derived",
         "detail": str(risk_entry["doctor_gap"]).lower(),
@@ -810,12 +871,17 @@ def _select_declared(
     group_entry: dict[str, Any],
     provenance: dict[str, dict[str, str]],
 ) -> str:
-    for source_name, source in (("catalog_repo", repo_entry), ("catalog_group", group_entry)):
+    for source_name, source in (
+        ("catalog_repo", repo_entry),
+        ("catalog_group", group_entry),
+    ):
         value = str(source.get(field, "") or "").strip()
         if value:
             provenance[f"declared.{field}"] = {
                 "source": source_name,
-                "detail": str(source.get("catalog_key") or source.get("group_key") or ""),
+                "detail": str(
+                    source.get("catalog_key") or source.get("group_key") or ""
+                ),
             }
             return value
     provenance[f"declared.{field}"] = {"source": "fallback", "detail": ""}
@@ -835,7 +901,10 @@ def _select_declared_with_default(
         return value
     default_value = str(repo_entry.get(default_field, "") or "").strip()
     if default_value:
-        provenance[f"declared.{field}"] = {"source": "catalog_defaults", "detail": default_value}
+        provenance[f"declared.{field}"] = {
+            "source": "catalog_defaults",
+            "detail": default_value,
+        }
         return default_value
     return value
 
@@ -865,7 +934,9 @@ def _select_with_legacy(
     return ""
 
 
-_GENERATED_SECURITY_NOTE_RE = re.compile(r"^(?:\[security: [^\]]+\]\s*)+", re.IGNORECASE)
+_GENERATED_SECURITY_NOTE_RE = re.compile(
+    r"^(?:\[security: [^\]]+\]\s*)+", re.IGNORECASE
+)
 _GENERATED_PATH_NOTE_PREFIXES = (
     "Stable path is ",
     "No stable operating path is declared yet.",
@@ -914,7 +985,10 @@ def _select_tool_provenance(
     ):
         normalized = str(value or "").strip().lower()
         if normalized:
-            provenance["declared.tool_provenance"] = {"source": source_name, "detail": normalized}
+            provenance["declared.tool_provenance"] = {
+                "source": source_name,
+                "detail": normalized,
+            }
             return normalized
     provenance["declared.tool_provenance"] = {"source": "fallback", "detail": "unknown"}
     return "unknown"
@@ -930,7 +1004,9 @@ def _resolve_group_key(
     return "standalone"
 
 
-def _resolve_group_label(group_entry: dict[str, Any], raw_project: dict[str, Any]) -> str:
+def _resolve_group_label(
+    group_entry: dict[str, Any], raw_project: dict[str, Any]
+) -> str:
     if group_entry.get("section_label"):
         return str(group_entry["section_label"])
     if "Swift" in raw_project.get("stack", []):
@@ -948,7 +1024,9 @@ def _resolve_section_marker(
     return "Standalone Projects"
 
 
-def _resolve_section_label(group_entry: dict[str, Any], raw_project: dict[str, Any]) -> str:
+def _resolve_section_label(
+    group_entry: dict[str, Any], raw_project: dict[str, Any]
+) -> str:
     if group_entry.get("section_label"):
         return str(group_entry["section_label"])
     if "Swift" in raw_project.get("stack", []):
@@ -956,15 +1034,10 @@ def _resolve_section_label(group_entry: dict[str, Any], raw_project: dict[str, A
     return "Root Level"
 
 
-def _activity_status_for(
-    last_activity: datetime | None,
-    lifecycle_state: str,
-    *,
-    now: datetime,
-    github_archived: bool = False,
-) -> str:
-    if github_archived or lifecycle_state == "archived":
-        return "archived"
+def _activity_status_for(last_activity: datetime | None, *, now: datetime) -> str:
+    """Pure recency observation. Lifecycle intent (archived) is a separate axis,
+    computed by the caller and passed to downstream consumers as its own boolean —
+    see the `archived` local in `_build_truth_project`."""
     if last_activity is None:
         return "stale"
     delta_days = (now - last_activity).days
@@ -975,44 +1048,37 @@ def _activity_status_for(
     return "stale"
 
 
-def _registry_status_for(activity_status: str) -> str:
-    if activity_status == "stale":
-        return "parked"
-    return activity_status
-
-
 def _attention_state_for(
     *,
-    registry_status: str,
+    activity_status: str,
+    archived: bool,
     lifecycle_state: str,
     operating_path: str,
     category: str,
     path_override: str,
     risk_entry: dict[str, Any],
-    github_archived: bool = False,
 ) -> str:
-    if (
-        github_archived
-        or registry_status == "archived"
-        or lifecycle_state == "archived"
-        or operating_path == "archive"
-    ):
+    if archived or operating_path == "archive":
         return "archived"
-    if (
-        operating_path == "experiment"
-        or lifecycle_state == "experimental"
-    ):
+    if operating_path == "experiment" or lifecycle_state == "experimental":
         return "experiment"
-    if registry_status == "parked":
+    if activity_status == "stale":
         return "parked"
-    if path_override == "investigate" or not operating_path or risk_entry.get("security_risk"):
+    if (
+        path_override == "investigate"
+        or not operating_path
+        or risk_entry.get("security_risk")
+    ):
         return "decision-needed"
-    if registry_status in {"active", "recent"} and operating_path in {"maintain", "finish"}:
+    if activity_status in {"active", "recent"} and operating_path in {
+        "maintain",
+        "finish",
+    }:
         if category == "infrastructure":
             return "active-infra"
         if category == "commercial":
             return "active-product"
         return "manual-only"
-    if registry_status in {"active", "recent"}:
+    if activity_status in {"active", "recent"}:
         return "manual-only"
     return "parked"

@@ -14,6 +14,31 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ## [Unreleased]
 
 ### Changed
+- Migrated `config/portfolio-catalog.yaml` and the example catalog from
+  `intended_disposition` to `operating_path` (179 + 3 entries; identity value
+  mapping — `resolve_declared_operating_path` already treated disposition
+  values as a fallback vintage of the same axis, so no value translation was
+  needed). `operating_path` is now wired as a first-class normalized catalog
+  field end-to-end (loader, reconciler `declared_values`, scorecard program
+  resolution, intent-alignment, and catalog summaries); previously it was
+  accepted by the resolver but never actually populated from the catalog, so
+  every entry resolved through the `intended_disposition` fallback.
+  `intended_disposition` stays as a deprecated read-compat fallback for one
+  release (resolver, loader, scorecards, catalog validator, and intent
+  summaries all still honor it); the catalog loader now emits a warning when
+  an entry still declares it. Resolved `operating_path`, `path_source`, risk
+  tier, and attention state are unchanged for every project.
+- Portfolio truth schema bumped to `0.9.0`: `derived.registry_status` (a
+  `stale`->`parked` synonym table over `activity_status`) is removed.
+  `derived.archived` is now a first-class boolean lifecycle fact (sourced from
+  `github_archived` or a declared `archived` lifecycle state), orthogonal to
+  the pure-recency `activity_status` axis. The `stale`->`parked` display
+  relabel moved to a single render-layer function
+  (`portfolio_truth_types.display_activity_status`). Snapshot
+  `source_summary.registry_status_counts` is replaced by
+  `activity_status_counts` + `archived_count`. Risk tier, attention state, and
+  displayed status are unchanged for every repo; `0.8.0` is accepted as a
+  legacy schema version.
 - Hardened the local web UI runner and HTMX fragments against CodeQL-reported
   command-injection and reflected-XSS paths.
 - Added a CodeQL code-scanning workflow and documented the public security

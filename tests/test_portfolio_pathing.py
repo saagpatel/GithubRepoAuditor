@@ -5,6 +5,7 @@ from src.portfolio_pathing import (
     build_operating_path_entry,
     build_operating_path_line,
     build_operating_paths_summary,
+    resolve_declared_operating_path,
 )
 
 
@@ -64,10 +65,41 @@ def test_operating_path_prefers_intended_disposition_over_defaulted_program() ->
     assert entry["operating_path_source"] == "intended-disposition"
 
 
+def test_intended_disposition_and_rewritten_operating_path_resolve_identically() -> (
+    None
+):
+    """Per-entry parity proof for the catalog migration: an entry declared the old
+    way (intended_disposition only) and the same entry rewritten the new way
+    (operating_path only, identity value mapping) must resolve to the same stable
+    path — only the provenance label differs."""
+    legacy_entry = {
+        "has_explicit_entry": True,
+        "maturity_program": "maintain",
+        "intended_disposition": "archive",
+    }
+    rewritten_entry = {
+        "has_explicit_entry": True,
+        "maturity_program": "maintain",
+        "operating_path": "archive",
+    }
+
+    legacy_path, legacy_source = resolve_declared_operating_path(legacy_entry)
+    rewritten_path, rewritten_source = resolve_declared_operating_path(rewritten_entry)
+
+    assert legacy_path == rewritten_path == "archive"
+    assert legacy_source == "intended-disposition"
+    assert rewritten_source == "explicit-operating-path"
+
+
 def test_operating_paths_summary_counts_paths_and_overrides() -> None:
     summary = build_operating_paths_summary(
         [
-            {"portfolio_catalog": {"operating_path": "maintain", "path_confidence": "high"}},
+            {
+                "portfolio_catalog": {
+                    "operating_path": "maintain",
+                    "path_confidence": "high",
+                }
+            },
             {
                 "portfolio_catalog": {
                     "operating_path": "finish",

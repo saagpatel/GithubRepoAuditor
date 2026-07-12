@@ -14,7 +14,6 @@ def _make_portfolio_truth() -> dict:
                 "identity": {"display_name": "GithubRepoAuditor"},
                 "declared": {"operating_path": "maintain"},
                 "derived": {
-                    "registry_status": "active",
                     "attention_state": "decision-needed",
                     "activity_status": "active",
                     "path_override": "investigate",
@@ -35,7 +34,6 @@ def _make_portfolio_truth() -> dict:
                 "identity": {"display_name": "JobCommandCenter"},
                 "declared": {"operating_path": ""},
                 "derived": {
-                    "registry_status": "active",
                     "attention_state": "decision-needed",
                     "activity_status": "active",
                     "path_override": "investigate",
@@ -56,7 +54,6 @@ def _make_portfolio_truth() -> dict:
                 "identity": {"display_name": "QuietActive"},
                 "declared": {"operating_path": "maintain"},
                 "derived": {
-                    "registry_status": "active",
                     "attention_state": "manual-only",
                     "activity_status": "active",
                     "path_override": "",
@@ -77,7 +74,7 @@ def _make_portfolio_truth() -> dict:
                 "identity": {"display_name": "ArchiveMe"},
                 "declared": {"operating_path": "archive"},
                 "derived": {
-                    "registry_status": "archived",
+                    "archived": True,
                     "attention_state": "archived",
                     "activity_status": "stale",
                     "path_override": "",
@@ -335,7 +332,6 @@ def _security_project(name: str, tier: str, security: dict, factors: list | None
         "identity": {"display_name": name},
         "declared": {"operating_path": "maintain"},
         "derived": {
-            "registry_status": "active",
             "activity_status": "active",
             "path_override": "",
             "path_confidence": "high",
@@ -448,7 +444,6 @@ def test_default_attention_watch_set_does_not_create_decision_queue() -> None:
                 "identity": {"display_name": "ActiveProduct"},
                 "declared": {"operating_path": "finish"},
                 "derived": {
-                    "registry_status": "active",
                     "attention_state": "active-product",
                     "activity_status": "active",
                     "path_override": "",
@@ -466,7 +461,6 @@ def test_default_attention_watch_set_does_not_create_decision_queue() -> None:
                 "identity": {"display_name": "ActiveInfra"},
                 "declared": {"operating_path": "maintain"},
                 "derived": {
-                    "registry_status": "active",
                     "attention_state": "active-infra",
                     "activity_status": "active",
                     "path_override": "",
