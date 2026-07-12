@@ -47,9 +47,17 @@ def _make_audit(
             {"dimension": "testing", "score": testing, "details": {}},
             {"dimension": "cicd", "score": cicd, "details": {}},
             {"dimension": "dependencies", "score": dependencies, "details": {}},
-            {"dimension": "community_profile", "score": community_profile, "details": {}},
+            {
+                "dimension": "community_profile",
+                "score": community_profile,
+                "details": {},
+            },
             {"dimension": "build_readiness", "score": build_readiness, "details": {}},
-            {"dimension": "activity", "score": 0.6, "details": {"days_since_push": activity_days}},
+            {
+                "dimension": "activity",
+                "score": 0.6,
+                "details": {"days_since_push": activity_days},
+            },
         ],
         "lenses": {
             "ship_readiness": {"score": ship_readiness},
@@ -123,12 +131,16 @@ programs:
     scorecards = load_scorecards(path)
 
     assert any("unsupported check" in error for error in scorecards["errors"])
-    assert any("ordered by ascending threshold" in error for error in scorecards["errors"])
+    assert any(
+        "ordered by ascending threshold" in error for error in scorecards["errors"]
+    )
 
 
 def test_evaluate_repo_scorecard_prefers_explicit_program_and_target(tmp_path: Path):
     pytest.importorskip("yaml")
-    scorecards = load_scorecards(Path(__file__).resolve().parents[1] / "config" / "scorecards.yaml")
+    scorecards = load_scorecards(
+        Path(__file__).resolve().parents[1] / "config" / "scorecards.yaml"
+    )
     audit = _make_audit(
         maturity_program="maintain",
         target_maturity="strong",
@@ -180,6 +192,62 @@ def test_evaluate_repo_scorecard_falls_back_to_disposition_program():
     assert result["status"] == "on-track"
 
 
+def test_evaluate_repo_scorecard_falls_back_to_legacy_disposition_program():
+    """`resolve_program_key` must still honor the deprecated `intended_disposition`
+    fallback (read-compat), same as before the migration to `operating_path`."""
+    programs = {
+        "experiment": {
+            "key": "experiment",
+            "label": "Experiment",
+            "description": "Lightweight bar",
+            "target_maturity": "foundation",
+            "levels": [
+                {"key": "missing-basics", "label": "Missing Basics", "threshold": 0.0},
+                {"key": "foundation", "label": "Foundation", "threshold": 0.35},
+            ],
+            "rules": [
+                {
+                    "key": "readme",
+                    "label": "README",
+                    "check": "dimension_at_least",
+                    "dimension": "readme",
+                    "threshold": 0.35,
+                    "partial_threshold": 0.20,
+                    "weight": 1.0,
+                }
+            ],
+        }
+    }
+    audit = _make_audit(disposition="experiment", readme=0.4)
+    audit["portfolio_catalog"]["operating_path"] = ""
+
+    result = evaluate_repo_scorecard(audit, programs)
+
+    assert result["program"] == "experiment"
+
+
+def test_live_archive_scorecard_reads_migrated_operating_path_field():
+    """Integration check for the config/scorecards.yaml migration: the live
+    'Archive Disposition' rule was repointed from `catalog_field:
+    intended_disposition` to `catalog_field: operating_path`. A catalog entry
+    declaring `operating_path: archive` (the post-migration shape) must still
+    pass that rule, not fall through to not_applicable."""
+    live_path = Path(__file__).parents[1] / "config" / "scorecards.yaml"
+    scorecards = load_scorecards(live_path)
+    audit = _make_audit(name="ArchivedRepo", maturity_program="archive")
+    audit["portfolio_catalog"]["intended_disposition"] = ""
+    audit["portfolio_catalog"]["operating_path"] = "archive"
+
+    result = evaluate_repo_scorecard(audit, scorecards["programs"])
+    disposition_rules = [
+        rule for rule in result["rule_results"] if rule["key"] == "disposition"
+    ]
+
+    assert result["program"] == "archive"
+    assert disposition_rules
+    assert disposition_rules[0]["status"] == "pass"
+
+
 def test_evaluate_scorecards_for_report_builds_summary():
     programs = {
         "maintain": {
@@ -207,14 +275,30 @@ def test_evaluate_scorecards_for_report_builds_summary():
     }
     report = SimpleNamespace(
         audits=[
-            _make_audit(name="RepoOnTrack", maturity_program="maintain", target_maturity="strong", testing=0.9),
-            _make_audit(name="RepoBelow", maturity_program="maintain", target_maturity="strong", testing=0.4),
+            _make_audit(
+                name="RepoOnTrack",
+                maturity_program="maintain",
+                target_maturity="strong",
+                testing=0.9,
+            ),
+            _make_audit(
+                name="RepoBelow",
+                maturity_program="maintain",
+                target_maturity="strong",
+                testing=0.4,
+            ),
         ]
     )
 
     repo_results, summary, programs_summary = evaluate_scorecards_for_report(
         report,
-        {"path": "config/scorecards.yaml", "exists": True, "errors": [], "warnings": [], "programs": programs},
+        {
+            "path": "config/scorecards.yaml",
+            "exists": True,
+            "errors": [],
+            "warnings": [],
+            "programs": programs,
+        },
     )
 
     assert len(repo_results) == 2
@@ -226,8 +310,23 @@ def test_evaluate_scorecards_for_report_builds_summary():
 
 def test_build_scorecards_summary_mentions_config_errors():
     summary = build_scorecards_summary(
-        [{"repo": "RepoA", "program": "default", "program_label": "Default", "maturity_level": "foundation", "status": "below-target", "summary": "Below target."}],
-        {"path": "config/scorecards.yaml", "exists": True, "errors": ["bad rule"], "warnings": [], "programs": {}},
+        [
+            {
+                "repo": "RepoA",
+                "program": "default",
+                "program_label": "Default",
+                "maturity_level": "foundation",
+                "status": "below-target",
+                "summary": "Below target.",
+            }
+        ],
+        {
+            "path": "config/scorecards.yaml",
+            "exists": True,
+            "errors": ["bad rule"],
+            "warnings": [],
+            "programs": {},
+        },
     )
 
     assert "below target" in summary["summary"]

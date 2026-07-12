@@ -566,6 +566,12 @@ def _build_truth_project(
         "review_cadence": _select_declared(
             "review_cadence", repo_entry, group_entry, provenance
         ),
+        "operating_path": _select_declared(
+            "operating_path", repo_entry, group_entry, provenance
+        ),
+        # Deprecated vintage of operating_path, kept as a read-compat fallback for one
+        # release; resolve_declared_operating_path consumes both with operating_path
+        # taking precedence.
         "intended_disposition": _select_declared(
             "intended_disposition", repo_entry, group_entry, provenance
         ),

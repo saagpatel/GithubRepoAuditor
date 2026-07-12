@@ -29,6 +29,9 @@ def resolve_declared_operating_path(entry: dict[str, Any]) -> tuple[str, str]:
     if explicit_path in VALID_OPERATING_PATHS:
         return explicit_path, "explicit-operating-path"
 
+    # Deprecated vintage of `operating_path`, kept as a read-compat fallback for one
+    # release (catalog migrated to `operating_path` in 0.9.x; see CHANGELOG). Slated
+    # for deletion once every catalog entry has moved off `intended_disposition`.
     intended_disposition = _normalize_key(entry.get("intended_disposition"))
     if intended_disposition in VALID_OPERATING_PATHS:
         return intended_disposition, "intended-disposition"
