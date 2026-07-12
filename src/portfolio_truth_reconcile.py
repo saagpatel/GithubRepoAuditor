@@ -1063,7 +1063,11 @@ def _attention_state_for(
     if operating_path == "experiment" or lifecycle_state == "experimental":
         return "experiment"
     if activity_status == "stale":
-        return "parked"
+        # A declared finish path is itself an unresolved operator decision. It can
+        # remain valid while the default branch is stale (for example, when work is
+        # on a release branch or waiting at a human/publication gate), so do not
+        # silently collapse it back into the parked pool.
+        return "decision-needed" if operating_path == "finish" else "parked"
     if (
         path_override == "investigate"
         or not operating_path
