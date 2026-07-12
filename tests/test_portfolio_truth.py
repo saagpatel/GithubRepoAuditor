@@ -410,7 +410,6 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
             registry_status="active",
             lifecycle_state="active",
             operating_path="maintain",
-            intended_disposition="maintain",
             category="commercial",
             path_override="",
             risk_entry={"security_risk": False},
@@ -422,7 +421,6 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
             registry_status="active",
             lifecycle_state="active",
             operating_path="maintain",
-            intended_disposition="maintain",
             category="infrastructure",
             path_override="",
             risk_entry={"security_risk": False},
@@ -434,7 +432,6 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
             registry_status="active",
             lifecycle_state="active",
             operating_path="maintain",
-            intended_disposition="maintain",
             category="vanity",
             path_override="investigate",
             risk_entry={"security_risk": False},
@@ -446,7 +443,6 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
             registry_status="active",
             lifecycle_state="active",
             operating_path="maintain",
-            intended_disposition="maintain",
             category="fun",
             path_override="",
             risk_entry={"security_risk": False},
@@ -458,7 +454,6 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
             registry_status="active",
             lifecycle_state="active",
             operating_path="experiment",
-            intended_disposition="experiment",
             category="vanity",
             path_override="investigate",
             risk_entry={"security_risk": True},
@@ -470,12 +465,51 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
             registry_status="archived",
             lifecycle_state="archived",
             operating_path="archive",
-            intended_disposition="archive",
             category="commercial",
             path_override="investigate",
             risk_entry={"security_risk": True},
         )
         == "archived"
+    )
+
+
+@pytest.mark.parametrize(
+    ("operating_path", "intended_disposition", "expected_attention"),
+    [
+        ("maintain", "experiment", "active-product"),
+        ("maintain", "maintain", "active-product"),
+        ("experiment", "experiment", "experiment"),
+    ],
+)
+def test_attention_state_uses_resolved_catalog_operating_path(
+    operating_path: str,
+    intended_disposition: str,
+    expected_attention: str,
+) -> None:
+    from src.portfolio_pathing import build_operating_path_entry
+    from src.portfolio_truth_reconcile import _attention_state_for
+
+    catalog_entry = build_operating_path_entry(
+        {
+            "has_explicit_entry": True,
+            "operating_path": operating_path,
+            "intended_disposition": intended_disposition,
+        },
+        context_quality="full",
+        registry_status="active",
+    )
+
+    assert catalog_entry["operating_path"] == operating_path
+    assert (
+        _attention_state_for(
+            registry_status="active",
+            lifecycle_state="active",
+            operating_path=catalog_entry["operating_path"],
+            category="commercial",
+            path_override=catalog_entry["path_override"],
+            risk_entry={"security_risk": False},
+        )
+        == expected_attention
     )
 
 
