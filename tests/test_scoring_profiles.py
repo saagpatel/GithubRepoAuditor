@@ -75,11 +75,12 @@ class TestScoringProfiles:
 
         audit = score_repo(_make_metadata(), results)
 
-        assert audit.grade == "B on 7/10 dimensions"
+        assert audit.grade == "B"
         assert audit.scored_dimensions == scored_dimensions
         assert audit.scored_weight_sum == 0.75
         assert audit.to_dict()["scored_dimensions"] == scored_dimensions
         assert audit.to_dict()["scored_weight_sum"] == 0.75
+        assert audit.to_dict()["grade"] == "B"
 
     def test_full_run_grade_remains_unqualified(self):
         results = _make_results({dim: 0.72 for dim in WEIGHTS})

@@ -660,7 +660,7 @@ class TestRenderHtml:
         report = _make_report()
         report["audits"][0].update(
             {
-                "grade": "B on 7/10 dimensions",
+                "grade": "B",
                 "scored_dimensions": ["readme", "testing"],
                 "scored_weight_sum": 0.3,
             }
@@ -668,9 +668,9 @@ class TestRenderHtml:
 
         html = _render_html(report)
 
-        assert "B on 7/10 dimensions" in html
+        assert "B on 2/10 dimensions" in html
         assert 'data-grade="B"' in html
-        assert 'data-grade="B on 7/10 dimensions"' not in html
+        assert 'data-grade="B on 2/10 dimensions"' not in html
 
     def test_run_changes_section_is_rendered(self):
         report = _make_report(run_change_summary="One repo improved and one regressed.")

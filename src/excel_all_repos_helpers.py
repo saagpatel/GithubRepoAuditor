@@ -10,6 +10,7 @@ from openpyxl.styles import Alignment, Font
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 from src.scoring_dimensions import display_dimension
+from src.scorer import PARTIAL_RUN_BASIS_THRESHOLD, WEIGHTS
 
 ALL_REPOS_HEADERS = [
     "Repo",
@@ -103,7 +104,7 @@ def build_all_repo_rows(
                 "commit_pattern": activity.get("commit_pattern", ""),
                 "values": [
                     repo_name,
-                    audit.get("grade", "F"),
+                    _build_display_grade(audit),
                     round(audit.get("overall_score", 0), 3),
                     round(audit.get("interest_score", 0), 3),
                     audit.get("interest_grade", "—"),
@@ -166,13 +167,30 @@ def _build_biggest_drag(audit: dict[str, Any]) -> str:
     return f"{display_dimension(worst_dimension)} ({dimension_scores[worst_dimension]:.1f})"
 
 
+def _build_display_grade(audit: dict[str, Any]) -> str:
+    """Render partial-run basis disclosure without changing the model grade."""
+    grade = str(audit.get("grade", "F"))
+    if " on " in grade:
+        return grade
+
+    scored_dimensions = audit.get("scored_dimensions") or []
+    scored_weight_sum = audit.get("scored_weight_sum")
+    if (
+        scored_dimensions
+        and isinstance(scored_weight_sum, (int, float))
+        and scored_weight_sum < sum(WEIGHTS.values()) * PARTIAL_RUN_BASIS_THRESHOLD
+    ):
+        return f"{grade} on {len(scored_dimensions)}/{len(WEIGHTS)} dimensions"
+    return grade
+
+
 def _build_grade_reason(audit: dict[str, Any]) -> str:
     dimension_scores = {
         result["dimension"]: result["score"]
         for result in audit.get("analyzer_results", [])
         if result["dimension"] != "interest"
     }
-    grade = audit.get("grade", "F")
+    grade = _build_display_grade(audit)
     if not dimension_scores:
         return grade
     weakest_dimensions = sorted(dimension_scores.items(), key=lambda item: item[1])[:2]

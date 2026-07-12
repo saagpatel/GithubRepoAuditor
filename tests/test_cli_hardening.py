@@ -1787,13 +1787,14 @@ def test_partial_run_basis_survives_report_readback(sample_metadata):
         analyzer_results=[],
         overall_score=0.72,
         completeness_tier="functional",
-        grade="B on 7/10 dimensions",
+        grade="B",
         scored_dimensions=["readme", "testing"],
         scored_weight_sum=0.30,
     )
 
     restored = audit_from_dict(audit.to_dict())
 
-    assert restored.grade == "B on 7/10 dimensions"
+    assert restored.grade == "B"
+    assert restored.to_dict()["grade"] == "B"
     assert restored.scored_dimensions == ["readme", "testing"]
     assert restored.scored_weight_sum == 0.30
