@@ -47,7 +47,9 @@ NOW = "2026-04-14T12:00:00+00:00"
 class FakeRunner:
     """Records every command, returns canned results keyed by the first 2 args."""
 
-    def __init__(self, results: dict[tuple[str, ...], CommandResult] | None = None) -> None:
+    def __init__(
+        self, results: dict[tuple[str, ...], CommandResult] | None = None
+    ) -> None:
         self.calls: list[tuple[list[str], Path]] = []
         self._results = results or {}
 
@@ -88,7 +90,7 @@ def _project(
             context_quality="minimum-viable",
             primary_context_file=primary_context_file,
             activity_status="active",
-            registry_status="active",
+            archived=False,
             path_confidence="high",
         ),
     )
@@ -206,7 +208,9 @@ def test_context_pr_plan_apply_change_preserves_existing_text(tmp_path: Path) ->
 
 
 def test_catalog_seeds_keyed_by_display_name() -> None:
-    project = _project(display_name="Signal & Noise", repo_full_name="owner/signal-noise")
+    project = _project(
+        display_name="Signal & Noise", repo_full_name="owner/signal-noise"
+    )
     seeds = build_catalog_seeds_for(project)
 
     assert set(seeds) == {"Signal & Noise"}
@@ -336,7 +340,9 @@ def test_execute_catalog_seed_applies_and_persists_executed(tmp_path: Path) -> N
 
 def test_execute_resolves_spaced_repo_by_slug(tmp_path: Path) -> None:
     project = _project(
-        display_name="Signal & Noise", path="Signal & Noise", repo_full_name="owner/signal-noise"
+        display_name="Signal & Noise",
+        path="Signal & Noise",
+        repo_full_name="owner/signal-noise",
     )
     (tmp_path / "Signal & Noise").mkdir()
     proposals_path = tmp_path / "pending-proposals.json"
@@ -381,7 +387,9 @@ def test_execute_skips_context_pr_without_slug(tmp_path: Path) -> None:
 
 def test_execute_skips_proposal_with_no_matching_project(tmp_path: Path) -> None:
     proposals_path = tmp_path / "pending-proposals.json"
-    _write(proposals_path, _proposal(display_name="Ghost", repo_full_name="owner/ghost"))
+    _write(
+        proposals_path, _proposal(display_name="Ghost", repo_full_name="owner/ghost")
+    )
 
     results = execute_approved_proposals(
         proposals_path=proposals_path,
@@ -397,7 +405,9 @@ def test_execute_skips_proposal_with_no_matching_project(tmp_path: Path) -> None
     assert results[0].detail == "project-not-found"
 
 
-def test_execute_isolates_one_failure_from_the_rest_of_the_batch(tmp_path: Path) -> None:
+def test_execute_isolates_one_failure_from_the_rest_of_the_batch(
+    tmp_path: Path,
+) -> None:
     # A catalog-seed pointed at a path whose parent is missing raises OSError
     # inside the merge; that must become a `failed` result for THAT proposal and
     # leave the following context-PR proposal free to apply.
@@ -407,7 +417,11 @@ def test_execute_isolates_one_failure_from_the_rest_of_the_batch(tmp_path: Path)
     proposals_path = tmp_path / "pending-proposals.json"
     _write(
         proposals_path,
-        _proposal(action_type=ACTION_CATALOG_SEED, display_name="Cat", repo_full_name="owner/cat"),
+        _proposal(
+            action_type=ACTION_CATALOG_SEED,
+            display_name="Cat",
+            repo_full_name="owner/cat",
+        ),
         _proposal(),  # context-pr for MyRepo
     )
 
@@ -415,7 +429,9 @@ def test_execute_isolates_one_failure_from_the_rest_of_the_batch(tmp_path: Path)
         proposals_path=proposals_path,
         snapshot=_snapshot(catalog, pr),
         workspace_root=tmp_path,
-        catalog_path=tmp_path / "missing-dir" / "catalog.yaml",  # parent absent -> OSError
+        catalog_path=tmp_path
+        / "missing-dir"
+        / "catalog.yaml",  # parent absent -> OSError
         executed_at=NOW,
         dry_run=False,
         runner=FakeRunner(),
@@ -423,5 +439,7 @@ def test_execute_isolates_one_failure_from_the_rest_of_the_batch(tmp_path: Path)
 
     assert [r.outcome for r in results] == ["failed", "applied"]
     by_id = {p.proposal_id: p for p in load_proposals(proposals_path)}
-    assert by_id["catalog-seed:owner/cat"].status == STATUS_APPROVED  # failed -> retryable
+    assert (
+        by_id["catalog-seed:owner/cat"].status == STATUS_APPROVED
+    )  # failed -> retryable
     assert by_id["context-pr:owner/MyRepo"].status == STATUS_EXECUTED

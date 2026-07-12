@@ -2,7 +2,7 @@
 
 This layer is strictly advisory/read-only: it identifies which repos clear the
 automation trust bar (high path confidence + trusted portfolio decision quality
-+ non-trivial context + eligible registry status). It opens no PRs and applies
++ non-trivial context + eligible activity status). It opens no PRs and applies
 no changes — proposal creation and execution land in later Arc D phases.
 """
 
@@ -24,7 +24,7 @@ def _project(
     *,
     display_name: str = "Repo",
     repo_full_name: str = "owner/Repo",
-    registry_status: str = "active",
+    activity_status: str = "active",
     path_confidence: str = "high",
     context_quality: str = "standard",
 ) -> dict:
@@ -32,7 +32,7 @@ def _project(
         "identity": {"display_name": display_name, "repo_full_name": repo_full_name},
         "declared": {"operating_path": "maintain"},
         "derived": {
-            "registry_status": registry_status,
+            "activity_status": activity_status,
             "path_confidence": path_confidence,
             "context_quality": context_quality,
         },
@@ -43,14 +43,18 @@ def _project(
 
 
 def test_fully_eligible_repo_has_no_blockers() -> None:
-    result = evaluate_automation_eligibility(_project(), decision_quality_status="trusted")
+    result = evaluate_automation_eligibility(
+        _project(), decision_quality_status="trusted"
+    )
     assert isinstance(result, AutomationEligibility)
     assert result.eligible is True
     assert result.blockers == ()
 
 
 def test_non_trusted_decision_quality_blocks() -> None:
-    result = evaluate_automation_eligibility(_project(), decision_quality_status="needs-skepticism")
+    result = evaluate_automation_eligibility(
+        _project(), decision_quality_status="needs-skepticism"
+    )
     assert result.eligible is False
     assert "decision-quality-not-trusted" in result.blockers
 
@@ -95,17 +99,17 @@ def test_unknown_context_blocks_conservatively() -> None:
     assert "context-quality-too-weak" in result.blockers
 
 
-def test_archived_registry_status_blocks() -> None:
+def test_archived_activity_status_blocks() -> None:
     result = evaluate_automation_eligibility(
-        _project(registry_status="archived"), decision_quality_status="trusted"
+        _project(activity_status="archived"), decision_quality_status="trusted"
     )
     assert result.eligible is False
-    assert "registry-status-not-eligible" in result.blockers
+    assert "activity-status-not-eligible" in result.blockers
 
 
-def test_candidate_registry_status_is_eligible() -> None:
+def test_candidate_activity_status_is_eligible() -> None:
     result = evaluate_automation_eligibility(
-        _project(registry_status="candidate"), decision_quality_status="trusted"
+        _project(activity_status="candidate"), decision_quality_status="trusted"
     )
     assert result.eligible is True
 
@@ -119,13 +123,15 @@ def test_minimum_viable_context_is_eligible() -> None:
 
 def test_multiple_blockers_accumulate() -> None:
     result = evaluate_automation_eligibility(
-        _project(registry_status="archived", path_confidence="low", context_quality="none"),
+        _project(
+            activity_status="archived", path_confidence="low", context_quality="none"
+        ),
         decision_quality_status="needs-skepticism",
     )
     assert result.eligible is False
     assert set(result.blockers) == {
         "decision-quality-not-trusted",
-        "registry-status-not-eligible",
+        "activity-status-not-eligible",
         "path-confidence-not-high",
         "context-quality-too-weak",
     }
@@ -141,7 +147,7 @@ def test_selects_only_eligible_repos_sorted_by_name() -> None:
             _project(display_name="Alpha", repo_full_name="o/Alpha"),
             _project(display_name="LowPath", path_confidence="low"),
             _project(display_name="Boiler", context_quality="boilerplate"),
-            _project(display_name="Archived", registry_status="archived"),
+            _project(display_name="Archived", activity_status="archived"),
         ]
     }
     candidates = select_automation_candidates(truth, decision_quality_status="trusted")
@@ -151,8 +157,16 @@ def test_selects_only_eligible_repos_sorted_by_name() -> None:
 
 def test_non_trusted_decision_quality_yields_no_candidates() -> None:
     # The portfolio-level gate kills every candidate regardless of per-repo state.
-    truth = {"projects": [_project(), _project(display_name="Other", repo_full_name="o/Other")]}
-    assert select_automation_candidates(truth, decision_quality_status="needs-skepticism") == []
+    truth = {
+        "projects": [
+            _project(),
+            _project(display_name="Other", repo_full_name="o/Other"),
+        ]
+    }
+    assert (
+        select_automation_candidates(truth, decision_quality_status="needs-skepticism")
+        == []
+    )
 
 
 def test_candidate_to_dict_shape() -> None:
@@ -161,7 +175,7 @@ def test_candidate_to_dict_shape() -> None:
     assert candidate.to_dict() == {
         "repo": "Solo",
         "repo_full_name": "acme/Solo",
-        "registry_status": "active",
+        "activity_status": "active",
         "path_confidence": "high",
         "context_quality": "standard",
     }
@@ -169,11 +183,21 @@ def test_candidate_to_dict_shape() -> None:
 
 def test_empty_or_missing_projects_is_safe() -> None:
     assert select_automation_candidates({}, decision_quality_status="trusted") == []
-    assert select_automation_candidates({"projects": None}, decision_quality_status="trusted") == []
+    assert (
+        select_automation_candidates(
+            {"projects": None}, decision_quality_status="trusted"
+        )
+        == []
+    )
 
 
 def test_non_dict_projects_are_skipped() -> None:
-    truth = {"projects": ["not-a-dict", _project(display_name="Real", repo_full_name="o/Real")]}
+    truth = {
+        "projects": [
+            "not-a-dict",
+            _project(display_name="Real", repo_full_name="o/Real"),
+        ]
+    }
     candidates = select_automation_candidates(truth, decision_quality_status="trusted")
     assert [c.display_name for c in candidates] == ["Real"]
 
@@ -195,7 +219,9 @@ def test_eligible_repo_with_missing_identity_falls_back_safely() -> None:
 
 
 def _digest_for(portfolio_truth: dict, decision_quality_status: str) -> dict:
-    operator_summary = {"decision_quality_v1": {"decision_quality_status": decision_quality_status}}
+    operator_summary = {
+        "decision_quality_v1": {"decision_quality_status": decision_quality_status}
+    }
     report_data = {
         "username": "testuser",
         "generated_at": "2026-04-14T12:00:00+00:00",
@@ -228,7 +254,11 @@ def test_digest_surfaces_automation_candidates_when_trusted() -> None:
 
 
 def test_digest_has_no_automation_candidates_when_not_trusted() -> None:
-    truth = {"projects": [_project(display_name="EligibleOne", repo_full_name="o/EligibleOne")]}
+    truth = {
+        "projects": [
+            _project(display_name="EligibleOne", repo_full_name="o/EligibleOne")
+        ]
+    }
     digest = _digest_for(truth, "needs-skepticism")
     assert digest["automation_candidates"] == []
 

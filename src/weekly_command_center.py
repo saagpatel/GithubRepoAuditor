@@ -7,7 +7,7 @@ from typing import Any
 
 from src.portfolio_automation import select_automation_candidates
 from src.portfolio_decision_queue import build_decision_queue, summarize_decision_queue
-from src.portfolio_truth_types import truth_latest_path
+from src.portfolio_truth_types import display_activity_status, truth_latest_path
 from src.portfolio_truth_trends import (
     build_verdict_transition_ledger,
     render_movement_summary,
@@ -47,12 +47,18 @@ def _parse_datetime(value: Any) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
-def _source_freshness(report_data: dict[str, Any], portfolio_truth: dict[str, Any]) -> dict[str, Any]:
+def _source_freshness(
+    report_data: dict[str, Any], portfolio_truth: dict[str, Any]
+) -> dict[str, Any]:
     report_generated_at = _parse_datetime(report_data.get("generated_at"))
     truth_generated_at = _parse_datetime(portfolio_truth.get("generated_at"))
     status = "current"
     summary = "Control-center source report and portfolio truth are aligned enough to read together."
-    if truth_generated_at and report_generated_at and truth_generated_at > report_generated_at:
+    if (
+        truth_generated_at
+        and report_generated_at
+        and truth_generated_at > report_generated_at
+    ):
         status = "portfolio-truth-newer"
         summary = (
             "Portfolio truth is newer than the audit report feeding the control-center queue; "
@@ -67,12 +73,18 @@ def _source_freshness(report_data: dict[str, Any], portfolio_truth: dict[str, An
     return {
         "status": status,
         "summary": summary,
-        "report_generated_at": report_generated_at.isoformat() if report_generated_at else "",
-        "portfolio_truth_generated_at": truth_generated_at.isoformat() if truth_generated_at else "",
+        "report_generated_at": report_generated_at.isoformat()
+        if report_generated_at
+        else "",
+        "portfolio_truth_generated_at": truth_generated_at.isoformat()
+        if truth_generated_at
+        else "",
     }
 
 
-def _weekly_pack_source(report_data: dict[str, Any], snapshot: dict[str, Any]) -> dict[str, Any]:
+def _weekly_pack_source(
+    report_data: dict[str, Any], snapshot: dict[str, Any]
+) -> dict[str, Any]:
     source = dict(report_data)
     snapshot_summary = _mapping(snapshot.get("operator_summary"))
     if snapshot_summary:
@@ -128,25 +140,34 @@ def build_weekly_command_center_digest(
     report_reference: str = "",
     generated_at: str = "",
 ) -> dict[str, Any]:
-    weekly_pack = build_weekly_review_pack(_weekly_pack_source(report_data, snapshot), diff_data)
+    weekly_pack = build_weekly_review_pack(
+        _weekly_pack_source(report_data, snapshot), diff_data
+    )
     weekly_story = _mapping(weekly_pack.get("weekly_story_v1"))
     operator_summary = _mapping(snapshot.get("operator_summary"))
     operator_queue = list(snapshot.get("operator_queue") or [])
     repo_briefings = list(weekly_pack.get("repo_briefings") or [])
     decision_quality = _mapping(operator_summary.get("decision_quality_v1"))
     decision_quality_status = (
-        _safe_text(decision_quality.get("decision_quality_status")) or "insufficient-data"
+        _safe_text(decision_quality.get("decision_quality_status"))
+        or "insufficient-data"
     )
     truth = portfolio_truth or {}
     freshness = _source_freshness(report_data, truth)
     source_is_stale = freshness["status"] != "current"
     truth_summary = _build_truth_summary(truth)
-    movement = build_verdict_transition_ledger(
-        portfolio_truth_history_dir,
-        max_snapshots=8,
-        current_snapshot=truth,
-        current_path=Path(portfolio_truth_reference) if portfolio_truth_reference else None,
-    ) if portfolio_truth_history_dir else build_verdict_transition_ledger(max_snapshots=0)
+    movement = (
+        build_verdict_transition_ledger(
+            portfolio_truth_history_dir,
+            max_snapshots=8,
+            current_snapshot=truth,
+            current_path=Path(portfolio_truth_reference)
+            if portfolio_truth_reference
+            else None,
+        )
+        if portfolio_truth_history_dir
+        else build_verdict_transition_ledger(max_snapshots=0)
+    )
     movement["summary_text"] = render_movement_summary(movement)
     decision_queue = build_decision_queue(truth)
     decision_queue_summary = summarize_decision_queue(decision_queue)
@@ -154,7 +175,9 @@ def build_weekly_command_center_digest(
     operator_why = _safe_text(operator_summary.get("trend_summary")) or _safe_text(
         operator_summary.get("why_it_matters")
     )
-    queue_pressure_summary = operator_why or _safe_text(weekly_pack.get("queue_pressure_summary"))
+    queue_pressure_summary = operator_why or _safe_text(
+        weekly_pack.get("queue_pressure_summary")
+    )
 
     headline = (
         "Refresh the audit report before acting on control-center queue pressure."
@@ -205,7 +228,8 @@ def build_weekly_command_center_digest(
         "workbook_first": True,
         "generated_at": generated_at or _safe_text(report_data.get("generated_at")),
         "username": _safe_text(report_data.get("username")) or "unknown",
-        "report_reference": report_reference or _safe_text(report_data.get("latest_report_path")),
+        "report_reference": report_reference
+        or _safe_text(report_data.get("latest_report_path")),
         "control_center_reference": control_center_reference,
         "portfolio_truth_reference": portfolio_truth_reference,
         "source_freshness": freshness,
@@ -214,17 +238,24 @@ def build_weekly_command_center_digest(
         "why_this_week": why_this_week,
         "next_step": _safe_text(weekly_story.get("next_step"))
         or "Open the workbook first, then use the read-only control center.",
-        "queue_pressure_summary": freshness["summary"] if source_is_stale else queue_pressure_summary,
-        "operating_paths_summary": _safe_text(weekly_pack.get("operating_paths_summary")),
+        "queue_pressure_summary": freshness["summary"]
+        if source_is_stale
+        else queue_pressure_summary,
+        "operating_paths_summary": _safe_text(
+            weekly_pack.get("operating_paths_summary")
+        ),
         "decision_quality": {
             "status": decision_quality_status,
             "human_skepticism_required": bool(
                 decision_quality.get("human_skepticism_required", True)
             ),
-            "summary": _safe_text(decision_quality.get("recommendation_quality_summary"))
+            "summary": _safe_text(
+                decision_quality.get("recommendation_quality_summary")
+            )
             or _safe_text(decision_quality.get("confidence_calibration_summary"))
             or "Decision quality is not available yet.",
-            "authority_cap": _safe_text(decision_quality.get("authority_cap")) or AUTHORITY_CAP,
+            "authority_cap": _safe_text(decision_quality.get("authority_cap"))
+            or AUTHORITY_CAP,
         },
         "portfolio_truth": {**truth_summary, **decision_queue_summary},
         "movement": movement,
@@ -317,7 +348,7 @@ def render_weekly_command_center_markdown(digest: dict[str, Any]) -> str:
     else:
         for item in path_attention:
             lines.append(
-                f"- {item['repo']} — {item['headline']} ({item['attention_state']}, {item['registry_status']} registry, {item['context_quality']} context)"
+                f"- {item['repo']} — {item['headline']} ({item['attention_state']}, {item['activity_status']} registry, {item['context_quality']} context)"
             )
 
     lines.extend(["", "## Automation Candidates"])
@@ -327,7 +358,7 @@ def render_weekly_command_center_markdown(digest: dict[str, Any]) -> str:
     else:
         for item in automation_candidates:
             lines.append(
-                f"- {item['repo']} ({item['registry_status']}, "
+                f"- {item['repo']} ({item['activity_status']}, "
                 f"{item['path_confidence']} path confidence, {item['context_quality']} context)"
             )
 
@@ -337,7 +368,9 @@ def render_weekly_command_center_markdown(digest: dict[str, Any]) -> str:
         lines.append("- No elevated risk items are currently surfaced.")
     else:
         for item in risk_items:
-            lines.append(f"- **{item['repo']}** [{item['risk_tier']}]: {item['risk_summary']}")
+            lines.append(
+                f"- **{item['repo']}** [{item['risk_tier']}]: {item['risk_summary']}"
+            )
 
     lines.extend(["", "## Security Posture"])
     security_items = list(security_posture.get("top_alerts") or [])
@@ -382,9 +415,13 @@ def render_weekly_command_center_markdown(digest: dict[str, Any]) -> str:
     if repo_briefings:
         lines.extend(["", "## Top Repo Briefings"])
         for item in repo_briefings:
-            lines.append(f"- {item['repo']}: {item['why_it_matters']} Next: {item['next_step']}")
+            lines.append(
+                f"- {item['repo']}: {item['why_it_matters']} Next: {item['next_step']}"
+            )
 
-    lines.extend(["", f"_Guardrail: {_safe_text(digest.get('report_only_guardrail'))}_", ""])
+    lines.extend(
+        ["", f"_Guardrail: {_safe_text(digest.get('report_only_guardrail'))}_", ""]
+    )
     return "\n".join(lines)
 
 
@@ -424,10 +461,12 @@ def _build_truth_summary(portfolio_truth: dict[str, Any]) -> dict[str, Any]:
         override = _safe_text(derived.get("path_override")) or "none"
         override_counts[override] = override_counts.get(override, 0) + 1
         attention_state = _safe_text(derived.get("attention_state")) or "manual-only"
-        attention_state_counts[attention_state] = attention_state_counts.get(attention_state, 0) + 1
+        attention_state_counts[attention_state] = (
+            attention_state_counts.get(attention_state, 0) + 1
+        )
         tier = _safe_text(risk.get("risk_tier")) or "baseline"
         risk_tier_counts[tier] = risk_tier_counts.get(tier, 0) + 1
-        if _safe_text(derived.get("registry_status")) == "active":
+        if _safe_text(derived.get("activity_status")) == "active":
             active_project_count += 1
         if _safe_text(derived.get("path_confidence")) == "low":
             low_confidence_path_count += 1
@@ -451,17 +490,28 @@ def _build_truth_summary(portfolio_truth: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _build_path_attention_items(portfolio_truth: dict[str, Any]) -> list[dict[str, Any]]:
+def _build_path_attention_items(
+    portfolio_truth: dict[str, Any],
+) -> list[dict[str, Any]]:
     projects = list(portfolio_truth.get("projects") or [])
     candidates: list[dict[str, Any]] = []
     status_rank = {"decision-needed": 0, "active-product": 1, "active-infra": 2}
-    context_rank = {"none": 0, "boilerplate": 1, "minimum-viable": 2, "standard": 3, "full": 4}
+    context_rank = {
+        "none": 0,
+        "boilerplate": 1,
+        "minimum-viable": 2,
+        "standard": 3,
+        "full": 4,
+    }
 
     for project in projects:
         identity = _mapping(project.get("identity"))
         declared = _mapping(project.get("declared"))
         derived = _mapping(project.get("derived"))
-        registry_status = _safe_text(derived.get("registry_status"))
+        activity_status = display_activity_status(
+            _safe_text(derived.get("activity_status")),
+            archived=bool(derived.get("archived")),
+        )
         attention_state = _safe_text(derived.get("attention_state"))
         if attention_state != "decision-needed":
             continue
@@ -471,7 +521,8 @@ def _build_path_attention_items(portfolio_truth: dict[str, Any]) -> list[dict[st
             continue
         context_quality = _safe_text(derived.get("context_quality")) or "unknown"
         rationale = (
-            _safe_text(derived.get("path_rationale")) or "Path guidance still needs clarification."
+            _safe_text(derived.get("path_rationale"))
+            or "Path guidance still needs clarification."
         )
         headline = (
             "Unspecified stable path"
@@ -483,9 +534,10 @@ def _build_path_attention_items(portfolio_truth: dict[str, Any]) -> list[dict[st
                 "repo": _safe_text(identity.get("display_name")) or "Repo",
                 "headline": headline,
                 "attention_state": attention_state,
-                "registry_status": registry_status or "unknown",
+                "activity_status": activity_status or "unknown",
                 "context_quality": context_quality,
-                "path_confidence": _safe_text(derived.get("path_confidence")) or "legacy",
+                "path_confidence": _safe_text(derived.get("path_confidence"))
+                or "legacy",
                 "rationale": rationale,
                 "operating_path": operating_path or "unspecified",
                 "path_override": override or "none",
@@ -504,7 +556,9 @@ def _build_path_attention_items(portfolio_truth: dict[str, Any]) -> list[dict[st
     return candidates[:MAX_PATH_ATTENTION_ITEMS]
 
 
-def _build_risk_attention_items(portfolio_truth: dict[str, Any]) -> list[dict[str, Any]]:
+def _build_risk_attention_items(
+    portfolio_truth: dict[str, Any],
+) -> list[dict[str, Any]]:
     projects = list(portfolio_truth.get("projects") or [])
     items: list[dict[str, Any]] = []
     status_rank = {"active": 0, "recent": 1, "stale": 2, "archived": 3}
@@ -560,7 +614,9 @@ def _build_security_summary(portfolio_truth: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _build_security_attention_items(portfolio_truth: dict[str, Any]) -> list[dict[str, Any]]:
+def _build_security_attention_items(
+    portfolio_truth: dict[str, Any],
+) -> list[dict[str, Any]]:
     """Top scanned repos carrying open high/critical Dependabot alerts, critical-first."""
     projects = list(portfolio_truth.get("projects") or [])
     items: list[dict[str, Any]] = []
@@ -600,8 +656,14 @@ def _build_section_digest(
     digest = []
     for section in sections:
         section_id = _safe_text(section.get("id"))
-        headline = _safe_text(section.get("headline")) or "No section headline is recorded yet."
-        next_step = _safe_text(section.get("next_step")) or "No section next step is recorded yet."
+        headline = (
+            _safe_text(section.get("headline"))
+            or "No section headline is recorded yet."
+        )
+        next_step = (
+            _safe_text(section.get("next_step"))
+            or "No section next step is recorded yet."
+        )
         if section_id == "weekly-priority":
             headline = operator_why or headline
             next_step = operator_decision or next_step

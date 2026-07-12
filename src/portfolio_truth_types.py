@@ -6,8 +6,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = "0.8.0"
-LEGACY_SCHEMA_VERSIONS = {"0.7.0"}
+SCHEMA_VERSION = "0.9.0"
+# 0.8.0: derived.registry_status removed (was a stale->parked synonym table over
+# activity_status); derived.archived added as a first-class lifecycle boolean;
+# source_summary.registry_status_counts replaced by activity_status_counts + archived_count.
+LEGACY_SCHEMA_VERSIONS = {"0.7.0", "0.8.0"}
 DERIVATION_POLICY_VERSION = "portfolio_attention.v2"
 
 # The published "latest" portfolio-truth artifact. The producer
@@ -22,8 +25,9 @@ def truth_latest_path(output_dir: Path) -> Path:
 
 
 VALID_CONTEXT_QUALITY = {"full", "standard", "minimum-viable", "boilerplate", "none"}
-VALID_ACTIVITY_STATUS = {"active", "recent", "stale", "archived"}
-VALID_REGISTRY_STATUS = {"active", "recent", "parked", "archived"}
+# Pure recency observation. Lifecycle intent (archived) is a separate axis —
+# see DerivedFields.archived and display_activity_status() below.
+VALID_ACTIVITY_STATUS = {"active", "recent", "stale"}
 VALID_ATTENTION_STATES = {
     "active-product",
     "active-infra",
@@ -59,6 +63,18 @@ def _serialize_datetime(value: datetime | None) -> str | None:
     if value is None:
         return None
     return value.isoformat()
+
+
+def display_activity_status(activity_status: str, *, archived: bool) -> str:
+    """The single legitimate place `stale` (an observation) is relabeled `parked` (a
+    lifecycle judgment) for human-facing surfaces. `archived` is a stored lifecycle fact,
+    not a relabel, and always wins. Every renderer/report that used to read
+    ``derived.registry_status`` for display calls this instead of re-deriving the label."""
+    if archived:
+        return "archived"
+    if activity_status == "stale":
+        return "parked"
+    return activity_status
 
 
 @dataclass(frozen=True)
@@ -122,7 +138,9 @@ class DerivedFields:
     next_recommended_move_present: bool = False
     last_meaningful_activity_at: datetime | None = None
     activity_status: str = "stale"
-    registry_status: str = "parked"
+    # Lifecycle fact, not a recency observation: github_archived OR declared
+    # lifecycle_state == "archived". Orthogonal to activity_status.
+    archived: bool = False
     attention_state: str = "parked"
     path_override: str = ""
     path_confidence: str = "legacy"

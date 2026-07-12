@@ -14,7 +14,10 @@ from src.portfolio_context_recovery import (
     apply_context_recovery_plan,
     build_context_recovery_plan,
 )
-from src.portfolio_truth_publish import PortfolioTruthPublishError, publish_portfolio_truth
+from src.portfolio_truth_publish import (
+    PortfolioTruthPublishError,
+    publish_portfolio_truth,
+)
 from src.portfolio_truth_reconcile import build_portfolio_truth_snapshot
 from src.portfolio_truth_render import (
     render_portfolio_report_markdown,
@@ -87,7 +90,9 @@ def _security_test_project(
 def test_extract_github_full_name_uses_exact_github_host() -> None:
     assert _extract_github_full_name("https://github.com/octo/repo.git") == "octo/repo"
     assert _extract_github_full_name("git@github.com:octo/repo.git") == "octo/repo"
-    assert _extract_github_full_name("https://evil.example/github.com/octo/repo.git") == ""
+    assert (
+        _extract_github_full_name("https://evil.example/github.com/octo/repo.git") == ""
+    )
 
 
 def test_git_remote_full_name_prefers_canonical_remote(tmp_path: Path) -> None:
@@ -161,13 +166,25 @@ def test_git_remote_full_name_keeps_normal_origin(tmp_path: Path) -> None:
     repo.mkdir()
     subprocess.run(["git", "init"], cwd=repo, capture_output=True, check=True)
     subprocess.run(
-        ["git", "remote", "add", "origin", "https://github.com/saagpatel/NormalProject.git"],
+        [
+            "git",
+            "remote",
+            "add",
+            "origin",
+            "https://github.com/saagpatel/NormalProject.git",
+        ],
         cwd=repo,
         capture_output=True,
         check=True,
     )
     subprocess.run(
-        ["git", "remote", "add", "mirror", "https://github.com/saagpatel/OtherProject.git"],
+        [
+            "git",
+            "remote",
+            "add",
+            "mirror",
+            "https://github.com/saagpatel/OtherProject.git",
+        ],
         cwd=repo,
         capture_output=True,
         check=True,
@@ -341,7 +358,9 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
         now=now,
     )
 
-    projects = {project.identity.display_name: project for project in result.snapshot.projects}
+    projects = {
+        project.identity.display_name: project for project in result.snapshot.projects
+    }
     alpha = projects["Alpha"]
     beta = projects["Beta"]
     gamma = projects["Calibrate"]
@@ -350,7 +369,8 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     assert alpha.declared.owner == "d"
     assert alpha.declared.category == "commercial"
     assert alpha.derived.context_quality == "full"
-    assert alpha.derived.registry_status == "active"
+    assert alpha.derived.activity_status == "active"
+    assert alpha.derived.archived is False
     assert alpha.derived.attention_state == "active-product"
     assert alpha.derived.primary_context_file == "CLAUDE.md"
     assert alpha.derived.project_summary_present is True
@@ -364,13 +384,13 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     assert beta.identity.section_marker == "ITPRJsViaClaude/"
     assert beta.declared.category == "it-work"
     assert beta.derived.context_quality == "boilerplate"
-    assert beta.derived.registry_status == "parked"
+    assert beta.derived.activity_status == "stale"
     assert beta.derived.attention_state == "parked"
 
     assert gamma.identity.section_marker == "iOS Projects"
     assert gamma.derived.stack == ["Swift"]
 
-    assert result.snapshot.schema_version == "0.8.0"
+    assert result.snapshot.schema_version == "0.9.0"
     assert result.snapshot.derivation_policy_version == "portfolio_attention.v2"
     assert result.snapshot.inputs["catalog"]["sha256"]
     assert result.snapshot.inputs["notion"]["mode"] == "unavailable"
@@ -378,14 +398,21 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
         "policy_version": "workspace_discovery.v1",
         "counts": {},
     }
-    assert result.snapshot.source_summary["attention_state_counts"]["active-product"] == 1
+    assert (
+        result.snapshot.source_summary["attention_state_counts"]["active-product"] == 1
+    )
     assert result.snapshot.source_summary["attention_state_counts"]["parked"] == 1
 
     # Derived rollups are emitted so downstream consumers (command-center) read
     # them instead of re-deriving the auditor's risk/security logic.
     snapshot_dict = result.snapshot.to_dict()
     rollups = snapshot_dict["rollups"]
-    assert set(rollups["risk_tier_counts"]) == {"elevated", "moderate", "baseline", "deferred"}
+    assert set(rollups["risk_tier_counts"]) == {
+        "elevated",
+        "moderate",
+        "baseline",
+        "deferred",
+    }
     assert sum(rollups["risk_tier_counts"].values()) == len(result.snapshot.projects)
     assert set(rollups["security"]) == {
         "scanned_count",
@@ -393,7 +420,10 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
         "total_open_high",
         "total_open_critical",
     }
-    assert set(rollups["decision"]) == {"decision_needed_count", "default_attention_count"}
+    assert set(rollups["decision"]) == {
+        "decision_needed_count",
+        "default_attention_count",
+    }
     assert (
         rollups["decision"]["default_attention_count"]
         >= rollups["decision"]["decision_needed_count"]
@@ -402,12 +432,15 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     assert "open_high_critical" in snapshot_dict["projects"][0]["security"]
 
 
-def test_attention_state_classifier_separates_activity_from_operator_attention() -> None:
+def test_attention_state_classifier_separates_activity_from_operator_attention() -> (
+    None
+):
     from src.portfolio_truth_reconcile import _attention_state_for
 
     assert (
         _attention_state_for(
-            registry_status="active",
+            activity_status="active",
+            archived=False,
             lifecycle_state="active",
             operating_path="maintain",
             category="commercial",
@@ -418,7 +451,8 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
     )
     assert (
         _attention_state_for(
-            registry_status="active",
+            activity_status="active",
+            archived=False,
             lifecycle_state="active",
             operating_path="maintain",
             category="infrastructure",
@@ -429,7 +463,8 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
     )
     assert (
         _attention_state_for(
-            registry_status="active",
+            activity_status="active",
+            archived=False,
             lifecycle_state="active",
             operating_path="maintain",
             category="vanity",
@@ -440,7 +475,8 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
     )
     assert (
         _attention_state_for(
-            registry_status="active",
+            activity_status="active",
+            archived=False,
             lifecycle_state="active",
             operating_path="maintain",
             category="fun",
@@ -451,7 +487,8 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
     )
     assert (
         _attention_state_for(
-            registry_status="active",
+            activity_status="active",
+            archived=False,
             lifecycle_state="active",
             operating_path="experiment",
             category="vanity",
@@ -462,7 +499,8 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
     )
     assert (
         _attention_state_for(
-            registry_status="archived",
+            activity_status="active",
+            archived=True,
             lifecycle_state="archived",
             operating_path="archive",
             category="commercial",
@@ -496,13 +534,13 @@ def test_attention_state_uses_resolved_catalog_operating_path(
             "intended_disposition": intended_disposition,
         },
         context_quality="full",
-        registry_status="active",
     )
 
     assert catalog_entry["operating_path"] == operating_path
     assert (
         _attention_state_for(
-            registry_status="active",
+            activity_status="active",
+            archived=False,
             lifecycle_state="active",
             operating_path=catalog_entry["operating_path"],
             category="commercial",
@@ -540,25 +578,47 @@ def test_github_archived_status_reconciles_to_archived_attention(
         },
     )
 
-    projects = {project.identity.display_name: project for project in result.snapshot.projects}
+    projects = {
+        project.identity.display_name: project for project in result.snapshot.projects
+    }
     alpha = projects["Alpha"]
 
     assert alpha.declared.lifecycle_state == "active"
     assert alpha.declared.operating_path == "maintain"
     assert alpha.derived.path_confidence == "low"
-    assert alpha.derived.activity_status == "archived"
-    assert alpha.derived.registry_status == "archived"
+    # activity_status is pure recency now — Alpha is genuinely recently active by git
+    # history; `archived` is the orthogonal lifecycle fact that routes attention.
+    assert alpha.derived.activity_status == "active"
+    assert alpha.derived.archived is True
     assert alpha.derived.attention_state == "archived"
+    from src.portfolio_truth_types import display_activity_status
+
+    assert (
+        display_activity_status(
+            alpha.derived.activity_status, archived=alpha.derived.archived
+        )
+        == "archived"
+    )
     assert alpha.provenance["github.archived"] == {
         "source": "audit_report",
         "detail": "true",
     }
     assert result.snapshot.source_summary["github_archived_count"] == 1
-    assert baseline.snapshot.source_summary["attention_state_counts"]["active-product"] == 1
-    assert result.snapshot.source_summary["attention_state_counts"].get("active-product", 0) == 0
+    assert (
+        baseline.snapshot.source_summary["attention_state_counts"]["active-product"]
+        == 1
+    )
+    assert (
+        result.snapshot.source_summary["attention_state_counts"].get(
+            "active-product", 0
+        )
+        == 0
+    )
     assert result.snapshot.source_summary["attention_state_counts"].get(
         "decision-needed", 0
-    ) == baseline.snapshot.source_summary["attention_state_counts"].get("decision-needed", 0)
+    ) == baseline.snapshot.source_summary["attention_state_counts"].get(
+        "decision-needed", 0
+    )
 
 
 def test_build_security_fields_maps_ghas_entry() -> None:
@@ -566,7 +626,13 @@ def test_build_security_fields_maps_ghas_entry() -> None:
 
     fields = _build_security_fields(
         {
-            "dependabot": {"critical": 2, "high": 3, "medium": 4, "low": 5, "available": True},
+            "dependabot": {
+                "critical": 2,
+                "high": 3,
+                "medium": 4,
+                "low": 5,
+                "available": True,
+            },
             "code_scanning": {"critical": 1, "high": 6, "available": True},
             "secret_scanning": {"open": 7, "available": True},
         }
@@ -595,7 +661,10 @@ def test_build_security_fields_unavailable_dependabot_is_not_available() -> None
     from src.portfolio_truth_reconcile import _build_security_fields
 
     fields = _build_security_fields(
-        {"dependabot": {"available": False}, "secret_scanning": {"open": 0, "available": False}}
+        {
+            "dependabot": {"available": False},
+            "secret_scanning": {"open": 0, "available": False},
+        }
     )
     assert fields.alerts_available is False
     assert fields.dependabot_high == 0
@@ -621,7 +690,13 @@ def test_security_overlay_populates_and_force_elevates(
     now = datetime.fromtimestamp(1_700_200_000, tz=timezone.utc)
     security = {
         "Alpha": {
-            "dependabot": {"critical": 1, "high": 0, "medium": 0, "low": 2, "available": True},
+            "dependabot": {
+                "critical": 1,
+                "high": 0,
+                "medium": 0,
+                "low": 2,
+                "available": True,
+            },
             "code_scanning": {"critical": 0, "high": 0, "available": True},
             "secret_scanning": {"open": 0, "available": True},
         }
@@ -679,7 +754,10 @@ def test_select_security_entry_joins_by_repo_name_when_display_differs() -> None
 
     entry = {"dependabot": {"high": 9, "available": True}}
     lookup = {"signal-noise": entry}
-    assert _select_security_entry(lookup, "saagpatel/signal-noise", "Signal & Noise") is entry
+    assert (
+        _select_security_entry(lookup, "saagpatel/signal-noise", "Signal & Noise")
+        is entry
+    )
 
 
 def test_select_security_entry_falls_back_to_display_name() -> None:
@@ -735,12 +813,16 @@ repos:
         if project_path.name == "Alpha":
             return {
                 "has_git": True,
-                "last_commit_at": datetime.fromtimestamp(1_700_100_000, tz=timezone.utc),
+                "last_commit_at": datetime.fromtimestamp(
+                    1_700_100_000, tz=timezone.utc
+                ),
                 "repo_full_name": "d/Alpha",
             }
         return {"has_git": False, "last_commit_at": None, "repo_full_name": ""}
 
-    monkeypatch.setattr("src.portfolio_truth_sources._gather_git_facts", _fake_git_facts)
+    monkeypatch.setattr(
+        "src.portfolio_truth_sources._gather_git_facts", _fake_git_facts
+    )
 
     result = build_portfolio_truth_snapshot(
         workspace_root=portfolio_workspace,
@@ -751,7 +833,9 @@ repos:
     )
 
     alpha = next(
-        project for project in result.snapshot.projects if project.identity.display_name == "Alpha"
+        project
+        for project in result.snapshot.projects
+        if project.identity.display_name == "Alpha"
     )
     assert alpha.declared.owner == "portfolio-owner"
     assert alpha.declared.review_cadence == "weekly"
@@ -759,7 +843,9 @@ repos:
     assert alpha.provenance["declared.owner"]["source"] == "catalog_repo"
 
 
-def test_agent_file_without_real_project_markers_stays_boilerplate(tmp_path: Path) -> None:
+def test_agent_file_without_real_project_markers_stays_boilerplate(
+    tmp_path: Path,
+) -> None:
     project = tmp_path / "WeakContext"
     project.mkdir()
     _write(project / "AGENTS.md", "# AGENTS\n\nProject specific rules.\n")
@@ -767,7 +853,9 @@ def test_agent_file_without_real_project_markers_stays_boilerplate(tmp_path: Pat
     assert _classify_context_quality(project, ["AGENTS.md"]) == "boilerplate"
 
 
-def test_primary_context_with_required_sections_becomes_minimum_viable(tmp_path: Path) -> None:
+def test_primary_context_with_required_sections_becomes_minimum_viable(
+    tmp_path: Path,
+) -> None:
     project = tmp_path / "MinimumViable"
     project.mkdir()
     _write(
@@ -837,7 +925,10 @@ def _substantive_readme(project_name: str) -> str:
         f"# {project_name}\n\n"
         f"{project_name} is a durable operator infrastructure repo with separate "
         "agent guidance and README-level workflow documentation.\n\n"
-        + ("It documents commands, boundaries, recovery paths, examples, and operator usage. " * 35)
+        + (
+            "It documents commands, boundaries, recovery paths, examples, and operator usage. "
+            * 35
+        )
     )
 
 
@@ -851,7 +942,7 @@ def test_catalog_backed_high_criticality_infra_readme_support_promotes_to_standa
     subprocess.run(["git", "init"], cwd=project, capture_output=True, check=True)
     _write(project / "AGENTS.md", _complete_agent_context("InfraRepo"))
     _write(project / "README.md", _substantive_readme("InfraRepo"))
-    _write(project / "pyproject.toml", "[project]\nname = \"infra-repo\"\n")
+    _write(project / "pyproject.toml", '[project]\nname = "infra-repo"\n')
     catalog_path = tmp_path / "portfolio-catalog.yaml"
     catalog_path.write_text(
         """
@@ -872,13 +963,22 @@ repos:
         include_notion=False,
     )
 
-    infra = next(project for project in result.snapshot.projects if project.identity.project_key == "InfraRepo")
+    infra = next(
+        project
+        for project in result.snapshot.projects
+        if project.identity.project_key == "InfraRepo"
+    )
     assert infra.derived.context_quality == "standard"
     assert infra.provenance["derived.context_quality"]["source"] == "workspace+catalog"
-    assert infra.provenance["derived.context_quality"]["detail"] == "minimum-viable->standard"
+    assert (
+        infra.provenance["derived.context_quality"]["detail"]
+        == "minimum-viable->standard"
+    )
 
 
-def test_substantive_readme_support_does_not_promote_non_infra_repo(tmp_path: Path) -> None:
+def test_substantive_readme_support_does_not_promote_non_infra_repo(
+    tmp_path: Path,
+) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     project = workspace / "ProductRepo"
@@ -908,7 +1008,9 @@ repos:
     )
 
     product = next(
-        project for project in result.snapshot.projects if project.identity.project_key == "ProductRepo"
+        project
+        for project in result.snapshot.projects
+        if project.identity.project_key == "ProductRepo"
     )
     assert product.derived.context_quality == "minimum-viable"
     assert product.provenance["derived.context_quality"]["source"] == "workspace"
@@ -924,7 +1026,7 @@ def test_legacy_registry_infra_category_does_not_promote_context_quality(
     subprocess.run(["git", "init"], cwd=project, capture_output=True, check=True)
     _write(project / "AGENTS.md", _complete_agent_context("LegacyInfra"))
     _write(project / "README.md", _substantive_readme("LegacyInfra"))
-    _write(project / "pyproject.toml", "[project]\nname = \"legacy-infra\"\n")
+    _write(project / "pyproject.toml", '[project]\nname = "legacy-infra"\n')
     catalog_path = tmp_path / "portfolio-catalog.yaml"
     catalog_path.write_text(
         """
@@ -958,7 +1060,9 @@ repos:
     )
 
     infra = next(
-        project for project in result.snapshot.projects if project.identity.project_key == "LegacyInfra"
+        project
+        for project in result.snapshot.projects
+        if project.identity.project_key == "LegacyInfra"
     )
     assert infra.declared.category == "infrastructure"
     assert infra.provenance["declared.category"]["source"] == "legacy_registry"
@@ -997,7 +1101,13 @@ def test_registry_render_surfaces_security_and_round_trips(
 ) -> None:
     security = {
         "Alpha": {
-            "dependabot": {"critical": 2, "high": 1, "medium": 0, "low": 0, "available": True},
+            "dependabot": {
+                "critical": 2,
+                "high": 1,
+                "medium": 0,
+                "low": 0,
+                "available": True,
+            },
             "code_scanning": {"available": True},
             "secret_scanning": {"open": 0, "available": True},
         }
@@ -1052,7 +1162,13 @@ def test_portfolio_report_security_posture_lists_open_alerts(
 ) -> None:
     security = {
         "Alpha": {
-            "dependabot": {"critical": 1, "high": 2, "medium": 0, "low": 0, "available": True},
+            "dependabot": {
+                "critical": 1,
+                "high": 2,
+                "medium": 0,
+                "low": 0,
+                "available": True,
+            },
             "code_scanning": {"available": True},
             "secret_scanning": {"open": 0, "available": True},
         }
@@ -1068,9 +1184,12 @@ def test_portfolio_report_security_posture_lists_open_alerts(
 
     assert "## Security Posture" in markdown
     assert "[Security Posture](#security-posture)" in markdown
-    assert "- **Alpha** [elevated]: 1 critical, 2 high open Dependabot alerts" in markdown
     assert (
-        "- Security posture: scanned `1`, with open high/critical Dependabot alerts `1`" in markdown
+        "- **Alpha** [elevated]: 1 critical, 2 high open Dependabot alerts" in markdown
+    )
+    assert (
+        "- Security posture: scanned `1`, with open high/critical Dependabot alerts `1`"
+        in markdown
     )
     # The new section keeps the report validator green.
     validate_portfolio_report_markdown(markdown)
@@ -1084,7 +1203,13 @@ def test_portfolio_report_security_posture_scanned_clear(
     # Scanned with zero open high/critical reads as "all clear", distinct from "not run".
     security = {
         "Alpha": {
-            "dependabot": {"critical": 0, "high": 0, "medium": 3, "low": 0, "available": True},
+            "dependabot": {
+                "critical": 0,
+                "high": 0,
+                "medium": 3,
+                "low": 0,
+                "available": True,
+            },
             "code_scanning": {"available": True},
             "secret_scanning": {"open": 0, "available": True},
         }
@@ -1097,7 +1222,10 @@ def test_portfolio_report_security_posture_scanned_clear(
         security_alerts_by_name=security,
     )
     markdown = render_portfolio_report_markdown(result.snapshot, "output/x.json")
-    assert "All 1 scanned repos are clear of open high/critical Dependabot alerts." in markdown
+    assert (
+        "All 1 scanned repos are clear of open high/critical Dependabot alerts."
+        in markdown
+    )
     validate_portfolio_report_markdown(markdown)
 
     # Same guard governs the registry: a scanned repo with only medium alerts gets no
@@ -1119,7 +1247,9 @@ def test_security_attention_items_caps_at_five_and_sorts_critical_first() -> Non
         _security_test_project("mid-crit", critical=2, high=0),
         _security_test_project("top-crit", critical=5, high=0),
         _security_test_project("clean", critical=0, high=0),  # excluded: nothing open
-        _security_test_project("unscanned", critical=9, high=9, available=False),  # excluded
+        _security_test_project(
+            "unscanned", critical=9, high=9, available=False
+        ),  # excluded
         _security_test_project("a-high", critical=0, high=3),
         _security_test_project("b-high", critical=0, high=3),
         _security_test_project("c-crit", critical=1, high=0),
@@ -1192,7 +1322,9 @@ groups:
     assert "OrbitForge [Labs/OrbitForge]" in parsed
 
 
-def test_path_catalog_contracts_clear_duplicate_display_name_warning(tmp_path: Path) -> None:
+def test_path_catalog_contracts_clear_duplicate_display_name_warning(
+    tmp_path: Path,
+) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     orbit_a = workspace / "Arcade" / "OrbitForge"
@@ -1228,9 +1360,12 @@ repos:
     assert result.snapshot.source_summary["duplicate_display_names"] == ["OrbitForge"]
     assert result.snapshot.source_summary["unresolved_duplicate_display_names"] == []
     assert not any(
-        "Duplicate project display names" in warning for warning in result.snapshot.warnings
+        "Duplicate project display names" in warning
+        for warning in result.snapshot.warnings
     )
-    projects_by_path = {project.identity.path: project for project in result.snapshot.projects}
+    projects_by_path = {
+        project.identity.path: project for project in result.snapshot.projects
+    }
     assert projects_by_path["Arcade/OrbitForge"].declared.lifecycle_state == "active"
     assert projects_by_path["Labs/OrbitForge"].declared.lifecycle_state == "archived"
 
@@ -1391,7 +1526,9 @@ def test_publish_failure_leaves_live_files_untouched(
     def _boom(_snapshot, _latest_json_path):
         raise RuntimeError("renderer exploded")
 
-    monkeypatch.setattr("src.portfolio_truth_publish.render_portfolio_report_markdown", _boom)
+    monkeypatch.setattr(
+        "src.portfolio_truth_publish.render_portfolio_report_markdown", _boom
+    )
 
     with pytest.raises(RuntimeError):
         publish_portfolio_truth(
@@ -1477,7 +1614,10 @@ def test_publish_refuses_to_drop_existing_notion_context(
             include_notion=True,
         )
 
-    assert json.loads(latest_path.read_text())["source_summary"]["notion_context_rows"] == 137
+    assert (
+        json.loads(latest_path.read_text())["source_summary"]["notion_context_rows"]
+        == 137
+    )
 
 
 def test_load_prior_notion_context_rebuilds_from_artifact(tmp_path: Path) -> None:
@@ -1523,7 +1663,9 @@ def test_load_prior_notion_context_rebuilds_from_artifact(tmp_path: Path) -> Non
     assert len(context) == 1
 
 
-def test_load_prior_notion_context_missing_or_malformed_returns_empty(tmp_path: Path) -> None:
+def test_load_prior_notion_context_missing_or_malformed_returns_empty(
+    tmp_path: Path,
+) -> None:
     from src.portfolio_truth_reconcile import load_prior_notion_context
 
     assert load_prior_notion_context(tmp_path / "absent.json") == {}
@@ -1650,7 +1792,9 @@ def test_publish_allow_empty_notion_carries_forward_prior_context(
     assert summary["notion_context_rows"] == 1
     assert summary["notion_context_carried_forward"] is True
     target = next(
-        item for item in published["projects"] if item["identity"]["display_name"] == target_name
+        item
+        for item in published["projects"]
+        if item["identity"]["display_name"] == target_name
     )
     assert target["advisory"]["notion_portfolio_call"] == "Ship"
     assert target["advisory"]["notion_current_state"] == "Building"
@@ -1698,7 +1842,12 @@ def test_report_subcommand_parses_allow_empty_notion_flag() -> None:
 
     parser = build_subcommand_parser()
     enabled = parser.parse_args(
-        ["report", "testuser", "--portfolio-truth", "--portfolio-truth-allow-empty-notion"]
+        [
+            "report",
+            "testuser",
+            "--portfolio-truth",
+            "--portfolio-truth-allow-empty-notion",
+        ]
     )
     assert enabled.portfolio_truth_allow_empty_notion is True
     default = parser.parse_args(["report", "testuser", "--portfolio-truth"])
@@ -1858,7 +2007,8 @@ def test_publish_allow_empty_notion_without_prior_context_publishes_zero(
     output_dir = tmp_path / "output"
     output_dir.mkdir()
     (output_dir / "portfolio-truth-latest.json").write_text(
-        json.dumps({"source_summary": {"notion_context_rows": 137}, "projects": []}) + "\n"
+        json.dumps({"source_summary": {"notion_context_rows": 137}, "projects": []})
+        + "\n"
     )
     monkeypatch.setattr(
         "src.portfolio_truth_sources.load_notion_project_context",
@@ -1906,7 +2056,9 @@ def test_context_recovery_plan_freezes_and_filters_targets(
         include_notion=False,
         now=datetime.fromtimestamp(1_700_000_100, tz=timezone.utc),
     )
-    plan = build_context_recovery_plan(result.snapshot, workspace_root=portfolio_workspace)
+    plan = build_context_recovery_plan(
+        result.snapshot, workspace_root=portfolio_workspace
+    )
     targets = {target.project_key: target for target in plan.projects}
 
     assert targets["Fresh"].status == "eligible"
@@ -1921,8 +2073,14 @@ def test_context_recovery_apply_writes_primary_context_and_catalog_seed(
 ) -> None:
     target_repo = portfolio_workspace / "FreshRecover"
     target_repo.mkdir()
-    _write(target_repo / "README.md", "# FreshRecover\n\nFreshRecover is a small active repo.\n")
-    _write(target_repo / "package.json", '{"dependencies":{"next":"14.2.0","react":"19.0.0"}}')
+    _write(
+        target_repo / "README.md",
+        "# FreshRecover\n\nFreshRecover is a small active repo.\n",
+    )
+    _write(
+        target_repo / "package.json",
+        '{"dependencies":{"next":"14.2.0","react":"19.0.0"}}',
+    )
 
     result = build_portfolio_truth_snapshot(
         workspace_root=portfolio_workspace,
@@ -1931,7 +2089,9 @@ def test_context_recovery_apply_writes_primary_context_and_catalog_seed(
         include_notion=False,
         now=datetime.fromtimestamp(1_700_000_100, tz=timezone.utc),
     )
-    plan = build_context_recovery_plan(result.snapshot, workspace_root=portfolio_workspace)
+    plan = build_context_recovery_plan(
+        result.snapshot, workspace_root=portfolio_workspace
+    )
     apply_result = apply_context_recovery_plan(
         result.snapshot,
         plan,
@@ -1954,7 +2114,10 @@ def test_context_recovery_preserves_fenced_run_commands(
 ) -> None:
     target_repo = portfolio_workspace / "FenceRecover"
     target_repo.mkdir()
-    _write(target_repo / "README.md", "# FenceRecover\n\nFenceRecover is a small active repo.\n")
+    _write(
+        target_repo / "README.md",
+        "# FenceRecover\n\nFenceRecover is a small active repo.\n",
+    )
     _write(
         target_repo / "CLAUDE.md",
         """# FenceRecover
@@ -1968,7 +2131,10 @@ npm run dev
 ```
 """,
     )
-    _write(target_repo / "package.json", '{"dependencies":{"vite":"6.0.0","react":"19.0.0"}}')
+    _write(
+        target_repo / "package.json",
+        '{"dependencies":{"vite":"6.0.0","react":"19.0.0"}}',
+    )
 
     result = build_portfolio_truth_snapshot(
         workspace_root=portfolio_workspace,
@@ -1977,7 +2143,9 @@ npm run dev
         include_notion=False,
         now=datetime.fromtimestamp(1_700_000_100, tz=timezone.utc),
     )
-    plan = build_context_recovery_plan(result.snapshot, workspace_root=portfolio_workspace)
+    plan = build_context_recovery_plan(
+        result.snapshot, workspace_root=portfolio_workspace
+    )
     apply_context_recovery_plan(
         result.snapshot,
         plan,
@@ -2000,7 +2168,10 @@ def test_context_recovery_ignores_development_conventions_for_run_commands(
 ) -> None:
     target_repo = portfolio_workspace / "ConventionsRecover"
     target_repo.mkdir()
-    _write(target_repo / "README.md", "# ConventionsRecover\n\nConventionsRecover is active.\n")
+    _write(
+        target_repo / "README.md",
+        "# ConventionsRecover\n\nConventionsRecover is active.\n",
+    )
     _write(
         target_repo / "CLAUDE.md",
         """# ConventionsRecover
@@ -2011,7 +2182,10 @@ def test_context_recovery_ignores_development_conventions_for_run_commands(
 - Conventional commits only.
 """,
     )
-    _write(target_repo / "package.json", '{"dependencies":{"vite":"6.0.0","react":"19.0.0"}}')
+    _write(
+        target_repo / "package.json",
+        '{"dependencies":{"vite":"6.0.0","react":"19.0.0"}}',
+    )
 
     result = build_portfolio_truth_snapshot(
         workspace_root=portfolio_workspace,
@@ -2020,7 +2194,9 @@ def test_context_recovery_ignores_development_conventions_for_run_commands(
         include_notion=False,
         now=datetime.fromtimestamp(1_700_000_100, tz=timezone.utc),
     )
-    plan = build_context_recovery_plan(result.snapshot, workspace_root=portfolio_workspace)
+    plan = build_context_recovery_plan(
+        result.snapshot, workspace_root=portfolio_workspace
+    )
     apply_context_recovery_plan(
         result.snapshot,
         plan,
@@ -2030,7 +2206,9 @@ def test_context_recovery_ignores_development_conventions_for_run_commands(
 
     context_text = (target_repo / "CLAUDE.md").read_text()
     managed_block = context_text.split("<!-- portfolio-context:start -->", 1)[1]
-    how_to_run = managed_block.split("## How To Run", 1)[1].split("## Known Risks", 1)[0]
+    how_to_run = managed_block.split("## How To Run", 1)[1].split("## Known Risks", 1)[
+        0
+    ]
     assert "npm run dev" in how_to_run
     assert "File naming" not in how_to_run
     assert _classify_context_quality(target_repo, ["CLAUDE.md"]) == "minimum-viable"
@@ -2061,7 +2239,10 @@ Run `npm run dev` after installing dependencies.
 This fixture only models pointer preambles.
 """,
     )
-    _write(target_repo / "package.json", '{"dependencies":{"vite":"6.0.0","react":"19.0.0"}}')
+    _write(
+        target_repo / "package.json",
+        '{"dependencies":{"vite":"6.0.0","react":"19.0.0"}}',
+    )
 
     result = build_portfolio_truth_snapshot(
         workspace_root=portfolio_workspace,
@@ -2070,7 +2251,9 @@ This fixture only models pointer preambles.
         include_notion=False,
         now=datetime.fromtimestamp(1_700_000_100, tz=timezone.utc),
     )
-    plan = build_context_recovery_plan(result.snapshot, workspace_root=portfolio_workspace)
+    plan = build_context_recovery_plan(
+        result.snapshot, workspace_root=portfolio_workspace
+    )
     apply_context_recovery_plan(
         result.snapshot,
         plan,
@@ -2095,7 +2278,10 @@ def test_context_recovery_does_not_use_unknown_as_stack(
 ) -> None:
     target_repo = portfolio_workspace / "UnknownStackRecover"
     target_repo.mkdir()
-    _write(target_repo / "README.md", "# UnknownStackRecover\n\nUnknownStackRecover is active.\n")
+    _write(
+        target_repo / "README.md",
+        "# UnknownStackRecover\n\nUnknownStackRecover is active.\n",
+    )
 
     result = build_portfolio_truth_snapshot(
         workspace_root=portfolio_workspace,
@@ -2104,7 +2290,9 @@ def test_context_recovery_does_not_use_unknown_as_stack(
         include_notion=False,
         now=datetime.fromtimestamp(1_700_000_100, tz=timezone.utc),
     )
-    plan = build_context_recovery_plan(result.snapshot, workspace_root=portfolio_workspace)
+    plan = build_context_recovery_plan(
+        result.snapshot, workspace_root=portfolio_workspace
+    )
     apply_context_recovery_plan(
         result.snapshot,
         plan,
@@ -2240,8 +2428,12 @@ def test_allow_dirty_worktree_makes_dirty_repos_eligible(
     )
 
     # Without allow_dirty: should be skipped
-    plan_strict = build_context_recovery_plan(result.snapshot, workspace_root=portfolio_workspace)
-    strict_target = next((t for t in plan_strict.projects if t.project_key == "DirtyRepo"), None)
+    plan_strict = build_context_recovery_plan(
+        result.snapshot, workspace_root=portfolio_workspace
+    )
+    strict_target = next(
+        (t for t in plan_strict.projects if t.project_key == "DirtyRepo"), None
+    )
     assert strict_target is not None
     assert strict_target.status == "skipped"
     assert strict_target.reason == "dirty-worktree"
@@ -2250,7 +2442,9 @@ def test_allow_dirty_worktree_makes_dirty_repos_eligible(
     plan_dirty = build_context_recovery_plan(
         result.snapshot, workspace_root=portfolio_workspace, allow_dirty=True
     )
-    dirty_target = next((t for t in plan_dirty.projects if t.project_key == "DirtyRepo"), None)
+    dirty_target = next(
+        (t for t in plan_dirty.projects if t.project_key == "DirtyRepo"), None
+    )
     assert dirty_target is not None
     assert dirty_target.status == "eligible"
 
@@ -2269,7 +2463,9 @@ def _apply_recovery_for(
         include_notion=False,
         now=datetime.fromtimestamp(1_700_000_100, tz=timezone.utc),
     )
-    plan = build_context_recovery_plan(result.snapshot, workspace_root=portfolio_workspace)
+    plan = build_context_recovery_plan(
+        result.snapshot, workspace_root=portfolio_workspace
+    )
     apply_context_recovery_plan(
         result.snapshot,
         plan,
@@ -2291,7 +2487,9 @@ def test_context_recovery_overrides_npm_text_when_pnpm_lockfile_present(
 ) -> None:
     target_repo = portfolio_workspace / "PnpmOverride"
     target_repo.mkdir()
-    _write(target_repo / "README.md", "# PnpmOverride\n\nPnpmOverride is an active repo.\n")
+    _write(
+        target_repo / "README.md", "# PnpmOverride\n\nPnpmOverride is an active repo.\n"
+    )
     _write(
         target_repo / "CLAUDE.md",
         """# PnpmOverride
@@ -2305,7 +2503,9 @@ def test_context_recovery_overrides_npm_text_when_pnpm_lockfile_present(
     _write(target_repo / "package.json", '{"dependencies":{"vite":"6.0.0"}}')
     _write(target_repo / "pnpm-lock.yaml", "lockfileVersion: '9.0'\n")
 
-    text = _apply_recovery_for(target_repo, portfolio_workspace, portfolio_catalog, legacy_registry)
+    text = _apply_recovery_for(
+        target_repo, portfolio_workspace, portfolio_catalog, legacy_registry
+    )
     how_to_run = _how_to_run_section(text)
     assert "pnpm" in how_to_run.lower()
     assert "Use `npm` only" not in how_to_run
@@ -2318,7 +2518,10 @@ def test_context_recovery_detects_package_manager_from_ci_workflow(
 ) -> None:
     target_repo = portfolio_workspace / "CiWorkflowPnpm"
     target_repo.mkdir()
-    _write(target_repo / "README.md", "# CiWorkflowPnpm\n\nCiWorkflowPnpm is an active repo.\n")
+    _write(
+        target_repo / "README.md",
+        "# CiWorkflowPnpm\n\nCiWorkflowPnpm is an active repo.\n",
+    )
     _write(
         target_repo / "CLAUDE.md",
         """# CiWorkflowPnpm
@@ -2334,7 +2537,9 @@ def test_context_recovery_detects_package_manager_from_ci_workflow(
         "name: test\njobs:\n  test:\n    steps:\n      - run: pnpm install --frozen-lockfile\n      - run: pnpm test\n",
     )
 
-    text = _apply_recovery_for(target_repo, portfolio_workspace, portfolio_catalog, legacy_registry)
+    text = _apply_recovery_for(
+        target_repo, portfolio_workspace, portfolio_catalog, legacy_registry
+    )
     how_to_run = _how_to_run_section(text)
     assert "pnpm" in how_to_run.lower()
 
@@ -2346,7 +2551,9 @@ def test_context_recovery_respects_manual_override_marker(
 ) -> None:
     target_repo = portfolio_workspace / "ManualMarker"
     target_repo.mkdir()
-    _write(target_repo / "README.md", "# ManualMarker\n\nManualMarker is an active repo.\n")
+    _write(
+        target_repo / "README.md", "# ManualMarker\n\nManualMarker is an active repo.\n"
+    )
     _write(
         target_repo / "CLAUDE.md",
         """# ManualMarker
@@ -2361,7 +2568,9 @@ def test_context_recovery_respects_manual_override_marker(
     _write(target_repo / "package.json", '{"dependencies":{"vite":"6.0.0"}}')
     _write(target_repo / "pnpm-lock.yaml", "lockfileVersion: '9.0'\n")
 
-    text = _apply_recovery_for(target_repo, portfolio_workspace, portfolio_catalog, legacy_registry)
+    text = _apply_recovery_for(
+        target_repo, portfolio_workspace, portfolio_catalog, legacy_registry
+    )
     how_to_run = _how_to_run_section(text)
     assert "Use `npm` only" in how_to_run
     assert "manual:run-instructions" in how_to_run
@@ -2387,7 +2596,9 @@ def test_context_recovery_emits_drift_note_when_correcting(
     _write(target_repo / "package.json", '{"dependencies":{"vite":"6.0.0"}}')
     _write(target_repo / "pnpm-lock.yaml", "lockfileVersion: '9.0'\n")
 
-    text = _apply_recovery_for(target_repo, portfolio_workspace, portfolio_catalog, legacy_registry)
+    text = _apply_recovery_for(
+        target_repo, portfolio_workspace, portfolio_catalog, legacy_registry
+    )
     how_to_run = _how_to_run_section(text)
     assert "corrected" in how_to_run.lower() or "detected" in how_to_run.lower()
 
@@ -2403,7 +2614,12 @@ def test_git_default_branch_reads_local_origin_head(tmp_path: Path) -> None:
     subprocess.run(["git", "init"], cwd=repo, capture_output=True, check=True)
     # Point the local origin/HEAD ref at a non-"main" branch (no network/clone).
     subprocess.run(
-        ["git", "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/develop"],
+        [
+            "git",
+            "symbolic-ref",
+            "refs/remotes/origin/HEAD",
+            "refs/remotes/origin/develop",
+        ],
         cwd=repo,
         capture_output=True,
         check=True,
@@ -2419,7 +2635,12 @@ def test_git_default_branch_keeps_multi_segment_branch(tmp_path: Path) -> None:
     repo.mkdir()
     subprocess.run(["git", "init"], cwd=repo, capture_output=True, check=True)
     subprocess.run(
-        ["git", "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/release/v1"],
+        [
+            "git",
+            "symbolic-ref",
+            "refs/remotes/origin/HEAD",
+            "refs/remotes/origin/release/v1",
+        ],
         cwd=repo,
         capture_output=True,
         check=True,

@@ -47,7 +47,6 @@ def build_operating_path_entry(
     context_quality: str = "",
     intent_alignment: str = "",
     archived: bool = False,
-    registry_status: str = "",
     completeness_tier: str = "",
     decision_quality_status: str = "",
 ) -> dict[str, Any]:
@@ -57,7 +56,6 @@ def build_operating_path_entry(
     explicit_contract = bool(entry.get("has_explicit_entry"))
     context_quality = _normalize_key(context_quality)
     intent_alignment = _normalize_key(intent_alignment)
-    registry_status = _normalize_key(registry_status)
     completeness_tier = _normalize_key(completeness_tier)
     decision_quality_status = _normalize_key(decision_quality_status)
 
@@ -100,13 +98,16 @@ def build_operating_path_entry(
             "Context quality is still too weak for path guidance to stand on its own."
         )
 
-    if archived or registry_status == "archived":
+    if archived:
         if stable_path != "archive":
             concerns.append("archived-outside-archive-path")
             rationale_parts.append(
                 "The repo currently looks archival, but the declared operating path is not archive."
             )
-    elif completeness_tier in {"abandoned", "skeleton"} and stable_path in {"maintain", "finish"}:
+    elif completeness_tier in {"abandoned", "skeleton"} and stable_path in {
+        "maintain",
+        "finish",
+    }:
         concerns.append("repo-state-below-path-bar")
         rationale_parts.append(
             "Current repo maturity is still below what the declared operating path usually expects."
@@ -140,7 +141,9 @@ def build_operating_path_entry(
 
     path_override = INVESTIGATE_OVERRIDE if path_confidence == "low" else ""
     if path_override:
-        rationale_parts.append("Treat this repo as investigate until path confidence improves.")
+        rationale_parts.append(
+            "Treat this repo as investigate until path confidence improves."
+        )
 
     rationale = " ".join(part for part in rationale_parts if part).strip()
     if not rationale:
@@ -164,7 +167,8 @@ def build_operating_path_line(value: dict[str, Any]) -> str:
     override = _normalize_key(value.get("path_override"))
     confidence = _normalize_key(value.get("path_confidence")) or "legacy"
     rationale = (
-        _safe_text(value.get("path_rationale")) or "No operating-path rationale is recorded yet."
+        _safe_text(value.get("path_rationale"))
+        or "No operating-path rationale is recorded yet."
     )
 
     if path:
@@ -204,7 +208,11 @@ def build_operating_paths_summary(items: list[Any]) -> dict[str, Any]:
     ]
     if path_counts.get("unspecified"):
         ordered_paths.append(f"Unspecified {path_counts['unspecified']}")
-    summary = ", ".join(ordered_paths) if ordered_paths else "No operating paths are recorded yet."
+    summary = (
+        ", ".join(ordered_paths)
+        if ordered_paths
+        else "No operating paths are recorded yet."
+    )
     if override_counts:
         summary += (
             f". {sum(override_counts.values())} repo(s) currently require an "

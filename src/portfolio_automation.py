@@ -7,7 +7,7 @@ only when ALL of the following hold:
 * the portfolio's ``decision_quality_status`` is ``"trusted"`` (a portfolio-wide
   gate — when calibration is noisy/mixed/insufficient, nothing is eligible);
 * the repo's ``path_confidence`` is ``"high"`` (its operating path is settled);
-* the repo's ``registry_status`` is active or candidate (not archived/parked);
+* the repo's ``activity_status`` is active or candidate (not archived/parked);
 * the repo's ``context_quality`` is non-trivial (not boilerplate/none/unknown).
 
 Selecting candidates does NOT propose or apply any change — proposal creation
@@ -25,7 +25,7 @@ CONTRACT_VERSION = "automation_candidates_v1"
 # creation, execution re-checks) reuse the exact same gate.
 TRUSTED_DECISION_QUALITY = "trusted"
 ELIGIBLE_PATH_CONFIDENCE = frozenset({"high"})
-ELIGIBLE_REGISTRY_STATUS = frozenset({"active", "candidate"})
+ELIGIBLE_ACTIVITY_STATUS = frozenset({"active", "candidate"})
 ELIGIBLE_CONTEXT_QUALITY = frozenset({"minimum-viable", "standard", "full"})
 
 MAX_AUTOMATION_CANDIDATES = 25
@@ -53,7 +53,7 @@ class AutomationCandidate:
 
     display_name: str
     repo_full_name: str
-    registry_status: str
+    activity_status: str
     path_confidence: str
     context_quality: str
 
@@ -61,7 +61,7 @@ class AutomationCandidate:
         return {
             "repo": self.display_name,
             "repo_full_name": self.repo_full_name,
-            "registry_status": self.registry_status,
+            "activity_status": self.activity_status,
             "path_confidence": self.path_confidence,
             "context_quality": self.context_quality,
         }
@@ -80,8 +80,8 @@ def evaluate_automation_eligibility(
     blockers: list[str] = []
     if _text(decision_quality_status) != TRUSTED_DECISION_QUALITY:
         blockers.append("decision-quality-not-trusted")
-    if _text(derived.get("registry_status")) not in ELIGIBLE_REGISTRY_STATUS:
-        blockers.append("registry-status-not-eligible")
+    if _text(derived.get("activity_status")) not in ELIGIBLE_ACTIVITY_STATUS:
+        blockers.append("activity-status-not-eligible")
     if _text(derived.get("path_confidence")) not in ELIGIBLE_PATH_CONFIDENCE:
         blockers.append("path-confidence-not-high")
     if _text(derived.get("context_quality")) not in ELIGIBLE_CONTEXT_QUALITY:
@@ -109,7 +109,7 @@ def select_automation_candidates(
             AutomationCandidate(
                 display_name=_text(identity.get("display_name")) or "Repo",
                 repo_full_name=_text(identity.get("repo_full_name")),
-                registry_status=_text(derived.get("registry_status")),
+                activity_status=_text(derived.get("activity_status")),
                 path_confidence=_text(derived.get("path_confidence")),
                 context_quality=_text(derived.get("context_quality")),
             )
