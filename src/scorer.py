@@ -111,7 +111,6 @@ def score_repo(
 
     overall_score = weighted_sum / weight_sum if weight_sum > 0 else 0.0
     scored_dimensions = [dimension for dimension in weights if dimension in score_map]
-    full_weight_sum = sum(weights.values())
 
     # Compute interest score (separate axis, from interest analyzer)
     interest_score = score_map.get("interest", 0.0)
@@ -173,10 +172,7 @@ def score_repo(
         tier = "skeleton"
         flags.append("readme-only")
 
-    base_grade = letter_grade(overall_score, grade_thresholds)
-    grade = base_grade
-    if weight_sum < full_weight_sum * PARTIAL_RUN_BASIS_THRESHOLD:
-        grade = f"{base_grade} on {len(scored_dimensions)}/{len(weights)} dimensions"
+    grade = letter_grade(overall_score, grade_thresholds)
 
     audit = RepoAudit(
         metadata=metadata,

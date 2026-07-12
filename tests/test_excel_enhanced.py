@@ -895,7 +895,7 @@ class TestAllReposSheet:
         report = _make_report()
         report["audits"][0].update(
             {
-                "grade": "B on 7/10 dimensions",
+                "grade": "B",
                 "scored_dimensions": ["readme", "testing"],
                 "scored_weight_sum": 0.3,
             }
@@ -908,13 +908,19 @@ class TestAllReposSheet:
 
         assert "Scored Dimensions" in headers
         assert "Scored Weight Sum" in headers
-        assert ws.cell(row=repo_row, column=headers["Grade"]).value == "B on 7/10 dimensions"
+        assert ws.cell(row=repo_row, column=headers["Grade"]).value == "B on 2/10 dimensions"
         assert ws.cell(row=repo_row, column=headers["Scored Dimensions"]).value == "readme, testing"
         assert ws.cell(row=repo_row, column=headers["Scored Weight Sum"]).value == 0.3
 
     def test_dashboard_grade_distribution_uses_qualified_grade_letter(self):
         report = _make_report()
-        report["audits"][0]["grade"] = "B on 7/10 dimensions"
+        report["audits"][0].update(
+            {
+                "grade": "B",
+                "scored_dimensions": ["readme", "testing"],
+                "scored_weight_sum": 0.3,
+            }
+        )
 
         wb = Workbook()
         _build_dashboard(wb, report)
