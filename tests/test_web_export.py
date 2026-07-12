@@ -656,6 +656,22 @@ class TestRenderHtml:
         html = _render_html(_make_report())
         assert "Next:" in html or "Gap:" in html
 
+    def test_partial_run_grade_is_displayed_but_filterable_by_letter(self):
+        report = _make_report()
+        report["audits"][0].update(
+            {
+                "grade": "B",
+                "scored_dimensions": ["readme", "testing"],
+                "scored_weight_sum": 0.3,
+            }
+        )
+
+        html = _render_html(report)
+
+        assert "B on 2/10 dimensions" in html
+        assert 'data-grade="B"' in html
+        assert 'data-grade="B on 2/10 dimensions"' not in html
+
     def test_run_changes_section_is_rendered(self):
         report = _make_report(run_change_summary="One repo improved and one regressed.")
         html = _render_html(

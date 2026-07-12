@@ -270,8 +270,9 @@ def write_kpi_card(
 
 def color_grade_cell(cell, grade: str) -> None:
     """Apply grade-specific coloring to a cell."""
-    if grade in GRADE_FILLS:
-        cell.fill = GRADE_FILLS[grade]
+    grade_letter = grade.split(" ", 1)[0]
+    if grade_letter in GRADE_FILLS:
+        cell.fill = GRADE_FILLS[grade_letter]
         cell.font = Font("Calibri", 10, bold=True, color=WHITE)
 
 

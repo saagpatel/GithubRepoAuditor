@@ -97,6 +97,8 @@ class RepoAudit:
     interest_score: float = 0.0
     interest_tier: str = "mundane"
     grade: str = "F"
+    scored_dimensions: list[str] = field(default_factory=list)
+    scored_weight_sum: float = 0.0
     interest_grade: str = "F"
     badges: list[str] = field(default_factory=list)
     next_badges: list[dict] = field(default_factory=list)
@@ -122,6 +124,8 @@ class RepoAudit:
             "completeness_tier": self.completeness_tier,
             "interest_tier": self.interest_tier,
             "grade": self.grade,
+            "scored_dimensions": self.scored_dimensions,
+            "scored_weight_sum": round(self.scored_weight_sum, 3),
             "interest_grade": self.interest_grade,
             "badges": self.badges,
             "next_badges": self.next_badges,
