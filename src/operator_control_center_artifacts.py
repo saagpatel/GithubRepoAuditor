@@ -69,6 +69,7 @@ def write_control_center_artifacts(
         snapshot,
         diff_data=diff_dict,
         portfolio_truth=portfolio_truth,
+        portfolio_truth_history_dir=portfolio_truth_path.parent if portfolio_truth_path else None,
         portfolio_truth_reference=str(portfolio_truth_path) if portfolio_truth_path else "",
         control_center_reference=str(json_path),
         report_reference=report_reference,
