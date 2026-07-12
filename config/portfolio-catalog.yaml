@@ -397,10 +397,16 @@ repos:
     category: vanity
   Phantom Frequencies:
     owner: d
+    purpose: compact authored supernatural-radio game being finished as an Oddworks release
     lifecycle_state: active
-    review_cadence: monthly
-    operating_path: maintain
-    tool_provenance: claude-code
+    criticality: high
+    review_cadence: weekly
+    operating_path: finish
+    category: commercial
+    tool_provenance: codex
+    maturity_program: finish
+    target_maturity: operating
+    notes: Release-candidate branch and playtest packet exist; human cohort, signing, and publication gates remain open. Oddworks reactivated this lane on 2026-07-12.
   RedditSentimentAnalyzer:
     owner: d
     lifecycle_state: active
@@ -410,10 +416,16 @@ repos:
     tool_provenance: claude-code
   SignalDecay:
     owner: d
+    purpose: one-room 8-12 minute tactile signal-tuning game for the Oddworks label
     lifecycle_state: active
-    review_cadence: monthly
-    operating_path: maintain
-    tool_provenance: claude-code
+    criticality: high
+    review_cadence: weekly
+    operating_path: finish
+    category: commercial
+    tool_provenance: codex
+    maturity_program: finish
+    target_maturity: operating
+    notes: Verified one-room packaged candidate exists; naive-player duration, tuning, retention, signing, and publication gates remain open. Oddworks reactivated this lane on 2026-07-12.
   desktop_terrarium:
     owner: d
     lifecycle_state: maintenance
@@ -632,10 +644,16 @@ repos:
     notes: Archived from active operator attention on 2026-06-13. The corrupt local checkout was preserved at /Users/d/Projects/GhostRoutes.corrupt-20260613T124820Z and /Users/d/Projects/GhostRoutes was restored from a fresh origin clone. Keep this repo archived/deferred unless explicitly reactivated.
   Liminal:
     owner: d
+    purpose: focused atmospheric iOS experience being finished as an Oddworks release
     lifecycle_state: active
+    criticality: high
     review_cadence: weekly
-    operating_path: maintain
-    tool_provenance: claude-code
+    operating_path: finish
+    category: commercial
+    tool_provenance: codex
+    maturity_program: finish
+    target_maturity: operating
+    notes: Verified unsigned device Release bundle and external cohort packet exist; physical-device, human-proof, signing, and publication gates remain open. Oddworks reactivated this lane on 2026-07-12.
   Nocturne:
     owner: d
     lifecycle_state: active
@@ -777,11 +795,16 @@ repos:
       confirm purpose/criticality.'
   DeepTank:
     owner: d
+    purpose: authored aquatic simulation game being evaluated and finished for the Oddworks label
     lifecycle_state: active
+    criticality: high
     review_cadence: weekly
-    operating_path: maintain
-    notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
-      confirm purpose/criticality.'
+    operating_path: finish
+    category: commercial
+    tool_provenance: codex
+    maturity_program: finish
+    target_maturity: operating
+    notes: Active Oddworks lane, but implementation is lease-protected by a dirty worktree with broad src-tauri deletions; preserve it until the existing owner clears or hands off the lease.
   DesktopPEt:
     owner: d
     lifecycle_state: active
@@ -1075,10 +1098,29 @@ repos:
     category: vanity
   BattleGrid:
     owner: d
+    purpose: focused tactical grid game being evaluated and finished for the Oddworks label
     lifecycle_state: active
-    review_cadence: monthly
-    operating_path: maintain
-    category: fun
+    criticality: high
+    review_cadence: weekly
+    operating_path: finish
+    category: commercial
+    tool_provenance: codex
+    maturity_program: finish
+    target_maturity: operating
+    notes: Active Oddworks lane, but implementation is lease-protected by a dirty feature branch that is behind origin; preserve it until the existing owner clears or hands off the lease.
+  OddworksCabinet:
+    owner: d
+    purpose: evidence-first gallery and release surface for small authored Oddworks experiences
+    lifecycle_state: active
+    criticality: high
+    review_cadence: weekly
+    operating_path: finish
+    category: commercial
+    tool_provenance: codex
+    maturity_program: finish
+    target_maturity: operating
+    automation_eligible: false
+    notes: Verified private candidate exists with genuine Liminal and SignalDecay media and explicit candidate status; public deployment remains gated until release approval.
   LegalDocsReview:
     owner: d
     lifecycle_state: active
