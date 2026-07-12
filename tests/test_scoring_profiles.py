@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from src.models import AnalyzerResult, RepoMetadata
+from src.app.run_audit import _load_scoring_profile
 from src.scorer import WEIGHTS, score_repo
 
 
@@ -77,3 +79,49 @@ class TestScoringProfiles:
             weights = json.loads(profile_path.read_text())
             total = sum(weights.values())
             assert abs(total - 1.0) < 0.01, f"{profile_path.name} weights sum to {total}"
+
+    def test_flat_profile_loads_weights_without_overrides(self):
+        profile, profile_name = _load_scoring_profile("default")
+
+        assert profile_name == "default"
+        assert profile is not None
+        assert dict(profile) == json.loads(
+            Path("config/scoring-profiles/default.json").read_text()
+        )
+        assert profile.overrides == {}
+
+    def test_profile_reserved_constants_override_scorer(self, tmp_path, monkeypatch):
+        profiles_dir = tmp_path / "config/scoring-profiles"
+        profiles_dir.mkdir(parents=True)
+        profile_path = profiles_dir / "override.json"
+        profile_path.write_text(
+            json.dumps(
+                {
+                    **WEIGHTS,
+                    "stale_threshold_days": 1,
+                    "grade_thresholds": [[0.9, "A"], [0.0, "F"]],
+                    "completeness_tiers": [["shipped", 0.8], ["functional", 0.7], ["draft", 0.0]],
+                }
+            )
+        )
+        monkeypatch.chdir(tmp_path)
+        profile, _ = _load_scoring_profile("override")
+        assert profile is not None
+
+        metadata = _make_metadata(
+            pushed_at=datetime.now(timezone.utc) - timedelta(days=3)
+        )
+        results = _make_results({dimension: 0.76 for dimension in WEIGHTS})
+        default_audit = score_repo(metadata, results)
+        overridden_audit = score_repo(
+            metadata,
+            results,
+            custom_weights=profile,
+            scoring_profile=profile.overrides,
+        )
+
+        assert dict(profile) == WEIGHTS
+        assert default_audit.completeness_tier == "shipped"
+        assert overridden_audit.completeness_tier == "wip"
+        assert default_audit.grade == "B"
+        assert overridden_audit.grade == "F"

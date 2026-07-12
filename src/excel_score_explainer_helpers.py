@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from src.scorer import UNSCORED_DIMENSIONS, display_dimension
+
 SCORE_EXPLAINER_HEADERS = ["Dimension", "Weight", "What It Measures", "How to Improve"]
 
 DIMENSION_INFO = {
@@ -41,6 +43,10 @@ DIMENSION_INFO = {
         "docs/ dir, CHANGELOG, comment density",
         "Add docs/ folder or CHANGELOG.md",
     ),
+    "description": (
+        "Repository description confidence and consistency",
+        "Add a concise, accurate repository description",
+    ),
 }
 
 
@@ -53,12 +59,21 @@ def build_score_explainer_content(
     return {
         "dimension_rows": [
             [
-                dimension,
+                display_dimension(dimension),
                 f"{weight:.0%}",
                 DIMENSION_INFO.get(dimension, ("", ""))[0],
                 DIMENSION_INFO.get(dimension, ("", ""))[1],
             ]
             for dimension, weight in sorted(weights.items(), key=lambda item: item[1], reverse=True)
+        ] + [
+            [
+                display_dimension(dimension),
+                "Unscored",
+                DIMENSION_INFO.get(dimension, ("", ""))[0],
+                DIMENSION_INFO.get(dimension, ("", ""))[1],
+            ]
+            for dimension in sorted(UNSCORED_DIMENSIONS)
+            if dimension not in weights
         ],
         "grade_rows": [[grade, f">= {threshold:.0%}"] for threshold, grade in grade_thresholds],
         "tier_rows": [

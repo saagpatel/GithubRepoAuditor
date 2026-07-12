@@ -653,7 +653,6 @@ def _build_truth_project(
         display_name=raw_project["name"],
         operating_path=path_entry.get("operating_path", ""),
         path_override=path_entry.get("path_override", ""),
-        path_confidence=path_entry.get("path_confidence", "legacy"),
         context_quality=context_quality,
         activity_status=activity_status,
         registry_status=registry_status,

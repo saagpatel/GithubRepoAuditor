@@ -112,7 +112,6 @@ class SecurityAnalyzer(BaseAnalyzer):
     """Scans for security surface issues — exposed secrets, dangerous files, missing config."""
 
     name = "security"
-    weight = 0.0  # Advisory dimension, not part of completeness score
 
     def analyze(
         self,

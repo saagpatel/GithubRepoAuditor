@@ -14,7 +14,6 @@ class BaseAnalyzer(ABC):
     """Abstract base for all repo analyzers."""
 
     name: str
-    weight: float
 
     @abstractmethod
     def analyze(

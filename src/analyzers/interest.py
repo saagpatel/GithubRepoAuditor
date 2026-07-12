@@ -35,7 +35,6 @@ class InterestAnalyzer(BaseAnalyzer):
     """
 
     name = "interest"
-    weight = 0.0  # Not part of completeness score — separate axis
 
     def analyze(
         self,

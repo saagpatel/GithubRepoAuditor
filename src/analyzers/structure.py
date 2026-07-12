@@ -42,7 +42,6 @@ LANG_DIRS: dict[str | None, list[str]] = {
 
 class StructureAnalyzer(BaseAnalyzer):
     name = "structure"
-    weight = 0.10
 
     def cache_inputs_hash(
         self,

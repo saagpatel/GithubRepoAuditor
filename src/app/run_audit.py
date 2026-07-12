@@ -53,6 +53,17 @@ from src.terminology import ACTION_SYNC_CANONICAL_LABELS
 DEFAULT_ANALYSIS_WORKERS = 1
 MAX_ANALYSIS_WORKERS = 8
 DEFAULT_PORTFOLIO_WORKSPACE = Path.home() / "Projects"
+_SCORING_PROFILE_RESERVED_KEYS = frozenset(
+    {"stale_threshold_days", "grade_thresholds", "completeness_tiers"}
+)
+
+
+class ScoringProfile(dict[str, float]):
+    """Flat profile weights plus optional scoring-constant overrides."""
+
+    def __init__(self, weights: dict[str, float], *, overrides: dict[str, object]) -> None:
+        super().__init__(weights)
+        self.overrides = overrides
 CLI_MODE_GUIDE = """GitHub portfolio operating system with four product modes:
   First Run     setup, baseline creation, first workbook, first control-center read
   Weekly Review normal workbook-first operator loop
@@ -545,6 +556,7 @@ def _analyze_repos(
             repo_path=repo_path,
             portfolio_lang_freq=portfolio_lang_freq,
             custom_weights=custom_weights,
+            scoring_profile=getattr(custom_weights, "overrides", None),
             github_client=worker_client,
             scorecard_enabled=args.scorecard,
             security_offline=args.security_offline,
@@ -1646,7 +1658,13 @@ def _load_scoring_profile(profile_name: str | None) -> tuple[dict[str, float] | 
     profile_path = Path(f"config/scoring-profiles/{profile_name}.json")
     if profile_path.is_file():
         print_info(f"Using scoring profile: {profile_name}")
-        return json.loads(profile_path.read_text()), normalized
+        profile = json.loads(profile_path.read_text())
+        overrides = {
+            key: profile.pop(key)
+            for key in _SCORING_PROFILE_RESERVED_KEYS
+            if key in profile
+        }
+        return ScoringProfile(profile, overrides=overrides), normalized
 
     print_warning(f"Scoring profile not found: {profile_path}")
     return None, normalized
