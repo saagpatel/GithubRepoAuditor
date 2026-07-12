@@ -391,7 +391,7 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     assert gamma.identity.section_marker == "iOS Projects"
     assert gamma.derived.stack == ["Swift"]
 
-    assert result.snapshot.schema_version == "0.9.0"
+    assert result.snapshot.schema_version == "0.10.0"
     assert result.snapshot.derivation_policy_version == "portfolio_attention.v2"
     assert result.snapshot.inputs["catalog"]["sha256"]
     assert result.snapshot.inputs["notion"]["mode"] == "unavailable"
@@ -417,6 +417,8 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     assert sum(rollups["risk_tier_counts"].values()) == len(result.snapshot.projects)
     assert set(rollups["security"]) == {
         "scanned_count",
+        "unavailable_count",
+        "coverage_state",
         "repos_with_open_high_critical",
         "total_open_high",
         "total_open_critical",
@@ -535,7 +537,31 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
             path_override="investigate",
             risk_entry={"security_risk": False},
         )
-        == "decision-needed"
+        == "manual-only"
+    )
+    assert (
+        _attention_state_for(
+            activity_status="active",
+            archived=False,
+            lifecycle_state="active",
+            operating_path="",
+            category="infrastructure",
+            path_override="investigate",
+            risk_entry={"security_risk": False},
+        )
+        == "manual-only"
+    )
+    assert (
+        _attention_state_for(
+            activity_status="active",
+            archived=False,
+            lifecycle_state="manual-only",
+            operating_path="maintain",
+            category="infrastructure",
+            path_override="",
+            risk_entry={"security_risk": False},
+        )
+        == "manual-only"
     )
     assert (
         _attention_state_for(
@@ -1961,8 +1987,11 @@ def test_portfolio_truth_app_passes_validated_producer_receipt_to_publisher(
                 "commit": "a" * 40,
                 "ref": "refs/remotes/origin/main",
                 "checkout_role": "canonical-automation",
+                "checkout_path": str(tmp_path / "producer-repo"),
                 "worktree_clean": True,
+                "dirty_path_count": 0,
                 "verified_at": "2026-07-10T12:00:00Z",
+                "receipt_id": "sha256:" + "a" * 64,
                 "checks": {},
             }
         )
@@ -2022,6 +2051,7 @@ def test_cli_portfolio_truth_allow_empty_notion_carries_forward(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     output_dir = tmp_path / "output"
+    monkeypatch.setenv("GHRA_REQUIRE_PRODUCER_EVIDENCE", "0")
     output_dir.mkdir()
 
     discovered = build_portfolio_truth_snapshot(
@@ -2404,6 +2434,7 @@ def test_cli_portfolio_truth_respects_path_overrides(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     output_dir = tmp_path / "output"
+    monkeypatch.setenv("GHRA_REQUIRE_PRODUCER_EVIDENCE", "0")
     registry_output = portfolio_workspace / "compat-registry.md"
     report_output = portfolio_workspace / "compat-report.md"
     argv = [

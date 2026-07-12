@@ -18,6 +18,7 @@ from src.portfolio_catalog import (
 from src.portfolio_context_contract import has_substantive_readme_support
 from src.portfolio_pathing import build_operating_path_entry
 from src.portfolio_risk import build_risk_entry
+from src.portfolio_repository_state import observe_repository_state
 from src.portfolio_truth_sources import (
     WORKSPACE_DISCOVERY_POLICY_VERSION,
     discover_workspace_projects,
@@ -337,6 +338,11 @@ def build_portfolio_truth_snapshot(
             notion_context_carried_forward=notion_context_carried_forward,
             prior_notion_generated_at=prior_notion_generated_at,
         ),
+        coverage=_build_coverage_envelope(
+            projects=projects,
+            notion_context_carried_forward=notion_context_carried_forward,
+            notion_context_rows=len(notion_context),
+        ),
         exclusions={
             "policy_version": WORKSPACE_DISCOVERY_POLICY_VERSION,
             "counts": dict(sorted(exclusion_counts.items())),
@@ -345,6 +351,24 @@ def build_portfolio_truth_snapshot(
     return PortfolioTruthBuildResult(
         snapshot=snapshot, catalog_data=catalog_data, legacy_rows=legacy_rows
     )
+
+
+def _build_coverage_envelope(
+    *,
+    projects: list[PortfolioTruthProject],
+    notion_context_carried_forward: bool,
+    notion_context_rows: int,
+) -> list[dict[str, Any]]:
+    scanned = sum(project.security.alerts_available for project in projects)
+    git_observed = sum(
+        project.repository_state.get("state") == "observed" for project in projects
+    )
+    return [
+        {"source": "workspace", "state": "observed", "project_count": len(projects)},
+        {"source": "git", "state": "observed" if git_observed else "unknown", "observed_count": git_observed, "project_count": len(projects)},
+        {"source": "github_security", "state": "known" if scanned == len(projects) else "partial" if scanned else "unknown", "scanned_count": scanned, "project_count": len(projects)},
+        {"source": "notion", "state": "carried_forward" if notion_context_carried_forward else "observed" if notion_context_rows else "unknown", "observed_count": notion_context_rows},
+    ]
 
 
 def _build_input_envelope(
@@ -483,6 +507,7 @@ def _build_security_fields(ghas_entry: dict[str, Any] | None) -> SecurityFields:
 
     return SecurityFields(
         alerts_available=bool(dependabot.get("available", False)),
+        coverage_state="known" if dependabot.get("available", False) else "unknown",
         dependabot_critical=_count(dependabot, "critical"),
         dependabot_high=_count(dependabot, "high"),
         dependabot_medium=_count(dependabot, "medium"),
@@ -701,6 +726,14 @@ def _build_truth_project(
         security_high_alerts=security.dependabot_high,
         security_critical_alerts=security.dependabot_critical,
     )
+    if (
+        not security.alerts_available
+        and risk_entry.get("risk_summary") == "No elevated risk factors."
+    ):
+        risk_entry["risk_summary"] = (
+            "No non-security risk factors detected; security posture is unknown "
+            "because alert coverage is unavailable."
+        )
     attention_state = _attention_state_for(
         activity_status=activity_status,
         archived=archived,
@@ -860,6 +893,11 @@ def _build_truth_project(
         risk=risk,
         security=security,
         advisory=advisory,
+        repository_state=(
+            observe_repository_state(project_path, observed_at=now)
+            if project_path is not None and has_git
+            else {"state": "not_a_repository", "observed_at": now.isoformat()}
+        ),
         provenance=provenance,
         warnings=warnings,
     )
@@ -1062,17 +1100,15 @@ def _attention_state_for(
         return "archived"
     if operating_path == "experiment" or lifecycle_state == "experimental":
         return "experiment"
+    if lifecycle_state == "manual-only":
+        return "manual-only"
     if activity_status == "stale":
         # A declared finish path is itself an unresolved operator decision. It can
         # remain valid while the default branch is stale (for example, when work is
         # on a release branch or waiting at a human/publication gate), so do not
         # silently collapse it back into the parked pool.
         return "decision-needed" if operating_path == "finish" else "parked"
-    if (
-        path_override == "investigate"
-        or not operating_path
-        or risk_entry.get("security_risk")
-    ):
+    if risk_entry.get("security_risk"):
         return "decision-needed"
     if activity_status in {"active", "recent"} and operating_path in {
         "maintain",

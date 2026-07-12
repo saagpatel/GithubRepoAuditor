@@ -85,7 +85,7 @@ def run_portfolio_truth_mode(args: Any) -> None:
             producer_evidence=producer_evidence,
             producer_repo_root=producer_repo_root,
             require_producer_evidence=bool(
-                os.environ.get("GHRA_REQUIRE_PRODUCER_EVIDENCE") == "1"
+                os.environ.get("GHRA_REQUIRE_PRODUCER_EVIDENCE", "1") == "1"
             ),
         )
     except (PortfolioTruthPublishError, ValueError) as exc:
