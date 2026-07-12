@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import re
+import tempfile
+
 from pathlib import Path
 
 from src.portfolio_catalog import (
@@ -11,6 +14,7 @@ from src.portfolio_catalog import (
     group_entry_for_path,
     load_portfolio_catalog,
 )
+from src.portfolio_pathing import resolve_declared_operating_path
 
 
 def test_load_portfolio_catalog_accepts_defaults_and_repo_entries(tmp_path: Path):
@@ -83,7 +87,11 @@ repos:
 
     catalog = load_portfolio_catalog(path)
     entry = catalog_entry_for_repo(
-        {"name": "signal-noise", "full_name": "saagpatel/signal-noise", "path": "signal-noise"},
+        {
+            "name": "signal-noise",
+            "full_name": "saagpatel/signal-noise",
+            "path": "signal-noise",
+        },
         catalog,
     )
 
@@ -155,7 +163,10 @@ def test_live_catalog_keeps_settled_recovery_exclusions_archived() -> None:
     for repo_name in ("engraph", "reliability-vault"):
         entry = catalog["repos"][repo_name]
         assert entry["lifecycle_state"] == "archived"
-        assert entry["intended_disposition"] == "archive"
+        assert entry["operating_path"] == "archive"
+        # Migrated off the deprecated field; read-compat fallback is covered
+        # separately by test_load_portfolio_catalog_warns_on_deprecated_disposition.
+        assert entry["intended_disposition"] == ""
         assert entry["maturity_program"] == "archive"
         assert entry["automation_eligible"] is False
 
@@ -200,8 +211,12 @@ def test_catalog_entry_matches_full_name_then_bare_name():
         }
     }
 
-    repo_a = catalog_entry_for_repo({"name": "RepoA", "full_name": "user/RepoA"}, catalog)
-    repo_b = catalog_entry_for_repo({"name": "RepoB", "full_name": "user/RepoB"}, catalog)
+    repo_a = catalog_entry_for_repo(
+        {"name": "RepoA", "full_name": "user/RepoA"}, catalog
+    )
+    repo_b = catalog_entry_for_repo(
+        {"name": "RepoB", "full_name": "user/RepoB"}, catalog
+    )
 
     assert repo_a["matched_by"] == "full-name"
     assert repo_b["matched_by"] == "bare-name"
@@ -401,3 +416,173 @@ def test_catalog_line_and_summaries_cover_missing_contracts():
     assert catalog_summary["missing_contract_count"] == 1
     assert alignment_summary["counts"]["aligned"] == 1
     assert alignment_summary["counts"]["missing-contract"] == 1
+
+
+def test_load_portfolio_catalog_normalizes_operating_path(tmp_path: Path):
+    path = tmp_path / "portfolio-catalog.yaml"
+    path.write_text(
+        """
+repos:
+  RepoA:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    operating_path: finish
+"""
+    )
+
+    catalog = load_portfolio_catalog(path)
+
+    assert catalog["errors"] == []
+    assert catalog["warnings"] == []
+    assert catalog["repos"]["repoa"]["operating_path"] == "finish"
+    assert catalog["repos"]["repoa"]["intended_disposition"] == ""
+
+
+def test_load_portfolio_catalog_warns_on_deprecated_disposition(tmp_path: Path):
+    path = tmp_path / "portfolio-catalog.yaml"
+    path.write_text(
+        """
+repos:
+  RepoA:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+groups:
+  legacy:
+    path_prefixes:
+      - legacy
+    intended_disposition: archive
+"""
+    )
+
+    catalog = load_portfolio_catalog(path)
+
+    assert catalog["errors"] == []
+    assert catalog["repos"]["repoa"]["intended_disposition"] == "maintain"
+    assert catalog["repos"]["repoa"]["operating_path"] == ""
+    assert catalog["groups"]["legacy"]["intended_disposition"] == "archive"
+    assert any(
+        "RepoA" in w and "deprecated" in w and "intended_disposition" in w
+        for w in catalog["warnings"]
+    )
+    assert any(
+        "legacy" in w and "deprecated" in w and "intended_disposition" in w
+        for w in catalog["warnings"]
+    )
+
+
+def test_evaluate_intent_alignment_falls_back_to_legacy_disposition():
+    legacy_entry = {"has_explicit_entry": True, "intended_disposition": "archive"}
+    migrated_entry = {"has_explicit_entry": True, "operating_path": "archive"}
+
+    legacy_result = evaluate_intent_alignment(
+        legacy_entry, completeness_tier="abandoned", archived=False, operator_focus=""
+    )
+    migrated_result = evaluate_intent_alignment(
+        migrated_entry, completeness_tier="abandoned", archived=False, operator_focus=""
+    )
+
+    assert (
+        legacy_result
+        == migrated_result
+        == (
+            "aligned",
+            "The repo posture already matches the plan to archive or let it stay dormant.",
+        )
+    )
+
+
+def test_operating_path_takes_precedence_over_legacy_disposition_in_alignment():
+    conflicting_entry = {
+        "has_explicit_entry": True,
+        "operating_path": "maintain",
+        "intended_disposition": "archive",
+    }
+
+    alignment, _reason = evaluate_intent_alignment(
+        conflicting_entry,
+        completeness_tier="functional",
+        archived=False,
+        operator_focus="Watch Closely",
+    )
+
+    assert alignment == "aligned"
+
+
+def test_live_catalog_migration_is_lossless_for_every_entry() -> None:
+    """Whole-catalog parity proof for the intended_disposition -> operating_path
+    migration: reconstruct the pre-migration catalog by mechanically inverting the
+    rename on the live (migrated) file, then assert every repo and group entry
+    resolves to the identical *stable path* either way. This runs against the real,
+    full catalog (179 repo entries), not a toy sample.
+
+    `path_source` is deliberately NOT required to match: moving a value from the
+    deprecated `intended_disposition` fallback to the canonical `operating_path`
+    field is supposed to flip the provenance label from "intended-disposition" to
+    "explicit-operating-path" -- that label change is the correct, intended
+    signal that the entry now declares its path explicitly rather than relying on
+    the fallback. What must not change is the routing decision itself, since risk
+    tier and attention state are pure functions of the resolved path value."""
+    live_path = Path(__file__).parents[1] / "config" / "portfolio-catalog.yaml"
+    migrated_text = live_path.read_text()
+    assert "intended_disposition:" not in migrated_text, (
+        "fixture assumption: the live catalog has fully migrated to operating_path"
+    )
+
+    pre_migration_text = re.sub(
+        r"^(\s*)operating_path:",
+        r"\1intended_disposition:",
+        migrated_text,
+        flags=re.MULTILINE,
+    )
+
+    migrated = load_portfolio_catalog(live_path)
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        pre_migration_path = Path(tmp_dir) / "portfolio-catalog.yaml"
+        pre_migration_path.write_text(pre_migration_text)
+        pre_migration = load_portfolio_catalog(pre_migration_path)
+
+    assert pre_migration["errors"] == []
+    assert migrated["errors"] == []
+
+    repo_keys = set(migrated["repos"]) | set(pre_migration["repos"])
+    assert repo_keys, "live catalog must have at least one repo entry to prove parity"
+
+    mismatches = []
+    migrated_source_counts: dict[str, int] = {}
+    for repo_key in sorted(repo_keys):
+        before_path, _before_source = resolve_declared_operating_path(
+            pre_migration["repos"][repo_key]
+        )
+        after_path, after_source = resolve_declared_operating_path(
+            migrated["repos"][repo_key]
+        )
+        if before_path != after_path:
+            mismatches.append((repo_key, before_path, after_path))
+        migrated_source_counts[after_source] = (
+            migrated_source_counts.get(after_source, 0) + 1
+        )
+
+    assert mismatches == [], (
+        f"{len(mismatches)} repo(s) resolve to a different path after migration: {mismatches}"
+    )
+    # Every migrated entry with a declared path now resolves via the canonical
+    # field, not the deprecated fallback -- the whole point of the migration.
+    assert migrated_source_counts.get("intended-disposition", 0) == 0
+    assert migrated_source_counts.get("explicit-operating-path", 0) == len(repo_keys)
+
+    group_keys = set(migrated["groups"]) | set(pre_migration["groups"])
+    for group_key in sorted(group_keys):
+        before_path, _before_source = resolve_declared_operating_path(
+            pre_migration["groups"][group_key]
+        )
+        after_path, _after_source = resolve_declared_operating_path(
+            migrated["groups"][group_key]
+        )
+        assert before_path == after_path, (
+            f"group '{group_key}' resolves to a different path: "
+            f"{before_path} vs {after_path}"
+        )

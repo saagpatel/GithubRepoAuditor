@@ -109,6 +109,10 @@ class DeclaredFields:
     lifecycle_state: str = ""
     criticality: str = ""
     review_cadence: str = ""
+    # Deprecated vintage of `operating_path` (same axis, same value domain). The
+    # catalog was migrated to declare `operating_path` directly in 0.9.x; this field
+    # is kept as a read-compat fallback for one release and then deleted. See
+    # portfolio_pathing.resolve_declared_operating_path and CHANGELOG.
     intended_disposition: str = ""
     maturity_program: str = ""
     target_maturity: str = ""

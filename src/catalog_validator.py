@@ -1,5 +1,6 @@
 # src/catalog_validator.py
 """Catalog completeness validator for portfolio-catalog.yaml entries (Arc H A3)."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -11,15 +12,24 @@ REQUIRED_FIELDS: tuple[str, ...] = (
     "owner",
     "lifecycle_state",
     "review_cadence",
-    "intended_disposition",
+    "operating_path",
 )
+
+# `intended_disposition` is a deprecated vintage of `operating_path` (same value
+# domain), kept as a read-compat fallback for one release so entries that haven't
+# migrated yet still score as complete. See portfolio_pathing.resolve_declared_operating_path.
+_LEGACY_FIELD_ALIASES: dict[str, str] = {"operating_path": "intended_disposition"}
 
 
 def score_catalog_entry(entry: dict[str, Any] | None) -> float:
     """Return completeness score (0.0-1.0) for a single catalog repo entry."""
     if not entry:
         return 0.0
-    present = sum(1 for f in REQUIRED_FIELDS if entry.get(f))
+    present = sum(
+        1
+        for f in REQUIRED_FIELDS
+        if entry.get(f) or entry.get(_LEGACY_FIELD_ALIASES.get(f, ""))
+    )
     return present / len(REQUIRED_FIELDS)
 
 

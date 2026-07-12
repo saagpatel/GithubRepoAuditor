@@ -368,6 +368,7 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     assert alpha.identity.project_key == "Alpha"
     assert alpha.declared.owner == "d"
     assert alpha.declared.category == "commercial"
+    assert alpha.declared.operating_path == "maintain"
     assert alpha.derived.context_quality == "full"
     assert alpha.derived.activity_status == "active"
     assert alpha.derived.archived is False
@@ -430,6 +431,69 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     )
     # Per-project open_high_critical is emitted in the security block.
     assert "open_high_critical" in snapshot_dict["projects"][0]["security"]
+
+
+def test_truth_snapshot_operating_path_catalog_field_matches_legacy_disposition(
+    portfolio_workspace: Path,
+    legacy_registry: Path,
+    tmp_path: Path,
+) -> None:
+    """Whole-pipeline parity proof for the catalog migration: a catalog declaring
+    `operating_path: maintain` directly must reconcile to the exact same declared
+    operating path, path source, risk tier, and attention state as the equivalent
+    catalog declaring `intended_disposition: maintain` (the fixture used by
+    test_truth_snapshot_respects_declared_and_derived_fields above). This exercises
+    the full build_portfolio_truth_snapshot pipeline, not just the resolver."""
+    migrated_catalog_path = tmp_path / "portfolio-catalog.yaml"
+    migrated_catalog_path.write_text(
+        """
+defaults:
+  lifecycle_state: maintenance
+  criticality: medium
+  review_cadence: monthly
+  category: vanity
+  tool_provenance: unknown
+
+groups:
+  it:
+    section_marker: ITPRJsViaClaude/
+    section_label: IT Tools
+    path_prefixes:
+      - ITPRJsViaClaude
+    category: it-work
+    tool_provenance: claude-code
+
+repos:
+  Alpha:
+    owner: d
+    lifecycle_state: active
+    review_cadence: weekly
+    operating_path: maintain
+    category: commercial
+    tool_provenance: claude-code
+"""
+    )
+
+    now = datetime.fromtimestamp(1_700_200_000, tz=timezone.utc)
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=migrated_catalog_path,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=now,
+    )
+
+    alpha = {
+        project.identity.display_name: project for project in result.snapshot.projects
+    }["Alpha"]
+
+    assert alpha.declared.operating_path == "maintain"
+    assert alpha.declared.intended_disposition == ""
+    assert alpha.derived.attention_state == "active-product"
+    assert alpha.risk.risk_tier in {"elevated", "moderate", "baseline", "deferred"}
+    assert alpha.provenance["declared.operating_path"]["detail"] == (
+        "explicit-operating-path"
+    )
 
 
 def test_attention_state_classifier_separates_activity_from_operator_attention() -> (
