@@ -61,6 +61,7 @@
 	"notion_projection_only_rows": {
 		"app": "local runtime/app shell placeholder; not a portfolio-truth repo",
 		"claude-code-harness": "local agent harness projection; outside repo-root truth",
+		"RAG Knowledge Base": "notion planning row; not a portfolio-truth repo",
 		"Sandbox Local Portfolio Project": "actuation sandbox fixture row",
 		"SecondBrain": "knowledge vault under /Users/d/Documents; not a /Users/d/Projects repo"
 	},

@@ -172,6 +172,18 @@ def test_projection_policy_is_published_from_defaults():
     assert policy["notion_truth_shadow_rows"]["agent-bridge-launch"] == "agent-bridge"
 
 
+def test_configured_projection_policy_preserves_rag_planning_row_exclusion():
+    registry = build_project_registry(
+        SNAPSHOT,
+        notion_snapshot_path=None,
+        overrides_config_path=Path("config/project-registry-overrides.json"),
+    )
+
+    assert registry["projection_policy"]["notion_projection_only_rows"][
+        "RAG Knowledge Base"
+    ] == "notion planning row; not a portfolio-truth repo"
+
+
 def test_resolve_returns_none_for_non_projects():
     registry = build_project_registry(SNAPSHOT, overrides_config_path=None)
     index = build_index(registry)
