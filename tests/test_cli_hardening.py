@@ -13,7 +13,8 @@ from src.app import auto_apply, run_audit
 from src.baseline_context import build_baseline_context
 from src.models import AnalyzerResult, AuditReport, RepoAudit
 from src.report_scorecards import apply_scorecards
-from src.report_state import report_from_dict
+from src.report_state import audit_from_dict, report_from_dict
+from src.scorer import WEIGHTS
 
 
 def _make_args(**overrides) -> Namespace:
@@ -1738,3 +1739,62 @@ def test_analyze_repos_forwards_security_flags_to_scorer(monkeypatch, sample_met
 
     assert captured[0]["scorecard_enabled"] is True
     assert captured[0]["security_offline"] is True
+
+
+def test_analyze_repos_forwards_real_scoring_profile_overrides(monkeypatch, sample_metadata):
+    args = _make_args()
+    captured: list[dict[str, object]] = []
+
+    class _CloneContext:
+        def __enter__(self):
+            return {sample_metadata.name: Path("/tmp/repo")}
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    monkeypatch.setattr(run_audit, "clone_workspace", lambda *a, **k: _CloneContext())
+    monkeypatch.setattr(run_audit, "create_progress", lambda: None)
+    monkeypatch.setattr(run_audit, "run_all_analyzers", lambda *a, **k: [])
+
+    def _record_score_repo(*a, **kwargs):
+        captured.append(kwargs)
+        return RepoAudit(
+            metadata=sample_metadata,
+            analyzer_results=[],
+            overall_score=0.5,
+            completeness_tier="functional",
+        )
+
+    monkeypatch.setattr(run_audit, "score_repo", _record_score_repo)
+    profile = run_audit.ScoringProfile(
+        dict(WEIGHTS), overrides={"stale_threshold_days": 1}
+    )
+
+    run_audit._analyze_repos(
+        [sample_metadata],
+        args=args,
+        client=run_audit.GitHubClient(token=None, cache=None),
+        portfolio_lang_freq={},
+        custom_weights=profile,
+    )
+
+    assert captured[0]["scoring_profile"] == profile.overrides
+
+
+def test_partial_run_basis_survives_report_readback(sample_metadata):
+    audit = RepoAudit(
+        metadata=sample_metadata,
+        analyzer_results=[],
+        overall_score=0.72,
+        completeness_tier="functional",
+        grade="B",
+        scored_dimensions=["readme", "testing"],
+        scored_weight_sum=0.30,
+    )
+
+    restored = audit_from_dict(audit.to_dict())
+
+    assert restored.grade == "B"
+    assert restored.to_dict()["grade"] == "B"
+    assert restored.scored_dimensions == ["readme", "testing"]
+    assert restored.scored_weight_sum == 0.30

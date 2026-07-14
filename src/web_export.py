@@ -58,6 +58,7 @@ from src.report_enrichment import (
     no_baseline_summary,
     no_linked_artifact_summary,
 )
+from src.scorer import PARTIAL_RUN_BASIS_THRESHOLD, WEIGHTS
 from src.sparkline import sparkline as render_sparkline
 from src.terminology import ACTION_SYNC_CANONICAL_LABELS
 from src.weekly_scheduling_overlay import resolve_weekly_story_value
@@ -180,6 +181,8 @@ def _render_html(
             {
                 "name": entry["name"],
                 "grade": a.get("grade", "F"),
+                "scored_dimensions": a.get("scored_dimensions", []),
+                "scored_weight_sum": a.get("scored_weight_sum", 0),
                 "score": round(a.get("overall_score", 0), 3),
                 "interest": round(a.get("interest_score", 0), 3),
                 "tier": a.get("completeness_tier", ""),
@@ -243,12 +246,29 @@ def _render_html(
 
 # ── KPI and header sections ───────────────────────────────────────────
 def _header_section(username: str, date: str, repos: int, grade: str) -> str:
-    color = GRADE_COLORS_CSS.get(grade, "#6B7280")
+    color = GRADE_COLORS_CSS.get(grade.split(" ", 1)[0], "#6B7280")
     return f"""
     <header>
       <h1>Portfolio Dashboard: {escape(username)}</h1>
       <p>Generated {escape(date)} | {repos} repos audited | Grade <span style="color:{color};font-weight:bold">{escape(grade)}</span></p>
     </header>"""
+
+
+def _build_display_grade(audit: dict) -> str:
+    """Render partial-run basis disclosure without changing the model grade."""
+    grade = str(audit.get("grade", "F"))
+    if " on " in grade:
+        return grade
+
+    scored_dimensions = audit.get("scored_dimensions") or []
+    scored_weight_sum = audit.get("scored_weight_sum")
+    if (
+        scored_dimensions
+        and isinstance(scored_weight_sum, (int, float))
+        and scored_weight_sum < sum(WEIGHTS.values()) * PARTIAL_RUN_BASIS_THRESHOLD
+    ):
+        return f"{grade} on {len(scored_dimensions)}/{len(WEIGHTS)} dimensions"
+    return grade
 
 
 def _kpi_section(data: dict) -> str:
@@ -923,6 +943,8 @@ def _repo_table(
         explanation = a.get("score_explanation") or build_score_explanation(a) or {}
         name = m.get("name", "")
         grade = a.get("grade", "F")
+        grade_letter = grade.split(" ", 1)[0]
+        display_grade = _build_display_grade(a)
         score = a.get("overall_score", 0)
         interest = a.get("interest_score", 0)
         profile_score = entry["profile_score"]
@@ -930,7 +952,7 @@ def _repo_table(
         lang = m.get("language") or ""
         desc = (m.get("description") or "")[:60]
         collections = ", ".join(entry["collections"])
-        gc = GRADE_COLORS_CSS.get(grade, "#6B7280")
+        gc = GRADE_COLORS_CSS.get(grade_letter, "#6B7280")
         tc = TIER_COLORS_CSS.get(tier, "#6B7280")
 
         spark = ""
@@ -974,14 +996,14 @@ def _repo_table(
         rows.append(
             f'<tr data-tier="{escape(tier, quote=True)}" '
             f'data-risk="{escape(risk_tier, quote=True)}" '
-            f'data-grade="{escape(grade, quote=True)}" '
+            f'data-grade="{escape(grade_letter, quote=True)}" '
             f'data-name="{escape(name, quote=True)}" '
             f'data-collections="{escape(collections.lower(), quote=True)}" '
             f'data-overall="{score:.3f}" '
             f'data-profile="{profile_score:.3f}">'
             f"<td>{link}</td>"
             f'<td class="num">{profile_score:.3f}</td>'
-            f'<td style="color:{gc};font-weight:bold;text-align:center">{escape(grade)}</td>'
+            f'<td style="color:{gc};font-weight:bold;text-align:center">{escape(display_grade)}</td>'
             f'<td class="num">{score:.3f}</td>'
             f'<td class="num">{interest:.3f}</td>'
             f'<td style="color:{tc};font-weight:bold">{safe_tier}</td>'

@@ -891,6 +891,44 @@ class TestAllReposSheet:
         for label in ("Tech Novelty", "Burst", "Ambition", "Storytelling"):
             assert label in header_values, f"Missing header: {label}"
 
+    def test_partial_run_basis_is_exported(self):
+        report = _make_report()
+        report["audits"][0].update(
+            {
+                "grade": "B",
+                "scored_dimensions": ["readme", "testing"],
+                "scored_weight_sum": 0.3,
+            }
+        )
+        wb = Workbook()
+        _build_all_repos(wb, report)
+        ws = wb["All Repos"]
+        headers = {ws.cell(row=1, column=column).value: column for column in range(1, 50)}
+        repo_row = next(row for row in range(2, 10) if ws.cell(row=row, column=1).value == "RepoA")
+
+        assert "Scored Dimensions" in headers
+        assert "Scored Weight Sum" in headers
+        assert ws.cell(row=repo_row, column=headers["Grade"]).value == "B on 2/10 dimensions"
+        assert ws.cell(row=repo_row, column=headers["Scored Dimensions"]).value == "readme, testing"
+        assert ws.cell(row=repo_row, column=headers["Scored Weight Sum"]).value == 0.3
+
+    def test_dashboard_grade_distribution_uses_qualified_grade_letter(self):
+        report = _make_report()
+        report["audits"][0].update(
+            {
+                "grade": "B",
+                "scored_dimensions": ["readme", "testing"],
+                "scored_weight_sum": 0.3,
+            }
+        )
+
+        wb = Workbook()
+        _build_dashboard(wb, report)
+        ws = wb["Dashboard"]
+
+        assert ws.cell(row=11, column=27).value == "B"
+        assert ws.cell(row=11, column=28).value == 1
+
     def test_trend_is_last_column(self):
         ws = self._build()
         # Trend is dynamically the last header column (currently 36)

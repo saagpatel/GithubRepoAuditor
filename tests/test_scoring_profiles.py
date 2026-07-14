@@ -69,6 +69,28 @@ class TestScoringProfiles:
         audit_default = score_repo(_make_metadata(), results)
         assert audit_none.overall_score == audit_default.overall_score
 
+    def test_partial_run_grade_discloses_scored_basis(self):
+        scored_dimensions = list(WEIGHTS)[:6] + ["documentation"]
+        results = _make_results({dim: 0.72 for dim in scored_dimensions})
+
+        audit = score_repo(_make_metadata(), results)
+
+        assert audit.grade == "B"
+        assert audit.scored_dimensions == scored_dimensions
+        assert audit.scored_weight_sum == 0.75
+        assert audit.to_dict()["scored_dimensions"] == scored_dimensions
+        assert audit.to_dict()["scored_weight_sum"] == 0.75
+        assert audit.to_dict()["grade"] == "B"
+
+    def test_full_run_grade_remains_unqualified(self):
+        results = _make_results({dim: 0.72 for dim in WEIGHTS})
+
+        audit = score_repo(_make_metadata(), results)
+
+        assert audit.grade == "B"
+        assert audit.scored_dimensions == list(WEIGHTS)
+        assert audit.scored_weight_sum == 1.0
+
     def test_profile_json_valid(self, tmp_path):
         """Verify profile JSONs sum to ~1.0."""
         from pathlib import Path
