@@ -396,7 +396,7 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     assert result.snapshot.inputs["catalog"]["sha256"]
     assert result.snapshot.inputs["notion"]["mode"] == "unavailable"
     assert result.snapshot.exclusions == {
-        "policy_version": "workspace_discovery.v1",
+            "policy_version": "workspace_discovery.v2",
         "counts": {},
     }
     assert (
@@ -502,6 +502,9 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
     None
 ):
     from src.portfolio_truth_reconcile import _attention_state_for
+    from src.portfolio_truth_types import VALID_LIFECYCLE_STATES
+
+    assert "manual-only" in VALID_LIFECYCLE_STATES
 
     assert (
         _attention_state_for(

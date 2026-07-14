@@ -171,6 +171,42 @@ def test_live_catalog_keeps_settled_recovery_exclusions_archived() -> None:
         assert entry["automation_eligible"] is False
 
 
+def test_live_catalog_keeps_settled_infrastructure_manual_only() -> None:
+    catalog_path = Path(__file__).parents[1] / "config" / "portfolio-catalog.yaml"
+    catalog = load_portfolio_catalog(catalog_path)
+
+    manual_only = {
+        "_machine/machine-control-tower",
+        "agent-bridge",
+        "MCPAudit",
+        "knowledgecore",
+        "operant-public",
+        "mcpforge",
+        "notification-hub",
+        "GPT_RAG",
+        "cross-provider-egress-guard",
+        "cost-tracker",
+        "portfolio-health",
+        "portfolio-mcp",
+        "Lazarus",
+        "continuity",
+        "peer-agent-tools",
+    }
+    for repo_name in manual_only:
+        assert catalog["repos"][repo_name.lower()]["lifecycle_state"] == "manual-only"
+
+    assert catalog["repos"]["afterimage"]["category"] == "commercial"
+    for repo_name in (
+        "AIGCCore",
+        "bridge-db",
+        "GithubRepoAuditor",
+        "mcp-trust",
+        "cross-system-smoke",
+        "PortfolioCommandCenter",
+    ):
+        assert catalog["repos"][repo_name.lower()]["lifecycle_state"] == "active"
+
+
 def test_catalog_entry_matches_full_name_then_bare_name():
     catalog = {
         "repos": {

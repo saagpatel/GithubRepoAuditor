@@ -43,6 +43,7 @@ VALID_ATTENTION_STATES = {
 VALID_LIFECYCLE_STATES = {
     "active",
     "maintenance",
+    "manual-only",
     "dormant",
     "experimental",
     "archived",
@@ -340,7 +341,7 @@ class PortfolioTruthSnapshot:
     coverage: list[dict[str, Any]] = field(default_factory=list)
     exclusions: dict[str, Any] = field(
         default_factory=lambda: {
-            "policy_version": "workspace_discovery.v1",
+            "policy_version": "workspace_discovery.v2",
             "counts": {},
         }
     )
