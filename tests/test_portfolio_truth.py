@@ -573,6 +573,30 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
         )
         == "archived"
     )
+    assert (
+        _attention_state_for(
+            activity_status="stale",
+            archived=False,
+            lifecycle_state="active",
+            operating_path="finish",
+            category="commercial",
+            path_override="",
+            risk_entry={"security_risk": False},
+        )
+        == "decision-needed"
+    )
+    assert (
+        _attention_state_for(
+            activity_status="stale",
+            archived=False,
+            lifecycle_state="active",
+            operating_path="maintain",
+            category="commercial",
+            path_override="",
+            risk_entry={"security_risk": False},
+        )
+        == "parked"
+    )
 
 
 @pytest.mark.parametrize(
