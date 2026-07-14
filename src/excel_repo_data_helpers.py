@@ -12,7 +12,7 @@ from src.report_enrichment import (
     build_score_explanation,
 )
 from src.sparkline import sparkline as render_sparkline
-from src.scorer import display_dimension
+from src.scoring_dimensions import display_dimension
 
 
 def score_explanation_for_audit(audit: dict) -> dict:

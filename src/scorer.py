@@ -6,6 +6,10 @@ from typing import TYPE_CHECKING, Any
 
 from src.badges import compute_badges, suggest_next_badges
 from src.models import AnalyzerResult, RepoAudit, RepoMetadata
+from src.scoring_dimensions import (
+    UNSCORED_DIMENSIONS as UNSCORED_DIMENSIONS,
+    display_dimension as display_dimension,
+)
 
 if TYPE_CHECKING:
     from src.github_client import GitHubClient
@@ -45,14 +49,6 @@ INTEREST_TIERS = [
 STALE_THRESHOLD_DAYS = 730  # 2 years
 
 GRADE_THRESHOLDS = [(0.80, "A"), (0.70, "B"), (0.55, "C"), (0.35, "D"), (0.0, "F")]
-
-UNSCORED_DIMENSIONS = frozenset({"description"})
-
-
-def display_dimension(dimension: str) -> str:
-    """Return the operator-facing label for a scored or advisory dimension."""
-    return f"{dimension} (unscored)" if dimension in UNSCORED_DIMENSIONS else dimension
-
 
 def letter_grade(
     score: float, grade_thresholds: list[tuple[float, str]] | None = None

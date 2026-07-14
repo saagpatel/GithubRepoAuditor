@@ -9,7 +9,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
-from src.scorer import display_dimension
+from src.scoring_dimensions import display_dimension
 
 ALL_REPOS_HEADERS = [
     "Repo",

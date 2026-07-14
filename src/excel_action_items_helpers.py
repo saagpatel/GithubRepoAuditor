@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.scorer import display_dimension
+from src.scoring_dimensions import display_dimension
 
 ACTION_ITEMS_HEADERS = ["#", "Repo", "Action", "Impact", "Effort", "Dimension"]
 EFFORT_MAP = {

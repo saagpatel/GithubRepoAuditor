@@ -49,7 +49,7 @@ from src.report_enrichment import (
     build_weekly_review_pack,
     no_linked_artifact_summary,
 )
-from src.scorer import display_dimension
+from src.scoring_dimensions import display_dimension
 from src.terminology import ACTION_SYNC_CANONICAL_LABELS
 from src.weekly_scheduling_overlay import resolve_weekly_story_value
 
