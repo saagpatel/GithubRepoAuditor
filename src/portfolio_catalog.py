@@ -10,6 +10,7 @@ from src.portfolio_pathing import VALID_OPERATING_PATHS
 VALID_LIFECYCLE_STATES = {
     "active",
     "maintenance",
+    "manual-only",
     "dormant",
     "experimental",
     "archived",

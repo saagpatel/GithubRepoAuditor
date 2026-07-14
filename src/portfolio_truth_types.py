@@ -6,11 +6,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = "0.9.0"
+SCHEMA_VERSION = "0.10.0"
+# 0.10.0: canonical producer receipts bind the exact checkout; coverage and
+# repository/worktree observation envelopes fail closed on unavailable evidence.
 # 0.8.0: derived.registry_status removed (was a stale->parked synonym table over
 # activity_status); derived.archived added as a first-class lifecycle boolean;
 # source_summary.registry_status_counts replaced by activity_status_counts + archived_count.
-LEGACY_SCHEMA_VERSIONS = {"0.7.0", "0.8.0"}
+LEGACY_SCHEMA_VERSIONS = {"0.7.0", "0.8.0", "0.9.0"}
 DERIVATION_POLICY_VERSION = "portfolio_attention.v2"
 
 # The published "latest" portfolio-truth artifact. The producer
@@ -41,6 +43,7 @@ VALID_ATTENTION_STATES = {
 VALID_LIFECYCLE_STATES = {
     "active",
     "maintenance",
+    "manual-only",
     "dormant",
     "experimental",
     "archived",
@@ -201,6 +204,7 @@ class SecurityFields:
     with zero open alerts, so consumers don't mislabel an unscanned repo as secure."""
 
     alerts_available: bool = False
+    coverage_state: str = "unknown"
     dependabot_critical: int = 0
     dependabot_high: int = 0
     dependabot_medium: int = 0
@@ -228,6 +232,7 @@ class PortfolioTruthProject:
     risk: RiskFields = field(default_factory=RiskFields)
     security: SecurityFields = field(default_factory=SecurityFields)
     advisory: AdvisoryFields = field(default_factory=AdvisoryFields)
+    repository_state: dict[str, Any] = field(default_factory=dict)
     provenance: dict[str, dict[str, str]] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
 
@@ -239,6 +244,7 @@ class PortfolioTruthProject:
             "risk": self.risk.to_dict(),
             "security": self.security.to_dict(),
             "advisory": self.advisory.to_dict(),
+            "repository_state": dict(self.repository_state),
             "provenance": self.provenance,
             "warnings": list(self.warnings),
         }
@@ -251,7 +257,7 @@ class PortfolioTruthRollups:
     re-deriving the auditor's risk/security logic, which is the #1 drift risk."""
 
     risk_tier_counts: dict[str, int]
-    security: dict[str, int]
+    security: dict[str, int | str]
     decision: dict[str, int]
 
     @classmethod
@@ -268,6 +274,7 @@ class PortfolioTruthRollups:
         repos_with_open_high_critical = 0
         total_open_high = 0
         total_open_critical = 0
+        unavailable_count = 0
         decision_needed_count = 0
         default_attention_count = 0
         for project in projects:
@@ -281,6 +288,8 @@ class PortfolioTruthRollups:
                     repos_with_open_high_critical += 1
                 total_open_high += security.dependabot_high
                 total_open_critical += security.dependabot_critical
+            else:
+                unavailable_count += 1
             attention = project.derived.attention_state
             if attention == "decision-needed":
                 decision_needed_count += 1
@@ -291,6 +300,14 @@ class PortfolioTruthRollups:
             risk_tier_counts=risk_tier_counts,
             security={
                 "scanned_count": scanned_count,
+                "unavailable_count": unavailable_count,
+                "coverage_state": (
+                    "known"
+                    if unavailable_count == 0
+                    else "partial"
+                    if scanned_count
+                    else "unknown"
+                ),
                 "repos_with_open_high_critical": repos_with_open_high_critical,
                 "total_open_high": total_open_high,
                 "total_open_critical": total_open_critical,
@@ -324,7 +341,7 @@ class PortfolioTruthSnapshot:
     coverage: list[dict[str, Any]] = field(default_factory=list)
     exclusions: dict[str, Any] = field(
         default_factory=lambda: {
-            "policy_version": "workspace_discovery.v1",
+            "policy_version": "workspace_discovery.v2",
             "counts": {},
         }
     )

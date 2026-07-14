@@ -77,7 +77,7 @@ repos:
   _machine/machine-control-tower:
     owner: d
     purpose: local machine-ops and Codex operating-layer control surface for durable operator cockpit assets
-    lifecycle_state: active
+    lifecycle_state: manual-only
     criticality: high
     review_cadence: weekly
     operating_path: maintain
@@ -90,7 +90,7 @@ repos:
   agent-bridge:
     owner: d
     purpose: local SQLite-backed MCP shared-state bus for coordinating coding agents
-    lifecycle_state: active
+    lifecycle_state: manual-only
     criticality: high
     review_cadence: weekly
     operating_path: maintain
@@ -225,7 +225,7 @@ repos:
   MCPAudit:
     owner: d
     purpose: local MCP security and drift audit tool
-    lifecycle_state: active
+    lifecycle_state: manual-only
     review_cadence: weekly
     operating_path: maintain
     category: infrastructure
@@ -236,7 +236,7 @@ repos:
     doctor_standard: full
   knowledgecore:
     owner: d
-    lifecycle_state: active
+    lifecycle_state: manual-only
     review_cadence: weekly
     operating_path: maintain
     category: infrastructure
@@ -276,7 +276,7 @@ repos:
   operant-public:
     owner: d
     purpose: operating-agent calibration benchmark with shipped public MCP access
-    lifecycle_state: active
+    lifecycle_state: manual-only
     criticality: high
     review_cadence: weekly
     operating_path: maintain
@@ -507,7 +507,7 @@ repos:
   mcpforge:
     owner: d
     purpose: FastMCP server generator and validation toolkit
-    lifecycle_state: active
+    lifecycle_state: manual-only
     criticality: high
     review_cadence: weekly
     operating_path: maintain
@@ -559,7 +559,7 @@ repos:
     tool_provenance: claude-code
   notification-hub:
     owner: d
-    lifecycle_state: active
+    lifecycle_state: manual-only
     review_cadence: weekly
     operating_path: maintain
     tool_provenance: claude-code
@@ -627,6 +627,7 @@ repos:
     lifecycle_state: active
     review_cadence: weekly
     operating_path: maintain
+    category: commercial
     tool_provenance: claude-code
   Calibrate:
     owner: d
@@ -707,7 +708,7 @@ repos:
     category: vanity
   GPT_RAG:
     owner: d
-    lifecycle_state: active
+    lifecycle_state: manual-only
     review_cadence: monthly
     operating_path: maintain
     category: infrastructure
@@ -957,7 +958,7 @@ repos:
   cross-provider-egress-guard:
     owner: d
     purpose: destination-aware egress-control hardening lane for Claude Code and Codex hook surfaces
-    lifecycle_state: active
+    lifecycle_state: manual-only
     criticality: high
     review_cadence: weekly
     operating_path: maintain
@@ -1148,14 +1149,14 @@ repos:
     tool_provenance: claude-code
   cost-tracker:
     owner: d
-    lifecycle_state: active
+    lifecycle_state: manual-only
     review_cadence: monthly
     operating_path: maintain
     category: infrastructure
     tool_provenance: claude-code
   portfolio-health:
     owner: d
-    lifecycle_state: active
+    lifecycle_state: manual-only
     review_cadence: monthly
     operating_path: maintain
     category: infrastructure
@@ -1305,7 +1306,7 @@ repos:
     operating_path: maintain
   portfolio-mcp:
     owner: d
-    lifecycle_state: active
+    lifecycle_state: manual-only
     review_cadence: monthly
     operating_path: maintain
     category: infrastructure
@@ -1363,7 +1364,7 @@ repos:
   Lazarus:
     owner: d
     purpose: guarded repository recovery tool that selects safe historical revisions and blocks sensitive-file restoration
-    lifecycle_state: maintenance
+    lifecycle_state: manual-only
     criticality: medium
     review_cadence: monthly
     operating_path: maintain
@@ -1386,14 +1387,14 @@ repos:
     notes: Session 2026-07-11 one-week and 32-scenario repeated dogfood matrices passed; a private connector remains unjustified. Keep outside default attention unless explicitly reactivated.
   continuity:
     owner: d
-    lifecycle_state: active
+    lifecycle_state: manual-only
     review_cadence: weekly
     operating_path: maintain
     category: infrastructure
   peer-agent-tools:
     owner: d
     purpose: local peer-agent dispatch and preflight tooling for branch-lease safety and verified agent handoffs
-    lifecycle_state: active
+    lifecycle_state: manual-only
     criticality: high
     review_cadence: weekly
     operating_path: maintain

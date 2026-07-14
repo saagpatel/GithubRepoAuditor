@@ -85,8 +85,11 @@ def test_evidence_rejects_head_change(tmp_path: Path) -> None:
         commit=commit,
         ref="refs/remotes/origin/main",
         checkout_role="canonical-automation",
+        checkout_path=str(repo.resolve()),
         worktree_clean=True,
+        dirty_path_count=0,
         verified_at=datetime.now(UTC),
+        receipt_id="sha256:" + "a" * 64,
     )
     (repo / "README.md").write_text("changed\n")
     _git(repo, "add", "README.md")
@@ -106,8 +109,11 @@ def test_load_producer_evidence_accepts_passing_receipt(tmp_path: Path) -> None:
                 "commit": "a" * 40,
                 "ref": "refs/remotes/origin/main",
                 "checkout_role": "canonical-automation",
+                "checkout_path": str(tmp_path / "producer-repo"),
                 "worktree_clean": True,
+                "dirty_path_count": 0,
                 "verified_at": "2026-07-10T12:00:00Z",
+                "receipt_id": "sha256:" + "a" * 64,
                 "checks": {},
             }
         )
