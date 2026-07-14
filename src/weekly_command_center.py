@@ -8,6 +8,10 @@ from typing import Any
 from src.portfolio_automation import select_automation_candidates
 from src.portfolio_decision_queue import build_decision_queue, summarize_decision_queue
 from src.portfolio_truth_types import truth_latest_path
+from src.portfolio_truth_trends import (
+    build_verdict_transition_ledger,
+    render_movement_summary,
+)
 from src.report_enrichment import build_weekly_review_pack
 
 CONTRACT_VERSION = "weekly_command_center_digest_v1"
@@ -118,6 +122,7 @@ def build_weekly_command_center_digest(
     *,
     diff_data: dict[str, Any] | None = None,
     portfolio_truth: dict[str, Any] | None = None,
+    portfolio_truth_history_dir: Path | None = None,
     portfolio_truth_reference: str = "",
     control_center_reference: str = "",
     report_reference: str = "",
@@ -136,6 +141,13 @@ def build_weekly_command_center_digest(
     freshness = _source_freshness(report_data, truth)
     source_is_stale = freshness["status"] != "current"
     truth_summary = _build_truth_summary(truth)
+    movement = build_verdict_transition_ledger(
+        portfolio_truth_history_dir,
+        max_snapshots=8,
+        current_snapshot=truth,
+        current_path=Path(portfolio_truth_reference) if portfolio_truth_reference else None,
+    ) if portfolio_truth_history_dir else build_verdict_transition_ledger(max_snapshots=0)
+    movement["summary_text"] = render_movement_summary(movement)
     decision_queue = build_decision_queue(truth)
     decision_queue_summary = summarize_decision_queue(decision_queue)
     operator_decision = _operator_decision(operator_summary, operator_queue)
@@ -215,6 +227,7 @@ def build_weekly_command_center_digest(
             "authority_cap": _safe_text(decision_quality.get("authority_cap")) or AUTHORITY_CAP,
         },
         "portfolio_truth": {**truth_summary, **decision_queue_summary},
+        "movement": movement,
         "decision_queue": decision_queue,
         "path_attention": _build_path_attention_items(truth),
         "automation_candidates": [
@@ -260,6 +273,7 @@ def render_weekly_command_center_markdown(digest: dict[str, Any]) -> str:
     risk_posture = _mapping(digest.get("risk_posture"))
     tier_counts = _mapping(risk_posture.get("risk_tier_counts"))
     security_posture = _mapping(digest.get("security_posture"))
+    movement = _mapping(digest.get("movement"))
     lines = [
         f"# Weekly Command Center: {_safe_text(digest.get('username')) or 'unknown'}",
         "",
@@ -343,6 +357,19 @@ def render_weekly_command_center_markdown(digest: dict[str, Any]) -> str:
         lines.append(
             "- Security overlay not run for this snapshot "
             "(re-run with `--portfolio-truth-include-security`)."
+        )
+
+    lines.extend(["", "## Movement"])
+    lines.append(
+        f"- {_safe_text(movement.get('summary_text')) or 'No verdict movement is recorded across the available truth snapshots.'}"
+    )
+    for item in list(movement.get("transitions") or []):
+        if item.get("kind") == "repo_lifecycle":
+            continue
+        lines.append(
+            f"- **{_safe_text(item.get('repo'))}** [{_safe_text(item.get('kind'))}]: "
+            f"{_safe_text(item.get('from')) or 'unknown'}→{_safe_text(item.get('to')) or 'unknown'} "
+            f"({_safe_text(item.get('to_date')) or 'undated'})"
         )
 
     lines.extend(["", "## Weekly Sections"])
