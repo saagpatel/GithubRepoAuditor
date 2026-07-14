@@ -49,6 +49,7 @@ from src.report_enrichment import (
     build_weekly_review_pack,
     no_linked_artifact_summary,
 )
+from src.scoring_dimensions import display_dimension
 from src.terminology import ACTION_SYNC_CANONICAL_LABELS
 from src.weekly_scheduling_overlay import resolve_weekly_story_value
 
@@ -65,7 +66,9 @@ def _truncate(text: str | None, length: int = 60) -> str:
     return text[:length] + "..." if len(text) > length else text
 
 
-def _file_path(output_dir: Path, prefix: str, username: str, dt: datetime, ext: str) -> Path:
+def _file_path(
+    output_dir: Path, prefix: str, username: str, dt: datetime, ext: str
+) -> Path:
     return output_dir / f"{prefix}-{username}-{_date_str(dt)}.{ext}"
 
 
@@ -88,7 +91,10 @@ def _sanitize_for_json(obj: object) -> object:
 def _has_preflight_issues(preflight_summary: dict) -> bool:
     return bool(
         preflight_summary
-        and (preflight_summary.get("blocking_errors") or preflight_summary.get("warnings"))
+        and (
+            preflight_summary.get("blocking_errors")
+            or preflight_summary.get("warnings")
+        )
     )
 
 
@@ -98,7 +104,9 @@ def _has_preflight_issues(preflight_summary: dict) -> bool:
 def write_json_report(report: AuditReport, output_dir: Path) -> Path:
     """Write the full audit report as JSON."""
     output_dir.mkdir(parents=True, exist_ok=True)
-    path = _file_path(output_dir, "audit-report", report.username, report.generated_at, "json")
+    path = _file_path(
+        output_dir, "audit-report", report.username, report.generated_at, "json"
+    )
 
     with open(path, "w") as f:
         json.dump(_sanitize_for_json(report.to_dict()), f, indent=2)
@@ -196,7 +204,9 @@ def write_raw_metadata(report: AuditReport, output_dir: Path) -> Path:
 def write_pcc_export(report: AuditReport, output_dir: Path) -> Path:
     """Write PCC-compatible flat JSON array."""
     output_dir.mkdir(parents=True, exist_ok=True)
-    path = _file_path(output_dir, "pcc-import", report.username, report.generated_at, "json")
+    path = _file_path(
+        output_dir, "pcc-import", report.username, report.generated_at, "json"
+    )
 
     records = []
     for audit in report.audits:
@@ -233,7 +243,9 @@ def write_markdown_report(
 ) -> Path:
     """Write human-readable Markdown audit report."""
     output_dir.mkdir(parents=True, exist_ok=True)
-    path = _file_path(output_dir, "audit-report", report.username, report.generated_at, "md")
+    path = _file_path(
+        output_dir, "audit-report", report.username, report.generated_at, "md"
+    )
 
     lines: list[str] = []
     _w = lines.append
@@ -269,7 +281,9 @@ def write_markdown_report(
             f"Warnings: {report.preflight_summary.get('warnings', 0)}"
         )
         for check in (report.preflight_summary.get("checks") or [])[:5]:
-            _w(f"- {check.get('summary', 'Issue detected')} ({check.get('category', 'setup')})")
+            _w(
+                f"- {check.get('summary', 'Issue detected')} ({check.get('category', 'setup')})"
+            )
         _w("")
 
     report_dict = report.to_dict()
@@ -326,7 +340,9 @@ def write_markdown_report(
     _w(
         f"- Run Changes: {weekly_pack.get('run_change_summary', build_run_change_summary(diff_data))}"
     )
-    _w(f"- Queue Pressure: {weekly_pack.get('queue_pressure_summary', queue_pressure_summary)}")
+    _w(
+        f"- Queue Pressure: {weekly_pack.get('queue_pressure_summary', queue_pressure_summary)}"
+    )
     _w(
         f"- Trust / Actionability: {weekly_pack.get('trust_actionability_summary', trust_actionability_summary)}"
     )
@@ -421,17 +437,25 @@ def write_markdown_report(
         _w(
             f"  - Intent Alignment: {item.get('intent_alignment', 'missing-contract')} — {item.get('intent_alignment_summary', 'Intent alignment cannot be judged until a portfolio catalog contract exists.')}"
         )
-        _w(f"  - {item.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.')}")
+        _w(
+            f"  - {item.get('scorecard_line', 'Scorecard: No maturity scorecard is recorded yet.')}"
+        )
         _w(
             f"  - Maturity Gap: {item.get('maturity_gap_summary', 'No maturity gap summary is recorded yet.')}"
         )
         _w("  - Evidence:")
         for evidence in item.get("evidence_strip", [])[:5]:
-            command = f" [{evidence.get('command_hint')}]" if evidence.get("command_hint") else ""
+            command = (
+                f" [{evidence.get('command_hint')}]"
+                if evidence.get("command_hint")
+                else ""
+            )
             _w(
                 f"    - {evidence.get('label', 'Item')} — {evidence.get('summary', 'No evidence summary is recorded yet.')}{command}"
             )
-        _w(f"  - Checkpoint Timing: {item.get('follow_through_checkpoint_timing', 'Unknown')}")
+        _w(
+            f"  - Checkpoint Timing: {item.get('follow_through_checkpoint_timing', 'Unknown')}"
+        )
         _w(
             f"  - Next Checkpoint: {item.get('follow_through_checkpoint', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}"
         )
@@ -446,7 +470,9 @@ def write_markdown_report(
     if weekly_pack.get("top_below_target_scorecard_items"):
         _w("- Scorecard Gaps:")
         for item in weekly_pack.get("top_below_target_scorecard_items", [])[:5]:
-            _w(f"  - {item.get('repo', 'Repo')} — {item.get('summary', 'Below target.')}")
+            _w(
+                f"  - {item.get('repo', 'Repo')} — {item.get('summary', 'Below target.')}"
+            )
     _w(
         f"- Next Checkpoint: {weekly_pack.get('follow_through_checkpoint_summary', 'Use the next run or linked artifact to confirm whether the recommendation moved.')}"
     )
@@ -529,7 +555,11 @@ def write_markdown_report(
         )
         _w("- Evidence:")
         for evidence in briefing.get("evidence_strip", [])[:5]:
-            command = f" [{evidence.get('command_hint')}]" if evidence.get("command_hint") else ""
+            command = (
+                f" [{evidence.get('command_hint')}]"
+                if evidence.get("command_hint")
+                else ""
+            )
             _w(
                 f"  - {evidence.get('label', 'Item')} — {evidence.get('summary', 'No evidence summary is recorded yet.')}{command}"
             )
@@ -556,7 +586,9 @@ def write_markdown_report(
         if report.operator_summary.get("watch_strategy"):
             _w(f"- Watch Strategy: `{report.operator_summary.get('watch_strategy')}`")
         if report.operator_summary.get("watch_decision_summary"):
-            _w(f"- Watch Decision: {report.operator_summary.get('watch_decision_summary')}")
+            _w(
+                f"- Watch Decision: {report.operator_summary.get('watch_decision_summary')}"
+            )
         if report.operator_summary.get("what_changed"):
             _w(f"- What Changed: {report.operator_summary.get('what_changed')}")
         if report.operator_summary.get("why_it_matters"):
@@ -567,9 +599,13 @@ def write_markdown_report(
         if report.operator_summary.get("trend_summary"):
             _w(f"- Trend: {report.operator_summary.get('trend_summary')}")
         if report.operator_summary.get("accountability_summary"):
-            _w(f"- Accountability: {report.operator_summary.get('accountability_summary')}")
+            _w(
+                f"- Accountability: {report.operator_summary.get('accountability_summary')}"
+            )
         if report.operator_summary.get("follow_through_summary"):
-            _w(f"- Follow-Through: {report.operator_summary.get('follow_through_summary')}")
+            _w(
+                f"- Follow-Through: {report.operator_summary.get('follow_through_summary')}"
+            )
         if report.operator_summary.get("follow_through_checkpoint_summary"):
             _w(
                 f"- Next Checkpoint: {report.operator_summary.get('follow_through_checkpoint_summary')}"
@@ -579,8 +615,12 @@ def write_markdown_report(
                 f"- {ACTION_SYNC_CANONICAL_LABELS['readiness']}: {(report.operator_summary.get('action_sync_summary') or {}).get('summary')}"
             )
         if report.operator_summary.get("next_action_sync_step"):
-            _w(f"- Next Action Sync Step: {report.operator_summary.get('next_action_sync_step')}")
-        if (report.operator_summary.get("apply_readiness_summary") or {}).get("summary"):
+            _w(
+                f"- Next Action Sync Step: {report.operator_summary.get('next_action_sync_step')}"
+            )
+        if (report.operator_summary.get("apply_readiness_summary") or {}).get(
+            "summary"
+        ):
             _w(
                 f"- Apply Packet: {(report.operator_summary.get('apply_readiness_summary') or {}).get('summary')}"
             )
@@ -590,10 +630,14 @@ def write_markdown_report(
             )
         command_hint = (report.operator_summary.get("next_apply_candidate") or {}).get(
             "apply_command"
-        ) or (report.operator_summary.get("next_apply_candidate") or {}).get("preview_command")
+        ) or (report.operator_summary.get("next_apply_candidate") or {}).get(
+            "preview_command"
+        )
         if command_hint:
             _w(f"- Action Sync Command Hint: `{command_hint}`")
-        if (report.operator_summary.get("campaign_outcomes_summary") or {}).get("summary"):
+        if (report.operator_summary.get("campaign_outcomes_summary") or {}).get(
+            "summary"
+        ):
             _w(
                 f"- {ACTION_SYNC_CANONICAL_LABELS['post_apply_monitoring']}: {(report.operator_summary.get('campaign_outcomes_summary') or {}).get('summary')}"
             )
@@ -601,7 +645,9 @@ def write_markdown_report(
             _w(
                 f"- Next Monitoring Step: {(report.operator_summary.get('next_monitoring_step') or {}).get('summary')}"
             )
-        if (report.operator_summary.get("intervention_ledger_summary") or {}).get("summary"):
+        if (report.operator_summary.get("intervention_ledger_summary") or {}).get(
+            "summary"
+        ):
             _w(
                 f"- {ACTION_SYNC_CANONICAL_LABELS['historical_portfolio_intelligence']}: {(report.operator_summary.get('intervention_ledger_summary') or {}).get('summary')}"
             )
@@ -609,15 +655,21 @@ def write_markdown_report(
             _w(
                 f"- Next Historical Focus: {(report.operator_summary.get('next_historical_focus') or {}).get('summary')}"
             )
-        if (report.operator_summary.get("automation_guidance_summary") or {}).get("summary"):
+        if (report.operator_summary.get("automation_guidance_summary") or {}).get(
+            "summary"
+        ):
             _w(
                 f"- {ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}: {(report.operator_summary.get('automation_guidance_summary') or {}).get('summary')}"
             )
-        if (report.operator_summary.get("next_safe_automation_step") or {}).get("summary"):
+        if (report.operator_summary.get("next_safe_automation_step") or {}).get(
+            "summary"
+        ):
             _w(
                 f"- Next Safe Automation Step: {(report.operator_summary.get('next_safe_automation_step') or {}).get('summary')}"
             )
-        if (report.operator_summary.get("approval_workflow_summary") or {}).get("summary"):
+        if (report.operator_summary.get("approval_workflow_summary") or {}).get(
+            "summary"
+        ):
             _w(
                 f"- {ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}: {(report.operator_summary.get('approval_workflow_summary') or {}).get('summary')}"
             )
@@ -649,7 +701,9 @@ def write_markdown_report(
             _w(
                 f"- Follow-Through Recovery Memory Reset: {report.operator_summary.get('follow_through_recovery_memory_reset_summary')}"
             )
-        if report.operator_summary.get("follow_through_recovery_rebuild_strength_summary"):
+        if report.operator_summary.get(
+            "follow_through_recovery_rebuild_strength_summary"
+        ):
             _w(
                 f"- Follow-Through Recovery Rebuild Strength: {report.operator_summary.get('follow_through_recovery_rebuild_strength_summary')}"
             )
@@ -657,7 +711,9 @@ def write_markdown_report(
             _w(
                 f"- Follow-Through Recovery Reacquisition: {report.operator_summary.get('follow_through_recovery_reacquisition_summary')}"
             )
-        if report.operator_summary.get("follow_through_recovery_reacquisition_durability_summary"):
+        if report.operator_summary.get(
+            "follow_through_recovery_reacquisition_durability_summary"
+        ):
             _w(
                 f"- Follow-Through Reacquisition Durability: {report.operator_summary.get('follow_through_recovery_reacquisition_durability_summary')}"
             )
@@ -669,8 +725,12 @@ def write_markdown_report(
             )
         primary_target = report.operator_summary.get("primary_target") or {}
         if primary_target:
-            repo = f"{primary_target.get('repo')}: " if primary_target.get("repo") else ""
-            _w(f"- Primary Target: {repo}{primary_target.get('title', 'Operator target')}")
+            repo = (
+                f"{primary_target.get('repo')}: " if primary_target.get("repo") else ""
+            )
+            _w(
+                f"- Primary Target: {repo}{primary_target.get('title', 'Operator target')}"
+            )
         if report.operator_summary.get("primary_target_reason"):
             _w(
                 f"- Why This Is The Top Target: {report.operator_summary.get('primary_target_reason')}"
@@ -682,13 +742,17 @@ def write_markdown_report(
         if report.operator_summary.get("closure_guidance"):
             _w(f"- Closure Guidance: {report.operator_summary.get('closure_guidance')}")
         if report.operator_summary.get("primary_target_last_intervention"):
-            intervention = report.operator_summary.get("primary_target_last_intervention") or {}
+            intervention = (
+                report.operator_summary.get("primary_target_last_intervention") or {}
+            )
             when = (intervention.get("recorded_at") or "")[:10]
             repo = f"{intervention.get('repo')}: " if intervention.get("repo") else ""
             title = intervention.get("title", "")
             event_type = intervention.get("event_type", "recorded")
             outcome = intervention.get("outcome", event_type)
-            _w(f"- What We Tried: {when} {event_type} for {repo}{title} ({outcome})".strip())
+            _w(
+                f"- What We Tried: {when} {event_type} for {repo}{title} ({outcome})".strip()
+            )
         if report.operator_summary.get("primary_target_resolution_evidence"):
             _w(
                 f"- Resolution Evidence: {report.operator_summary.get('primary_target_resolution_evidence')}"
@@ -701,7 +765,10 @@ def write_markdown_report(
         if report.operator_summary.get("primary_target_confidence_reasons"):
             _w(
                 "- Confidence Reasons: "
-                + ", ".join(report.operator_summary.get("primary_target_confidence_reasons") or [])
+                + ", ".join(
+                    report.operator_summary.get("primary_target_confidence_reasons")
+                    or []
+                )
             )
         if report.operator_summary.get("next_action_confidence_label"):
             _w(
@@ -719,12 +786,18 @@ def write_markdown_report(
             _w(
                 f"- Why This Confidence Is Actionable: {report.operator_summary.get('adaptive_confidence_summary')}"
             )
-        if report.operator_summary.get("primary_target_exception_status") not in {None, "", "none"}:
+        if report.operator_summary.get("primary_target_exception_status") not in {
+            None,
+            "",
+            "none",
+        }:
             _w(
                 f"- Trust Policy Exception: {report.operator_summary.get('primary_target_exception_status')} "
                 f"({report.operator_summary.get('primary_target_exception_reason', 'No trust-policy exception reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_exception_pattern_status") not in {
+        if report.operator_summary.get(
+            "primary_target_exception_pattern_status"
+        ) not in {
             None,
             "",
             "none",
@@ -751,7 +824,9 @@ def write_markdown_report(
             _w(
                 f"- Recovery Confidence Summary: {report.operator_summary.get('recovery_confidence_summary')}"
             )
-        if report.operator_summary.get("primary_target_exception_retirement_status") not in {
+        if report.operator_summary.get(
+            "primary_target_exception_retirement_status"
+        ) not in {
             None,
             "",
             "none",
@@ -769,7 +844,9 @@ def write_markdown_report(
                 f"- Policy Debt Cleanup: {report.operator_summary.get('primary_target_policy_debt_status')} "
                 f"({report.operator_summary.get('primary_target_policy_debt_reason', 'No policy-debt reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_class_normalization_status") not in {
+        if report.operator_summary.get(
+            "primary_target_class_normalization_status"
+        ) not in {
             None,
             "",
             "none",
@@ -797,7 +874,10 @@ def write_markdown_report(
             _w(
                 "- Why Class Guidance Shifted: "
                 + ", ".join(
-                    report.operator_summary.get("primary_target_class_trust_reweight_reasons") or []
+                    report.operator_summary.get(
+                        "primary_target_class_trust_reweight_reasons"
+                    )
+                    or []
                 )
             )
         if report.operator_summary.get("primary_target_class_trust_momentum_status"):
@@ -805,7 +885,9 @@ def write_markdown_report(
                 f"- Class Trust Momentum: {report.operator_summary.get('primary_target_class_trust_momentum_status')} "
                 f"({report.operator_summary.get('primary_target_class_trust_momentum_score', 0.0):.2f})"
             )
-        if report.operator_summary.get("primary_target_class_reweight_stability_status"):
+        if report.operator_summary.get(
+            "primary_target_class_reweight_stability_status"
+        ):
             _w(
                 f"- Reweighting Stability: {report.operator_summary.get('primary_target_class_reweight_stability_status')} "
                 f"({report.operator_summary.get('primary_target_class_reweight_transition_status', 'none')}: "
@@ -816,12 +898,16 @@ def write_markdown_report(
                 f"- Class Transition Health: {report.operator_summary.get('primary_target_class_transition_health_status')} "
                 f"({report.operator_summary.get('primary_target_class_transition_health_reason', 'No class transition health reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_class_transition_resolution_status"):
+        if report.operator_summary.get(
+            "primary_target_class_transition_resolution_status"
+        ):
             _w(
                 f"- Pending Transition Resolution: {report.operator_summary.get('primary_target_class_transition_resolution_status')} "
                 f"({report.operator_summary.get('primary_target_class_transition_resolution_reason', 'No class transition resolution reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_transition_closure_confidence_label"):
+        if report.operator_summary.get(
+            "primary_target_transition_closure_confidence_label"
+        ):
             _w(
                 f"- Transition Closure Confidence: {report.operator_summary.get('primary_target_transition_closure_confidence_label')} "
                 f"({report.operator_summary.get('primary_target_transition_closure_confidence_score', 0.0):.2f}; "
@@ -837,22 +923,30 @@ def write_markdown_report(
                 f"- Pending Debt Freshness: {report.operator_summary.get('primary_target_pending_debt_freshness_status')} "
                 f"({report.operator_summary.get('primary_target_pending_debt_freshness_reason', 'No pending-debt freshness reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reweight_direction"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reweight_direction"
+        ):
             _w(
                 f"- Closure Forecast Reweighting: {report.operator_summary.get('primary_target_closure_forecast_reweight_direction')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reweight_score', 0.0):.2f})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_momentum_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_momentum_status"
+        ):
             _w(
                 f"- Closure Forecast Momentum: {report.operator_summary.get('primary_target_closure_forecast_momentum_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_momentum_score', 0.0):.2f})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_freshness_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_freshness_status"
+        ):
             _w(
                 f"- Closure Forecast Freshness: {report.operator_summary.get('primary_target_closure_forecast_freshness_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_freshness_reason', 'No closure-forecast freshness reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_stability_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_stability_status"
+        ):
             _w(
                 f"- Closure Forecast Hysteresis: {report.operator_summary.get('primary_target_closure_forecast_stability_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_hysteresis_status', 'none')}: "
@@ -863,12 +957,16 @@ def write_markdown_report(
                 f"- Hysteresis Decay Controls: {report.operator_summary.get('primary_target_closure_forecast_decay_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_decay_reason', 'No closure-forecast decay reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_refresh_recovery_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_refresh_recovery_status"
+        ):
             _w(
                 f"- Closure Forecast Refresh Recovery: {report.operator_summary.get('primary_target_closure_forecast_refresh_recovery_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_refresh_recovery_score', 0.0):.2f})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reacquisition_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reacquisition_status"
+        ):
             _w(
                 f"- Reacquisition Controls: {report.operator_summary.get('primary_target_closure_forecast_reacquisition_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reacquisition_reason', 'No closure-forecast reacquisition reason is recorded yet.')})"
@@ -881,7 +979,9 @@ def write_markdown_report(
                 f"({report.operator_summary.get('primary_target_closure_forecast_reacquisition_persistence_score', 0.0):.2f}; "
                 f"{report.operator_summary.get('primary_target_closure_forecast_reacquisition_age_runs', 0)} run(s))"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_recovery_churn_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_recovery_churn_status"
+        ):
             _w(
                 f"- Recovery Churn Controls: {report.operator_summary.get('primary_target_closure_forecast_recovery_churn_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_recovery_churn_reason', 'No recovery-churn reason is recorded yet.')})"
@@ -893,7 +993,9 @@ def write_markdown_report(
                 f"- Reacquisition Freshness: {report.operator_summary.get('primary_target_closure_forecast_reacquisition_freshness_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reacquisition_freshness_reason', 'No reacquisition-freshness reason is recorded yet.')})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_persistence_reset_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_persistence_reset_status"
+        ):
             _w(
                 f"- Persistence Reset Controls: {report.operator_summary.get('primary_target_closure_forecast_persistence_reset_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_persistence_reset_reason', 'No persistence-reset reason is recorded yet.')})"
@@ -905,7 +1007,9 @@ def write_markdown_report(
                 f"- Reset Refresh Recovery: {report.operator_summary.get('primary_target_closure_forecast_reset_refresh_recovery_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_refresh_recovery_score', 0.0):.2f})"
             )
-        if report.operator_summary.get("primary_target_closure_forecast_reset_reentry_status"):
+        if report.operator_summary.get(
+            "primary_target_closure_forecast_reset_reentry_status"
+        ):
             _w(
                 f"- Reset Re-entry Controls: {report.operator_summary.get('primary_target_closure_forecast_reset_reentry_status')} "
                 f"({report.operator_summary.get('primary_target_closure_forecast_reset_reentry_reason', 'No reset re-entry reason is recorded yet.')})"
@@ -1182,21 +1286,29 @@ def write_markdown_report(
                 f"- Exception Retirement Summary: {report.operator_summary.get('exception_retirement_summary')}"
             )
         if report.operator_summary.get("policy_debt_summary"):
-            _w(f"- Policy Debt Summary: {report.operator_summary.get('policy_debt_summary')}")
+            _w(
+                f"- Policy Debt Summary: {report.operator_summary.get('policy_debt_summary')}"
+            )
         if report.operator_summary.get("trust_normalization_summary"):
             _w(
                 f"- Trust Normalization Summary: {report.operator_summary.get('trust_normalization_summary')}"
             )
         if report.operator_summary.get("class_memory_summary"):
-            _w(f"- Class Memory Summary: {report.operator_summary.get('class_memory_summary')}")
+            _w(
+                f"- Class Memory Summary: {report.operator_summary.get('class_memory_summary')}"
+            )
         if report.operator_summary.get("class_decay_summary"):
-            _w(f"- Class Decay Summary: {report.operator_summary.get('class_decay_summary')}")
+            _w(
+                f"- Class Decay Summary: {report.operator_summary.get('class_decay_summary')}"
+            )
         if report.operator_summary.get("class_reweighting_summary"):
             _w(
                 f"- Class Reweighting Summary: {report.operator_summary.get('class_reweighting_summary')}"
             )
         if report.operator_summary.get("class_momentum_summary"):
-            _w(f"- Class Momentum Summary: {report.operator_summary.get('class_momentum_summary')}")
+            _w(
+                f"- Class Momentum Summary: {report.operator_summary.get('class_momentum_summary')}"
+            )
         if report.operator_summary.get("class_reweight_stability_summary"):
             _w(
                 f"- Reweighting Stability Summary: {report.operator_summary.get('class_reweight_stability_summary')}"
@@ -1261,7 +1373,9 @@ def write_markdown_report(
             _w(
                 f"- Closure Forecast Reacquisition Summary: {report.operator_summary.get('closure_forecast_reacquisition_summary')}"
             )
-        if report.operator_summary.get("closure_forecast_reacquisition_persistence_summary"):
+        if report.operator_summary.get(
+            "closure_forecast_reacquisition_persistence_summary"
+        ):
             _w(
                 f"- Reacquisition Persistence Summary: {report.operator_summary.get('closure_forecast_reacquisition_persistence_summary')}"
             )
@@ -1269,7 +1383,9 @@ def write_markdown_report(
             _w(
                 f"- Recovery Churn Summary: {report.operator_summary.get('closure_forecast_recovery_churn_summary')}"
             )
-        if report.operator_summary.get("closure_forecast_reacquisition_freshness_summary"):
+        if report.operator_summary.get(
+            "closure_forecast_reacquisition_freshness_summary"
+        ):
             _w(
                 f"- Reacquisition Freshness Summary: {report.operator_summary.get('closure_forecast_reacquisition_freshness_summary')}"
             )
@@ -1277,7 +1393,9 @@ def write_markdown_report(
             _w(
                 f"- Persistence Reset Summary: {report.operator_summary.get('closure_forecast_persistence_reset_summary')}"
             )
-        if report.operator_summary.get("closure_forecast_reset_refresh_recovery_summary"):
+        if report.operator_summary.get(
+            "closure_forecast_reset_refresh_recovery_summary"
+        ):
             _w(
                 f"- Reset Refresh Recovery Summary: {report.operator_summary.get('closure_forecast_reset_refresh_recovery_summary')}"
             )
@@ -1285,7 +1403,9 @@ def write_markdown_report(
             _w(
                 f"- Reset Re-entry Summary: {report.operator_summary.get('closure_forecast_reset_reentry_summary')}"
             )
-        if report.operator_summary.get("closure_forecast_reset_reentry_persistence_summary"):
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_persistence_summary"
+        ):
             _w(
                 f"- Reset Re-entry Persistence Summary: {report.operator_summary.get('closure_forecast_reset_reentry_persistence_summary')}"
             )
@@ -1293,7 +1413,9 @@ def write_markdown_report(
             _w(
                 f"- Reset Re-entry Churn Summary: {report.operator_summary.get('closure_forecast_reset_reentry_churn_summary')}"
             )
-        if report.operator_summary.get("closure_forecast_reset_reentry_freshness_summary"):
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_freshness_summary"
+        ):
             _w(
                 f"- Reset Re-entry Freshness Summary: {report.operator_summary.get('closure_forecast_reset_reentry_freshness_summary')}"
             )
@@ -1301,19 +1423,27 @@ def write_markdown_report(
             _w(
                 f"- Reset Re-entry Reset Summary: {report.operator_summary.get('closure_forecast_reset_reentry_reset_summary')}"
             )
-        if report.operator_summary.get("closure_forecast_reset_reentry_refresh_recovery_summary"):
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_refresh_recovery_summary"
+        ):
             _w(
                 f"- Reset Re-entry Refresh Recovery Summary: {report.operator_summary.get('closure_forecast_reset_reentry_refresh_recovery_summary')}"
             )
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_summary"):
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_summary"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_summary')}"
             )
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_freshness_summary"):
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_freshness_summary"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Freshness Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_freshness_summary')}"
             )
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reset_summary"):
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_reset_summary"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Reset Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reset_summary')}"
             )
@@ -1323,7 +1453,9 @@ def write_markdown_report(
             _w(
                 f"- Reset Re-entry Rebuild Refresh Recovery Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_refresh_recovery_summary')}"
             )
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_reentry_summary"):
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_reentry_summary"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Re-entry Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_reentry_summary')}"
             )
@@ -1477,7 +1609,9 @@ def write_markdown_report(
             _w(
                 f"- Reset Re-entry Rebuild Persistence Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_persistence_summary')}"
             )
-        if report.operator_summary.get("closure_forecast_reset_reentry_rebuild_churn_summary"):
+        if report.operator_summary.get(
+            "closure_forecast_reset_reentry_rebuild_churn_summary"
+        ):
             _w(
                 f"- Reset Re-entry Rebuild Churn Summary: {report.operator_summary.get('closure_forecast_reset_reentry_rebuild_churn_summary')}"
             )
@@ -1492,7 +1626,9 @@ def write_markdown_report(
             )
         if report.operator_summary.get("recent_validation_outcomes"):
             recent_outcomes = []
-            for item in (report.operator_summary.get("recent_validation_outcomes") or [])[:3]:
+            for item in (
+                report.operator_summary.get("recent_validation_outcomes") or []
+            )[:3]:
                 recent_outcomes.append(
                     f"{item.get('target_label', 'Operator target')} "
                     f"[{item.get('confidence_label', 'low')}] -> {str(item.get('outcome', 'unresolved')).replace('_', ' ')}"
@@ -1516,13 +1652,19 @@ def write_markdown_report(
             )
             _w(f"  - Why: {item.get('summary', 'No summary available.')}")
             _w(f"  - Lane Reason: {item.get('lane_reason', 'Operator triage')}")
-            _w(f"  - Next: {item.get('recommended_action', 'Review the latest state.')}")
-            _w(f"  - Last Movement: {build_last_movement_label(item, report.review_summary or {})}")
+            _w(
+                f"  - Next: {item.get('recommended_action', 'Review the latest state.')}"
+            )
+            _w(
+                f"  - Last Movement: {build_last_movement_label(item, report.review_summary or {})}"
+            )
             _w(
                 f"  - Follow-Through: {build_follow_through_status_label(item)} — "
                 f"{build_follow_through_summary(item)}"
             )
-            _w(f"  - Checkpoint Timing: {build_follow_through_checkpoint_status_label(item)}")
+            _w(
+                f"  - Checkpoint Timing: {build_follow_through_checkpoint_status_label(item)}"
+            )
             _w(
                 f"  - Escalation: {build_follow_through_escalation_status_label(item)} — "
                 f"{build_follow_through_escalation_summary(item)}"
@@ -1659,7 +1801,9 @@ def write_markdown_report(
         _w("")
         provider_coverage = report.security_posture.get("provider_coverage", {})
         open_alerts = report.security_posture.get("open_alerts", {})
-        _w(f"- Average posture score: {report.security_posture.get('average_score', 0):.2f}")
+        _w(
+            f"- Average posture score: {report.security_posture.get('average_score', 0):.2f}"
+        )
         _w(
             f"- Critical repos: {', '.join(report.security_posture.get('critical_repos', [])[:5]) or '—'}"
         )
@@ -1685,7 +1829,9 @@ def write_markdown_report(
         for entry in risk_lookup.values():
             tier_counts[entry["risk_tier"]] = tier_counts.get(entry["risk_tier"], 0) + 1
         elevated_repos = sorted(
-            name for name, entry in risk_lookup.items() if entry["risk_tier"] == "elevated"
+            name
+            for name, entry in risk_lookup.items()
+            if entry["risk_tier"] == "elevated"
         )
         _w("### Risk Posture")
         _w("")
@@ -1742,13 +1888,17 @@ def write_markdown_report(
                 f"- {ACTION_SYNC_CANONICAL_LABELS['historical_portfolio_intelligence']}: {report.intervention_ledger_summary.get('summary')}"
             )
         if report.next_historical_focus.get("summary"):
-            _w(f"- Next Historical Focus: {report.next_historical_focus.get('summary')}")
+            _w(
+                f"- Next Historical Focus: {report.next_historical_focus.get('summary')}"
+            )
         if report.automation_guidance_summary.get("summary"):
             _w(
                 f"- {ACTION_SYNC_CANONICAL_LABELS['automation_guidance']}: {report.automation_guidance_summary.get('summary')}"
             )
         if report.next_safe_automation_step.get("summary"):
-            _w(f"- Next Safe Automation Step: {report.next_safe_automation_step.get('summary')}")
+            _w(
+                f"- Next Safe Automation Step: {report.next_safe_automation_step.get('summary')}"
+            )
         if report.approval_workflow_summary.get("summary"):
             _w(
                 f"- {ACTION_SYNC_CANONICAL_LABELS['approval_workflow']}: {report.approval_workflow_summary.get('summary')}"
@@ -1807,12 +1957,18 @@ def write_markdown_report(
             )
         _w("")
 
-    if report.rollback_preview.get("items") or report.rollback_preview.get("item_count", 0):
+    if report.rollback_preview.get("items") or report.rollback_preview.get(
+        "item_count", 0
+    ):
         _w("### Rollback Preview")
         _w("")
-        _w(f"- Available: {'yes' if report.rollback_preview.get('available') else 'no'}")
+        _w(
+            f"- Available: {'yes' if report.rollback_preview.get('available') else 'no'}"
+        )
         _w(f"- Items: {report.rollback_preview.get('item_count', 0)}")
-        _w(f"- Fully reversible: {report.rollback_preview.get('fully_reversible_count', 0)}")
+        _w(
+            f"- Fully reversible: {report.rollback_preview.get('fully_reversible_count', 0)}"
+        )
         _w("")
 
     if report.security_governance_preview:
@@ -1829,7 +1985,11 @@ def write_markdown_report(
         _w("")
 
     governance_summary = report.governance_summary or {}
-    if governance_summary or report.governance_results.get("results") or report.governance_drift:
+    if (
+        governance_summary
+        or report.governance_results.get("results")
+        or report.governance_drift
+    ):
         _w("### Governance Operator State")
         _w("")
         _w(
@@ -1837,15 +1997,21 @@ def write_markdown_report(
         )
         _w(f"- Status: {governance_summary.get('status', 'preview')}")
         _w(f"- Approved: {'yes' if report.governance_approval else 'no'}")
-        _w(f"- Needs Re-Approval: {'yes' if governance_summary.get('needs_reapproval') else 'no'}")
-        _w(f"- Drift Count: {governance_summary.get('drift_count', len(report.governance_drift))}")
+        _w(
+            f"- Needs Re-Approval: {'yes' if governance_summary.get('needs_reapproval') else 'no'}"
+        )
+        _w(
+            f"- Drift Count: {governance_summary.get('drift_count', len(report.governance_drift))}"
+        )
         _w(
             f"- Applyable Count: {governance_summary.get('applyable_count', report.governance_preview.get('applyable_count', 0) if isinstance(report.governance_preview, dict) else 0)}"
         )
         _w(
             f"- Applied Count: {governance_summary.get('applied_count', len(report.governance_results.get('results', [])))}"
         )
-        _w(f"- Rollback Available: {governance_summary.get('rollback_available_count', 0)}")
+        _w(
+            f"- Rollback Available: {governance_summary.get('rollback_available_count', 0)}"
+        )
         if governance_summary.get("approval_age_days") is not None:
             _w(f"- Approval Age (days): {governance_summary.get('approval_age_days')}")
         for item in governance_summary.get("top_actions", [])[:4]:
@@ -1928,7 +2094,9 @@ def write_markdown_report(
         for audit in tier_audits:
             m = audit.metadata
             name_link = f"[{m.name}]({m.html_url})"
-            badges_str = " ".join(f"`{b}`" for b in audit.badges[:3]) if audit.badges else "—"
+            badges_str = (
+                " ".join(f"`{b}`" for b in audit.badges[:3]) if audit.badges else "—"
+            )
             desc = _truncate(m.description)
             lang = m.language or "—"
             _w(
@@ -1971,7 +2139,9 @@ def write_markdown_report(
         )
         _w("")
         _w("**Current State**")
-        _w(f"- {briefing.get('current_state_line', 'No current-state summary is recorded yet.')}")
+        _w(
+            f"- {briefing.get('current_state_line', 'No current-state summary is recorded yet.')}"
+        )
         _w(f"- URL: {m.html_url}")
         _w(
             f"- Description: {briefing.get('current_state', {}).get('description', m.description or 'No description recorded yet.')}"
@@ -2024,7 +2194,7 @@ def write_markdown_report(
         _w("|-----------|-------|-------------|")
         for r in audit.analyzer_results:
             findings = ", ".join(r.findings[:2]) if r.findings else "—"
-            _w(f"| {r.dimension} | {r.score:.2f} | {findings} |")
+            _w(f"| {display_dimension(r.dimension)} | {r.score:.2f} | {findings} |")
         _w("")
         _w(
             f"**Language:** {m.language or '—'} | "
@@ -2075,7 +2245,9 @@ def write_markdown_report(
             _w(
                 f"- Intent Alignment: {briefing.get('intent_alignment_line', 'missing-contract: Intent alignment cannot be judged until a portfolio catalog contract exists.')}"
             )
-            _w(f"- Checkpoint Timing: {briefing.get('checkpoint_timing_line', 'Unknown')}")
+            _w(
+                f"- Checkpoint Timing: {briefing.get('checkpoint_timing_line', 'Unknown')}"
+            )
             _w(
                 f"- Escalation: {briefing.get('escalation_line', 'Unknown: No stronger follow-through escalation is currently surfaced.')}"
             )
@@ -2141,7 +2313,9 @@ def _write_ranked_list(
     for i, name in enumerate(names, 1):
         audit = audit_map.get(name)
         if audit:
-            lines.append(f"{i}. {name} — {audit.overall_score:.2f} ({audit.completeness_tier})")
+            lines.append(
+                f"{i}. {name} — {audit.overall_score:.2f} ({audit.completeness_tier})"
+            )
 
 
 def _group_by_tier(audits: list[RepoAudit]) -> dict[str, list[RepoAudit]]:
@@ -2174,7 +2348,9 @@ def _write_reconciliation_section(lines: list[str], report: AuditReport) -> None
 
     # On GitHub but not in registry
     if recon.on_github_not_registry:
-        _w(f"### On GitHub but NOT in Registry ({len(recon.on_github_not_registry)} repos)")
+        _w(
+            f"### On GitHub but NOT in Registry ({len(recon.on_github_not_registry)} repos)"
+        )
         _w("")
         _w("| Repo | Tier | Score | Language |")
         _w("|------|------|-------|----------|")
@@ -2189,7 +2365,9 @@ def _write_reconciliation_section(lines: list[str], report: AuditReport) -> None
 
     # In registry but not on GitHub
     if recon.in_registry_not_github:
-        _w(f"### In Registry but NOT on GitHub ({len(recon.in_registry_not_github)} projects)")
+        _w(
+            f"### In Registry but NOT on GitHub ({len(recon.in_registry_not_github)} projects)"
+        )
         _w("")
         _w("| Project | Registry Status |")
         _w("|---------|----------------|")
@@ -2237,7 +2415,9 @@ def _render_weekly_story_sections(_w, weekly_pack: dict) -> None:
             continue
         _w(f"### {section.get('label', 'Weekly Story')}")
         _w("")
-        _w(f"- Summary: {section.get('headline', 'No section summary is recorded yet.')}")
+        _w(
+            f"- Summary: {section.get('headline', 'No section summary is recorded yet.')}"
+        )
         _w(
             f"- {section.get('next_label', 'Next Step')}: {section.get('next_step', 'No next step is recorded yet.')}"
         )
@@ -2246,7 +2426,9 @@ def _render_weekly_story_sections(_w, weekly_pack: dict) -> None:
         if evidence_items:
             _w("- Evidence:")
             for item in evidence_items[:5]:
-                command = f" [{item.get('command_hint')}]" if item.get("command_hint") else ""
+                command = (
+                    f" [{item.get('command_hint')}]" if item.get("command_hint") else ""
+                )
                 _w(
                     f"  - {item.get('label', 'Item')} — {item.get('summary', 'No evidence summary is recorded yet.')}{command}"
                 )

@@ -15,6 +15,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
 from src.portfolio_truth_types import truth_latest_path
+from src.scoring_dimensions import display_dimension
 from src.serve.runner import SAFE_FLAG_NAMES, get_session, spawn_run, validate_flags
 
 router = APIRouter()
@@ -194,7 +195,10 @@ async def repo_detail(request: Request, name: str) -> HTMLResponse:
                     """,
                     (name, name, name),
                 ).fetchall()
-            dimension_scores = [dict(r) for r in rows2]
+            dimension_scores = [
+                {**dict(row), "dimension": display_dimension(str(row["dimension"]))}
+                for row in rows2
+            ]
         except sqlite3.Error:
             # Optional dimension breakdown should not block the repo detail page.
             pass

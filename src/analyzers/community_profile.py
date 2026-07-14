@@ -32,7 +32,6 @@ class CommunityProfileAnalyzer(BaseAnalyzer):
     """
 
     name = "community_profile"
-    weight = 0.03
 
     def analyze(
         self,

@@ -50,7 +50,6 @@ LAZY_COMMIT_PATTERNS = re.compile(
 
 class CodeQualityAnalyzer(BaseAnalyzer):
     name = "code_quality"
-    weight = 0.15
 
     def analyze(
         self,

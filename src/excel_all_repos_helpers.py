@@ -9,6 +9,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
+from src.scoring_dimensions import display_dimension
 
 ALL_REPOS_HEADERS = [
     "Repo",
@@ -158,7 +159,7 @@ def _build_biggest_drag(audit: dict[str, Any]) -> str:
     if not dimension_scores:
         return "—"
     worst_dimension = min(dimension_scores, key=dimension_scores.get)
-    return f"{worst_dimension} ({dimension_scores[worst_dimension]:.1f})"
+    return f"{display_dimension(worst_dimension)} ({dimension_scores[worst_dimension]:.1f})"
 
 
 def _build_grade_reason(audit: dict[str, Any]) -> str:
@@ -174,8 +175,8 @@ def _build_grade_reason(audit: dict[str, Any]) -> str:
     if len(weakest_dimensions) < 2:
         return grade
     return (
-        f"{grade}: {weakest_dimensions[0][0]}={weakest_dimensions[0][1]:.1f}, "
-        f"{weakest_dimensions[1][0]}={weakest_dimensions[1][1]:.1f}"
+        f"{grade}: {display_dimension(weakest_dimensions[0][0])}={weakest_dimensions[0][1]:.1f}, "
+        f"{display_dimension(weakest_dimensions[1][0])}={weakest_dimensions[1][1]:.1f}"
     )
 
 

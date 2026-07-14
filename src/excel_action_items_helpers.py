@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from src.scoring_dimensions import display_dimension
+
 ACTION_ITEMS_HEADERS = ["#", "Repo", "Action", "Impact", "Effort", "Dimension"]
 EFFORT_MAP = {
     "readme": "Low",
@@ -42,11 +44,13 @@ def collect_action_items(data: dict[str, Any]) -> list[dict[str, Any]]:
             for result in audit.get("analyzer_results", [])
             if result["dimension"] != "interest"
         }
-        for dimension, score in sorted(dimension_scores.items(), key=lambda item: item[1])[:2]:
+        for dimension, score in sorted(
+            dimension_scores.items(), key=lambda item: item[1]
+        )[:2]:
             actions.append(
                 {
                     "repo": audit["metadata"]["name"],
-                    "action": f"Improve {dimension} (currently {score:.1f})",
+                    "action": f"Improve {display_dimension(dimension)} (currently {score:.1f})",
                     "impact": f"Close {gap:.3f} gap to {next_tier}",
                     "effort": EFFORT_MAP.get(dimension, "Med"),
                     "dimension": dimension,
@@ -69,7 +73,9 @@ def collect_action_items(data: dict[str, Any]) -> list[dict[str, Any]]:
             )
 
     effort_order = {"Low": 0, "Med": 1, "High": 2}
-    actions.sort(key=lambda action: (effort_order.get(action["effort"], 1), action["gap"]))
+    actions.sort(
+        key=lambda action: (effort_order.get(action["effort"], 1), action["gap"])
+    )
 
     seen: set[tuple[str, str]] = set()
     unique: list[dict[str, Any]] = []
@@ -102,7 +108,9 @@ def write_action_items_sections(
     ws.freeze_panes = "A5"
 
     if content["sprint_rows"]:
-        ws.cell(row=3, column=1, value="Weekly Sprint (Top 5 Low-Effort)").font = section_font
+        ws.cell(
+            row=3, column=1, value="Weekly Sprint (Top 5 Low-Effort)"
+        ).font = section_font
         for col, header in enumerate(ACTION_ITEMS_HEADERS, 1):
             ws.cell(row=4, column=col, value=header)
         style_header_row(ws, 4, len(ACTION_ITEMS_HEADERS))
@@ -111,7 +119,9 @@ def write_action_items_sections(
                 style_data_cell(ws.cell(row=row_number, column=col, value=value))
 
     full_start = len(content["sprint_rows"]) + 7
-    ws.cell(row=full_start, column=1, value="All Actions (Prioritized)").font = section_font
+    ws.cell(
+        row=full_start, column=1, value="All Actions (Prioritized)"
+    ).font = section_font
     full_start += 1
     for col, header in enumerate(ACTION_ITEMS_HEADERS, 1):
         ws.cell(row=full_start, column=col, value=header)
@@ -136,7 +146,7 @@ def _build_action_rows(actions: list[dict[str, Any]]) -> list[list[Any]]:
             action["action"],
             action["impact"],
             action["effort"],
-            action["dimension"],
+            display_dimension(action["dimension"]),
         ]
         for index, action in enumerate(actions, start=1)
     ]

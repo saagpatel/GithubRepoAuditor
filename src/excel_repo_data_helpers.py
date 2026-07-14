@@ -12,6 +12,7 @@ from src.report_enrichment import (
     build_score_explanation,
 )
 from src.sparkline import sparkline as render_sparkline
+from src.scoring_dimensions import display_dimension
 
 
 def score_explanation_for_audit(audit: dict) -> dict:
@@ -300,7 +301,9 @@ def repo_detail_rows(
         )
         for rank, (dimension, score, summary) in enumerate(ranked_dimensions, 1):
             lookup_key = f"{repo_name}::{rank}"
-            dimension_rows.append([lookup_key, repo_name, rank, dimension, score, summary])
+            dimension_rows.append(
+                [lookup_key, repo_name, rank, display_dimension(dimension), score, summary]
+            )
 
         for run_index, score in enumerate(scores, 1):
             history_rows.append([repo_name, run_index, score, render_sparkline(scores)])

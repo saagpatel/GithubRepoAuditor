@@ -2,10 +2,14 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from src.badges import compute_badges, suggest_next_badges
 from src.models import AnalyzerResult, RepoAudit, RepoMetadata
+from src.scoring_dimensions import (
+    UNSCORED_DIMENSIONS as UNSCORED_DIMENSIONS,
+    display_dimension as display_dimension,
+)
 
 if TYPE_CHECKING:
     from src.github_client import GitHubClient
@@ -46,10 +50,11 @@ STALE_THRESHOLD_DAYS = 730  # 2 years
 
 GRADE_THRESHOLDS = [(0.80, "A"), (0.70, "B"), (0.55, "C"), (0.35, "D"), (0.0, "F")]
 
-
-def letter_grade(score: float) -> str:
+def letter_grade(
+    score: float, grade_thresholds: list[tuple[float, str]] | None = None
+) -> str:
     """Map a 0.0-1.0 score to a letter grade A-F."""
-    for threshold, grade in GRADE_THRESHOLDS:
+    for threshold, grade in grade_thresholds or GRADE_THRESHOLDS:
         if score >= threshold:
             return grade
     return "F"
@@ -61,13 +66,22 @@ def score_repo(
     repo_path: Path | None = None,
     portfolio_lang_freq: dict[str, float] | None = None,
     custom_weights: dict[str, float] | None = None,
+    scoring_profile: dict[str, Any] | None = None,
     github_client: GitHubClient | None = None,
     *,
     scorecard_enabled: bool = False,
     security_offline: bool = False,
 ) -> RepoAudit:
     """Compute dual-axis scores: completeness + interest."""
-    weights = dict(custom_weights) if custom_weights else dict(WEIGHTS)
+    profile = scoring_profile or {}
+    weights = dict(custom_weights or WEIGHTS)
+    completeness_tiers = [
+        tuple(tier) for tier in profile.get("completeness_tiers", COMPLETENESS_TIERS)
+    ]
+    grade_thresholds = [
+        tuple(threshold) for threshold in profile.get("grade_thresholds", GRADE_THRESHOLDS)
+    ]
+    stale_threshold_days = profile.get("stale_threshold_days", STALE_THRESHOLD_DAYS)
     flags: list[str] = []
 
     # Fork override: reduce activity weight
@@ -111,7 +125,7 @@ def score_repo(
 
     # Classify completeness tier
     tier = "abandoned"
-    for tier_name, threshold in COMPLETENESS_TIERS:
+    for tier_name, threshold in completeness_tiers:
         if overall_score >= threshold:
             tier = tier_name
             break
@@ -141,7 +155,7 @@ def score_repo(
     # Override: stale >2 years capped at "wip"
     if metadata.pushed_at:
         days_since = (datetime.now(timezone.utc) - metadata.pushed_at).days
-        if days_since > STALE_THRESHOLD_DAYS:
+        if days_since > stale_threshold_days:
             flags.append("stale-2yr")
             if tier in ("shipped", "functional"):
                 tier = "wip"
@@ -159,8 +173,8 @@ def score_repo(
         interest_score=interest_score,
         completeness_tier=tier,
         interest_tier=interest_tier,
-        grade=letter_grade(overall_score),
-        interest_grade=letter_grade(interest_score),
+        grade=letter_grade(overall_score, grade_thresholds),
+        interest_grade=letter_grade(interest_score, grade_thresholds),
         flags=flags,
     )
 
