@@ -31,7 +31,13 @@ CLAIM_FIELDS = (
     "next_recommended_move_present",
 )
 
-FORK_JUNK_PATTERNS = (r"-security-fix", r"-cve-", r"-backup-", r"\.bundle$", r"-openssl-")
+FORK_JUNK_PATTERNS = (
+    r"-security-fix",
+    r"-cve-",
+    r"-backup-",
+    r"\.bundle$",
+    r"-openssl-",
+)
 DEFAULT_PER_TIER = {
     "none": 3,
     "boilerplate": 4,
@@ -53,7 +59,9 @@ def assign_bucket(tool_today: bool, verdict: bool, evidence_in_primary: bool) ->
     return "fp_overclaim"
 
 
-def assign_drift_bucket(snapshot_claim: bool, tool_today: bool, repo_drifted: bool) -> str:
+def assign_drift_bucket(
+    snapshot_claim: bool, tool_today: bool, repo_drifted: bool
+) -> str:
     if snapshot_claim == tool_today:
         return "claim_same"
     return "claim_changed_drift" if repo_drifted else "claim_changed_nodrift"
@@ -65,7 +73,7 @@ def select_pilot(
     eligible = [
         p
         for p in projects
-        if p["derived"]["registry_status"] != "archived" and not is_fork_junk(p["identity"]["path"])
+        if not p["derived"]["archived"] and not is_fork_junk(p["identity"]["path"])
     ]
     selected: list[dict] = []
     for tier, count in per_tier.items():
@@ -87,13 +95,17 @@ def build_record(project: dict, workspace_root: str) -> dict:
         "abs_path": str(Path(workspace_root) / path),
         "primary_file_name": choose_primary_context_file(context_files),
         "context_files": context_files,
-        "snapshot_claims": {field: bool(derived.get(field, False)) for field in CLAIM_FIELDS},
+        "snapshot_claims": {
+            field: bool(derived.get(field, False)) for field in CLAIM_FIELDS
+        },
     }
 
 
 def compute_tool_today(abs_path: str) -> dict:
     project_path = Path(abs_path)
-    analysis = analyze_project_context(project_path, _collect_context_files(project_path))
+    analysis = analyze_project_context(
+        project_path, _collect_context_files(project_path)
+    )
     return {field: bool(getattr(analysis, field)) for field in CLAIM_FIELDS}
 
 
@@ -117,7 +129,9 @@ def compute_drifted(abs_path: str, generated_at: str) -> bool:
     return is_after(commit_iso, generated_at)
 
 
-def prepare_pilot(snapshot_path: str, *, per_tier: dict[str, int] = DEFAULT_PER_TIER) -> dict:
+def prepare_pilot(
+    snapshot_path: str, *, per_tier: dict[str, int] = DEFAULT_PER_TIER
+) -> dict:
     snapshot = json.loads(Path(snapshot_path).read_text())
     workspace_root = snapshot["workspace_root"]
     generated_at = snapshot["generated_at"]
@@ -148,7 +162,9 @@ def prepare_pilot(snapshot_path: str, *, per_tier: dict[str, int] = DEFAULT_PER_
 def main() -> None:
     import sys
 
-    snapshot_path = sys.argv[1] if len(sys.argv) > 1 else "output/portfolio-truth-latest.json"
+    snapshot_path = (
+        sys.argv[1] if len(sys.argv) > 1 else "output/portfolio-truth-latest.json"
+    )
     print(json.dumps(prepare_pilot(snapshot_path), indent=2))
 
 

@@ -44,7 +44,7 @@ def _candidate(
     return AutomationCandidate(
         display_name=display_name,
         repo_full_name=repo_full_name,
-        registry_status="active",
+        activity_status="active",
         path_confidence="high",
         context_quality="standard",
     )
@@ -84,7 +84,10 @@ def test_build_creates_pending_proposals_for_each_candidate() -> None:
     proposals = build_automation_proposals(
         candidates, action_type=ACTION_CONTEXT_PR, created_at=NOW
     )
-    assert [p.proposal_id for p in proposals] == ["context-pr:o/Alpha", "context-pr:o/Beta"]
+    assert [p.proposal_id for p in proposals] == [
+        "context-pr:o/Alpha",
+        "context-pr:o/Beta",
+    ]
     assert all(p.status == STATUS_PENDING for p in proposals)
 
 
@@ -248,7 +251,9 @@ def test_approve_non_pending_raises() -> None:
         )
     ]
     with pytest.raises(ProposalApprovalError):
-        approve_proposal(proposals, "context-pr:o/Alpha", approved_by="x", approved_at=LATER)
+        approve_proposal(
+            proposals, "context-pr:o/Alpha", approved_by="x", approved_at=LATER
+        )
 
 
 def test_reject_pending_sets_status_and_rejected_at_only() -> None:
@@ -298,6 +303,8 @@ def test_require_approved_passes_for_approved() -> None:
 
 @pytest.mark.parametrize("status", [STATUS_PENDING, STATUS_REJECTED, STATUS_EXECUTED])
 def test_require_approved_blocks_non_approved(status: str) -> None:
-    proposal = AutomationProposal("context-pr:b", ACTION_CONTEXT_PR, "B", "o/b", "d", status=status)
+    proposal = AutomationProposal(
+        "context-pr:b", ACTION_CONTEXT_PR, "B", "o/b", "d", status=status
+    )
     with pytest.raises(ProposalApprovalError):
         require_approved(proposal)
