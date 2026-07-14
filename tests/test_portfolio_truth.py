@@ -2017,9 +2017,6 @@ def test_portfolio_truth_app_passes_validated_producer_receipt_to_publisher(
     monkeypatch.setattr(
         "src.app.portfolio_truth.load_live_repo_status_by_name", lambda **_kwargs: {}
     )
-    monkeypatch.setattr(
-        "src.app.portfolio_truth.warn_if_warehouse_report_stale", lambda *_args: None
-    )
     monkeypatch.setenv("GHRA_REQUIRE_PRODUCER_EVIDENCE", "1")
     monkeypatch.setenv("GHRA_PRODUCER_EVIDENCE", str(receipt))
     monkeypatch.setenv("GHRA_PRODUCER_REPO_ROOT", str(tmp_path / "producer-repo"))
@@ -2781,42 +2778,3 @@ def test_git_default_branch_empty_when_origin_head_unset(tmp_path: Path) -> None
 
     # A freshly init'd repo has no origin/HEAD → "" so callers fall back.
     assert _git_default_branch(repo) == ""
-
-
-# ── F2: warehouse-report staleness reminder ────────────────────────────────
-from src.portfolio_truth_status import warn_if_warehouse_report_stale  # noqa: E402
-
-
-def _write_warehouse_report(d: Path, username: str, date_str: str) -> None:
-    (d / f"audit-report-{username}-{date_str}.json").write_text("{}", encoding="utf-8")
-
-
-class TestWarehouseStalenessReminder:
-    """F2 (keep-dual): --portfolio-truth mode warns when the warehouse report Notion
-    reads is missing or stale, so the operator refreshes it."""
-
-    def test_missing_report_warns(self, tmp_path: Path, capsys) -> None:
-        import re
-
-        warn_if_warehouse_report_stale(tmp_path, "saagpatel")
-        captured = capsys.readouterr()
-        # print_warning word-wraps, so normalize whitespace before substring checks
-        combined = re.sub(r"\s+", " ", captured.out + captured.err)
-        assert "No audit-report-saagpatel" in combined
-        assert "audit report saagpatel" in combined
-
-    def test_stale_report_warns(self, tmp_path: Path, capsys) -> None:
-        _write_warehouse_report(tmp_path, "saagpatel", "2020-01-01")
-        warn_if_warehouse_report_stale(tmp_path, "saagpatel")
-        captured = capsys.readouterr()
-        assert "stale" in (captured.out + captured.err).lower()
-
-    def test_fresh_report_no_warning(self, tmp_path: Path, capsys) -> None:
-        from datetime import date
-
-        _write_warehouse_report(tmp_path, "saagpatel", date.today().isoformat())
-        warn_if_warehouse_report_stale(tmp_path, "saagpatel")
-        captured = capsys.readouterr()
-        combined = captured.out + captured.err
-        assert "stale" not in combined.lower()
-        assert "No audit-report" not in combined

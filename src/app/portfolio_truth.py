@@ -18,7 +18,6 @@ from src.portfolio_truth_status import (
     load_release_count_by_name,
     load_repo_status_from_audit_by_name,
     load_security_alerts_by_name,
-    warn_if_warehouse_report_stale,
 )
 from src.producer_preflight import load_producer_evidence
 
@@ -99,7 +98,6 @@ def run_portfolio_truth_mode(args: Any) -> None:
         f"(registry {'updated' if result.registry_changed else 'unchanged'}, "
         f"report {'updated' if result.report_changed else 'unchanged'})"
     )
-    warn_if_warehouse_report_stale(output_dir, args.username)
 
 
 def run_portfolio_context_recovery_mode(args: Any) -> None:
