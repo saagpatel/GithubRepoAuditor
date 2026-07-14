@@ -257,7 +257,7 @@ class PortfolioTruthRollups:
     re-deriving the auditor's risk/security logic, which is the #1 drift risk."""
 
     risk_tier_counts: dict[str, int]
-    security: dict[str, int]
+    security: dict[str, int | str]
     decision: dict[str, int]
 
     @classmethod
