@@ -1,4 +1,10 @@
 {
+	"operator-os-explainer": {
+		"localProjectId": "39dc21f1-caf0-8142-8718-e1454dea1198"
+	},
+	"claude-code-harness": {
+		"localProjectId": "362c21f1-caf0-81bd-8c6e-dd3acaebc34b"
+	},
 	"Notion Operating System": {
 		"localProjectId": "332c21f1-caf0-81c5-85fb-d7451163ab6b"
 	},
