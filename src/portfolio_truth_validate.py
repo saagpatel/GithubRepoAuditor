@@ -105,8 +105,11 @@ def _validate_contract_envelope(snapshot: PortfolioTruthSnapshot) -> None:
             "commit",
             "ref",
             "checkout_role",
+            "checkout_path",
             "worktree_clean",
+            "dirty_path_count",
             "verified_at",
+            "receipt_id",
         }
         missing = sorted(required - producer.keys())
         if missing:
@@ -122,6 +125,12 @@ def _validate_contract_envelope(snapshot: PortfolioTruthSnapshot) -> None:
             raise ValueError(
                 "Canonical producer evidence must declare a clean worktree."
             )
+        if producer.get("dirty_path_count") != 0:
+            raise ValueError(
+                "Canonical producer evidence must declare zero dirty paths."
+            )
+    if not snapshot.coverage:
+        raise ValueError("Portfolio truth coverage envelope is required.")
     notion = (
         snapshot.inputs.get("notion") if isinstance(snapshot.inputs, dict) else None
     )

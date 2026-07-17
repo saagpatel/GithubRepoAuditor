@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import subprocess
 from dataclasses import dataclass
@@ -10,7 +11,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 
-PREFLIGHT_SCHEMA_VERSION = "ghra_producer_preflight.v1"
+PREFLIGHT_SCHEMA_VERSION = "ghra_producer_preflight.v2"
 
 
 @dataclass(frozen=True)
@@ -19,8 +20,11 @@ class ProducerEvidence:
     commit: str
     ref: str
     checkout_role: str
+    checkout_path: str
     worktree_clean: bool
+    dirty_path_count: int
     verified_at: datetime
+    receipt_id: str
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -28,8 +32,11 @@ class ProducerEvidence:
             "commit": self.commit,
             "ref": self.ref,
             "checkout_role": self.checkout_role,
+            "checkout_path": self.checkout_path,
             "worktree_clean": self.worktree_clean,
+            "dirty_path_count": self.dirty_path_count,
             "verified_at": self.verified_at.isoformat(),
+            "receipt_id": self.receipt_id,
         }
 
     @classmethod
@@ -39,8 +46,11 @@ class ProducerEvidence:
             "commit",
             "ref",
             "checkout_role",
+            "checkout_path",
             "worktree_clean",
+            "dirty_path_count",
             "verified_at",
+            "receipt_id",
         }
         missing = sorted(required - payload.keys())
         if missing:
@@ -59,13 +69,18 @@ class ProducerEvidence:
             raise ValueError("Producer evidence commit must be a lowercase 40-character SHA.")
         if payload["worktree_clean"] is not True:
             raise ValueError("Producer evidence must declare a clean worktree.")
+        if payload["dirty_path_count"] != 0:
+            raise ValueError("Clean producer evidence must declare dirty_path_count=0.")
         return cls(
             repository=str(payload["repository"]),
             commit=commit,
             ref=str(payload["ref"]),
             checkout_role=str(payload["checkout_role"]),
+            checkout_path=str(payload["checkout_path"]),
             worktree_clean=True,
+            dirty_path_count=0,
             verified_at=parsed_verified_at.astimezone(UTC),
+            receipt_id=str(payload["receipt_id"]),
         )
 
 
@@ -119,13 +134,21 @@ def inspect_canonical_producer(
         "pass" if commit == expected_commit else "fail"
     )
     state = "pass" if all(value == "pass" for value in checks.values()) else "fail"
+    verified_at = now or datetime.now(UTC)
+    dirty_path_count = len(status.splitlines()) if status else 0
+    receipt_material = "\n".join(
+        (repository, commit, expected_ref, checkout_role, str(repo_root.resolve()), verified_at.isoformat())
+    )
     evidence = ProducerEvidence(
         repository=repository,
         commit=commit,
         ref=expected_ref,
         checkout_role=checkout_role,
+        checkout_path=str(repo_root.resolve()),
         worktree_clean=not status,
-        verified_at=now or datetime.now(UTC),
+        dirty_path_count=dirty_path_count,
+        verified_at=verified_at,
+        receipt_id=f"sha256:{hashlib.sha256(receipt_material.encode()).hexdigest()}",
     )
     return ProducerPreflightResult(state=state, checks=checks, evidence=evidence)
 
@@ -137,6 +160,14 @@ def verify_evidence_still_current(repo_root: Path, evidence: ProducerEvidence) -
             "Producer HEAD changed after preflight: "
             f"verified={evidence.commit}; current={current}"
         )
+    if str(repo_root.resolve()) != evidence.checkout_path:
+        raise ValueError(
+            "Producer checkout changed after preflight: "
+            f"verified={evidence.checkout_path}; current={repo_root.resolve()}"
+        )
+    status = _git(repo_root, "status", "--porcelain", "--untracked-files=all")
+    if status:
+        raise ValueError("Producer worktree became dirty after preflight.")
 
 
 def load_producer_evidence(path: Path) -> ProducerEvidence:

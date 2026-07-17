@@ -6,6 +6,10 @@ from typing import TYPE_CHECKING, Any
 
 from src.badges import compute_badges, suggest_next_badges
 from src.models import AnalyzerResult, RepoAudit, RepoMetadata
+from src.scoring_dimensions import (
+    UNSCORED_DIMENSIONS as UNSCORED_DIMENSIONS,
+    display_dimension as display_dimension,
+)
 
 if TYPE_CHECKING:
     from src.github_client import GitHubClient
@@ -47,13 +51,6 @@ STALE_THRESHOLD_DAYS = 730  # 2 years
 GRADE_THRESHOLDS = [(0.80, "A"), (0.70, "B"), (0.55, "C"), (0.35, "D"), (0.0, "F")]
 PARTIAL_RUN_BASIS_THRESHOLD = 0.85
 
-UNSCORED_DIMENSIONS = frozenset({"description"})
-
-
-def display_dimension(dimension: str) -> str:
-    """Return the operator-facing label for a scored or advisory dimension."""
-    return f"{dimension} (unscored)" if dimension in UNSCORED_DIMENSIONS else dimension
-
 
 def letter_grade(
     score: float, grade_thresholds: list[tuple[float, str]] | None = None
@@ -84,7 +81,8 @@ def score_repo(
         tuple(tier) for tier in profile.get("completeness_tiers", COMPLETENESS_TIERS)
     ]
     grade_thresholds = [
-        tuple(threshold) for threshold in profile.get("grade_thresholds", GRADE_THRESHOLDS)
+        tuple(threshold)
+        for threshold in profile.get("grade_thresholds", GRADE_THRESHOLDS)
     ]
     stale_threshold_days = profile.get("stale_threshold_days", STALE_THRESHOLD_DAYS)
     flags: list[str] = []
@@ -118,16 +116,20 @@ def score_repo(
     # Portfolio-relative novelty adjustment: reduce novelty for dominant languages
     if portfolio_lang_freq and metadata.language:
         from src.analyzers.interest import NOVEL_LANGUAGES
+
         if metadata.language in NOVEL_LANGUAGES:
             freq = portfolio_lang_freq.get(metadata.language, 0.0)
             if freq >= 0.30:
                 interest_result = next(
-                    (r for r in results if r.dimension == "interest"), None,
+                    (r for r in results if r.dimension == "interest"),
+                    None,
                 )
                 if interest_result:
                     raw_novelty = interest_result.details.get("tech_novelty", 0.0)
                     adjusted_novelty = raw_novelty * max(0.0, 1.0 - freq)
-                    interest_score = max(0.0, interest_score - (raw_novelty - adjusted_novelty))
+                    interest_score = max(
+                        0.0, interest_score - (raw_novelty - adjusted_novelty)
+                    )
 
     # Classify completeness tier
     tier = "abandoned"
@@ -234,20 +236,28 @@ def compute_portfolio_grade(audits: list[RepoAudit]) -> tuple[str, float]:
     diversity_bonus = min(0.10, max(0, (len(languages) - 3)) * 0.05)
 
     # Shipped ratio bonus
-    shipped_ratio = sum(1 for a in audits if a.completeness_tier == "shipped") / len(audits)
-    shipped_bonus = 0.10 if shipped_ratio > 0.5 else (0.05 if shipped_ratio > 0.3 else 0)
+    shipped_ratio = sum(1 for a in audits if a.completeness_tier == "shipped") / len(
+        audits
+    )
+    shipped_bonus = (
+        0.10 if shipped_ratio > 0.5 else (0.05 if shipped_ratio > 0.3 else 0)
+    )
 
     # Abandonment penalty
     abandon_ratio = sum(
         1 for a in audits if a.completeness_tier in ("skeleton", "abandoned")
     ) / len(audits)
-    abandon_penalty = -0.10 if abandon_ratio > 0.6 else (-0.05 if abandon_ratio > 0.4 else 0)
+    abandon_penalty = (
+        -0.10 if abandon_ratio > 0.6 else (-0.05 if abandon_ratio > 0.4 else 0)
+    )
 
     # Badge density bonus
     avg_badges = sum(len(a.badges) for a in audits) / len(audits)
     badge_bonus = 0.05 if avg_badges > 3 else 0
 
-    health_score = avg_score + diversity_bonus + shipped_bonus + abandon_penalty + badge_bonus
+    health_score = (
+        avg_score + diversity_bonus + shipped_bonus + abandon_penalty + badge_bonus
+    )
     health_score = max(0.0, min(1.0, health_score))
 
     return letter_grade(health_score), round(health_score, 3)

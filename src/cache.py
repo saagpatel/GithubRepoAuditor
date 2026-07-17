@@ -2,32 +2,40 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import time
-from urllib.parse import parse_qsl, urlparse
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qsl, urlparse
 
 CACHE_DIR = Path("output/.cache")
 CACHE_TTL = 3600  # 1 hour
 _SENSITIVE_FIELD_NAMES = frozenset(
     {
         "access_token",
-    "api_key",
-    "apikey",
-    "authorization",
+        "api_key",
+        "apikey",
+        "authorization",
         "client_secret",
         "credential",
-    "password",
-    "private_key",
+        "password",
+        "private_key",
         "github_token",
         "secret",
         "token",
     }
 )
+_SENSITIVE_VALUE_PATTERNS = (
+    re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
+    re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36,}\b"),
+    re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}\b"),
+    re.compile(r"\bxox[bpors]-[A-Za-z0-9-]{10,}\b"),
+    re.compile(r"-----BEGIN (?:RSA |EC |DSA )?PRIVATE KEY-----"),
+)
 
 
 def contains_sensitive_data(value: Any) -> bool:
-    """Return whether JSON-compatible data contains a credential field."""
+    """Return whether JSON-compatible data contains credential data."""
     if isinstance(value, dict):
         return any(
             str(key).lower() in _SENSITIVE_FIELD_NAMES or contains_sensitive_data(item)
@@ -37,6 +45,8 @@ def contains_sensitive_data(value: Any) -> bool:
         return any(contains_sensitive_data(item) for item in value)
     if isinstance(value, tuple):
         return any(contains_sensitive_data(item) for item in value)
+    if isinstance(value, str):
+        return any(pattern.search(value) for pattern in _SENSITIVE_VALUE_PATTERNS)
     return False
 
 
@@ -95,7 +105,8 @@ class ResponseCache:
             "cached_at": time.time(),
         }
         try:
-            path.write_text(json.dumps(entry))  # lgtm [py/clear-text-storage-sensitive-data] redacted above
+            # lgtm[py/clear-text-storage-sensitive-data] Credential-shaped data is rejected above.
+            path.write_text(json.dumps(entry))
         except OSError:
             pass  # Cache write failure is non-fatal
 

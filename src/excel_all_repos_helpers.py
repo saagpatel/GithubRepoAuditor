@@ -9,7 +9,8 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
-from src.scorer import PARTIAL_RUN_BASIS_THRESHOLD, WEIGHTS, display_dimension
+from src.scoring_dimensions import display_dimension
+from src.scorer import PARTIAL_RUN_BASIS_THRESHOLD, WEIGHTS
 
 ALL_REPOS_HEADERS = [
     "Repo",
@@ -74,7 +75,9 @@ def build_all_repo_rows(
     render_sparkline: Callable[[list[float]], str],
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    ranked_audits = sorted(audits, key=lambda audit: audit.get("overall_score", 0), reverse=True)
+    ranked_audits = sorted(
+        audits, key=lambda audit: audit.get("overall_score", 0), reverse=True
+    )
     for audit in ranked_audits:
         metadata = audit.get("metadata", {})
         details = {
@@ -228,13 +231,21 @@ def write_all_repo_rows(
             name_cell.hyperlink = repo_row["html_url"]
             name_cell.font = Font("Calibri", 10, color=link_color, underline="single")
 
-        color_grade_cell(ws.cell(row=row_index, column=ALL_REPOS_GRADE_COLUMN), repo_row["grade"])
-        color_tier_cell(ws.cell(row=row_index, column=ALL_REPOS_TIER_COLUMN), repo_row["tier"])
+        color_grade_cell(
+            ws.cell(row=row_index, column=ALL_REPOS_GRADE_COLUMN), repo_row["grade"]
+        )
+        color_tier_cell(
+            ws.cell(row=row_index, column=ALL_REPOS_TIER_COLUMN), repo_row["tier"]
+        )
         pattern = repo_row["commit_pattern"]
         if pattern and pattern != "—":
-            color_pattern_cell(ws.cell(row=row_index, column=ALL_REPOS_PATTERN_COLUMN), pattern)
+            color_pattern_cell(
+                ws.cell(row=row_index, column=ALL_REPOS_PATTERN_COLUMN), pattern
+            )
 
-        trend_cell = ws.cell(row=row_index, column=len(headers) - ALL_REPOS_TREND_COLUMN_OFFSET)
+        trend_cell = ws.cell(
+            row=row_index, column=len(headers) - ALL_REPOS_TREND_COLUMN_OFFSET
+        )
         if trend_cell.value:
             trend_cell.font = sparkline_font
 
@@ -264,7 +275,9 @@ def finalize_all_repos_layout(
 
     for column_name in ALL_REPOS_LONG_TEXT_HEADERS:
         col_index = headers.index(column_name) + 1
-        ws.column_dimensions[get_column_letter(col_index)].width = ALL_REPOS_LONG_TEXT_WIDTH
+        ws.column_dimensions[
+            get_column_letter(col_index)
+        ].width = ALL_REPOS_LONG_TEXT_WIDTH
         for row_index in range(2, max_row + 1):
             ws.cell(row=row_index, column=col_index).alignment = Alignment(
                 wrap_text=True,
@@ -378,13 +391,21 @@ def apply_all_repos_postprocessing(
         ws.conditional_formatting.add(
             f"C2:C{max_row}",
             data_bar_rule_factory(
-                start_type="num", start_value=0, end_type="num", end_value=1, color="166534"
+                start_type="num",
+                start_value=0,
+                end_type="num",
+                end_value=1,
+                color="166534",
             ),
         )
         ws.conditional_formatting.add(
             f"D2:D{max_row}",
             data_bar_rule_factory(
-                start_type="num", start_value=0, end_type="num", end_value=1, color="0EA5E9"
+                start_type="num",
+                start_value=0,
+                end_type="num",
+                end_value=1,
+                color="0EA5E9",
             ),
         )
         ws.conditional_formatting.add(

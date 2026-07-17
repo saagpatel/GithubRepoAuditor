@@ -86,21 +86,42 @@ PROJECT_MARKERS = frozenset(
 #   nogoprjs     -> operator-flagged "no-go" projects, never pursued
 #   smoke-export -> generated AuraForge signed-smoke-export bundles (no real repo)
 IGNORE_PROJECT_DIR_TOKENS = frozenset({"nogoprjs", "smoke-export"})
-IGNORE_PROJECT_DIR_NAMES = frozenset({"codex backups"})
+IGNORE_PROJECT_DIR_NAMES = frozenset(
+    {
+        "codex backups",
+        "scratch",
+        "_backups",
+        "_preserved-local-artifacts",
+        "sweep-reports",
+        "_fable-worktrees",
+        "_codex-worktrees",
+    }
+)
+IGNORE_NESTED_PROJECT_DIR_NAMES = frozenset({"packets", "prompts"})
 # Transient / generated working directories matched by regex on the dir name —
 # e.g. a `<repo>-tmp-<timestamp>` clone left behind by a tooling run.
 IGNORE_PROJECT_DIR_PATTERNS: tuple[re.Pattern[str], ...] = (re.compile(r"-tmp-\d+$"),)
 ARCHIVE_REMOTE_BASENAME_TOKENS = frozenset({"private-archive", "scrubbed-import"})
 
 
-WORKSPACE_DISCOVERY_POLICY_VERSION = "workspace_discovery.v1"
+WORKSPACE_DISCOVERY_POLICY_VERSION = "workspace_discovery.v2"
 
 
-def workspace_exclusion_reason(name: str) -> str | None:
+def workspace_exclusion_reason(name: str, *, nested: bool = False) -> str | None:
     """Return the stable policy reason for a non-project directory name."""
     lowered = name.lower()
-    if lowered in IGNORE_PROJECT_DIR_NAMES:
+    if lowered in {"codex backups", "_backups"}:
         return "backup-container"
+    if lowered == "_preserved-local-artifacts":
+        return "preserved-artifacts"
+    if lowered == "scratch":
+        return "scratch-container"
+    if lowered == "sweep-reports":
+        return "generated-reports"
+    if lowered in {"_fable-worktrees", "_codex-worktrees"}:
+        return "linked-worktree-container"
+    if nested and lowered in IGNORE_NESTED_PROJECT_DIR_NAMES:
+        return "nested-content"
     if any(token in lowered for token in IGNORE_PROJECT_DIR_TOKENS):
         return "operator-excluded" if "nogoprjs" in lowered else "generated-evidence"
     if any(pattern.search(name) for pattern in IGNORE_PROJECT_DIR_PATTERNS):
@@ -210,7 +231,7 @@ def _discover_nested_projects(
     for child in sorted(root.iterdir(), key=lambda item: item.name.lower()):
         if child.name.startswith(".") or not child.is_dir() or child.is_symlink():
             continue
-        exclusion_reason = workspace_exclusion_reason(child.name)
+        exclusion_reason = workspace_exclusion_reason(child.name, nested=True)
         if exclusion_reason is not None:
             _record_exclusion(exclusion_counts, exclusion_reason)
             continue

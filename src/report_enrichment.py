@@ -7,7 +7,7 @@ from typing import Any
 
 from src.portfolio_truth_types import truth_latest_path
 from src.report_contracts import RiskLookupEntry, RiskPosture, TopElevatedEntry
-from src.scorer import display_dimension
+from src.scoring_dimensions import display_dimension
 from src.terminology import ACTION_SYNC_CANONICAL_LABELS
 from src.weekly_packaging import finalize_weekly_pack
 from src.weekly_scheduling_overlay import apply_weekly_scheduling_overlay

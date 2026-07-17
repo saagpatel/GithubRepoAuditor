@@ -99,6 +99,24 @@ def test_ignore_predicate_matches_transient_dirs() -> None:
     assert _is_ignored_project_dir("resume-evolver-tmp-1776063720")
     assert _is_ignored_project_dir("Codex Backups")
     assert workspace_exclusion_reason("Codex Backups") == "backup-container"
+    assert workspace_exclusion_reason("scratch") == "scratch-container"
+    assert workspace_exclusion_reason("_backups") == "backup-container"
+    assert (
+        workspace_exclusion_reason("_preserved-local-artifacts")
+        == "preserved-artifacts"
+    )
+    assert workspace_exclusion_reason("sweep-reports") == "generated-reports"
+    assert (
+        workspace_exclusion_reason("_fable-worktrees")
+        == "linked-worktree-container"
+    )
+    assert (
+        workspace_exclusion_reason("_codex-worktrees")
+        == "linked-worktree-container"
+    )
+    assert workspace_exclusion_reason("packets") is None
+    assert workspace_exclusion_reason("packets", nested=True) == "nested-content"
+    assert workspace_exclusion_reason("prompts", nested=True) == "nested-content"
 
 
 def test_ignore_predicate_keeps_real_projects() -> None:
@@ -128,6 +146,14 @@ def test_discovery_skips_ignored_subtrees(tmp_path) -> None:
     _project("resume-evolver-tmp-1776063720")  # top-level tmp clone -> skipped
     _project("Documents", "Codex Backups", "Wave 2R Post-Update", "README-fixture")
     _project("Documents", "RealNestedProject")
+    _project("scratch", "README-fixture")
+    _project("_backups", "old-repo")
+    _project("_preserved-local-artifacts", "saved-repo")
+    _project("sweep-reports", "branch-hygiene-2026-07-03")
+    _project("_fable-worktrees", "personal-ops-worklist-phase1")
+    _project("_codex-worktrees", "personal-ops-truth-authority")
+    _project("Campaign", "packets")
+    _project("Campaign", "prompts")
 
     exclusion_counts: dict[str, int] = {}
     result = discover_workspace_projects(
@@ -138,8 +164,13 @@ def test_discovery_skips_ignored_subtrees(tmp_path) -> None:
     )
     assert {p["name"] for p in result} == {"LegitProject", "RealNestedProject"}
     assert exclusion_counts == {
-        "backup-container": 1,
+        "backup-container": 2,
         "generated-evidence": 1,
+        "generated-reports": 1,
+        "linked-worktree-container": 2,
+        "nested-content": 2,
         "operator-excluded": 1,
+        "preserved-artifacts": 1,
+        "scratch-container": 1,
         "temporary-checkout": 1,
     }

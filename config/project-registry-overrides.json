@@ -4,6 +4,7 @@
 		"jcc": "JobCommandCenter",
 		"jsm_export": "JSMTicketAnalyticsExport",
 		"bhv": "BrowserHistoryVisualizer",
+		"claude-harness-modernization": "supp:claude-code-harness",
 		"netmapper": "NetworkMapper",
 		"notion_os": "Notion",
 		"mcpaudit-web": "MCPAudit",
@@ -13,6 +14,14 @@
 		"interruptionresume": "Interruption Resume Studio"
 	},
 	"supplementary": [
+		{
+			"canonical_key": "supp:claude-code-harness",
+			"display_name": "claude-code-harness",
+			"repo_full_name": null,
+			"group_key": "operator_infra",
+			"lifecycle_state": "manual-only",
+			"note": "Machine-wide Claude Code harness operating surface under /Users/d/.claude; tracked as shipped/monitor-only, not a standalone repo."
+		},
 		{
 			"canonical_key": "supp:personal-ops",
 			"display_name": "personal-ops",
@@ -60,7 +69,7 @@
 	},
 	"notion_projection_only_rows": {
 		"app": "local runtime/app shell placeholder; not a portfolio-truth repo",
-		"claude-code-harness": "local agent harness projection; outside repo-root truth",
+		"RAG Knowledge Base": "notion planning row; not a portfolio-truth repo",
 		"Sandbox Local Portfolio Project": "actuation sandbox fixture row",
 		"SecondBrain": "knowledge vault under /Users/d/Documents; not a /Users/d/Projects repo"
 	},

@@ -4,15 +4,17 @@ from __future__ import annotations
 
 import json
 import logging
-import re
-from datetime import date
+from datetime import datetime
 from pathlib import Path
 
 from src.cache import ResponseCache
-from src.cli_output import print_warning
 from src.github_client import GitHubClient
-
-WAREHOUSE_REPORT_STALE_DAYS = 7
+from src.github_security_coverage import (
+    GITHUB_SECURITY_RECEIPT_FILENAME,
+    LoadedSecurityCoverage,
+    SecurityCoverageError,
+    load_security_coverage_receipt,
+)
 
 
 def load_release_count_by_name(*, output_dir: Path, username: str) -> dict[str, int] | None:
@@ -152,26 +154,30 @@ def load_security_alerts_by_name(
     return {name: entry for name, entry in data.items() if isinstance(entry, dict)}
 
 
-def warn_if_warehouse_report_stale(output_dir: Path, username: str) -> None:
-    report_path = latest_audit_report_path(output_dir=output_dir, username=username)
-    if report_path is None:
-        print_warning(
-            f"No audit-report-{username}-*.json in {output_dir}: Notion's Repo Auditor "
-            f"signal reads that warehouse report and this --portfolio-truth run did not "
-            f"create one. Run `audit report {username}` to generate it (F2)."
-        )
-        return
-    match = re.search(r"(\d{4}-\d{2}-\d{2})", report_path.name)
-    if not match:
-        return
+def load_security_coverage_by_full_name(
+    *,
+    output_dir: Path,
+    receipt_path: Path | None = None,
+    max_age_hours: int = 24,
+    now: datetime | None = None,
+) -> LoadedSecurityCoverage | None:
+    """Load the canonical provenance-bearing security receipt.
+
+    Unlike the legacy GHAS overlay loader above, this path never discovers
+    candidates by filesystem mtime.  The fixed pointer or explicit path must
+    validate its embedded schema, producer, cohort, observation timestamps, and
+    freshness before PortfolioTruth may consume it.
+    """
+    selected = receipt_path or output_dir / GITHUB_SECURITY_RECEIPT_FILENAME
     try:
-        report_date = date.fromisoformat(match.group(1))
-    except ValueError:
-        return
-    age = (date.today() - report_date).days
-    if age > WAREHOUSE_REPORT_STALE_DAYS:
-        print_warning(
-            f"Newest warehouse report {report_path.name} is {age}d old: Notion's Repo "
-            f"Auditor signal reads it and is now stale. Run `audit report {username}` to "
-            f"refresh the warehouse report (F2 — both artifacts kept live by decision)."
+        return load_security_coverage_receipt(
+            selected,
+            max_age_hours=max_age_hours,
+            now=now,
         )
+    except SecurityCoverageError as exc:
+        logging.getLogger(__name__).warning(
+            "--portfolio-truth-include-security: %s — security coverage remains unknown",
+            exc,
+        )
+        return None

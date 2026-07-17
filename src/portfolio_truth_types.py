@@ -6,11 +6,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = "0.9.0"
+SCHEMA_VERSION = "0.11.0"
+# 0.11.0: provenance-bearing GitHub security receipts preserve per-provider
+# states and expose complete/partial/stale/unknown coverage denominators.
+# 0.10.0: canonical producer receipts bind the exact checkout; coverage and
+# repository/worktree observation envelopes fail closed on unavailable evidence.
 # 0.8.0: derived.registry_status removed (was a stale->parked synonym table over
 # activity_status); derived.archived added as a first-class lifecycle boolean;
 # source_summary.registry_status_counts replaced by activity_status_counts + archived_count.
-LEGACY_SCHEMA_VERSIONS = {"0.7.0", "0.8.0"}
+LEGACY_SCHEMA_VERSIONS = {"0.7.0", "0.8.0", "0.9.0", "0.10.0"}
 DERIVATION_POLICY_VERSION = "portfolio_attention.v2"
 
 # The published "latest" portfolio-truth artifact. The producer
@@ -41,6 +45,7 @@ VALID_ATTENTION_STATES = {
 VALID_LIFECYCLE_STATES = {
     "active",
     "maintenance",
+    "manual-only",
     "dormant",
     "experimental",
     "archived",
@@ -195,24 +200,38 @@ class RiskFields:
 
 @dataclass(frozen=True)
 class SecurityFields:
-    """Live GitHub Advanced Security alert counts, overlaid opt-in from the latest
-    output/ghas-alerts-<username>-*.json. When alerts_available is False the repo was
-    not scanned (no token / GHAS disabled / not fetched) — distinct from a clean scan
-    with zero open alerts, so consumers don't mislabel an unscanned repo as secure."""
+    """Receipt-backed GitHub security coverage with compatibility count fields.
+
+    ``alerts_available`` remains for older consumers, but now means all three
+    providers were freshly and completely observed.  Provider-specific states in
+    ``providers`` are the authority for partial or unavailable coverage.
+    """
 
     alerts_available: bool = False
-    dependabot_critical: int = 0
-    dependabot_high: int = 0
-    dependabot_medium: int = 0
-    dependabot_low: int = 0
-    code_scanning_critical: int = 0
-    code_scanning_high: int = 0
-    secret_scanning_open: int = 0
+    coverage_state: str = "unknown"
+    cohort_member: bool = False
+    cohort_policy: str = ""
+    receipt_schema_version: str = ""
+    receipt_state: str = "unknown"
+    source_produced_at: str = ""
+    providers: dict[str, dict[str, Any]] = field(default_factory=dict)
+    dependabot_critical: int | None = None
+    dependabot_high: int | None = None
+    dependabot_medium: int | None = None
+    dependabot_low: int | None = None
+    code_scanning_critical: int | None = None
+    code_scanning_high: int | None = None
+    secret_scanning_open: int | None = None
 
     @property
     def open_high_critical(self) -> int:
         """Dependabot high + critical — the security-risk-factor trigger surface."""
-        return self.dependabot_high + self.dependabot_critical
+        return (self.dependabot_high or 0) + (self.dependabot_critical or 0)
+
+    def provider_state(self, provider: str) -> str:
+        data = self.providers.get(provider) or {}
+        state = data.get("state")
+        return state if isinstance(state, str) else "not_requested"
 
     def to_dict(self) -> dict[str, Any]:
         data = dataclasses.asdict(self)
@@ -228,6 +247,7 @@ class PortfolioTruthProject:
     risk: RiskFields = field(default_factory=RiskFields)
     security: SecurityFields = field(default_factory=SecurityFields)
     advisory: AdvisoryFields = field(default_factory=AdvisoryFields)
+    repository_state: dict[str, Any] = field(default_factory=dict)
     provenance: dict[str, dict[str, str]] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
 
@@ -239,6 +259,7 @@ class PortfolioTruthProject:
             "risk": self.risk.to_dict(),
             "security": self.security.to_dict(),
             "advisory": self.advisory.to_dict(),
+            "repository_state": dict(self.repository_state),
             "provenance": self.provenance,
             "warnings": list(self.warnings),
         }
@@ -251,7 +272,7 @@ class PortfolioTruthRollups:
     re-deriving the auditor's risk/security logic, which is the #1 drift risk."""
 
     risk_tier_counts: dict[str, int]
-    security: dict[str, int]
+    security: dict[str, int | str]
     decision: dict[str, int]
 
     @classmethod
@@ -268,6 +289,19 @@ class PortfolioTruthRollups:
         repos_with_open_high_critical = 0
         total_open_high = 0
         total_open_critical = 0
+        unavailable_count = 0
+        complete_repo_count = 0
+        partial_repo_count = 0
+        stale_count = 0
+        unknown_count = 0
+        cohort_repository_count = 0
+        cohort_complete_count = 0
+        cohort_partial_count = 0
+        cohort_stale_count = 0
+        cohort_unknown_count = 0
+        dependabot_observed_count = 0
+        code_scanning_observed_count = 0
+        secret_scanning_observed_count = 0
         decision_needed_count = 0
         default_attention_count = 0
         for project in projects:
@@ -275,12 +309,42 @@ class PortfolioTruthRollups:
             if tier in risk_tier_counts:
                 risk_tier_counts[tier] += 1
             security = project.security
-            if security.alerts_available:
-                scanned_count += 1
+            if security.cohort_member:
+                cohort_repository_count += 1
+            provider_states = {
+                provider: security.provider_state(provider)
+                for provider in ("dependabot", "code_scanning", "secret_scanning")
+            }
+            dependabot_observed = provider_states["dependabot"] == "observed"
+            if dependabot_observed:
+                dependabot_observed_count += 1
                 if security.open_high_critical > 0:
                     repos_with_open_high_critical += 1
-                total_open_high += security.dependabot_high
-                total_open_critical += security.dependabot_critical
+                total_open_high += security.dependabot_high or 0
+                total_open_critical += security.dependabot_critical or 0
+            if provider_states["code_scanning"] == "observed":
+                code_scanning_observed_count += 1
+            if provider_states["secret_scanning"] == "observed":
+                secret_scanning_observed_count += 1
+            if security.coverage_state == "complete":
+                complete_repo_count += 1
+                scanned_count += 1
+                if security.cohort_member:
+                    cohort_complete_count += 1
+            elif security.coverage_state == "partial":
+                partial_repo_count += 1
+                if security.cohort_member:
+                    cohort_partial_count += 1
+            elif security.coverage_state == "stale":
+                stale_count += 1
+                if security.cohort_member:
+                    cohort_stale_count += 1
+            else:
+                unknown_count += 1
+                if security.cohort_member:
+                    cohort_unknown_count += 1
+            if not security.alerts_available:
+                unavailable_count += 1
             attention = project.derived.attention_state
             if attention == "decision-needed":
                 decision_needed_count += 1
@@ -291,6 +355,26 @@ class PortfolioTruthRollups:
             risk_tier_counts=risk_tier_counts,
             security={
                 "scanned_count": scanned_count,
+                "unavailable_count": unavailable_count,
+                "complete_repo_count": complete_repo_count,
+                "partial_repo_count": partial_repo_count,
+                "stale_count": stale_count,
+                "unknown_count": unknown_count,
+                "cohort_repository_count": cohort_repository_count,
+                "cohort_complete_count": cohort_complete_count,
+                "cohort_partial_count": cohort_partial_count,
+                "cohort_stale_count": cohort_stale_count,
+                "cohort_unknown_count": cohort_unknown_count,
+                "dependabot_observed_count": dependabot_observed_count,
+                "code_scanning_observed_count": code_scanning_observed_count,
+                "secret_scanning_observed_count": secret_scanning_observed_count,
+                "coverage_state": (
+                    "known"
+                    if unavailable_count == 0
+                    else "partial"
+                    if complete_repo_count or partial_repo_count
+                    else "unknown"
+                ),
                 "repos_with_open_high_critical": repos_with_open_high_critical,
                 "total_open_high": total_open_high,
                 "total_open_critical": total_open_critical,
@@ -324,7 +408,7 @@ class PortfolioTruthSnapshot:
     coverage: list[dict[str, Any]] = field(default_factory=list)
     exclusions: dict[str, Any] = field(
         default_factory=lambda: {
-            "policy_version": "workspace_discovery.v1",
+            "policy_version": "workspace_discovery.v2",
             "counts": {},
         }
     )

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.scorer import UNSCORED_DIMENSIONS, display_dimension
+from src.scoring_dimensions import UNSCORED_DIMENSIONS, display_dimension
 
 SCORE_EXPLAINER_HEADERS = ["Dimension", "Weight", "What It Measures", "How to Improve"]
 

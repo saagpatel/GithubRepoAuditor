@@ -60,6 +60,8 @@ def write_control_center_artifacts(
     report_reference: str,
     diff_dict: dict | None = None,
 ) -> tuple[Path, Path, Path, Path, dict]:
+    if contains_sensitive_data(report_data) or contains_sensitive_data(snapshot):
+        raise ValueError("control-center artifacts must not persist credential fields")
     filter_snapshot_for_default_view(snapshot)
     json_path, md_path = control_center_paths(output_dir, username, generated_at)
     snapshot.setdefault("operator_summary", {})["control_center_reference"] = str(json_path)
@@ -75,20 +77,24 @@ def write_control_center_artifacts(
         report_reference=report_reference,
         generated_at=generated_at.isoformat(),
     )
+    payload = control_center_artifact_payload(report_data, snapshot)
+    payload["weekly_command_center_digest_v1"] = weekly_digest
+    if contains_sensitive_data(payload) or contains_sensitive_data(snapshot):
+        raise ValueError("control-center artifacts must not persist credential fields")
     weekly_json, weekly_md = write_weekly_command_center_artifacts(
         output_dir,
         username=username,
         generated_at=generated_at,
         digest=weekly_digest,
     )
-    payload = control_center_artifact_payload(report_data, snapshot)
-    payload["weekly_command_center_digest_v1"] = weekly_digest
     payload["weekly_command_center_reference"] = {
         "json_path": str(weekly_json),
         "markdown_path": str(weekly_md),
     }
-    if contains_sensitive_data(payload) or contains_sensitive_data(snapshot):
-        raise ValueError("control-center artifacts must not persist credential fields")
-    json_path.write_text(json.dumps(payload, indent=2))  # codeql[py/clear-text-storage-sensitive-data] guarded above
-    md_path.write_text(render_control_center_markdown(snapshot, username, generated_at.isoformat()))  # codeql[py/clear-text-storage-sensitive-data] guarded above
+    # lgtm[py/clear-text-storage-sensitive-data] Credential-shaped data is rejected above.
+    json_path.write_text(json.dumps(payload, indent=2))
+    # lgtm[py/clear-text-storage-sensitive-data] Credential-shaped data is rejected above.
+    md_path.write_text(
+        render_control_center_markdown(snapshot, username, generated_at.isoformat())
+    )
     return json_path, md_path, weekly_json, weekly_md, payload

@@ -146,6 +146,33 @@ def test_resolve_hard_normalization_failures_via_override():
     assert resolve("bhv", index)["canonical_key"] == "BrowserHistoryVisualizer"
 
 
+def test_configured_shipped_mappings_cover_operator_os_and_claude_harness():
+    snapshot = _snapshot(
+        _ident(
+            "operator-os-explainer",
+            "operator-os-explainer",
+            "saagpatel/operator-os-explainer",
+        )
+    )
+    registry = build_project_registry(
+        snapshot,
+        notion_project_map_path=Path("config/notion-project-map.json"),
+        overrides_config_path=Path("config/project-registry-overrides.json"),
+    )
+    index = build_index(registry)
+    by_key = {entry["canonical_key"]: entry for entry in registry["entries"]}
+
+    assert resolve("claude-harness-modernization", index)["canonical_key"] == (
+        "supp:claude-code-harness"
+    )
+    assert by_key["supp:claude-code-harness"]["notion_local_page_id"] == (
+        "362c21f1-caf0-81bd-8c6e-dd3acaebc34b"
+    )
+    assert by_key["operator-os-explainer"]["notion_local_page_id"] == (
+        "39dc21f1-caf0-8142-8718-e1454dea1198"
+    )
+
+
 def test_resolve_collision_guard_screenshotselect():
     registry = build_project_registry(SNAPSHOT, overrides_config_path=None)
     index = build_index(registry)
@@ -170,6 +197,18 @@ def test_projection_policy_is_published_from_defaults():
     assert policy["notion_title_aliases"]["DesktopPEt-ready"] == "DesktopPEt"
     assert "SecondBrain" in policy["notion_projection_only_rows"]
     assert policy["notion_truth_shadow_rows"]["agent-bridge-launch"] == "agent-bridge"
+
+
+def test_configured_projection_policy_preserves_rag_planning_row_exclusion():
+    registry = build_project_registry(
+        SNAPSHOT,
+        notion_snapshot_path=None,
+        overrides_config_path=Path("config/project-registry-overrides.json"),
+    )
+
+    assert registry["projection_policy"]["notion_projection_only_rows"][
+        "RAG Knowledge Base"
+    ] == "notion planning row; not a portfolio-truth repo"
 
 
 def test_resolve_returns_none_for_non_projects():

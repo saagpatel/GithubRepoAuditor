@@ -391,12 +391,12 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     assert gamma.identity.section_marker == "iOS Projects"
     assert gamma.derived.stack == ["Swift"]
 
-    assert result.snapshot.schema_version == "0.9.0"
+    assert result.snapshot.schema_version == "0.11.0"
     assert result.snapshot.derivation_policy_version == "portfolio_attention.v2"
     assert result.snapshot.inputs["catalog"]["sha256"]
     assert result.snapshot.inputs["notion"]["mode"] == "unavailable"
     assert result.snapshot.exclusions == {
-        "policy_version": "workspace_discovery.v1",
+        "policy_version": "workspace_discovery.v2",
         "counts": {},
     }
     assert (
@@ -417,10 +417,27 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     assert sum(rollups["risk_tier_counts"].values()) == len(result.snapshot.projects)
     assert set(rollups["security"]) == {
         "scanned_count",
+        "unavailable_count",
+        "complete_repo_count",
+        "partial_repo_count",
+        "stale_count",
+        "unknown_count",
+        "cohort_repository_count",
+        "cohort_complete_count",
+        "cohort_partial_count",
+        "cohort_stale_count",
+        "cohort_unknown_count",
+        "dependabot_observed_count",
+        "code_scanning_observed_count",
+        "secret_scanning_observed_count",
+        "coverage_state",
         "repos_with_open_high_critical",
         "total_open_high",
         "total_open_critical",
     }
+    assert rollups["security"]["cohort_repository_count"] == 1
+    assert rollups["security"]["cohort_unknown_count"] == 1
+    assert rollups["security"]["cohort_complete_count"] == 0
     assert set(rollups["decision"]) == {
         "decision_needed_count",
         "default_attention_count",
@@ -500,6 +517,9 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
     None
 ):
     from src.portfolio_truth_reconcile import _attention_state_for
+    from src.portfolio_truth_types import VALID_LIFECYCLE_STATES
+
+    assert "manual-only" in VALID_LIFECYCLE_STATES
 
     assert (
         _attention_state_for(
@@ -535,7 +555,31 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
             path_override="investigate",
             risk_entry={"security_risk": False},
         )
-        == "decision-needed"
+        == "manual-only"
+    )
+    assert (
+        _attention_state_for(
+            activity_status="active",
+            archived=False,
+            lifecycle_state="active",
+            operating_path="",
+            category="infrastructure",
+            path_override="investigate",
+            risk_entry={"security_risk": False},
+        )
+        == "manual-only"
+    )
+    assert (
+        _attention_state_for(
+            activity_status="active",
+            archived=False,
+            lifecycle_state="manual-only",
+            operating_path="maintain",
+            category="infrastructure",
+            path_override="",
+            risk_entry={"security_risk": False},
+        )
+        == "manual-only"
     )
     assert (
         _attention_state_for(
@@ -742,7 +786,7 @@ def test_build_security_fields_none_is_unscanned() -> None:
     fields = _build_security_fields(None)
     assert fields.alerts_available is False
     assert fields.open_high_critical == 0
-    assert fields.dependabot_critical == 0
+    assert fields.dependabot_critical is None
 
 
 def test_build_security_fields_unavailable_dependabot_is_not_available() -> None:
@@ -755,19 +799,95 @@ def test_build_security_fields_unavailable_dependabot_is_not_available() -> None
         }
     )
     assert fields.alerts_available is False
-    assert fields.dependabot_high == 0
+    assert fields.dependabot_high is None
 
 
-def test_build_security_fields_scanned_clean_is_available_with_zero_counts() -> None:
-    # A repo whose Dependabot scan succeeded with zero open alerts must read as
-    # scanned-and-clean (available=True), distinct from an unscanned repo.
+def test_dependabot_only_clean_is_partial_not_combined_security_coverage() -> None:
+    # A clean Dependabot observation must not stand in for combined GitHub
+    # security coverage when code and secret scanning were not observed.
     from src.portfolio_truth_reconcile import _build_security_fields
 
     fields = _build_security_fields({"dependabot": {"available": True}})
-    assert fields.alerts_available is True
+    assert fields.alerts_available is False
+    assert fields.coverage_state == "partial"
     assert fields.dependabot_high == 0
     assert fields.dependabot_critical == 0
+    assert fields.code_scanning_high is None
+    assert fields.secret_scanning_open is None
     assert fields.open_high_critical == 0
+
+
+def test_receipt_partial_provider_coverage_emits_explicit_denominators(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    now = datetime.fromtimestamp(1_700_200_000, tz=timezone.utc)
+    alpha_path = portfolio_workspace / "Alpha"
+    subprocess.run(["git", "init"], cwd=alpha_path, capture_output=True, check=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", "https://github.com/d/Alpha.git"],
+        cwd=alpha_path,
+        capture_output=True,
+        check=True,
+    )
+    observed = {
+        "state": "observed",
+        "observed_at": now.isoformat(),
+        "http_status": 200,
+        "pagination_complete": True,
+        "counts": {"critical": 0, "high": 0, "medium": 0, "low": 0},
+    }
+    security = {
+        "d/Alpha": {
+            "repo_full_name": "d/Alpha",
+            "cohort_member": True,
+            "cohort_policy": "portfolio-default-attention-v1",
+            "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
+            "receipt_state": "fresh",
+            "source_produced_at": now.isoformat(),
+            "providers": {
+                "dependabot": observed,
+                "code_scanning": {
+                    "state": "forbidden",
+                    "counts": None,
+                    "pagination_complete": False,
+                },
+                "secret_scanning": {
+                    "state": "not_requested",
+                    "counts": None,
+                    "pagination_complete": False,
+                },
+            },
+        }
+    }
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=now,
+        security_alerts_by_name=security,
+    )
+    alpha = next(
+        project
+        for project in result.snapshot.projects
+        if project.identity.display_name == "Alpha"
+    )
+    rollup = result.snapshot.to_dict()["rollups"]["security"]
+
+    assert alpha.security.coverage_state == "partial"
+    assert alpha.security.dependabot_high == 0
+    assert alpha.security.code_scanning_high is None
+    assert alpha.security.secret_scanning_open is None
+    assert rollup["cohort_repository_count"] == 1
+    assert rollup["complete_repo_count"] == 0
+    assert rollup["partial_repo_count"] == 1
+    assert rollup["cohort_partial_count"] == 1
+    assert rollup["cohort_unknown_count"] == 0
+    assert rollup["dependabot_observed_count"] == 1
+    assert rollup["code_scanning_observed_count"] == 0
+    assert rollup["secret_scanning_observed_count"] == 0
 
 
 def test_security_overlay_populates_and_force_elevates(
@@ -808,7 +928,7 @@ def test_security_overlay_populates_and_force_elevates(
     # A repo with no security entry stays unscanned (overlay is strictly opt-in).
     calibrate = projects["Calibrate"]
     assert calibrate.security.alerts_available is False
-    assert calibrate.security.dependabot_critical == 0
+    assert calibrate.security.dependabot_critical is None
     assert calibrate.risk.security_risk is False
 
     # Serialized snapshot carries the security block.
@@ -1961,8 +2081,11 @@ def test_portfolio_truth_app_passes_validated_producer_receipt_to_publisher(
                 "commit": "a" * 40,
                 "ref": "refs/remotes/origin/main",
                 "checkout_role": "canonical-automation",
+                "checkout_path": str(tmp_path / "producer-repo"),
                 "worktree_clean": True,
+                "dirty_path_count": 0,
                 "verified_at": "2026-07-10T12:00:00Z",
+                "receipt_id": "sha256:" + "a" * 64,
                 "checks": {},
             }
         )
@@ -1984,9 +2107,6 @@ def test_portfolio_truth_app_passes_validated_producer_receipt_to_publisher(
     monkeypatch.setattr("src.app.portfolio_truth.publish_portfolio_truth", fake_publish)
     monkeypatch.setattr(
         "src.app.portfolio_truth.load_live_repo_status_by_name", lambda **_kwargs: {}
-    )
-    monkeypatch.setattr(
-        "src.app.portfolio_truth.warn_if_warehouse_report_stale", lambda *_args: None
     )
     monkeypatch.setenv("GHRA_REQUIRE_PRODUCER_EVIDENCE", "1")
     monkeypatch.setenv("GHRA_PRODUCER_EVIDENCE", str(receipt))
@@ -2022,6 +2142,7 @@ def test_cli_portfolio_truth_allow_empty_notion_carries_forward(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     output_dir = tmp_path / "output"
+    monkeypatch.setenv("GHRA_REQUIRE_PRODUCER_EVIDENCE", "0")
     output_dir.mkdir()
 
     discovered = build_portfolio_truth_snapshot(
@@ -2404,6 +2525,7 @@ def test_cli_portfolio_truth_respects_path_overrides(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     output_dir = tmp_path / "output"
+    monkeypatch.setenv("GHRA_REQUIRE_PRODUCER_EVIDENCE", "0")
     registry_output = portfolio_workspace / "compat-registry.md"
     report_output = portfolio_workspace / "compat-report.md"
     argv = [
@@ -2747,42 +2869,3 @@ def test_git_default_branch_empty_when_origin_head_unset(tmp_path: Path) -> None
 
     # A freshly init'd repo has no origin/HEAD → "" so callers fall back.
     assert _git_default_branch(repo) == ""
-
-
-# ── F2: warehouse-report staleness reminder ────────────────────────────────
-from src.portfolio_truth_status import warn_if_warehouse_report_stale  # noqa: E402
-
-
-def _write_warehouse_report(d: Path, username: str, date_str: str) -> None:
-    (d / f"audit-report-{username}-{date_str}.json").write_text("{}", encoding="utf-8")
-
-
-class TestWarehouseStalenessReminder:
-    """F2 (keep-dual): --portfolio-truth mode warns when the warehouse report Notion
-    reads is missing or stale, so the operator refreshes it."""
-
-    def test_missing_report_warns(self, tmp_path: Path, capsys) -> None:
-        import re
-
-        warn_if_warehouse_report_stale(tmp_path, "saagpatel")
-        captured = capsys.readouterr()
-        # print_warning word-wraps, so normalize whitespace before substring checks
-        combined = re.sub(r"\s+", " ", captured.out + captured.err)
-        assert "No audit-report-saagpatel" in combined
-        assert "audit report saagpatel" in combined
-
-    def test_stale_report_warns(self, tmp_path: Path, capsys) -> None:
-        _write_warehouse_report(tmp_path, "saagpatel", "2020-01-01")
-        warn_if_warehouse_report_stale(tmp_path, "saagpatel")
-        captured = capsys.readouterr()
-        assert "stale" in (captured.out + captured.err).lower()
-
-    def test_fresh_report_no_warning(self, tmp_path: Path, capsys) -> None:
-        from datetime import date
-
-        _write_warehouse_report(tmp_path, "saagpatel", date.today().isoformat())
-        warn_if_warehouse_report_stale(tmp_path, "saagpatel")
-        captured = capsys.readouterr()
-        combined = captured.out + captured.err
-        assert "stale" not in combined.lower()
-        assert "No audit-report" not in combined

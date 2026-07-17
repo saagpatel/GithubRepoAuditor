@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Set as AbstractSet
 from pathlib import Path
 from typing import Any
 
@@ -9,6 +10,7 @@ from src.portfolio_pathing import VALID_OPERATING_PATHS
 VALID_LIFECYCLE_STATES = {
     "active",
     "maintenance",
+    "manual-only",
     "dormant",
     "experimental",
     "archived",
@@ -40,7 +42,7 @@ def _normalize_key(key: str) -> str:
     return key.strip().lower()
 
 
-def _normalize_enum(value: Any, allowed: set[str]) -> str:
+def _normalize_enum(value: Any, allowed: AbstractSet[str]) -> str:
     normalized = _safe_text(value).lower()
     return normalized if normalized in allowed else ""
 
