@@ -1126,14 +1126,30 @@ def _strip_generated_registry_note_decorations(
     repo_entry: dict[str, Any],
     group_entry: dict[str, Any],
 ) -> str:
-    """Keep generated registry markdown idempotent when used as legacy input."""
-    value = notes.strip()
-    value = _GENERATED_SECURITY_NOTE_RE.sub("", value).strip()
+    """Keep generated registry markdown idempotent when used as legacy input.
 
+    ``_note_text`` composes ``[security: ...] <purpose> <notes>`` fresh on every
+    run, and project-registry.md is both that render target and (by default,
+    when ``--registry`` is omitted) the next run's legacy-notes source. For a
+    repo with no declared purpose the accumulated security flags stay glued
+    together at the front, so a single regex pass strips all of them. But when
+    a purpose is declared, each run interleaves a fresh flag ahead of the
+    purpose ahead of whatever notes text came back in, so old corruption reads
+    as ``[secN] purpose [secN-1] purpose ...``, and a single strip pass only
+    peels the outermost layer, leaving the rest to compound on the next run.
+    Loop the strip to a fixed point so one call collapses any amount of
+    accumulated history, not just the newest layer.
+    """
+    value = notes.strip()
     purpose = str(repo_entry.get("purpose") or group_entry.get("purpose") or "").strip()
-    if purpose:
-        while value == purpose or value.startswith(f"{purpose} "):
-            value = value[len(purpose) :].strip()
+
+    while True:
+        next_value = _GENERATED_SECURITY_NOTE_RE.sub("", value).strip()
+        if purpose and (next_value == purpose or next_value.startswith(f"{purpose} ")):
+            next_value = next_value[len(purpose) :].strip()
+        if next_value == value:
+            break
+        value = next_value
 
     if value.startswith(_GENERATED_PATH_NOTE_PREFIXES) or any(
         marker in value for marker in _GENERATED_PATH_NOTE_MARKERS
