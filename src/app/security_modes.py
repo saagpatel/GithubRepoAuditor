@@ -85,8 +85,8 @@ def run_security_gate_mode(args: Any) -> None:
         max_age_hours=getattr(args, "max_age_hours", None),
     )
     if getattr(args, "json", False):
-        print(json.dumps(report.to_dict(), indent=2))
+        print(json.dumps(report.to_dict(), indent=2))  # codeql[py/clear-text-logging-sensitive-data] count-only alert summary
     else:
-        print(render_security_gate_markdown(report))
+        print(render_security_gate_markdown(report))  # codeql[py/clear-text-logging-sensitive-data] count-only alert summary
     if not report.passed:
         raise SystemExit(1)

@@ -343,7 +343,7 @@ def _fetch_provider(
             try:
                 reserve_reached = int(remaining) <= budget.quota_reserve
             except ValueError:
-                pass
+                pass  # Missing/malformed quota metadata leaves the conservative request budget in control.
         if response.status_code == 304:
             if reserve_reached:
                 budget.stop_reason = "quota_reserve"
