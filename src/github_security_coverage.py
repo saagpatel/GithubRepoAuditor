@@ -27,6 +27,18 @@ DEFAULT_ATTENTION_STATES = frozenset(
     {"active-product", "active-infra", "decision-needed"}
 )
 PROVIDER_NAMES = ("dependabot", "code_scanning", "secret_scanning")
+ELIGIBILITY_SOURCE = "github-account-repository-preflight-v1"
+ELIGIBILITY_REASON = "private_user_repo_plan_unavailable"
+ELIGIBILITY_STATES = frozenset(
+    {
+        "not_requested",
+        "observed",
+        "forbidden",
+        "rate_limited",
+        "transient_error",
+        "malformed",
+    }
+)
 PROVIDER_STATES = frozenset(
     {
         "observed",
@@ -181,6 +193,7 @@ def _provider_result(
     counts: dict[str, int] | None = None,
     conditional_request: bool = False,
     conditional_result: str = "not_used",
+    http_classification: str | None = None,
 ) -> dict[str, Any]:
     if state not in PROVIDER_STATES:
         raise SecurityCoverageError(f"invalid provider state: {state}")
@@ -188,7 +201,8 @@ def _provider_result(
         "state": state,
         "observed_at": observed_at,
         "http_status": http_status,
-        "http_classification": (
+        "http_classification": http_classification
+        or (
             None
             if http_status is None
             else "success"
@@ -225,11 +239,7 @@ def _classify_failure(provider: str, response: requests.Response) -> tuple[str, 
     remaining = response.headers.get("X-RateLimit-Remaining")
     if status == 429 or (
         status == 403
-        and (
-            remaining == "0"
-            or "rate limit" in message
-            or "secondary rate" in message
-        )
+        and (remaining == "0" or "rate limit" in message or "secondary rate" in message)
     ):
         return "rate_limited", "github_rate_limit"
     if status == 403:
@@ -256,7 +266,9 @@ def _accumulate(provider: str, counts: dict[str, int], alerts: list[Any]) -> boo
         if provider == "dependabot":
             advisory = _mapping(alert.get("security_advisory"))
             vulnerability = _mapping(alert.get("security_vulnerability"))
-            severity = _text(advisory.get("severity") or vulnerability.get("severity")).lower()
+            severity = _text(
+                advisory.get("severity") or vulnerability.get("severity")
+            ).lower()
             if severity in counts:
                 counts[severity] += 1
         elif provider == "code_scanning":
@@ -280,6 +292,264 @@ def _prior_provider(
     repositories = _mapping(_mapping(prior_receipt).get("repositories"))
     entry = _mapping(repositories.get(repo_full_name))
     return _mapping(_mapping(entry.get("providers")).get(provider))
+
+
+def _eligibility_candidates(
+    prior_receipt: dict[str, Any] | None,
+    cohort: tuple[str, ...],
+) -> tuple[str, ...]:
+    candidates: list[str] = []
+    for repo_full_name in cohort:
+        code_state = _text(
+            _prior_provider(prior_receipt, repo_full_name, "code_scanning").get("state")
+        )
+        secret_state = _text(
+            _prior_provider(prior_receipt, repo_full_name, "secret_scanning").get(
+                "state"
+            )
+        )
+        if code_state in {"feature_unavailable", "not_found"} or secret_state in {
+            "feature_unavailable",
+            "not_found",
+        }:
+            candidates.append(repo_full_name)
+    return tuple(candidates)
+
+
+def _reserve_reached(response: requests.Response, budget: _Budget) -> bool:
+    remaining = response.headers.get("X-RateLimit-Remaining")
+    if remaining is None:
+        return False
+    try:
+        return int(remaining) <= budget.quota_reserve
+    except ValueError:
+        return False
+
+
+def _eligibility_metadata(
+    *,
+    state: str,
+    observed_at: str | None,
+    reason: str | None,
+    candidates: tuple[str, ...],
+    request_count: int,
+    account: dict[str, str] | None = None,
+    repositories: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    if state not in ELIGIBILITY_STATES:
+        raise SecurityCoverageError(f"invalid eligibility state: {state}")
+    return {
+        "source": ELIGIBILITY_SOURCE,
+        "state": state,
+        "observed_at": observed_at,
+        "reason": reason,
+        "candidate_repositories": list(candidates),
+        "request_count": request_count,
+        "account": account,
+        "repositories": repositories or {},
+    }
+
+
+def _preflight_failure(
+    response: requests.Response,
+) -> tuple[str, str]:
+    state, reason = _classify_failure("dependabot", response)
+    if state in {"not_found", "gone"}:
+        return "malformed", reason
+    if state == "feature_unavailable":
+        return "forbidden", reason
+    return state, reason
+
+
+def _preflight_json(
+    session: requests.Session,
+    *,
+    method: str,
+    url: str,
+    budget: _Budget,
+    request_kwargs: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any] | None, str, str | None, bool]:
+    if not budget.consume(pagination=False):
+        return None, "not_requested", budget.stop_reason, True
+    try:
+        response = getattr(session, method)(
+            url,
+            timeout=30,
+            **(request_kwargs or {}),
+        )
+    except requests.RequestException:
+        return None, "transient_error", "network_error", False
+    reserve_reached = _reserve_reached(response, budget)
+    if response.status_code != 200:
+        state, reason = _preflight_failure(response)
+        if state == "rate_limited":
+            budget.stop_reason = "rate_limited"
+        elif reserve_reached:
+            budget.stop_reason = "quota_reserve"
+        return (
+            None,
+            state,
+            reason,
+            state == "rate_limited" or reserve_reached,
+        )
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = None
+    if not isinstance(payload, dict):
+        return None, "malformed", "non_object_payload", reserve_reached
+    if reserve_reached:
+        budget.stop_reason = "quota_reserve"
+    return payload, "observed", None, reserve_reached
+
+
+def _collect_eligibility_preflight(
+    session: requests.Session,
+    *,
+    api_base_url: str,
+    candidates: tuple[str, ...],
+    now_iso: str,
+    budget: _Budget,
+) -> tuple[dict[str, Any], dict[str, frozenset[str]], bool]:
+    before_requests = budget.base_requests
+
+    def finish(
+        *,
+        state: str,
+        reason: str | None,
+        account: dict[str, str] | None = None,
+        repositories: dict[str, dict[str, Any]] | None = None,
+        unavailable: dict[str, frozenset[str]] | None = None,
+        halted: bool = False,
+    ) -> tuple[dict[str, Any], dict[str, frozenset[str]], bool]:
+        return (
+            _eligibility_metadata(
+                state=state,
+                observed_at=now_iso if budget.base_requests > before_requests else None,
+                reason=reason,
+                candidates=candidates,
+                request_count=budget.base_requests - before_requests,
+                account=account,
+                repositories=repositories,
+            ),
+            unavailable or {},
+            halted,
+        )
+
+    if not candidates:
+        return finish(
+            state="not_requested",
+            reason="no_prior_unavailable_candidates",
+        )
+    account_payload, state, reason, halted = _preflight_json(
+        session,
+        method="get",
+        url=f"{api_base_url}/user",
+        budget=budget,
+    )
+    if state != "observed":
+        return finish(
+            state=state,
+            reason=f"account_{reason}",
+            halted=halted,
+        )
+    account_data = _mapping(account_payload)
+    account_login = _text(account_data.get("login"))
+    account_plan = _text(_mapping(account_data.get("plan")).get("name")).lower()
+    if not account_login or not account_plan:
+        return finish(
+            state="malformed",
+            reason="account_payload_invalid",
+            halted=halted,
+        )
+    account = {"login": account_login, "plan": account_plan}
+    if halted:
+        return finish(
+            state="not_requested",
+            reason="quota_reserve_before_repository_query",
+            account=account,
+            halted=True,
+        )
+
+    variables: dict[str, str] = {}
+    fields: list[str] = []
+    for index, repo_full_name in enumerate(candidates):
+        owner_name, name = repo_full_name.split("/", 1)
+        variables[f"owner{index}"] = owner_name
+        variables[f"name{index}"] = name
+        fields.append(
+            f"repo{index}: repository(owner: $owner{index}, name: $name{index}) "
+            "{ nameWithOwner visibility owner { __typename login } }"
+        )
+    declarations = ", ".join(f"${key}: String!" for key in variables)
+    query = f"query({declarations}) {{ {' '.join(fields)} }}"
+    repository_payload, state, reason, halted = _preflight_json(
+        session,
+        method="post",
+        url=f"{api_base_url}/graphql",
+        budget=budget,
+        request_kwargs={"json": {"query": query, "variables": variables}},
+    )
+    if state != "observed":
+        return finish(
+            state=state,
+            reason=f"repository_query_{reason}",
+            account=account,
+            halted=halted,
+        )
+    payload_mapping = _mapping(repository_payload)
+    data = _mapping(payload_mapping.get("data"))
+    if payload_mapping.get("errors") or len(data) != len(candidates):
+        return finish(
+            state="malformed",
+            reason="repository_query_payload_invalid",
+            account=account,
+            halted=halted,
+        )
+
+    repository_evidence: dict[str, dict[str, Any]] = {}
+    unavailable: dict[str, frozenset[str]] = {}
+    for index, expected_repo in enumerate(candidates):
+        repository = _mapping(data.get(f"repo{index}"))
+        full_name = _canonical_repo(repository.get("nameWithOwner"))
+        if full_name.lower() != expected_repo.lower():
+            return finish(
+                state="malformed",
+                reason="repository_identity_mismatch",
+                account=account,
+                halted=halted,
+            )
+        owner_data = _mapping(repository.get("owner"))
+        visibility = _text(repository.get("visibility")).lower()
+        owner_type = _text(owner_data.get("__typename"))
+        owner_login = _text(owner_data.get("login"))
+        plan_blocked = (
+            account_plan in {"free", "pro"}
+            and visibility == "private"
+            and owner_type == "User"
+            and owner_login.lower() == account_login.lower()
+        )
+        unavailable_providers = (
+            frozenset({"code_scanning", "secret_scanning"})
+            if plan_blocked
+            else frozenset()
+        )
+        repository_evidence[expected_repo] = {
+            "visibility": visibility,
+            "owner_type": owner_type,
+            "owner_login": owner_login,
+            "unavailable_providers": sorted(unavailable_providers),
+        }
+        if unavailable_providers:
+            unavailable[expected_repo] = unavailable_providers
+    return finish(
+        state="observed",
+        reason=None,
+        account=account,
+        repositories=repository_evidence,
+        unavailable=unavailable,
+        halted=halted,
+    )
 
 
 def _fetch_provider(
@@ -369,7 +639,9 @@ def _fetch_provider(
                     http_status=304,
                     reason="not_modified",
                     etag=etag or prior_etag,
-                    last_modified=last_modified or _text(prior.get("last_modified")) or None,
+                    last_modified=last_modified
+                    or _text(prior.get("last_modified"))
+                    or None,
                     pagination_complete=True,
                     counts={
                         key: int(prior_counts.get(key, 0) or 0)
@@ -487,12 +759,6 @@ def collect_security_coverage(
     cohort = derive_default_attention_cohort(
         portfolio_truth, expected_count=expected_cohort_count
     )
-    required_base_requests = len(cohort) * len(PROVIDER_NAMES)
-    if required_base_requests > base_request_limit:
-        raise SecurityCoverageError(
-            f"cohort requires {required_base_requests} base requests; "
-            f"limit is {base_request_limit}"
-        )
     commit = producer_commit
     if not commit:
         try:
@@ -527,8 +793,17 @@ def collect_security_coverage(
         total_limit=total_request_limit,
         quota_reserve=quota_reserve,
     )
+    resolved_api_base_url = api_base_url or os.environ.get(
+        "GITHUB_API_BASE_URL", "https://api.github.com"
+    )
+    eligibility, unavailable_providers, halted = _collect_eligibility_preflight(
+        client,
+        api_base_url=resolved_api_base_url,
+        candidates=_eligibility_candidates(prior_receipt, cohort),
+        now_iso=now_iso,
+        budget=budget,
+    )
     repositories: dict[str, dict[str, Any]] = {}
-    halted = False
     for repo_full_name in cohort:
         providers: dict[str, dict[str, Any]] = {}
         for provider in PROVIDER_NAMES:
@@ -539,10 +814,19 @@ def collect_security_coverage(
                     reason=budget.stop_reason or "collection_halted",
                 )
                 continue
+            if provider in unavailable_providers.get(repo_full_name, frozenset()):
+                providers[provider] = _provider_result(
+                    provider,
+                    state="feature_unavailable",
+                    observed_at=now_iso,
+                    http_status=200,
+                    http_classification="eligibility",
+                    reason=ELIGIBILITY_REASON,
+                )
+                continue
             providers[provider], halted = _fetch_provider(
                 client,
-                api_base_url=api_base_url
-                or os.environ.get("GITHUB_API_BASE_URL", "https://api.github.com"),
+                api_base_url=resolved_api_base_url,
                 repo_full_name=repo_full_name,
                 provider=provider,
                 now_iso=now_iso,
@@ -562,6 +846,7 @@ def collect_security_coverage(
             "commit": commit,
         },
         "github_api_version": GITHUB_API_VERSION,
+        "eligibility": eligibility,
         "cohort": {
             "policy": DEFAULT_COHORT_POLICY,
             "expected_count": expected_cohort_count,
@@ -580,10 +865,138 @@ def collect_security_coverage(
     }
 
 
+def _validate_eligibility(
+    value: Any,
+    *,
+    produced_at: datetime,
+    current: datetime,
+    cohort: tuple[str, ...],
+) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    data = _mapping(value)
+    if data.get("source") != ELIGIBILITY_SOURCE:
+        raise SecurityCoverageError("eligibility.source is invalid")
+    state = _text(data.get("state"))
+    if state not in ELIGIBILITY_STATES:
+        raise SecurityCoverageError(f"eligibility.state is invalid: {state!r}")
+    request_count = data.get("request_count")
+    if (
+        not isinstance(request_count, int)
+        or isinstance(request_count, bool)
+        or not 0 <= request_count <= 2
+    ):
+        raise SecurityCoverageError("eligibility.request_count is invalid")
+    raw_candidates = data.get("candidate_repositories")
+    if not isinstance(raw_candidates, list):
+        raise SecurityCoverageError("eligibility candidates are required")
+    candidates = tuple(_canonical_repo(repo) for repo in raw_candidates)
+    if candidates != tuple(sorted(candidates, key=str.lower)):
+        raise SecurityCoverageError("eligibility candidates must be canonically sorted")
+    if len({repo.lower() for repo in candidates}) != len(candidates):
+        raise SecurityCoverageError("eligibility candidates contain duplicates")
+    if not set(candidates).issubset(cohort):
+        raise SecurityCoverageError("eligibility candidates are outside the cohort")
+
+    observed_at_value = data.get("observed_at")
+    observed_at = (
+        _parse_datetime(observed_at_value, field_name="eligibility.observed_at")
+        if observed_at_value is not None
+        else None
+    )
+    if observed_at is not None:
+        if observed_at > produced_at:
+            raise SecurityCoverageError(
+                "eligibility.observed_at is later than receipt produced_at"
+            )
+        if (current - observed_at).total_seconds() / 3600 < -0.05:
+            raise SecurityCoverageError("eligibility.observed_at is future-dated")
+    if request_count and observed_at is None:
+        raise SecurityCoverageError(
+            "eligibility.observed_at is required when requests were attempted"
+        )
+
+    account_value = data.get("account")
+    account = _mapping(account_value)
+    normalized_account: dict[str, str] | None = None
+    if account_value is not None:
+        login = _text(account.get("login"))
+        plan = _text(account.get("plan")).lower()
+        if not login or not plan:
+            raise SecurityCoverageError("eligibility.account is invalid")
+        normalized_account = {"login": login, "plan": plan}
+
+    raw_repositories = data.get("repositories")
+    if not isinstance(raw_repositories, dict):
+        raise SecurityCoverageError("eligibility.repositories must be an object")
+    if not set(raw_repositories).issubset(candidates):
+        raise SecurityCoverageError(
+            "eligibility repository evidence is outside the candidates"
+        )
+    normalized_repositories: dict[str, dict[str, Any]] = {}
+    for repo_full_name, raw_repository in raw_repositories.items():
+        repository = _mapping(raw_repository)
+        visibility = _text(repository.get("visibility")).lower()
+        owner_type = _text(repository.get("owner_type"))
+        owner_login = _text(repository.get("owner_login"))
+        unavailable = repository.get("unavailable_providers")
+        if (
+            visibility not in {"public", "private", "internal"}
+            or not owner_type
+            or not owner_login
+            or not isinstance(unavailable, list)
+            or any(
+                provider not in {"code_scanning", "secret_scanning"}
+                for provider in unavailable
+            )
+            or len(set(unavailable)) != len(unavailable)
+        ):
+            raise SecurityCoverageError(
+                f"eligibility repository evidence is invalid: {repo_full_name}"
+            )
+        normalized_unavailable = sorted(unavailable)
+        if normalized_unavailable:
+            if (
+                normalized_account is None
+                or normalized_account["plan"] not in {"free", "pro"}
+                or visibility != "private"
+                or owner_type != "User"
+                or owner_login.lower() != normalized_account["login"].lower()
+            ):
+                raise SecurityCoverageError(
+                    f"eligibility unavailable claim is unproven: {repo_full_name}"
+                )
+        normalized_repositories[repo_full_name] = {
+            "visibility": visibility,
+            "owner_type": owner_type,
+            "owner_login": owner_login,
+            "unavailable_providers": normalized_unavailable,
+        }
+    if state == "observed":
+        if (
+            request_count != 2
+            or normalized_account is None
+            or set(normalized_repositories) != set(candidates)
+        ):
+            raise SecurityCoverageError("observed eligibility evidence is incomplete")
+    return {
+        "source": ELIGIBILITY_SOURCE,
+        "state": state,
+        "observed_at": data.get("observed_at"),
+        "reason": data.get("reason"),
+        "candidate_repositories": list(candidates),
+        "request_count": request_count,
+        "account": normalized_account,
+        "repositories": normalized_repositories,
+    }
+
+
 def _validate_provider(
     provider: str,
     value: Any,
     *,
+    repo_full_name: str,
+    eligibility: dict[str, Any] | None,
     receipt_is_stale: bool,
     produced_at: datetime,
     current: datetime,
@@ -597,24 +1010,24 @@ def _validate_provider(
     http_status = data.get("http_status")
     http_classification = data.get("http_classification")
     conditional = _mapping(data.get("conditional"))
-    if (
-        not isinstance(conditional.get("requested"), bool)
-        or conditional.get("result")
-        not in {
-            "not_used",
-            "modified",
-            "not_modified",
-            "failed",
-            "malformed",
-            "incomplete",
-            "invalid_prior",
-        }
-    ):
+    if not isinstance(conditional.get("requested"), bool) or conditional.get(
+        "result"
+    ) not in {
+        "not_used",
+        "modified",
+        "not_modified",
+        "failed",
+        "malformed",
+        "incomplete",
+        "invalid_prior",
+    }:
         raise SecurityCoverageError(f"{provider}.conditional metadata is invalid")
     if http_status is not None and (
         not isinstance(http_status, int) or isinstance(http_status, bool)
     ):
-        raise SecurityCoverageError(f"{provider}.http_status must be an integer or null")
+        raise SecurityCoverageError(
+            f"{provider}.http_status must be an integer or null"
+        )
     if http_classification is not None and not isinstance(http_classification, str):
         raise SecurityCoverageError(
             f"{provider}.http_classification must be a string or null"
@@ -637,16 +1050,16 @@ def _validate_provider(
             raise SecurityCoverageError(f"{provider}.observed_at is required")
         provider_age_hours = (current - observed_at).total_seconds() / 3600
         if not data.get("pagination_complete"):
-            raise SecurityCoverageError(f"{provider} observed without complete pagination")
+            raise SecurityCoverageError(
+                f"{provider} observed without complete pagination"
+            )
         if not isinstance(counts, dict) or set(counts) != set(_COUNT_KEYS[provider]):
             raise SecurityCoverageError(f"{provider}.counts required when observed")
         if http_status not in {200, 304}:
             raise SecurityCoverageError(
                 f"{provider}.http_status must be 200 or 304 when observed"
             )
-        expected_classification = (
-            "success" if http_status == 200 else "not_modified"
-        )
+        expected_classification = "success" if http_status == 200 else "not_modified"
         if http_classification != expected_classification:
             raise SecurityCoverageError(
                 f"{provider}.http_classification does not match observed response"
@@ -655,7 +1068,9 @@ def _validate_provider(
         for key in _COUNT_KEYS[provider]:
             raw = counts.get(key)
             if not isinstance(raw, int) or raw < 0:
-                raise SecurityCoverageError(f"{provider}.counts.{key} must be non-negative")
+                raise SecurityCoverageError(
+                    f"{provider}.counts.{key} must be non-negative"
+                )
             normalized_counts[key] = raw
         counts = normalized_counts
         if provider_age_hours > max_age_hours:
@@ -664,21 +1079,37 @@ def _validate_provider(
     elif counts is not None:
         raise SecurityCoverageError(f"{provider}.counts must be null unless observed")
     if state == "not_requested" and http_status is not None:
-        raise SecurityCoverageError(f"{provider} not_requested must not claim HTTP status")
+        raise SecurityCoverageError(
+            f"{provider} not_requested must not claim HTTP status"
+        )
     if state == "forbidden" and http_status != 403:
         raise SecurityCoverageError(f"{provider} forbidden requires HTTP 403")
-    if state == "feature_unavailable" and http_status not in {403, 404}:
-        raise SecurityCoverageError(
-            f"{provider} feature_unavailable requires HTTP 403 or 404"
-        )
+    if state == "feature_unavailable":
+        if data.get("reason") == ELIGIBILITY_REASON:
+            repository_eligibility = _mapping(
+                _mapping(eligibility).get("repositories")
+            ).get(repo_full_name)
+            unavailable = _mapping(repository_eligibility).get("unavailable_providers")
+            if (
+                http_status != 200
+                or http_classification != "eligibility"
+                or _mapping(eligibility).get("state") != "observed"
+                or not isinstance(unavailable, list)
+                or provider not in unavailable
+            ):
+                raise SecurityCoverageError(
+                    f"{provider} eligibility-based unavailability is unproven"
+                )
+        elif http_status not in {403, 404}:
+            raise SecurityCoverageError(
+                f"{provider} feature_unavailable requires HTTP 403 or 404"
+            )
     if state == "not_found" and http_status != 404:
         raise SecurityCoverageError(f"{provider} not_found requires HTTP 404")
     if state == "gone" and http_status != 410:
         raise SecurityCoverageError(f"{provider} gone requires HTTP 410")
     if state == "rate_limited" and http_status not in {403, 429}:
-        raise SecurityCoverageError(
-            f"{provider} rate_limited requires HTTP 403 or 429"
-        )
+        raise SecurityCoverageError(f"{provider} rate_limited requires HTTP 403 or 429")
     if receipt_is_stale and state == "observed":
         state = "stale"
         counts = None
@@ -723,10 +1154,14 @@ def validate_security_coverage_receipt(
 
     producer = _mapping(payload.get("producer"))
     if producer.get("repository") != "saagpatel/GithubRepoAuditor":
-        raise SecurityCoverageError("security coverage receipt producer repository is invalid")
+        raise SecurityCoverageError(
+            "security coverage receipt producer repository is invalid"
+        )
     commit = _text(producer.get("commit"))
     if not _COMMIT_RE.fullmatch(commit):
-        raise SecurityCoverageError("security coverage receipt producer commit is invalid")
+        raise SecurityCoverageError(
+            "security coverage receipt producer commit is invalid"
+        )
     if payload.get("github_api_version") != GITHUB_API_VERSION:
         raise SecurityCoverageError("security coverage receipt API version is invalid")
 
@@ -754,6 +1189,12 @@ def validate_security_coverage_receipt(
         raise SecurityCoverageError("cohort count contract mismatch")
     if canonical_cohort != tuple(sorted(canonical_cohort, key=str.lower)):
         raise SecurityCoverageError("cohort repositories must be canonically sorted")
+    eligibility = _validate_eligibility(
+        payload.get("eligibility"),
+        produced_at=produced_at,
+        current=current,
+        cohort=canonical_cohort,
+    )
 
     request_budget = _mapping(payload.get("request_budget"))
     base_limit = request_budget.get("base_limit")
@@ -797,6 +1238,8 @@ def validate_security_coverage_receipt(
                 provider: _validate_provider(
                     provider,
                     providers[provider],
+                    repo_full_name=repo_full_name,
+                    eligibility=eligibility,
                     receipt_is_stale=receipt_is_stale,
                     produced_at=produced_at,
                     current=current,
@@ -826,7 +1269,9 @@ def load_security_coverage_receipt(
     try:
         payload = json.loads(path.read_text())
     except FileNotFoundError as exc:
-        raise SecurityCoverageError(f"security coverage receipt not found: {path}") from exc
+        raise SecurityCoverageError(
+            f"security coverage receipt not found: {path}"
+        ) from exc
     except (OSError, json.JSONDecodeError) as exc:
         raise SecurityCoverageError(
             f"could not read security coverage receipt {path}: {exc}"
@@ -852,7 +1297,9 @@ def _load_json_object(path: Path) -> dict[str, Any]:
     try:
         payload = json.loads(path.read_text())
     except (OSError, json.JSONDecodeError) as exc:
-        raise SecurityCoverageError(f"could not read JSON object {path}: {exc}") from exc
+        raise SecurityCoverageError(
+            f"could not read JSON object {path}: {exc}"
+        ) from exc
     if not isinstance(payload, dict):
         raise SecurityCoverageError(f"{path} must contain a JSON object")
     return payload
