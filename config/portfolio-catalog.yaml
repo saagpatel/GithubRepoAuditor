@@ -120,7 +120,7 @@ repos:
       plans
     lifecycle_state: dormant
     criticality: medium
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     category: productivity
     tool_provenance: codex
@@ -142,14 +142,14 @@ repos:
   BrowserHistoryVisualizer:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     category: vanity
     tool_provenance: claude-code
   DecisionStressTest:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: experiment
     tool_provenance: codex
     doctor_standard: full
@@ -179,19 +179,19 @@ repos:
   EvolutionSandbox:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: experiment
   HowMoneyMoves:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     category: vanity
     tool_provenance: claude-code
   JobMarketHeatmap:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     category: vanity
     tool_provenance: claude-code
@@ -246,7 +246,7 @@ repos:
   OrbitMechanic:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     tool_provenance: claude-code
     notes: Local checkout for the canonical saagpatel/OrbitMechanics browser-game repo.
@@ -291,14 +291,14 @@ repos:
   PageDiffBookmark:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     category: vanity
     tool_provenance: claude-code
   Recall:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     tool_provenance: claude-code
   ResumeEvolver:
@@ -311,7 +311,7 @@ repos:
   ScreenshottoDataSelect:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     category: vanity
     tool_provenance: claude-code
@@ -321,7 +321,7 @@ repos:
       local LLM workflows
     lifecycle_state: dormant
     criticality: medium
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     category: productivity
     tool_provenance: codex
@@ -333,19 +333,19 @@ repos:
   TabTriage:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     tool_provenance: claude-code
   Terroir:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     tool_provenance: claude-code
   Cartograph:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     tool_provenance: claude-code
   GithubRepoAuditor:
@@ -438,14 +438,14 @@ repos:
   APIReverse:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     category: vanity
     tool_provenance: claude-code
   ArguMap:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     category: vanity
     tool_provenance: claude-code
@@ -467,7 +467,7 @@ repos:
   Codec:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     category: vanity
     tool_provenance: claude-code
@@ -481,28 +481,28 @@ repos:
   GlassLayer:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     category: vanity
     tool_provenance: claude-code
   IncidentReview:
     owner: d
     lifecycle_state: archived
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: archive
     category: it-work
     tool_provenance: codex
   ink:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     category: vanity
     tool_provenance: claude-code
   Interruption Resume Studio:
     owner: d
     lifecycle_state: archived
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: archive
     category: it-work
     tool_provenance: claude-code
@@ -543,20 +543,20 @@ repos:
   NetworkDecoder:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     category: vanity
     tool_provenance: claude-code
   NetworkMapper:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     tool_provenance: claude-code
   NeuralNetwork:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     tool_provenance: claude-code
   notification-hub:
@@ -570,21 +570,21 @@ repos:
   Premise:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     category: vanity
     tool_provenance: claude-code
   Pulse Orbit:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     category: vanity
     tool_provenance: claude-code
   ReturnRadar:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     category: vanity
     tool_provenance: claude-code
@@ -605,14 +605,14 @@ repos:
   SpecCompanion:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     category: vanity
     tool_provenance: codex
   thought-trails:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     category: vanity
     tool_provenance: claude-code
@@ -660,32 +660,32 @@ repos:
   Nocturne:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     tool_provenance: claude-code
   Redact:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     tool_provenance: claude-code
   RoomTone:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     tool_provenance: claude-code
   TideEngine:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     tool_provenance: claude-code
     automation_eligible: true
   Wavelength:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     tool_provenance: claude-code
   ComplianceKit:
@@ -792,7 +792,7 @@ repos:
   CryptForge:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
       confirm purpose/criticality.'
@@ -811,35 +811,35 @@ repos:
   DesktopPEt:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
       confirm purpose/criticality.'
   EarthPulse:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
       confirm purpose/criticality.'
   SmartClipboard:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
       confirm purpose/criticality.'
   SnippetLibrary:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
       confirm purpose/criticality.'
   TicketDashboard:
     owner: d
     lifecycle_state: archived
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: archive
     category: vanity
     purpose: On-demand native Jira ticket dashboard for local workload visibility and SLA metrics.
@@ -847,14 +847,14 @@ repos:
   WorkdayDebrief:
     owner: d
     lifecycle_state: archived
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: archive
     notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
       confirm purpose/criticality.'
   sovereign:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     category: fun
     tool_provenance: claude-code
@@ -863,53 +863,53 @@ repos:
   Chronomap:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
       confirm purpose/criticality.'
   Conductor:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
       confirm purpose/criticality.'
   Echolocate:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
       confirm purpose/criticality.'
   prompt-englab:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
       confirm purpose/criticality.'
   TerraSynth:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     notes: 'Auto-seeded 2026-06-02 from derived signals (path_confidence: medium);
       confirm purpose/criticality.'
   AIFortuneTeller:
     owner: d
     lifecycle_state: archived
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: archive
     category: fun
   Grotto:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
   ITServiceHealth:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     category: it-work
   Notion:
@@ -944,12 +944,12 @@ repos:
   Undertone:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
   Veritas:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
   cross-system-smoke:
     owner: d
@@ -974,13 +974,13 @@ repos:
   da-scaffold:
     owner: d
     lifecycle_state: archived
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: archive
   hermes-harness-foundation:
     owner: d
     purpose: local-only manifesto-stage foundation for the planned Frontier Sentinel orchestrator
     lifecycle_state: archived
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: archive
     category: infrastructure
     maturity_program: experiment
@@ -1096,7 +1096,7 @@ repos:
   stockpulse:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: maintain
     category: vanity
   BattleGrid:
@@ -1285,7 +1285,7 @@ repos:
   devils-advocate:
     owner: d
     lifecycle_state: dormant
-    review_cadence: weekly
+    review_cadence: quarterly
     operating_path: finish
     maturity_program: finish
   agent-permission-diff-bot:
