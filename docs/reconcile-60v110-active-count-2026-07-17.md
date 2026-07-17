@@ -39,12 +39,11 @@ Advance the pin to the post-tribunal head and sync the runtime clone:
 
 ```bash
 git -C ~/Projects/GithubRepoAuditor-runtime-truth-authority fetch origin \
-  && git -C ~/Projects/GithubRepoAuditor-runtime-truth-authority checkout b05e150 \
-  && sed -i '' 's/^EXPECTED_REF=.*/EXPECTED_REF=b05e150348... # advance to full SHA of b05e150/' ~/scripts/portfolio-maintenance.sh
+  && git -C ~/Projects/GithubRepoAuditor-runtime-truth-authority checkout b05e150e0150d3286de653c3647677f535bcddd8 \
+  && sed -i '' 's/^EXPECTED_REF=.*/EXPECTED_REF=b05e150e0150d3286de653c3647677f535bcddd8/' ~/scripts/portfolio-maintenance.sh
 ```
 
-(Substitute the full 40-char SHA of `b05e150`; the script pins full SHAs.
-The runtime clone must contain the ref before the pin advances, hence the
+(The runtime clone must contain the ref before the pin advances, hence the
 fetch/checkout first. If the tribunal merge has not been pushed to the
 runtime clone's origin, push it first — agent branches stay unpushed by
 standing rule.)
