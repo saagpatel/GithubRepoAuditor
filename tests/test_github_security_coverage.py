@@ -72,6 +72,12 @@ class _Session:
             return self.responses.pop(0)
         return _Response()
 
+    def post(self, url: str, **kwargs: Any) -> _Response:
+        self.calls.append((url, kwargs))
+        if self.responses:
+            return self.responses.pop(0)
+        return _Response()
+
 
 def _collect(
     *,
@@ -87,6 +93,52 @@ def _collect(
         producer_commit="a" * 40,
         api_base_url="https://api.example.test",
     )
+
+
+def _prior_with_private_unavailable(count: int = 6) -> dict[str, Any]:
+    prior = _collect()
+    for index in range(count):
+        providers = prior["repositories"][f"owner/repo-{index:02d}"]["providers"]
+        providers["code_scanning"] = {
+            "state": "feature_unavailable",
+            "observed_at": NOW.isoformat(),
+            "http_status": 403,
+            "http_classification": "code_scanning_not_enabled",
+            "reason": "code_scanning_not_enabled",
+            "etag": None,
+            "last_modified": None,
+            "conditional": {"requested": False, "result": "failed"},
+            "pagination_complete": False,
+            "counts": None,
+        }
+        providers["secret_scanning"] = {
+            "state": "not_found",
+            "observed_at": NOW.isoformat(),
+            "http_status": 404,
+            "http_classification": "github_not_found",
+            "reason": "github_not_found",
+            "etag": None,
+            "last_modified": None,
+            "conditional": {"requested": False, "result": "failed"},
+            "pagination_complete": False,
+            "counts": None,
+        }
+    return prior
+
+
+def _eligibility_responses(count: int = 6) -> list[_Response]:
+    repositories = {
+        f"repo{index}": {
+            "nameWithOwner": f"owner/repo-{index:02d}",
+            "visibility": "PRIVATE",
+            "owner": {"__typename": "User", "login": "owner"},
+        }
+        for index in range(count)
+    }
+    return [
+        _Response(200, {"login": "owner", "plan": {"name": "pro"}}),
+        _Response(200, {"data": repositories}),
+    ]
 
 
 def test_default_attention_cohort_is_exact_and_fail_closed() -> None:
@@ -153,6 +205,108 @@ def test_collector_is_serial_count_only_and_bounded_to_48_base_requests() -> Non
             assert provider["pagination_complete"] is True
 
 
+def test_incremental_eligibility_preflight_skips_plan_blocked_providers() -> None:
+    prior = _prior_with_private_unavailable()
+    session = _Session([*_eligibility_responses(), *[_Response() for _ in range(36)]])
+
+    receipt = _collect(session=session, prior=prior)
+
+    assert len(session.calls) == 38
+    assert receipt["request_budget"]["base_requests"] == 38
+    assert receipt["request_budget"]["total_requests"] == 38
+    assert receipt["request_budget"]["stop_reason"] is None
+    assert receipt["eligibility"]["state"] == "observed"
+    assert receipt["eligibility"]["request_count"] == 2
+    assert len(receipt["eligibility"]["candidate_repositories"]) == 6
+    called_urls = [url for url, _ in session.calls]
+    for index in range(6):
+        repo = f"owner/repo-{index:02d}"
+        assert (
+            f"https://api.example.test/repos/{repo}/code-scanning/alerts"
+            not in called_urls
+        )
+        assert (
+            f"https://api.example.test/repos/{repo}/secret-scanning/alerts"
+            not in called_urls
+        )
+        providers = receipt["repositories"][repo]["providers"]
+        for provider in ("code_scanning", "secret_scanning"):
+            assert providers[provider]["state"] == "feature_unavailable"
+            assert providers[provider]["reason"] == (
+                "private_user_repo_plan_unavailable"
+            )
+            assert providers[provider]["http_status"] == 200
+            assert providers[provider]["http_classification"] == "eligibility"
+            assert providers[provider]["counts"] is None
+    validate_security_coverage_receipt(receipt, now=NOW)
+
+
+def test_eligibility_claim_requires_matching_embedded_provenance() -> None:
+    prior = _prior_with_private_unavailable()
+    session = _Session([*_eligibility_responses(), *[_Response() for _ in range(36)]])
+    receipt = _collect(session=session, prior=prior)
+    receipt["eligibility"]["repositories"]["owner/repo-00"][
+        "unavailable_providers"
+    ] = []
+
+    with pytest.raises(
+        SecurityCoverageError,
+        match="eligibility-based unavailability is unproven",
+    ):
+        validate_security_coverage_receipt(receipt, now=NOW)
+
+
+def test_malformed_eligibility_preflight_falls_back_without_exceeding_budget() -> None:
+    prior = _prior_with_private_unavailable()
+    session = _Session(
+        [
+            _Response(200, {"login": "owner", "plan": {"name": "pro"}}),
+            _Response(200, {"errors": [{"message": "unavailable"}]}),
+            *[_Response() for _ in range(46)],
+        ]
+    )
+
+    receipt = _collect(session=session, prior=prior)
+    states = [
+        provider["state"]
+        for repository in receipt["repositories"].values()
+        for provider in repository["providers"].values()
+    ]
+
+    assert len(session.calls) == 48
+    assert receipt["eligibility"]["state"] == "malformed"
+    assert receipt["request_budget"]["base_requests"] == 48
+    assert receipt["request_budget"]["stop_reason"] == "base_request_limit"
+    assert states.count("observed") == 46
+    assert states.count("not_requested") == 2
+    assert states.count("feature_unavailable") == 0
+
+
+def test_rate_limited_eligibility_preflight_stops_before_provider_calls() -> None:
+    prior = _prior_with_private_unavailable()
+    session = _Session(
+        [
+            _Response(
+                403,
+                {"message": "API rate limit exceeded"},
+                headers={"X-RateLimit-Remaining": "0"},
+            )
+        ]
+    )
+
+    receipt = _collect(session=session, prior=prior)
+    states = [
+        provider["state"]
+        for repository in receipt["repositories"].values()
+        for provider in repository["providers"].values()
+    ]
+
+    assert len(session.calls) == 1
+    assert receipt["eligibility"]["state"] == "rate_limited"
+    assert receipt["request_budget"]["stop_reason"] == "rate_limited"
+    assert states == ["not_requested"] * 48
+
+
 @pytest.mark.parametrize(
     "limits",
     [
@@ -204,9 +358,7 @@ def test_rate_limit_stops_immediately_and_leaves_remainder_not_requested() -> No
 
 
 def test_quota_reserve_stops_before_following_request() -> None:
-    session = _Session(
-        [_Response(headers={"X-RateLimit-Remaining": "100"})]
-    )
+    session = _Session([_Response(headers={"X-RateLimit-Remaining": "100"})])
 
     receipt = _collect(session=session)
     states = [
@@ -286,9 +438,7 @@ def test_stale_provider_observation_becomes_unknown_count() -> None:
     provider["observed_at"] = (NOW - timedelta(hours=25)).isoformat()
 
     loaded = validate_security_coverage_receipt(receipt, now=NOW)
-    normalized = loaded.entries_by_full_name["owner/repo-00"]["providers"][
-        "dependabot"
-    ]
+    normalized = loaded.entries_by_full_name["owner/repo-00"]["providers"]["dependabot"]
 
     assert normalized["state"] == "stale"
     assert normalized["counts"] is None
@@ -333,9 +483,13 @@ def test_canonical_receipt_join_does_not_fall_back_to_repo_basename() -> None:
         "providers": {},
     }
 
-    assert _select_security_entry(
-        {"other/shared": entry}, "owner/shared", "shared"
-    ) is None
-    assert _select_security_entry(
-        {"owner/shared": entry}, "owner/shared", "different display"
-    ) is entry
+    assert (
+        _select_security_entry({"other/shared": entry}, "owner/shared", "shared")
+        is None
+    )
+    assert (
+        _select_security_entry(
+            {"owner/shared": entry}, "owner/shared", "different display"
+        )
+        is entry
+    )
