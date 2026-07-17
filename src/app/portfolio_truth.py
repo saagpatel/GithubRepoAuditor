@@ -17,7 +17,7 @@ from src.portfolio_truth_status import (
     load_live_repo_status_by_name,
     load_release_count_by_name,
     load_repo_status_from_audit_by_name,
-    load_security_alerts_by_name,
+    load_security_coverage_by_full_name,
 )
 from src.producer_preflight import load_producer_evidence
 
@@ -53,11 +53,30 @@ def run_portfolio_truth_mode(args: Any) -> None:
             username=args.username,
         )
     security_alerts_by_name: dict[str, dict] | None = None
+    security_coverage_metadata: dict[str, object] | None = None
     if getattr(args, "portfolio_truth_include_security", False):
-        security_alerts_by_name = load_security_alerts_by_name(
+        receipt_path_value = getattr(args, "portfolio_truth_security_receipt", None)
+        loaded_security = load_security_coverage_by_full_name(
             output_dir=output_dir,
-            username=args.username,
+            receipt_path=Path(receipt_path_value) if receipt_path_value else None,
+            max_age_hours=getattr(
+                args, "portfolio_truth_security_max_age_hours", 24
+            ),
         )
+        if loaded_security is not None:
+            security_alerts_by_name = loaded_security.entries_by_full_name
+            security_coverage_metadata = {
+                "source_id": "github-security-coverage-receipt",
+                "schema_version": loaded_security.schema_version,
+                "produced_at": loaded_security.produced_at,
+                "state": loaded_security.receipt_state,
+                "age_hours": loaded_security.age_hours,
+                "cohort_policy": loaded_security.cohort_policy,
+                "cohort_repository_count": len(
+                    loaded_security.cohort_repositories
+                ),
+                "path": loaded_security.source_path,
+            }
     repo_status_by_name = load_live_repo_status_by_name(
         username=args.username,
         token=getattr(args, "token", None),
@@ -80,6 +99,7 @@ def run_portfolio_truth_mode(args: Any) -> None:
             allow_empty_notion=getattr(args, "portfolio_truth_allow_empty_notion", False),
             release_count_by_name=release_count_by_name,
             security_alerts_by_name=security_alerts_by_name,
+            security_coverage_metadata=security_coverage_metadata,
             repo_status_by_name=repo_status_by_name,
             producer_evidence=producer_evidence,
             producer_repo_root=producer_repo_root,

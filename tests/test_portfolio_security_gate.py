@@ -19,6 +19,9 @@ def _project(
     alerts_available: bool = True,
     critical: int = 0,
     high: int = 0,
+    code_critical: int = 0,
+    code_high: int = 0,
+    secrets: int = 0,
     risk_tier: str = "baseline",
 ) -> dict:
     return {
@@ -26,8 +29,19 @@ def _project(
         "risk": {"risk_tier": risk_tier},
         "security": {
             "alerts_available": alerts_available,
+            "cohort_member": True,
+            "coverage_state": "complete" if alerts_available else "unknown",
+            "providers": {
+                provider: {
+                    "state": "observed" if alerts_available else "not_requested"
+                }
+                for provider in ("dependabot", "code_scanning", "secret_scanning")
+            },
             "dependabot_critical": critical,
             "dependabot_high": high,
+            "code_scanning_critical": code_critical,
+            "code_scanning_high": code_high,
+            "secret_scanning_open": secrets,
         },
     }
 
@@ -47,7 +61,9 @@ def test_security_gate_passes_when_scanned_repos_are_clear() -> None:
     assert report.status == "pass"
     assert report.scanned_count == 2
     assert report.repos_with_open_high_critical == 0
-    assert "All scanned repos are clear" in render_security_gate_markdown(report)
+    assert "All required-cohort repos are clear" in render_security_gate_markdown(
+        report
+    )
 
 
 def test_security_gate_passes_when_snapshot_is_fresh_enough() -> None:
@@ -116,8 +132,32 @@ def test_security_gate_fails_and_ranks_open_high_critical_repos() -> None:
     assert report.total_open_high == 2
     assert [item.repo for item in report.flagged_repos] == ["Critical", "HighOnly"]
     rendered = render_security_gate_markdown(report)
-    assert "| Critical | elevated | 1 | 0 |" in rendered
-    assert "| HighOnly | moderate | 0 | 2 |" in rendered
+    assert "| Critical | elevated | 1 | 0 | 0 |" in rendered
+    assert "| HighOnly | moderate | 0 | 2 | 0 |" in rendered
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "expected_critical", "expected_high", "expected_secrets"),
+    [
+        ({"code_critical": 1}, 1, 0, 0),
+        ({"code_high": 2}, 0, 2, 0),
+        ({"secrets": 1}, 0, 0, 1),
+    ],
+)
+def test_security_gate_fails_on_each_non_dependabot_provider(
+    kwargs: dict[str, int],
+    expected_critical: int,
+    expected_high: int,
+    expected_secrets: int,
+) -> None:
+    report = build_security_gate_report(
+        {"projects": [_project("ProviderAlert", **kwargs)]}
+    )
+
+    assert report.status == "fail"
+    assert report.total_open_critical == expected_critical
+    assert report.total_open_high == expected_high
+    assert report.total_open_secrets == expected_secrets
 
 
 def test_security_gate_treats_missing_overlay_as_unknown_not_pass() -> None:
@@ -133,7 +173,24 @@ def test_security_gate_treats_missing_overlay_as_unknown_not_pass() -> None:
     assert report.passed is False
     assert report.status == "unknown"
     assert report.scanned_count == 0
-    assert "Security overlay was not present" in render_security_gate_markdown(report)
+    assert "security coverage is missing or incomplete" in render_security_gate_markdown(
+        report
+    )
+
+
+@pytest.mark.parametrize("coverage_state", ["partial", "stale", "unknown"])
+def test_security_gate_fails_closed_on_incomplete_required_cohort(
+    coverage_state: str,
+) -> None:
+    project = _project("Incomplete")
+    project["security"]["coverage_state"] = coverage_state
+    project["security"]["alerts_available"] = False
+
+    report = build_security_gate_report({"projects": [project]})
+
+    assert report.passed is False
+    assert report.status in {"unknown", "stale"}
+    assert report.complete_count == 0
 
 
 def test_security_gate_subcommand_parses() -> None:

@@ -5,7 +5,7 @@ import logging
 import re
 import hashlib
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -233,6 +233,7 @@ def build_portfolio_truth_snapshot(
     now: datetime | None = None,
     release_count_by_name: dict[str, int] | None = None,
     security_alerts_by_name: dict[str, dict] | None = None,
+    security_coverage_metadata: dict[str, Any] | None = None,
     repo_status_by_name: dict[str, dict] | None = None,
     producer: dict[str, Any] | None = None,
     prior_notion_generated_at: str | None = None,
@@ -337,6 +338,7 @@ def build_portfolio_truth_snapshot(
             notion_context_rows=len(notion_context),
             notion_context_carried_forward=notion_context_carried_forward,
             prior_notion_generated_at=prior_notion_generated_at,
+            security_coverage_metadata=security_coverage_metadata,
         ),
         coverage=_build_coverage_envelope(
             projects=projects,
@@ -359,14 +361,62 @@ def _build_coverage_envelope(
     notion_context_carried_forward: bool,
     notion_context_rows: int,
 ) -> list[dict[str, Any]]:
-    scanned = sum(project.security.alerts_available for project in projects)
+    complete = sum(project.security.coverage_state == "complete" for project in projects)
+    partial = sum(project.security.coverage_state == "partial" for project in projects)
+    stale = sum(project.security.coverage_state == "stale" for project in projects)
+    unknown = len(projects) - complete - partial - stale
+    cohort_count = sum(project.security.cohort_member for project in projects)
+    cohort_complete = sum(
+        project.security.cohort_member
+        and project.security.coverage_state == "complete"
+        for project in projects
+    )
+    cohort_partial = sum(
+        project.security.cohort_member
+        and project.security.coverage_state == "partial"
+        for project in projects
+    )
+    cohort_stale = sum(
+        project.security.cohort_member
+        and project.security.coverage_state == "stale"
+        for project in projects
+    )
+    cohort_unknown = cohort_count - cohort_complete - cohort_partial - cohort_stale
+    provider_counts = {
+        provider: sum(
+            project.security.provider_state(provider) == "observed"
+            for project in projects
+        )
+        for provider in ("dependabot", "code_scanning", "secret_scanning")
+    }
     git_observed = sum(
         project.repository_state.get("state") == "observed" for project in projects
     )
     return [
         {"source": "workspace", "state": "observed", "project_count": len(projects)},
         {"source": "git", "state": "observed" if git_observed else "unknown", "observed_count": git_observed, "project_count": len(projects)},
-        {"source": "github_security", "state": "known" if scanned == len(projects) else "partial" if scanned else "unknown", "scanned_count": scanned, "project_count": len(projects)},
+        {
+            "source": "github_security",
+            "state": (
+                "known"
+                if complete == len(projects)
+                else "partial"
+                if complete or partial
+                else "unknown"
+            ),
+            "scanned_count": complete,
+            "complete_repo_count": complete,
+            "partial_repo_count": partial,
+            "stale_count": stale,
+            "unknown_count": unknown,
+            "cohort_repository_count": cohort_count,
+            "cohort_complete_count": cohort_complete,
+            "cohort_partial_count": cohort_partial,
+            "cohort_stale_count": cohort_stale,
+            "cohort_unknown_count": cohort_unknown,
+            "provider_observed_counts": provider_counts,
+            "project_count": len(projects),
+        },
         {"source": "notion", "state": "carried_forward" if notion_context_carried_forward else "observed" if notion_context_rows else "unknown", "observed_count": notion_context_rows},
     ]
 
@@ -380,6 +430,7 @@ def _build_input_envelope(
     notion_context_rows: int,
     notion_context_carried_forward: bool,
     prior_notion_generated_at: str | None,
+    security_coverage_metadata: dict[str, Any] | None,
 ) -> dict[str, Any]:
     resolved_catalog = Path(str(catalog_data.get("path") or ""))
     catalog_hash = (
@@ -396,7 +447,7 @@ def _build_input_envelope(
     else:
         notion_mode = "live"
         notion_observed_at = now.isoformat()
-    return {
+    inputs = {
         "catalog": {
             "source_id": "portfolio-catalog",
             "sha256": catalog_hash,
@@ -414,6 +465,9 @@ def _build_input_envelope(
             ),
         },
     }
+    if security_coverage_metadata:
+        inputs["github_security"] = dict(security_coverage_metadata)
+    return inputs
 
 
 def load_prior_notion_context(latest_path: Path) -> dict[str, dict[str, str]]:
@@ -491,30 +545,87 @@ def _has_path_catalog_contract(project: PortfolioTruthProject) -> bool:
 
 
 def _build_security_fields(ghas_entry: dict[str, Any] | None) -> SecurityFields:
-    """Map a per-repo GHAS alert entry (from output/ghas-alerts-<username>-*.json)
-    into SecurityFields. A missing/None entry yields all-zero counts with
-    alerts_available=False (the repo was not scanned) — distinct from a clean scan,
-    and keeps the security overlay strictly opt-in (no entry → no security signal)."""
+    """Map a validated receipt entry into provider-specific security fields.
+
+    Legacy GHAS-shaped entries remain accepted for unit/backward compatibility,
+    but only a fresh observation from all three providers is complete coverage.
+    """
     if not ghas_entry:
         return SecurityFields()
-    dependabot = ghas_entry.get("dependabot") or {}
-    code_scanning = ghas_entry.get("code_scanning") or {}
-    secret_scanning = ghas_entry.get("secret_scanning") or {}
+    raw_providers = ghas_entry.get("providers")
+    if isinstance(raw_providers, dict):
+        providers = {
+            name: dict(raw_providers.get(name) or {})
+            for name in ("dependabot", "code_scanning", "secret_scanning")
+        }
+    else:
+        providers = {}
+        for name in ("dependabot", "code_scanning", "secret_scanning"):
+            legacy = dict(ghas_entry.get(name) or {})
+            providers[name] = {
+                "state": "observed" if legacy.get("available") else "not_requested",
+                "observed_at": None,
+                "http_status": None,
+                "reason": "legacy_ghas_entry",
+                "etag": None,
+                "last_modified": None,
+                "pagination_complete": bool(legacy.get("available")),
+                "counts": (
+                    {
+                        key: value
+                        for key, value in legacy.items()
+                        if key != "available"
+                        and isinstance(value, int)
+                        and value >= 0
+                    }
+                    if legacy.get("available")
+                    else None
+                ),
+            }
 
-    def _count(source: dict[str, Any], key: str) -> int:
-        value = source.get(key)
+    states = {
+        name: str((providers.get(name) or {}).get("state") or "not_requested")
+        for name in providers
+    }
+    observed_count = sum(state == "observed" for state in states.values())
+    receipt_state = str(ghas_entry.get("receipt_state") or "unknown")
+    if receipt_state == "stale":
+        coverage_state = "stale"
+    elif observed_count == 3:
+        coverage_state = "complete"
+    elif observed_count:
+        coverage_state = "partial"
+    elif any(state == "stale" for state in states.values()):
+        coverage_state = "stale"
+    else:
+        coverage_state = "unknown"
+
+    def _count(provider: str, key: str) -> int | None:
+        source = providers.get(provider) or {}
+        if source.get("state") != "observed":
+            return None
+        counts = source.get("counts") or {}
+        value = counts.get(key)
         return value if isinstance(value, int) and value >= 0 else 0
 
     return SecurityFields(
-        alerts_available=bool(dependabot.get("available", False)),
-        coverage_state="known" if dependabot.get("available", False) else "unknown",
-        dependabot_critical=_count(dependabot, "critical"),
-        dependabot_high=_count(dependabot, "high"),
-        dependabot_medium=_count(dependabot, "medium"),
-        dependabot_low=_count(dependabot, "low"),
-        code_scanning_critical=_count(code_scanning, "critical"),
-        code_scanning_high=_count(code_scanning, "high"),
-        secret_scanning_open=_count(secret_scanning, "open"),
+        alerts_available=coverage_state == "complete",
+        coverage_state=coverage_state,
+        cohort_member=bool(ghas_entry.get("cohort_member", False)),
+        cohort_policy=str(ghas_entry.get("cohort_policy") or ""),
+        receipt_schema_version=str(
+            ghas_entry.get("receipt_schema_version") or ""
+        ),
+        receipt_state=receipt_state,
+        source_produced_at=str(ghas_entry.get("source_produced_at") or ""),
+        providers=providers,
+        dependabot_critical=_count("dependabot", "critical"),
+        dependabot_high=_count("dependabot", "high"),
+        dependabot_medium=_count("dependabot", "medium"),
+        dependabot_low=_count("dependabot", "low"),
+        code_scanning_critical=_count("code_scanning", "critical"),
+        code_scanning_high=_count("code_scanning", "high"),
+        secret_scanning_open=_count("secret_scanning", "open"),
     )
 
 
@@ -525,6 +636,11 @@ def _select_security_entry(
     name, but the local dir display_name often differs (e.g. "Signal & Noise" vs
     "signal-noise"), so match on the repo name from repo_full_name first and fall back
     to display_name only when repo_full_name is absent or unmatched."""
+    exact = lookup.get(repo_full_name or "")
+    if exact is not None:
+        return exact
+    if any(entry.get("receipt_schema_version") for entry in lookup.values()):
+        return None
     repo_name = (repo_full_name or "").rsplit("/", 1)[-1]
     return lookup.get(repo_name) or lookup.get(display_name)
 
@@ -723,16 +839,16 @@ def _build_truth_project(
         doctor_standard=declared_values["doctor_standard"],
         known_risks_present=bool(raw_project["known_risks_present"]),
         run_instructions_present=bool(raw_project["run_instructions_present"]),
-        security_high_alerts=security.dependabot_high,
-        security_critical_alerts=security.dependabot_critical,
+        security_high_alerts=security.dependabot_high or 0,
+        security_critical_alerts=security.dependabot_critical or 0,
     )
     if (
-        not security.alerts_available
+        security.coverage_state != "complete"
         and risk_entry.get("risk_summary") == "No elevated risk factors."
     ):
         risk_entry["risk_summary"] = (
-            "No non-security risk factors detected; security posture is unknown "
-            "because alert coverage is unavailable."
+            "No non-security risk factors detected; GitHub security coverage is "
+            f"{security.coverage_state}."
         )
     attention_state = _attention_state_for(
         activity_status=activity_status,
@@ -743,6 +859,15 @@ def _build_truth_project(
         path_override=path_entry.get("path_override", ""),
         risk_entry=risk_entry,
     )
+    if (
+        not security.receipt_schema_version
+        and attention_state in {"active-product", "active-infra", "decision-needed"}
+    ):
+        security = replace(
+            security,
+            cohort_member=True,
+            cohort_policy="portfolio-default-attention-v1",
+        )
 
     declared = DeclaredFields(
         owner=declared_values["owner"],
