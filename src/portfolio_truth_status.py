@@ -4,10 +4,17 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime
 from pathlib import Path
 
 from src.cache import ResponseCache
 from src.github_client import GitHubClient
+from src.github_security_coverage import (
+    GITHUB_SECURITY_RECEIPT_FILENAME,
+    LoadedSecurityCoverage,
+    SecurityCoverageError,
+    load_security_coverage_receipt,
+)
 
 
 def load_release_count_by_name(*, output_dir: Path, username: str) -> dict[str, int] | None:
@@ -145,3 +152,32 @@ def load_security_alerts_by_name(
         )
         return None
     return {name: entry for name, entry in data.items() if isinstance(entry, dict)}
+
+
+def load_security_coverage_by_full_name(
+    *,
+    output_dir: Path,
+    receipt_path: Path | None = None,
+    max_age_hours: int = 24,
+    now: datetime | None = None,
+) -> LoadedSecurityCoverage | None:
+    """Load the canonical provenance-bearing security receipt.
+
+    Unlike the legacy GHAS overlay loader above, this path never discovers
+    candidates by filesystem mtime.  The fixed pointer or explicit path must
+    validate its embedded schema, producer, cohort, observation timestamps, and
+    freshness before PortfolioTruth may consume it.
+    """
+    selected = receipt_path or output_dir / GITHUB_SECURITY_RECEIPT_FILENAME
+    try:
+        return load_security_coverage_receipt(
+            selected,
+            max_age_hours=max_age_hours,
+            now=now,
+        )
+    except SecurityCoverageError as exc:
+        logging.getLogger(__name__).warning(
+            "--portfolio-truth-include-security: %s — security coverage remains unknown",
+            exc,
+        )
+        return None

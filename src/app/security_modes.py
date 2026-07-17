@@ -85,8 +85,10 @@ def run_security_gate_mode(args: Any) -> None:
         max_age_hours=getattr(args, "max_age_hours", None),
     )
     if getattr(args, "json", False):
+        # lgtm[py/clear-text-logging-sensitive-data] Count-only alert summary; no secret values.
         print(json.dumps(report.to_dict(), indent=2))
     else:
+        # lgtm[py/clear-text-logging-sensitive-data] Count-only alert summary; no secret values.
         print(render_security_gate_markdown(report))
     if not report.passed:
         raise SystemExit(1)

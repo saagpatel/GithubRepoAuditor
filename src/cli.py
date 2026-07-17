@@ -438,6 +438,28 @@ def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         "--portfolio-truth", action="store_true", help="Generate canonical portfolio truth snapshot"
     )
     p.add_argument(
+        "--portfolio-truth-include-security",
+        action="store_true",
+        help=(
+            "Overlay security coverage from the validated "
+            "github-security-coverage-latest.json receipt"
+        ),
+    )
+    p.add_argument(
+        "--portfolio-truth-security-receipt",
+        type=str,
+        default=None,
+        metavar="PATH",
+        help="Explicit provenance-bearing GitHub security receipt path",
+    )
+    p.add_argument(
+        "--portfolio-truth-security-max-age-hours",
+        type=int,
+        default=24,
+        metavar="HOURS",
+        help="Freshness window for GitHub security observations (default: 24)",
+    )
+    p.add_argument(
         "--portfolio-truth-allow-empty-notion",
         action="store_true",
         help=(
@@ -683,10 +705,23 @@ def build_parser() -> argparse.ArgumentParser:
         "--portfolio-truth-include-security",
         action="store_true",
         help=(
-            "Overlay the security.* GHAS alert counts on each project from the latest "
-            "output/ghas-alerts-<username>-*.json file, feeding the active-high-severity-alerts "
-            "risk factor (requires a prior `audit report --ghas-alerts` run)"
+            "Overlay security coverage from the validated "
+            "github-security-coverage-latest.json receipt"
         ),
+    )
+    parser.add_argument(
+        "--portfolio-truth-security-receipt",
+        type=str,
+        default=None,
+        metavar="PATH",
+        help="Explicit provenance-bearing GitHub security receipt path",
+    )
+    parser.add_argument(
+        "--portfolio-truth-security-max-age-hours",
+        type=int,
+        default=24,
+        metavar="HOURS",
+        help="Freshness window for GitHub security observations (default: 24)",
     )
     parser.add_argument(
         "--portfolio-truth-allow-empty-notion",

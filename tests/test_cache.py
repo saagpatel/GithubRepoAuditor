@@ -65,6 +65,33 @@ class TestResponseCache:
 
         assert not cache._path(url, {"access_token": "secret-param", "per_page": "10"}).exists()
 
+    def test_put_skips_credential_shaped_value_under_benign_key(self, tmp_path):
+        cache = ResponseCache(cache_dir=tmp_path / "cache", ttl=3600)
+        url = "https://api.github.com/repos/user/repo"
+        response = {"note": "ghp_" + ("a" * 36)}
+
+        cache.put(url, None, response)
+
+        assert not cache._path(url, None).exists()
+
+    def test_put_skips_credential_inside_serialized_payload(self, tmp_path):
+        cache = ResponseCache(cache_dir=tmp_path / "cache", ttl=3600)
+        url = "https://api.github.com/repos/user/repo"
+        response = json.dumps({"note": "github_pat_" + ("a" * 40)})
+
+        cache.put(url, None, response)
+
+        assert not cache._path(url, None).exists()
+
+    def test_put_skips_private_key_material_under_benign_key(self, tmp_path):
+        cache = ResponseCache(cache_dir=tmp_path / "cache", ttl=3600)
+        url = "https://api.github.com/repos/user/repo"
+        response = {"content": "-----BEGIN PRIVATE KEY-----\nnot-a-real-key"}
+
+        cache.put(url, None, response)
+
+        assert not cache._path(url, None).exists()
+
     def test_put_preserves_noncredential_secret_scanning_shape(self, tmp_path):
         cache = ResponseCache(cache_dir=tmp_path / "cache", ttl=3600)
         url = "https://api.github.com/repos/user/repo"
