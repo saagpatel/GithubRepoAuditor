@@ -1474,3 +1474,91 @@ repos:
     lifecycle_state: archived
     review_cadence: quarterly
     operating_path: archive
+  # --- 2026-07-17 Portfolio Tribunal: contracts for previously uncataloged KEEP repos ---
+  Temper:
+    owner: d
+    purpose: private local-first macOS instrument for forecast-backed decision receipts
+      (forecast, deliberate, decide, observe, learn loop)
+    lifecycle_state: active
+    review_cadence: weekly
+    operating_path: finish
+    category: commercial
+    notes: Phase 1 secure foundation merged 2026-07-12 after independent review; Phase
+      2 in progress at tribunal judgment.
+  book-two-manuscript:
+    owner: d
+    purpose: Book Two / Field Manual manuscript workspace holding the complete
+      validation-gated draft
+    lifecycle_state: active
+    review_cadence: weekly
+    operating_path: finish
+    category: commercial
+    criticality: high
+    tool_provenance: claude-ai
+    notes: Next lane operator-approved and dated (human cold-route pilot, 2026-07-10).
+      Governing FIELD-MANUAL sources live in fable-queue until migrated.
+  fable-queue:
+    owner: d
+    purpose: staging ground for Fable campaign mission packets and prompts, sole home
+      of the FIELD-MANUAL packets that book-two-manuscript lists as governing sources
+    lifecycle_state: active
+    review_cadence: monthly
+    operating_path: maintain
+    category: infrastructure
+    criticality: high
+    tool_provenance: claude-code
+    notes: Archive only after the FIELD-MANUAL packets migrate into book-two-manuscript
+      (operator lane, 2026-07-17 tribunal resolution).
+  ccusage:
+    owner: d
+    purpose: upstream-contribution fork of the ccusage CLI (Claude Code usage/cost
+      reporting), kept as an active contribution vehicle
+    lifecycle_state: active
+    review_cadence: monthly
+    operating_path: maintain
+    category: infrastructure
+    tool_provenance: codex
+  lazarus:
+    owner: d
+    purpose: recovery utility that extracts the most valuable coherent product from
+      a degraded repository and emits a source-bound recovery receipt
+    lifecycle_state: active
+    review_cadence: monthly
+    operating_path: maintain
+    category: infrastructure
+    notes: Drill-verified with a dated passing-drill note at tribunal judgment.
+  human-ai-frontier-lab:
+    owner: d
+    purpose: research laboratory evaluating human-AI systems through time, consequence,
+      and reproducible evidence across five products in one evidence-preserving loop
+    lifecycle_state: active
+    review_cadence: weekly
+    operating_path: experiment
+    category: learning
+  manipulable-library:
+    owner: d
+    purpose: public publishing imprint for difficult systems explained through direct
+      manipulation, simulation, annotation, narrative, and evidence
+    lifecycle_state: active
+    review_cadence: weekly
+    operating_path: finish
+    category: commercial
+    notes: Staged gate state at tribunal judgment, G0 established, G1 held for operator
+      signoff.
+  operator-os-explainer:
+    owner: d
+    purpose: public interactive explainer of the personal multi-agent operator OS,
+      deployed at operator-os-explainer.vercel.app
+    lifecycle_state: active
+    review_cadence: monthly
+    operating_path: maintain
+    category: vanity
+    tool_provenance: claude-code
+  repository-renaissance:
+    owner: d
+    purpose: local-first case system for understanding and planning interventions in
+      difficult Git repositories, binding observations to immutable scan epochs
+    lifecycle_state: active
+    review_cadence: weekly
+    operating_path: experiment
+    category: infrastructure
