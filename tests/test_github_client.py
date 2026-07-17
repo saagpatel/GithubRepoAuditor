@@ -6,6 +6,7 @@ import pytest
 import requests
 
 from src.github_client import REST_API_VERSION, GitHubClient
+from src.http_link_header import next_link_from_header
 
 
 class _MemoryCache:
@@ -29,6 +30,49 @@ class TestGitHubClientHardening:
     def test_rest_session_sets_explicit_api_version(self):
         client = GitHubClient()
         assert client.session.headers["X-GitHub-Api-Version"] == REST_API_VERSION
+
+    def test_pagination_uses_linear_link_header_fallback(self, monkeypatch):
+        client = GitHubClient()
+
+        class _Page:
+            def __init__(self, payload, link_header=""):
+                self._payload = payload
+                self.links = {}
+                self.headers = {"Link": link_header}
+
+            def json(self):
+                return self._payload
+
+        pages = iter(
+            [
+                _Page(
+                    [{"page": 1}],
+                    '<https://api.github.test/items?page=2>; rel="next", '
+                    '<https://api.github.test/items?page=2>; rel="last"',
+                ),
+                _Page([{"page": 2}]),
+            ]
+        )
+        requested = []
+
+        def _request(url, params=None):
+            requested.append((url, params))
+            return next(pages)
+
+        monkeypatch.setattr(client, "_request", _request)
+
+        assert client._paginate(
+            "https://api.github.test/items", {"per_page": 100}
+        ) == [{"page": 1}, {"page": 2}]
+        assert requested == [
+            ("https://api.github.test/items", {"per_page": 100}),
+            ("https://api.github.test/items?page=2", {}),
+        ]
+
+    def test_link_header_fallback_fails_closed_on_large_malformed_input(self):
+        malformed = "<" + "<=" * 100_000
+
+        assert next_link_from_header(malformed) is None
 
     def test_repo_list_cache_key_includes_owner_private_scope(self, monkeypatch):
         cache = _MemoryCache()
