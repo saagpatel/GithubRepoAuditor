@@ -156,18 +156,23 @@ def test_catalog_entry_for_repo_defaults_automation_eligible_false():
     assert entry["automation_eligible"] is False
 
 
-def test_live_catalog_keeps_settled_recovery_exclusions_archived() -> None:
+def test_live_catalog_reflects_tribunal_reactivation_of_recovery_exclusions() -> None:
+    # The 2026-06 recovery settlement archived these two; the operator-approved
+    # 2026-07-17 Portfolio Tribunal ledger reversed both on live evidence
+    # (engraph: in-flight perf branch + harness-registered MCP server;
+    # reliability-vault: substantive feature commits 07-09/07-10). This pin now
+    # guards the reactivated state; automation stays off pending re-review.
     catalog_path = Path(__file__).parents[1] / "config" / "portfolio-catalog.yaml"
     catalog = load_portfolio_catalog(catalog_path)
 
     for repo_name in ("engraph", "reliability-vault"):
         entry = catalog["repos"][repo_name]
-        assert entry["lifecycle_state"] == "archived"
-        assert entry["operating_path"] == "archive"
+        assert entry["lifecycle_state"] == "active"
+        assert entry["operating_path"] == "maintain"
         # Migrated off the deprecated field; read-compat fallback is covered
         # separately by test_load_portfolio_catalog_warns_on_deprecated_disposition.
         assert entry["intended_disposition"] == ""
-        assert entry["maturity_program"] == "archive"
+        assert entry["maturity_program"] == "maintain"
         assert entry["automation_eligible"] is False
 
 
