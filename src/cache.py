@@ -105,7 +105,8 @@ class ResponseCache:
             "cached_at": time.time(),
         }
         try:
-            path.write_text(json.dumps(entry))  # lgtm [py/clear-text-storage-sensitive-data] redacted above
+            # lgtm[py/clear-text-storage-sensitive-data] Credential-shaped data is rejected above.
+            path.write_text(json.dumps(entry))
         except OSError:
             pass  # Cache write failure is non-fatal
 

@@ -28,6 +28,7 @@ from collections import defaultdict
 import requests
 
 from src.cache import ResponseCache
+from src.http_link_header import next_link_from_header
 
 logger = logging.getLogger(__name__)
 
@@ -85,11 +86,8 @@ def _paginate(
         if next_link:
             next_url = next_link
         else:
-            import re
             link_header = resp.headers.get("Link", "")
-            match = re.search(r'<([^>]+)>;\s*rel="next"', link_header)
-            if match:
-                next_url = match.group(1)
+            next_url = next_link_from_header(link_header)
 
     return results
 

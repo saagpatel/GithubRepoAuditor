@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import base64
 import logging
-import re
 import sys
 import time
 from collections.abc import Callable
@@ -13,6 +12,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
 
 from src.cache import ResponseCache
+from src.http_link_header import next_link_from_header
 from src.models import RepoMetadata
 
 logger = logging.getLogger(__name__)
@@ -130,12 +130,10 @@ class GitHubClient:
             # After the first request, params are baked into the next URL
             params = {}
 
-            # Parse next link — prefer response.links, fall back to regex
+            # Parse next link — prefer requests' parser, then a linear fallback.
             next_link = response.links.get("next", {}).get("url")
             if not next_link:
-                link_header = response.headers.get("Link", "")
-                match = re.search(r'<([^>]+)>;\s*rel="next"', link_header)
-                next_link = match.group(1) if match else None
+                next_link = next_link_from_header(response.headers.get("Link", ""))
             url = next_link  # type: ignore[assignment]
 
         return results
