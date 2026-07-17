@@ -1545,6 +1545,92 @@ repos:
     assert alpha.declared.notes == "handoff note"
 
 
+def test_generated_registry_notes_collapse_multi_layer_security_purpose_corruption(
+    portfolio_workspace: Path,
+    tmp_path: Path,
+) -> None:
+    """Regression for the append-loop bug: when a repo has both a declared
+    purpose and open security alerts, ``_note_text`` interleaves a fresh
+    flag+purpose ahead of whatever notes text round-trips back in from
+    project-registry.md (the default --registry legacy source is the same
+    file --portfolio-truth writes). Before the fixed-point strip, each
+    generation only peeled the outermost interleaved layer, so historical
+    corruption survived and the composed Notes column grew by one flag+purpose
+    pair every run. Assert a single generation collapses any amount of
+    pre-existing corruption, and that two full generation cycles back-to-back
+    produce byte-identical output."""
+    catalog_path = tmp_path / "portfolio-catalog.yaml"
+    catalog_path.write_text(
+        """
+repos:
+  Alpha:
+    owner: d
+    purpose: flagship workbook-first flow
+    lifecycle_state: active
+    review_cadence: weekly
+    intended_disposition: maintain
+    category: commercial
+    tool_provenance: codex
+"""
+    )
+    security = {
+        "Alpha": {
+            "dependabot": {
+                "critical": 1,
+                "high": 2,
+                "medium": 0,
+                "low": 0,
+                "available": True,
+            },
+            "code_scanning": {"available": True},
+            "secret_scanning": {"open": 0, "available": True},
+        }
+    }
+    flag = "[security: 1 critical / 2 high open Dependabot alerts]"
+    purpose = "flagship workbook-first flow"
+    # Three layers of pre-existing interleaved corruption, as if the append-loop
+    # bug had already compounded for a few nights before this fix landed.
+    corrupted_notes = f"{flag} {purpose} {flag} {purpose} {flag} {purpose}"
+    legacy_registry_path = tmp_path / "project-registry.md"
+    legacy_registry_path.write_text(
+        "\n# Project Registry\n\n## Standalone Projects (Root Level)\n\n"
+        "| Project | Status | Tool | Context Quality | Stack | Context Files | Category | Notes |\n"
+        "|---------|--------|------|-----------------|-------|---------------|----------|-------|\n"
+        f"| Alpha | active | codex | full | Next.js | CLAUDE.md | commercial | {corrupted_notes} |\n"
+    )
+
+    first = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=catalog_path,
+        legacy_registry_path=legacy_registry_path,
+        include_notion=False,
+        security_alerts_by_name=security,
+    )
+    alpha_first = next(
+        project
+        for project in first.snapshot.projects
+        if project.identity.display_name == "Alpha"
+    )
+    # One generation collapses however many layers were already accumulated.
+    assert alpha_first.declared.notes == ""
+    markdown_first = render_registry_markdown(first.snapshot)
+    assert markdown_first.count("[security:") == 1
+    assert markdown_first.count(purpose) == 1
+
+    # Feed generation 1's own output back in, exactly like --registry
+    # defaulting to registry_output on the next run.
+    legacy_registry_path.write_text(markdown_first)
+    second = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=catalog_path,
+        legacy_registry_path=legacy_registry_path,
+        include_notion=False,
+        security_alerts_by_name=security,
+    )
+    markdown_second = render_registry_markdown(second.snapshot)
+    assert markdown_second == markdown_first
+
+
 def test_generated_registry_notes_drop_security_and_path_boilerplate(
     portfolio_workspace: Path,
     tmp_path: Path,
