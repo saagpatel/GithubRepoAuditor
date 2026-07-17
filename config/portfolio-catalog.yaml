@@ -1504,16 +1504,16 @@ repos:
       Governing FIELD-MANUAL sources live in fable-queue until migrated.
   fable-queue:
     owner: d
-    purpose: staging ground for Fable campaign mission packets and prompts, sole home
-      of the FIELD-MANUAL packets that book-two-manuscript lists as governing sources
-    lifecycle_state: active
-    review_cadence: monthly
-    operating_path: maintain
+    purpose: archived staging ground for Fable campaign mission packets and prompts;
+      the FIELD-MANUAL governing sources were imported into book-two-manuscript
+    lifecycle_state: archived
+    review_cadence: quarterly
+    operating_path: archive
     category: infrastructure
-    criticality: high
     tool_provenance: claude-code
-    notes: Archive only after the FIELD-MANUAL packets migrate into book-two-manuscript
-      (operator lane, 2026-07-17 tribunal resolution).
+    notes: Archival condition satisfied 2026-07-17 — FIELD-MANUAL packets imported
+      byte-identical into book-two-manuscript sources/field-manual/ (originals retained
+      here for history). Per 2026-07-17 tribunal resolution.
   ccusage:
     owner: d
     purpose: upstream-contribution fork of the ccusage CLI (Claude Code usage/cost
