@@ -95,16 +95,23 @@ def build_risk_entry(
     if criticality in {"high", "critical"} and not known_risks_present:
         factors.append("undocumented-risks")
 
-    # Active repo carrying open high- or critical-severity Dependabot alerts.
+    # A currently active repo, or a stale repo intentionally kept on the maintain
+    # path, carrying open high- or critical-severity Dependabot alerts.
     # High alerts contribute one normal factor toward the 3+ elevation threshold;
     # an open critical alert force-elevates on its own (see is_elevated below) — a
     # lone unpatched critical CVE cannot hide in an otherwise-clean repo.
-    active = activity_status in ACTIVE_STATUSES
-    if active and (security_high_alerts > 0 or security_critical_alerts > 0):
+    security_relevant = (
+        activity_status in ACTIVE_STATUSES or operating_path == "maintain"
+    )
+    if security_relevant and (
+        security_high_alerts > 0 or security_critical_alerts > 0
+    ):
         factors.append("active-high-severity-alerts")
 
     # Derive tier
-    security_forces_elevated = active and security_critical_alerts > 0
+    security_forces_elevated = (
+        security_relevant and security_critical_alerts > 0
+    )
     is_elevated = (
         len(factors) >= 3
         or ("weak-context-active" in factors and "investigate-override" in factors)

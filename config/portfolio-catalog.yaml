@@ -132,7 +132,7 @@ repos:
   ApplyKit:
     owner: d
     purpose: deterministic local-first application packet generation
-    lifecycle_state: active
+    lifecycle_state: manual-only
     review_cadence: weekly
     operating_path: maintain
     category: commercial
@@ -227,7 +227,7 @@ repos:
   MCPAudit:
     owner: d
     purpose: local MCP security and drift audit tool
-    lifecycle_state: manual-only
+    lifecycle_state: active
     review_cadence: weekly
     operating_path: maintain
     category: infrastructure
@@ -278,7 +278,7 @@ repos:
   operant-public:
     owner: d
     purpose: operating-agent calibration benchmark with shipped public MCP access
-    lifecycle_state: manual-only
+    lifecycle_state: active
     criticality: high
     review_cadence: weekly
     operating_path: maintain
@@ -363,7 +363,7 @@ repos:
   JobCommandCenter:
     owner: d
     purpose: desktop command-center shell for portfolio and operator workflows
-    lifecycle_state: active
+    lifecycle_state: manual-only
     review_cadence: weekly
     operating_path: maintain
     category: commercial
@@ -386,7 +386,7 @@ repos:
     tool_provenance: claude-code
   AIWorkFlow:
     owner: d
-    lifecycle_state: active
+    lifecycle_state: manual-only
     review_cadence: monthly
     operating_path: maintain
     category: commercial
@@ -400,7 +400,7 @@ repos:
   Phantom Frequencies:
     owner: d
     purpose: compact authored supernatural-radio game being finished as an Oddworks release
-    lifecycle_state: active
+    lifecycle_state: manual-only
     criticality: high
     review_cadence: weekly
     operating_path: finish
@@ -419,7 +419,7 @@ repos:
   SignalDecay:
     owner: d
     purpose: one-room 8-12 minute tactile signal-tuning game for the Oddworks label
-    lifecycle_state: active
+    lifecycle_state: manual-only
     criticality: high
     review_cadence: weekly
     operating_path: finish
@@ -626,7 +626,7 @@ repos:
     automation_eligible: true
   Afterimage:
     owner: d
-    lifecycle_state: active
+    lifecycle_state: manual-only
     review_cadence: weekly
     operating_path: maintain
     category: commercial
@@ -648,7 +648,7 @@ repos:
   Liminal:
     owner: d
     purpose: focused atmospheric iOS experience being finished as an Oddworks release
-    lifecycle_state: active
+    lifecycle_state: manual-only
     criticality: high
     review_cadence: weekly
     operating_path: finish
@@ -799,7 +799,7 @@ repos:
   DeepTank:
     owner: d
     purpose: authored aquatic simulation game being evaluated and finished for the Oddworks label
-    lifecycle_state: active
+    lifecycle_state: manual-only
     criticality: high
     review_cadence: weekly
     operating_path: finish
@@ -953,7 +953,7 @@ repos:
     operating_path: maintain
   cross-system-smoke:
     owner: d
-    lifecycle_state: active
+    lifecycle_state: manual-only
     review_cadence: weekly
     operating_path: maintain
     category: infrastructure
@@ -1079,17 +1079,18 @@ repos:
     owner: d
     purpose: public-safe static portfolio index for hiring-manager review
     lifecycle_state: active
+    criticality: high
     review_cadence: monthly
     operating_path: maintain
-    category: vanity
+    category: commercial
     tool_provenance: claude-code
     maturity_program: maintain
     target_maturity: operating
     automation_eligible: false
-    notes: Keep manual-only unless code or deployment work is active; resume and custom-domain decisions are mostly external to this repo.
+    notes: Tier-0 public workshop and canonical saagarpatel.dev product surface. Keep in default attention as the public front door for the core portfolio.
   rag-knowledge-base:
     owner: d
-    lifecycle_state: active
+    lifecycle_state: manual-only
     review_cadence: weekly
     operating_path: maintain
     category: infrastructure
@@ -1102,7 +1103,7 @@ repos:
   BattleGrid:
     owner: d
     purpose: focused tactical grid game being evaluated and finished for the Oddworks label
-    lifecycle_state: active
+    lifecycle_state: manual-only
     criticality: high
     review_cadence: weekly
     operating_path: finish
@@ -1114,7 +1115,7 @@ repos:
   OddworksCabinet:
     owner: d
     purpose: evidence-first gallery and release surface for small authored Oddworks experiences
-    lifecycle_state: active
+    lifecycle_state: manual-only
     criticality: high
     review_cadence: weekly
     operating_path: finish
@@ -1296,7 +1297,7 @@ repos:
     maturity_program: finish
   mcpaudit-web:
     owner: d
-    lifecycle_state: active
+    lifecycle_state: manual-only
     review_cadence: weekly
     operating_path: finish
     maturity_program: finish
@@ -1479,12 +1480,25 @@ repos:
     lifecycle_state: archived
     review_cadence: quarterly
     operating_path: archive
+  personal-ops:
+    owner: d
+    purpose: local operator control plane for cross-system workflows, approvals, and recovery
+    lifecycle_state: active
+    criticality: high
+    review_cadence: weekly
+    operating_path: maintain
+    category: infrastructure
+    tool_provenance: codex
+    maturity_program: maintain
+    target_maturity: operating
+    automation_eligible: false
+    notes: Tier-0 Operator OS project. The live checkout is outside the Projects workspace and is represented in generated registry output as supp:personal-ops.
   # --- 2026-07-17 Portfolio Tribunal: contracts for previously uncataloged KEEP repos ---
   Temper:
     owner: d
     purpose: private local-first macOS instrument for forecast-backed decision receipts
       (forecast, deliberate, decide, observe, learn loop)
-    lifecycle_state: active
+    lifecycle_state: manual-only
     review_cadence: weekly
     operating_path: finish
     category: commercial
@@ -1494,7 +1508,7 @@ repos:
     owner: d
     purpose: Book Two / Field Manual manuscript workspace holding the complete
       validation-gated draft
-    lifecycle_state: active
+    lifecycle_state: manual-only
     review_cadence: weekly
     operating_path: finish
     category: commercial
@@ -1518,7 +1532,7 @@ repos:
     owner: d
     purpose: upstream-contribution fork of the ccusage CLI (Claude Code usage/cost
       reporting), kept as an active contribution vehicle
-    lifecycle_state: active
+    lifecycle_state: manual-only
     review_cadence: monthly
     operating_path: maintain
     category: infrastructure
@@ -1535,7 +1549,7 @@ repos:
     owner: d
     purpose: public publishing imprint for difficult systems explained through direct
       manipulation, simulation, annotation, narrative, and evidence
-    lifecycle_state: active
+    lifecycle_state: manual-only
     review_cadence: weekly
     operating_path: finish
     category: commercial
@@ -1546,10 +1560,12 @@ repos:
     purpose: public interactive explainer of the personal multi-agent operator OS,
       deployed at operator-os-explainer.vercel.app
     lifecycle_state: active
+    criticality: high
     review_cadence: monthly
     operating_path: maintain
-    category: vanity
+    category: commercial
     tool_provenance: claude-code
+    notes: Tier-0 flagship story for the Operator OS and part of the public workshop product surface.
   repository-renaissance:
     owner: d
     purpose: local-first case system for understanding and planning interventions in

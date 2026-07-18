@@ -38,6 +38,7 @@ from src.portfolio_truth_types import (
     SecurityFields,
     display_activity_status,
 )
+from src.project_registry import DEFAULT_SUPPLEMENTARY
 from src.registry_parser import _normalize
 
 logger = logging.getLogger(__name__)
@@ -262,6 +263,13 @@ def build_portfolio_truth_snapshot(
         now=now,
         exclusion_counts=exclusion_counts,
     )
+    workspace_projects = _merge_supplementary_discoveries(
+        discovered=workspace_projects,
+        supplementary=_cataloged_supplementary_projects(
+            catalog_data=catalog_data,
+            now=now,
+        ),
+    )
     projects = [
         _build_truth_project(
             raw_project,
@@ -355,55 +363,170 @@ def build_portfolio_truth_snapshot(
     )
 
 
+def _cataloged_supplementary_projects(
+    *, catalog_data: dict[str, Any], now: datetime
+) -> list[dict[str, Any]]:
+    """Promote explicitly cataloged repo-less Operator OS identities into truth."""
+
+    projects: list[dict[str, Any]] = []
+    for supplementary in DEFAULT_SUPPLEMENTARY:
+        name = str(supplementary.get("display_name") or "").strip()
+        canonical_key = str(supplementary.get("canonical_key") or "").strip()
+        if not name or not canonical_key:
+            continue
+        catalog_entry = catalog_entry_for_repo(
+            {"name": name, "full_name": name, "path": canonical_key},
+            catalog_data,
+        )
+        if not catalog_entry.get("has_explicit_entry"):
+            continue
+        projects.append(
+            {
+                "name": name,
+                "project_path": None,
+                "path": canonical_key,
+                "top_level_dir": "supplementary",
+                "group_entry": {
+                    "group_key": str(supplementary.get("group_key") or "operator_infra"),
+                    "group_label": str(
+                        supplementary.get("group_label") or "Operator Infrastructure"
+                    ),
+                    "section_marker": str(
+                        supplementary.get("section_marker")
+                        or "Supplementary Projects"
+                    ),
+                    "section_label": str(
+                        supplementary.get("section_label") or "Operator OS"
+                    ),
+                },
+                "has_git": False,
+                "repo_full_name": "",
+                "default_branch": "",
+                "context_files": [],
+                "context_quality": "none",
+                "primary_context_file": "AGENTS.md",
+                "project_summary_present": False,
+                "current_state_present": False,
+                "stack_present": False,
+                "run_instructions_present": False,
+                "known_risks_present": False,
+                "next_recommended_move_present": False,
+                "missing_context_fields": [],
+                "supporting_context_files": [],
+                "stack": ["Unknown"],
+                "last_meaningful_activity_at": None,
+                "inferred_tool_provenance": "",
+                "now": now,
+                "source": "supplementary-registry",
+            }
+        )
+    return projects
+
+
+def _merge_supplementary_discoveries(
+    *,
+    discovered: list[dict[str, Any]],
+    supplementary: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Keep one canonical identity while retaining local checkout observations."""
+    supplementary_by_name = {
+        _normalize(str(project.get("name") or "")): project
+        for project in supplementary
+    }
+    used: set[str] = set()
+    merged: list[dict[str, Any]] = []
+    for project in discovered:
+        normalized_name = _normalize(str(project.get("name") or ""))
+        supplement = supplementary_by_name.get(normalized_name)
+        if supplement is None:
+            merged.append(project)
+            continue
+        used.add(normalized_name)
+        if str(project.get("repo_full_name") or "").strip():
+            merged.append(project)
+            continue
+        merged.append(
+            {
+                **project,
+                "path": supplement["path"],
+                "top_level_dir": supplement["top_level_dir"],
+                "group_entry": supplement["group_entry"],
+                "source": "workspace+supplementary-registry",
+            }
+        )
+    merged.extend(
+        project
+        for normalized_name, project in supplementary_by_name.items()
+        if normalized_name not in used
+    )
+    return merged
+
+
 def _build_coverage_envelope(
     *,
     projects: list[PortfolioTruthProject],
     notion_context_carried_forward: bool,
     notion_context_rows: int,
 ) -> list[dict[str, Any]]:
+    workspace_projects = [
+        project
+        for project in projects
+        if not project.identity.project_key.startswith("supp:")
+    ]
+    workspace_project_count = len(workspace_projects)
+    supplementary_project_count = len(projects) - workspace_project_count
     complete = sum(
-        project.security.coverage_state == "complete" for project in projects
+        project.security.coverage_state == "complete" for project in workspace_projects
     )
-    partial = sum(project.security.coverage_state == "partial" for project in projects)
-    stale = sum(project.security.coverage_state == "stale" for project in projects)
-    unknown = len(projects) - complete - partial - stale
-    cohort_count = sum(project.security.cohort_member for project in projects)
+    partial = sum(
+        project.security.coverage_state == "partial" for project in workspace_projects
+    )
+    stale = sum(
+        project.security.coverage_state == "stale" for project in workspace_projects
+    )
+    unknown = workspace_project_count - complete - partial - stale
+    cohort_count = sum(project.security.cohort_member for project in workspace_projects)
     cohort_complete = sum(
         project.security.cohort_member and project.security.coverage_state == "complete"
-        for project in projects
+        for project in workspace_projects
     )
     cohort_partial = sum(
         project.security.cohort_member and project.security.coverage_state == "partial"
-        for project in projects
+        for project in workspace_projects
     )
     cohort_stale = sum(
         project.security.cohort_member and project.security.coverage_state == "stale"
-        for project in projects
+        for project in workspace_projects
     )
     cohort_unknown = cohort_count - cohort_complete - cohort_partial - cohort_stale
     provider_counts = {
         provider: sum(
             project.security.provider_state(provider) == "observed"
-            for project in projects
+            for project in workspace_projects
         )
         for provider in ("dependabot", "code_scanning", "secret_scanning")
     }
     git_observed = sum(
-        project.repository_state.get("state") == "observed" for project in projects
+        project.repository_state.get("state") == "observed"
+        for project in workspace_projects
     )
-    return [
-        {"source": "workspace", "state": "observed", "project_count": len(projects)},
+    coverage = [
+        {
+            "source": "workspace",
+            "state": "observed",
+            "project_count": workspace_project_count,
+        },
         {
             "source": "git",
             "state": "observed" if git_observed else "unknown",
             "observed_count": git_observed,
-            "project_count": len(projects),
+            "project_count": workspace_project_count,
         },
         {
             "source": "github_security",
             "state": (
                 "known"
-                if complete == len(projects)
+                if complete == workspace_project_count
                 else "partial"
                 if complete or partial
                 else "unknown"
@@ -419,7 +542,7 @@ def _build_coverage_envelope(
             "cohort_stale_count": cohort_stale,
             "cohort_unknown_count": cohort_unknown,
             "provider_observed_counts": provider_counts,
-            "project_count": len(projects),
+            "project_count": workspace_project_count,
         },
         {
             "source": "notion",
@@ -431,6 +554,15 @@ def _build_coverage_envelope(
             "observed_count": notion_context_rows,
         },
     ]
+    if supplementary_project_count:
+        coverage.append(
+            {
+                "source": "supplementary_registry",
+                "state": "observed",
+                "project_count": supplementary_project_count,
+            }
+        )
+    return coverage
 
 
 def _build_input_envelope(
@@ -674,6 +806,9 @@ def _build_truth_project(
 ) -> PortfolioTruthProject:
     relative_path = raw_project["path"]
     group_entry = group_entry_for_path(relative_path, catalog_data)
+    supplementary_group = raw_project.get("group_entry")
+    if isinstance(supplementary_group, dict):
+        group_entry = {**group_entry, **supplementary_group}
     repo_entry = catalog_entry_for_repo(
         {
             "name": raw_project["name"],
@@ -764,10 +899,11 @@ def _build_truth_project(
         provenance=provenance,
         readme_char_count=derived_readme_char_count,
     )
+    raw_source = str(raw_project.get("source") or "workspace")
     provenance["derived.context_quality"] = {
-        "source": "workspace+catalog"
+        "source": f"{raw_source}+catalog"
         if context_quality != raw_context_quality
-        else "workspace",
+        else raw_source,
         "detail": (
             f"{raw_context_quality}->{context_quality}"
             if context_quality != raw_context_quality
@@ -871,7 +1007,7 @@ def _build_truth_project(
         "active-product",
         "active-infra",
         "decision-needed",
-    }:
+    } and not identity.project_key.startswith("supp:"):
         security = replace(
             security,
             cohort_member=True,
@@ -896,7 +1032,7 @@ def _build_truth_project(
         automation_eligible=declared_values["automation_eligible"],
     )
     provenance["derived.last_meaningful_activity_at"] = {
-        "source": "git" if raw_project["has_git"] and last_activity else "workspace",
+        "source": "git" if raw_project["has_git"] and last_activity else raw_source,
         "detail": "derived",
     }
     provenance["derived.activity_status"] = {
@@ -912,15 +1048,15 @@ def _build_truth_project(
         "detail": attention_state,
     }
     provenance["derived.stack"] = {
-        "source": "workspace",
+        "source": raw_source,
         "detail": ", ".join(raw_project["stack"]),
     }
     provenance["derived.context_files"] = {
-        "source": "workspace",
+        "source": raw_source,
         "detail": str(len(raw_project["context_files"])),
     }
     provenance["derived.primary_context_file"] = {
-        "source": "workspace",
+        "source": raw_source,
         "detail": raw_project["primary_context_file"],
     }
     for field in (
@@ -932,7 +1068,7 @@ def _build_truth_project(
         "next_recommended_move_present",
     ):
         provenance[f"derived.{field}"] = {
-            "source": "workspace",
+            "source": raw_source,
             "detail": str(bool(raw_project[field])).lower(),
         }
 
@@ -1195,6 +1331,8 @@ def _resolve_group_key(
 def _resolve_group_label(
     group_entry: dict[str, Any], raw_project: dict[str, Any]
 ) -> str:
+    if group_entry.get("group_label"):
+        return str(group_entry["group_label"])
     if group_entry.get("section_label"):
         return str(group_entry["section_label"])
     if "Swift" in raw_project.get("stack", []):
@@ -1250,16 +1388,23 @@ def _attention_state_for(
         return "archived"
     if operating_path == "experiment" or lifecycle_state == "experimental":
         return "experiment"
+    if risk_entry.get("security_risk"):
+        return "decision-needed"
     if lifecycle_state == "manual-only":
         return "manual-only"
+    if lifecycle_state == "dormant":
+        return "parked"
+    if lifecycle_state == "active" and operating_path == "maintain":
+        if category == "infrastructure":
+            return "active-infra"
+        if category == "commercial":
+            return "active-product"
     if activity_status == "stale":
         # A declared finish path is itself an unresolved operator decision. It can
         # remain valid while the default branch is stale (for example, when work is
         # on a release branch or waiting at a human/publication gate), so do not
         # silently collapse it back into the parked pool.
         return "decision-needed" if operating_path == "finish" else "parked"
-    if risk_entry.get("security_risk"):
-        return "decision-needed"
     if activity_status in {"active", "recent"} and operating_path in {
         "maintain",
         "finish",

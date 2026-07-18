@@ -30,6 +30,7 @@ from src.portfolio_truth_sources import (
     load_safe_notion_project_context,
 )
 from src.portfolio_truth_validate import validate_portfolio_report_markdown
+from src.project_registry import build_project_registry
 from src.registry_parser import parse_registry
 
 
@@ -392,7 +393,7 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     assert gamma.derived.stack == ["Swift"]
 
     assert result.snapshot.schema_version == "0.11.0"
-    assert result.snapshot.derivation_policy_version == "portfolio_attention.v2"
+    assert result.snapshot.derivation_policy_version == "portfolio_attention.v3"
     assert result.snapshot.inputs["catalog"]["sha256"]
     assert result.snapshot.inputs["notion"]["mode"] == "unavailable"
     assert result.snapshot.exclusions == {
@@ -448,6 +449,198 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     )
     # Per-project open_high_critical is emitted in the security block.
     assert "open_high_critical" in snapshot_dict["projects"][0]["security"]
+
+
+def test_live_catalog_produces_exact_tier_zero_attention_semantics(
+    tmp_path: Path,
+) -> None:
+    """Pin the operator's Tier 0 policy at generated-output level.
+
+    personal-ops lives outside the audited Projects workspace, so portfolio truth
+    carries the nine repo-backed logical identities while the generated canonical
+    project registry carries personal-ops as its established supplementary identity.
+    """
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    now = datetime(2026, 7, 18, 12, tzinfo=timezone.utc)
+    repo_projects = {
+        "MCPAudit": None,
+        "mcp-trust": None,
+        "bridge-db": None,
+        "GithubRepoAuditor": None,
+        "PortfolioCommandCenter": None,
+        "operant-public": "saagpatel/operant",
+        "AIGCCore": None,
+        "portfolio-index": None,
+        "operator-os-explainer": None,
+    }
+    supporting_or_retired = (
+        "mcpaudit-web",
+        "mcpforge",
+        "notification-hub",
+        "cross-system-smoke",
+        "continuity",
+        "ApplyKit",
+    )
+
+    for name, remote in {
+        **repo_projects,
+        **dict.fromkeys(supporting_or_retired),
+    }.items():
+        project = workspace / name
+        project.mkdir()
+        readme = project / "README.md"
+        _write(readme, f"# {name}\n\nTier policy fixture.\n")
+        _set_mtime(readme, now.timestamp())
+        if remote:
+            subprocess.run(
+                ["git", "init"],
+                cwd=project,
+                capture_output=True,
+                check=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "remote",
+                    "add",
+                    "origin",
+                    f"https://github.com/{remote}.git",
+                ],
+                cwd=project,
+                capture_output=True,
+                check=True,
+            )
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=workspace,
+        catalog_path=Path(__file__).parents[1] / "config" / "portfolio-catalog.yaml",
+        include_notion=False,
+        now=now,
+    )
+    active = {}
+    by_display_name = {}
+    for project in result.snapshot.projects:
+        by_display_name[project.identity.display_name] = project
+        if project.derived.attention_state not in {"active-infra", "active-product"}:
+            continue
+        logical_key = (
+            project.identity.repo_full_name or project.identity.display_name
+        )
+        active[logical_key] = project.derived.attention_state
+
+    assert active == {
+        "MCPAudit": "active-infra",
+        "mcp-trust": "active-infra",
+        "bridge-db": "active-infra",
+        "GithubRepoAuditor": "active-infra",
+        "PortfolioCommandCenter": "active-infra",
+        "personal-ops": "active-infra",
+        "saagpatel/operant": "active-infra",
+        "AIGCCore": "active-infra",
+        "portfolio-index": "active-product",
+        "operator-os-explainer": "active-product",
+    }
+    for name in supporting_or_retired:
+        assert by_display_name[name].derived.attention_state == "manual-only"
+
+    registry = build_project_registry(
+        result.snapshot.to_dict(),
+        overrides_config_path=None,
+    )
+    registry_by_key = {
+        entry["canonical_key"]: entry for entry in registry["entries"]
+    }
+    assert registry_by_key["supp:personal-ops"]["lifecycle_state"] == "active"
+    assert registry_by_key["supp:personal-ops"]["group_key"] == "operator_infra"
+    coverage_by_source = {
+        row["source"]: row for row in result.snapshot.coverage
+    }
+    assert coverage_by_source["workspace"]["project_count"] == 15
+    assert coverage_by_source["git"]["project_count"] == 15
+    assert coverage_by_source["supplementary_registry"]["project_count"] == 1
+    assert coverage_by_source["github_security"]["project_count"] == 15
+    assert coverage_by_source["github_security"]["unknown_count"] == 15
+    security_rollup = result.snapshot.to_dict()["rollups"]["security"]
+    assert security_rollup["unknown_count"] == 15
+    assert security_rollup["unavailable_count"] == 15
+    assert (
+        result.catalog_data["repos"]["personal-ops"]["lifecycle_state"] == "active"
+    )
+    personal_ops = by_display_name["personal-ops"]
+    assert personal_ops.identity.project_key == "supp:personal-ops"
+    assert personal_ops.identity.group_key == "operator_infra"
+    assert personal_ops.identity.group_label == "Operator Infrastructure"
+    assert personal_ops.identity.section_marker == "Supplementary Projects"
+    assert personal_ops.identity.section_label == "Operator OS"
+    assert personal_ops.derived.activity_status == "stale"
+    assert personal_ops.derived.attention_state == "active-infra"
+    assert personal_ops.security.cohort_member is False
+    assert (
+        personal_ops.provenance["derived.context_quality"]["source"]
+        == "supplementary-registry"
+    )
+
+
+def test_discovered_personal_ops_replaces_supplementary_registry_identity(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    project = workspace / "personal-ops"
+    project.mkdir(parents=True)
+    _write(project / "README.md", "# personal-ops\n\nWorkspace checkout.\n")
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=workspace,
+        catalog_path=Path(__file__).parents[1] / "config" / "portfolio-catalog.yaml",
+        include_notion=False,
+        now=datetime(2026, 7, 18, 12, tzinfo=timezone.utc),
+    )
+    matches = [
+        item
+        for item in result.snapshot.projects
+        if item.identity.display_name == "personal-ops"
+    ]
+
+    assert len(matches) == 1
+    assert matches[0].identity.project_key == "supp:personal-ops"
+    assert matches[0].security.cohort_member is False
+    assert matches[0].provenance["derived.context_quality"]["source"].startswith(
+        "workspace+supplementary-registry"
+    )
+    by_source = {row["source"]: row for row in result.snapshot.coverage}
+    assert by_source["workspace"]["project_count"] == 0
+    assert by_source["supplementary_registry"]["project_count"] == 1
+
+
+def test_workspace_supplementary_directory_stays_in_coverage_denominators(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    project = workspace / "supplementary" / "real-repo"
+    project.mkdir(parents=True)
+    _write(project / "README.md", "# real-repo\n\nWorkspace checkout.\n")
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=workspace,
+        catalog_path=Path(__file__).parents[1] / "config" / "portfolio-catalog.yaml",
+        include_notion=False,
+        now=datetime(2026, 7, 18, 12, tzinfo=timezone.utc),
+    )
+    by_source = {row["source"]: row for row in result.snapshot.coverage}
+    real_repo = next(
+        item
+        for item in result.snapshot.projects
+        if item.identity.display_name == "real-repo"
+    )
+
+    assert real_repo.identity.top_level_dir == "supplementary"
+    assert real_repo.identity.project_key == "supplementary/real-repo"
+    assert by_source["workspace"]["project_count"] == 1
+    assert by_source["git"]["project_count"] == 1
+    assert by_source["github_security"]["project_count"] == 1
+    assert result.snapshot.rollups.security["unknown_count"] == 1
 
 
 def test_truth_snapshot_operating_path_catalog_field_matches_legacy_disposition(
@@ -551,11 +744,71 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
             archived=False,
             lifecycle_state="active",
             operating_path="maintain",
+            category="commercial",
+            path_override="",
+            risk_entry={"security_risk": True},
+        )
+        == "decision-needed"
+    )
+    assert (
+        _attention_state_for(
+            activity_status="stale",
+            archived=False,
+            lifecycle_state="active",
+            operating_path="maintain",
+            category="commercial",
+            path_override="",
+            risk_entry={"security_risk": True},
+        )
+        == "decision-needed"
+    )
+    assert (
+        _attention_state_for(
+            activity_status="recent",
+            archived=False,
+            lifecycle_state="active",
+            operating_path="maintain",
+            category="infrastructure",
+            path_override="",
+            risk_entry={"security_risk": True},
+        )
+        == "decision-needed"
+    )
+    assert (
+        _attention_state_for(
+            activity_status="active",
+            archived=False,
+            lifecycle_state="active",
+            operating_path="maintain",
             category="vanity",
             path_override="investigate",
             risk_entry={"security_risk": False},
         )
         == "manual-only"
+    )
+    assert (
+        _attention_state_for(
+            activity_status="active",
+            archived=False,
+            lifecycle_state="dormant",
+            operating_path="maintain",
+            category="infrastructure",
+            path_override="",
+            risk_entry={"security_risk": False},
+        )
+        == "parked"
+    )
+    assert (
+        _attention_state_for(
+            activity_status="stale",
+            archived=False,
+            lifecycle_state="dormant",
+            operating_path="maintain",
+            category="infrastructure",
+            path_override="",
+            risk_entry={"security_risk": True},
+        )
+        == "decision-needed"
     )
     assert (
         _attention_state_for(
@@ -639,7 +892,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
             path_override="",
             risk_entry={"security_risk": False},
         )
-        == "parked"
+        == "active-product"
     )
 
 
@@ -1182,6 +1435,18 @@ repos:
         infra.provenance["derived.context_quality"]["detail"]
         == "minimum-viable->standard"
     )
+    assert infra.identity.has_git is True
+    assert infra.identity.repo_full_name == ""
+    assert infra.derived.attention_state == "active-infra"
+    assert infra.security.cohort_member is True
+    assert infra.security.coverage_state == "unknown"
+    security_coverage = next(
+        row
+        for row in result.snapshot.coverage
+        if row["source"] == "github_security"
+    )
+    assert security_coverage["cohort_repository_count"] == 1
+    assert security_coverage["cohort_unknown_count"] == 1
 
 
 def test_substantive_readme_support_does_not_promote_non_infra_repo(

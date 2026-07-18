@@ -10,6 +10,7 @@ import pytest
 
 from src.github_security_coverage import (
     DEFAULT_BASE_REQUEST_LIMIT,
+    DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
     GITHUB_SECURITY_RECEIPT_FILENAME,
     SecurityCoverageError,
     collect_security_coverage,
@@ -83,10 +84,12 @@ def _collect(
     *,
     session: _Session | None = None,
     prior: dict[str, Any] | None = None,
+    cohort_count: int = 16,
 ) -> dict[str, Any]:
     return collect_security_coverage(
-        _truth(),
+        _truth(cohort_count),
         token="opaque-test-token",
+        expected_cohort_count=cohort_count,
         session=session or _Session(),
         prior_receipt=prior,
         now=NOW,
@@ -142,12 +145,37 @@ def _eligibility_responses(count: int = 6) -> list[_Response]:
 
 
 def test_default_attention_cohort_is_exact_and_fail_closed() -> None:
-    cohort = derive_default_attention_cohort(_truth())
+    truth = _truth(DEFAULT_EXPECTED_GITHUB_COHORT_COUNT)
+    truth["projects"].append(
+        {
+            "identity": {
+                "project_key": "supp:personal-ops",
+                "repo_full_name": "",
+            },
+            "derived": {"attention_state": "active-infra"},
+        }
+    )
+    cohort = derive_default_attention_cohort(truth)
 
-    assert len(cohort) == 16
+    assert len(cohort) == DEFAULT_EXPECTED_GITHUB_COHORT_COUNT
     assert "owner/parked" not in cohort
-    with pytest.raises(SecurityCoverageError, match="expected 16, observed 17"):
-        derive_default_attention_cohort(_truth(17))
+    with pytest.raises(SecurityCoverageError, match="expected 9, observed 10"):
+        derive_default_attention_cohort(_truth(10))
+
+
+def test_repo_less_non_supplementary_attention_identity_fails_closed() -> None:
+    truth = _truth(DEFAULT_EXPECTED_GITHUB_COHORT_COUNT)
+    truth["projects"].append(
+        {
+            "identity": {"project_key": "repo:missing", "repo_full_name": ""},
+            "derived": {"attention_state": "active-infra"},
+        }
+    )
+
+    with pytest.raises(
+        SecurityCoverageError, match="invalid canonical repository name"
+    ):
+        derive_default_attention_cohort(truth)
 
 
 def test_no_token_never_attempts_collection() -> None:
@@ -157,6 +185,35 @@ def test_no_token_never_attempts_collection() -> None:
         collect_security_coverage(_truth(), token=None, session=session)
 
     assert session.calls == []
+
+
+def test_valid_prior_for_old_cohort_is_ignored_during_contraction() -> None:
+    old_prior = _collect(cohort_count=16)
+    session = _Session()
+
+    receipt = _collect(
+        session=session,
+        prior=old_prior,
+        cohort_count=DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+    )
+
+    assert receipt["cohort"]["repository_count"] == 9
+    assert len(session.calls) == 27
+    assert all(
+        kwargs.get("headers") == {}
+        for _, kwargs in session.calls
+    )
+
+
+def test_invalid_prior_for_old_cohort_still_fails_closed() -> None:
+    old_prior = _collect(cohort_count=16)
+    old_prior["producer"]["commit"] = "invalid"
+
+    with pytest.raises(SecurityCoverageError, match="producer commit"):
+        _collect(
+            prior=old_prior,
+            cohort_count=DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+        )
 
 
 def test_validate_only_requires_no_token_or_network(
@@ -178,6 +235,8 @@ def test_validate_only_requires_no_token_or_network(
             str(path),
             "--max-age-hours",
             "24",
+            "--expected-cohort-count",
+            "16",
         ],
     )
 
@@ -238,7 +297,9 @@ def test_incremental_eligibility_preflight_skips_plan_blocked_providers() -> Non
             assert providers[provider]["http_status"] == 200
             assert providers[provider]["http_classification"] == "eligibility"
             assert providers[provider]["counts"] is None
-    validate_security_coverage_receipt(receipt, now=NOW)
+    validate_security_coverage_receipt(
+        receipt, expected_cohort_count=16, now=NOW
+    )
 
 
 def test_eligibility_claim_requires_matching_embedded_provenance() -> None:
@@ -253,7 +314,9 @@ def test_eligibility_claim_requires_matching_embedded_provenance() -> None:
         SecurityCoverageError,
         match="eligibility-based unavailability is unproven",
     ):
-        validate_security_coverage_receipt(receipt, now=NOW)
+        validate_security_coverage_receipt(
+            receipt, expected_cohort_count=16, now=NOW
+        )
 
 
 def test_malformed_eligibility_preflight_falls_back_without_exceeding_budget() -> None:
@@ -437,7 +500,9 @@ def test_stale_provider_observation_becomes_unknown_count() -> None:
     provider = receipt["repositories"]["owner/repo-00"]["providers"]["dependabot"]
     provider["observed_at"] = (NOW - timedelta(hours=25)).isoformat()
 
-    loaded = validate_security_coverage_receipt(receipt, now=NOW)
+    loaded = validate_security_coverage_receipt(
+        receipt, expected_cohort_count=16, now=NOW
+    )
     normalized = loaded.entries_by_full_name["owner/repo-00"]["providers"]["dependabot"]
 
     assert normalized["state"] == "stale"
@@ -447,7 +512,7 @@ def test_stale_provider_observation_becomes_unknown_count() -> None:
 def test_receipt_loader_uses_embedded_provenance_not_newer_mtime(
     tmp_path: Path,
 ) -> None:
-    receipt = _collect()
+    receipt = _collect(cohort_count=DEFAULT_EXPECTED_GITHUB_COHORT_COUNT)
     canonical = tmp_path / GITHUB_SECURITY_RECEIPT_FILENAME
     canonical.write_text(json.dumps(receipt))
     decoy = tmp_path / "github-security-coverage-newer.json"
@@ -458,7 +523,10 @@ def test_receipt_loader_uses_embedded_provenance_not_newer_mtime(
 
     assert loaded is not None
     assert loaded.source_path == str(canonical)
-    assert len(loaded.entries_by_full_name) == 16
+    assert (
+        len(loaded.entries_by_full_name)
+        == DEFAULT_EXPECTED_GITHUB_COHORT_COUNT
+    )
 
 
 def test_receipt_provenance_and_provider_timestamps_fail_closed(tmp_path: Path) -> None:
@@ -474,7 +542,9 @@ def test_receipt_provenance_and_provider_timestamps_fail_closed(tmp_path: Path) 
     provider = receipt["repositories"]["owner/repo-00"]["providers"]["dependabot"]
     provider["observed_at"] = (NOW + timedelta(minutes=1)).isoformat()
     with pytest.raises(SecurityCoverageError, match="later than receipt produced_at"):
-        validate_security_coverage_receipt(receipt, now=NOW)
+        validate_security_coverage_receipt(
+            receipt, expected_cohort_count=16, now=NOW
+        )
 
 
 def test_canonical_receipt_join_does_not_fall_back_to_repo_basename() -> None:
