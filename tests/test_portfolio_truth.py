@@ -436,8 +436,8 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
         "total_open_high",
         "total_open_critical",
     }
-    assert rollups["security"]["cohort_repository_count"] == 1
-    assert rollups["security"]["cohort_unknown_count"] == 1
+    assert rollups["security"]["cohort_repository_count"] == 0
+    assert rollups["security"]["cohort_unknown_count"] == 0
     assert rollups["security"]["cohort_complete_count"] == 0
     assert set(rollups["decision"]) == {
         "decision_needed_count",
@@ -560,6 +560,7 @@ def test_live_catalog_produces_exact_tier_zero_attention_semantics(
     assert personal_ops.identity.project_key == "supp:personal-ops"
     assert personal_ops.derived.activity_status == "stale"
     assert personal_ops.derived.attention_state == "active-infra"
+    assert personal_ops.security.cohort_member is False
     assert (
         personal_ops.provenance["derived.context_quality"]["source"]
         == "supplementary-registry"

@@ -187,6 +187,35 @@ def test_no_token_never_attempts_collection() -> None:
     assert session.calls == []
 
 
+def test_valid_prior_for_old_cohort_is_ignored_during_contraction() -> None:
+    old_prior = _collect(cohort_count=16)
+    session = _Session()
+
+    receipt = _collect(
+        session=session,
+        prior=old_prior,
+        cohort_count=DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+    )
+
+    assert receipt["cohort"]["repository_count"] == 9
+    assert len(session.calls) == 27
+    assert all(
+        kwargs.get("headers") == {}
+        for _, kwargs in session.calls
+    )
+
+
+def test_invalid_prior_for_old_cohort_still_fails_closed() -> None:
+    old_prior = _collect(cohort_count=16)
+    old_prior["producer"]["commit"] = "invalid"
+
+    with pytest.raises(SecurityCoverageError, match="producer commit"):
+        _collect(
+            prior=old_prior,
+            cohort_count=DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+        )
+
+
 def test_validate_only_requires_no_token_or_network(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

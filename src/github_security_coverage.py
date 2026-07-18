@@ -759,12 +759,24 @@ def collect_security_coverage(
     ):
         raise SecurityCoverageError("request budget limits exceed the bounded contract")
     if prior_receipt is not None:
+        prior_expected_count = _mapping(prior_receipt.get("cohort")).get(
+            "expected_count"
+        )
+        if not isinstance(prior_expected_count, int):
+            raise SecurityCoverageError(
+                "prior receipt cohort expected_count is invalid"
+            )
         validate_security_coverage_receipt(
             prior_receipt,
             max_age_hours=24 * 365,
-            expected_cohort_count=expected_cohort_count,
+            expected_cohort_count=prior_expected_count,
             now=now,
         )
+        if prior_expected_count != expected_cohort_count:
+            # A valid receipt for the previous bounded cohort cannot safely
+            # supply conditional-request or eligibility hints for the new one.
+            # Ignore it so the policy transition can produce fresh evidence.
+            prior_receipt = None
     cohort = derive_default_attention_cohort(
         portfolio_truth, expected_count=expected_cohort_count
     )
