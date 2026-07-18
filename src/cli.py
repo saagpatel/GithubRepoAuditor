@@ -56,6 +56,7 @@ from src.app.portfolio_analysis import (
 )
 from src.app.improvement_application import _run_apply_improvements_mode
 from src.app.semantic_search import run_semantic_search_mode
+from src.github_security_coverage import DEFAULT_EXPECTED_GITHUB_COHORT_COUNT
 
 
 # Emitted at most once per process when legacy flat invocation is used.
@@ -460,6 +461,16 @@ def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         help="Freshness window for GitHub security observations (default: 24)",
     )
     p.add_argument(
+        "--portfolio-truth-security-cohort-count",
+        type=int,
+        default=DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+        metavar="COUNT",
+        help=(
+            "Expected security cohort size; must match the receipt collection "
+            f"contract (default: {DEFAULT_EXPECTED_GITHUB_COHORT_COUNT})"
+        ),
+    )
+    p.add_argument(
         "--portfolio-truth-allow-empty-notion",
         action="store_true",
         help=(
@@ -722,6 +733,16 @@ def build_parser() -> argparse.ArgumentParser:
         default=24,
         metavar="HOURS",
         help="Freshness window for GitHub security observations (default: 24)",
+    )
+    parser.add_argument(
+        "--portfolio-truth-security-cohort-count",
+        type=int,
+        default=DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+        metavar="COUNT",
+        help=(
+            "Expected security cohort size; must match the receipt collection "
+            f"contract (default: {DEFAULT_EXPECTED_GITHUB_COHORT_COUNT})"
+        ),
     )
     parser.add_argument(
         "--portfolio-truth-allow-empty-notion",

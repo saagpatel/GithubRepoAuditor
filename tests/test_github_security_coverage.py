@@ -529,6 +529,24 @@ def test_receipt_loader_uses_embedded_provenance_not_newer_mtime(
     )
 
 
+def test_receipt_loader_honors_explicit_nondefault_cohort_count(
+    tmp_path: Path,
+) -> None:
+    receipt = _collect(cohort_count=3)
+    canonical = tmp_path / GITHUB_SECURITY_RECEIPT_FILENAME
+    canonical.write_text(json.dumps(receipt))
+
+    assert load_security_coverage_by_full_name(output_dir=tmp_path, now=NOW) is None
+    loaded = load_security_coverage_by_full_name(
+        output_dir=tmp_path,
+        expected_cohort_count=3,
+        now=NOW,
+    )
+
+    assert loaded is not None
+    assert len(loaded.cohort_repositories) == 3
+
+
 def test_receipt_provenance_and_provider_timestamps_fail_closed(tmp_path: Path) -> None:
     receipt = _collect()
     receipt["producer"]["commit"] = "short"

@@ -10,6 +10,7 @@ from pathlib import Path
 from src.cache import ResponseCache
 from src.github_client import GitHubClient
 from src.github_security_coverage import (
+    DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
     GITHUB_SECURITY_RECEIPT_FILENAME,
     LoadedSecurityCoverage,
     SecurityCoverageError,
@@ -159,6 +160,7 @@ def load_security_coverage_by_full_name(
     output_dir: Path,
     receipt_path: Path | None = None,
     max_age_hours: int = 24,
+    expected_cohort_count: int = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
     now: datetime | None = None,
 ) -> LoadedSecurityCoverage | None:
     """Load the canonical provenance-bearing security receipt.
@@ -173,6 +175,7 @@ def load_security_coverage_by_full_name(
         return load_security_coverage_receipt(
             selected,
             max_age_hours=max_age_hours,
+            expected_cohort_count=expected_cohort_count,
             now=now,
         )
     except SecurityCoverageError as exc:

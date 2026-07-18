@@ -2413,6 +2413,87 @@ def test_report_subcommand_parses_allow_empty_notion_flag() -> None:
     assert default.portfolio_truth_allow_empty_notion is False
 
 
+def test_report_subcommand_parses_security_cohort_count() -> None:
+    from src.cli import build_subcommand_parser
+    from src.github_security_coverage import DEFAULT_EXPECTED_GITHUB_COHORT_COUNT
+
+    parser = build_subcommand_parser()
+    explicit = parser.parse_args(
+        [
+            "report",
+            "testuser",
+            "--portfolio-truth",
+            "--portfolio-truth-security-cohort-count",
+            "3",
+        ]
+    )
+    default = parser.parse_args(["report", "testuser", "--portfolio-truth"])
+
+    assert explicit.portfolio_truth_security_cohort_count == 3
+    assert (
+        default.portfolio_truth_security_cohort_count
+        == DEFAULT_EXPECTED_GITHUB_COHORT_COUNT
+    )
+
+
+def test_portfolio_truth_app_threads_security_cohort_count(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from types import SimpleNamespace
+
+    from src.app.portfolio_truth import run_portfolio_truth_mode
+
+    captured: dict[str, object] = {}
+
+    def fake_security_loader(**kwargs):
+        captured.update(kwargs)
+        return None
+
+    def fake_publish(**_kwargs):
+        return SimpleNamespace(
+            latest_path=tmp_path / "latest.json",
+            snapshot_path=tmp_path / "history.json",
+            registry_output=tmp_path / "registry.md",
+            portfolio_report_output=tmp_path / "report.md",
+            project_count=0,
+            registry_changed=False,
+            report_changed=False,
+        )
+
+    monkeypatch.setattr(
+        "src.app.portfolio_truth.load_security_coverage_by_full_name",
+        fake_security_loader,
+    )
+    monkeypatch.setattr("src.app.portfolio_truth.publish_portfolio_truth", fake_publish)
+    monkeypatch.setattr(
+        "src.app.portfolio_truth.load_live_repo_status_by_name", lambda **_kwargs: {}
+    )
+    monkeypatch.setenv("GHRA_REQUIRE_PRODUCER_EVIDENCE", "0")
+    args = SimpleNamespace(
+        output_dir=str(tmp_path / "output"),
+        workspace_root=str(tmp_path),
+        registry_output=str(tmp_path / "registry.md"),
+        portfolio_report_output=str(tmp_path / "report.md"),
+        registry=None,
+        catalog=None,
+        username="testuser",
+        token=None,
+        no_cache=True,
+        portfolio_truth_include_release_count=False,
+        portfolio_truth_include_security=True,
+        portfolio_truth_security_receipt=None,
+        portfolio_truth_security_max_age_hours=12,
+        portfolio_truth_security_cohort_count=3,
+        portfolio_truth_allow_empty_notion=False,
+    )
+
+    run_portfolio_truth_mode(args)
+
+    assert captured["expected_cohort_count"] == 3
+    assert captured["max_age_hours"] == 12
+
+
 def test_portfolio_truth_app_passes_validated_producer_receipt_to_publisher(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
