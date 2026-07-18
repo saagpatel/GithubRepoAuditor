@@ -241,7 +241,6 @@ def test_live_catalog_matches_operator_attention_reconciliation() -> None:
         "SignalDecay",
         "Afterimage",
         "Liminal",
-        "GPT_RAG",
         "DeepTank",
         "BattleGrid",
         "OddworksCabinet",
@@ -253,6 +252,7 @@ def test_live_catalog_matches_operator_attention_reconciliation() -> None:
     }
     for repo_name in manual_only:
         assert catalog["repos"][repo_name.lower()]["lifecycle_state"] == "manual-only"
+    assert catalog["repos"]["gpt_rag"]["lifecycle_state"] == "dormant"
 
 
 def test_catalog_entry_matches_full_name_then_bare_name():

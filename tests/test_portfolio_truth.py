@@ -554,6 +554,11 @@ def test_live_catalog_produces_exact_tier_zero_attention_semantics(
     }
     assert registry_by_key["supp:personal-ops"]["lifecycle_state"] == "active"
     assert registry_by_key["supp:personal-ops"]["group_key"] == "operator_infra"
+    coverage_by_source = {
+        row["source"]: row for row in result.snapshot.coverage
+    }
+    assert coverage_by_source["workspace"]["project_count"] == 15
+    assert coverage_by_source["supplementary_registry"]["project_count"] == 1
     assert (
         result.catalog_data["repos"]["personal-ops"]["lifecycle_state"] == "active"
     )
@@ -698,6 +703,18 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
             risk_entry={"security_risk": False},
         )
         == "manual-only"
+    )
+    assert (
+        _attention_state_for(
+            activity_status="active",
+            archived=False,
+            lifecycle_state="dormant",
+            operating_path="maintain",
+            category="infrastructure",
+            path_override="",
+            risk_entry={"security_risk": False},
+        )
+        == "parked"
     )
     assert (
         _attention_state_for(

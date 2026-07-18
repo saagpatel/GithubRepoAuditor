@@ -417,6 +417,11 @@ def _build_coverage_envelope(
     notion_context_carried_forward: bool,
     notion_context_rows: int,
 ) -> list[dict[str, Any]]:
+    workspace_project_count = sum(
+        project.identity.top_level_dir != "supplementary"
+        for project in projects
+    )
+    supplementary_project_count = len(projects) - workspace_project_count
     complete = sum(
         project.security.coverage_state == "complete" for project in projects
     )
@@ -447,8 +452,12 @@ def _build_coverage_envelope(
     git_observed = sum(
         project.repository_state.get("state") == "observed" for project in projects
     )
-    return [
-        {"source": "workspace", "state": "observed", "project_count": len(projects)},
+    coverage = [
+        {
+            "source": "workspace",
+            "state": "observed",
+            "project_count": workspace_project_count,
+        },
         {
             "source": "git",
             "state": "observed" if git_observed else "unknown",
@@ -487,6 +496,15 @@ def _build_coverage_envelope(
             "observed_count": notion_context_rows,
         },
     ]
+    if supplementary_project_count:
+        coverage.append(
+            {
+                "source": "supplementary_registry",
+                "state": "observed",
+                "project_count": supplementary_project_count,
+            }
+        )
+    return coverage
 
 
 def _build_input_envelope(
@@ -1312,6 +1330,8 @@ def _attention_state_for(
         return "experiment"
     if lifecycle_state == "manual-only":
         return "manual-only"
+    if lifecycle_state == "dormant":
+        return "parked"
     if risk_entry.get("security_risk"):
         return "decision-needed"
     if lifecycle_state == "active" and operating_path == "maintain":

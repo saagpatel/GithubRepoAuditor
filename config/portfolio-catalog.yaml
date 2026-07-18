@@ -710,7 +710,7 @@ repos:
     category: vanity
   GPT_RAG:
     owner: d
-    lifecycle_state: manual-only
+    lifecycle_state: dormant
     review_cadence: monthly
     operating_path: maintain
     category: infrastructure
