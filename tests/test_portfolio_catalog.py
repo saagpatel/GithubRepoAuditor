@@ -186,7 +186,9 @@ def test_live_catalog_matches_operator_attention_reconciliation() -> None:
         "bridge-db": "infrastructure",
         "GithubRepoAuditor": "infrastructure",
         "PortfolioCommandCenter": "infrastructure",
+        "personal-ops": "infrastructure",
         "saagpatel/operant": "infrastructure",
+        "AIGCCore": "infrastructure",
         "portfolio-index": "commercial",
         "operator-os-explainer": "commercial",
     }
@@ -232,7 +234,6 @@ def test_live_catalog_matches_operator_attention_reconciliation() -> None:
         "portfolio-mcp",
         "Lazarus",
         "peer-agent-tools",
-        "AIGCCore",
         "ApplyKit",
         "JobCommandCenter",
         "AIWorkFlow",

@@ -38,6 +38,7 @@ from src.portfolio_truth_types import (
     SecurityFields,
     display_activity_status,
 )
+from src.project_registry import DEFAULT_SUPPLEMENTARY
 from src.registry_parser import _normalize
 
 logger = logging.getLogger(__name__)
@@ -262,6 +263,9 @@ def build_portfolio_truth_snapshot(
         now=now,
         exclusion_counts=exclusion_counts,
     )
+    workspace_projects.extend(
+        _cataloged_supplementary_projects(catalog_data=catalog_data, now=now)
+    )
     projects = [
         _build_truth_project(
             raw_project,
@@ -353,6 +357,54 @@ def build_portfolio_truth_snapshot(
     return PortfolioTruthBuildResult(
         snapshot=snapshot, catalog_data=catalog_data, legacy_rows=legacy_rows
     )
+
+
+def _cataloged_supplementary_projects(
+    *, catalog_data: dict[str, Any], now: datetime
+) -> list[dict[str, Any]]:
+    """Promote explicitly cataloged repo-less Operator OS identities into truth."""
+
+    projects: list[dict[str, Any]] = []
+    for supplementary in DEFAULT_SUPPLEMENTARY:
+        name = str(supplementary.get("display_name") or "").strip()
+        canonical_key = str(supplementary.get("canonical_key") or "").strip()
+        if not name or not canonical_key:
+            continue
+        catalog_entry = catalog_entry_for_repo(
+            {"name": name, "full_name": name, "path": canonical_key},
+            catalog_data,
+        )
+        if not catalog_entry.get("has_explicit_entry"):
+            continue
+        projects.append(
+            {
+                "name": name,
+                "project_path": None,
+                "path": canonical_key,
+                "top_level_dir": "supplementary",
+                "group_entry": {},
+                "has_git": False,
+                "repo_full_name": "",
+                "default_branch": "",
+                "context_files": [],
+                "context_quality": "none",
+                "primary_context_file": "AGENTS.md",
+                "project_summary_present": False,
+                "current_state_present": False,
+                "stack_present": False,
+                "run_instructions_present": False,
+                "known_risks_present": False,
+                "next_recommended_move_present": False,
+                "missing_context_fields": [],
+                "supporting_context_files": [],
+                "stack": ["Unknown"],
+                "last_meaningful_activity_at": None,
+                "inferred_tool_provenance": "",
+                "now": now,
+                "source": "supplementary-registry",
+            }
+        )
+    return projects
 
 
 def _build_coverage_envelope(
@@ -764,10 +816,11 @@ def _build_truth_project(
         provenance=provenance,
         readme_char_count=derived_readme_char_count,
     )
+    raw_source = str(raw_project.get("source") or "workspace")
     provenance["derived.context_quality"] = {
-        "source": "workspace+catalog"
+        "source": f"{raw_source}+catalog"
         if context_quality != raw_context_quality
-        else "workspace",
+        else raw_source,
         "detail": (
             f"{raw_context_quality}->{context_quality}"
             if context_quality != raw_context_quality
@@ -896,7 +949,7 @@ def _build_truth_project(
         automation_eligible=declared_values["automation_eligible"],
     )
     provenance["derived.last_meaningful_activity_at"] = {
-        "source": "git" if raw_project["has_git"] and last_activity else "workspace",
+        "source": "git" if raw_project["has_git"] and last_activity else raw_source,
         "detail": "derived",
     }
     provenance["derived.activity_status"] = {
@@ -912,15 +965,15 @@ def _build_truth_project(
         "detail": attention_state,
     }
     provenance["derived.stack"] = {
-        "source": "workspace",
+        "source": raw_source,
         "detail": ", ".join(raw_project["stack"]),
     }
     provenance["derived.context_files"] = {
-        "source": "workspace",
+        "source": raw_source,
         "detail": str(len(raw_project["context_files"])),
     }
     provenance["derived.primary_context_file"] = {
-        "source": "workspace",
+        "source": raw_source,
         "detail": raw_project["primary_context_file"],
     }
     for field in (
@@ -932,7 +985,7 @@ def _build_truth_project(
         "next_recommended_move_present",
     ):
         provenance[f"derived.{field}"] = {
-            "source": "workspace",
+            "source": raw_source,
             "detail": str(bool(raw_project[field])).lower(),
         }
 
@@ -1252,6 +1305,11 @@ def _attention_state_for(
         return "experiment"
     if lifecycle_state == "manual-only":
         return "manual-only"
+    if lifecycle_state == "active" and operating_path == "maintain":
+        if category == "infrastructure":
+            return "active-infra"
+        if category == "commercial":
+            return "active-product"
     if activity_status == "stale":
         # A declared finish path is itself an unresolved operator decision. It can
         # remain valid while the default branch is stale (for example, when work is

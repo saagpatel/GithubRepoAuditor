@@ -76,6 +76,20 @@ def test_build_includes_supplementary_projects_from_defaults():
     assert registry["entry_count"] == len(SNAPSHOT["projects"]) + 2
 
 
+def test_build_does_not_duplicate_supplementary_project_promoted_into_truth():
+    snapshot = _snapshot(_ident("supp:personal-ops", "personal-ops", None))
+
+    registry = build_project_registry(snapshot, overrides_config_path=None)
+    personal_ops = [
+        entry
+        for entry in registry["entries"]
+        if entry["canonical_key"] == "supp:personal-ops"
+    ]
+
+    assert len(personal_ops) == 1
+    assert personal_ops[0]["source"] == "auditor"
+
+
 def test_supp_key_is_emitted_for_repo_less_entries_only():
     # A repo-backed and a repo-less auditor project side by side.
     snapshot = _snapshot(

@@ -30,6 +30,7 @@ from src.portfolio_truth_sources import (
     load_safe_notion_project_context,
 )
 from src.portfolio_truth_validate import validate_portfolio_report_markdown
+from src.project_registry import build_project_registry
 from src.registry_parser import parse_registry
 
 
@@ -450,6 +451,121 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     assert "open_high_critical" in snapshot_dict["projects"][0]["security"]
 
 
+def test_live_catalog_produces_exact_tier_zero_attention_semantics(
+    tmp_path: Path,
+) -> None:
+    """Pin the operator's Tier 0 policy at generated-output level.
+
+    personal-ops lives outside the audited Projects workspace, so portfolio truth
+    carries the nine repo-backed logical identities while the generated canonical
+    project registry carries personal-ops as its established supplementary identity.
+    """
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    now = datetime(2026, 7, 18, 12, tzinfo=timezone.utc)
+    repo_projects = {
+        "MCPAudit": None,
+        "mcp-trust": None,
+        "bridge-db": None,
+        "GithubRepoAuditor": None,
+        "PortfolioCommandCenter": None,
+        "operant-public": "saagpatel/operant",
+        "AIGCCore": None,
+        "portfolio-index": None,
+        "operator-os-explainer": None,
+    }
+    supporting_or_retired = (
+        "mcpaudit-web",
+        "mcpforge",
+        "notification-hub",
+        "cross-system-smoke",
+        "continuity",
+        "ApplyKit",
+    )
+
+    for name, remote in {
+        **repo_projects,
+        **dict.fromkeys(supporting_or_retired),
+    }.items():
+        project = workspace / name
+        project.mkdir()
+        readme = project / "README.md"
+        _write(readme, f"# {name}\n\nTier policy fixture.\n")
+        _set_mtime(readme, now.timestamp())
+        if remote:
+            subprocess.run(
+                ["git", "init"],
+                cwd=project,
+                capture_output=True,
+                check=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "remote",
+                    "add",
+                    "origin",
+                    f"https://github.com/{remote}.git",
+                ],
+                cwd=project,
+                capture_output=True,
+                check=True,
+            )
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=workspace,
+        catalog_path=Path(__file__).parents[1] / "config" / "portfolio-catalog.yaml",
+        include_notion=False,
+        now=now,
+    )
+    active = {}
+    by_display_name = {}
+    for project in result.snapshot.projects:
+        by_display_name[project.identity.display_name] = project
+        if project.derived.attention_state not in {"active-infra", "active-product"}:
+            continue
+        logical_key = (
+            project.identity.repo_full_name or project.identity.display_name
+        )
+        active[logical_key] = project.derived.attention_state
+
+    assert active == {
+        "MCPAudit": "active-infra",
+        "mcp-trust": "active-infra",
+        "bridge-db": "active-infra",
+        "GithubRepoAuditor": "active-infra",
+        "PortfolioCommandCenter": "active-infra",
+        "personal-ops": "active-infra",
+        "saagpatel/operant": "active-infra",
+        "AIGCCore": "active-infra",
+        "portfolio-index": "active-product",
+        "operator-os-explainer": "active-product",
+    }
+    for name in supporting_or_retired:
+        assert by_display_name[name].derived.attention_state == "manual-only"
+
+    registry = build_project_registry(
+        result.snapshot.to_dict(),
+        overrides_config_path=None,
+    )
+    registry_by_key = {
+        entry["canonical_key"]: entry for entry in registry["entries"]
+    }
+    assert registry_by_key["supp:personal-ops"]["lifecycle_state"] == "active"
+    assert (
+        result.catalog_data["repos"]["personal-ops"]["lifecycle_state"] == "active"
+    )
+    personal_ops = by_display_name["personal-ops"]
+    assert personal_ops.identity.project_key == "supp:personal-ops"
+    assert personal_ops.derived.activity_status == "stale"
+    assert personal_ops.derived.attention_state == "active-infra"
+    assert (
+        personal_ops.provenance["derived.context_quality"]["source"]
+        == "supplementary-registry"
+    )
+
+
 def test_truth_snapshot_operating_path_catalog_field_matches_legacy_disposition(
     portfolio_workspace: Path,
     legacy_registry: Path,
@@ -639,7 +755,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
             path_override="",
             risk_entry={"security_risk": False},
         )
-        == "parked"
+        == "active-product"
     )
 
 

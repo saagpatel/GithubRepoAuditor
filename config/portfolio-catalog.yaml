@@ -103,7 +103,7 @@ repos:
     owner: d
     purpose: local-first AI governance core with offline enforcement and hash-chained
       audit exports
-    lifecycle_state: manual-only
+    lifecycle_state: active
     criticality: high
     review_cadence: weekly
     operating_path: maintain
@@ -1480,6 +1480,19 @@ repos:
     lifecycle_state: archived
     review_cadence: quarterly
     operating_path: archive
+  personal-ops:
+    owner: d
+    purpose: local operator control plane for cross-system workflows, approvals, and recovery
+    lifecycle_state: active
+    criticality: high
+    review_cadence: weekly
+    operating_path: maintain
+    category: infrastructure
+    tool_provenance: codex
+    maturity_program: maintain
+    target_maturity: operating
+    automation_eligible: false
+    notes: Tier-0 Operator OS project. The live checkout is outside the Projects workspace and is represented in generated registry output as supp:personal-ops.
   # --- 2026-07-17 Portfolio Tribunal: contracts for previously uncataloged KEEP repos ---
   Temper:
     owner: d

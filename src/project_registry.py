@@ -437,7 +437,10 @@ def build_project_registry(
         _Entry(p["identity"], (p.get("declared") or {}).get("lifecycle_state"), "auditor", None)
         for p in snapshot.get("projects", [])
     ]
+    existing_keys = {entry.canonical_key for entry in entries}
     for supp in supplementary:
+        if supp["canonical_key"] in existing_keys:
+            continue
         entries.append(
             _Entry(
                 {
@@ -451,6 +454,7 @@ def build_project_registry(
                 supp.get("note"),
             )
         )
+        existing_keys.add(supp["canonical_key"])
 
     by_key = {e.canonical_key: e for e in entries}
     index: dict[str, _Entry] = {}
