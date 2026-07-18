@@ -1285,6 +1285,7 @@ def load_security_coverage_receipt(
     path: Path,
     *,
     max_age_hours: int = 24,
+    expected_cohort_count: int = 16,
     now: datetime | None = None,
 ) -> LoadedSecurityCoverage:
     try:
@@ -1300,6 +1301,7 @@ def load_security_coverage_receipt(
     return validate_security_coverage_receipt(
         payload,
         max_age_hours=max_age_hours,
+        expected_cohort_count=expected_cohort_count,
         now=now,
         source_path=str(path),
     )
@@ -1390,6 +1392,7 @@ def main() -> None:
             loaded = load_security_coverage_receipt(
                 args.output,
                 max_age_hours=args.max_age_hours,
+                expected_cohort_count=args.expected_cohort_count,
             )
             print(
                 json.dumps(
