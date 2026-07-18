@@ -186,7 +186,7 @@ def test_live_catalog_matches_operator_attention_reconciliation() -> None:
         "bridge-db": "infrastructure",
         "GithubRepoAuditor": "infrastructure",
         "PortfolioCommandCenter": "infrastructure",
-        "operant-public": "infrastructure",
+        "saagpatel/operant": "infrastructure",
         "portfolio-index": "commercial",
         "operator-os-explainer": "commercial",
     }
@@ -195,6 +195,25 @@ def test_live_catalog_matches_operator_attention_reconciliation() -> None:
         assert entry["lifecycle_state"] == "active"
         assert entry["operating_path"] == "maintain"
         assert entry["category"] == category
+
+    # OPERANT has one logical identity with two catalog lookup keys: the canonical
+    # GitHub full name and the local checkout basename. Normalize that alias before
+    # asserting exclusivity so a duplicate lookup contract is not mistaken for a
+    # ninth project.
+    operant_alias = catalog["repos"]["operant-public"]
+    canonical_operant = catalog["repos"]["saagpatel/operant"]
+    for field in ("lifecycle_state", "operating_path", "category"):
+        assert operant_alias[field] == canonical_operant[field]
+
+    attention_aliases = {"operant-public": "saagpatel/operant"}
+    eligible_catalog_keys = {
+        attention_aliases.get(repo_name, repo_name)
+        for repo_name, entry in catalog["repos"].items()
+        if entry["lifecycle_state"] == "active"
+        and entry["operating_path"] in {"maintain", "finish"}
+        and entry["category"] in {"infrastructure", "commercial"}
+    }
+    assert eligible_catalog_keys == {name.lower() for name in tier_zero}
 
     # Tier 1, Tier 2, and explicitly unranked projects remain available only when
     # the operator asks for them. They do not create default portfolio attention.
@@ -229,6 +248,7 @@ def test_live_catalog_matches_operator_attention_reconciliation() -> None:
         "book-two-manuscript",
         "ccusage",
         "manipulable-library",
+        "rag-knowledge-base",
     }
     for repo_name in manual_only:
         assert catalog["repos"][repo_name.lower()]["lifecycle_state"] == "manual-only"

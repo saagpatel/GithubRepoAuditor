@@ -1090,7 +1090,7 @@ repos:
     notes: Tier-0 public workshop and canonical saagarpatel.dev product surface. Keep in default attention as the public front door for the core portfolio.
   rag-knowledge-base:
     owner: d
-    lifecycle_state: active
+    lifecycle_state: manual-only
     review_cadence: weekly
     operating_path: maintain
     category: infrastructure
