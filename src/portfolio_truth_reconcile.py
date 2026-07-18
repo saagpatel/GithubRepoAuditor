@@ -382,7 +382,11 @@ def _cataloged_supplementary_projects(
                 "project_path": None,
                 "path": canonical_key,
                 "top_level_dir": "supplementary",
-                "group_entry": {},
+                "group_entry": {
+                    "group_key": str(
+                        supplementary.get("group_key") or "operator_infra"
+                    )
+                },
                 "has_git": False,
                 "repo_full_name": "",
                 "default_branch": "",
@@ -726,6 +730,9 @@ def _build_truth_project(
 ) -> PortfolioTruthProject:
     relative_path = raw_project["path"]
     group_entry = group_entry_for_path(relative_path, catalog_data)
+    supplementary_group = raw_project.get("group_entry")
+    if isinstance(supplementary_group, dict):
+        group_entry = {**group_entry, **supplementary_group}
     repo_entry = catalog_entry_for_repo(
         {
             "name": raw_project["name"],
@@ -1305,6 +1312,8 @@ def _attention_state_for(
         return "experiment"
     if lifecycle_state == "manual-only":
         return "manual-only"
+    if risk_entry.get("security_risk"):
+        return "decision-needed"
     if lifecycle_state == "active" and operating_path == "maintain":
         if category == "infrastructure":
             return "active-infra"
@@ -1316,8 +1325,6 @@ def _attention_state_for(
         # on a release branch or waiting at a human/publication gate), so do not
         # silently collapse it back into the parked pool.
         return "decision-needed" if operating_path == "finish" else "parked"
-    if risk_entry.get("security_risk"):
-        return "decision-needed"
     if activity_status in {"active", "recent"} and operating_path in {
         "maintain",
         "finish",
