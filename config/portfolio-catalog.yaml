@@ -161,11 +161,13 @@ repos:
     tool_provenance: claude-code
   evals:
     owner: d
+    purpose: repo-native eval harness comparing AI coding work across portfolio subprojects
     lifecycle_state: active
     review_cadence: weekly
     operating_path: experiment
   engraph:
     owner: d
+    purpose: markdown-vault knowledge graph with 5-lane hybrid search queryable by any AI agent
     lifecycle_state: active
     review_cadence: quarterly
     operating_path: maintain
@@ -197,6 +199,7 @@ repos:
     tool_provenance: claude-code
   reliability-vault:
     owner: d
+    purpose: reproducibility and change-receipt layer for at-risk decision-critical public datasets
     lifecycle_state: active
     review_cadence: quarterly
     operating_path: maintain
@@ -209,6 +212,7 @@ repos:
       a settled portfolio-recovery exclusion).
   JSMTicketAnalyticsExport:
     owner: d
+    purpose: full-export Jira Service Management ticket pipeline to CSV and JSON with an audit manifest
     lifecycle_state: active
     review_cadence: weekly
     operating_path: maintain
@@ -374,18 +378,21 @@ repos:
     doctor_standard: full
   Chromafield:
     owner: d
+    purpose: GPU-accelerated Metal particle-field canvas for iPhone and iPad
     lifecycle_state: active
     review_cadence: weekly
     operating_path: maintain
     tool_provenance: claude-code
   Seismoscope:
     owner: d
+    purpose: iPhone seismograph with STA/LTA event detection cross-referenced against USGS events
     lifecycle_state: active
     review_cadence: weekly
     operating_path: maintain
     tool_provenance: claude-code
   AIWorkFlow:
     owner: d
+    purpose: monorepo of Claude-backed client automation tools behind a Next.js engagement portal
     lifecycle_state: active
     review_cadence: monthly
     operating_path: maintain
@@ -451,6 +458,7 @@ repos:
     tool_provenance: claude-code
   AssistSupport:
     owner: d
+    purpose: local-LLM IT support responder with hybrid intent classification and TF-IDF retrieval
     lifecycle_state: active
     review_cadence: weekly
     operating_path: maintain
@@ -458,6 +466,7 @@ repos:
     tool_provenance: codex
   bridge-db:
     owner: d
+    purpose: live SQLite-backed MCP coordination spine consumed by Claude.ai, Claude Code, Codex, notion-os, and personal-ops
     lifecycle_state: active
     review_cadence: weekly
     operating_path: maintain
@@ -473,6 +482,7 @@ repos:
     tool_provenance: claude-code
   DNSWatcher:
     owner: d
+    purpose: backend iterative DNS trace service rendered as the flagship Systems Explainer Arcade exhibit
     lifecycle_state: active
     review_cadence: weekly
     operating_path: maintain
@@ -535,6 +545,7 @@ repos:
     notes: Fresh v0.1.0 Python/FastAPI/Typer repo with v1 launch runbook; public launch is gated on real catalog seeding, sandboxed engine scans, live deploy smoke, and outreach loop validation.
   ModelColosseum:
     owner: d
+    purpose: local-first macOS evaluation lab comparing local models with uncertainty-aware repeated trials
     lifecycle_state: active
     review_cadence: weekly
     operating_path: maintain
@@ -561,6 +572,7 @@ repos:
     tool_provenance: claude-code
   notification-hub:
     owner: d
+    purpose: local daemon routing AI-tool events to channels by deterministic urgency rules
     lifecycle_state: manual-only
     review_cadence: weekly
     operating_path: maintain
@@ -618,6 +630,7 @@ repos:
     tool_provenance: claude-code
   TradeOffAtlas:
     owner: d
+    purpose: local-first desktop multi-criteria decision analysis with live sensitivity analysis
     lifecycle_state: active
     review_cadence: weekly
     operating_path: maintain
@@ -626,6 +639,7 @@ repos:
     automation_eligible: true
   Afterimage:
     owner: d
+    purpose: on-device iOS historical-photo overlay matching camera shots against a bundled geolocated archive index
     lifecycle_state: active
     review_cadence: weekly
     operating_path: maintain
@@ -633,6 +647,7 @@ repos:
     tool_provenance: claude-code
   Calibrate:
     owner: d
+    purpose: daily iOS prediction game measuring and training confidence calibration
     lifecycle_state: active
     review_cadence: weekly
     operating_path: maintain
@@ -914,6 +929,7 @@ repos:
     category: it-work
   Notion:
     owner: d
+    purpose: local automation layer turning Notion into a project and portfolio control system across GitHub and Vercel
     lifecycle_state: active
     review_cadence: weekly
     operating_path: maintain
@@ -938,6 +954,7 @@ repos:
     notes: Keep non-default; use canonical PortfolioCommandCenter for local infrastructure planning.
   Pressfield:
     owner: d
+    purpose: local-first macOS writing app where idle prose visibly decays until typing resumes
     lifecycle_state: active
     review_cadence: weekly
     operating_path: maintain
@@ -953,6 +970,7 @@ repos:
     operating_path: maintain
   cross-system-smoke:
     owner: d
+    purpose: shared read-only smoke checks verifying the local operating layer across agents
     lifecycle_state: active
     review_cadence: weekly
     operating_path: maintain
@@ -1151,6 +1169,7 @@ repos:
     tool_provenance: claude-code
   cost-tracker:
     owner: d
+    purpose: local MCP server for live in-session AI cost visibility parsed from local usage data
     lifecycle_state: manual-only
     review_cadence: monthly
     operating_path: maintain
@@ -1158,6 +1177,7 @@ repos:
     tool_provenance: claude-code
   portfolio-health:
     owner: d
+    purpose: read-oriented MCP cache surfacing active, stale, and unshipped portfolio projects
     lifecycle_state: manual-only
     review_cadence: monthly
     operating_path: maintain
@@ -1266,18 +1286,21 @@ repos:
   # --- 2026-07-04 portfolio working-set reconciliation: finish contracts ---
   agent-session-replay:
     owner: d
+    purpose: local-first failure-forensics viewer for Claude Code and Codex session transcripts
     lifecycle_state: active
     review_cadence: weekly
     operating_path: finish
     maturity_program: finish
   egress-guard-oss:
     owner: d
+    purpose: destination-aware default-deny egress control enforced at the agent tool-dispatch boundary
     lifecycle_state: active
     review_cadence: weekly
     operating_path: finish
     maturity_program: finish
   proof-pr:
     owner: d
+    purpose: standard and CLI for pull requests carrying a machine-readable proof bundle
     lifecycle_state: active
     review_cadence: weekly
     operating_path: finish
@@ -1290,12 +1313,14 @@ repos:
     maturity_program: finish
   agent-permission-diff-bot:
     owner: d
+    purpose: semantic correlator surfacing agent-facing permission changes in pull requests
     lifecycle_state: active
     review_cadence: weekly
     operating_path: finish
     maturity_program: finish
   mcpaudit-web:
     owner: d
+    purpose: hosted paste-your-config MCP trust report front door over the MCPAudit engine
     lifecycle_state: active
     review_cadence: weekly
     operating_path: finish
@@ -1303,42 +1328,50 @@ repos:
   # --- 2026-07-04 portfolio working-set reconciliation: maintain contracts ---
   shadow-mcp:
     owner: d
+    purpose: local discovery and risk-grading of the MCP servers actually present on this machine
     lifecycle_state: active
     review_cadence: monthly
     operating_path: maintain
   portfolio-mcp:
     owner: d
+    purpose: agent-native MCP layer serving saagarpatel.dev writing, projects, and benchmark results
     lifecycle_state: manual-only
     review_cadence: monthly
     operating_path: maintain
     category: infrastructure
   harness-scorecard:
     owner: d
+    purpose: read-only A-F maturity grader for Claude Code and Codex agent harnesses
     lifecycle_state: active
     review_cadence: monthly
     operating_path: maintain
   ccq:
     owner: d
+    purpose: read-only DuckDB query CLI over local Claude Code transcript JSONL
     lifecycle_state: active
     review_cadence: monthly
     operating_path: maintain
   plumbline:
     owner: d
+    purpose: OpenTelemetry-compatible agent-trace schema with an offline decision-path scorer
     lifecycle_state: active
     review_cadence: monthly
     operating_path: maintain
   agent-flight-recorder:
     owner: d
+    purpose: public-core deterministic NDJSON timeline contract for local-first agent observability
     lifecycle_state: active
     review_cadence: monthly
     operating_path: maintain
   agent-flight-recorder-local:
     owner: d
+    purpose: private local adapters feeding real machine sources into the public agent-flight-recorder core
     lifecycle_state: active
     review_cadence: monthly
     operating_path: maintain
   reliquary:
     owner: d
+    purpose: subagent-native memory protocol delivered as an MCP server that harnesses consume
     lifecycle_state: active
     review_cadence: monthly
     operating_path: maintain
@@ -1391,6 +1424,7 @@ repos:
     notes: Session 2026-07-11 one-week and 32-scenario repeated dogfood matrices passed; a private connector remains unjustified. Keep outside default attention unless explicitly reactivated.
   continuity:
     owner: d
+    purpose: encrypted backup and disaster-recovery contract for the local portfolio with rehearsed restore verification
     lifecycle_state: manual-only
     review_cadence: weekly
     operating_path: maintain
@@ -1423,6 +1457,7 @@ repos:
     category: infrastructure
   mcp-kit:
     owner: d
+    purpose: shared zero-dependency toolbelt for the baked-corpus MCP server franchise
     lifecycle_state: active
     review_cadence: monthly
     operating_path: experiment
@@ -1471,6 +1506,7 @@ repos:
     operating_path: archive
   trust-receipt-generator:
     owner: d
+    purpose: honest receipt pages built from public-safe proof artifacts
     lifecycle_state: active
     review_cadence: quarterly
     operating_path: maintain
