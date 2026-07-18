@@ -152,8 +152,17 @@ def derive_default_attention_cohort(
     portfolio_truth: dict[str, Any],
     *,
     expected_count: int = 16,
+    owner: str | None = None,
 ) -> tuple[str, ...]:
-    """Return the canonical default-attention GitHub cohort, failing on expansion."""
+    """Return the canonical default-attention GitHub cohort, failing on expansion.
+
+    When ``owner`` is given, repositories under a different owner are excluded.
+    A fork whose origin points upstream surfaces in portfolio truth under the
+    upstream owner; its security alerts require access the operator does not
+    hold and are not theirs to remediate. Default ``None`` preserves the
+    unfiltered behaviour.
+    """
+    owner_prefix = f"{owner.lower()}/" if owner else None
     repos: list[str] = []
     for project in portfolio_truth.get("projects") or []:
         if not isinstance(project, dict):
@@ -168,6 +177,10 @@ def derive_default_attention_cohort(
             # surface, so it cannot belong to a GitHub cohort. Skip rather than
             # fail -- an absent name is a legitimate state, unlike a malformed
             # one, which _canonical_repo still rejects below.
+            continue
+        if owner_prefix and not full_name.lower().startswith(owner_prefix):
+            # Not the operator's repository: alerts there need access they do
+            # not hold, and are not theirs to act on.
             continue
         repos.append(_canonical_repo(full_name))
     if len({repo.lower() for repo in repos}) != len(repos):
@@ -745,6 +758,7 @@ def collect_security_coverage(
     now: datetime | None = None,
     producer_commit: str | None = None,
     api_base_url: str | None = None,
+    owner: str | None = None,
 ) -> dict[str, Any]:
     """Collect the bounded default-attention cohort into a provenance receipt."""
     if not token:
@@ -764,7 +778,7 @@ def collect_security_coverage(
             now=now,
         )
     cohort = derive_default_attention_cohort(
-        portfolio_truth, expected_count=expected_cohort_count
+        portfolio_truth, expected_count=expected_cohort_count, owner=owner
     )
     commit = producer_commit
     if not commit:
@@ -1339,6 +1353,15 @@ def main() -> None:
     )
     parser.add_argument("--expected-cohort-count", type=int, default=16)
     parser.add_argument(
+        "--owner",
+        default=None,
+        help=(
+            "Restrict the cohort to repositories under this GitHub owner. "
+            "Forks whose origin points upstream otherwise pull third-party "
+            "repositories into the cohort."
+        ),
+    )
+    parser.add_argument(
         "--base-request-limit", type=int, default=DEFAULT_BASE_REQUEST_LIMIT
     )
     parser.add_argument(
@@ -1372,6 +1395,7 @@ def main() -> None:
             truth,
             token=os.environ.get("GITHUB_TOKEN"),
             expected_cohort_count=args.expected_cohort_count,
+            owner=args.owner,
             base_request_limit=args.base_request_limit,
             total_request_limit=args.total_request_limit,
             quota_reserve=args.quota_reserve,

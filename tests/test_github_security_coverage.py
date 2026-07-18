@@ -178,6 +178,36 @@ def test_cohort_skips_local_only_repos_without_a_remote() -> None:
     assert all(repo for repo in cohort)
 
 
+def test_cohort_excludes_repositories_owned_by_others() -> None:
+    """A repo you do not own is not your security surface.
+
+    Forks whose origin points upstream (e.g. ryoppippi/ccusage) surface in
+    portfolio truth under the upstream owner. Security alerts there require
+    admin/write you do not hold, and are not yours to remediate, so an explicit
+    owner filter must drop them.
+    """
+    truth = _truth(15)
+    truth["projects"].append(
+        {
+            "identity": {"repo_full_name": "someone-else/their-tool"},
+            "derived": {"attention_state": "active-infra"},
+        }
+    )
+
+    unfiltered = derive_default_attention_cohort(truth, expected_count=16)
+    assert "someone-else/their-tool" in unfiltered
+
+    filtered = derive_default_attention_cohort(truth, expected_count=15, owner="owner")
+    assert "someone-else/their-tool" not in filtered
+    assert len(filtered) == 15
+
+
+def test_cohort_owner_filter_is_case_insensitive() -> None:
+    truth = _truth(3)
+    cohort = derive_default_attention_cohort(truth, expected_count=3, owner="OWNER")
+    assert len(cohort) == 3
+
+
 def test_cohort_still_rejects_malformed_repository_names() -> None:
     """Skipping absent names must not weaken validation of present-but-garbage ones."""
     truth = _truth(15)
