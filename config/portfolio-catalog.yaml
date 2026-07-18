@@ -141,6 +141,7 @@ repos:
     target_maturity: operating
   BrowserHistoryVisualizer:
     owner: d
+    purpose: local Chromium browser-history analysis pipeline with a React time-spend dashboard
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
@@ -148,6 +149,7 @@ repos:
     tool_provenance: claude-code
   DecisionStressTest:
     owner: d
+    purpose: local-first structured decision workbench for medium-stakes professional choices
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: experiment
@@ -155,6 +157,7 @@ repos:
     doctor_standard: full
   Devil's Advocate:
     owner: d
+    purpose: Claude-backed four-part critique returning steelman, blind spots, assumptions, and killer questions
     lifecycle_state: active
     review_cadence: weekly
     operating_path: maintain
@@ -180,11 +183,13 @@ repos:
       a settled portfolio-recovery exclusion).
   EvolutionSandbox:
     owner: d
+    purpose: local-first browser evolution experiment lab rendered on Canvas
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: experiment
   HowMoneyMoves:
     owner: d
+    purpose: interactive explainer of US banking infrastructure from ACH through Fed settlement and SWIFT
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
@@ -192,6 +197,7 @@ repos:
     tool_provenance: claude-code
   JobMarketHeatmap:
     owner: d
+    purpose: macOS job-posting analytics app with spaCy skill extraction and interactive visualizations
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
@@ -242,6 +248,7 @@ repos:
     doctor_standard: full
   knowledgecore:
     owner: d
+    purpose: local-first encrypted document vault with SQLCipher storage and hybrid query
     lifecycle_state: manual-only
     review_cadence: weekly
     operating_path: maintain
@@ -249,6 +256,7 @@ repos:
     tool_provenance: codex
   OrbitMechanic:
     owner: d
+    purpose: browser puzzle game built on real Newtonian orbital physics with Verlet integration
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
@@ -294,6 +302,7 @@ repos:
     notes: Canonical operating project is OPERANT / saagpatel/operant; local checkout remains operant-public. operant-mcp is the shipped MCP distribution slice, not a separate active project.
   PageDiffBookmark:
     owner: d
+    purpose: background page-change tracker surfacing sentence-level diffs in a browser side panel
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
@@ -301,12 +310,14 @@ repos:
     tool_provenance: claude-code
   Recall:
     owner: d
+    purpose: offline Godot memory-palace builder with spaced-repetition review and room decay
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
     tool_provenance: claude-code
   ResumeEvolver:
     owner: d
+    purpose: private-first career evidence ledger generating traceable resume and changelog drafts
     lifecycle_state: dormant
     review_cadence: monthly
     operating_path: maintain
@@ -314,6 +325,7 @@ repos:
     doctor_standard: basic
   ScreenshottoDataSelect:
     owner: d
+    purpose: Chrome extension extracting selected table and chart data to CSV, JSON, TSV, or Markdown
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
@@ -336,18 +348,21 @@ repos:
       while CodeQL remains a manual follow-up.
   TabTriage:
     owner: d
+    purpose: local-first Chrome MV3 extension for grouping, suspending, archiving, and searching tabs
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
     tool_provenance: claude-code
   Terroir:
     owner: d
+    purpose: interactive 3D globe mapping a 12-dimensional flavor profile to any coordinate
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
     tool_provenance: claude-code
   Cartograph:
     owner: d
+    purpose: macOS procedural world-map generator simulating tectonics, erosion, climate, and settlement
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
@@ -400,6 +415,7 @@ repos:
     tool_provenance: claude-code
   job-search-2026:
     owner: d
+    purpose: private per-company tailored resume and cover-letter materials
     lifecycle_state: dormant
     review_cadence: monthly
     operating_path: maintain
@@ -418,6 +434,7 @@ repos:
     notes: Release-candidate branch and playtest packet exist; human cohort, signing, and publication gates remain open. Oddworks reactivated this lane on 2026-07-12.
   RedditSentimentAnalyzer:
     owner: d
+    purpose: local-first subreddit sentiment trend monitor with PRAW ingestion and VADER scoring
     lifecycle_state: dormant
     review_cadence: monthly
     operating_path: maintain
@@ -444,6 +461,7 @@ repos:
     tool_provenance: codex
   APIReverse:
     owner: d
+    purpose: API traffic capture and endpoint-pattern deduplication via browser extension or MITM proxy
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
@@ -451,6 +469,7 @@ repos:
     tool_provenance: claude-code
   ArguMap:
     owner: d
+    purpose: local-first macOS argument mapping tool with typed claim, evidence, and rebuttal nodes
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
@@ -475,6 +494,7 @@ repos:
     notes: Active operating-layer infrastructure, but scope-closed steady maintenance; surface only concrete bridge, sync, health, or cross-system state decisions.
   Codec:
     owner: d
+    purpose: local network traffic capture presented as a device conversation timeline
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
@@ -490,6 +510,7 @@ repos:
     category: vanity
   GlassLayer:
     owner: d
+    purpose: always-on-top macOS NSPanel desktop overlay for live logs, quotes, and system metrics
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
@@ -497,6 +518,7 @@ repos:
     tool_provenance: claude-code
   IncidentReview:
     owner: d
+    purpose: local-first macOS app for quarterly incident reviews with MTTD, MTTA, and MTTR computation
     lifecycle_state: archived
     review_cadence: quarterly
     operating_path: archive
@@ -504,6 +526,7 @@ repos:
     tool_provenance: codex
   ink:
     owner: d
+    purpose: local-first Markdown workspace where AI suggestions appear as margin overlay cards
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
@@ -511,6 +534,7 @@ repos:
     tool_provenance: claude-code
   Interruption Resume Studio:
     owner: d
+    purpose: desktop app capturing cognitive-state snapshots at interruption and tracking interruption patterns
     lifecycle_state: archived
     review_cadence: quarterly
     operating_path: archive
@@ -553,6 +577,7 @@ repos:
     tool_provenance: claude-code
   NetworkDecoder:
     owner: d
+    purpose: live capture and PCAP packet decoder from Ethernet through HTTP, DNS, and TLS
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
@@ -560,12 +585,14 @@ repos:
     tool_provenance: claude-code
   NetworkMapper:
     owner: d
+    purpose: local LAN scanner with ARP sweep, nmap enrichment, and a browser UI
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
     tool_provenance: claude-code
   NeuralNetwork:
     owner: d
+    purpose: in-browser neural network playground for building, training, and visualizing networks
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
@@ -581,6 +608,7 @@ repos:
     notes: Active operating-layer localhost daemon; surface runtime or operator-signal decisions only after fresh read-only verification.
   Premise:
     owner: d
+    purpose: open-source structured debate platform with typed argument trees and crux detection
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
@@ -588,6 +616,7 @@ repos:
     tool_provenance: claude-code
   Pulse Orbit:
     owner: d
+    purpose: macOS menu bar system monitor built on Tauri 2 and Rust
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
@@ -595,6 +624,7 @@ repos:
     tool_provenance: claude-code
   ReturnRadar:
     owner: d
+    purpose: local-first macOS tracker for return windows, rebate deadlines, and warranty expiry
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
@@ -616,6 +646,7 @@ repos:
       - signal-noise
   SpecCompanion:
     owner: d
+    purpose: desktop app producing evidence-backed executable requirements linked to source
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
@@ -623,6 +654,7 @@ repos:
     tool_provenance: codex
   thought-trails:
     owner: d
+    purpose: live D3 force-directed graph of local Ollama reasoning tokens as they stream
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
@@ -654,6 +686,7 @@ repos:
     tool_provenance: claude-code
   GhostRoutes:
     owner: d
+    purpose: privacy-first iOS app surfacing abandoned locations from Google Location History
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
@@ -674,24 +707,28 @@ repos:
     notes: Verified unsigned device Release bundle and external cohort packet exist; physical-device, human-proof, signing, and publication gates remain open. Oddworks reactivated this lane on 2026-07-12.
   Nocturne:
     owner: d
+    purpose: iOS light-pollution meter producing calibrated sky brightness readings from camera exposure
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
     tool_provenance: claude-code
   Redact:
     owner: d
+    purpose: iOS writing app hiding each finished paragraph behind a black bar with no scrollback
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
     tool_provenance: claude-code
   RoomTone:
     owner: d
+    purpose: iOS LiDAR room scanner synthesizing a room's acoustic resonant modes
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
     tool_provenance: claude-code
   TideEngine:
     owner: d
+    purpose: iOS tidal simulation pairing a gravitational physics engine with live NOAA station data
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
@@ -699,12 +736,14 @@ repos:
     automation_eligible: true
   Wavelength:
     owner: d
+    purpose: real-time iOS electromagnetic spectrum visualizer with a Metal-rendered spectrogram
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
     tool_provenance: claude-code
   ComplianceKit:
     owner: d
+    purpose: early Next.js scaffold for a SOC 2 audit-readiness productized service
     lifecycle_state: archived
     review_cadence: monthly
     operating_path: archive
@@ -712,6 +751,7 @@ repos:
     tool_provenance: claude-code
   ConvictionMapper:
     owner: d
+    purpose: local-first desktop belief graph tracking confidence, domain, and evidence per node
     lifecycle_state: dormant
     review_cadence: monthly
     operating_path: maintain
@@ -719,12 +759,14 @@ repos:
     tool_provenance: claude-code
   DevToolsTranslator:
     owner: d
+    purpose: Chrome event capture organized into human-readable timelines with shareable bundles
     lifecycle_state: dormant
     review_cadence: monthly
     operating_path: maintain
     category: vanity
   GPT_RAG:
     owner: d
+    purpose: local-only macOS RAG scaffold with hybrid FTS5 and LanceDB retrieval fused by reciprocal rank fusion
     lifecycle_state: dormant
     review_cadence: monthly
     operating_path: maintain
@@ -732,6 +774,7 @@ repos:
     tool_provenance: codex
   visual-album-studio:
     owner: d
+    purpose: local-first music-synced video generator with deterministic resumable export
     lifecycle_state: archived
     review_cadence: monthly
     operating_path: archive
@@ -832,6 +875,7 @@ repos:
       confirm purpose/criticality.'
   EarthPulse:
     owner: d
+    purpose: desktop live globe aggregating 12 planetary activity data streams
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
@@ -868,6 +912,7 @@ repos:
       confirm purpose/criticality.'
   sovereign:
     owner: d
+    purpose: browser geopolitical simulation applying policy levers across 18 countries and blocs
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
@@ -912,17 +957,20 @@ repos:
       confirm purpose/criticality.'
   AIFortuneTeller:
     owner: d
+    purpose: theatrical webcam fortune-telling web app driven by local LLaVA inference
     lifecycle_state: archived
     review_cadence: quarterly
     operating_path: archive
     category: fun
   Grotto:
     owner: d
+    purpose: local-first Go CLI and TUI rendering OpenTelemetry shell and application traces as waterfalls
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
   ITServiceHealth:
     owner: d
+    purpose: real-time status dashboard polling roughly 30 enterprise SaaS vendor status pages
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
@@ -960,11 +1008,13 @@ repos:
     operating_path: maintain
   Undertone:
     owner: d
+    purpose: browser musical toy rendering hummed melodies as real-time hand-scored sheet music
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
   Veritas:
     owner: d
+    purpose: local-first Tauri app surfacing decision hesitation from voice memo speech analysis
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
@@ -991,6 +1041,7 @@ repos:
     notes: Lane is live end-to-end as of 2026-06-12; keep residual hardening, policy widening, and hook deployment under explicit operator review.
   da-scaffold:
     owner: d
+    purpose: unmodified create-next-app scaffold retained as a starting template
     lifecycle_state: archived
     review_cadence: quarterly
     operating_path: archive
@@ -1113,6 +1164,7 @@ repos:
     category: infrastructure
   stockpulse:
     owner: d
+    purpose: private Next.js stock watchlist dashboard with scanners, alerts, and a refresh worker
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
@@ -1144,17 +1196,20 @@ repos:
     notes: Verified private candidate exists with genuine Liminal and SignalDecay media and explicit candidate status; public deployment remains gated until release approval.
   LegalDocsReview:
     owner: d
+    purpose: Tauri desktop app for local PDF clause extraction, risk scoring, and document comparison
     lifecycle_state: dormant
     review_cadence: monthly
     operating_path: maintain
     category: it-work
   Relay:
     owner: d
+    purpose: peer-to-peer file transfer over QUIC with encrypted WebSocket relay fallback
     lifecycle_state: dormant
     review_cadence: monthly
     operating_path: maintain
   ai-fluency-tracker:
     owner: d
+    purpose: single-file HTML tracker for AI practice sessions with optional Notion sync
     lifecycle_state: dormant
     review_cadence: monthly
     operating_path: maintain
@@ -1162,6 +1217,7 @@ repos:
     tool_provenance: claude-code
   asc-radar:
     owner: d
+    purpose: daily App Store Connect operator digest delivered each morning via launchd
     lifecycle_state: dormant
     review_cadence: monthly
     operating_path: maintain
@@ -1185,6 +1241,7 @@ repos:
     tool_provenance: claude-code
   IncidentMgmt:
     owner: d
+    purpose: local-first macOS IT incident tracker with blameless post-mortems and DOCX and PDF reports
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: maintain
@@ -1307,6 +1364,7 @@ repos:
     maturity_program: finish
   devils-advocate:
     owner: d
+    purpose: Claude-backed four-part critique returning steelman, blind spots, assumptions, and killer questions
     lifecycle_state: dormant
     review_cadence: quarterly
     operating_path: finish
@@ -1443,6 +1501,7 @@ repos:
   # --- 2026-07-04 portfolio working-set reconciliation: experiment contracts ---
   agent-guestbook-inbox:
     owner: d
+    purpose: submission inbox backing the agent guestbook on the portfolio site
     lifecycle_state: dormant
     review_cadence: monthly
     operating_path: experiment
@@ -1450,6 +1509,7 @@ repos:
     category: infrastructure
   doctrine-pilot-sandbox:
     owner: d
+    purpose: disposable zero-blast-radius sandbox for peer-agent doctrine drills
     lifecycle_state: archived
     review_cadence: monthly
     operating_path: archive
@@ -1465,6 +1525,7 @@ repos:
     category: infrastructure
   portfolio-supercharge-handoff:
     owner: d
+    purpose: dispatched handoff packet of six enhancement initiatives for the portfolio site
     lifecycle_state: archived
     review_cadence: monthly
     operating_path: archive
@@ -1472,6 +1533,7 @@ repos:
     category: infrastructure
   fable-second-sprint:
     owner: d
+    purpose: control room for the second Fable access window
     lifecycle_state: archived
     review_cadence: ad-hoc
     operating_path: archive
@@ -1481,26 +1543,31 @@ repos:
   # --- 2026-07-04 portfolio working-set reconciliation: archive contracts ---
   sae-synth-spike:
     owner: d
+    purpose: time-boxed spike testing sparse-autoencoder feature steering as a creative synthesizer
     lifecycle_state: archived
     review_cadence: quarterly
     operating_path: archive
   mcp-permission-audit-deprecation:
     owner: d
+    purpose: deprecation shim redirecting mcp-permission-audit installs to mcp-audits
     lifecycle_state: archived
     review_cadence: quarterly
     operating_path: archive
   awesome-mcp-servers:
     owner: d
+    purpose: curated public list of Model Context Protocol servers
     lifecycle_state: archived
     review_cadence: quarterly
     operating_path: archive
   portfolio-hooks:
     owner: d
+    purpose: shared React hooks and UI primitives for the portfolio site
     lifecycle_state: archived
     review_cadence: quarterly
     operating_path: archive
   ccq-archive:
     owner: d
+    purpose: archived snapshot of the ccq transcript query CLI
     lifecycle_state: archived
     review_cadence: quarterly
     operating_path: archive
