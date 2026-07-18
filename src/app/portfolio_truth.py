@@ -6,6 +6,7 @@ from typing import Any
 
 from src.cache import ResponseCache
 from src.cli_output import print_info
+from src.github_security_coverage import DEFAULT_EXPECTED_GITHUB_COHORT_COUNT
 from src.portfolio_context_recovery import (
     apply_context_recovery_plan,
     build_context_recovery_plan,
@@ -61,6 +62,11 @@ def run_portfolio_truth_mode(args: Any) -> None:
             receipt_path=Path(receipt_path_value) if receipt_path_value else None,
             max_age_hours=getattr(
                 args, "portfolio_truth_security_max_age_hours", 24
+            ),
+            expected_cohort_count=getattr(
+                args,
+                "portfolio_truth_security_cohort_count",
+                DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
             ),
         )
         if loaded_security is not None:
