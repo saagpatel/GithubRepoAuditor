@@ -15,7 +15,7 @@ SCHEMA_VERSION = "0.11.0"
 # activity_status); derived.archived added as a first-class lifecycle boolean;
 # source_summary.registry_status_counts replaced by activity_status_counts + archived_count.
 LEGACY_SCHEMA_VERSIONS = {"0.7.0", "0.8.0", "0.9.0", "0.10.0"}
-DERIVATION_POLICY_VERSION = "portfolio_attention.v2"
+DERIVATION_POLICY_VERSION = "portfolio_attention.v3"
 
 # The published "latest" portfolio-truth artifact. The producer
 # (portfolio_truth_publish) writes it; every reader resolves it through

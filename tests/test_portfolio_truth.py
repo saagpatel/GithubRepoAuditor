@@ -393,7 +393,7 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     assert gamma.derived.stack == ["Swift"]
 
     assert result.snapshot.schema_version == "0.11.0"
-    assert result.snapshot.derivation_policy_version == "portfolio_attention.v2"
+    assert result.snapshot.derivation_policy_version == "portfolio_attention.v3"
     assert result.snapshot.inputs["catalog"]["sha256"]
     assert result.snapshot.inputs["notion"]["mode"] == "unavailable"
     assert result.snapshot.exclusions == {
@@ -558,6 +558,7 @@ def test_live_catalog_produces_exact_tier_zero_attention_semantics(
         row["source"]: row for row in result.snapshot.coverage
     }
     assert coverage_by_source["workspace"]["project_count"] == 15
+    assert coverage_by_source["git"]["project_count"] == 15
     assert coverage_by_source["supplementary_registry"]["project_count"] == 1
     assert coverage_by_source["github_security"]["project_count"] == 15
     assert coverage_by_source["github_security"]["unknown_count"] == 15

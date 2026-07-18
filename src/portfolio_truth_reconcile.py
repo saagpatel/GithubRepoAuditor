@@ -464,7 +464,8 @@ def _build_coverage_envelope(
         for provider in ("dependabot", "code_scanning", "secret_scanning")
     }
     git_observed = sum(
-        project.repository_state.get("state") == "observed" for project in projects
+        project.repository_state.get("state") == "observed"
+        for project in workspace_projects
     )
     coverage = [
         {
@@ -476,7 +477,7 @@ def _build_coverage_envelope(
             "source": "git",
             "state": "observed" if git_observed else "unknown",
             "observed_count": git_observed,
-            "project_count": len(projects),
+            "project_count": workspace_project_count,
         },
         {
             "source": "github_security",
