@@ -150,6 +150,50 @@ def test_default_attention_cohort_is_exact_and_fail_closed() -> None:
         derive_default_attention_cohort(_truth(17))
 
 
+def test_cohort_skips_local_only_repos_without_a_remote() -> None:
+    """A repo with no GitHub remote has no GitHub security surface.
+
+    Local-only projects (no origin) legitimately carry an empty repo_full_name.
+    They can hold no Dependabot or code-scanning alerts, so they must be skipped
+    rather than crashing cohort derivation. Regression: two local-only repos
+    entering active-product state broke collection entirely.
+    """
+    truth = _truth()
+    truth["projects"].append(
+        {
+            "identity": {"repo_full_name": ""},
+            "derived": {"attention_state": "active-product"},
+        }
+    )
+    truth["projects"].append(
+        {
+            "identity": {},
+            "derived": {"attention_state": "active-infra"},
+        }
+    )
+
+    cohort = derive_default_attention_cohort(truth)
+
+    assert len(cohort) == 16
+    assert all(repo for repo in cohort)
+
+
+def test_cohort_still_rejects_malformed_repository_names() -> None:
+    """Skipping absent names must not weaken validation of present-but-garbage ones."""
+    truth = _truth(15)
+    truth["projects"].append(
+        {
+            "identity": {"repo_full_name": "not-a-valid-full-name"},
+            "derived": {"attention_state": "active-product"},
+        }
+    )
+
+    with pytest.raises(
+        SecurityCoverageError, match="invalid canonical repository name"
+    ):
+        derive_default_attention_cohort(truth)
+
+
 def test_no_token_never_attempts_collection() -> None:
     session = _Session()
 

@@ -162,7 +162,14 @@ def derive_default_attention_cohort(
         if derived.get("attention_state") not in DEFAULT_ATTENTION_STATES:
             continue
         identity = _mapping(project.get("identity"))
-        repos.append(_canonical_repo(identity.get("repo_full_name")))
+        full_name = _text(identity.get("repo_full_name"))
+        if not full_name:
+            # Local-only repo: no GitHub remote means no GitHub security
+            # surface, so it cannot belong to a GitHub cohort. Skip rather than
+            # fail -- an absent name is a legitimate state, unlike a malformed
+            # one, which _canonical_repo still rejects below.
+            continue
+        repos.append(_canonical_repo(full_name))
     if len({repo.lower() for repo in repos}) != len(repos):
         raise SecurityCoverageError(
             "default-attention cohort contains duplicate canonical repositories"
