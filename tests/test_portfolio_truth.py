@@ -604,11 +604,14 @@ def test_discovered_personal_ops_replaces_supplementary_registry_identity(
     ]
 
     assert len(matches) == 1
-    assert matches[0].identity.project_key == "personal-ops"
-    assert not any(
-        row["source"] == "supplementary_registry"
-        for row in result.snapshot.coverage
+    assert matches[0].identity.project_key == "supp:personal-ops"
+    assert matches[0].security.cohort_member is False
+    assert matches[0].provenance["derived.context_quality"]["source"].startswith(
+        "workspace+supplementary-registry"
     )
+    by_source = {row["source"]: row for row in result.snapshot.coverage}
+    assert by_source["workspace"]["project_count"] == 0
+    assert by_source["supplementary_registry"]["project_count"] == 1
 
 
 def test_workspace_supplementary_directory_stays_in_coverage_denominators(

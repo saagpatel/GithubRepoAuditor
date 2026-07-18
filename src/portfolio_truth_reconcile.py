@@ -263,17 +263,12 @@ def build_portfolio_truth_snapshot(
         now=now,
         exclusion_counts=exclusion_counts,
     )
-    discovered_names = {
-        _normalize(str(project.get("name") or ""))
-        for project in workspace_projects
-    }
-    workspace_projects.extend(
-        project
-        for project in _cataloged_supplementary_projects(
+    workspace_projects = _merge_supplementary_discoveries(
+        discovered=workspace_projects,
+        supplementary=_cataloged_supplementary_projects(
             catalog_data=catalog_data,
             now=now,
-        )
-        if _normalize(str(project.get("name") or "")) not in discovered_names
+        ),
     )
     projects = [
         _build_truth_project(
@@ -426,6 +421,45 @@ def _cataloged_supplementary_projects(
             }
         )
     return projects
+
+
+def _merge_supplementary_discoveries(
+    *,
+    discovered: list[dict[str, Any]],
+    supplementary: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Keep one canonical identity while retaining local checkout observations."""
+    supplementary_by_name = {
+        _normalize(str(project.get("name") or "")): project
+        for project in supplementary
+    }
+    used: set[str] = set()
+    merged: list[dict[str, Any]] = []
+    for project in discovered:
+        normalized_name = _normalize(str(project.get("name") or ""))
+        supplement = supplementary_by_name.get(normalized_name)
+        if supplement is None:
+            merged.append(project)
+            continue
+        used.add(normalized_name)
+        if str(project.get("repo_full_name") or "").strip():
+            merged.append(project)
+            continue
+        merged.append(
+            {
+                **project,
+                "path": supplement["path"],
+                "top_level_dir": supplement["top_level_dir"],
+                "group_entry": supplement["group_entry"],
+                "source": "workspace+supplementary-registry",
+            }
+        )
+    merged.extend(
+        project
+        for normalized_name, project in supplementary_by_name.items()
+        if normalized_name not in used
+    )
+    return merged
 
 
 def _build_coverage_envelope(
