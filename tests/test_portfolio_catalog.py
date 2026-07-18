@@ -176,42 +176,62 @@ def test_live_catalog_reflects_tribunal_reactivation_of_recovery_exclusions() ->
         assert entry["automation_eligible"] is False
 
 
-def test_live_catalog_keeps_settled_infrastructure_manual_only() -> None:
+def test_live_catalog_matches_operator_attention_reconciliation() -> None:
     catalog_path = Path(__file__).parents[1] / "config" / "portfolio-catalog.yaml"
     catalog = load_portfolio_catalog(catalog_path)
 
-    # GPT_RAG removed from this cohort by operator ruling 2026-07-17: the tribunal
-    # found its live-driver claim evidentially false (the JSON trace artifacts its
-    # README promises exist nowhere in the tree), so it is dormant, not manual-only.
+    tier_zero = {
+        "MCPAudit": "infrastructure",
+        "mcp-trust": "infrastructure",
+        "bridge-db": "infrastructure",
+        "GithubRepoAuditor": "infrastructure",
+        "PortfolioCommandCenter": "infrastructure",
+        "operant-public": "infrastructure",
+        "portfolio-index": "commercial",
+        "operator-os-explainer": "commercial",
+    }
+    for repo_name, category in tier_zero.items():
+        entry = catalog["repos"][repo_name.lower()]
+        assert entry["lifecycle_state"] == "active"
+        assert entry["operating_path"] == "maintain"
+        assert entry["category"] == category
+
+    # Tier 1, Tier 2, and explicitly unranked projects remain available only when
+    # the operator asks for them. They do not create default portfolio attention.
     manual_only = {
         "_machine/machine-control-tower",
         "agent-bridge",
-        "MCPAudit",
         "knowledgecore",
-        "operant-public",
         "mcpforge",
+        "mcpaudit-web",
         "notification-hub",
+        "cross-system-smoke",
+        "continuity",
         "cross-provider-egress-guard",
         "cost-tracker",
         "portfolio-health",
         "portfolio-mcp",
         "Lazarus",
-        "continuity",
         "peer-agent-tools",
+        "AIGCCore",
+        "ApplyKit",
+        "JobCommandCenter",
+        "AIWorkFlow",
+        "Phantom Frequencies",
+        "SignalDecay",
+        "Afterimage",
+        "Liminal",
+        "GPT_RAG",
+        "DeepTank",
+        "BattleGrid",
+        "OddworksCabinet",
+        "Temper",
+        "book-two-manuscript",
+        "ccusage",
+        "manipulable-library",
     }
     for repo_name in manual_only:
         assert catalog["repos"][repo_name.lower()]["lifecycle_state"] == "manual-only"
-
-    assert catalog["repos"]["afterimage"]["category"] == "commercial"
-    for repo_name in (
-        "AIGCCore",
-        "bridge-db",
-        "GithubRepoAuditor",
-        "mcp-trust",
-        "cross-system-smoke",
-        "PortfolioCommandCenter",
-    ):
-        assert catalog["repos"][repo_name.lower()]["lifecycle_state"] == "active"
 
 
 def test_catalog_entry_matches_full_name_then_bare_name():
