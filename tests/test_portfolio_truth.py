@@ -436,8 +436,8 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
         "total_open_high",
         "total_open_critical",
     }
-    assert rollups["security"]["cohort_repository_count"] == 0
-    assert rollups["security"]["cohort_unknown_count"] == 0
+    assert rollups["security"]["cohort_repository_count"] == 1
+    assert rollups["security"]["cohort_unknown_count"] == 1
     assert rollups["security"]["cohort_complete_count"] == 0
     assert set(rollups["decision"]) == {
         "decision_needed_count",
@@ -1432,6 +1432,18 @@ repos:
         infra.provenance["derived.context_quality"]["detail"]
         == "minimum-viable->standard"
     )
+    assert infra.identity.has_git is True
+    assert infra.identity.repo_full_name == ""
+    assert infra.derived.attention_state == "active-infra"
+    assert infra.security.cohort_member is True
+    assert infra.security.coverage_state == "unknown"
+    security_coverage = next(
+        row
+        for row in result.snapshot.coverage
+        if row["source"] == "github_security"
+    )
+    assert security_coverage["cohort_repository_count"] == 1
+    assert security_coverage["cohort_unknown_count"] == 1
 
 
 def test_substantive_readme_support_does_not_promote_non_infra_repo(

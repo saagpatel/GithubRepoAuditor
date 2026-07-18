@@ -973,7 +973,7 @@ def _build_truth_project(
         "active-product",
         "active-infra",
         "decision-needed",
-    } and str(raw_project.get("repo_full_name") or "").strip():
+    } and not identity.project_key.startswith("supp:"):
         security = replace(
             security,
             cohort_member=True,
