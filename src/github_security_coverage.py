@@ -26,6 +26,7 @@ DEFAULT_COHORT_POLICY = "portfolio-default-attention-v1"
 DEFAULT_ATTENTION_STATES = frozenset(
     {"active-product", "active-infra", "decision-needed"}
 )
+DEFAULT_EXPECTED_GITHUB_COHORT_COUNT = 9
 PROVIDER_NAMES = ("dependabot", "code_scanning", "secret_scanning")
 ELIGIBILITY_SOURCE = "github-account-repository-preflight-v1"
 ELIGIBILITY_REASON = "private_user_repo_plan_unavailable"
@@ -151,9 +152,9 @@ def _canonical_repo(value: Any) -> str:
 def derive_default_attention_cohort(
     portfolio_truth: dict[str, Any],
     *,
-    expected_count: int = 16,
+    expected_count: int = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
 ) -> tuple[str, ...]:
-    """Return the canonical default-attention GitHub cohort, failing on expansion."""
+    """Return the repo-backed default-attention cohort, failing on expansion."""
     repos: list[str] = []
     for project in portfolio_truth.get("projects") or []:
         if not isinstance(project, dict):
@@ -162,7 +163,14 @@ def derive_default_attention_cohort(
         if derived.get("attention_state") not in DEFAULT_ATTENTION_STATES:
             continue
         identity = _mapping(project.get("identity"))
-        repos.append(_canonical_repo(identity.get("repo_full_name")))
+        repo_full_name = identity.get("repo_full_name")
+        if not _text(repo_full_name) and _text(identity.get("project_key")).startswith(
+            "supp:"
+        ):
+            # Supplementary projects such as personal-ops are real portfolio
+            # identities, but they do not have a GitHub repository to query.
+            continue
+        repos.append(_canonical_repo(repo_full_name))
     if len({repo.lower() for repo in repos}) != len(repos):
         raise SecurityCoverageError(
             "default-attention cohort contains duplicate canonical repositories"
@@ -729,7 +737,7 @@ def collect_security_coverage(
     portfolio_truth: dict[str, Any],
     *,
     token: str | None,
-    expected_cohort_count: int = 16,
+    expected_cohort_count: int = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
     base_request_limit: int = DEFAULT_BASE_REQUEST_LIMIT,
     total_request_limit: int = DEFAULT_TOTAL_REQUEST_LIMIT,
     quota_reserve: int = DEFAULT_QUOTA_RESERVE,
@@ -754,6 +762,7 @@ def collect_security_coverage(
         validate_security_coverage_receipt(
             prior_receipt,
             max_age_hours=24 * 365,
+            expected_cohort_count=expected_cohort_count,
             now=now,
         )
     cohort = derive_default_attention_cohort(
@@ -1131,7 +1140,7 @@ def validate_security_coverage_receipt(
     payload: Any,
     *,
     max_age_hours: int = 24,
-    expected_cohort_count: int = 16,
+    expected_cohort_count: int = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
     now: datetime | None = None,
     source_path: str = "",
 ) -> LoadedSecurityCoverage:
@@ -1264,6 +1273,7 @@ def load_security_coverage_receipt(
     path: Path,
     *,
     max_age_hours: int = 24,
+    expected_cohort_count: int = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
     now: datetime | None = None,
 ) -> LoadedSecurityCoverage:
     try:
@@ -1279,14 +1289,24 @@ def load_security_coverage_receipt(
     return validate_security_coverage_receipt(
         payload,
         max_age_hours=max_age_hours,
+        expected_cohort_count=expected_cohort_count,
         now=now,
         source_path=str(path),
     )
 
 
-def write_security_coverage_receipt(payload: dict[str, Any], path: Path) -> None:
+def write_security_coverage_receipt(
+    payload: dict[str, Any],
+    path: Path,
+    *,
+    expected_cohort_count: int = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+) -> None:
     """Atomically write a validated receipt payload."""
-    validate_security_coverage_receipt(payload, max_age_hours=24 * 365)
+    validate_security_coverage_receipt(
+        payload,
+        max_age_hours=24 * 365,
+        expected_cohort_count=expected_cohort_count,
+    )
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp")
     temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
@@ -1330,7 +1350,11 @@ def main() -> None:
         default=24,
         help="Freshness window used by --validate-only (default: 24)",
     )
-    parser.add_argument("--expected-cohort-count", type=int, default=16)
+    parser.add_argument(
+        "--expected-cohort-count",
+        type=int,
+        default=DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+    )
     parser.add_argument(
         "--base-request-limit", type=int, default=DEFAULT_BASE_REQUEST_LIMIT
     )
@@ -1345,6 +1369,7 @@ def main() -> None:
             loaded = load_security_coverage_receipt(
                 args.output,
                 max_age_hours=args.max_age_hours,
+                expected_cohort_count=args.expected_cohort_count,
             )
             print(
                 json.dumps(
@@ -1370,7 +1395,11 @@ def main() -> None:
             quota_reserve=args.quota_reserve,
             prior_receipt=prior,
         )
-        write_security_coverage_receipt(receipt, args.output)
+        write_security_coverage_receipt(
+            receipt,
+            args.output,
+            expected_cohort_count=args.expected_cohort_count,
+        )
     except SecurityCoverageError as exc:
         raise SystemExit(str(exc)) from exc
     print(
