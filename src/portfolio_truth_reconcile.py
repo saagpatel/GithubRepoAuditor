@@ -1334,12 +1334,12 @@ def _attention_state_for(
         return "archived"
     if operating_path == "experiment" or lifecycle_state == "experimental":
         return "experiment"
+    if risk_entry.get("security_risk"):
+        return "decision-needed"
     if lifecycle_state == "manual-only":
         return "manual-only"
     if lifecycle_state == "dormant":
         return "parked"
-    if risk_entry.get("security_risk"):
-        return "decision-needed"
     if lifecycle_state == "active" and operating_path == "maintain":
         if category == "infrastructure":
             return "active-infra"

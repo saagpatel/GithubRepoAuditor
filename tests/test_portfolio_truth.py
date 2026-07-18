@@ -735,6 +735,18 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
     )
     assert (
         _attention_state_for(
+            activity_status="stale",
+            archived=False,
+            lifecycle_state="dormant",
+            operating_path="maintain",
+            category="infrastructure",
+            path_override="",
+            risk_entry={"security_risk": True},
+        )
+        == "decision-needed"
+    )
+    assert (
+        _attention_state_for(
             activity_status="active",
             archived=False,
             lifecycle_state="active",
