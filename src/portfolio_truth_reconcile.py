@@ -383,9 +383,17 @@ def _cataloged_supplementary_projects(
                 "path": canonical_key,
                 "top_level_dir": "supplementary",
                 "group_entry": {
-                    "group_key": str(
-                        supplementary.get("group_key") or "operator_infra"
-                    )
+                    "group_key": str(supplementary.get("group_key") or "operator_infra"),
+                    "group_label": str(
+                        supplementary.get("group_label") or "Operator Infrastructure"
+                    ),
+                    "section_marker": str(
+                        supplementary.get("section_marker")
+                        or "Supplementary Projects"
+                    ),
+                    "section_label": str(
+                        supplementary.get("section_label") or "Operator OS"
+                    ),
                 },
                 "has_git": False,
                 "repo_full_name": "",
@@ -1279,6 +1287,8 @@ def _resolve_group_key(
 def _resolve_group_label(
     group_entry: dict[str, Any], raw_project: dict[str, Any]
 ) -> str:
+    if group_entry.get("group_label"):
+        return str(group_entry["group_label"])
     if group_entry.get("section_label"):
         return str(group_entry["section_label"])
     if "Swift" in raw_project.get("stack", []):

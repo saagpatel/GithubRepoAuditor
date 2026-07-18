@@ -98,6 +98,9 @@ DEFAULT_SUPPLEMENTARY: list[dict] = [
         "display_name": "personal-ops",
         "repo_full_name": None,
         "group_key": "operator_infra",
+        "group_label": "Operator Infrastructure",
+        "section_marker": "Supplementary Projects",
+        "section_label": "Operator OS",
         "lifecycle_state": "active",
         "note": (
             "Local operator control plane (127.0.0.1:46210). Most active "
@@ -109,6 +112,9 @@ DEFAULT_SUPPLEMENTARY: list[dict] = [
         "display_name": "SecondBrain",
         "repo_full_name": None,
         "group_key": "operator_infra",
+        "group_label": "Operator Infrastructure",
+        "section_marker": "Supplementary Projects",
+        "section_label": "Operator OS",
         "lifecycle_state": "active",
         "note": (
             "4-layer knowledge vault at /Users/d/Documents/SecondBrain "

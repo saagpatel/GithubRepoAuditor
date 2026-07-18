@@ -569,6 +569,10 @@ def test_live_catalog_produces_exact_tier_zero_attention_semantics(
     )
     personal_ops = by_display_name["personal-ops"]
     assert personal_ops.identity.project_key == "supp:personal-ops"
+    assert personal_ops.identity.group_key == "operator_infra"
+    assert personal_ops.identity.group_label == "Operator Infrastructure"
+    assert personal_ops.identity.section_marker == "Supplementary Projects"
+    assert personal_ops.identity.section_label == "Operator OS"
     assert personal_ops.derived.activity_status == "stale"
     assert personal_ops.derived.attention_state == "active-infra"
     assert personal_ops.security.cohort_member is False
