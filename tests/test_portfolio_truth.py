@@ -559,6 +559,11 @@ def test_live_catalog_produces_exact_tier_zero_attention_semantics(
     }
     assert coverage_by_source["workspace"]["project_count"] == 15
     assert coverage_by_source["supplementary_registry"]["project_count"] == 1
+    assert coverage_by_source["github_security"]["project_count"] == 15
+    assert coverage_by_source["github_security"]["unknown_count"] == 15
+    security_rollup = result.snapshot.to_dict()["rollups"]["security"]
+    assert security_rollup["unknown_count"] == 15
+    assert security_rollup["unavailable_count"] == 15
     assert (
         result.catalog_data["repos"]["personal-ops"]["lifecycle_state"] == "active"
     )

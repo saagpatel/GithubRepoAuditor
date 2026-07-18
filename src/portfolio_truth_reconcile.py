@@ -417,35 +417,41 @@ def _build_coverage_envelope(
     notion_context_carried_forward: bool,
     notion_context_rows: int,
 ) -> list[dict[str, Any]]:
-    workspace_project_count = sum(
-        project.identity.top_level_dir != "supplementary"
+    workspace_projects = [
+        project
         for project in projects
-    )
+        if project.identity.top_level_dir != "supplementary"
+    ]
+    workspace_project_count = len(workspace_projects)
     supplementary_project_count = len(projects) - workspace_project_count
     complete = sum(
-        project.security.coverage_state == "complete" for project in projects
+        project.security.coverage_state == "complete" for project in workspace_projects
     )
-    partial = sum(project.security.coverage_state == "partial" for project in projects)
-    stale = sum(project.security.coverage_state == "stale" for project in projects)
-    unknown = len(projects) - complete - partial - stale
-    cohort_count = sum(project.security.cohort_member for project in projects)
+    partial = sum(
+        project.security.coverage_state == "partial" for project in workspace_projects
+    )
+    stale = sum(
+        project.security.coverage_state == "stale" for project in workspace_projects
+    )
+    unknown = workspace_project_count - complete - partial - stale
+    cohort_count = sum(project.security.cohort_member for project in workspace_projects)
     cohort_complete = sum(
         project.security.cohort_member and project.security.coverage_state == "complete"
-        for project in projects
+        for project in workspace_projects
     )
     cohort_partial = sum(
         project.security.cohort_member and project.security.coverage_state == "partial"
-        for project in projects
+        for project in workspace_projects
     )
     cohort_stale = sum(
         project.security.cohort_member and project.security.coverage_state == "stale"
-        for project in projects
+        for project in workspace_projects
     )
     cohort_unknown = cohort_count - cohort_complete - cohort_partial - cohort_stale
     provider_counts = {
         provider: sum(
             project.security.provider_state(provider) == "observed"
-            for project in projects
+            for project in workspace_projects
         )
         for provider in ("dependabot", "code_scanning", "secret_scanning")
     }
@@ -468,7 +474,7 @@ def _build_coverage_envelope(
             "source": "github_security",
             "state": (
                 "known"
-                if complete == len(projects)
+                if complete == workspace_project_count
                 else "partial"
                 if complete or partial
                 else "unknown"
@@ -484,7 +490,7 @@ def _build_coverage_envelope(
             "cohort_stale_count": cohort_stale,
             "cohort_unknown_count": cohort_unknown,
             "provider_observed_counts": provider_counts,
-            "project_count": len(projects),
+            "project_count": workspace_project_count,
         },
         {
             "source": "notion",

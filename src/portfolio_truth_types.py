@@ -308,43 +308,44 @@ class PortfolioTruthRollups:
             tier = project.risk.risk_tier
             if tier in risk_tier_counts:
                 risk_tier_counts[tier] += 1
-            security = project.security
-            if security.cohort_member:
-                cohort_repository_count += 1
-            provider_states = {
-                provider: security.provider_state(provider)
-                for provider in ("dependabot", "code_scanning", "secret_scanning")
-            }
-            dependabot_observed = provider_states["dependabot"] == "observed"
-            if dependabot_observed:
-                dependabot_observed_count += 1
-                if security.open_high_critical > 0:
-                    repos_with_open_high_critical += 1
-                total_open_high += security.dependabot_high or 0
-                total_open_critical += security.dependabot_critical or 0
-            if provider_states["code_scanning"] == "observed":
-                code_scanning_observed_count += 1
-            if provider_states["secret_scanning"] == "observed":
-                secret_scanning_observed_count += 1
-            if security.coverage_state == "complete":
-                complete_repo_count += 1
-                scanned_count += 1
+            if project.identity.top_level_dir != "supplementary":
+                security = project.security
                 if security.cohort_member:
-                    cohort_complete_count += 1
-            elif security.coverage_state == "partial":
-                partial_repo_count += 1
-                if security.cohort_member:
-                    cohort_partial_count += 1
-            elif security.coverage_state == "stale":
-                stale_count += 1
-                if security.cohort_member:
-                    cohort_stale_count += 1
-            else:
-                unknown_count += 1
-                if security.cohort_member:
-                    cohort_unknown_count += 1
-            if not security.alerts_available:
-                unavailable_count += 1
+                    cohort_repository_count += 1
+                provider_states = {
+                    provider: security.provider_state(provider)
+                    for provider in ("dependabot", "code_scanning", "secret_scanning")
+                }
+                dependabot_observed = provider_states["dependabot"] == "observed"
+                if dependabot_observed:
+                    dependabot_observed_count += 1
+                    if security.open_high_critical > 0:
+                        repos_with_open_high_critical += 1
+                    total_open_high += security.dependabot_high or 0
+                    total_open_critical += security.dependabot_critical or 0
+                if provider_states["code_scanning"] == "observed":
+                    code_scanning_observed_count += 1
+                if provider_states["secret_scanning"] == "observed":
+                    secret_scanning_observed_count += 1
+                if security.coverage_state == "complete":
+                    complete_repo_count += 1
+                    scanned_count += 1
+                    if security.cohort_member:
+                        cohort_complete_count += 1
+                elif security.coverage_state == "partial":
+                    partial_repo_count += 1
+                    if security.cohort_member:
+                        cohort_partial_count += 1
+                elif security.coverage_state == "stale":
+                    stale_count += 1
+                    if security.cohort_member:
+                        cohort_stale_count += 1
+                else:
+                    unknown_count += 1
+                    if security.cohort_member:
+                        cohort_unknown_count += 1
+                if not security.alerts_available:
+                    unavailable_count += 1
             attention = project.derived.attention_state
             if attention == "decision-needed":
                 decision_needed_count += 1
