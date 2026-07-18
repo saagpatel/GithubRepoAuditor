@@ -772,9 +772,13 @@ def collect_security_coverage(
     ):
         raise SecurityCoverageError("request budget limits exceed the bounded contract")
     if prior_receipt is not None:
+        # The prior receipt was collected under the same cohort contract as this
+        # run; validating it against the module default instead of the caller's
+        # count made every post-resize run fail on its own previous output.
         validate_security_coverage_receipt(
             prior_receipt,
             max_age_hours=24 * 365,
+            expected_cohort_count=expected_cohort_count,
             now=now,
         )
     cohort = derive_default_attention_cohort(
