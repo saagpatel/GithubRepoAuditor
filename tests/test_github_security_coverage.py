@@ -208,6 +208,29 @@ def test_cohort_owner_filter_is_case_insensitive() -> None:
     assert len(cohort) == 3
 
 
+def test_write_honours_the_expected_cohort_count(tmp_path) -> None:
+    """The write path must validate against the caller's cohort count.
+
+    write_security_coverage_receipt validated against the hardcoded default of
+    16, ignoring --expected-cohort-count entirely. A legitimately resized cohort
+    therefore collected successfully and then failed on write with 'cohort count
+    contract mismatch', making the flag non-functional at any non-default value.
+    """
+    from src.github_security_coverage import write_security_coverage_receipt
+
+    payload = _collect()  # natural cohort of 16
+    destination = tmp_path / "receipt.json"
+
+    # Matching count writes cleanly.
+    write_security_coverage_receipt(payload, destination, expected_cohort_count=16)
+    assert json.loads(destination.read_text())["cohort"]["repository_count"] == 16
+
+    # A mismatched count must be rejected, proving the argument is honoured
+    # rather than silently replaced by the default.
+    with pytest.raises(SecurityCoverageError, match="cohort count contract mismatch"):
+        write_security_coverage_receipt(payload, destination, expected_cohort_count=18)
+
+
 def test_cohort_still_rejects_malformed_repository_names() -> None:
     """Skipping absent names must not weaken validation of present-but-garbage ones."""
     truth = _truth(15)

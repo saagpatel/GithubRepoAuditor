@@ -1305,9 +1305,24 @@ def load_security_coverage_receipt(
     )
 
 
-def write_security_coverage_receipt(payload: dict[str, Any], path: Path) -> None:
-    """Atomically write a validated receipt payload."""
-    validate_security_coverage_receipt(payload, max_age_hours=24 * 365)
+def write_security_coverage_receipt(
+    payload: dict[str, Any],
+    path: Path,
+    *,
+    expected_cohort_count: int = 16,
+) -> None:
+    """Atomically write a validated receipt payload.
+
+    ``expected_cohort_count`` must match the count the payload was collected
+    under. Hardcoding the default here made ``--expected-cohort-count``
+    non-functional at any other value: a resized cohort collected fine and then
+    failed on write.
+    """
+    validate_security_coverage_receipt(
+        payload,
+        max_age_hours=24 * 365,
+        expected_cohort_count=expected_cohort_count,
+    )
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp")
     temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
@@ -1401,7 +1416,9 @@ def main() -> None:
             quota_reserve=args.quota_reserve,
             prior_receipt=prior,
         )
-        write_security_coverage_receipt(receipt, args.output)
+        write_security_coverage_receipt(
+            receipt, args.output, expected_cohort_count=args.expected_cohort_count
+        )
     except SecurityCoverageError as exc:
         raise SystemExit(str(exc)) from exc
     print(
