@@ -583,6 +583,63 @@ def test_live_catalog_produces_exact_tier_zero_attention_semantics(
     )
 
 
+def test_discovered_personal_ops_replaces_supplementary_registry_identity(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    project = workspace / "personal-ops"
+    project.mkdir(parents=True)
+    _write(project / "README.md", "# personal-ops\n\nWorkspace checkout.\n")
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=workspace,
+        catalog_path=Path(__file__).parents[1] / "config" / "portfolio-catalog.yaml",
+        include_notion=False,
+        now=datetime(2026, 7, 18, 12, tzinfo=timezone.utc),
+    )
+    matches = [
+        item
+        for item in result.snapshot.projects
+        if item.identity.display_name == "personal-ops"
+    ]
+
+    assert len(matches) == 1
+    assert matches[0].identity.project_key == "personal-ops"
+    assert not any(
+        row["source"] == "supplementary_registry"
+        for row in result.snapshot.coverage
+    )
+
+
+def test_workspace_supplementary_directory_stays_in_coverage_denominators(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    project = workspace / "supplementary" / "real-repo"
+    project.mkdir(parents=True)
+    _write(project / "README.md", "# real-repo\n\nWorkspace checkout.\n")
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=workspace,
+        catalog_path=Path(__file__).parents[1] / "config" / "portfolio-catalog.yaml",
+        include_notion=False,
+        now=datetime(2026, 7, 18, 12, tzinfo=timezone.utc),
+    )
+    by_source = {row["source"]: row for row in result.snapshot.coverage}
+    real_repo = next(
+        item
+        for item in result.snapshot.projects
+        if item.identity.display_name == "real-repo"
+    )
+
+    assert real_repo.identity.top_level_dir == "supplementary"
+    assert real_repo.identity.project_key == "supplementary/real-repo"
+    assert by_source["workspace"]["project_count"] == 1
+    assert by_source["git"]["project_count"] == 1
+    assert by_source["github_security"]["project_count"] == 1
+    assert result.snapshot.rollups.security["unknown_count"] == 1
+
+
 def test_truth_snapshot_operating_path_catalog_field_matches_legacy_disposition(
     portfolio_workspace: Path,
     legacy_registry: Path,

@@ -263,8 +263,17 @@ def build_portfolio_truth_snapshot(
         now=now,
         exclusion_counts=exclusion_counts,
     )
+    discovered_names = {
+        _normalize(str(project.get("name") or ""))
+        for project in workspace_projects
+    }
     workspace_projects.extend(
-        _cataloged_supplementary_projects(catalog_data=catalog_data, now=now)
+        project
+        for project in _cataloged_supplementary_projects(
+            catalog_data=catalog_data,
+            now=now,
+        )
+        if _normalize(str(project.get("name") or "")) not in discovered_names
     )
     projects = [
         _build_truth_project(
@@ -428,7 +437,7 @@ def _build_coverage_envelope(
     workspace_projects = [
         project
         for project in projects
-        if project.identity.top_level_dir != "supplementary"
+        if not project.identity.project_key.startswith("supp:")
     ]
     workspace_project_count = len(workspace_projects)
     supplementary_project_count = len(projects) - workspace_project_count

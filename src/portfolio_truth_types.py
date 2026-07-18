@@ -308,7 +308,7 @@ class PortfolioTruthRollups:
             tier = project.risk.risk_tier
             if tier in risk_tier_counts:
                 risk_tier_counts[tier] += 1
-            if project.identity.top_level_dir != "supplementary":
+            if not project.identity.project_key.startswith("supp:"):
                 security = project.security
                 if security.cohort_member:
                     cohort_repository_count += 1
