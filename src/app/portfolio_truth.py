@@ -11,7 +11,10 @@ from src.portfolio_context_recovery import (
     build_context_recovery_plan,
     write_context_recovery_plan_artifacts,
 )
-from src.portfolio_truth_publish import PortfolioTruthPublishError, publish_portfolio_truth
+from src.portfolio_truth_publish import (
+    PortfolioTruthPublishError,
+    publish_portfolio_truth,
+)
 from src.portfolio_truth_reconcile import build_portfolio_truth_snapshot
 from src.portfolio_truth_status import (
     load_live_repo_status_by_name,
@@ -59,8 +62,9 @@ def run_portfolio_truth_mode(args: Any) -> None:
         loaded_security = load_security_coverage_by_full_name(
             output_dir=output_dir,
             receipt_path=Path(receipt_path_value) if receipt_path_value else None,
-            max_age_hours=getattr(
-                args, "portfolio_truth_security_max_age_hours", 24
+            max_age_hours=getattr(args, "portfolio_truth_security_max_age_hours", 24),
+            expected_cohort_count=getattr(
+                args, "portfolio_truth_security_cohort_count", 16
             ),
         )
         if loaded_security is not None:
@@ -72,9 +76,7 @@ def run_portfolio_truth_mode(args: Any) -> None:
                 "state": loaded_security.receipt_state,
                 "age_hours": loaded_security.age_hours,
                 "cohort_policy": loaded_security.cohort_policy,
-                "cohort_repository_count": len(
-                    loaded_security.cohort_repositories
-                ),
+                "cohort_repository_count": len(loaded_security.cohort_repositories),
                 "path": loaded_security.source_path,
             }
     repo_status_by_name = load_live_repo_status_by_name(
@@ -96,7 +98,9 @@ def run_portfolio_truth_mode(args: Any) -> None:
             catalog_path=Path(args.catalog) if args.catalog else None,
             legacy_registry_path=legacy_registry_path,
             include_notion=True,
-            allow_empty_notion=getattr(args, "portfolio_truth_allow_empty_notion", False),
+            allow_empty_notion=getattr(
+                args, "portfolio_truth_allow_empty_notion", False
+            ),
             release_count_by_name=release_count_by_name,
             security_alerts_by_name=security_alerts_by_name,
             security_coverage_metadata=security_coverage_metadata,
@@ -112,7 +116,9 @@ def run_portfolio_truth_mode(args: Any) -> None:
     print_info(f"Portfolio truth snapshot: {result.latest_path}")
     print_info(f"Portfolio truth history snapshot: {result.snapshot_path}")
     print_info(f"Project registry compatibility output: {result.registry_output}")
-    print_info(f"Portfolio audit compatibility output: {result.portfolio_report_output}")
+    print_info(
+        f"Portfolio audit compatibility output: {result.portfolio_report_output}"
+    )
     print_info(
         f"Portfolio truth generated for {result.project_count} projects "
         f"(registry {'updated' if result.registry_changed else 'unchanged'}, "
@@ -146,7 +152,9 @@ def run_portfolio_context_recovery_mode(args: Any) -> None:
         workspace_root=workspace_root,
         allow_dirty=bool(getattr(args, "allow_dirty_worktree", False)),
     )
-    plan_json, plan_markdown = write_context_recovery_plan_artifacts(plan, output_dir=output_dir)
+    plan_json, plan_markdown = write_context_recovery_plan_artifacts(
+        plan, output_dir=output_dir
+    )
     print_info(f"Context recovery plan JSON: {plan_json}")
     print_info(f"Context recovery plan Markdown: {plan_markdown}")
     eligible_count = sum(project.status == "eligible" for project in plan.projects)
@@ -166,7 +174,9 @@ def run_portfolio_context_recovery_mode(args: Any) -> None:
         limit=args.context_recovery_limit,
     )
     if apply_result.failed_projects:
-        raise SystemExit("Context recovery failed for: " + ", ".join(apply_result.failed_projects))
+        raise SystemExit(
+            "Context recovery failed for: " + ", ".join(apply_result.failed_projects)
+        )
     truth_result = publish_portfolio_truth(
         workspace_root=workspace_root,
         output_dir=output_dir,
@@ -182,4 +192,6 @@ def run_portfolio_context_recovery_mode(args: Any) -> None:
     )
     print_info(f"Portfolio truth snapshot: {truth_result.latest_path}")
     print_info(f"Project registry compatibility output: {truth_result.registry_output}")
-    print_info(f"Portfolio audit compatibility output: {truth_result.portfolio_report_output}")
+    print_info(
+        f"Portfolio audit compatibility output: {truth_result.portfolio_report_output}"
+    )

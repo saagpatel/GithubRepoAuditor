@@ -96,8 +96,6 @@ Legacy flat form (deprecated, still supported):
   audit <github-username> --campaign security-review --writeback-target all --github-projects"""
 
 
-
-
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -175,18 +173,34 @@ def _build_run_subparser(subparsers: argparse._SubParsersAction) -> None:  # typ
         help="Audit only these specific repos (targeted mode)",
     )
     p.add_argument("--skip-forks", action="store_true", help="Exclude forked repos")
-    p.add_argument("--skip-archived", action="store_true", help="Exclude archived repos")
-    p.add_argument("--skip-clone", action="store_true", help="Skip clone step (metadata only)")
     p.add_argument(
-        "--incremental", action="store_true", help="Re-audit only repos changed since last run"
+        "--skip-archived", action="store_true", help="Exclude archived repos"
     )
-    p.add_argument("--graphql", action="store_true", help="Use GraphQL API for faster bulk fetch")
-    p.add_argument("--badges", action="store_true", help="Generate Shields.io badge files")
-    p.add_argument("--html", action="store_true", help="Generate interactive HTML dashboard")
-    p.add_argument("--pdf", action="store_true", help="Generate PDF audit report")
-    p.add_argument("--narrative", action="store_true", help="Generate AI portfolio narrative")
     p.add_argument(
-        "--briefing", action="store_true", help="Generate structured weekly operator briefing"
+        "--skip-clone", action="store_true", help="Skip clone step (metadata only)"
+    )
+    p.add_argument(
+        "--incremental",
+        action="store_true",
+        help="Re-audit only repos changed since last run",
+    )
+    p.add_argument(
+        "--graphql", action="store_true", help="Use GraphQL API for faster bulk fetch"
+    )
+    p.add_argument(
+        "--badges", action="store_true", help="Generate Shields.io badge files"
+    )
+    p.add_argument(
+        "--html", action="store_true", help="Generate interactive HTML dashboard"
+    )
+    p.add_argument("--pdf", action="store_true", help="Generate PDF audit report")
+    p.add_argument(
+        "--narrative", action="store_true", help="Generate AI portfolio narrative"
+    )
+    p.add_argument(
+        "--briefing",
+        action="store_true",
+        help="Generate structured weekly operator briefing",
     )
     p.add_argument(
         "--fetch-mode",
@@ -195,7 +209,10 @@ def _build_run_subparser(subparsers: argparse._SubParsersAction) -> None:  # typ
         help="Per-repo enrichment fetch strategy (default: sync)",
     )
     p.add_argument(
-        "--analysis-workers", type=int, default=None, help="Number of repo-analysis workers"
+        "--analysis-workers",
+        type=int,
+        default=None,
+        help="Number of repo-analysis workers",
     )
     p.add_argument("--no-cache", action="store_true", help="Bypass API response cache")
     p.add_argument(
@@ -206,14 +223,20 @@ def _build_run_subparser(subparsers: argparse._SubParsersAction) -> None:  # typ
         help="Custom scoring profile from config/scoring-profiles/NAME.json",
     )
     p.add_argument(
-        "--watch", action="store_true", help="Re-run audit on interval (see --watch-interval)"
+        "--watch",
+        action="store_true",
+        help="Re-run audit on interval (see --watch-interval)",
     )
     p.add_argument("--resume", action="store_true", help="Resume a partial audit run")
     p.add_argument(
-        "--vuln-check", action="store_true", help="Query OSV.dev for known vulnerabilities"
+        "--vuln-check",
+        action="store_true",
+        help="Query OSV.dev for known vulnerabilities",
     )
     p.add_argument(
-        "--reindex", action="store_true", help="Rebuild portfolio semantic index after audit"
+        "--reindex",
+        action="store_true",
+        help="Rebuild portfolio semantic index after audit",
     )
     p.add_argument(
         "--embedder",
@@ -232,9 +255,13 @@ def _build_triage_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     _add_global_flags(p)
-    p.add_argument("--control-center", action="store_true", help="Show latest operator state")
     p.add_argument(
-        "--approval-center", action="store_true", help="Show latest approval workflow state"
+        "--control-center", action="store_true", help="Show latest operator state"
+    )
+    p.add_argument(
+        "--approval-center",
+        action="store_true",
+        help="Show latest approval workflow state",
     )
     p.add_argument(
         "--triage-view",
@@ -253,29 +280,48 @@ def _build_triage_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         action="store_true",
         help="Apply approved campaign packets for repos passing the automation trust bar",
     )
-    p.add_argument("--dry-run", action="store_true", help="Preview without making changes")
     p.add_argument(
-        "--approve-governance", action="store_true", help="Capture a governance approval"
-    )
-    p.add_argument("--approve-packet", action="store_true", help="Capture a campaign approval")
-    p.add_argument(
-        "--review-governance", action="store_true", help="Capture a governance follow-up review"
+        "--dry-run", action="store_true", help="Preview without making changes"
     )
     p.add_argument(
-        "--review-packet", action="store_true", help="Capture a campaign follow-up review"
+        "--approve-governance",
+        action="store_true",
+        help="Capture a governance approval",
     )
-    p.add_argument("--reset-prefs", action="store_true", help="Clear operator suppression hints")
     p.add_argument(
-        "--acknowledge-target", type=str, default=None, help="Repo to acknowledge in review queue"
+        "--approve-packet", action="store_true", help="Capture a campaign approval"
     )
-    p.add_argument("--acknowledge-kind", type=str, default=None, help="Change type to acknowledge")
+    p.add_argument(
+        "--review-governance",
+        action="store_true",
+        help="Capture a governance follow-up review",
+    )
+    p.add_argument(
+        "--review-packet",
+        action="store_true",
+        help="Capture a campaign follow-up review",
+    )
+    p.add_argument(
+        "--reset-prefs", action="store_true", help="Clear operator suppression hints"
+    )
+    p.add_argument(
+        "--acknowledge-target",
+        type=str,
+        default=None,
+        help="Repo to acknowledge in review queue",
+    )
+    p.add_argument(
+        "--acknowledge-kind", type=str, default=None, help="Change type to acknowledge"
+    )
     p.add_argument(
         "--semantic-search",
         default=None,
         metavar="QUERY",
         help="Semantic search against portfolio index",
     )
-    p.add_argument("--ask", default=None, metavar="QUERY", help="Alias for --semantic-search")
+    p.add_argument(
+        "--ask", default=None, metavar="QUERY", help="Alias for --semantic-search"
+    )
     # ── Initiative tracker (7A.3) ─────────────────────────────────────────
     p.add_argument(
         "--set-initiative",
@@ -435,7 +481,9 @@ def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
     )
     _add_global_flags(p)
     p.add_argument(
-        "--portfolio-truth", action="store_true", help="Generate canonical portfolio truth snapshot"
+        "--portfolio-truth",
+        action="store_true",
+        help="Generate canonical portfolio truth snapshot",
     )
     p.add_argument(
         "--portfolio-truth-include-security",
@@ -458,6 +506,16 @@ def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         default=24,
         metavar="HOURS",
         help="Freshness window for GitHub security observations (default: 24)",
+    )
+    p.add_argument(
+        "--portfolio-truth-security-cohort-count",
+        type=int,
+        default=16,
+        metavar="COUNT",
+        help=(
+            "Expected security cohort size; must match the count the receipt "
+            "was collected under or coverage is dropped (default: 16)"
+        ),
     )
     p.add_argument(
         "--portfolio-truth-allow-empty-notion",
@@ -503,8 +561,12 @@ def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         metavar="PREVIOUS_REPORT",
         help="Compare against a previous report",
     )
-    p.add_argument("--summary", action="store_true", help="Print a Rich diff summary to stderr")
-    p.add_argument("--scorecard", action="store_true", help="Apply internal scorecard programs")
+    p.add_argument(
+        "--summary", action="store_true", help="Print a Rich diff summary to stderr"
+    )
+    p.add_argument(
+        "--scorecard", action="store_true", help="Apply internal scorecard programs"
+    )
     p.add_argument(
         "--campaign",
         choices=[
@@ -524,7 +586,9 @@ def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         help="External system to receive writeback actions",
     )
     p.add_argument(
-        "--writeback-apply", action="store_true", help="Execute live writeback (not preview)"
+        "--writeback-apply",
+        action="store_true",
+        help="Execute live writeback (not preview)",
     )
     p.add_argument(
         "--campaign-from-ledger",
@@ -554,10 +618,15 @@ def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         help="Apply description/topics from improvements file",
     )
     p.add_argument(
-        "--apply-readmes", action="store_true", help="Push README updates via Contents API"
+        "--apply-readmes",
+        action="store_true",
+        help="Push README updates via Contents API",
     )
     p.add_argument(
-        "--improvements-file", type=Path, default=None, help="Path to improvements JSON file"
+        "--improvements-file",
+        type=Path,
+        default=None,
+        help="Path to improvements JSON file",
     )
     p.add_argument(
         "--generate-manifest",
@@ -569,9 +638,15 @@ def _build_report_subparser(subparsers: argparse._SubParsersAction) -> None:  # 
         action="store_true",
         help="Create GitHub issues for high-priority action items",
     )
-    p.add_argument("--upload-badges", action="store_true", help="Upload badge JSON to GitHub Gist")
-    p.add_argument("--notion-sync", action="store_true", help="Push audit events to Notion API")
-    p.add_argument("--notion-registry", action="store_true", help="Use Notion as registry source")
+    p.add_argument(
+        "--upload-badges", action="store_true", help="Upload badge JSON to GitHub Gist"
+    )
+    p.add_argument(
+        "--notion-sync", action="store_true", help="Push audit events to Notion API"
+    )
+    p.add_argument(
+        "--notion-registry", action="store_true", help="Use Notion as registry source"
+    )
     p.add_argument(
         "--portfolio-profile",
         type=str,
@@ -650,15 +725,21 @@ def _build_serve_subparser(subparsers: argparse._SubParsersAction) -> None:  # t
         description="Serve portfolio artefacts via a local FastAPI + HTMX web UI. Requires [serve] extra.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    p.add_argument("--port", type=int, default=8080, help="Port to listen on (default: 8080)")
-    p.add_argument("--host", default="127.0.0.1", help="Host to bind (default: 127.0.0.1)")
+    p.add_argument(
+        "--port", type=int, default=8080, help="Port to listen on (default: 8080)"
+    )
+    p.add_argument(
+        "--host", default="127.0.0.1", help="Host to bind (default: 127.0.0.1)"
+    )
     p.add_argument(
         "--token",
         default=os.environ.get("GITHUB_TOKEN") or _gh_auth_token(),
         help="GitHub personal access token",
     )
     p.add_argument(
-        "--output-dir", default="output", help="Directory for output files (default: output/)"
+        "--output-dir",
+        default="output",
+        help="Directory for output files (default: output/)",
     )
     p.add_argument("--config", default=None, help="Path to audit-config.yaml")
     p.add_argument("--verbose", action="store_true", help="Print detailed output")
@@ -722,6 +803,16 @@ def build_parser() -> argparse.ArgumentParser:
         default=24,
         metavar="HOURS",
         help="Freshness window for GitHub security observations (default: 24)",
+    )
+    parser.add_argument(
+        "--portfolio-truth-security-cohort-count",
+        type=int,
+        default=16,
+        metavar="COUNT",
+        help=(
+            "Expected security cohort size; must match the count the receipt "
+            "was collected under or coverage is dropped (default: 16)"
+        ),
     )
     parser.add_argument(
         "--portfolio-truth-allow-empty-notion",
@@ -1063,7 +1154,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--governance-scope",
-        choices=["all", "codeql", "secret-scanning", "push-protection", "code-security"],
+        choices=[
+            "all",
+            "codeql",
+            "secret-scanning",
+            "push-protection",
+            "code-security",
+        ],
         default="all",
         help="Select which governed control family a local approval should cover (default: all)",
     )
@@ -1632,32 +1729,10 @@ def build_subcommand_parser() -> argparse.ArgumentParser:
 # ── Repo filtering and selection helpers ─────────────────────────────
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def _run_control_center_mode(args, parser) -> None:
     from src.app.control_center import run_control_center_mode
 
     run_control_center_mode(args, parser)
-
-
-
-
 
 
 def _run_approval_center_mode(args, parser) -> None:
@@ -1666,14 +1741,10 @@ def _run_approval_center_mode(args, parser) -> None:
     run_approval_center_mode(args, parser)
 
 
-
-
 def _run_approval_capture_mode(args, parser) -> None:
     from src.app.approval_center import run_approval_capture_mode
 
     run_approval_capture_mode(args, parser)
-
-
 
 
 def _run_acknowledgment_capture_mode(args, parser) -> None:
@@ -1694,57 +1765,7 @@ def _run_generate_manifest_mode(args, parser) -> None:
     run_generate_manifest_mode(args, parser)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # ── Core analysis pipeline ────────────────────────────────────────────
-
-
-
 
 
 def _run_portfolio_truth_mode(args) -> None:
@@ -1759,29 +1780,10 @@ def _run_portfolio_context_recovery_mode(args) -> None:
     run_portfolio_context_recovery_mode(args)
 
 
-
-
-
-
-
-
-
-
-
-
-
 # ── Report output orchestration ───────────────────────────────────────
 
 
-
-
-
-
 # ── Partial run modes ─────────────────────────────────────────────────
-
-
-
-
 
 
 # ── Scoring profile loader ─────────────────────────────────────────────
@@ -1791,8 +1793,6 @@ def _run_portfolio_context_recovery_mode(args) -> None:
 
 
 # ── Semantic index helpers (Arc F S3.1) ───────────────────────────────
-
-
 
 
 # ── Serve mode ───────────────────────────────────────────────────────────────
@@ -1828,7 +1828,9 @@ def _infer_subcommand_from_flags(args: argparse.Namespace) -> str:
         val = getattr(args, flag, None)
         if val and val not in (False, "all", None, ""):
             return "triage"
-    if getattr(args, "approval_center", False) or getattr(args, "control_center", False):
+    if getattr(args, "approval_center", False) or getattr(
+        args, "control_center", False
+    ):
         return "triage"
 
     # report signals
@@ -1857,7 +1859,9 @@ def _infer_subcommand_from_flags(args: argparse.Namespace) -> str:
         return "report"
     if getattr(args, "writeback_target", None):
         return "report"
-    if getattr(args, "approve_proposal", None) or getattr(args, "reject_proposal", None):
+    if getattr(args, "approve_proposal", None) or getattr(
+        args, "reject_proposal", None
+    ):
         return "report"
 
     return "run"
@@ -2077,7 +2081,9 @@ def main() -> None:
         _run_approval_capture_mode(args, parser)
         return
 
-    if getattr(args, "acknowledge_target", None) or getattr(args, "acknowledge_kind", None):
+    if getattr(args, "acknowledge_target", None) or getattr(
+        args, "acknowledge_kind", None
+    ):
         _run_acknowledgment_capture_mode(args, parser)
         return
 

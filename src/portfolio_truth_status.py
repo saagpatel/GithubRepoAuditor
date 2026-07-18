@@ -17,7 +17,9 @@ from src.github_security_coverage import (
 )
 
 
-def load_release_count_by_name(*, output_dir: Path, username: str) -> dict[str, int] | None:
+def load_release_count_by_name(
+    *, output_dir: Path, username: str
+) -> dict[str, int] | None:
     audit_files = sorted(
         output_dir.glob(f"audit-report-{username}-*.json"),
         key=lambda path: path.stat().st_mtime,
@@ -47,7 +49,9 @@ def load_release_count_by_name(*, output_dir: Path, username: str) -> dict[str, 
             continue
         for analyzer_result in audit.get("analyzer_results") or []:
             if analyzer_result.get("dimension") == "activity":
-                release_count = (analyzer_result.get("details") or {}).get("release_count")
+                release_count = (analyzer_result.get("details") or {}).get(
+                    "release_count"
+                )
                 if isinstance(release_count, int):
                     result[name] = release_count
                 break
@@ -159,6 +163,7 @@ def load_security_coverage_by_full_name(
     output_dir: Path,
     receipt_path: Path | None = None,
     max_age_hours: int = 24,
+    expected_cohort_count: int = 16,
     now: datetime | None = None,
 ) -> LoadedSecurityCoverage | None:
     """Load the canonical provenance-bearing security receipt.
@@ -173,6 +178,7 @@ def load_security_coverage_by_full_name(
         return load_security_coverage_receipt(
             selected,
             max_age_hours=max_age_hours,
+            expected_cohort_count=expected_cohort_count,
             now=now,
         )
     except SecurityCoverageError as exc:

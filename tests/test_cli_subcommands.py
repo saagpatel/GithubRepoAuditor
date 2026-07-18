@@ -224,7 +224,12 @@ class TestReportSubcommand:
 
     def test_report_writeback(self):
         args = _parse(
-            "report", "myuser", "--campaign", "promotion-push", "--writeback-target", "github"
+            "report",
+            "myuser",
+            "--campaign",
+            "promotion-push",
+            "--writeback-target",
+            "github",
         )
         assert args.writeback_target == "github"
 
@@ -238,7 +243,10 @@ class TestReportSubcommand:
 
     def test_report_apply_context_recovery(self):
         args = _parse(
-            "report", "myuser", "--portfolio-context-recovery", "--apply-context-recovery"
+            "report",
+            "myuser",
+            "--portfolio-context-recovery",
+            "--apply-context-recovery",
         )
         assert args.portfolio_context_recovery is True
         assert args.apply_context_recovery is True
@@ -277,7 +285,9 @@ class TestServeSubcommand:
 
     def test_legacy_parser_accepts_arc_h_report_flags(self):
         parser = build_parser()
-        args = parser.parse_args(["saagpatel", "--context-triage", "--tier-recalibration-report"])
+        args = parser.parse_args(
+            ["saagpatel", "--context-triage", "--tier-recalibration-report"]
+        )
         assert args.context_triage is True
         assert args.tier_recalibration_report is True
 
@@ -305,8 +315,8 @@ class TestHelpFlagCounts:
     def test_report_help_flag_count(self):
         text = _help_text("report")
         count = _count_flags_in_help(text)
-        assert count <= 44, (
-            f"audit report --help shows {count} non-global flags (limit 44, including the explicit security receipt path, freshness, and opt-in controls).\n"
+        assert count <= 45, (
+            f"audit report --help shows {count} non-global flags (limit 45, raised for --portfolio-truth-security-cohort-count: the receipt's cohort size must be assertable or a resized cohort silently drops security coverage).\n"
             f"Flags found: {sorted(set(re.findall(r'  (--[a-z][a-z0-9-]*)', text)))}"
         )
 
@@ -356,13 +366,22 @@ class TestInferSubcommand:
         assert _infer_subcommand_from_flags(self._ns(approval_center=True)) == "triage"
 
     def test_infer_triage_acknowledge(self):
-        assert _infer_subcommand_from_flags(self._ns(acknowledge_target="myrepo")) == "triage"
+        assert (
+            _infer_subcommand_from_flags(self._ns(acknowledge_target="myrepo"))
+            == "triage"
+        )
 
     def test_infer_report_portfolio_truth(self):
         assert _infer_subcommand_from_flags(self._ns(portfolio_truth=True)) == "report"
 
     def test_infer_report_campaign(self):
-        assert _infer_subcommand_from_flags(self._ns(campaign="security-review")) == "report"
+        assert (
+            _infer_subcommand_from_flags(self._ns(campaign="security-review"))
+            == "report"
+        )
 
     def test_infer_report_writeback(self):
-        assert _infer_subcommand_from_flags(self._ns(writeback_target="github")) == "report"
+        assert (
+            _infer_subcommand_from_flags(self._ns(writeback_target="github"))
+            == "report"
+        )
