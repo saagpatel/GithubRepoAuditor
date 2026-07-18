@@ -148,9 +148,9 @@ def test_security_no_alerts_leaves_security_risk_false():
     assert "active-high-severity-alerts" not in result["risk_factors"]
 
 
-def test_security_alerts_ignored_when_not_active():
-    # Alerts on a stale (non-active) repo on the maintain path do not fire the
-    # factor or force elevation — the factor is gated on active status, like the others.
+def test_security_alerts_on_stale_maintain_path_remain_actionable():
+    # A stale repo deliberately kept on the maintain path still needs a security
+    # decision when receipt-backed high/critical alerts remain open.
     result = build_risk_entry(
         **_baseline_kwargs(
             activity_status="stale",
@@ -159,9 +159,9 @@ def test_security_alerts_ignored_when_not_active():
             security_high_alerts=5,
         )
     )
-    assert result["risk_tier"] != "elevated"
-    assert result["security_risk"] is False
-    assert "active-high-severity-alerts" not in result["risk_factors"]
+    assert result["risk_tier"] == "elevated"
+    assert result["security_risk"] is True
+    assert "active-high-severity-alerts" in result["risk_factors"]
 
 
 def test_security_alerts_do_not_override_deferred_short_circuit():
