@@ -31,6 +31,14 @@
 			"note": "Local operator control plane (127.0.0.1:46210). Most active project in bridge-db yet absent from auditor portfolio-truth."
 		},
 		{
+			"canonical_key": "operator-scripts",
+			"display_name": "operator-scripts",
+			"repo_full_name": "saagpatel/operator-scripts",
+			"group_key": "operator_infra",
+			"lifecycle_state": "active",
+			"note": "Private scheduled-job scripts repository rooted at /Users/d/scripts, outside the default /Users/d/Projects audit scan."
+		},
+		{
 			"canonical_key": "supp:SecondBrain",
 			"display_name": "SecondBrain",
 			"repo_full_name": null,

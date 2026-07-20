@@ -22,9 +22,9 @@ from src.project_registry import (
     BRIDGE_CANONICAL_KEY_DISAGREEMENTS,
     DEFAULT_NOTION_PROJECTION_ONLY_ROWS,
     DEFAULT_NOTION_TITLE_ALIASES,
-    DEFAULT_SUPPLEMENTARY,
     IDENTITY_ALIAS_MAP,
     IDENTITY_ALIAS_MAP_DEPRECATES_AFTER,
+    load_overrides_config,
     normalize,
     supp_key_for,
 )
@@ -38,6 +38,9 @@ DEFAULT_NOTIFICATION_DB_PATH = Path(
 DEFAULT_NOTION_SNAPSHOT_PATH = Path(
     "~/.local/share/notion-os/project-snapshot.json"
 ).expanduser()
+DEFAULT_PROJECT_REGISTRY_OVERRIDES_PATH = (
+    Path(__file__).resolve().parents[1] / "config" / "project-registry-overrides.json"
+)
 
 HEX_FRAGMENT_RE = re.compile(r"^[0-9a-fA-F]{3}$")
 EXPLICIT_UNRESOLVED_IDENTITIES = {"homeadhoc", "unresolved"}
@@ -792,14 +795,22 @@ def _build_identity_resolver(truth: dict[str, Any]) -> dict[str, str]:
             if supp:
                 for value in (identity.get("display_name"), project_key, supp):
                     _add_identity_alias(resolver, value, supp)
-    # Supplementary registry projects (repo-less operator-OS projects the
-    # auditor's portfolio-truth does not track, e.g. personal-ops, SecondBrain)
-    # carry a supp: canonical_key. Seed them so they resolve like any project.
-    for supp_entry in DEFAULT_SUPPLEMENTARY:
+    # Supplementary registry projects (operator-OS projects the auditor's
+    # portfolio-truth does not track) must come from the same operator-owned
+    # config consumed by the registry generator. Falling back to built-ins
+    # preserves degraded operation when that config is absent.
+    _, supplementary, *_ = load_overrides_config(
+        DEFAULT_PROJECT_REGISTRY_OVERRIDES_PATH
+    )
+    for supp_entry in supplementary:
         canonical = supp_entry.get("canonical_key")
         if not isinstance(canonical, str) or not canonical:
             continue
-        for value in (supp_entry.get("display_name"), canonical):
+        for value in (
+            supp_entry.get("display_name"),
+            supp_entry.get("repo_full_name"),
+            canonical,
+        ):
             _add_identity_alias(resolver, value, canonical)
     # Notion title aliases (e.g. "OrbitForge (staging)" -> OrbitForge): resolve
     # the alias target to its canonical, then map the drifted title onto it so
