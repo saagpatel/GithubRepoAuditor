@@ -134,7 +134,12 @@ def _validate_relative_path(value: object, *, field: str) -> str:
     if not isinstance(value, str) or not value:
         raise ContractMigrationError(f"{field} must be a non-empty relative path")
     path = Path(value)
-    if path.is_absolute() or ".." in path.parts:
+    if (
+        path.is_absolute()
+        or ".." in path.parts
+        or value.startswith(("-", "~"))
+        or any(character in value for character in ("*", "?", "[", "]"))
+    ):
         raise ContractMigrationError(f"{field} escapes the repository: {value}")
     if any(part.lower() in _FORBIDDEN_SECRET_PATH_PARTS for part in path.parts):
         raise ContractMigrationError(f"{field} targets secret-bearing state: {value}")

@@ -356,6 +356,10 @@ def test_path_verifier_secret_and_producer_first_controls() -> None:
         "node -e process.exit(0)",
         "cargo check --manifest-path /etc/Cargo.toml",
         "pnpm test --token=do-not-copy",
+        "uv run ruff check --fix src",
+        "pnpm --dir ~ run build",
+        "cargo check --manifest-path ~/Cargo.toml",
+        "node --test ~/outside.js",
     ):
         unsafe_verifier = _descriptor(PERSONAL_OPS, "consumer")
         unsafe_verifier["verifier"]["commands"] = [command]
