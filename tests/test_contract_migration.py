@@ -360,6 +360,9 @@ def test_path_verifier_secret_and_producer_first_controls() -> None:
         "pnpm --dir ~ run build",
         "cargo check --manifest-path ~/Cargo.toml",
         "node --test ~/outside.js",
+        "uv run ruff check {~/outside,src/inside}.py",
+        "node --test {~/outside,src/inside}.js",
+        "pnpm --dir =ls run build",
     ):
         unsafe_verifier = _descriptor(PERSONAL_OPS, "consumer")
         unsafe_verifier["verifier"]["commands"] = [command]

@@ -137,8 +137,8 @@ def _validate_relative_path(value: object, *, field: str) -> str:
     if (
         path.is_absolute()
         or ".." in path.parts
-        or value.startswith(("-", "~"))
-        or any(character in value for character in ("*", "?", "[", "]"))
+        or value.startswith(("-", "~", "="))
+        or any(character in value for character in ("*", "?", "[", "]", "{", "}"))
     ):
         raise ContractMigrationError(f"{field} escapes the repository: {value}")
     if any(part.lower() in _FORBIDDEN_SECRET_PATH_PARTS for part in path.parts):
