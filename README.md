@@ -348,6 +348,17 @@ For day-to-day operations, `--control-center` is now the clean read-only entrypo
 
 The portfolio truth layer now has its own dedicated generation path. `--portfolio-truth` scans the configured local projects workspace, produces `output/portfolio-truth-latest.json` plus dated historical truth snapshots, and regenerates the configured project-registry and portfolio-audit Markdown compatibility outputs from that same truth contract instead of treating either markdown file as canonical.
 
+PortfolioTruth 0.12.0 retains `schema_version` and adds the compatibility
+envelope `contract: {id, version, compatibility}`. Cross-repository changes are
+planned from tracked `ContractDescriptorV1` files with
+`contract-migration-plan`; the resulting `ContractGraphV1` and
+`MigrationPlanV1` bind repository paths, HEADs, descriptor hashes, and an
+operator-supplied inspection time. Any missing or unverifiable declared edge
+returns `state=unknown`, with `patch_preparation_allowed=false`. Consumers are
+ordered before the producer, producer-first rollback is explicit, and legacy
+cleanup remains deferred. This is static planning only: it does not run
+adapters or mutate repositories.
+
 After regenerating portfolio truth, verify the canonical snapshot instead of copying numbers into handoff or demo docs:
 
 ```bash

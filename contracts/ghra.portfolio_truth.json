@@ -1,0 +1,34 @@
+{
+  "schema_version": "ContractDescriptorV1",
+  "contract_id": "ghra.portfolio_truth",
+  "repository": "saagpatel/GithubRepoAuditor",
+  "role": "producer",
+  "producer": "saagpatel/GithubRepoAuditor",
+  "consumer": null,
+  "current_version": "0.11.0",
+  "target_version": "0.12.0",
+  "accepted_version_range": null,
+  "compatibility": "additive",
+  "expected_consumers": [
+    "saagpatel/personal-ops",
+    "saagpatel/PortfolioCommandCenter"
+  ],
+  "evidence": "declared-static",
+  "adapter": {
+    "id": "githubrepoauditor.portfolio_truth_0_12",
+    "patch_paths": [
+      "src/portfolio_truth_types.py",
+      "src/portfolio_truth_validate.py"
+    ]
+  },
+  "verifier": {
+    "commands": [
+      "uv run --extra dev ruff check src/contract_migration.py src/portfolio_truth_types.py src/portfolio_truth_validate.py tests/test_contract_migration.py",
+      "uv run --extra dev pytest -q tests/test_contract_migration.py tests/test_portfolio_truth.py"
+    ]
+  },
+  "rollback": {
+    "strategy": "producer-first",
+    "version": "0.11.0"
+  }
+}

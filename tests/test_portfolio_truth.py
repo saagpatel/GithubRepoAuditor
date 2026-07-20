@@ -392,7 +392,12 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     assert gamma.identity.section_marker == "iOS Projects"
     assert gamma.derived.stack == ["Swift"]
 
-    assert result.snapshot.schema_version == "0.11.0"
+    assert result.snapshot.schema_version == "0.12.0"
+    assert result.snapshot.to_dict()["contract"] == {
+        "id": "ghra.portfolio_truth",
+        "version": "0.12.0",
+        "compatibility": "additive",
+    }
     assert result.snapshot.derivation_policy_version == "portfolio_attention.v3"
     assert result.snapshot.inputs["catalog"]["sha256"]
     assert result.snapshot.inputs["notion"]["mode"] == "unavailable"

@@ -11,6 +11,8 @@ from src.portfolio_pathing import (
 from src.portfolio_truth_render import registry_project_labels
 from src.portfolio_truth_types import (
     DERIVATION_POLICY_VERSION,
+    PORTFOLIO_TRUTH_COMPATIBILITY,
+    PORTFOLIO_TRUTH_CONTRACT_ID,
     SCHEMA_VERSION,
     VALID_ACTIVITY_STATUS,
     VALID_ATTENTION_STATES,
@@ -32,6 +34,16 @@ def validate_truth_snapshot(snapshot: PortfolioTruthSnapshot) -> None:
             f"{snapshot.derivation_policy_version}"
         )
     _validate_contract_envelope(snapshot)
+    serialized_contract = snapshot.to_dict().get("contract")
+    expected_contract = {
+        "id": PORTFOLIO_TRUTH_CONTRACT_ID,
+        "version": SCHEMA_VERSION,
+        "compatibility": PORTFOLIO_TRUTH_COMPATIBILITY,
+    }
+    if serialized_contract != expected_contract:
+        raise ValueError(
+            f"Unexpected PortfolioTruth contract envelope: {serialized_contract}"
+        )
     seen_keys: set[str] = set()
     for project in snapshot.projects:
         key = project.identity.project_key

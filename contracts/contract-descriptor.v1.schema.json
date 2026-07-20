@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/saagpatel/GithubRepoAuditor/contracts/contract-descriptor.v1.schema.json",
+  "title": "ContractDescriptorV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_id",
+    "repository",
+    "role",
+    "producer",
+    "consumer",
+    "current_version",
+    "target_version",
+    "accepted_version_range",
+    "compatibility",
+    "expected_consumers",
+    "evidence",
+    "adapter",
+    "verifier",
+    "rollback"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "ContractDescriptorV1"
+    },
+    "contract_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]+$"
+    },
+    "repository": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+    },
+    "role": {
+      "enum": [
+        "producer",
+        "consumer"
+      ]
+    },
+    "producer": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+    },
+    "consumer": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "current_version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "target_version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "accepted_version_range": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "compatibility": {
+      "enum": [
+        "additive",
+        "breaking"
+      ]
+    },
+    "expected_consumers": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+      },
+      "uniqueItems": true
+    },
+    "evidence": {
+      "const": "declared-static"
+    },
+    "adapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "patch_paths"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.-]+$"
+        },
+        "patch_paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      }
+    },
+    "verifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commands"
+      ],
+      "properties": {
+        "commands": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      }
+    },
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "strategy",
+        "version"
+      ],
+      "properties": {
+        "strategy": {
+          "enum": [
+            "producer-first",
+            "consumer-remains-dual-read"
+          ]
+        },
+        "version": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

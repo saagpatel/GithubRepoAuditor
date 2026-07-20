@@ -6,7 +6,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = "0.11.0"
+SCHEMA_VERSION = "0.12.0"
+# 0.12.0: additive contract envelope identifies the canonical artifact and
+# compatibility class while retaining schema_version for legacy consumers.
 # 0.11.0: provenance-bearing GitHub security receipts preserve per-provider
 # states and expose complete/partial/stale/unknown coverage denominators.
 # 0.10.0: canonical producer receipts bind the exact checkout; coverage and
@@ -14,8 +16,10 @@ SCHEMA_VERSION = "0.11.0"
 # 0.8.0: derived.registry_status removed (was a stale->parked synonym table over
 # activity_status); derived.archived added as a first-class lifecycle boolean;
 # source_summary.registry_status_counts replaced by activity_status_counts + archived_count.
-LEGACY_SCHEMA_VERSIONS = {"0.7.0", "0.8.0", "0.9.0", "0.10.0"}
+LEGACY_SCHEMA_VERSIONS = {"0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0"}
 DERIVATION_POLICY_VERSION = "portfolio_attention.v3"
+PORTFOLIO_TRUTH_CONTRACT_ID = "ghra.portfolio_truth"
+PORTFOLIO_TRUTH_COMPATIBILITY = "additive"
 
 # The published "latest" portfolio-truth artifact. The producer
 # (portfolio_truth_publish) writes it; every reader resolves it through
@@ -423,6 +427,11 @@ class PortfolioTruthSnapshot:
     def to_dict(self) -> dict[str, Any]:
         return {
             "schema_version": self.schema_version,
+            "contract": {
+                "id": PORTFOLIO_TRUTH_CONTRACT_ID,
+                "version": self.schema_version,
+                "compatibility": PORTFOLIO_TRUTH_COMPATIBILITY,
+            },
             "generated_at": _serialize_datetime(self.generated_at),
             "derivation_policy_version": self.derivation_policy_version,
             "producer": dict(self.producer),
