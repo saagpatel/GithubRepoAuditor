@@ -243,12 +243,18 @@ def build_portfolio_truth_snapshot(
     catalog_data = load_portfolio_catalog(catalog_path)
     legacy_rows = load_legacy_registry_rows(legacy_registry_path)
     notion_context = load_safe_notion_project_context() if include_notion else {}
+    notion_source_mode = str(
+        getattr(notion_context, "source_mode", "live") or "live"
+    )
+    notion_observed_at = getattr(notion_context, "observed_at", None)
     notion_context_carried_forward = False
     if include_notion and not notion_context and notion_context_fallback:
         # Live Notion was unavailable; carry forward the prior published context so
         # a headless refresh updates risk/activity signals without dropping advisory
         # data to zero. The caller opts in via publish_portfolio_truth(allow_empty_notion=True).
         notion_context = notion_context_fallback
+        notion_source_mode = "carried-forward"
+        notion_observed_at = prior_notion_generated_at
         notion_context_carried_forward = True
         logger.warning(
             "Live Notion context unavailable; carrying forward %d project rows "
@@ -346,6 +352,8 @@ def build_portfolio_truth_snapshot(
             notion_context_rows=len(notion_context),
             notion_context_carried_forward=notion_context_carried_forward,
             prior_notion_generated_at=prior_notion_generated_at,
+            notion_source_mode=notion_source_mode,
+            notion_observed_at=notion_observed_at,
             security_coverage_metadata=security_coverage_metadata,
         ),
         coverage=_build_coverage_envelope(
@@ -574,6 +582,8 @@ def _build_input_envelope(
     notion_context_rows: int,
     notion_context_carried_forward: bool,
     prior_notion_generated_at: str | None,
+    notion_source_mode: str,
+    notion_observed_at: str | None,
     security_coverage_metadata: dict[str, Any] | None,
 ) -> dict[str, Any]:
     resolved_catalog = Path(str(catalog_data.get("path") or ""))
@@ -589,8 +599,8 @@ def _build_input_envelope(
         notion_mode = "carried-forward" if prior_notion_generated_at else "unavailable"
         notion_observed_at = prior_notion_generated_at
     else:
-        notion_mode = "live"
-        notion_observed_at = now.isoformat()
+        notion_mode = notion_source_mode
+        notion_observed_at = notion_observed_at or now.isoformat()
     inputs = {
         "catalog": {
             "source_id": "portfolio-catalog",

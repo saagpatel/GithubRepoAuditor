@@ -269,6 +269,8 @@ def test_notion_context_uses_fresh_verified_snapshot_when_live_api_unavailable(
         "momentum": "Watch",
         "current_state": "Shipped",
     }
+    assert context.source_mode == "verified-snapshot"
+    assert context.observed_at is not None
 
 
 def test_notion_context_rejects_snapshot_without_verified_live_receipt(
@@ -288,6 +290,24 @@ def test_notion_context_rejects_snapshot_without_verified_live_receipt(
             }
         )
     )
+    monkeypatch.setattr(
+        "src.portfolio_truth_sources.load_notion_project_context",
+        lambda _config_dir: None,
+    )
+
+    assert (
+        load_safe_notion_project_context(
+            tmp_path / "config", snapshot_path=snapshot_path
+        )
+        == {}
+    )
+
+
+def test_notion_context_rejects_non_object_snapshot_json(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    snapshot_path = tmp_path / "project-snapshot.json"
+    snapshot_path.write_text("[]")
     monkeypatch.setattr(
         "src.portfolio_truth_sources.load_notion_project_context",
         lambda _config_dir: None,
