@@ -20,7 +20,7 @@
 			"repo_full_name": null,
 			"group_key": "operator_infra",
 			"lifecycle_state": "manual-only",
-			"note": "Machine-wide Claude Code harness operating surface under /Users/d/.claude; tracked as shipped/monitor-only, not a standalone repo."
+			"note": "Machine-wide Claude Code harness operating surface under the machine-wide Claude Code config directory; tracked as shipped/monitor-only, not a standalone repo."
 		},
 		{
 			"canonical_key": "supp:personal-ops",
@@ -36,7 +36,7 @@
 			"repo_full_name": null,
 			"group_key": "operator_infra",
 			"lifecycle_state": "active",
-			"note": "4-layer knowledge vault at /Users/d/Documents/SecondBrain (engraph-indexed). Not a git repo; absent from auditor."
+			"note": "4-layer knowledge vault in a local documents folder (engraph-indexed). Not a git repo; absent from auditor."
 		}
 	],
 	"memory_meta": {
@@ -71,7 +71,7 @@
 		"app": "local runtime/app shell placeholder; not a portfolio-truth repo",
 		"RAG Knowledge Base": "notion planning row; not a portfolio-truth repo",
 		"Sandbox Local Portfolio Project": "actuation sandbox fixture row",
-		"SecondBrain": "knowledge vault under /Users/d/Documents; not a /Users/d/Projects repo"
+		"SecondBrain": "knowledge vault under a local documents folder; not a projects-directory repo"
 	},
 	"notion_truth_shadow_rows": {
 		"agent-bridge-launch": "agent-bridge",
