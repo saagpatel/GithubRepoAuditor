@@ -137,12 +137,14 @@ def _validate_contract_envelope(snapshot: PortfolioTruthSnapshot) -> None:
     if not isinstance(notion, dict):
         raise ValueError("Portfolio truth inputs.notion is required.")
     mode = notion.get("mode")
-    if mode not in {"live", "carried-forward", "unavailable"}:
+    if mode not in {"live", "verified-snapshot", "carried-forward", "unavailable"}:
         raise ValueError(f"Invalid Notion input mode: {mode}")
     if mode == "carried-forward" and not notion.get("carried_from_generated_at"):
         raise ValueError("Carried-forward Notion input requires an origin timestamp.")
     if mode == "live" and notion.get("carried_from_generated_at") is not None:
         raise ValueError("Live Notion input cannot declare a carried-forward origin.")
+    if mode == "verified-snapshot" and not notion.get("observed_at"):
+        raise ValueError("Verified Notion snapshot input requires an observation timestamp.")
 
 
 def validate_publish_targets(

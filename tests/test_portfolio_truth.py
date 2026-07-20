@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -223,6 +224,101 @@ def test_notion_context_uses_configured_title_aliases(
     context = load_safe_notion_project_context(config_dir)
 
     assert context["notion"]["current_state"] == "Shipped"
+
+
+def test_notion_context_uses_fresh_verified_snapshot_when_live_api_unavailable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    snapshot_path = tmp_path / "project-snapshot.json"
+    projects = [
+        {
+            "title": "operator-scripts",
+            "portfolio_call": "Maintain",
+            "operating_queue": "Watch",
+            "current_state": "Shipped",
+        }
+    ]
+    snapshot_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "2.0.0",
+                "generated_at": datetime.now(timezone.utc).isoformat(),
+                "project_count": 1,
+                "projects": projects,
+                "content_sha256": hashlib.sha256(
+                    json.dumps(
+                        projects, separators=(",", ":"), ensure_ascii=False
+                    ).encode()
+                ).hexdigest(),
+                "live_read_receipt": {"state": "verified", "page_count": 1},
+                "attention_authority_receipt": {"state": "verified"},
+            }
+        )
+    )
+    monkeypatch.setattr(
+        "src.portfolio_truth_sources.load_notion_project_context",
+        lambda _config_dir: None,
+    )
+
+    context = load_safe_notion_project_context(
+        tmp_path / "config", snapshot_path=snapshot_path
+    )
+
+    assert context["operatorscripts"] == {
+        "portfolio_call": "Maintain",
+        "momentum": "Watch",
+        "current_state": "Shipped",
+    }
+    assert context.source_mode == "verified-snapshot"
+    assert context.observed_at is not None
+
+
+def test_notion_context_rejects_snapshot_without_verified_live_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    snapshot_path = tmp_path / "project-snapshot.json"
+    snapshot_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "2.0.0",
+                "generated_at": datetime.now(timezone.utc).isoformat(),
+                "project_count": 1,
+                "projects": [{"title": "operator-scripts"}],
+                "content_sha256": "not-relevant",
+                "live_read_receipt": {"state": "unverified", "page_count": 1},
+                "attention_authority_receipt": {"state": "verified"},
+            }
+        )
+    )
+    monkeypatch.setattr(
+        "src.portfolio_truth_sources.load_notion_project_context",
+        lambda _config_dir: None,
+    )
+
+    assert (
+        load_safe_notion_project_context(
+            tmp_path / "config", snapshot_path=snapshot_path
+        )
+        == {}
+    )
+
+
+def test_notion_context_rejects_non_object_snapshot_json(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    snapshot_path = tmp_path / "project-snapshot.json"
+    snapshot_path.write_text("[]")
+    monkeypatch.setattr(
+        "src.portfolio_truth_sources.load_notion_project_context",
+        lambda _config_dir: None,
+    )
+
+    assert (
+        load_safe_notion_project_context(
+            tmp_path / "config", snapshot_path=snapshot_path
+        )
+        == {}
+    )
 
 
 @pytest.fixture

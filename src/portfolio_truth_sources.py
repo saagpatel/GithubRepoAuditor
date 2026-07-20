@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import re
 import subprocess
 from datetime import datetime, timezone
@@ -105,6 +107,19 @@ ARCHIVE_REMOTE_BASENAME_TOKENS = frozenset({"private-archive", "scrubbed-import"
 
 
 WORKSPACE_DISCOVERY_POLICY_VERSION = "workspace_discovery.v2"
+MAX_NOTION_SNAPSHOT_AGE_HOURS = 30
+
+
+class NotionProjectContext(dict[str, dict[str, str]]):
+    def __init__(
+        self,
+        *,
+        source_mode: str,
+        observed_at: str | None,
+    ) -> None:
+        super().__init__()
+        self.source_mode = source_mode
+        self.observed_at = observed_at
 
 
 def workspace_exclusion_reason(name: str, *, nested: bool = False) -> str | None:
@@ -306,9 +321,24 @@ def load_legacy_registry_rows(path: Path | None) -> dict[str, dict[str, str]]:
 
 def load_safe_notion_project_context(
     config_dir: Path = Path("config"),
+    snapshot_path: Path | None = None,
 ) -> dict[str, dict[str, str]]:
-    raw_context = load_notion_project_context(config_dir) or {}
-    sanitized: dict[str, dict[str, str]] = {}
+    raw_context = load_notion_project_context(config_dir)
+    source_mode = "live"
+    observed_at: str | None = None
+    if not raw_context:
+        configured_snapshot = snapshot_path or _notion_snapshot_path_from_environment()
+        if configured_snapshot:
+            raw_context, observed_at = _load_verified_notion_snapshot_context(
+                configured_snapshot
+            )
+            source_mode = "verified-snapshot"
+        else:
+            raw_context = {}
+    sanitized = NotionProjectContext(
+        source_mode=source_mode,
+        observed_at=observed_at,
+    )
     for name, context in raw_context.items():
         sanitized[_normalize(name)] = {
             "portfolio_call": str(context.get("portfolio_call", "") or "").strip(),
@@ -320,6 +350,78 @@ def load_safe_notion_project_context(
         if alias_context:
             sanitized.setdefault(_normalize(target), alias_context)
     return sanitized
+
+
+def _notion_snapshot_path_from_environment() -> Path | None:
+    configured = os.environ.get("GHRA_NOTION_SNAPSHOT_PATH", "").strip()
+    if not configured:
+        return None
+    return Path(configured).expanduser()
+
+
+def _load_verified_notion_snapshot_context(
+    snapshot_path: Path,
+) -> tuple[dict[str, dict[str, str]], str | None]:
+    try:
+        payload = json.loads(snapshot_path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}, None
+    if not isinstance(payload, dict):
+        return {}, None
+    if payload.get("schema_version") != "2.0.0":
+        return {}, None
+    projects = payload.get("projects")
+    if (
+        not isinstance(projects, list)
+        or payload.get("project_count") != len(projects)
+        or not projects
+    ):
+        return {}, None
+    live_receipt = payload.get("live_read_receipt")
+    if (
+        not isinstance(live_receipt, dict)
+        or live_receipt.get("state") != "verified"
+        or live_receipt.get("page_count") != len(projects)
+    ):
+        return {}, None
+    authority_receipt = payload.get("attention_authority_receipt")
+    if (
+        not isinstance(authority_receipt, dict)
+        or authority_receipt.get("state") != "verified"
+    ):
+        return {}, None
+    try:
+        generated_at = datetime.fromisoformat(
+            str(payload.get("generated_at", "")).replace("Z", "+00:00")
+        )
+    except ValueError:
+        return {}, None
+    age_hours = (
+        datetime.now(timezone.utc) - generated_at.astimezone(timezone.utc)
+    ).total_seconds() / 3600
+    if age_hours < -(5 / 60) or age_hours > MAX_NOTION_SNAPSHOT_AGE_HOURS:
+        return {}, None
+    content_bytes = json.dumps(
+        projects, separators=(",", ":"), ensure_ascii=False
+    ).encode()
+    if hashlib.sha256(content_bytes).hexdigest() != payload.get("content_sha256"):
+        return {}, None
+
+    context: dict[str, dict[str, str]] = {}
+    for project in projects:
+        if not isinstance(project, dict):
+            continue
+        title = str(project.get("title", "") or "").strip()
+        if not title:
+            continue
+        context[title] = {
+            "portfolio_call": str(project.get("portfolio_call", "") or "").strip(),
+            "momentum": str(
+                project.get("momentum") or project.get("operating_queue") or ""
+            ).strip(),
+            "current_state": str(project.get("current_state", "") or "").strip(),
+        }
+    return context, generated_at.isoformat()
 
 
 def _load_notion_title_aliases(config_dir: Path) -> dict[str, str]:
