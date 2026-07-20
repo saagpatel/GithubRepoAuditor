@@ -456,6 +456,28 @@ def test_identity_resolution_supplementary_project_resolves(tmp_path: Path) -> N
     assert result.passed, [f.detail for f in result.findings]
 
 
+def test_identity_resolution_configured_supplementary_repo_resolves(
+    tmp_path: Path,
+) -> None:
+    # operator-scripts is enrolled only in the operator-owned supplementary
+    # config, not the built-in fallback. Both bridge identity dialects must
+    # resolve through the same source used by the registry generator.
+    truth, markdown = _passing_paths(tmp_path)
+    _write_identity_truth(truth)
+    bridge_db = tmp_path / "bridge.db"
+    _write_bridge_db(
+        bridge_db,
+        activity_rows=[
+            ("operator-scripts", "saagpatel/operator-scripts"),
+            ("saagpatel/operator-scripts", "saagpatel/operator-scripts"),
+        ],
+    )
+    result = lint_operator_os_seams(
+        truth_path=truth, markdown_paths=markdown, bridge_db_path=bridge_db, now=NOW
+    )
+    assert result.passed, [f.detail for f in result.findings]
+
+
 def test_identity_resolution_migration_drift_alias_resolves(tmp_path: Path) -> None:
     # o2-fable-runpack is OPERANT activity logged under a loose name; the
     # census-seeded alias map maps it to the operant repo so it resolves.
