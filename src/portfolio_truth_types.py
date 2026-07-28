@@ -9,6 +9,8 @@ from typing import Any
 SCHEMA_VERSION = "0.11.0"
 # 0.11.0: provenance-bearing GitHub security receipts preserve per-provider
 # states and expose complete/partial/stale/unknown coverage denominators.
+# Additive 0.11.0 fields bind normalized provider reason codes, completed-zero
+# observations, and live remote default-branch/head evidence to the same receipt.
 # 0.10.0: canonical producer receipts bind the exact checkout; coverage and
 # repository/worktree observation envelopes fail closed on unavailable evidence.
 # 0.8.0: derived.registry_status removed (was a stale->parked synonym table over
@@ -302,6 +304,13 @@ class PortfolioTruthRollups:
         dependabot_observed_count = 0
         code_scanning_observed_count = 0
         secret_scanning_observed_count = 0
+        dependabot_zero_finding_count = 0
+        code_scanning_zero_finding_count = 0
+        secret_scanning_zero_finding_count = 0
+        remote_default_branch_observed_count = 0
+        remote_default_branch_partial_count = 0
+        remote_default_branch_stale_count = 0
+        remote_default_branch_unavailable_count = 0
         decision_needed_count = 0
         default_attention_count = 0
         for project in projects:
@@ -327,6 +336,33 @@ class PortfolioTruthRollups:
                     code_scanning_observed_count += 1
                 if provider_states["secret_scanning"] == "observed":
                     secret_scanning_observed_count += 1
+                dependabot_zero_finding_count += int(
+                    (security.providers.get("dependabot") or {}).get("zero_findings")
+                    is True
+                )
+                code_scanning_zero_finding_count += int(
+                    (security.providers.get("code_scanning") or {}).get(
+                        "zero_findings"
+                    )
+                    is True
+                )
+                secret_scanning_zero_finding_count += int(
+                    (security.providers.get("secret_scanning") or {}).get(
+                        "zero_findings"
+                    )
+                    is True
+                )
+                remote_state = (
+                    project.repository_state.get("remote_default_branch") or {}
+                ).get("state")
+                if remote_state == "observed":
+                    remote_default_branch_observed_count += 1
+                elif remote_state == "partial":
+                    remote_default_branch_partial_count += 1
+                elif remote_state == "stale":
+                    remote_default_branch_stale_count += 1
+                else:
+                    remote_default_branch_unavailable_count += 1
                 if security.coverage_state == "complete":
                     complete_repo_count += 1
                     scanned_count += 1
@@ -369,6 +405,21 @@ class PortfolioTruthRollups:
                 "dependabot_observed_count": dependabot_observed_count,
                 "code_scanning_observed_count": code_scanning_observed_count,
                 "secret_scanning_observed_count": secret_scanning_observed_count,
+                "dependabot_zero_finding_count": dependabot_zero_finding_count,
+                "code_scanning_zero_finding_count": code_scanning_zero_finding_count,
+                "secret_scanning_zero_finding_count": secret_scanning_zero_finding_count,
+                "remote_default_branch_observed_count": (
+                    remote_default_branch_observed_count
+                ),
+                "remote_default_branch_partial_count": (
+                    remote_default_branch_partial_count
+                ),
+                "remote_default_branch_stale_count": (
+                    remote_default_branch_stale_count
+                ),
+                "remote_default_branch_unavailable_count": (
+                    remote_default_branch_unavailable_count
+                ),
                 "coverage_state": (
                     "known"
                     if unavailable_count == 0

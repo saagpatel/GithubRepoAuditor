@@ -68,6 +68,9 @@ def run_portfolio_truth_mode(args: Any) -> None:
                 "portfolio_truth_security_cohort_count",
                 DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
             ),
+            expected_producer_commit=(
+                producer_evidence.commit if producer_evidence is not None else None
+            ),
         )
         if loaded_security is not None:
             security_alerts_by_name = loaded_security.entries_by_full_name
@@ -77,6 +80,7 @@ def run_portfolio_truth_mode(args: Any) -> None:
                 "produced_at": loaded_security.produced_at,
                 "state": loaded_security.receipt_state,
                 "age_hours": loaded_security.age_hours,
+                "producer_commit": loaded_security.producer_commit,
                 "cohort_policy": loaded_security.cohort_policy,
                 "cohort_repository_count": len(
                     loaded_security.cohort_repositories

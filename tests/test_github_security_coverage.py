@@ -23,6 +23,14 @@ from src.portfolio_truth_reconcile import _select_security_entry
 from src.portfolio_truth_status import load_security_coverage_by_full_name
 
 NOW = datetime(2026, 7, 16, 12, tzinfo=timezone.utc)
+OUTCOME_FIXTURES = json.loads(
+    (
+        Path(__file__).parent
+        / "fixtures"
+        / "github_security_coverage"
+        / "outcomes.json"
+    ).read_text()
+)
 
 
 def _truth(count: int = 16) -> dict[str, Any]:
@@ -144,6 +152,21 @@ def _eligibility_responses(count: int = 6) -> list[_Response]:
     ]
 
 
+def _remote_graphql_response(count: int) -> _Response:
+    repositories = {
+        f"repo{index}": {
+            "nameWithOwner": f"owner/repo-{index:02d}",
+            "isArchived": False,
+            "defaultBranchRef": {
+                "name": "main",
+                "target": {"oid": f"{index:040x}"},
+            },
+        }
+        for index in range(count)
+    }
+    return _Response(200, {"data": repositories})
+
+
 def test_default_attention_cohort_is_exact_and_fail_closed() -> None:
     truth = _truth(DEFAULT_EXPECTED_GITHUB_COHORT_COUNT)
     truth["projects"].append(
@@ -178,13 +201,44 @@ def test_repo_less_non_supplementary_attention_identity_fails_closed() -> None:
         derive_default_attention_cohort(truth)
 
 
-def test_no_token_never_attempts_collection() -> None:
+def test_no_token_writes_exact_fail_closed_outcomes_without_network() -> None:
     session = _Session()
 
-    with pytest.raises(SecurityCoverageError, match="credential unavailable"):
-        collect_security_coverage(_truth(), token=None, session=session)
+    receipt = collect_security_coverage(
+        _truth(DEFAULT_EXPECTED_GITHUB_COHORT_COUNT),
+        token=None,
+        session=session,
+        now=NOW,
+        producer_commit="a" * 40,
+    )
 
     assert session.calls == []
+    expected = OUTCOME_FIXTURES["authentication_missing"]
+    for repository in receipt["repositories"].values():
+        assert repository["repository"]["state"] == expected["state"]
+        assert repository["repository"]["reason_code"] == expected["reason_code"]
+        for provider in repository["providers"].values():
+            assert provider["state"] == expected["state"]
+            assert provider["reason_code"] == expected["reason_code"]
+            assert provider["completed"] is False
+            assert provider["zero_findings"] is None
+
+
+def test_rejected_token_stops_after_first_request_and_marks_whole_cut_unknown() -> None:
+    session = _Session([_Response(401, {"message": "Bad credentials"})])
+
+    receipt = _collect(session=session)
+
+    assert len(session.calls) == 1
+    assert receipt["request_budget"]["stop_reason"] == "authentication_missing"
+    assert all(
+        repository["repository"]["reason_code"] == "authentication_missing"
+        and all(
+            provider["reason_code"] == "authentication_missing"
+            for provider in repository["providers"].values()
+        )
+        for repository in receipt["repositories"].values()
+    )
 
 
 def test_valid_prior_for_old_cohort_is_ignored_during_contraction() -> None:
@@ -198,11 +252,12 @@ def test_valid_prior_for_old_cohort_is_ignored_during_contraction() -> None:
     )
 
     assert receipt["cohort"]["repository_count"] == 9
-    assert len(session.calls) == 27
+    assert len(session.calls) == 28
     assert all(
         kwargs.get("headers") == {}
-        for _, kwargs in session.calls
+        for _, kwargs in session.calls[:27]
     )
+    assert "headers" not in session.calls[27][1]
 
 
 def test_invalid_prior_for_old_cohort_still_fails_closed() -> None:
@@ -255,13 +310,71 @@ def test_collector_is_serial_count_only_and_bounded_to_48_base_requests() -> Non
     assert len(session.calls) == DEFAULT_BASE_REQUEST_LIMIT == 48
     assert receipt["request_budget"]["base_requests"] == 48
     assert receipt["request_budget"]["total_requests"] == 48
-    assert receipt["request_budget"]["stop_reason"] is None
+    assert receipt["request_budget"]["stop_reason"] == "base_request_limit"
     assert all("/alerts/" not in url for url, _ in session.calls)
     for repository in receipt["repositories"].values():
         for provider in repository["providers"].values():
             assert provider["state"] == "observed"
             assert provider["counts"] is not None
             assert provider["pagination_complete"] is True
+            assert provider["completed"] is True
+            assert provider["zero_findings"] is True
+    assert all(
+        repository["repository"]["state"] == "not_requested"
+        for repository in receipt["repositories"].values()
+    )
+
+
+def test_current_nine_repository_cut_binds_remote_branch_and_head() -> None:
+    session = _Session(
+        [
+            *[_Response() for _ in range(27)],
+            _remote_graphql_response(DEFAULT_EXPECTED_GITHUB_COHORT_COUNT),
+        ]
+    )
+
+    receipt = _collect(
+        session=session,
+        cohort_count=DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+    )
+
+    assert len(session.calls) == 28
+    assert receipt["request_budget"]["stop_reason"] is None
+    assert all(
+        repository["repository"]["state"] == "observed"
+        and repository["repository"]["reason_code"] == "observed"
+        and repository["repository"]["default_branch"] == "main"
+        and len(repository["repository"]["head_sha"]) == 40
+        for repository in receipt["repositories"].values()
+    )
+
+
+def test_graphql_rate_limit_marks_remote_cut_with_exact_reason_code() -> None:
+    outcome = OUTCOME_FIXTURES["rate_limited"]
+    session = _Session(
+        [
+            *[_Response() for _ in range(27)],
+            _Response(
+                200,
+                {
+                    "data": None,
+                    "errors": [{"message": outcome["message"]}],
+                },
+            ),
+        ]
+    )
+
+    receipt = _collect(
+        session=session,
+        cohort_count=DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+    )
+
+    assert receipt["request_budget"]["stop_reason"] == "rate_limited"
+    assert all(
+        repository["repository"]["state"] == "rate_limited"
+        and repository["repository"]["reason_code"] == outcome["reason_code"]
+        for repository in receipt["repositories"].values()
+    )
 
 
 def test_incremental_eligibility_preflight_skips_plan_blocked_providers() -> None:
@@ -270,9 +383,9 @@ def test_incremental_eligibility_preflight_skips_plan_blocked_providers() -> Non
 
     receipt = _collect(session=session, prior=prior)
 
-    assert len(session.calls) == 38
-    assert receipt["request_budget"]["base_requests"] == 38
-    assert receipt["request_budget"]["total_requests"] == 38
+    assert len(session.calls) == 39
+    assert receipt["request_budget"]["base_requests"] == 39
+    assert receipt["request_budget"]["total_requests"] == 39
     assert receipt["request_budget"]["stop_reason"] is None
     assert receipt["eligibility"]["state"] == "observed"
     assert receipt["eligibility"]["request_count"] == 2
@@ -397,12 +510,13 @@ def test_collector_rejects_relaxed_request_bounds_before_network(
 
 
 def test_rate_limit_stops_immediately_and_leaves_remainder_not_requested() -> None:
+    outcome = OUTCOME_FIXTURES["rate_limited"]
     session = _Session(
         [
             _Response(
-                403,
-                {"message": "API rate limit exceeded"},
-                headers={"X-RateLimit-Remaining": "0"},
+                outcome["status_code"],
+                {"message": outcome["message"]},
+                headers={"X-RateLimit-Remaining": outcome["remaining"]},
             )
         ]
     )
@@ -418,6 +532,10 @@ def test_rate_limit_stops_immediately_and_leaves_remainder_not_requested() -> No
     assert states.count("rate_limited") == 1
     assert states.count("not_requested") == 47
     assert receipt["request_budget"]["stop_reason"] == "rate_limited"
+    first = receipt["repositories"]["owner/repo-00"]["providers"]["dependabot"]
+    assert first["reason_code"] == outcome["reason_code"]
+    assert first["completed"] is False
+    assert first["zero_findings"] is None
 
 
 def test_quota_reserve_stops_before_following_request() -> None:
@@ -455,9 +573,10 @@ def test_total_request_ceiling_halts_incomplete_pagination() -> None:
 
 
 def test_forbidden_and_feature_unavailable_are_distinct() -> None:
+    outcome = OUTCOME_FIXTURES["partial_coverage"]
     session = _Session(
         [
-            _Response(403, {"message": "Resource not accessible by integration"}),
+            _Response(outcome["status_code"], {"message": outcome["message"]}),
             _Response(403, {"message": "Advanced Security must be enabled"}),
         ]
     )
@@ -466,9 +585,26 @@ def test_forbidden_and_feature_unavailable_are_distinct() -> None:
     first = receipt["repositories"]["owner/repo-00"]["providers"]
 
     assert first["dependabot"]["state"] == "forbidden"
+    assert first["dependabot"]["reason_code"] == outcome["reason_code"]
+    assert first["dependabot"]["completed"] is False
+    assert first["dependabot"]["zero_findings"] is None
     assert first["dependabot"]["counts"] is None
     assert first["code_scanning"]["state"] == "feature_unavailable"
+    assert first["code_scanning"]["reason_code"] == "provider_unavailable"
     assert first["code_scanning"]["counts"] is None
+
+
+def test_malformed_provider_payload_has_exact_fail_closed_reason_code() -> None:
+    outcome = OUTCOME_FIXTURES["malformed_provider_data"]
+    session = _Session([_Response(200, outcome["payload"])])
+
+    receipt = _collect(session=session)
+    provider = receipt["repositories"]["owner/repo-00"]["providers"]["dependabot"]
+
+    assert provider["state"] == "malformed"
+    assert provider["reason_code"] == outcome["reason_code"]
+    assert provider["completed"] is False
+    assert provider["zero_findings"] is None
 
 
 def test_conditional_304_reuses_only_valid_prior_counts() -> None:
@@ -495,10 +631,13 @@ def test_conditional_304_reuses_only_valid_prior_counts() -> None:
 
 
 def test_stale_provider_observation_becomes_unknown_count() -> None:
+    outcome = OUTCOME_FIXTURES["stale_observation"]
     receipt = _collect()
     receipt["produced_at"] = NOW.isoformat()
     provider = receipt["repositories"]["owner/repo-00"]["providers"]["dependabot"]
-    provider["observed_at"] = (NOW - timedelta(hours=25)).isoformat()
+    provider["observed_at"] = (
+        NOW - timedelta(hours=outcome["age_hours"])
+    ).isoformat()
 
     loaded = validate_security_coverage_receipt(
         receipt, expected_cohort_count=16, now=NOW
@@ -506,7 +645,27 @@ def test_stale_provider_observation_becomes_unknown_count() -> None:
     normalized = loaded.entries_by_full_name["owner/repo-00"]["providers"]["dependabot"]
 
     assert normalized["state"] == "stale"
+    assert normalized["reason_code"] == outcome["reason_code"]
+    assert normalized["completed"] is False
+    assert normalized["zero_findings"] is None
     assert normalized["counts"] is None
+
+
+def test_successful_empty_provider_response_is_explicit_completed_zero() -> None:
+    outcome = OUTCOME_FIXTURES["successful_zero_findings"]
+    receipt = _collect(session=_Session([_Response(200, outcome["payload"])]))
+    provider = receipt["repositories"]["owner/repo-00"]["providers"]["dependabot"]
+
+    assert provider["state"] == "observed"
+    assert provider["reason_code"] == outcome["reason_code"]
+    assert provider["completed"] is True
+    assert provider["zero_findings"] is outcome["zero_findings"]
+    assert provider["counts"] == {
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+    }
 
 
 def test_receipt_loader_uses_embedded_provenance_not_newer_mtime(
@@ -562,6 +721,26 @@ def test_receipt_provenance_and_provider_timestamps_fail_closed(tmp_path: Path) 
     with pytest.raises(SecurityCoverageError, match="later than receipt produced_at"):
         validate_security_coverage_receipt(
             receipt, expected_cohort_count=16, now=NOW
+        )
+
+
+def test_receipt_producer_must_match_expected_canonical_commit() -> None:
+    receipt = _collect()
+
+    loaded = validate_security_coverage_receipt(
+        receipt,
+        expected_cohort_count=16,
+        expected_producer_commit="a" * 40,
+        now=NOW,
+    )
+    assert loaded.producer_commit == "a" * 40
+
+    with pytest.raises(SecurityCoverageError, match="producer commit mismatch"):
+        validate_security_coverage_receipt(
+            receipt,
+            expected_cohort_count=16,
+            expected_producer_commit="b" * 40,
+            now=NOW,
         )
 
 

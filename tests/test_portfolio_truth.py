@@ -527,6 +527,13 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
         "dependabot_observed_count",
         "code_scanning_observed_count",
         "secret_scanning_observed_count",
+        "dependabot_zero_finding_count",
+        "code_scanning_zero_finding_count",
+        "secret_scanning_zero_finding_count",
+        "remote_default_branch_observed_count",
+        "remote_default_branch_partial_count",
+        "remote_default_branch_stale_count",
+        "remote_default_branch_unavailable_count",
         "coverage_state",
         "repos_with_open_high_critical",
         "total_open_high",
@@ -1195,6 +1202,16 @@ def test_receipt_partial_provider_coverage_emits_explicit_denominators(
             "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
             "receipt_state": "fresh",
             "source_produced_at": now.isoformat(),
+            "repository": {
+                "source": "github-graphql-default-branch-head-v1",
+                "state": "observed",
+                "reason_code": "observed",
+                "reason": None,
+                "observed_at": now.isoformat(),
+                "default_branch": "main",
+                "head_sha": "b" * 40,
+                "archived": False,
+            },
             "providers": {
                 "dependabot": observed,
                 "code_scanning": {
@@ -1218,6 +1235,15 @@ def test_receipt_partial_provider_coverage_emits_explicit_denominators(
         now=now,
         security_alerts_by_name=security,
     )
+    repeated = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=now,
+        security_alerts_by_name=security,
+    )
+    assert repeated.snapshot.to_dict() == result.snapshot.to_dict()
     alpha = next(
         project
         for project in result.snapshot.projects
@@ -1237,6 +1263,17 @@ def test_receipt_partial_provider_coverage_emits_explicit_denominators(
     assert rollup["dependabot_observed_count"] == 1
     assert rollup["code_scanning_observed_count"] == 0
     assert rollup["secret_scanning_observed_count"] == 0
+    assert rollup["remote_default_branch_observed_count"] == 1
+    assert alpha.repository_state["remote_default_branch"] == {
+        "source": "github-graphql-default-branch-head-v1",
+        "state": "observed",
+        "reason_code": "observed",
+        "reason": None,
+        "observed_at": now.isoformat(),
+        "default_branch": "main",
+        "head_sha": "b" * 40,
+        "archived": False,
+    }
 
 
 def test_security_overlay_populates_and_force_elevates(
@@ -2588,6 +2625,7 @@ def test_portfolio_truth_app_threads_security_cohort_count(
 
     assert captured["expected_cohort_count"] == 3
     assert captured["max_age_hours"] == 12
+    assert captured["expected_producer_commit"] is None
 
 
 def test_portfolio_truth_app_passes_validated_producer_receipt_to_publisher(

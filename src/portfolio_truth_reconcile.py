@@ -514,6 +514,33 @@ def _build_coverage_envelope(
         )
         for provider in ("dependabot", "code_scanning", "secret_scanning")
     }
+    provider_zero_finding_counts = {
+        provider: sum(
+            (project.security.providers.get(provider) or {}).get("zero_findings")
+            is True
+            for project in workspace_projects
+        )
+        for provider in ("dependabot", "code_scanning", "secret_scanning")
+    }
+    remote_default_branch_counts = {
+        state: sum(
+            (project.repository_state.get("remote_default_branch") or {}).get("state")
+            == state
+            for project in workspace_projects
+        )
+        for state in (
+            "observed",
+            "partial",
+            "stale",
+            "credential_unavailable",
+            "forbidden",
+            "not_found",
+            "rate_limited",
+            "malformed",
+            "not_requested",
+            "unknown",
+        )
+    }
     git_observed = sum(
         project.repository_state.get("state") == "observed"
         for project in workspace_projects
@@ -550,6 +577,8 @@ def _build_coverage_envelope(
             "cohort_stale_count": cohort_stale,
             "cohort_unknown_count": cohort_unknown,
             "provider_observed_counts": provider_counts,
+            "provider_zero_finding_counts": provider_zero_finding_counts,
+            "remote_default_branch_counts": remote_default_branch_counts,
             "project_count": workspace_project_count,
         },
         {
@@ -1166,6 +1195,32 @@ def _build_truth_project(
         "source": "derived",
         "detail": str(risk_entry["doctor_gap"]).lower(),
     }
+    remote_default_branch = (
+        dict(security_entry.get("repository") or {})
+        if security_entry is not None
+        else None
+    )
+    repository_state = (
+        observe_repository_state(
+            project_path,
+            observed_at=now,
+            remote_default_branch=remote_default_branch,
+        )
+        if project_path is not None and has_git
+        else {
+            "state": "not_a_repository",
+            "observed_at": now.isoformat(),
+            "remote_default_branch": remote_default_branch
+            or {
+                "state": "unknown",
+                "reason_code": "not_requested",
+                "reason": (
+                    "no independent live remote read was performed by "
+                    "portfolio generation"
+                ),
+            },
+        }
+    )
     return PortfolioTruthProject(
         identity=identity,
         declared=declared,
@@ -1173,11 +1228,7 @@ def _build_truth_project(
         risk=risk,
         security=security,
         advisory=advisory,
-        repository_state=(
-            observe_repository_state(project_path, observed_at=now)
-            if project_path is not None and has_git
-            else {"state": "not_a_repository", "observed_at": now.isoformat()}
-        ),
+        repository_state=repository_state,
         provenance=provenance,
         warnings=warnings,
     )
