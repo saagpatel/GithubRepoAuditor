@@ -712,7 +712,7 @@ requires-dist = [
     { name = "requests", specifier = ">=2.31.0" },
     { name = "responses", marker = "extra == 'dev'", specifier = ">=0.25" },
     { name = "rich", specifier = ">=13.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.4" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.4,<0.16" },
     { name = "sentence-transformers", marker = "extra == 'semantic'", specifier = ">=3.0" },
     { name = "shiv", marker = "extra == 'build'", specifier = ">=1.0" },
     { name = "sqlite-vec", marker = "extra == 'semantic'", specifier = ">=0.1.0" },
