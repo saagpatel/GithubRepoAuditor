@@ -969,7 +969,7 @@ def _build_truth_project(
         status_entry and status_entry.get("source") == "github_api"
     )
     remote_status_available = (
-        remote_repository.get("state") == "observed"
+        remote_repository.get("state") in {"observed", "partial"}
         and isinstance(remote_repository.get("archived"), bool)
     )
     if live_status_available:

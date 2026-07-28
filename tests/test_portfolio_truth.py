@@ -1109,10 +1109,12 @@ def test_github_archived_status_reconciles_to_archived_attention(
     )
 
 
+@pytest.mark.parametrize("remote_state", ["observed", "partial"])
 def test_receipt_archived_state_is_fallback_when_live_status_is_unavailable(
     portfolio_workspace: Path,
     portfolio_catalog: Path,
     legacy_registry: Path,
+    remote_state: str,
 ) -> None:
     now = datetime.fromtimestamp(1_700_200_000, tz=timezone.utc)
     alpha_path = portfolio_workspace / "Alpha"
@@ -1129,12 +1131,20 @@ def test_receipt_archived_state_is_fallback_when_live_status_is_unavailable(
             "receipt_state": "fresh",
             "repository": {
                 "source": "github-graphql-default-branch-head-v1",
-                "state": "observed",
-                "reason_code": "observed",
+                "state": remote_state,
+                "reason_code": (
+                    "observed"
+                    if remote_state == "observed"
+                    else "default_branch_head_unavailable"
+                ),
                 "reason": None,
                 "observed_at": now.isoformat(),
-                "default_branch": "main",
-                "head_sha": "b" * 40,
+                "default_branch": (
+                    "main" if remote_state == "observed" else None
+                ),
+                "head_sha": (
+                    "b" * 40 if remote_state == "observed" else None
+                ),
                 "archived": True,
             },
             "providers": {},
@@ -2688,7 +2698,9 @@ def test_portfolio_truth_app_threads_security_cohort_count(
     )
     monkeypatch.setattr("src.app.portfolio_truth.publish_portfolio_truth", fake_publish)
     monkeypatch.setattr(
-        "src.app.portfolio_truth.load_live_repo_status_by_name", lambda **_kwargs: {}
+        "src.app.portfolio_truth.load_live_repo_status_by_name",
+        lambda **kwargs: captured.setdefault("repo_status_cache", kwargs["cache"])
+        or {},
     )
     monkeypatch.setenv("GHRA_REQUIRE_PRODUCER_EVIDENCE", "0")
     args = SimpleNamespace(
@@ -2700,7 +2712,7 @@ def test_portfolio_truth_app_threads_security_cohort_count(
         catalog=None,
         username="testuser",
         token=None,
-        no_cache=True,
+        no_cache=False,
         portfolio_truth_include_release_count=False,
         portfolio_truth_include_security=True,
         portfolio_truth_security_receipt=None,
@@ -2714,6 +2726,7 @@ def test_portfolio_truth_app_threads_security_cohort_count(
     assert captured["expected_cohort_count"] == 3
     assert captured["max_age_hours"] == 12
     assert captured["expected_producer_commit"] is None
+    assert captured["repo_status_cache"] is None
 
 
 def test_portfolio_truth_app_passes_validated_producer_receipt_to_publisher(
