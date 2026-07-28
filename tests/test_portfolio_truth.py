@@ -1373,6 +1373,34 @@ def test_receipt_partial_provider_coverage_emits_explicit_denominators(
         "archived": False,
     }
 
+    security["d/Alpha"]["repository"] = {
+        "source": "github-graphql-default-branch-head-v1",
+        "state": "transient_error",
+        "reason_code": "transient_error",
+        "reason": "GitHub GraphQL request failed",
+        "observed_at": now.isoformat(),
+        "default_branch": None,
+        "head_sha": None,
+        "archived": None,
+    }
+    transient_result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=now,
+        security_alerts_by_name=security,
+    )
+    github_coverage = next(
+        item
+        for item in transient_result.snapshot.to_dict()["coverage"]
+        if item["source"] == "github_security"
+    )
+    assert github_coverage["remote_default_branch_counts"]["transient_error"] == 1
+    assert sum(github_coverage["remote_default_branch_counts"].values()) == (
+        github_coverage["project_count"]
+    )
+
 
 def test_security_overlay_populates_and_force_elevates(
     portfolio_workspace: Path,

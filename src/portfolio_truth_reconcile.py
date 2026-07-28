@@ -536,6 +536,7 @@ def _build_coverage_envelope(
             "forbidden",
             "not_found",
             "rate_limited",
+            "transient_error",
             "malformed",
             "not_requested",
             "unknown",
