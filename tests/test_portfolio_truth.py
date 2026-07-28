@@ -1109,6 +1109,94 @@ def test_github_archived_status_reconciles_to_archived_attention(
     )
 
 
+def test_receipt_archived_state_is_fallback_when_live_status_is_unavailable(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    now = datetime.fromtimestamp(1_700_200_000, tz=timezone.utc)
+    alpha_path = portfolio_workspace / "Alpha"
+    subprocess.run(["git", "init"], cwd=alpha_path, capture_output=True, check=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", "https://github.com/d/Alpha.git"],
+        cwd=alpha_path,
+        capture_output=True,
+        check=True,
+    )
+    security = {
+        "d/Alpha": {
+            "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
+            "receipt_state": "fresh",
+            "repository": {
+                "source": "github-graphql-default-branch-head-v1",
+                "state": "observed",
+                "reason_code": "observed",
+                "reason": None,
+                "observed_at": now.isoformat(),
+                "default_branch": "main",
+                "head_sha": "b" * 40,
+                "archived": True,
+            },
+            "providers": {},
+        }
+    }
+    stale_status = {
+        "Alpha": {
+            "full_name": "d/Alpha",
+            "archived": False,
+            "source": "audit_report",
+        }
+    }
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=now,
+        security_alerts_by_name=security,
+        repo_status_by_name=stale_status,
+    )
+    alpha = next(
+        project
+        for project in result.snapshot.projects
+        if project.identity.display_name == "Alpha"
+    )
+
+    assert alpha.derived.archived is True
+    assert alpha.derived.attention_state == "archived"
+    assert alpha.provenance["github.archived"] == {
+        "source": "github-graphql-default-branch-head-v1",
+        "detail": "true",
+    }
+
+    live_result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=now,
+        security_alerts_by_name=security,
+        repo_status_by_name={
+            "Alpha": {
+                "full_name": "d/Alpha",
+                "archived": False,
+                "source": "github_api",
+            }
+        },
+    )
+    live_alpha = next(
+        project
+        for project in live_result.snapshot.projects
+        if project.identity.display_name == "Alpha"
+    )
+    assert live_alpha.derived.archived is False
+    assert live_alpha.provenance["github.archived"] == {
+        "source": "github_api",
+        "detail": "false",
+    }
+
+
 def test_build_security_fields_maps_ghas_entry() -> None:
     from src.portfolio_truth_reconcile import _build_security_fields
 

@@ -950,17 +950,47 @@ def _build_truth_project(
         ),
     }
 
+    security_entry = _select_security_entry(
+        security_alerts_by_name or {},
+        raw_project.get("repo_full_name"),
+        raw_project["name"],
+    )
+    remote_repository = (
+        dict(security_entry.get("repository") or {})
+        if security_entry is not None
+        else {}
+    )
     status_entry = _select_repo_status_entry(
         repo_status_by_name or {},
         raw_project.get("repo_full_name"),
         raw_project["name"],
     )
-    github_archived = bool(status_entry and status_entry.get("archived") is True)
-    if status_entry is not None:
+    live_status_available = bool(
+        status_entry and status_entry.get("source") == "github_api"
+    )
+    remote_status_available = (
+        remote_repository.get("state") == "observed"
+        and isinstance(remote_repository.get("archived"), bool)
+    )
+    if live_status_available:
+        github_archived = status_entry.get("archived") is True
         provenance["github.archived"] = {
-            "source": str(status_entry.get("source") or "audit_report"),
+            "source": "github_api",
             "detail": str(github_archived).lower(),
         }
+    elif remote_status_available:
+        github_archived = remote_repository["archived"] is True
+        provenance["github.archived"] = {
+            "source": str(remote_repository.get("source") or "github_security"),
+            "detail": str(github_archived).lower(),
+        }
+    else:
+        github_archived = bool(status_entry and status_entry.get("archived") is True)
+        if status_entry is not None:
+            provenance["github.archived"] = {
+                "source": str(status_entry.get("source") or "audit_report"),
+                "detail": str(github_archived).lower(),
+            }
 
     last_activity = raw_project["last_meaningful_activity_at"]
     activity_status = _activity_status_for(last_activity, now=now)
@@ -1001,11 +1031,6 @@ def _build_truth_project(
         "detail": "derived",
     }
 
-    security_entry = _select_security_entry(
-        security_alerts_by_name or {},
-        raw_project.get("repo_full_name"),
-        raw_project["name"],
-    )
     security = _build_security_fields(security_entry)
 
     # Only Dependabot high/critical counts drive the risk tier today. Code-scanning
