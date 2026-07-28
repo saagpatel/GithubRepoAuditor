@@ -4,7 +4,6 @@ import os
 from pathlib import Path
 from typing import Any
 
-from src.cache import ResponseCache
 from src.cli_output import print_info
 from src.github_security_coverage import DEFAULT_EXPECTED_GITHUB_COHORT_COUNT
 from src.portfolio_context_recovery import (
@@ -68,6 +67,9 @@ def run_portfolio_truth_mode(args: Any) -> None:
                 "portfolio_truth_security_cohort_count",
                 DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
             ),
+            expected_producer_commit=(
+                producer_evidence.commit if producer_evidence is not None else None
+            ),
         )
         if loaded_security is not None:
             security_alerts_by_name = loaded_security.entries_by_full_name
@@ -77,6 +79,7 @@ def run_portfolio_truth_mode(args: Any) -> None:
                 "produced_at": loaded_security.produced_at,
                 "state": loaded_security.receipt_state,
                 "age_hours": loaded_security.age_hours,
+                "producer_commit": loaded_security.producer_commit,
                 "cohort_policy": loaded_security.cohort_policy,
                 "cohort_repository_count": len(
                     loaded_security.cohort_repositories
@@ -86,7 +89,10 @@ def run_portfolio_truth_mode(args: Any) -> None:
     repo_status_by_name = load_live_repo_status_by_name(
         username=args.username,
         token=getattr(args, "token", None),
-        cache=None if getattr(args, "no_cache", False) else ResponseCache(),
+        # Lifecycle state is reconciled against the fresh security receipt.
+        # Do not let the general API response cache masquerade as a newer
+        # repository-status observation.
+        cache=None,
     )
     if repo_status_by_name is None:
         repo_status_by_name = load_repo_status_from_audit_by_name(

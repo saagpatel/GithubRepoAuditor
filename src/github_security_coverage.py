@@ -23,6 +23,7 @@ GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION = "GitHubSecurityCoverageReceiptV1"
 GITHUB_SECURITY_RECEIPT_FILENAME = "github-security-coverage-latest.json"
 GITHUB_API_VERSION = "2026-03-10"
 DEFAULT_COHORT_POLICY = "portfolio-default-attention-v1"
+REMOTE_REPOSITORY_SOURCE = "github-graphql-default-branch-head-v1"
 DEFAULT_ATTENTION_STATES = frozenset(
     {"active-product", "active-infra", "decision-needed"}
 )
@@ -34,6 +35,7 @@ ELIGIBILITY_STATES = frozenset(
     {
         "not_requested",
         "observed",
+        "credential_unavailable",
         "forbidden",
         "rate_limited",
         "transient_error",
@@ -49,6 +51,20 @@ PROVIDER_STATES = frozenset(
         "feature_unavailable",
         "not_found",
         "gone",
+        "rate_limited",
+        "transient_error",
+        "malformed",
+        "stale",
+    }
+)
+REMOTE_REPOSITORY_STATES = frozenset(
+    {
+        "observed",
+        "partial",
+        "not_requested",
+        "credential_unavailable",
+        "forbidden",
+        "not_found",
         "rate_limited",
         "transient_error",
         "malformed",
@@ -90,6 +106,7 @@ class SecurityCoverageError(ValueError):
 class LoadedSecurityCoverage:
     entries_by_full_name: dict[str, dict[str, Any]]
     produced_at: str
+    producer_commit: str
     schema_version: str
     cohort_policy: str
     cohort_repositories: tuple[str, ...]
@@ -188,6 +205,37 @@ def _empty_counts(provider: str) -> dict[str, int]:
     return {key: 0 for key in _COUNT_KEYS[provider]}
 
 
+def _provider_reason_code(state: str) -> str:
+    return {
+        "observed": "observed",
+        "stale": "stale_observation",
+        "feature_unavailable": "provider_unavailable",
+        "forbidden": "forbidden",
+        "credential_unavailable": "authentication_missing",
+        "not_found": "endpoint_unsupported",
+        "gone": "endpoint_unsupported",
+        "rate_limited": "rate_limited",
+        "malformed": "malformed_response",
+        "transient_error": "transient_error",
+        "not_requested": "not_requested",
+    }[state]
+
+
+def _remote_reason_code(state: str) -> str:
+    return {
+        "observed": "observed",
+        "partial": "default_branch_head_unavailable",
+        "stale": "stale_observation",
+        "forbidden": "forbidden",
+        "credential_unavailable": "authentication_missing",
+        "not_found": "repository_not_found",
+        "rate_limited": "rate_limited",
+        "malformed": "malformed_response",
+        "transient_error": "transient_error",
+        "not_requested": "not_requested",
+    }[state]
+
+
 def _provider_result(
     provider: str,
     *,
@@ -205,8 +253,14 @@ def _provider_result(
 ) -> dict[str, Any]:
     if state not in PROVIDER_STATES:
         raise SecurityCoverageError(f"invalid provider state: {state}")
+    completed = (
+        state == "observed"
+        and pagination_complete
+        and isinstance(counts, dict)
+    )
     return {
         "state": state,
+        "reason_code": _provider_reason_code(state),
         "observed_at": observed_at,
         "http_status": http_status,
         "http_classification": http_classification
@@ -227,6 +281,10 @@ def _provider_result(
             "result": conditional_result,
         },
         "pagination_complete": pagination_complete,
+        "completed": completed,
+        "zero_findings": (
+            sum(counts.values()) == 0 if completed and counts is not None else None
+        ),
         "counts": counts if state == "observed" else None,
     }
 
@@ -245,6 +303,8 @@ def _classify_failure(provider: str, response: requests.Response) -> tuple[str, 
     status = response.status_code
     message = _response_message(response)
     remaining = response.headers.get("X-RateLimit-Remaining")
+    if status == 401:
+        return "credential_unavailable", "github_authentication_missing"
     if status == 429 or (
         status == 403
         and (remaining == "0" or "rate limit" in message or "secondary rate" in message)
@@ -392,13 +452,15 @@ def _preflight_json(
         state, reason = _preflight_failure(response)
         if state == "rate_limited":
             budget.stop_reason = "rate_limited"
+        elif state == "credential_unavailable":
+            budget.stop_reason = "authentication_missing"
         elif reserve_reached:
             budget.stop_reason = "quota_reserve"
         return (
             None,
             state,
             reason,
-            state == "rate_limited" or reserve_reached,
+            state in {"credential_unavailable", "rate_limited"} or reserve_reached,
         )
     try:
         payload = response.json()
@@ -664,6 +726,8 @@ def _fetch_provider(
             state, reason = _classify_failure(provider, response)
             if state == "rate_limited":
                 budget.stop_reason = "rate_limited"
+            elif state == "credential_unavailable":
+                budget.stop_reason = "authentication_missing"
             elif reserve_reached:
                 budget.stop_reason = "quota_reserve"
             return (
@@ -678,7 +742,8 @@ def _fetch_provider(
                     conditional_request=bool(prior_etag),
                     conditional_result="failed",
                 ),
-                state == "rate_limited" or reserve_reached,
+                state in {"credential_unavailable", "rate_limited"}
+                or reserve_reached,
             )
         try:
             page = response.json()
@@ -733,6 +798,225 @@ def _fetch_provider(
     return result, budget.stop_reason == "quota_reserve"
 
 
+def _remote_repository_result(
+    *,
+    state: str,
+    observed_at: str | None = None,
+    reason: str | None = None,
+    default_branch: str | None = None,
+    head_sha: str | None = None,
+    archived: bool | None = None,
+) -> dict[str, Any]:
+    if state not in REMOTE_REPOSITORY_STATES:
+        raise SecurityCoverageError(f"invalid remote repository state: {state}")
+    return {
+        "source": REMOTE_REPOSITORY_SOURCE,
+        "state": state,
+        "reason_code": _remote_reason_code(state),
+        "reason": reason,
+        "observed_at": observed_at,
+        "default_branch": default_branch if state == "observed" else None,
+        "head_sha": head_sha if state == "observed" else None,
+        "archived": archived if state in {"observed", "partial"} else None,
+    }
+
+
+def _remote_failure_results(
+    cohort: tuple[str, ...],
+    *,
+    state: str,
+    observed_at: str | None,
+    reason: str | None,
+) -> dict[str, dict[str, Any]]:
+    return {
+        repo_full_name: _remote_repository_result(
+            state=state,
+            observed_at=observed_at,
+            reason=reason,
+        )
+        for repo_full_name in cohort
+    }
+
+
+def _graphql_error_outcome(
+    errors: Any,
+    *,
+    alias: str | None = None,
+) -> tuple[str, str] | None:
+    if not isinstance(errors, list):
+        return None
+    matching: list[dict[str, Any]] = []
+    for value in errors:
+        error = _mapping(value)
+        path = error.get("path")
+        path_alias = path[0] if isinstance(path, list) and path else None
+        if alias is None or path_alias in {None, alias}:
+            matching.append(error)
+    if not matching:
+        return None
+    messages = " ".join(_text(error.get("message")).lower() for error in matching)
+    if "rate limit" in messages or "secondary rate" in messages:
+        return "rate_limited", "github_graphql_rate_limited"
+    if any(
+        phrase in messages
+        for phrase in (
+            "bad credentials",
+            "requires authentication",
+            "could not authenticate",
+        )
+    ):
+        return "credential_unavailable", "github_graphql_authentication_missing"
+    if "resource not accessible" in messages or "forbidden" in messages:
+        return "forbidden", "github_graphql_forbidden"
+    if "could not resolve to a repository" in messages or "not found" in messages:
+        return "not_found", "github_graphql_repository_not_found"
+    return "malformed", "github_graphql_error"
+
+
+def _collect_remote_repository_observations(
+    session: requests.Session,
+    *,
+    api_base_url: str,
+    cohort: tuple[str, ...],
+    now_iso: str,
+    budget: _Budget,
+) -> dict[str, dict[str, Any]]:
+    """Observe each cohort repo's default branch and head in one bounded query."""
+    if not budget.consume(pagination=False):
+        return _remote_failure_results(
+            cohort,
+            state="not_requested",
+            observed_at=None,
+            reason=budget.stop_reason,
+        )
+
+    variables: dict[str, str] = {}
+    fields: list[str] = []
+    for index, repo_full_name in enumerate(cohort):
+        owner_name, name = repo_full_name.split("/", 1)
+        variables[f"owner{index}"] = owner_name
+        variables[f"name{index}"] = name
+        fields.append(
+            f"repo{index}: repository(owner: $owner{index}, name: $name{index}) "
+            "{ nameWithOwner isArchived defaultBranchRef { name target { oid } } }"
+        )
+    declarations = ", ".join(f"${key}: String!" for key in variables)
+    query = f"query({declarations}) {{ {' '.join(fields)} }}"
+    try:
+        response = session.post(
+            f"{api_base_url}/graphql",
+            json={"query": query, "variables": variables},
+            timeout=30,
+        )
+    except requests.RequestException:
+        return _remote_failure_results(
+            cohort,
+            state="transient_error",
+            observed_at=now_iso,
+            reason="network_error",
+        )
+
+    reserve_reached = _reserve_reached(response, budget)
+    if response.status_code != 200:
+        state, reason = _preflight_failure(response)
+        if state == "rate_limited":
+            budget.stop_reason = "rate_limited"
+        elif state == "credential_unavailable":
+            budget.stop_reason = "authentication_missing"
+        elif reserve_reached:
+            budget.stop_reason = "quota_reserve"
+        remote_state = (
+            state if state in REMOTE_REPOSITORY_STATES else "malformed"
+        )
+        return _remote_failure_results(
+            cohort,
+            state=remote_state,
+            observed_at=now_iso,
+            reason=reason,
+        )
+
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = None
+    if not isinstance(payload, dict):
+        return _remote_failure_results(
+            cohort,
+            state="malformed",
+            observed_at=now_iso,
+            reason="non_object_payload",
+        )
+    errors = payload.get("errors")
+    data = _mapping(payload.get("data"))
+    if not data:
+        global_error = _graphql_error_outcome(errors)
+        if global_error is not None:
+            state, reason = global_error
+            if state == "rate_limited":
+                budget.stop_reason = "rate_limited"
+            elif state == "credential_unavailable":
+                budget.stop_reason = "authentication_missing"
+            return _remote_failure_results(
+                cohort,
+                state=state,
+                observed_at=now_iso,
+                reason=reason,
+            )
+    results: dict[str, dict[str, Any]] = {}
+    for index, expected_repo in enumerate(cohort):
+        alias = f"repo{index}"
+        repository = _mapping(data.get(alias))
+        if not repository:
+            error_outcome = _graphql_error_outcome(errors, alias=alias)
+            state, reason = error_outcome or (
+                "not_found",
+                "repository_not_returned",
+            )
+            results[expected_repo] = _remote_repository_result(
+                state=state,
+                observed_at=now_iso,
+                reason=reason,
+            )
+            continue
+        full_name = _text(repository.get("nameWithOwner"))
+        if full_name.lower() != expected_repo.lower():
+            results[expected_repo] = _remote_repository_result(
+                state="malformed",
+                observed_at=now_iso,
+                reason="repository_identity_mismatch",
+            )
+            continue
+        archived = repository.get("isArchived")
+        default_ref = _mapping(repository.get("defaultBranchRef"))
+        default_branch = _text(default_ref.get("name"))
+        head_sha = _text(_mapping(default_ref.get("target")).get("oid"))
+        if not isinstance(archived, bool):
+            results[expected_repo] = _remote_repository_result(
+                state="malformed",
+                observed_at=now_iso,
+                reason="repository_archived_state_invalid",
+            )
+        elif not default_branch or not re.fullmatch(r"[0-9a-f]{40,64}", head_sha):
+            results[expected_repo] = _remote_repository_result(
+                state="partial",
+                observed_at=now_iso,
+                reason="default_branch_head_unavailable",
+                archived=archived,
+            )
+        else:
+            results[expected_repo] = _remote_repository_result(
+                state="observed",
+                observed_at=now_iso,
+                reason=None,
+                default_branch=default_branch,
+                head_sha=head_sha,
+                archived=archived,
+            )
+    if reserve_reached:
+        budget.stop_reason = "quota_reserve"
+    return results
+
+
 def collect_security_coverage(
     portfolio_truth: dict[str, Any],
     *,
@@ -748,10 +1032,6 @@ def collect_security_coverage(
     api_base_url: str | None = None,
 ) -> dict[str, Any]:
     """Collect the bounded default-attention cohort into a provenance receipt."""
-    if not token:
-        raise SecurityCoverageError(
-            "authorized GitHub read credential unavailable; no receipt was written"
-        )
     if (
         not 0 < base_request_limit <= DEFAULT_BASE_REQUEST_LIMIT
         or not base_request_limit <= total_request_limit <= DEFAULT_TOTAL_REQUEST_LIMIT
@@ -801,14 +1081,14 @@ def collect_security_coverage(
     collected_at = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     now_iso = collected_at.isoformat()
     client = session or requests.Session()
-    client.headers.update(
-        {
-            "Accept": "application/vnd.github+json",
-            "Authorization": f"Bearer {token}",
-            "User-Agent": "github-repo-auditor/security-coverage",
-            "X-GitHub-Api-Version": GITHUB_API_VERSION,
-        }
-    )
+    client_headers = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "github-repo-auditor/security-coverage",
+        "X-GitHub-Api-Version": GITHUB_API_VERSION,
+    }
+    if token:
+        client_headers["Authorization"] = f"Bearer {token}"
+    client.headers.update(client_headers)
     budget = _Budget(
         base_limit=base_request_limit,
         total_limit=total_request_limit,
@@ -817,22 +1097,50 @@ def collect_security_coverage(
     resolved_api_base_url = api_base_url or os.environ.get(
         "GITHUB_API_BASE_URL", "https://api.github.com"
     )
-    eligibility, unavailable_providers, halted = _collect_eligibility_preflight(
-        client,
-        api_base_url=resolved_api_base_url,
-        candidates=_eligibility_candidates(prior_receipt, cohort),
-        now_iso=now_iso,
-        budget=budget,
-    )
+    if token:
+        eligibility, unavailable_providers, halted = _collect_eligibility_preflight(
+            client,
+            api_base_url=resolved_api_base_url,
+            candidates=_eligibility_candidates(prior_receipt, cohort),
+            now_iso=now_iso,
+            budget=budget,
+        )
+    else:
+        eligibility = _eligibility_metadata(
+            state="credential_unavailable",
+            observed_at=now_iso,
+            reason="github_authentication_missing",
+            candidates=(),
+            request_count=0,
+        )
+        unavailable_providers = {}
+        halted = True
     repositories: dict[str, dict[str, Any]] = {}
     for repo_full_name in cohort:
         providers: dict[str, dict[str, Any]] = {}
         for provider in PROVIDER_NAMES:
             if halted:
+                halted_state = (
+                    "credential_unavailable"
+                    if not token
+                    or _mapping(eligibility).get("state")
+                    == "credential_unavailable"
+                    or budget.stop_reason == "authentication_missing"
+                    else "not_requested"
+                )
                 providers[provider] = _provider_result(
                     provider,
-                    state="not_requested",
-                    reason=budget.stop_reason or "collection_halted",
+                    state=halted_state,
+                    observed_at=(
+                        now_iso
+                        if halted_state == "credential_unavailable"
+                        else None
+                    ),
+                    reason=(
+                        "github_authentication_missing"
+                        if halted_state == "credential_unavailable"
+                        else budget.stop_reason or "collection_halted"
+                    ),
                 )
                 continue
             if provider in unavailable_providers.get(repo_full_name, frozenset()):
@@ -855,6 +1163,30 @@ def collect_security_coverage(
                 prior=_prior_provider(prior_receipt, repo_full_name, provider),
             )
         repositories[repo_full_name] = {"providers": providers}
+
+    eligibility_state = _text(_mapping(eligibility).get("state"))
+    authentication_missing = (
+        not token
+        or eligibility_state == "credential_unavailable"
+        or budget.stop_reason == "authentication_missing"
+    )
+    if not authentication_missing:
+        remote_observations = _collect_remote_repository_observations(
+            client,
+            api_base_url=resolved_api_base_url,
+            cohort=cohort,
+            now_iso=now_iso,
+            budget=budget,
+        )
+    else:
+        remote_observations = _remote_failure_results(
+            cohort,
+            state="credential_unavailable",
+            observed_at=now_iso,
+            reason="github_authentication_missing",
+        )
+    for repo_full_name, observation in remote_observations.items():
+        repositories[repo_full_name]["repository"] = observation
 
     produced_at = (
         collected_at if now is not None else datetime.now(timezone.utc)
@@ -1027,7 +1359,14 @@ def _validate_provider(
     state = _text(data.get("state"))
     if state not in PROVIDER_STATES:
         raise SecurityCoverageError(f"{provider}.state is invalid: {state!r}")
+    raw_state = state
+    declared_reason_code = data.get("reason_code")
+    expected_raw_reason_code = _provider_reason_code(raw_state)
+    if declared_reason_code is not None and declared_reason_code != expected_raw_reason_code:
+        raise SecurityCoverageError(f"{provider}.reason_code does not match state")
     counts = data.get("counts")
+    raw_completed = False
+    raw_zero_findings: bool | None = None
     http_status = data.get("http_status")
     http_classification = data.get("http_classification")
     conditional = _mapping(data.get("conditional"))
@@ -1094,6 +1433,8 @@ def _validate_provider(
                 )
             normalized_counts[key] = raw
         counts = normalized_counts
+        raw_completed = True
+        raw_zero_findings = sum(normalized_counts.values()) == 0
         if provider_age_hours > max_age_hours:
             state = "stale"
             counts = None
@@ -1102,6 +1443,10 @@ def _validate_provider(
     if state == "not_requested" and http_status is not None:
         raise SecurityCoverageError(
             f"{provider} not_requested must not claim HTTP status"
+        )
+    if state == "credential_unavailable" and http_status not in {None, 401}:
+        raise SecurityCoverageError(
+            f"{provider} credential_unavailable requires HTTP 401 or no request"
         )
     if state == "forbidden" and http_status != 403:
         raise SecurityCoverageError(f"{provider} forbidden requires HTTP 403")
@@ -1131,11 +1476,24 @@ def _validate_provider(
         raise SecurityCoverageError(f"{provider} gone requires HTTP 410")
     if state == "rate_limited" and http_status not in {403, 429}:
         raise SecurityCoverageError(f"{provider} rate_limited requires HTTP 403 or 429")
+    declared_completed = data.get("completed")
+    if declared_completed is not None and declared_completed is not raw_completed:
+        raise SecurityCoverageError(f"{provider}.completed does not match observation")
+    declared_zero_findings = data.get("zero_findings")
+    if (
+        declared_zero_findings is not None
+        and declared_zero_findings is not raw_zero_findings
+    ):
+        raise SecurityCoverageError(
+            f"{provider}.zero_findings requires a completed observation"
+        )
     if receipt_is_stale and state == "observed":
         state = "stale"
         counts = None
+    normalized_completed = state == "observed" and raw_completed
     return {
         "state": state,
+        "reason_code": _provider_reason_code(state),
         "observed_at": data.get("observed_at"),
         "http_status": http_status,
         "http_classification": http_classification,
@@ -1144,7 +1502,109 @@ def _validate_provider(
         "last_modified": data.get("last_modified"),
         "conditional": conditional,
         "pagination_complete": bool(data.get("pagination_complete")),
+        "completed": normalized_completed,
+        "zero_findings": raw_zero_findings if normalized_completed else None,
         "counts": counts,
+    }
+
+
+def _validate_remote_repository(
+    value: Any,
+    *,
+    receipt_is_stale: bool,
+    produced_at: datetime,
+    current: datetime,
+    max_age_hours: int,
+) -> dict[str, Any]:
+    if value is None:
+        return _remote_repository_result(
+            state="not_requested",
+            reason="remote_observation_not_in_receipt",
+        )
+    data = _mapping(value)
+    if data.get("source") != REMOTE_REPOSITORY_SOURCE:
+        raise SecurityCoverageError("repository observation source is invalid")
+    state = _text(data.get("state"))
+    if state not in REMOTE_REPOSITORY_STATES:
+        raise SecurityCoverageError(
+            f"repository observation state is invalid: {state!r}"
+        )
+    declared_reason_code = data.get("reason_code")
+    if (
+        declared_reason_code is not None
+        and declared_reason_code != _remote_reason_code(state)
+    ):
+        raise SecurityCoverageError(
+            "repository observation reason_code does not match state"
+        )
+    observed_at_value = data.get("observed_at")
+    observed_at = (
+        _parse_datetime(
+            observed_at_value,
+            field_name="repository.observed_at",
+        )
+        if observed_at_value is not None
+        else None
+    )
+    if observed_at is not None:
+        if observed_at > produced_at:
+            raise SecurityCoverageError(
+                "repository.observed_at is later than receipt produced_at"
+            )
+        if (current - observed_at).total_seconds() / 3600 < -0.05:
+            raise SecurityCoverageError("repository.observed_at is future-dated")
+    default_branch = data.get("default_branch")
+    head_sha = data.get("head_sha")
+    archived = data.get("archived")
+    if state == "observed":
+        if observed_at is None:
+            raise SecurityCoverageError(
+                "repository.observed_at is required when observed"
+            )
+        if not isinstance(default_branch, str) or not default_branch.strip():
+            raise SecurityCoverageError(
+                "repository.default_branch is required when observed"
+            )
+        if not isinstance(head_sha, str) or not re.fullmatch(
+            r"[0-9a-f]{40,64}", head_sha
+        ):
+            raise SecurityCoverageError(
+                "repository.head_sha is invalid when observed"
+            )
+        if not isinstance(archived, bool):
+            raise SecurityCoverageError(
+                "repository.archived must be boolean when observed"
+            )
+    elif state == "partial":
+        if observed_at is None or not isinstance(archived, bool):
+            raise SecurityCoverageError(
+                "partial repository observation requires timestamp and archived state"
+            )
+        if default_branch is not None or head_sha is not None:
+            raise SecurityCoverageError(
+                "partial repository observation cannot claim branch or head"
+            )
+    elif any(value is not None for value in (default_branch, head_sha, archived)):
+        raise SecurityCoverageError(
+            "unobserved repository state cannot claim remote values"
+        )
+
+    if state in {"observed", "partial"} and observed_at is not None:
+        observation_age_hours = (current - observed_at).total_seconds() / 3600
+        if receipt_is_stale or observation_age_hours > max_age_hours:
+            state = "stale"
+            default_branch = None
+            head_sha = None
+            archived = None
+    return {
+        "source": REMOTE_REPOSITORY_SOURCE,
+        "state": state,
+        "reason_code": _remote_reason_code(state),
+        "reason": "receipt_stale" if state == "stale" else data.get("reason"),
+        "observed_at": data.get("observed_at"),
+        "default_branch": default_branch,
+        "head_sha": head_sha,
+        "archived": archived,
     }
 
 
@@ -1153,6 +1613,7 @@ def validate_security_coverage_receipt(
     *,
     max_age_hours: int = 24,
     expected_cohort_count: int = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+    expected_producer_commit: str | None = None,
     now: datetime | None = None,
     source_path: str = "",
 ) -> LoadedSecurityCoverage:
@@ -1182,6 +1643,11 @@ def validate_security_coverage_receipt(
     if not _COMMIT_RE.fullmatch(commit):
         raise SecurityCoverageError(
             "security coverage receipt producer commit is invalid"
+        )
+    if expected_producer_commit is not None and commit != expected_producer_commit:
+        raise SecurityCoverageError(
+            "security coverage receipt producer commit mismatch: "
+            f"receipt={commit}; expected={expected_producer_commit}"
         )
     if payload.get("github_api_version") != GITHUB_API_VERSION:
         raise SecurityCoverageError("security coverage receipt API version is invalid")
@@ -1255,6 +1721,13 @@ def validate_security_coverage_receipt(
             "receipt_schema_version": GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
             "source_produced_at": produced_at.isoformat(),
             "receipt_state": "stale" if receipt_is_stale else "fresh",
+            "repository": _validate_remote_repository(
+                repo_data.get("repository"),
+                receipt_is_stale=receipt_is_stale,
+                produced_at=produced_at,
+                current=current,
+                max_age_hours=max_age_hours,
+            ),
             "providers": {
                 provider: _validate_provider(
                     provider,
@@ -1272,6 +1745,7 @@ def validate_security_coverage_receipt(
     return LoadedSecurityCoverage(
         entries_by_full_name=entries,
         produced_at=produced_at.isoformat(),
+        producer_commit=commit,
         schema_version=GITHUB_SECURITY_RECEIPT_SCHEMA_VERSION,
         cohort_policy=policy,
         cohort_repositories=canonical_cohort,
@@ -1286,6 +1760,7 @@ def load_security_coverage_receipt(
     *,
     max_age_hours: int = 24,
     expected_cohort_count: int = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+    expected_producer_commit: str | None = None,
     now: datetime | None = None,
 ) -> LoadedSecurityCoverage:
     try:
@@ -1302,6 +1777,7 @@ def load_security_coverage_receipt(
         payload,
         max_age_hours=max_age_hours,
         expected_cohort_count=expected_cohort_count,
+        expected_producer_commit=expected_producer_commit,
         now=now,
         source_path=str(path),
     )
@@ -1368,6 +1844,11 @@ def main() -> None:
         default=DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
     )
     parser.add_argument(
+        "--expected-producer-commit",
+        default=None,
+        help="Require the receipt producer commit to match this exact SHA",
+    )
+    parser.add_argument(
         "--base-request-limit", type=int, default=DEFAULT_BASE_REQUEST_LIMIT
     )
     parser.add_argument(
@@ -1382,6 +1863,7 @@ def main() -> None:
                 args.output,
                 max_age_hours=args.max_age_hours,
                 expected_cohort_count=args.expected_cohort_count,
+                expected_producer_commit=args.expected_producer_commit,
             )
             print(
                 json.dumps(

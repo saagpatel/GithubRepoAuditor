@@ -14,6 +14,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ## [Unreleased]
 
 ### Changed
+- Kept PortfolioTruth `0.11.0` and
+  `GitHubSecurityCoverageReceiptV1` read-compatible while adding normalized
+  provider reason codes, explicit completed-zero semantics, producer-commit
+  binding, and a same-pass GitHub default-branch/head observation for every
+  repository in the security cohort. Missing credentials and stale or partial
+  observations now stay fail-closed instead of presenting zero as clean. The
+  development dependency also bounds Ruff below `0.16` so CI retains its
+  reviewed lint contract until the expanded ruleset is migrated separately.
 - Migrated `config/portfolio-catalog.yaml` and the example catalog from
   `intended_disposition` to `operating_path` (179 + 3 entries; identity value
   mapping — `resolve_declared_operating_path` already treated disposition

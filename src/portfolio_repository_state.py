@@ -6,12 +6,23 @@ from pathlib import Path
 from typing import Any
 
 
-def observe_repository_state(path: Path, *, observed_at: datetime) -> dict[str, Any]:
+def observe_repository_state(
+    path: Path,
+    *,
+    observed_at: datetime,
+    remote_default_branch: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Read local Git/worktree state without changing refs or exposing file names."""
+    remote = dict(remote_default_branch) if remote_default_branch else {
+        "state": "unknown",
+        "reason_code": "not_requested",
+        "reason": "no independent live remote read was performed by portfolio generation",
+    }
     if not (path / ".git").exists():
         return {
             "state": "not_a_repository",
             "observed_at": observed_at.astimezone(UTC).isoformat(),
+            "remote_default_branch": remote,
         }
     try:
         head = _git(path, "rev-parse", "HEAD")
@@ -53,10 +64,7 @@ def observe_repository_state(path: Path, *, observed_at: datetime) -> dict[str, 
                 "ahead": ahead,
                 "behind": behind,
             },
-            "remote_default_branch": {
-                "state": "unknown",
-                "reason": "no independent live remote read was performed by portfolio generation",
-            },
+            "remote_default_branch": remote,
             "worktrees": worktrees,
         }
     except (OSError, subprocess.CalledProcessError, ValueError) as exc:
@@ -64,6 +72,7 @@ def observe_repository_state(path: Path, *, observed_at: datetime) -> dict[str, 
             "state": "unknown",
             "observed_at": observed_at.astimezone(UTC).isoformat(),
             "reason": str(exc),
+            "remote_default_branch": remote,
         }
 
 

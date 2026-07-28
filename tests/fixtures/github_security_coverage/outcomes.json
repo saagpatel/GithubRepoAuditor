@@ -1,0 +1,32 @@
+{
+  "authentication_missing": {
+    "reason_code": "authentication_missing",
+    "state": "credential_unavailable"
+  },
+  "partial_coverage": {
+    "message": "Resource not accessible by integration",
+    "reason_code": "forbidden",
+    "status_code": 403
+  },
+  "stale_observation": {
+    "age_hours": 25,
+    "reason_code": "stale_observation"
+  },
+  "successful_zero_findings": {
+    "payload": [],
+    "reason_code": "observed",
+    "zero_findings": true
+  },
+  "malformed_provider_data": {
+    "payload": {
+      "unexpected": "object"
+    },
+    "reason_code": "malformed_response"
+  },
+  "rate_limited": {
+    "message": "API rate limit exceeded",
+    "reason_code": "rate_limited",
+    "remaining": "0",
+    "status_code": 403
+  }
+}

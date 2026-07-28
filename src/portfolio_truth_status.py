@@ -161,6 +161,7 @@ def load_security_coverage_by_full_name(
     receipt_path: Path | None = None,
     max_age_hours: int = 24,
     expected_cohort_count: int = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+    expected_producer_commit: str | None = None,
     now: datetime | None = None,
 ) -> LoadedSecurityCoverage | None:
     """Load the canonical provenance-bearing security receipt.
@@ -176,6 +177,7 @@ def load_security_coverage_by_full_name(
             selected,
             max_age_hours=max_age_hours,
             expected_cohort_count=expected_cohort_count,
+            expected_producer_commit=expected_producer_commit,
             now=now,
         )
     except SecurityCoverageError as exc:

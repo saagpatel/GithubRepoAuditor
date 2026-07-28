@@ -527,6 +527,13 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
         "dependabot_observed_count",
         "code_scanning_observed_count",
         "secret_scanning_observed_count",
+        "dependabot_zero_finding_count",
+        "code_scanning_zero_finding_count",
+        "secret_scanning_zero_finding_count",
+        "remote_default_branch_observed_count",
+        "remote_default_branch_partial_count",
+        "remote_default_branch_stale_count",
+        "remote_default_branch_unavailable_count",
         "coverage_state",
         "repos_with_open_high_critical",
         "total_open_high",
@@ -1102,6 +1109,104 @@ def test_github_archived_status_reconciles_to_archived_attention(
     )
 
 
+@pytest.mark.parametrize("remote_state", ["observed", "partial"])
+def test_receipt_archived_state_is_fallback_when_live_status_is_unavailable(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+    remote_state: str,
+) -> None:
+    now = datetime.fromtimestamp(1_700_200_000, tz=timezone.utc)
+    alpha_path = portfolio_workspace / "Alpha"
+    subprocess.run(["git", "init"], cwd=alpha_path, capture_output=True, check=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", "https://github.com/d/Alpha.git"],
+        cwd=alpha_path,
+        capture_output=True,
+        check=True,
+    )
+    security = {
+        "d/Alpha": {
+            "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
+            "receipt_state": "fresh",
+            "repository": {
+                "source": "github-graphql-default-branch-head-v1",
+                "state": remote_state,
+                "reason_code": (
+                    "observed"
+                    if remote_state == "observed"
+                    else "default_branch_head_unavailable"
+                ),
+                "reason": None,
+                "observed_at": now.isoformat(),
+                "default_branch": (
+                    "main" if remote_state == "observed" else None
+                ),
+                "head_sha": (
+                    "b" * 40 if remote_state == "observed" else None
+                ),
+                "archived": True,
+            },
+            "providers": {},
+        }
+    }
+    stale_status = {
+        "Alpha": {
+            "full_name": "d/Alpha",
+            "archived": False,
+            "source": "audit_report",
+        }
+    }
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=now,
+        security_alerts_by_name=security,
+        repo_status_by_name=stale_status,
+    )
+    alpha = next(
+        project
+        for project in result.snapshot.projects
+        if project.identity.display_name == "Alpha"
+    )
+
+    assert alpha.derived.archived is True
+    assert alpha.derived.attention_state == "archived"
+    assert alpha.provenance["github.archived"] == {
+        "source": "github-graphql-default-branch-head-v1",
+        "detail": "true",
+    }
+
+    live_result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=now,
+        security_alerts_by_name=security,
+        repo_status_by_name={
+            "Alpha": {
+                "full_name": "d/Alpha",
+                "archived": False,
+                "source": "github_api",
+            }
+        },
+    )
+    live_alpha = next(
+        project
+        for project in live_result.snapshot.projects
+        if project.identity.display_name == "Alpha"
+    )
+    assert live_alpha.derived.archived is False
+    assert live_alpha.provenance["github.archived"] == {
+        "source": "github_api",
+        "detail": "false",
+    }
+
+
 def test_build_security_fields_maps_ghas_entry() -> None:
     from src.portfolio_truth_reconcile import _build_security_fields
 
@@ -1195,6 +1300,16 @@ def test_receipt_partial_provider_coverage_emits_explicit_denominators(
             "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
             "receipt_state": "fresh",
             "source_produced_at": now.isoformat(),
+            "repository": {
+                "source": "github-graphql-default-branch-head-v1",
+                "state": "observed",
+                "reason_code": "observed",
+                "reason": None,
+                "observed_at": now.isoformat(),
+                "default_branch": "main",
+                "head_sha": "b" * 40,
+                "archived": False,
+            },
             "providers": {
                 "dependabot": observed,
                 "code_scanning": {
@@ -1218,6 +1333,15 @@ def test_receipt_partial_provider_coverage_emits_explicit_denominators(
         now=now,
         security_alerts_by_name=security,
     )
+    repeated = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=now,
+        security_alerts_by_name=security,
+    )
+    assert repeated.snapshot.to_dict() == result.snapshot.to_dict()
     alpha = next(
         project
         for project in result.snapshot.projects
@@ -1237,6 +1361,45 @@ def test_receipt_partial_provider_coverage_emits_explicit_denominators(
     assert rollup["dependabot_observed_count"] == 1
     assert rollup["code_scanning_observed_count"] == 0
     assert rollup["secret_scanning_observed_count"] == 0
+    assert rollup["remote_default_branch_observed_count"] == 1
+    assert alpha.repository_state["remote_default_branch"] == {
+        "source": "github-graphql-default-branch-head-v1",
+        "state": "observed",
+        "reason_code": "observed",
+        "reason": None,
+        "observed_at": now.isoformat(),
+        "default_branch": "main",
+        "head_sha": "b" * 40,
+        "archived": False,
+    }
+
+    security["d/Alpha"]["repository"] = {
+        "source": "github-graphql-default-branch-head-v1",
+        "state": "transient_error",
+        "reason_code": "transient_error",
+        "reason": "GitHub GraphQL request failed",
+        "observed_at": now.isoformat(),
+        "default_branch": None,
+        "head_sha": None,
+        "archived": None,
+    }
+    transient_result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=now,
+        security_alerts_by_name=security,
+    )
+    github_coverage = next(
+        item
+        for item in transient_result.snapshot.to_dict()["coverage"]
+        if item["source"] == "github_security"
+    )
+    assert github_coverage["remote_default_branch_counts"]["transient_error"] == 1
+    assert sum(github_coverage["remote_default_branch_counts"].values()) == (
+        github_coverage["project_count"]
+    )
 
 
 def test_security_overlay_populates_and_force_elevates(
@@ -2563,7 +2726,9 @@ def test_portfolio_truth_app_threads_security_cohort_count(
     )
     monkeypatch.setattr("src.app.portfolio_truth.publish_portfolio_truth", fake_publish)
     monkeypatch.setattr(
-        "src.app.portfolio_truth.load_live_repo_status_by_name", lambda **_kwargs: {}
+        "src.app.portfolio_truth.load_live_repo_status_by_name",
+        lambda **kwargs: captured.setdefault("repo_status_cache", kwargs["cache"])
+        or {},
     )
     monkeypatch.setenv("GHRA_REQUIRE_PRODUCER_EVIDENCE", "0")
     args = SimpleNamespace(
@@ -2575,7 +2740,7 @@ def test_portfolio_truth_app_threads_security_cohort_count(
         catalog=None,
         username="testuser",
         token=None,
-        no_cache=True,
+        no_cache=False,
         portfolio_truth_include_release_count=False,
         portfolio_truth_include_security=True,
         portfolio_truth_security_receipt=None,
@@ -2588,6 +2753,8 @@ def test_portfolio_truth_app_threads_security_cohort_count(
 
     assert captured["expected_cohort_count"] == 3
     assert captured["max_age_hours"] == 12
+    assert captured["expected_producer_commit"] is None
+    assert captured["repo_status_cache"] is None
 
 
 def test_portfolio_truth_app_passes_validated_producer_receipt_to_publisher(
