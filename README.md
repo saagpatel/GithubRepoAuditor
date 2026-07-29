@@ -126,6 +126,7 @@ Treat campaign/writeback, GitHub Projects, Notion sync, catalog overrides, score
 - Project history: [docs/project-history.md](docs/project-history.md)
 - Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
 - Security policy: [SECURITY.md](SECURITY.md)
+- PR evidence-to-head binding: [docs/pr-head-evidence.md](docs/pr-head-evidence.md)
 
 ## Features
 
@@ -272,6 +273,9 @@ audit run <github-username> --repos <repo-name> --html
 
 # Action Sync — managed campaign preview / writeback
 audit report <github-username> --campaign security-review --writeback-target github
+
+# Local PR evidence binding — no token, network request, or output file
+audit pr-evidence tests/fixtures/pr_head_evidence/current.json
 ```
 
 Normal runs perform a lightweight automatic preflight before fetching repos. By default
@@ -287,6 +291,15 @@ and `Safe to Defer`, and writes `operator-control-center-<username>-<date>.json`
 groups work into `Needs Re-Approval`, `Ready For Review`, `Approved But Manual`, and
 `Blocked`, and writes `approval-center-<username>-<date>.json` plus `.md`. Local approval
 capture stays separate from writeback apply.
+
+`audit pr-evidence <snapshot.json>` is a separate local-only evidence check. It
+validates a versioned `PRHeadEvidenceV1` snapshot and emits deterministic
+`PRHeadEvidenceVerdictV1` JSON showing whether evidence required by the
+supplied rules is current for the supplied PR head, while classifying every
+supplied review and check. It does not read GitHub credentials, call GitHub,
+write files, affect portfolio scoring, or regenerate portfolio truth. See
+[docs/pr-head-evidence.md](docs/pr-head-evidence.md) for the input contract,
+coverage requirements, exit codes, and claim ceiling.
 
 Watch mode supports `--watch-strategy adaptive|incremental|full`. `adaptive` is the
 default and uses the stored baseline contract plus the scheduled full-refresh interval to
