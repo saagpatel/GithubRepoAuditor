@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Mapping
 
 SNAPSHOT_SCHEMA_VERSION = "PRHeadEvidenceV1"
@@ -103,6 +103,15 @@ class Review:
     dismissed: bool
     dismissed_at: datetime | None
     dismissed_prior_state: str | None
+
+
+def _review_sort_key(review: Review) -> tuple[bool, datetime, tuple[int, int | str]]:
+    submitted_at = review.submitted_at or datetime.min.replace(tzinfo=timezone.utc)
+    return (
+        review.submitted_at is None,
+        submitted_at,
+        _id_sort_key(review.review_id),
+    )
 
 
 @dataclass(frozen=True)
@@ -804,14 +813,7 @@ def _review_payload(
 
 def _latest_decisive_reviews(reviews: tuple[Review, ...]) -> dict[str, Review]:
     latest: dict[str, Review] = {}
-    for review in sorted(
-        reviews,
-        key=lambda item: (
-            item.submitted_at is None,
-            item.submitted_at.isoformat() if item.submitted_at is not None else "",
-            _id_sort_key(item.review_id),
-        ),
-    ):
+    for review in sorted(reviews, key=_review_sort_key):
         if review.state in {"COMMENTED", "PENDING"}:
             continue
         latest[_actor_key(review.actor.login)] = review
@@ -828,14 +830,7 @@ def _evaluate_reviews(
 ) -> tuple[dict[str, object], list[dict[str, object]], list[str]]:
     review_rows = [
         _review_payload(review, snapshot)
-        for review in sorted(
-            snapshot.reviews,
-            key=lambda item: (
-                item.submitted_at is None,
-                item.submitted_at.isoformat() if item.submitted_at is not None else "",
-                _id_sort_key(item.review_id),
-            ),
-        )
+        for review in sorted(snapshot.reviews, key=_review_sort_key)
     ]
     rows_by_id = {str(row["id"]): row for row in review_rows}
     latest = _latest_decisive_reviews(snapshot.reviews)
@@ -899,15 +894,7 @@ def _evaluate_reviews(
                 and _actor_key(review.actor.login) != _actor_key(push.actor)
             ]
             if candidates:
-                selected = sorted(
-                    candidates,
-                    key=lambda item: (
-                        item.submitted_at.isoformat()
-                        if item.submitted_at is not None
-                        else "",
-                        _id_sort_key(item.review_id),
-                    ),
-                )[-1]
+                selected = sorted(candidates, key=_review_sort_key)[-1]
                 latest_push_satisfied = True
                 latest_push_approval_actor = selected.actor.login
                 rows_by_id[selected.review_id]["satisfies_latest_push_approval"] = True

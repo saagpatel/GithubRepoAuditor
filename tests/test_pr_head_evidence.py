@@ -268,6 +268,52 @@ def test_latest_push_approval_requires_other_actor_after_push() -> None:
     assert _approval_result(current_verdict)["latest_push_approval_actor"] == "carol"
 
 
+def test_latest_decisive_review_orders_timezone_offsets_by_instant() -> None:
+    verdict = _evaluate(
+        _snapshot(
+            reviews=[
+                _review(
+                    review_id=1,
+                    state="APPROVED",
+                    submitted_at="2026-07-28T10:05:00Z",
+                ),
+                _review(
+                    review_id=2,
+                    state="CHANGES_REQUESTED",
+                    submitted_at="2026-07-28T09:30:00-01:00",
+                ),
+            ]
+        )
+    )
+
+    assert verdict["state"] == "blocked"
+    assert "changes_requested" in verdict["reasons"]
+    assert _approval_result(verdict)["counted_count"] == 0
+
+
+def test_latest_push_approval_actor_orders_timezone_offsets_by_instant() -> None:
+    verdict = _evaluate(
+        _snapshot(
+            reviews=[
+                _review(
+                    review_id=1,
+                    actor="alice",
+                    submitted_at="2026-07-28T10:05:00Z",
+                ),
+                _review(
+                    review_id=2,
+                    actor="carol",
+                    submitted_at="2026-07-28T09:30:00-01:00",
+                ),
+            ],
+            require_last_push_approval=True,
+        )
+    )
+
+    assert verdict["state"] == "current"
+    assert _approval_result(verdict)["latest_push_approval_actor"] == "carol"
+
+
 def test_actor_logins_are_case_insensitive_for_counts_and_latest_push() -> None:
     duplicate_case = _snapshot(
         reviews=[
