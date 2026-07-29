@@ -268,6 +268,44 @@ def test_latest_push_approval_requires_other_actor_after_push() -> None:
     assert _approval_result(current_verdict)["latest_push_approval_actor"] == "carol"
 
 
+def test_actor_logins_are_case_insensitive_for_counts_and_latest_push() -> None:
+    duplicate_case = _snapshot(
+        reviews=[
+            _review(review_id=1, actor="Alice"),
+            _review(review_id=2, actor="alice"),
+        ],
+        required_approvals=2,
+    )
+    duplicate_verdict = _evaluate(duplicate_case)
+
+    assert duplicate_verdict["state"] == "missing"
+    assert _approval_result(duplicate_verdict)["counted_count"] == 1
+
+    same_pusher = _snapshot(
+        reviews=[_review(actor="Alice")],
+        require_last_push_approval=True,
+    )
+    cast(dict[str, object], same_pusher["latest_reviewable_push"])["actor"] = "alice"
+    pusher_verdict = _evaluate(same_pusher)
+
+    assert pusher_verdict["state"] == "missing"
+    assert _approval_result(pusher_verdict)["latest_push_approval_actor"] is None
+
+
+def test_pull_request_author_cannot_count_own_approval() -> None:
+    snapshot = _snapshot(reviews=[_review(actor="Alice", can_count=True)])
+    cast(dict[str, object], snapshot["pull_request"])["author"] = "alice"
+
+    verdict = _evaluate(snapshot)
+    row = cast(list[dict[str, object]], verdict["reviews"])[0]
+
+    assert verdict["state"] == "missing"
+    assert _approval_result(verdict)["counted_count"] == 0
+    assert row["eligibility_state"] == "ineligible"
+    assert row["counts_toward_required_approvals"] is False
+    assert "pull_request_author_cannot_approve" in row["reasons"]
+
+
 @pytest.mark.parametrize(
     ("status", "conclusion", "expected_state", "github_satisfied"),
     [

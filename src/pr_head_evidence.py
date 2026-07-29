@@ -50,6 +50,12 @@ def _id_sort_key(value: str) -> tuple[int, int | str]:
     return (0, int(value)) if value.isdigit() else (1, value)
 
 
+def _actor_key(login: str) -> str:
+    """Return the case-insensitive identity key GitHub uses for logins."""
+
+    return login.casefold()
+
+
 class SnapshotValidationError(ValueError):
     """Raised when a PRHeadEvidenceV1 snapshot is structurally malformed."""
 
@@ -752,7 +758,12 @@ def _review_payload(
         decision_state = "dismissed"
     else:
         decision_state = review.state.lower()
-    if review.actor.can_count is None:
+    is_pull_request_author = _actor_key(review.actor.login) == _actor_key(
+        snapshot.pull_request.author
+    )
+    if is_pull_request_author:
+        eligibility_state = "ineligible"
+    elif review.actor.can_count is None:
         eligibility_state = "unknown"
     elif review.actor.can_count:
         eligibility_state = "eligible"
@@ -769,6 +780,8 @@ def _review_payload(
         reasons.append("reviewer_counting_eligibility_unknown")
     if eligibility_state == "ineligible":
         reasons.append("reviewer_does_not_count")
+    if is_pull_request_author:
+        reasons.append("pull_request_author_cannot_approve")
     return {
         "id": review.review_id,
         "actor": review.actor.login,
@@ -801,7 +814,7 @@ def _latest_decisive_reviews(reviews: tuple[Review, ...]) -> dict[str, Review]:
     ):
         if review.state in {"COMMENTED", "PENDING"}:
             continue
-        latest[review.actor.login] = review
+        latest[_actor_key(review.actor.login)] = review
     return latest
 
 
@@ -833,6 +846,8 @@ def _evaluate_reviews(
     blocking_change_requests: list[str] = []
 
     for review in latest.values():
+        if _actor_key(review.actor.login) == _actor_key(snapshot.pull_request.author):
+            continue
         if review.actor.can_count is None and review.state in {
             "APPROVED",
             "CHANGES_REQUESTED",
@@ -881,7 +896,7 @@ def _evaluate_reviews(
                 if review.commit_id == snapshot.pull_request.head_sha
                 and review.submitted_at is not None
                 and review.submitted_at >= push.pushed_at
-                and review.actor.login != push.actor
+                and _actor_key(review.actor.login) != _actor_key(push.actor)
             ]
             if candidates:
                 selected = sorted(
@@ -946,7 +961,10 @@ def _evaluate_reviews(
         {
             "state": state,
             "required_count": required_approvals,
-            "counted_actors": sorted(review.actor.login for review in counted),
+            "counted_actors": sorted(
+                (review.actor.login for review in counted),
+                key=_actor_key,
+            ),
             "counted_count": len(counted),
             "head_bound_count": current_count,
             "retained_stale_count": retained_stale_count,

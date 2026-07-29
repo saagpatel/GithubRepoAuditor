@@ -130,7 +130,9 @@ verdict.
 `actor.can_count` is a normalized collector assertion that the reviewer is
 eligible to count under the supplied repository policy. Use `null` when the
 permission or actor eligibility could not be established; that keeps approval
-coverage `unknown`.
+coverage `unknown`. Actor logins are compared case-insensitively, matching
+GitHub identity semantics. An approval from `pull_request.author` never counts,
+even if a malformed collector assertion sets `can_count` to `true`.
 
 `review.submitted_at` may be `null` only for a `PENDING` review, matching
 GitHub's response shape for an unsubmitted review. Submitted reviews require a
