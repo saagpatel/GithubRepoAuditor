@@ -581,7 +581,7 @@ def _read_small_json(path: Path) -> dict[str, Any]:
 
 def _gather_git_facts(project_path: Path) -> dict[str, Any]:
     git_dir = project_path / ".git"
-    if not git_dir.exists():
+    if not git_dir.exists() and not _is_bare_repository_root(project_path):
         return {
             "has_git": False,
             "last_commit_at": None,
@@ -619,6 +619,34 @@ def _gather_git_facts(project_path: Path) -> dict[str, Any]:
         }
     except ValueError:
         return base
+
+
+def _is_bare_repository_root(project_path: Path) -> bool:
+    """Recognize a conventional bare repository without climbing into parents."""
+    try:
+        result = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(project_path),
+                "rev-parse",
+                "--is-bare-repository",
+                "--absolute-git-dir",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return False
+    lines = result.stdout.splitlines()
+    if result.returncode != 0 or len(lines) != 2 or lines[0].strip() != "true":
+        return False
+    try:
+        return Path(lines[1].strip()).resolve() == project_path.resolve()
+    except OSError:
+        return False
 
 
 def _git_default_branch(project_path: Path) -> str:
