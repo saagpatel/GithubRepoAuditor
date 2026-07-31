@@ -5,7 +5,11 @@ from pathlib import Path
 from typing import Any
 
 from src.cli_output import print_info
-from src.github_security_coverage import DEFAULT_EXPECTED_GITHUB_COHORT_COUNT
+from src.github_security_coverage import (
+    DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+    SecurityCoverageError,
+    SecurityCoverageReceiptBinding,
+)
 from src.portfolio_context_recovery import (
     apply_context_recovery_plan,
     build_context_recovery_plan,
@@ -46,6 +50,9 @@ def run_portfolio_truth_mode(args: Any) -> None:
     producer_repo_root = (
         Path(producer_repo_root_value) if producer_repo_root_value else None
     )
+    require_producer_evidence = bool(
+        os.environ.get("GHRA_REQUIRE_PRODUCER_EVIDENCE", "1") == "1"
+    )
     release_count_by_name: dict[str, int] | None = None
     if getattr(args, "portfolio_truth_include_release_count", False):
         release_count_by_name = load_release_count_by_name(
@@ -54,6 +61,7 @@ def run_portfolio_truth_mode(args: Any) -> None:
         )
     security_alerts_by_name: dict[str, dict] | None = None
     security_coverage_metadata: dict[str, object] | None = None
+    security_receipt_binding: SecurityCoverageReceiptBinding | None = None
     if getattr(args, "portfolio_truth_include_security", False):
         receipt_path_value = getattr(args, "portfolio_truth_security_receipt", None)
         loaded_security = load_security_coverage_by_full_name(
@@ -72,6 +80,13 @@ def run_portfolio_truth_mode(args: Any) -> None:
             ),
         )
         if loaded_security is not None:
+            try:
+                security_receipt_binding = loaded_security.binding()
+            except SecurityCoverageError as exc:
+                if require_producer_evidence:
+                    raise SystemExit(
+                        f"Canonical PortfolioTruth security publication refused: {exc}"
+                    ) from exc
             security_alerts_by_name = loaded_security.entries_by_full_name
             security_coverage_metadata = {
                 "source_id": "github-security-coverage-receipt",
@@ -86,6 +101,17 @@ def run_portfolio_truth_mode(args: Any) -> None:
                 ),
                 "path": loaded_security.source_path,
             }
+            if loaded_security.receipt_id is not None:
+                security_coverage_metadata["receipt_id"] = loaded_security.receipt_id
+            if loaded_security.content_sha256 is not None:
+                security_coverage_metadata["content_sha256"] = (
+                    loaded_security.content_sha256
+                )
+        elif require_producer_evidence:
+            raise SystemExit(
+                "Canonical PortfolioTruth security publication requires a valid "
+                "identity-bound GitHub security receipt."
+            )
     repo_status_by_name = load_live_repo_status_by_name(
         username=args.username,
         token=getattr(args, "token", None),
@@ -112,12 +138,11 @@ def run_portfolio_truth_mode(args: Any) -> None:
             release_count_by_name=release_count_by_name,
             security_alerts_by_name=security_alerts_by_name,
             security_coverage_metadata=security_coverage_metadata,
+            security_receipt_binding=security_receipt_binding,
             repo_status_by_name=repo_status_by_name,
             producer_evidence=producer_evidence,
             producer_repo_root=producer_repo_root,
-            require_producer_evidence=bool(
-                os.environ.get("GHRA_REQUIRE_PRODUCER_EVIDENCE", "1") == "1"
-            ),
+            require_producer_evidence=require_producer_evidence,
         )
     except (PortfolioTruthPublishError, ValueError) as exc:
         raise SystemExit(str(exc)) from exc

@@ -2,9 +2,15 @@ from __future__ import annotations
 
 import json
 import tempfile
+from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 
+from src.github_security_coverage import (
+    SecurityCoverageError,
+    SecurityCoverageReceiptBinding,
+    verified_security_coverage_receipt_binding,
+)
 from src.portfolio_truth_reconcile import (
     build_portfolio_truth_snapshot,
     load_prior_notion_context,
@@ -91,6 +97,7 @@ def publish_portfolio_truth(
     release_count_by_name: dict[str, int] | None = None,
     security_alerts_by_name: dict[str, dict] | None = None,
     security_coverage_metadata: dict[str, object] | None = None,
+    security_receipt_binding: SecurityCoverageReceiptBinding | None = None,
     repo_status_by_name: dict[str, dict] | None = None,
     producer_evidence: ProducerEvidence | None = None,
     producer_repo_root: Path | None = None,
@@ -109,6 +116,15 @@ def publish_portfolio_truth(
             verify_evidence_still_current(producer_repo_root, producer_evidence)
         except ValueError as exc:
             raise PortfolioTruthPublishError(str(exc)) from exc
+    _validate_security_receipt_binding(
+        metadata=security_coverage_metadata,
+        binding=security_receipt_binding,
+        required=require_producer_evidence
+        and (
+            security_alerts_by_name is not None
+            or security_coverage_metadata is not None
+        ),
+    )
     validate_publish_targets(
         workspace_root=workspace_root,
         output_dir=output_dir,
@@ -134,11 +150,6 @@ def publish_portfolio_truth(
         prior_notion_generated_at=prior_notion_generated_at,
     )
     validate_truth_snapshot(build_result.snapshot)
-    if producer_evidence is not None and producer_repo_root is not None:
-        try:
-            verify_evidence_still_current(producer_repo_root, producer_evidence)
-        except ValueError as exc:
-            raise PortfolioTruthPublishError(str(exc)) from exc
 
     snapshot_stamp = build_result.snapshot.generated_at.strftime("%Y-%m-%dT%H%M%SZ")
     snapshot_path = output_dir / f"portfolio-truth-{snapshot_stamp}.json"
@@ -186,14 +197,22 @@ def publish_portfolio_truth(
     originals = {path: (path.read_text() if path.exists() else None) for path in targets}
     published: list[Path] = []
 
+    publication_guard = (
+        verified_security_coverage_receipt_binding(security_receipt_binding)
+        if security_receipt_binding is not None
+        else nullcontext()
+    )
     try:
-        for path, staged in temp_files.items():
-            if path in {registry_output, portfolio_report_output} and not changed[path]:
-                staged.unlink(missing_ok=True)
-                continue
-            staged.replace(path)
-            published.append(path)
-    except Exception:
+        with publication_guard:
+            if producer_evidence is not None and producer_repo_root is not None:
+                verify_evidence_still_current(producer_repo_root, producer_evidence)
+            for path, staged in temp_files.items():
+                if path in {registry_output, portfolio_report_output} and not changed[path]:
+                    staged.unlink(missing_ok=True)
+                    continue
+                staged.replace(path)
+                published.append(path)
+    except Exception as exc:
         for path in reversed(published):
             original = originals[path]
             if original is None:
@@ -202,6 +221,8 @@ def publish_portfolio_truth(
                 path.write_text(original)
         for staged in temp_files.values():
             staged.unlink(missing_ok=True)
+        if isinstance(exc, (SecurityCoverageError, ValueError)):
+            raise PortfolioTruthPublishError(str(exc)) from exc
         raise
 
     for staged in temp_files.values():
@@ -217,6 +238,36 @@ def publish_portfolio_truth(
         report_changed=changed[portfolio_report_output],
         project_registry_path=project_registry_path,
     )
+
+
+def _validate_security_receipt_binding(
+    *,
+    metadata: dict[str, object] | None,
+    binding: SecurityCoverageReceiptBinding | None,
+    required: bool,
+) -> None:
+    if binding is None:
+        if required:
+            raise PortfolioTruthPublishError(
+                "Canonical security publication requires immutable receipt identity."
+            )
+        return
+    if metadata is None:
+        raise PortfolioTruthPublishError(
+            "Security receipt binding requires PortfolioTruth input metadata."
+        )
+    if metadata.get("receipt_id") != binding.receipt_id:
+        raise PortfolioTruthPublishError(
+            "Security receipt_id metadata does not match the bound receipt."
+        )
+    if metadata.get("content_sha256") != binding.content_sha256:
+        raise PortfolioTruthPublishError(
+            "Security content_sha256 metadata does not match the bound receipt bytes."
+        )
+    if metadata.get("path") != binding.source_path:
+        raise PortfolioTruthPublishError(
+            "Security receipt path metadata does not match the bound receipt."
+        )
 
 
 def _stage_text(target: Path, content: str) -> Path:
