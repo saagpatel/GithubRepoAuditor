@@ -141,6 +141,16 @@ class TestProjectMappingLookup:
         assert _lookup_project_mapping("MCPAudit", mapping)["localProjectId"] == "mcp-id"
 
 
+def test_lookup_project_mapping_rejects_ambiguous_normalized_aliases() -> None:
+    mapping = {
+        "Foo Bar": {"localProjectId": "space"},
+        "Foo-Bar": {"localProjectId": "dash"},
+        "Foo_Bar": {"localProjectId": "underscore"},
+    }
+
+    assert _lookup_project_mapping("foo.bar", mapping) is None
+
+
 class TestBiggestDrag:
     def test_finds_lowest(self):
         audit = _make_report()["audits"][0]
