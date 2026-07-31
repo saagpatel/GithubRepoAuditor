@@ -8,14 +8,18 @@ alerts, or secret-scanning payloads.
 from __future__ import annotations
 
 import argparse
+import fcntl
+import hashlib
 import json
 import os
 import re
 import subprocess
+import tempfile
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 import requests
 
@@ -76,6 +80,8 @@ DEFAULT_TOTAL_REQUEST_LIMIT = 75
 DEFAULT_QUOTA_RESERVE = 100
 _COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 _REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+_RECEIPT_ID_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 _ENDPOINTS = {
     "dependabot": "dependabot/alerts",
@@ -103,6 +109,19 @@ class SecurityCoverageError(ValueError):
 
 
 @dataclass(frozen=True)
+class SecurityCoverageReceiptBinding:
+    """Immutable identity needed to authorize a PortfolioTruth publication."""
+
+    source_path: str
+    receipt_id: str
+    content_sha256: str
+    receipt_state: str
+    max_age_hours: int
+    expected_cohort_count: int
+    expected_producer_commit: str | None
+
+
+@dataclass(frozen=True)
 class LoadedSecurityCoverage:
     entries_by_full_name: dict[str, dict[str, Any]]
     produced_at: str
@@ -113,6 +132,64 @@ class LoadedSecurityCoverage:
     receipt_state: str
     age_hours: float
     source_path: str
+    receipt_id: str | None = None
+    content_sha256: str | None = None
+    max_age_hours: int = 24
+    expected_cohort_count: int = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT
+    expected_producer_commit: str | None = None
+
+    def binding(self) -> SecurityCoverageReceiptBinding:
+        """Return the strict byte binding used by canonical publication.
+
+        Legacy V1 receipts remain readable, but they cannot authorize a new
+        canonical PortfolioTruth publication because they do not identify the
+        exact semantic receipt or the exact file bytes that were consumed.
+        """
+        if not self.receipt_id:
+            raise SecurityCoverageError(
+                "security coverage receipt is missing immutable receipt_id provenance"
+            )
+        if not self.content_sha256:
+            raise SecurityCoverageError(
+                "security coverage receipt is missing an exact content digest"
+            )
+        if not self.source_path:
+            raise SecurityCoverageError(
+                "security coverage receipt is missing its canonical source path"
+            )
+        return SecurityCoverageReceiptBinding(
+            source_path=self.source_path,
+            receipt_id=self.receipt_id,
+            content_sha256=self.content_sha256,
+            receipt_state=self.receipt_state,
+            max_age_hours=self.max_age_hours,
+            expected_cohort_count=self.expected_cohort_count,
+            expected_producer_commit=self.expected_producer_commit,
+        )
+
+
+@dataclass(frozen=True)
+class SecurityCoverageReceiptWriter:
+    """Exclusive writer intent for one canonical security receipt.
+
+    The lock is intentionally held before the prior receipt is read and remains
+    held until the replacement bytes land.  That gives PortfolioTruth a
+    concrete signal that a newer same-cycle receipt is in flight even before
+    the canonical pointer has changed.
+    """
+
+    path: Path
+    expected_cohort_count: int
+
+    def load_prior(self) -> dict[str, Any] | None:
+        return _load_json_object(self.path) if self.path.is_file() else None
+
+    def write(self, payload: dict[str, Any]) -> LoadedSecurityCoverage:
+        return _write_security_coverage_receipt_unlocked(
+            payload,
+            self.path,
+            expected_cohort_count=self.expected_cohort_count,
+        )
 
 
 @dataclass
@@ -157,6 +234,83 @@ def _text(value: Any) -> str:
 
 def _mapping(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
+
+
+def _receipt_id_for_payload(payload: dict[str, Any]) -> str:
+    """Return a deterministic semantic identity for a receipt payload."""
+    unsigned = {key: value for key, value in payload.items() if key != "receipt_id"}
+    canonical = json.dumps(
+        unsigned,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return f"sha256:{hashlib.sha256(canonical).hexdigest()}"
+
+
+def _with_receipt_id(payload: dict[str, Any]) -> dict[str, Any]:
+    bound = dict(payload)
+    declared = bound.get("receipt_id")
+    expected = _receipt_id_for_payload(bound)
+    if declared is None:
+        bound["receipt_id"] = expected
+    elif declared != expected:
+        raise SecurityCoverageError(
+            "security coverage receipt_id does not match the receipt payload"
+        )
+    return bound
+
+
+def _receipt_lock_path(path: Path) -> Path:
+    return path.with_name(f".{path.name}.lock")
+
+
+@contextmanager
+def _receipt_lock(
+    path: Path,
+    *,
+    exclusive: bool,
+    create: bool,
+    blocking: bool = True,
+) -> Iterator[None]:
+    lock_path = _receipt_lock_path(path)
+    flags = os.O_RDWR | (os.O_CREAT if create else 0)
+    try:
+        descriptor = os.open(lock_path, flags, 0o600)
+    except FileNotFoundError as exc:
+        raise SecurityCoverageError(
+            f"security coverage receipt lock is missing: {lock_path}"
+        ) from exc
+    try:
+        operation = fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH
+        if not blocking:
+            operation |= fcntl.LOCK_NB
+        try:
+            fcntl.flock(descriptor, operation)
+        except BlockingIOError as exc:
+            raise SecurityCoverageError(
+                "security coverage receipt collection is active; retry "
+                "PortfolioTruth publication after the current receipt lands"
+            ) from exc
+        yield
+    finally:
+        fcntl.flock(descriptor, fcntl.LOCK_UN)
+        os.close(descriptor)
+
+
+@contextmanager
+def security_coverage_receipt_writer(
+    path: Path,
+    *,
+    expected_cohort_count: int = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+) -> Iterator[SecurityCoverageReceiptWriter]:
+    """Hold exclusive writer intent across collection and receipt replacement."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with _receipt_lock(path, exclusive=True, create=True):
+        yield SecurityCoverageReceiptWriter(
+            path=path,
+            expected_cohort_count=expected_cohort_count,
+        )
 
 
 def _canonical_repo(value: Any) -> str:
@@ -1616,6 +1770,7 @@ def validate_security_coverage_receipt(
     expected_producer_commit: str | None = None,
     now: datetime | None = None,
     source_path: str = "",
+    content_sha256: str | None = None,
 ) -> LoadedSecurityCoverage:
     """Validate provenance/freshness and return normalized full-name entries."""
     if max_age_hours <= 0:
@@ -1626,6 +1781,22 @@ def validate_security_coverage_receipt(
         raise SecurityCoverageError(
             "unexpected security coverage receipt schema: "
             f"{payload.get('schema_version')!r}"
+        )
+    receipt_id_value = payload.get("receipt_id")
+    receipt_id: str | None = None
+    if receipt_id_value is not None:
+        receipt_id = _text(receipt_id_value)
+        if not _RECEIPT_ID_RE.fullmatch(receipt_id):
+            raise SecurityCoverageError(
+                "security coverage receipt_id must be a sha256 identity"
+            )
+        if receipt_id != _receipt_id_for_payload(payload):
+            raise SecurityCoverageError(
+                "security coverage receipt_id does not match the receipt payload"
+            )
+    if content_sha256 is not None and not _SHA256_RE.fullmatch(content_sha256):
+        raise SecurityCoverageError(
+            "security coverage content_sha256 must be a lowercase SHA-256 digest"
         )
     produced_at = _parse_datetime(payload.get("produced_at"), field_name="produced_at")
     current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
@@ -1752,6 +1923,11 @@ def validate_security_coverage_receipt(
         receipt_state="stale" if receipt_is_stale else "fresh",
         age_hours=round(age_hours, 3),
         source_path=source_path,
+        receipt_id=receipt_id,
+        content_sha256=content_sha256,
+        max_age_hours=max_age_hours,
+        expected_cohort_count=expected_cohort_count,
+        expected_producer_commit=expected_producer_commit,
     )
 
 
@@ -1763,8 +1939,26 @@ def load_security_coverage_receipt(
     expected_producer_commit: str | None = None,
     now: datetime | None = None,
 ) -> LoadedSecurityCoverage:
+    return _load_security_coverage_receipt_unlocked(
+        path,
+        max_age_hours=max_age_hours,
+        expected_cohort_count=expected_cohort_count,
+        expected_producer_commit=expected_producer_commit,
+        now=now,
+    )
+
+
+def _load_security_coverage_receipt_unlocked(
+    path: Path,
+    *,
+    max_age_hours: int,
+    expected_cohort_count: int,
+    expected_producer_commit: str | None,
+    now: datetime | None,
+) -> LoadedSecurityCoverage:
     try:
-        payload = json.loads(path.read_text())
+        raw_bytes = path.read_bytes()
+        payload = json.loads(raw_bytes)
     except FileNotFoundError as exc:
         raise SecurityCoverageError(
             f"security coverage receipt not found: {path}"
@@ -1780,7 +1974,37 @@ def load_security_coverage_receipt(
         expected_producer_commit=expected_producer_commit,
         now=now,
         source_path=str(path),
+        content_sha256=hashlib.sha256(raw_bytes).hexdigest(),
     )
+
+
+@contextmanager
+def verified_security_coverage_receipt_binding(
+    binding: SecurityCoverageReceiptBinding,
+) -> Iterator[LoadedSecurityCoverage]:
+    """Hold the collector lock while revalidating the bound receipt bytes."""
+    path = Path(binding.source_path)
+    with _receipt_lock(path, exclusive=False, create=False, blocking=False):
+        loaded = _load_security_coverage_receipt_unlocked(
+            path,
+            max_age_hours=binding.max_age_hours,
+            expected_cohort_count=binding.expected_cohort_count,
+            expected_producer_commit=binding.expected_producer_commit,
+            now=None,
+        )
+        if loaded.receipt_id != binding.receipt_id:
+            raise SecurityCoverageError(
+                "security coverage receipt identity changed after it was loaded"
+            )
+        if loaded.content_sha256 != binding.content_sha256:
+            raise SecurityCoverageError(
+                "security coverage receipt bytes changed after they were loaded"
+            )
+        if loaded.receipt_state != binding.receipt_state:
+            raise SecurityCoverageError(
+                "security coverage receipt freshness changed after it was loaded"
+            )
+        yield loaded
 
 
 def write_security_coverage_receipt(
@@ -1788,17 +2012,56 @@ def write_security_coverage_receipt(
     path: Path,
     *,
     expected_cohort_count: int = DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
-) -> None:
-    """Atomically write a validated receipt payload."""
-    validate_security_coverage_receipt(
-        payload,
+) -> LoadedSecurityCoverage:
+    """Atomically write a validated, identity-bound receipt payload."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with _receipt_lock(path, exclusive=True, create=True):
+        return _write_security_coverage_receipt_unlocked(
+            payload,
+            path,
+            expected_cohort_count=expected_cohort_count,
+        )
+
+
+def _write_security_coverage_receipt_unlocked(
+    payload: dict[str, Any],
+    path: Path,
+    *,
+    expected_cohort_count: int,
+) -> LoadedSecurityCoverage:
+    """Write a receipt while the caller already holds exclusive writer intent."""
+    bound_payload = _with_receipt_id(payload)
+    serialized = (
+        json.dumps(bound_payload, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+    ).encode("utf-8")
+    content_sha256 = hashlib.sha256(serialized).hexdigest()
+    loaded = validate_security_coverage_receipt(
+        bound_payload,
         max_age_hours=24 * 365,
         expected_cohort_count=expected_cohort_count,
+        source_path=str(path),
+        content_sha256=content_sha256,
     )
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.tmp")
-    temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
-    temporary.replace(path)
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "wb",
+            delete=False,
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+        ) as handle:
+            temporary_path = Path(handle.name)
+            handle.write(serialized)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_path, path)
+        temporary_path = None
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+    return loaded
 
 
 def _load_json_object(path: Path) -> dict[str, Any]:
@@ -1873,27 +2136,29 @@ def main() -> None:
                         "receipt_state": loaded.receipt_state,
                         "age_hours": loaded.age_hours,
                         "cohort_count": len(loaded.cohort_repositories),
+                        "receipt_id": loaded.receipt_id,
+                        "content_sha256": loaded.content_sha256,
                     },
                     indent=2,
                 )
             )
             return
-        truth = _load_json_object(args.truth)
-        prior = _load_json_object(args.output) if args.output.is_file() else None
-        receipt = collect_security_coverage(
-            truth,
-            token=os.environ.get("GITHUB_TOKEN"),
-            expected_cohort_count=args.expected_cohort_count,
-            base_request_limit=args.base_request_limit,
-            total_request_limit=args.total_request_limit,
-            quota_reserve=args.quota_reserve,
-            prior_receipt=prior,
-        )
-        write_security_coverage_receipt(
-            receipt,
+        with security_coverage_receipt_writer(
             args.output,
             expected_cohort_count=args.expected_cohort_count,
-        )
+        ) as writer:
+            truth = _load_json_object(args.truth)
+            prior = writer.load_prior()
+            receipt = collect_security_coverage(
+                truth,
+                token=os.environ.get("GITHUB_TOKEN"),
+                expected_cohort_count=args.expected_cohort_count,
+                base_request_limit=args.base_request_limit,
+                total_request_limit=args.total_request_limit,
+                quota_reserve=args.quota_reserve,
+                prior_receipt=prior,
+            )
+            written = writer.write(receipt)
     except SecurityCoverageError as exc:
         raise SystemExit(str(exc)) from exc
     print(
@@ -1903,6 +2168,8 @@ def main() -> None:
                 "path": str(args.output),
                 "cohort_count": receipt["cohort"]["repository_count"],
                 "request_budget": receipt["request_budget"],
+                "receipt_id": written.receipt_id,
+                "content_sha256": written.content_sha256,
             },
             indent=2,
         )
