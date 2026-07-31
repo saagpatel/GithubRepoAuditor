@@ -5,12 +5,18 @@ import json
 import os
 import subprocess
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
 
 from src.cli import main
+from src.github_security_coverage import (
+    collect_security_coverage,
+    load_security_coverage_receipt,
+    write_security_coverage_receipt,
+)
+from src.portfolio_decision_queue import build_decision_queue
 from src.portfolio_context_recovery import (
     apply_context_recovery_plan,
     build_context_recovery_plan,
@@ -30,7 +36,10 @@ from src.portfolio_truth_sources import (
     _git_remote_full_name,
     load_safe_notion_project_context,
 )
-from src.portfolio_truth_validate import validate_portfolio_report_markdown
+from src.portfolio_truth_validate import (
+    validate_portfolio_report_markdown,
+    validate_truth_snapshot,
+)
 from src.project_registry import build_project_registry
 from src.registry_parser import parse_registry
 
@@ -1449,6 +1458,106 @@ def test_security_overlay_populates_and_force_elevates(
     assert alpha_dict["security"]["dependabot_critical"] == 1
 
 
+def test_bound_security_identity_and_high_findings_reach_decision_queue(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    now = datetime.fromtimestamp(1_700_200_000, tz=timezone.utc)
+    alpha_path = portfolio_workspace / "Alpha"
+    subprocess.run(["git", "init"], cwd=alpha_path, capture_output=True, check=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", "https://github.com/d/Alpha.git"],
+        cwd=alpha_path,
+        capture_output=True,
+        check=True,
+    )
+    observed_at = now.isoformat()
+    security = {
+        "d/Alpha": {
+            "repo_full_name": "d/Alpha",
+            "cohort_member": True,
+            "cohort_policy": "portfolio-default-attention-v1",
+            "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
+            "receipt_state": "fresh",
+            "source_produced_at": observed_at,
+            "repository": {
+                "source": "github-graphql-default-branch-head-v1",
+                "state": "observed",
+                "reason_code": "observed",
+                "reason": None,
+                "observed_at": observed_at,
+                "default_branch": "main",
+                "head_sha": "b" * 40,
+                "archived": False,
+            },
+            "providers": {
+                "dependabot": {
+                    "state": "observed",
+                    "observed_at": observed_at,
+                    "pagination_complete": True,
+                    "counts": {"critical": 0, "high": 2, "medium": 1, "low": 0},
+                },
+                "code_scanning": {
+                    "state": "observed",
+                    "observed_at": observed_at,
+                    "pagination_complete": True,
+                    "counts": {"critical": 0, "high": 0, "warning": 0, "note": 0},
+                },
+                "secret_scanning": {
+                    "state": "observed",
+                    "observed_at": observed_at,
+                    "pagination_complete": True,
+                    "counts": {"open": 0},
+                },
+            },
+        }
+    }
+    metadata = {
+        "source_id": "github-security-coverage-receipt",
+        "schema_version": "GitHubSecurityCoverageReceiptV1",
+        "produced_at": observed_at,
+        "state": "fresh",
+        "age_hours": 0.0,
+        "producer_commit": "a" * 40,
+        "cohort_policy": "portfolio-default-attention-v1",
+        "cohort_repository_count": 1,
+        "path": "/evidence/github-security-coverage-latest.json",
+        "receipt_id": "sha256:" + "c" * 64,
+        "content_sha256": "d" * 64,
+    }
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=now,
+        security_alerts_by_name=security,
+        security_coverage_metadata=metadata,
+    )
+    truth = result.snapshot.to_dict()
+    alpha = next(
+        project
+        for project in truth["projects"]
+        if project["identity"]["display_name"] == "Alpha"
+    )
+    decision = next(
+        item for item in build_decision_queue(truth) if item["project"] == "Alpha"
+    )
+
+    assert truth["inputs"]["github_security"] == metadata
+    assert alpha["risk"]["security_risk"] is True
+    assert alpha["security"]["dependabot_high"] == 2
+    assert alpha["security"]["dependabot_medium"] == 1
+    assert decision["decision_type"] == "security follow-up"
+    assert "critical=0, high=2" in decision["evidence"][0]
+
+    result.snapshot.inputs["github_security"].pop("content_sha256")
+    with pytest.raises(ValueError, match="requires both receipt_id"):
+        validate_truth_snapshot(result.snapshot)
+
+
 def test_security_overlay_absent_leaves_repos_unscanned(
     portfolio_workspace: Path,
     portfolio_catalog: Path,
@@ -2364,6 +2473,112 @@ def test_publish_failure_leaves_live_files_untouched(
     assert not list(output_dir.glob("*.tmp"))
 
 
+def test_publish_refuses_receipt_pointer_replacement_after_load(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    receipt_path = output_dir / "github-security-coverage-latest.json"
+    receipt_truth = {
+        "projects": [
+            {
+                "identity": {"repo_full_name": "d/Alpha"},
+                "derived": {"attention_state": "active-product"},
+            }
+        ]
+    }
+    first_receipt = collect_security_coverage(
+        receipt_truth,
+        token=None,
+        expected_cohort_count=1,
+        now=now,
+        producer_commit="a" * 40,
+    )
+    write_security_coverage_receipt(
+        first_receipt,
+        receipt_path,
+        expected_cohort_count=1,
+    )
+    loaded = load_security_coverage_receipt(
+        receipt_path,
+        expected_cohort_count=1,
+        expected_producer_commit="a" * 40,
+        now=now,
+    )
+    binding = loaded.binding()
+    metadata = {
+        "source_id": "github-security-coverage-receipt",
+        "schema_version": loaded.schema_version,
+        "produced_at": loaded.produced_at,
+        "state": loaded.receipt_state,
+        "age_hours": loaded.age_hours,
+        "producer_commit": loaded.producer_commit,
+        "cohort_policy": loaded.cohort_policy,
+        "cohort_repository_count": len(loaded.cohort_repositories),
+        "path": loaded.source_path,
+        "receipt_id": loaded.receipt_id,
+        "content_sha256": loaded.content_sha256,
+    }
+    registry_output = portfolio_workspace / "project-registry.md"
+    report_output = portfolio_workspace / "PORTFOLIO-AUDIT-REPORT.md"
+    registry_output.write_text("sentinel-registry\n")
+    report_output.write_text("sentinel-report\n")
+
+    from src import portfolio_truth_publish as publish_module
+
+    original_stage = publish_module._stage_text
+    replaced = False
+
+    def stage_then_replace_receipt(target: Path, content: str) -> Path:
+        nonlocal replaced
+        staged = original_stage(target, content)
+        if not replaced:
+            replaced = True
+            newer_receipt = collect_security_coverage(
+                receipt_truth,
+                token=None,
+                expected_cohort_count=1,
+                now=now + timedelta(minutes=1),
+                producer_commit="a" * 40,
+            )
+            write_security_coverage_receipt(
+                newer_receipt,
+                receipt_path,
+                expected_cohort_count=1,
+            )
+        return staged
+
+    monkeypatch.setattr(publish_module, "_stage_text", stage_then_replace_receipt)
+
+    with pytest.raises(
+        PortfolioTruthPublishError,
+        match="changed after it was loaded",
+    ):
+        publish_portfolio_truth(
+            workspace_root=portfolio_workspace,
+            output_dir=output_dir,
+            registry_output=registry_output,
+            portfolio_report_output=report_output,
+            catalog_path=portfolio_catalog,
+            legacy_registry_path=legacy_registry,
+            include_notion=False,
+            security_alerts_by_name=loaded.entries_by_full_name,
+            security_coverage_metadata=metadata,
+            security_receipt_binding=binding,
+        )
+
+    assert replaced is True
+    assert registry_output.read_text() == "sentinel-registry\n"
+    assert report_output.read_text() == "sentinel-report\n"
+    assert not (output_dir / "portfolio-truth-latest.json").exists()
+    assert not list(output_dir.glob("portfolio-truth-*.json"))
+
+
 def test_publish_requires_producer_evidence_before_touching_outputs(
     portfolio_workspace: Path,
     portfolio_catalog: Path,
@@ -2755,6 +2970,131 @@ def test_portfolio_truth_app_threads_security_cohort_count(
     assert captured["max_age_hours"] == 12
     assert captured["expected_producer_commit"] is None
     assert captured["repo_status_cache"] is None
+
+
+def test_portfolio_truth_app_carries_security_receipt_binding_to_publisher(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from types import SimpleNamespace
+
+    from src.app.portfolio_truth import run_portfolio_truth_mode
+    from src.github_security_coverage import SecurityCoverageReceiptBinding
+
+    receipt_path = tmp_path / "github-security-coverage-latest.json"
+    binding = SecurityCoverageReceiptBinding(
+        source_path=str(receipt_path),
+        receipt_id="sha256:" + "b" * 64,
+        content_sha256="c" * 64,
+        receipt_state="fresh",
+        max_age_hours=12,
+        expected_cohort_count=3,
+        expected_producer_commit=None,
+    )
+    loaded = SimpleNamespace(
+        entries_by_full_name={},
+        schema_version="GitHubSecurityCoverageReceiptV1",
+        produced_at="2026-07-31T12:00:00+00:00",
+        receipt_state="fresh",
+        age_hours=0.0,
+        producer_commit="a" * 40,
+        cohort_policy="portfolio-default-attention-v1",
+        cohort_repositories=("d/one", "d/two", "d/three"),
+        source_path=str(receipt_path),
+        receipt_id=binding.receipt_id,
+        content_sha256=binding.content_sha256,
+        binding=lambda: binding,
+    )
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        "src.app.portfolio_truth.load_security_coverage_by_full_name",
+        lambda **_kwargs: loaded,
+    )
+    monkeypatch.setattr(
+        "src.app.portfolio_truth.load_live_repo_status_by_name", lambda **_kwargs: {}
+    )
+
+    def fake_publish(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(
+            latest_path=tmp_path / "latest.json",
+            snapshot_path=tmp_path / "history.json",
+            registry_output=tmp_path / "registry.md",
+            portfolio_report_output=tmp_path / "report.md",
+            project_count=0,
+            registry_changed=False,
+            report_changed=False,
+        )
+
+    monkeypatch.setattr("src.app.portfolio_truth.publish_portfolio_truth", fake_publish)
+    monkeypatch.setenv("GHRA_REQUIRE_PRODUCER_EVIDENCE", "0")
+    args = SimpleNamespace(
+        output_dir=str(tmp_path / "output"),
+        workspace_root=str(tmp_path),
+        registry_output=str(tmp_path / "registry.md"),
+        portfolio_report_output=str(tmp_path / "report.md"),
+        registry=None,
+        catalog=None,
+        username="testuser",
+        token=None,
+        no_cache=True,
+        portfolio_truth_include_release_count=False,
+        portfolio_truth_include_security=True,
+        portfolio_truth_security_receipt=str(receipt_path),
+        portfolio_truth_security_max_age_hours=12,
+        portfolio_truth_security_cohort_count=3,
+        portfolio_truth_allow_empty_notion=False,
+    )
+
+    run_portfolio_truth_mode(args)
+
+    assert captured["security_receipt_binding"] == binding
+    metadata = captured["security_coverage_metadata"]
+    assert metadata["receipt_id"] == binding.receipt_id
+    assert metadata["content_sha256"] == binding.content_sha256
+
+
+def test_canonical_portfolio_truth_refuses_legacy_security_receipt_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from types import SimpleNamespace
+
+    from src.app.portfolio_truth import run_portfolio_truth_mode
+    from src.github_security_coverage import SecurityCoverageError
+
+    def missing_binding():
+        raise SecurityCoverageError(
+            "security coverage receipt is missing immutable receipt_id provenance"
+        )
+
+    loaded = SimpleNamespace(binding=missing_binding)
+    monkeypatch.setattr(
+        "src.app.portfolio_truth.load_security_coverage_by_full_name",
+        lambda **_kwargs: loaded,
+    )
+    monkeypatch.setenv("GHRA_REQUIRE_PRODUCER_EVIDENCE", "1")
+    args = SimpleNamespace(
+        output_dir=str(tmp_path / "output"),
+        workspace_root=str(tmp_path),
+        registry_output=str(tmp_path / "registry.md"),
+        portfolio_report_output=str(tmp_path / "report.md"),
+        registry=None,
+        catalog=None,
+        username="testuser",
+        token=None,
+        no_cache=True,
+        portfolio_truth_include_release_count=False,
+        portfolio_truth_include_security=True,
+        portfolio_truth_security_receipt=None,
+        portfolio_truth_security_max_age_hours=24,
+        portfolio_truth_security_cohort_count=9,
+        portfolio_truth_allow_empty_notion=False,
+    )
+
+    with pytest.raises(SystemExit, match="missing immutable receipt_id"):
+        run_portfolio_truth_mode(args)
 
 
 def test_portfolio_truth_app_passes_validated_producer_receipt_to_publisher(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -17,7 +18,10 @@ from src.github_security_coverage import (
     derive_default_attention_cohort,
     load_security_coverage_receipt,
     main,
+    security_coverage_receipt_writer,
     validate_security_coverage_receipt,
+    verified_security_coverage_receipt_binding,
+    write_security_coverage_receipt,
 )
 from src.portfolio_truth_reconcile import _select_security_entry
 from src.portfolio_truth_status import load_security_coverage_by_full_name
@@ -104,6 +108,42 @@ def _collect(
         producer_commit="a" * 40,
         api_base_url="https://api.example.test",
     )
+
+
+def _assert_binding_revalidation_fails_in_child(
+    binding: Any,
+    *,
+    expected: str,
+) -> None:
+    script = """
+import json
+import sys
+
+from src.github_security_coverage import (
+    SecurityCoverageError,
+    SecurityCoverageReceiptBinding,
+    verified_security_coverage_receipt_binding,
+)
+
+binding = SecurityCoverageReceiptBinding(**json.loads(sys.stdin.read()))
+try:
+    with verified_security_coverage_receipt_binding(binding):
+        pass
+except SecurityCoverageError as exc:
+    print(str(exc))
+    raise SystemExit(0)
+raise SystemExit("binding unexpectedly revalidated")
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        input=json.dumps(binding.__dict__),
+        text=True,
+        capture_output=True,
+        cwd=Path(__file__).resolve().parents[1],
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr or result.stdout
+    assert expected in result.stdout
 
 
 def _prior_with_private_unavailable(count: int = 6) -> dict[str, Any]:
@@ -686,6 +726,192 @@ def test_receipt_loader_uses_embedded_provenance_not_newer_mtime(
         len(loaded.entries_by_full_name)
         == DEFAULT_EXPECTED_GITHUB_COHORT_COUNT
     )
+
+
+def test_written_receipt_binds_semantic_identity_and_exact_bytes(
+    tmp_path: Path,
+) -> None:
+    receipt = _collect(cohort_count=DEFAULT_EXPECTED_GITHUB_COHORT_COUNT)
+    canonical = tmp_path / GITHUB_SECURITY_RECEIPT_FILENAME
+
+    written = write_security_coverage_receipt(receipt, canonical)
+    loaded = load_security_coverage_receipt(canonical, now=NOW)
+
+    assert written.receipt_id == loaded.receipt_id
+    assert written.content_sha256 == loaded.content_sha256
+    assert written.receipt_id is not None
+    assert written.receipt_id.startswith("sha256:")
+    assert written.content_sha256 is not None
+    assert len(written.content_sha256) == 64
+    assert json.loads(canonical.read_text())["receipt_id"] == written.receipt_id
+    assert canonical.with_name(f".{canonical.name}.lock").is_file()
+
+
+def test_collector_cli_holds_writer_intent_before_truth_read_and_replacement(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    truth_path = tmp_path / "portfolio-truth-latest.json"
+    receipt_path = tmp_path / GITHUB_SECURITY_RECEIPT_FILENAME
+    truth = _truth(DEFAULT_EXPECTED_GITHUB_COHORT_COUNT)
+    truth_path.write_text(json.dumps(truth))
+    first = _collect(cohort_count=DEFAULT_EXPECTED_GITHUB_COHORT_COUNT)
+    write_security_coverage_receipt(first, receipt_path)
+    binding = load_security_coverage_receipt(receipt_path, now=NOW).binding()
+    second = collect_security_coverage(
+        truth,
+        token="opaque-test-token",
+        expected_cohort_count=DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+        session=_Session(),
+        now=NOW + timedelta(minutes=1),
+        producer_commit="a" * 40,
+        api_base_url="https://api.example.test",
+    )
+    observed: dict[str, object] = {}
+    from src import github_security_coverage as coverage_module
+
+    original_load_json_object = coverage_module._load_json_object
+
+    def load_json_with_truth_read_probe(path: Path) -> dict[str, Any]:
+        if path == truth_path:
+            _assert_binding_revalidation_fails_in_child(
+                binding,
+                expected="security coverage receipt collection is active",
+            )
+            observed["publisher_blocked_during_truth_read"] = True
+        return original_load_json_object(path)
+
+    def fake_collect_security_coverage(
+        _truth_payload: dict[str, Any],
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        prior_receipt = kwargs["prior_receipt"]
+        assert prior_receipt is not None
+        observed["prior_receipt_id"] = prior_receipt["receipt_id"]
+        _assert_binding_revalidation_fails_in_child(
+            binding,
+            expected="security coverage receipt collection is active",
+        )
+        observed["publisher_blocked_during_collection"] = True
+        return second
+
+    monkeypatch.setattr(
+        "src.github_security_coverage._load_json_object",
+        load_json_with_truth_read_probe,
+    )
+    monkeypatch.setattr(
+        "src.github_security_coverage.collect_security_coverage",
+        fake_collect_security_coverage,
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "github-security-coverage",
+            "--truth",
+            str(truth_path),
+            "--output",
+            str(receipt_path),
+            "--expected-cohort-count",
+            str(DEFAULT_EXPECTED_GITHUB_COHORT_COUNT),
+        ],
+    )
+
+    main()
+    loaded = load_security_coverage_receipt(receipt_path, now=NOW + timedelta(minutes=1))
+
+    assert observed == {
+        "publisher_blocked_during_truth_read": True,
+        "prior_receipt_id": binding.receipt_id,
+        "publisher_blocked_during_collection": True,
+    }
+    assert loaded.receipt_id != binding.receipt_id
+
+
+def test_writer_intent_interruption_does_not_leave_stale_lock(
+    tmp_path: Path,
+) -> None:
+    receipt = _collect(cohort_count=DEFAULT_EXPECTED_GITHUB_COHORT_COUNT)
+    canonical = tmp_path / GITHUB_SECURITY_RECEIPT_FILENAME
+    write_security_coverage_receipt(receipt, canonical)
+    binding = load_security_coverage_receipt(
+        canonical,
+        max_age_hours=24 * 365,
+        now=NOW,
+    ).binding()
+
+    with pytest.raises(RuntimeError, match="collector interrupted"):
+        with security_coverage_receipt_writer(canonical):
+            raise RuntimeError("collector interrupted")
+
+    assert canonical.with_name(f".{canonical.name}.lock").is_file()
+    with verified_security_coverage_receipt_binding(binding) as loaded:
+        assert loaded.receipt_id == binding.receipt_id
+
+
+def test_replacement_after_load_fails_bound_revalidation(tmp_path: Path) -> None:
+    canonical = tmp_path / GITHUB_SECURITY_RECEIPT_FILENAME
+    first = _collect(cohort_count=DEFAULT_EXPECTED_GITHUB_COHORT_COUNT)
+    write_security_coverage_receipt(first, canonical)
+    binding = load_security_coverage_receipt(canonical, now=NOW).binding()
+
+    second = collect_security_coverage(
+        _truth(DEFAULT_EXPECTED_GITHUB_COHORT_COUNT),
+        token="opaque-test-token",
+        expected_cohort_count=DEFAULT_EXPECTED_GITHUB_COHORT_COUNT,
+        session=_Session(),
+        now=NOW + timedelta(minutes=1),
+        producer_commit="a" * 40,
+        api_base_url="https://api.example.test",
+    )
+    write_security_coverage_receipt(second, canonical)
+
+    with pytest.raises(SecurityCoverageError, match="changed after it was loaded"):
+        with verified_security_coverage_receipt_binding(binding):
+            pass
+
+
+def test_byte_change_with_same_receipt_id_fails_bound_revalidation(
+    tmp_path: Path,
+) -> None:
+    canonical = tmp_path / GITHUB_SECURITY_RECEIPT_FILENAME
+    write_security_coverage_receipt(
+        _collect(cohort_count=DEFAULT_EXPECTED_GITHUB_COHORT_COUNT), canonical
+    )
+    binding = load_security_coverage_receipt(canonical, now=NOW).binding()
+    payload = json.loads(canonical.read_text())
+    canonical.write_text(json.dumps(payload, separators=(",", ":")))
+
+    with pytest.raises(SecurityCoverageError, match="bytes changed"):
+        with verified_security_coverage_receipt_binding(binding):
+            pass
+
+
+def test_legacy_receipt_remains_readable_but_cannot_authorize_publication(
+    tmp_path: Path,
+) -> None:
+    legacy = _collect(cohort_count=DEFAULT_EXPECTED_GITHUB_COHORT_COUNT)
+    canonical = tmp_path / GITHUB_SECURITY_RECEIPT_FILENAME
+    canonical.write_text(json.dumps(legacy))
+
+    loaded = load_security_coverage_receipt(canonical, now=NOW)
+
+    assert loaded.receipt_id is None
+    assert loaded.content_sha256 is not None
+    with pytest.raises(SecurityCoverageError, match="missing immutable receipt_id"):
+        loaded.binding()
+
+
+def test_malformed_or_mismatched_receipt_identity_fails_closed() -> None:
+    receipt = _collect()
+    receipt["receipt_id"] = "sha256:" + "0" * 64
+
+    with pytest.raises(SecurityCoverageError, match="does not match"):
+        validate_security_coverage_receipt(
+            receipt,
+            expected_cohort_count=16,
+            now=NOW,
+        )
 
 
 def test_receipt_loader_honors_explicit_nondefault_cohort_count(

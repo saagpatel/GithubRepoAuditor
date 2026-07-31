@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from src.portfolio_pathing import (
@@ -145,6 +146,27 @@ def _validate_contract_envelope(snapshot: PortfolioTruthSnapshot) -> None:
         raise ValueError("Live Notion input cannot declare a carried-forward origin.")
     if mode == "verified-snapshot" and not notion.get("observed_at"):
         raise ValueError("Verified Notion snapshot input requires an observation timestamp.")
+    github_security = (
+        snapshot.inputs.get("github_security")
+        if isinstance(snapshot.inputs, dict)
+        else None
+    )
+    if isinstance(github_security, dict):
+        receipt_id = github_security.get("receipt_id")
+        content_sha256 = github_security.get("content_sha256")
+        if (receipt_id is None) != (content_sha256 is None):
+            raise ValueError(
+                "GitHub security input identity requires both receipt_id and "
+                "content_sha256."
+            )
+        if receipt_id is not None and not re.fullmatch(
+            r"sha256:[0-9a-f]{64}", str(receipt_id)
+        ):
+            raise ValueError("GitHub security receipt_id is malformed.")
+        if content_sha256 is not None and not re.fullmatch(
+            r"[0-9a-f]{64}", str(content_sha256)
+        ):
+            raise ValueError("GitHub security content_sha256 is malformed.")
 
 
 def validate_publish_targets(
