@@ -8,6 +8,7 @@ so they don't inflate the project count and pollute catalog-completeness.
 
 from __future__ import annotations
 
+import subprocess
 from datetime import datetime, timezone
 
 from src.portfolio_truth_sources import (
@@ -174,3 +175,23 @@ def test_discovery_skips_ignored_subtrees(tmp_path) -> None:
         "scratch-container": 1,
         "temporary-checkout": 1,
     }
+
+
+def test_discovery_recognizes_conventional_bare_coordinator(tmp_path) -> None:
+    coordinator = tmp_path / "bare-coordinator"
+    subprocess.run(
+        ["git", "init", "--bare", str(coordinator)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    result = discover_workspace_projects(
+        tmp_path,
+        catalog_data={},
+        now=datetime(2026, 7, 30, tzinfo=timezone.utc),
+    )
+
+    project = next(item for item in result if item["name"] == coordinator.name)
+    assert project["has_git"] is True
+    assert project["project_path"] == coordinator
