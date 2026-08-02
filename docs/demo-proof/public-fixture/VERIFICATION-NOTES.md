@@ -4,11 +4,16 @@ Date: 2026-06-27
 
 ## Fixture Truth
 
-- Fixture input: `fixtures/demo/sample-report.json`.
+- Fixture input: `fixtures/demo/sample-report.json` (audit-report lane) and
+  `src/demo_portfolio.py` (PortfolioCommandCenter lane).
 - Generated output directory: `output/demo`.
-- Portfolio truth schema: `0.7.0`.
-- Visible project names: `RepoA`, `RepoB`, `RepoC`.
-- Visible workspace root: `fixtures/demo`.
+- Portfolio truth schema: sourced from the producer constant
+  `src.portfolio_truth_types.SCHEMA_VERSION`, never restated in the generator.
+- Visible project names: closed synthetic codename pool (`Aurora Ledger`,
+  `Basalt Relay`, ... `Nocturne Spar`); no real repository is named.
+- Visible workspace root: `/demo-workspace`.
+- Freshness: `generated_at` is six hours before generation time, inside the
+  consumer's 48h fresh band.
 
 ## Commands Run
 
@@ -41,6 +46,16 @@ Manual inspection confirmed the retained frames show fixture labels only:
   calendar, Slack, Notion row, bridge-db row, personal-ops data, SecondBrain
   content, or real security finding is visible.
 
-Known visible caveat: the fixture date is intentionally `2026-04-12`, so the app
-shows a stale-data banner on 2026-06-27. That banner is public-safe, but a future
-polish pass may choose to make fixture freshness deterministic for public demos.
+The regenerated truth artifacts were re-checked for the same boundary: no
+absolute local path, operator name, or real repository name appears in
+`output/demo/portfolio-truth*.json`, and every advisory remains synthetic
+(`demo-crypto-core`, `demo-ui-kit`, `demo-transport`, `GHSA-DEMO-0001` through
+`GHSA-DEMO-0003`).
+
+Open item: the screenshots above were captured on 2026-06-27 from the previous
+three-project `0.7.0` fixture. They no longer depict the generated artifacts and
+must be recaptured by the operator before the package is republished. The stale
+fixture date that produced the old stale-data banner is resolved: freshness is
+now computed at generation time, and `scripts/validate_proof_package.py` fails
+the package if the published truth ever drifts out of the fresh window or off
+the producer's current schema.

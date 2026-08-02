@@ -24,10 +24,16 @@ Expected generated artifacts:
 - `output/demo/operator-control-center-demo.json`
 - `output/demo/operator-control-center-demo.md`
 - `output/demo/portfolio-truth-latest.json`
-- `output/demo/weekly-command-center-sample-user-2026-04-12.json`
-- `output/demo/security-burndown-sample-user-2026-04-12.json`
+- `output/demo/portfolio-truth-history-01.json` through `-09.json`
+- `output/demo/weekly-command-center-demo.json`
+- `output/demo/security-burndown-demo.json`
 - `output/demo/pending-proposals.json`
 - `output/demo/portfolio-warehouse.db`
+
+The truth artifacts are regenerated on every run: the schema version comes from
+the producer constant and the timestamp is computed at generation time, so the
+demo always reflects the current contract. `validate_proof_package.py` fails the
+package if either drifts.
 
 ## Desktop Demo
 

@@ -1,0 +1,102 @@
+{
+  "username": "demo-operator",
+  "generated_at": "2026-08-01T22:50:13.825998+00:00",
+  "headline": "10 projects carry open high or critical alerts.",
+  "decision": "Clear Aurora Ledger before starting lower-pressure cleanup.",
+  "why_this_week": "Aurora Ledger holds the largest observed alert backlog and is the only flagship blocked on a security decision.",
+  "next_step": "Open the burndown view, confirm the grouped fix, then record the decision.",
+  "risk_posture": {
+    "elevated_count": 10,
+    "risk_tier_counts": {
+      "elevated": 10,
+      "moderate": 12,
+      "baseline": 10,
+      "deferred": 8
+    },
+    "top_elevated": [
+      {
+        "repo": "flagship/aurora-ledger",
+        "risk_tier": "elevated",
+        "risk_summary": "Open high or critical alerts need an operator decision."
+      },
+      {
+        "repo": "flagship/basalt-relay",
+        "risk_tier": "elevated",
+        "risk_summary": "Open high or critical alerts need an operator decision."
+      },
+      {
+        "repo": "flagship/cinder-atlas",
+        "risk_tier": "elevated",
+        "risk_summary": "Open high or critical alerts need an operator decision."
+      },
+      {
+        "repo": "platform/ember-conduit",
+        "risk_tier": "elevated",
+        "risk_summary": "Open high or critical alerts need an operator decision."
+      },
+      {
+        "repo": "studio/glacier-quill",
+        "risk_tier": "elevated",
+        "risk_summary": "Open high or critical alerts need an operator decision."
+      }
+    ]
+  },
+  "security_posture": {
+    "scanned_count": 10,
+    "repos_with_open_high_critical": 10,
+    "total_open_critical": 5,
+    "total_open_high": 20,
+    "top_alerts": [
+      {
+        "repo": "flagship/aurora-ledger",
+        "risk_tier": "elevated",
+        "dependabot_critical": 1,
+        "dependabot_high": 4
+      },
+      {
+        "repo": "flagship/cinder-atlas",
+        "risk_tier": "elevated",
+        "dependabot_critical": 2,
+        "dependabot_high": 3
+      },
+      {
+        "repo": "studio/glacier-quill",
+        "risk_tier": "elevated",
+        "dependabot_critical": 1,
+        "dependabot_high": 2
+      },
+      {
+        "repo": "flagship/basalt-relay",
+        "risk_tier": "elevated",
+        "dependabot_critical": 0,
+        "dependabot_high": 2
+      },
+      {
+        "repo": "studio/kestrel-loom",
+        "risk_tier": "elevated",
+        "dependabot_critical": 0,
+        "dependabot_high": 3
+      }
+    ]
+  },
+  "path_attention": [
+    {
+      "repo": "flagship/cinder-atlas",
+      "headline": "Open high or critical alerts need an operator decision.",
+      "activity_status": "active",
+      "context_quality": "minimum-viable"
+    },
+    {
+      "repo": "studio/glacier-quill",
+      "headline": "Open high or critical alerts need an operator decision.",
+      "activity_status": "active",
+      "context_quality": "minimum-viable"
+    },
+    {
+      "repo": "studio/kestrel-loom",
+      "headline": "Open high or critical alerts need an operator decision.",
+      "activity_status": "recent",
+      "context_quality": "minimum-viable"
+    }
+  ]
+}
