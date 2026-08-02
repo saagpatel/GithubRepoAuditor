@@ -130,7 +130,8 @@
     ],
     "missing_receipts": [],
     "known_gaps": [
-      "The committed screenshots were captured from the previous three-project 0.7.0 fixture and predate the synthetic 0.11.0 portfolio; they must be recaptured by the operator before republication."
+      "The committed screenshots were captured from the previous three-project 0.7.0 fixture and predate the synthetic 0.11.0 portfolio; they must be recaptured by the operator before republication.",
+      "Recapture is blocked on the consumer, not the fixture: PortfolioCommandCenter renders a persistent SELECTED PRODUCER boundary panel above the tab bar whose repository and ref are compile-time constants in src-tauri/src/boundary.rs, so every frame of every tab shows the real producer identity. Unblocking requires a PortfolioCommandCenter change that lets a demo build present a fixture producer identity. See VERIFICATION-NOTES.md."
     ]
   },
   "safety": {

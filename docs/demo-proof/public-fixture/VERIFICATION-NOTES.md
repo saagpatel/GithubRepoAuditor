@@ -54,8 +54,44 @@ absolute local path, operator name, or real repository name appears in
 
 Open item: the screenshots above were captured on 2026-06-27 from the previous
 three-project `0.7.0` fixture. They no longer depict the generated artifacts and
-must be recaptured by the operator before the package is republished. The stale
+must be recaptured before the package is republished. The stale
 fixture date that produced the old stale-data banner is resolved: freshness is
 now computed at generation time, and `scripts/validate_proof_package.py` fails
 the package if the published truth ever drifts out of the fresh window or off
 the producer's current schema.
+
+## Recapture Blocker (2026-08-02)
+
+A recapture attempt against the regenerated `0.11.0` fixture was made on
+2026-08-02 and **abandoned before any frame was accepted**. The fixture itself is
+sound: the app launched via `pnpm demo:desktop:fixture` rendered
+`schema 0.11.0 · 40 projects`, `Freshness: fresh`, synthetic codenames only, and
+the relative output path `../GithubRepoAuditor/output/demo`.
+
+The blocker is in the consumer, not the fixture. PortfolioCommandCenter now
+renders a persistent `SELECTED PRODUCER` boundary panel above the tab bar
+(`src/App.tsx` renders `BoundaryPanel` unconditionally, immediately before the
+tab nav), and that panel prints the operator's real GitHub owner and repository
+name plus the canonical ref. Both values are compile-time constants in
+`src-tauri/src/boundary.rs`:
+
+```rust
+pub(crate) const EXPECTED_PRODUCER_REPOSITORY: &str = "<owner>/<producer-repo>";
+pub(crate) const EXPECTED_PRODUCER_REF: &str = "refs/remotes/origin/main";
+```
+
+They are surfaced through `BoundaryStatus.expected_repository` /
+`expected_ref`. No environment variable, fixture path, demo Tauri config, or
+output-directory choice overrides them, so **every tab of every frame carries the
+real producer identity**. That is a public-safety stop under this package's own
+"do not publish" list, which forbids private repo names and account identifiers.
+
+Cropping or patching the band was rejected: the boundary panel is now
+load-bearing UI, and a redacted frame is a doctored exhibit rather than evidence
+of what the app renders.
+
+Unblocking requires a PortfolioCommandCenter change that lets a demo build
+present a fixture producer identity (for example, sourcing the expected producer
+from configuration with the current constant as the default). That is consumer
+work outside this package; until it lands, the visual-capture claim stays
+`stale` and `verification.overall` stays `partial`.
