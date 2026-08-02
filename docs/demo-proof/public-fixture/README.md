@@ -54,16 +54,20 @@ the live local default output directory for public recording.
 
 Public-safe frames are included under `screenshots/`:
 
-- `00-ops-tauri-window.png` - desktop shell proof.
+- `00-ops-tauri-window.png` - desktop shell proof, Ops tab.
 - `01-portfolio.png` - portfolio table.
 - `02-risk-security.png` - risk and security posture.
 - `03-burndown.png` - grouped remediation view.
 - `04-trends.png` - history and security drift.
 - `05-weekly-digest.png` - weekly digest and next move.
+- `06-decisions.png` - decision queue and suppression breakdown.
+- `07-automation.png` - metadata-only proposal approval queue.
 
-The frames show only fixture repos (`RepoA`, `RepoB`, `RepoC`), synthetic
-packages, synthetic advisory ids, relative fixture paths, and the fixture output
-directory.
+The frames show only synthetic project codenames (`Aurora Ledger`, `Basalt
+Relay`, ... `Umbra Trellis`), synthetic packages, synthetic advisory ids,
+relative fixture paths, and a redacted fixture output label. The producer
+identity renders as `demo-org/demo-producer` behind a `FIXTURE / DEMO DATA`
+pill.
 
 ## Safety Claim
 

@@ -94,8 +94,8 @@
     },
     {
       "id": "visual-capture",
-      "statement": "Public-safe Portfolio Command Center frames were captured from the fixture-backed desktop shell and React tab surfaces.",
-      "status": "stale",
+      "statement": "Public-safe Portfolio Command Center frames were captured from the live fixture-backed Tauri desktop window for all eight tabs, and carry no real producer identity.",
+      "status": "passed",
       "evidence": [
         "summary",
         "verification-notes",
@@ -104,12 +104,14 @@
         "screenshot-risk-security",
         "screenshot-burndown",
         "screenshot-trends",
-        "screenshot-weekly-digest"
+        "screenshot-weekly-digest",
+        "screenshot-decisions",
+        "screenshot-automation"
       ]
     }
   ],
   "verification": {
-    "overall": "partial",
+    "overall": "passed",
     "checks": [
       {
         "name": "manifest references fixture input and generated output paths",
@@ -125,13 +127,16 @@
       },
       {
         "name": "visual capture from Portfolio Command Center",
-        "status": "stale"
+        "status": "passed"
+      },
+      {
+        "name": "captured frames carry no real producer identity (OCR sweep, control-scored)",
+        "status": "passed"
       }
     ],
     "missing_receipts": [],
     "known_gaps": [
-      "The committed screenshots were captured from the previous three-project 0.7.0 fixture and predate the synthetic 0.11.0 portfolio; they must be recaptured by the operator before republication.",
-      "Recapture is blocked on the consumer, not the fixture: PortfolioCommandCenter renders a persistent SELECTED PRODUCER boundary panel above the tab bar whose repository and ref are compile-time constants in src-tauri/src/boundary.rs, so every frame of every tab shows the real producer identity. Unblocking requires a PortfolioCommandCenter change that lets a demo build present a fixture producer identity. See VERIFICATION-NOTES.md."
+      "The published frames are a point-in-time capture of a fixture whose generated_at sits inside a rolling 48h fresh window. Once that window closes the committed truth reads as stale and the package must be regenerated before republication; the frames themselves stay public-safe."
     ]
   },
   "safety": {
@@ -370,6 +375,20 @@
       "kind": "screenshot",
       "path": "screenshots/05-weekly-digest.png",
       "description": "Weekly Digest tab rendered from fixture digest.",
+      "required": true
+    },
+    {
+      "id": "screenshot-decisions",
+      "kind": "screenshot",
+      "path": "screenshots/06-decisions.png",
+      "description": "Decisions tab rendered from fixture truth, including the suppression breakdown.",
+      "required": true
+    },
+    {
+      "id": "screenshot-automation",
+      "kind": "screenshot",
+      "path": "screenshots/07-automation.png",
+      "description": "Automation tab rendered from fixture proposals, showing the metadata-only approval queue.",
       "required": true
     }
   ]
