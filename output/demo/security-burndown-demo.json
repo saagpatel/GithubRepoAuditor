@@ -1,0 +1,49 @@
+{
+  "distinct_advisories": 3,
+  "total_repo_instances": 12,
+  "repos_touched": 10,
+  "entries": [
+    {
+      "package": "demo-crypto-core",
+      "ecosystem": "pip",
+      "severity": "critical",
+      "ghsa_id": "GHSA-DEMO-0001",
+      "first_patched_version": "3.1.0",
+      "affected_repos": [
+        "Aurora Ledger",
+        "Basalt Relay",
+        "Cinder Atlas"
+      ],
+      "affected_repo_count": 3
+    },
+    {
+      "package": "demo-ui-kit",
+      "ecosystem": "npm",
+      "severity": "high",
+      "ghsa_id": "GHSA-DEMO-0002",
+      "first_patched_version": "4.1.0",
+      "affected_repos": [
+        "Aurora Ledger",
+        "Basalt Relay",
+        "Cinder Atlas",
+        "Ember Conduit",
+        "Glacier Quill"
+      ],
+      "affected_repo_count": 5
+    },
+    {
+      "package": "demo-transport",
+      "ecosystem": "cargo",
+      "severity": "high",
+      "ghsa_id": "GHSA-DEMO-0003",
+      "first_patched_version": "0.9.2",
+      "affected_repos": [
+        "Cinder Atlas",
+        "Ember Conduit",
+        "Glacier Quill",
+        "Ivory Sextant"
+      ],
+      "affected_repo_count": 4
+    }
+  ]
+}

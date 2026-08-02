@@ -47,3 +47,5 @@ Pair the copy with these local assets:
 - `screenshots/03-burndown.png`
 - `screenshots/04-trends.png`
 - `screenshots/05-weekly-digest.png`
+- `screenshots/06-decisions.png`
+- `screenshots/07-automation.png`

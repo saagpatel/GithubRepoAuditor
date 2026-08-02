@@ -1,14 +1,14 @@
 {
   "schema_version": "0.11.0",
   "derivation_policy_version": "portfolio_attention.v3",
-  "generated_at": "2026-08-01T22:50:13.825998+00:00",
+  "generated_at": "2026-07-25T22:50:13.825998+00:00",
   "workspace_root": "/demo-workspace",
   "producer": {
     "repository": "demo-org/portfolio-auditor",
     "checkout_role": "demo-fixture",
     "worktree_clean": true,
     "dirty_path_count": 0,
-    "verified_at": "2026-08-01T22:50:13.825998+00:00"
+    "verified_at": "2026-07-25T22:50:13.825998+00:00"
   },
   "source_summary": {
     "workspace_root": "/demo-workspace",
@@ -134,7 +134,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-07-30T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-07-23T22:50:13.825998+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -147,7 +147,7 @@
       "risk": {
         "risk_tier": "elevated",
         "risk_factors": [
-          "7 open high/critical security alerts"
+          "8 open high/critical security alerts"
         ],
         "risk_summary": "Open high or critical alerts need an operator decision.",
         "security_risk": true,
@@ -162,7 +162,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-01T22:50:13.825998+00:00",
+        "source_produced_at": "2026-07-25T22:50:13.825998+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -177,11 +177,11 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 1,
-              "high": 4,
+              "high": 5,
               "medium": 2,
               "low": 3
             },
@@ -200,7 +200,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -223,7 +223,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 0
@@ -232,13 +232,13 @@
           }
         },
         "dependabot_critical": 1,
-        "dependabot_high": 4,
+        "dependabot_high": 5,
         "dependabot_medium": 2,
         "dependabot_low": 3,
         "code_scanning_critical": 0,
         "code_scanning_high": 2,
         "secret_scanning_open": 0,
-        "open_high_critical": 7
+        "open_high_critical": 8
       },
       "advisory": {
         "notion_portfolio_call": "",
@@ -302,7 +302,7 @@
         "run_instructions_present": true,
         "known_risks_present": false,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-07-30T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-07-23T22:50:13.825998+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -330,7 +330,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-01T22:50:13.825998+00:00",
+        "source_produced_at": "2026-07-25T22:50:13.825998+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -345,7 +345,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -368,7 +368,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -391,7 +391,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 0
@@ -469,7 +469,7 @@
         "run_instructions_present": true,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-30T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-07-23T22:50:13.825998+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -498,7 +498,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-01T22:50:13.825998+00:00",
+        "source_produced_at": "2026-07-25T22:50:13.825998+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -513,7 +513,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 2,
@@ -536,7 +536,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 1,
@@ -559,7 +559,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 1
@@ -636,7 +636,7 @@
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-30T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-07-23T22:50:13.825998+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -647,12 +647,13 @@
         "path_rationale": "Stable path is maintain from explicit operating path."
       },
       "risk": {
-        "risk_tier": "baseline",
+        "risk_tier": "elevated",
         "risk_factors": [
+          "1 open high/critical security alerts",
           "thin project context"
         ],
-        "risk_summary": "No elevated pressure; routine cadence is sufficient.",
-        "security_risk": false,
+        "risk_summary": "Open high or critical alerts need an operator decision.",
+        "security_risk": true,
         "doctor_gap": false,
         "context_risk": true,
         "path_risk": false
@@ -664,7 +665,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-01T22:50:13.825998+00:00",
+        "source_produced_at": "2026-07-25T22:50:13.825998+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -679,11 +680,11 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
-              "high": 0,
+              "high": 1,
               "medium": 2,
               "low": 4
             },
@@ -702,7 +703,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -725,7 +726,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 0
@@ -734,13 +735,13 @@
           }
         },
         "dependabot_critical": 0,
-        "dependabot_high": 0,
+        "dependabot_high": 1,
         "dependabot_medium": 2,
         "dependabot_low": 4,
         "code_scanning_critical": 0,
         "code_scanning_high": 0,
         "secret_scanning_open": 0,
-        "open_high_critical": 0
+        "open_high_critical": 1
       },
       "advisory": {
         "notion_portfolio_call": "",
@@ -804,7 +805,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-07-30T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-07-23T22:50:13.825998+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -832,7 +833,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-01T22:50:13.825998+00:00",
+        "source_produced_at": "2026-07-25T22:50:13.825998+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -847,7 +848,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -870,7 +871,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -893,7 +894,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 0
@@ -972,7 +973,7 @@
         "run_instructions_present": true,
         "known_risks_present": false,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-07-11T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-07-04T22:50:13.825998+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -998,7 +999,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-01T22:50:13.825998+00:00",
+        "source_produced_at": "2026-07-25T22:50:13.825998+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -1013,7 +1014,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -1036,7 +1037,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -1059,7 +1060,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 0
@@ -1137,7 +1138,7 @@
         "run_instructions_present": true,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-30T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-07-23T22:50:13.825998+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -1150,7 +1151,7 @@
       "risk": {
         "risk_tier": "elevated",
         "risk_factors": [
-          "4 open high/critical security alerts",
+          "5 open high/critical security alerts",
           "thin project context"
         ],
         "risk_summary": "Open high or critical alerts need an operator decision.",
@@ -1166,7 +1167,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-01T22:50:13.825998+00:00",
+        "source_produced_at": "2026-07-25T22:50:13.825998+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -1181,11 +1182,11 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 1,
-              "high": 2,
+              "high": 3,
               "medium": 3,
               "low": 1
             },
@@ -1204,7 +1205,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -1227,7 +1228,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 0
@@ -1236,13 +1237,13 @@
           }
         },
         "dependabot_critical": 1,
-        "dependabot_high": 2,
+        "dependabot_high": 3,
         "dependabot_medium": 3,
         "dependabot_low": 1,
         "code_scanning_critical": 0,
         "code_scanning_high": 1,
         "secret_scanning_open": 0,
-        "open_high_critical": 4
+        "open_high_critical": 5
       },
       "advisory": {
         "notion_portfolio_call": "",
@@ -1305,7 +1306,7 @@
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-11T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-07-04T22:50:13.825998+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -1333,7 +1334,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-01T22:50:13.825998+00:00",
+        "source_produced_at": "2026-07-25T22:50:13.825998+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -1348,7 +1349,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -1371,7 +1372,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -1394,7 +1395,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 0
@@ -1473,7 +1474,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-07-11T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-07-04T22:50:13.825998+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -1501,7 +1502,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-01T22:50:13.825998+00:00",
+        "source_produced_at": "2026-07-25T22:50:13.825998+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -1516,7 +1517,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -1539,7 +1540,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -1562,7 +1563,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 0
@@ -1640,7 +1641,7 @@
         "run_instructions_present": true,
         "known_risks_present": false,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-07-30T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-07-23T22:50:13.825998+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -1651,10 +1652,12 @@
         "path_rationale": "Stable path is experiment from explicit operating path."
       },
       "risk": {
-        "risk_tier": "baseline",
-        "risk_factors": [],
-        "risk_summary": "No elevated pressure; routine cadence is sufficient.",
-        "security_risk": false,
+        "risk_tier": "elevated",
+        "risk_factors": [
+          "1 open high/critical security alerts"
+        ],
+        "risk_summary": "Open high or critical alerts need an operator decision.",
+        "security_risk": true,
         "doctor_gap": false,
         "context_risk": false,
         "path_risk": false
@@ -1666,7 +1669,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-01T22:50:13.825998+00:00",
+        "source_produced_at": "2026-07-25T22:50:13.825998+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -1681,11 +1684,11 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
-              "high": 0,
+              "high": 1,
               "medium": 0,
               "low": 1
             },
@@ -1704,7 +1707,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -1727,7 +1730,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "open": 0
@@ -1736,13 +1739,13 @@
           }
         },
         "dependabot_critical": 0,
-        "dependabot_high": 0,
+        "dependabot_high": 1,
         "dependabot_medium": 0,
         "dependabot_low": 1,
         "code_scanning_critical": 0,
         "code_scanning_high": 0,
         "secret_scanning_open": 0,
-        "open_high_critical": 0
+        "open_high_critical": 1
       },
       "advisory": {
         "notion_portfolio_call": "",
@@ -1804,7 +1807,7 @@
         "run_instructions_present": true,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-11T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-07-04T22:50:13.825998+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -1833,7 +1836,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-01T22:50:13.825998+00:00",
+        "source_produced_at": "2026-07-25T22:50:13.825998+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -1848,7 +1851,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -1871,7 +1874,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -1889,7 +1892,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -1964,7 +1967,7 @@
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-11T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-07-04T22:50:13.825998+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -1993,7 +1996,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-01T22:50:13.825998+00:00",
+        "source_produced_at": "2026-07-25T22:50:13.825998+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -2008,7 +2011,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 1,
@@ -2031,7 +2034,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -2049,7 +2052,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -2127,7 +2130,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-07-30T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-07-23T22:50:13.825998+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -2140,7 +2143,7 @@
       "risk": {
         "risk_tier": "elevated",
         "risk_factors": [
-          "2 open high/critical security alerts"
+          "3 open high/critical security alerts"
         ],
         "risk_summary": "Open high or critical alerts need an operator decision.",
         "security_risk": true,
@@ -2155,7 +2158,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-01T22:50:13.825998+00:00",
+        "source_produced_at": "2026-07-25T22:50:13.825998+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -2170,11 +2173,11 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
-              "high": 2,
+              "high": 3,
               "medium": 4,
               "low": 1
             },
@@ -2193,7 +2196,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -2211,20 +2214,20 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
           }
         },
         "dependabot_critical": 0,
-        "dependabot_high": 2,
+        "dependabot_high": 3,
         "dependabot_medium": 4,
         "dependabot_low": 1,
         "code_scanning_critical": null,
         "code_scanning_high": null,
         "secret_scanning_open": null,
-        "open_high_critical": 2
+        "open_high_critical": 3
       },
       "advisory": {
         "notion_portfolio_call": "",
@@ -2287,7 +2290,7 @@
         "run_instructions_present": true,
         "known_risks_present": false,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-01-23T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-01-16T22:50:13.825998+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -2315,7 +2318,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-01T22:50:13.825998+00:00",
+        "source_produced_at": "2026-07-25T22:50:13.825998+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -2330,7 +2333,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -2353,7 +2356,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -2371,7 +2374,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -2446,7 +2449,7 @@
         "run_instructions_present": true,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-11T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-07-04T22:50:13.825998+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -2475,7 +2478,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-01T22:50:13.825998+00:00",
+        "source_produced_at": "2026-07-25T22:50:13.825998+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -2490,7 +2493,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
@@ -2513,7 +2516,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -2531,7 +2534,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -2606,7 +2609,7 @@
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-30T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-07-23T22:50:13.825998+00:00",
         "has_tests": true,
         "has_ci": false,
         "has_license": true,
@@ -2617,13 +2620,14 @@
         "path_rationale": "Stable path is experiment from explicit operating path."
       },
       "risk": {
-        "risk_tier": "baseline",
+        "risk_tier": "elevated",
         "risk_factors": [
+          "1 open high/critical security alerts",
           "no CI workflow",
           "thin project context"
         ],
-        "risk_summary": "No elevated pressure; routine cadence is sufficient.",
-        "security_risk": false,
+        "risk_summary": "Open high or critical alerts need an operator decision.",
+        "security_risk": true,
         "doctor_gap": true,
         "context_risk": true,
         "path_risk": false
@@ -2635,7 +2639,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "fresh",
-        "source_produced_at": "2026-08-01T22:50:13.825998+00:00",
+        "source_produced_at": "2026-07-25T22:50:13.825998+00:00",
         "providers": {
           "dependabot": {
             "state": "observed",
@@ -2650,11 +2654,11 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": true,
             "counts": {
               "critical": 0,
-              "high": 0,
+              "high": 1,
               "medium": 1,
               "low": 1
             },
@@ -2673,7 +2677,7 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
@@ -2691,20 +2695,20 @@
             },
             "etag": null,
             "last_modified": null,
-            "observed_at": "2026-08-01T22:50:13.825998+00:00",
+            "observed_at": "2026-07-25T22:50:13.825998+00:00",
             "pagination_complete": false,
             "counts": null,
             "zero_findings": null
           }
         },
         "dependabot_critical": 0,
-        "dependabot_high": 0,
+        "dependabot_high": 1,
         "dependabot_medium": 1,
         "dependabot_low": 1,
         "code_scanning_critical": null,
         "code_scanning_high": null,
         "secret_scanning_open": null,
-        "open_high_critical": 0
+        "open_high_critical": 1
       },
       "advisory": {
         "notion_portfolio_call": "",
@@ -2768,7 +2772,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-01-23T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-01-16T22:50:13.825998+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -2797,7 +2801,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "stale",
-        "source_produced_at": "2026-08-01T22:50:13.825998+00:00",
+        "source_produced_at": "2026-07-25T22:50:13.825998+00:00",
         "providers": {},
         "dependabot_critical": null,
         "dependabot_high": null,
@@ -2869,7 +2873,7 @@
         "run_instructions_present": true,
         "known_risks_present": false,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-01-23T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-01-16T22:50:13.825998+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -2898,7 +2902,7 @@
         "cohort_policy": "portfolio-default-attention-v1",
         "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
         "receipt_state": "stale",
-        "source_produced_at": "2026-08-01T22:50:13.825998+00:00",
+        "source_produced_at": "2026-07-25T22:50:13.825998+00:00",
         "providers": {},
         "dependabot_critical": null,
         "dependabot_high": null,
@@ -2969,7 +2973,7 @@
         "run_instructions_present": true,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-11T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-07-04T22:50:13.825998+00:00",
         "has_tests": false,
         "has_ci": true,
         "has_license": true,
@@ -3070,7 +3074,7 @@
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-11T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-07-04T22:50:13.825998+00:00",
         "has_tests": true,
         "has_ci": false,
         "has_license": true,
@@ -3173,7 +3177,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-01-23T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-01-16T22:50:13.825998+00:00",
         "has_tests": false,
         "has_ci": true,
         "has_license": true,
@@ -3275,7 +3279,7 @@
         "run_instructions_present": true,
         "known_risks_present": false,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-01-23T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-01-16T22:50:13.825998+00:00",
         "has_tests": false,
         "has_ci": false,
         "has_license": true,
@@ -3377,7 +3381,7 @@
         "run_instructions_present": true,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-23T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-01-16T22:50:13.825998+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -3478,7 +3482,7 @@
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-11T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-07-04T22:50:13.825998+00:00",
         "has_tests": true,
         "has_ci": false,
         "has_license": true,
@@ -3581,7 +3585,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-01-23T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-01-16T22:50:13.825998+00:00",
         "has_tests": false,
         "has_ci": true,
         "has_license": true,
@@ -3683,7 +3687,7 @@
         "run_instructions_present": true,
         "known_risks_present": false,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-01-23T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-01-16T22:50:13.825998+00:00",
         "has_tests": false,
         "has_ci": false,
         "has_license": true,
@@ -3786,7 +3790,7 @@
         "run_instructions_present": true,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-11T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-07-04T22:50:13.825998+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -3886,7 +3890,7 @@
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-23T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-01-16T22:50:13.825998+00:00",
         "has_tests": false,
         "has_ci": true,
         "has_license": true,
@@ -3990,7 +3994,7 @@
         "run_instructions_present": true,
         "known_risks_present": true,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-07-11T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-07-04T22:50:13.825998+00:00",
         "has_tests": true,
         "has_ci": false,
         "has_license": true,
@@ -4091,7 +4095,7 @@
         "run_instructions_present": true,
         "known_risks_present": false,
         "next_recommended_move_present": true,
-        "last_meaningful_activity_at": "2026-01-23T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-01-16T22:50:13.825998+00:00",
         "has_tests": false,
         "has_ci": false,
         "has_license": true,
@@ -4193,7 +4197,7 @@
         "run_instructions_present": true,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-23T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-01-16T22:50:13.825998+00:00",
         "has_tests": true,
         "has_ci": true,
         "has_license": true,
@@ -4294,7 +4298,7 @@
         "run_instructions_present": false,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-07-11T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-07-04T22:50:13.825998+00:00",
         "has_tests": false,
         "has_ci": true,
         "has_license": true,
@@ -4395,7 +4399,7 @@
         "run_instructions_present": true,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-23T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-01-16T22:50:13.825998+00:00",
         "has_tests": false,
         "has_ci": false,
         "has_license": false,
@@ -4496,7 +4500,7 @@
         "run_instructions_present": true,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-23T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-01-16T22:50:13.825998+00:00",
         "has_tests": false,
         "has_ci": false,
         "has_license": false,
@@ -4597,7 +4601,7 @@
         "run_instructions_present": true,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-23T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-01-16T22:50:13.825998+00:00",
         "has_tests": true,
         "has_ci": false,
         "has_license": false,
@@ -4697,7 +4701,7 @@
         "run_instructions_present": true,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-23T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-01-16T22:50:13.825998+00:00",
         "has_tests": false,
         "has_ci": true,
         "has_license": false,
@@ -4797,7 +4801,7 @@
         "run_instructions_present": true,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-23T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-01-16T22:50:13.825998+00:00",
         "has_tests": false,
         "has_ci": false,
         "has_license": false,
@@ -4898,7 +4902,7 @@
         "run_instructions_present": true,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-23T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-01-16T22:50:13.825998+00:00",
         "has_tests": true,
         "has_ci": false,
         "has_license": false,
@@ -4998,7 +5002,7 @@
         "run_instructions_present": true,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-23T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-01-16T22:50:13.825998+00:00",
         "has_tests": false,
         "has_ci": true,
         "has_license": false,
@@ -5098,7 +5102,7 @@
         "run_instructions_present": true,
         "known_risks_present": false,
         "next_recommended_move_present": false,
-        "last_meaningful_activity_at": "2026-01-23T22:50:13.825998+00:00",
+        "last_meaningful_activity_at": "2026-01-16T22:50:13.825998+00:00",
         "has_tests": false,
         "has_ci": false,
         "has_license": false,
@@ -5152,9 +5156,9 @@
   ],
   "rollups": {
     "risk_tier_counts": {
-      "elevated": 10,
+      "elevated": 13,
       "moderate": 12,
-      "baseline": 10,
+      "baseline": 7,
       "deferred": 8
     },
     "security": {
@@ -5164,8 +5168,8 @@
       "stale_count": 2,
       "unknown_count": 22,
       "scanned_count": 10,
-      "repos_with_open_high_critical": 10,
-      "total_open_high": 20,
+      "repos_with_open_high_critical": 13,
+      "total_open_high": 26,
       "total_open_critical": 5
     },
     "decision": {

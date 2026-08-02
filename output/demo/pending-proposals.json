@@ -1,4 +1,61 @@
 {
   "contract_version": "automation_proposals_v1",
-  "proposals": []
+  "proposals": [
+    {
+      "proposal_id": "demo-proposal-0001",
+      "action_type": "context-pr",
+      "display_name": "Solstice Cairn",
+      "repo_full_name": "demo-org/solstice-cairn",
+      "description": "Open an auto-PR improving the managed context block for Solstice Cairn.",
+      "status": "pending",
+      "created_at": "2026-07-31T22:50:13.825998+00:00",
+      "approved_at": "",
+      "approved_by": "",
+      "rejected_at": "",
+      "executed_at": "",
+      "execution_ref": ""
+    },
+    {
+      "proposal_id": "demo-proposal-0002",
+      "action_type": "catalog-seed",
+      "display_name": "Tabard Anvil",
+      "repo_full_name": "demo-org/tabard-anvil",
+      "description": "Apply catalog seed updates for Tabard Anvil.",
+      "status": "approved",
+      "created_at": "2026-07-31T22:50:13.825998+00:00",
+      "approved_at": "2026-08-01T19:50:13.825998+00:00",
+      "approved_by": "demo-operator",
+      "rejected_at": "",
+      "executed_at": "",
+      "execution_ref": ""
+    },
+    {
+      "proposal_id": "demo-proposal-0003",
+      "action_type": "context-pr",
+      "display_name": "Umbra Trellis",
+      "repo_full_name": "demo-org/umbra-trellis",
+      "description": "Open an auto-PR improving the managed context block for Umbra Trellis.",
+      "status": "rejected",
+      "created_at": "2026-07-31T22:50:13.825998+00:00",
+      "approved_at": "",
+      "approved_by": "",
+      "rejected_at": "2026-08-01T19:50:13.825998+00:00",
+      "executed_at": "",
+      "execution_ref": ""
+    },
+    {
+      "proposal_id": "demo-proposal-0004",
+      "action_type": "catalog-seed",
+      "display_name": "Vellum Compass",
+      "repo_full_name": "demo-org/vellum-compass",
+      "description": "Apply catalog seed updates for Vellum Compass.",
+      "status": "executed",
+      "created_at": "2026-07-31T22:50:13.825998+00:00",
+      "approved_at": "2026-08-01T19:50:13.825998+00:00",
+      "approved_by": "demo-operator",
+      "rejected_at": "",
+      "executed_at": "2026-08-01T20:50:13.825998+00:00",
+      "execution_ref": "demo-run-0004"
+    }
+  ]
 }
