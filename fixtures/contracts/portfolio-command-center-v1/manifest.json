@@ -1,0 +1,30 @@
+{
+  "consumer": {
+    "compatibility_policy": "additive-0.x",
+    "repository": "saagpatel/PortfolioCommandCenter"
+  },
+  "contract_version": "ghra-pcc-portfolio-truth.v1",
+  "fixture": {
+    "additive_canary_paths": [
+      "contract_fixture",
+      "projects[0].additive_contract_canary"
+    ],
+    "coverage_states": [
+      "complete",
+      "partial",
+      "stale",
+      "unknown"
+    ],
+    "evaluation_time": "2026-08-01T06:00:00+00:00",
+    "generated_at": "2026-08-01T00:00:00+00:00",
+    "project_count": 4
+  },
+  "portfolio_truth_schema_version": "0.11.0",
+  "producer": {
+    "artifact_path": "fixtures/contracts/portfolio-command-center-v1/portfolio-truth.json",
+    "artifact_sha256": "d73e53c2f349f9a8a6fcd117d3fbf868e4ed3ed538cda6ad9ec6334f7bb750cf",
+    "generator": "src.portfolio_truth_contract_fixture:build_contract_fixture",
+    "manifest_path": "fixtures/contracts/portfolio-command-center-v1/manifest.json",
+    "repository": "saagpatel/GithubRepoAuditor"
+  }
+}

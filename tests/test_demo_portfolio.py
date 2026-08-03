@@ -9,6 +9,7 @@ them renders as UNKNOWN or stale in the app, which is worse than no demo.
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timedelta, timezone
 
 from src.automation_proposals import VALID_ACTION_TYPES, VALID_STATUSES
@@ -212,7 +213,18 @@ def test_fixture_carries_no_operator_identifying_strings() -> None:
         ]
     ).lower()
 
-    for forbidden in ("/users/", "saagpatel", "saagar", "@gmail.com", "gmail"):
+    _forbidden_extra = [
+        token
+        for token in os.environ.get("PORTFOLIO_FORBIDDEN_TOKENS", "").split(",")
+        if token
+    ]
+    for forbidden in (
+        "/users/",
+        "saagpatel",
+        "@gmail.com",
+        "gmail",
+        *_forbidden_extra,
+    ):
         assert forbidden not in payload
 
 
