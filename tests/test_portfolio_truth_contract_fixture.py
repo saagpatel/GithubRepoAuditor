@@ -49,6 +49,26 @@ def test_fixture_spans_the_receipt_states_with_additive_canaries() -> None:
 
     assert fixture["schema_version"] == SCHEMA_VERSION
     assert fixture["generated_at"] == GENERATED_AT.isoformat()
+    assert fixture["inputs"] == {
+        "catalog": {
+            "source_id": "portfolio-catalog",
+            "sha256": None,
+            "observed_at": GENERATED_AT.isoformat(),
+        },
+        "workspace": {
+            "source_id": "projects-root",
+            "observed_at": GENERATED_AT.isoformat(),
+        },
+        "notion": {
+            "mode": "unavailable",
+            "observed_at": None,
+            "carried_from_generated_at": None,
+        },
+    }
+    assert fixture["exclusions"] == {
+        "policy_version": "workspace_discovery.v2",
+        "counts": {},
+    }
     assert states == ["complete", "partial", "stale", "unknown"]
     assert fixture["contract_fixture"]["contract_version"] == CONTRACT_VERSION
     assert "additive_contract_canary" in fixture["projects"][0]
