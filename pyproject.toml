@@ -45,7 +45,7 @@ dev = [
     # Ruff 0.16 enables a materially wider ruleset under the repository's
     # implicit selection; keep CI on the reviewed 0.15 line until that migration
     # is handled as its own cleanup change.
-    "ruff>=0.4,<0.16",
+    "ruff>=0.4,<0.17",
     "mypy>=1.10",
     "mutmut>=2.5",
     "responses>=0.25",
