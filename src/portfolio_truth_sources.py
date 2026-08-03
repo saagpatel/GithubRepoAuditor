@@ -13,6 +13,10 @@ from urllib.parse import urlparse
 from src.notion_registry import load_notion_project_context
 from src.portfolio_catalog import group_entry_for_path
 from src.portfolio_context_contract import analyze_project_context
+from src.portfolio_truth_types import (
+    CHECKOUT_COLLISION_SCHEMA_VERSION,
+    CHECKOUT_COLLISION_SUMMARY_SCHEMA_VERSION,
+)
 from src.registry_parser import _normalize
 
 MAX_CONTEXT_DEPTH = 2
@@ -106,8 +110,14 @@ IGNORE_PROJECT_DIR_PATTERNS: tuple[re.Pattern[str], ...] = (re.compile(r"-tmp-\d
 ARCHIVE_REMOTE_BASENAME_TOKENS = frozenset({"private-archive", "scrubbed-import"})
 
 
-WORKSPACE_DISCOVERY_POLICY_VERSION = "workspace_discovery.v2"
+WORKSPACE_DISCOVERY_POLICY_VERSION = "workspace_discovery.v3"
 MAX_NOTION_SNAPSHOT_AGE_HOURS = 30
+
+_CANONICAL_PATHS_HEADING = re.compile(
+    r"^(?P<marks>#{1,6})\s+canonical\s+paths?\s*$", re.IGNORECASE
+)
+_MARKDOWN_HEADING = re.compile(r"^(?P<marks>#{1,6})\s+\S")
+_ABSOLUTE_CODE_PATH = re.compile(r"`(?P<path>/[^`\r\n]+)`")
 
 
 class NotionProjectContext(dict[str, dict[str, str]]):
@@ -160,6 +170,7 @@ def discover_workspace_projects(
     catalog_data: dict[str, Any],
     now: datetime | None = None,
     exclusion_counts: dict[str, int] | None = None,
+    checkout_collisions: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     discovered: list[dict[str, Any]] = []
     now = now or datetime.now(timezone.utc)
@@ -186,11 +197,16 @@ def discover_workspace_projects(
                 exclusion_counts=exclusion_counts,
             )
         )
-    return _dedupe_checkouts_by_origin(discovered)
+    return _dedupe_checkouts_by_origin(
+        discovered,
+        checkout_collisions=checkout_collisions,
+    )
 
 
 def _dedupe_checkouts_by_origin(
     discovered: list[dict[str, Any]],
+    *,
+    checkout_collisions: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """Collapse multiple on-disk checkouts of the same repo to one canonical project.
 
@@ -199,10 +215,11 @@ def _dedupe_checkouts_by_origin(
     (``repo_full_name``), so without this they each count as a distinct project —
     inflating the portfolio count and dragging catalog-completeness toward zero.
 
-    Keep one canonical checkout per origin, preferring the directory whose name
-    matches the repo basename, then the shortest name, then alphabetical. Projects
-    without an origin are local-only and are never collapsed. Result is sorted by
-    name (case-insensitive), matching the prior discovery ordering.
+    Keep one compatibility representative per origin without claiming checkout
+    authority when independent full clones disagree. Every non-representative
+    checkout remains visible in ``CheckoutCollisionV1`` evidence. Projects without
+    an origin are local-only and are never collapsed. Result is sorted by name
+    (case-insensitive), matching the prior discovery ordering.
     """
     by_origin: dict[str, list[dict[str, Any]]] = {}
     canonical: list[dict[str, Any]] = []
@@ -214,20 +231,279 @@ def _dedupe_checkouts_by_origin(
             canonical.append(project)
 
     for origin_key, group in by_origin.items():
-        repo_base = origin_key.rsplit("/", 1)[-1]
-        canonical.append(
-            min(
-                group,
-                key=lambda p: (
-                    str(p.get("name", "")).lower() != repo_base,
-                    len(str(p.get("name", ""))),
-                    str(p.get("name", "")).lower(),
-                ),
+        representative = _checkout_representative(group, origin_key)
+        if len(group) > 1:
+            collision = _checkout_collision_record(
+                origin=str(representative.get("repo_full_name") or origin_key),
+                origin_key=origin_key,
+                group=group,
+                representative=representative,
             )
-        )
+            representative["checkout_authority"] = collision
+            if checkout_collisions is not None:
+                checkout_collisions.append(collision)
+        canonical.append(representative)
 
     canonical.sort(key=lambda p: str(p.get("name", "")).lower())
     return canonical
+
+
+def checkout_collision_summary(
+    collisions: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Build the stable portfolio-level collision summary without adding projects."""
+    groups = sorted(collisions, key=lambda item: str(item["origin"]).lower())
+    ambiguous_group_count = sum(
+        item["selection"]["state"] == "unknown" for item in groups
+    )
+    return {
+        "schema_version": CHECKOUT_COLLISION_SUMMARY_SCHEMA_VERSION,
+        "state": "unknown" if ambiguous_group_count else "observed",
+        "group_count": len(groups),
+        "full_clone_group_count": sum(
+            int(item["full_clone_count"] > 1) for item in groups
+        ),
+        "ambiguous_group_count": ambiguous_group_count,
+        "discarded_checkout_count": sum(
+            len(item["discarded_checkouts"]) for item in groups
+        ),
+        "groups": groups,
+    }
+
+
+def _checkout_representative(
+    group: list[dict[str, Any]], origin_key: str
+) -> dict[str, Any]:
+    repo_base = origin_key.rsplit("/", 1)[-1]
+    return min(
+        group,
+        key=lambda project: (
+            str(project.get("name", "")).lower() != repo_base,
+            len(Path(str(project.get("path", ""))).parts),
+            len(str(project.get("path", ""))),
+            str(project.get("path", "")).lower(),
+        ),
+    )
+
+
+def _checkout_collision_record(
+    *,
+    origin: str,
+    origin_key: str,
+    group: list[dict[str, Any]],
+    representative: dict[str, Any],
+) -> dict[str, Any]:
+    clone_groups: dict[str, list[dict[str, Any]]] = {}
+    for project in group:
+        clone_groups.setdefault(_checkout_clone_key(project), []).append(project)
+
+    representative_clone = _checkout_clone_key(representative)
+    declarations, unresolved_declarations = _declared_checkout_evidence(group)
+    declared_checkout_paths = sorted(
+        {item["target_checkout_path"] for item in declarations}, key=str.lower
+    )
+    declared_clone_keys = {
+        _checkout_clone_key(
+            next(
+                project
+                for project in group
+                if str(project.get("path")) == declared_path
+            )
+        )
+        for declared_path in declared_checkout_paths
+    }
+
+    clone_representatives = [
+        _checkout_representative(members, origin_key)
+        for members in clone_groups.values()
+    ]
+    clone_heads = {
+        str(_checkout_observation(project).get("head") or "")
+        for project in clone_representatives
+    }
+    observations_complete = all(
+        _checkout_observation(project).get("state") == "observed"
+        and _checkout_observation(project).get("git_common_dir")
+        for project in group
+    )
+    conflicting_heads = len(clone_heads) > 1 or "" in clone_heads
+
+    state = "selected"
+    reason_code = "single_clone_topology"
+    reason = "all discovered checkouts share one Git common directory"
+    if len(clone_groups) > 1:
+        if not observations_complete:
+            state = "unknown"
+            reason_code = "checkout_observation_failed"
+            reason = (
+                "one or more same-origin checkouts could not be observed completely"
+            )
+        elif len(declared_clone_keys) > 1:
+            state = "unknown"
+            reason_code = "conflicting_declared_checkout_paths"
+            reason = (
+                "canonical path declarations resolve to multiple independent clones"
+            )
+        elif declared_clone_keys and representative_clone not in declared_clone_keys:
+            state = "unknown"
+            reason_code = "declared_path_conflicts_with_representative"
+            reason = (
+                "canonical path declarations resolve to a different full clone than "
+                "the compatibility representative"
+            )
+        elif unresolved_declarations:
+            state = "unknown"
+            reason_code = "declared_checkout_path_unresolved"
+            reason = (
+                "one or more canonical path declarations do not resolve to a checkout"
+            )
+        elif conflicting_heads:
+            state = "unknown"
+            reason_code = "conflicting_full_clone_heads"
+            reason = (
+                "independent same-origin clones have different or unavailable heads"
+            )
+        elif any(
+            _checkout_observation(project).get("dirty") is True
+            for project in clone_representatives
+        ):
+            state = "unknown"
+            reason_code = "full_clone_local_work_present"
+            reason = "an independent same-origin clone contains local work"
+        else:
+            reason_code = "equivalent_full_clones"
+            reason = (
+                "independent same-origin clones have equivalent observed heads; "
+                "the deterministic compatibility representative is selected"
+            )
+
+    checkouts = [
+        _published_checkout(
+            project,
+            representative=representative,
+            representative_clone=representative_clone,
+        )
+        for project in sorted(group, key=lambda item: str(item.get("path", "")).lower())
+    ]
+    representative_path = str(representative.get("path") or "")
+    discarded = [
+        checkout for checkout in checkouts if checkout["path"] != representative_path
+    ]
+    return {
+        "schema_version": CHECKOUT_COLLISION_SCHEMA_VERSION,
+        "origin": origin,
+        "checkout_count": len(group),
+        "full_clone_count": len(clone_groups),
+        "declared_checkout_paths": declared_checkout_paths,
+        "declared_path_evidence": declarations,
+        "unresolved_declared_paths": unresolved_declarations,
+        "selection": {
+            "state": state,
+            "reason_code": reason_code,
+            "reason": reason,
+            "representative_path": representative_path,
+            "selected_path": representative_path if state == "selected" else None,
+            "rationale": (
+                "Compatibility representative prefers an origin-basename match, "
+                "then the shallowest, shortest, alphabetic workspace-relative path."
+            ),
+        },
+        "checkouts": checkouts,
+        "discarded_checkouts": discarded,
+    }
+
+
+def _checkout_clone_key(project: dict[str, Any]) -> str:
+    observation = _checkout_observation(project)
+    common_dir = str(observation.get("git_common_dir") or "")
+    if observation.get("state") == "observed" and common_dir:
+        return f"observed:{common_dir}"
+    return f"unknown:{project.get('path', '')}"
+
+
+def _checkout_observation(project: dict[str, Any]) -> dict[str, Any]:
+    value = project.get("_checkout_observation")
+    if isinstance(value, dict):
+        return value
+    return {
+        "state": "unknown",
+        "head": None,
+        "branch": None,
+        "dirty": None,
+        "dirty_path_count": None,
+        "git_common_dir": None,
+        "declared_paths": [],
+    }
+
+
+def _published_checkout(
+    project: dict[str, Any],
+    *,
+    representative: dict[str, Any],
+    representative_clone: str,
+) -> dict[str, Any]:
+    observation = _checkout_observation(project)
+    path = str(project.get("path") or "")
+    representative_path = str(representative.get("path") or "")
+    if path == representative_path:
+        relation = "representative"
+    elif _checkout_clone_key(project) == representative_clone:
+        relation = "linked_worktree"
+    else:
+        relation = "independent_full_clone"
+    return {
+        "path": path,
+        "state": str(observation.get("state") or "unknown"),
+        "relation": relation,
+        "head": observation.get("head"),
+        "branch": observation.get("branch"),
+        "dirty": observation.get("dirty"),
+        "dirty_path_count": observation.get("dirty_path_count"),
+    }
+
+
+def _declared_checkout_evidence(
+    group: list[dict[str, Any]],
+) -> tuple[list[dict[str, str]], list[str]]:
+    evidence: list[dict[str, str]] = []
+    unresolved: set[str] = set()
+    for source_project in group:
+        observation = _checkout_observation(source_project)
+        for declaration in observation.get("declared_paths") or []:
+            target = Path(str(declaration["absolute_path"]))
+            candidates = [
+                project
+                for project in group
+                if _path_is_within(target, Path(str(project["project_path"])))
+            ]
+            if not candidates:
+                unresolved.add(str(declaration["workspace_relative_path"]))
+                continue
+            target_project = max(
+                candidates,
+                key=lambda project: len(Path(str(project["project_path"])).parts),
+            )
+            evidence.append(
+                {
+                    "source_path": (
+                        f"{source_project['path']}/{declaration['source_file']}"
+                    ),
+                    "target_checkout_path": str(target_project["path"]),
+                }
+            )
+    unique_evidence = {
+        (item["source_path"], item["target_checkout_path"]): item for item in evidence
+    }
+    return (
+        sorted(
+            unique_evidence.values(),
+            key=lambda item: (
+                item["source_path"].lower(),
+                item["target_checkout_path"].lower(),
+            ),
+        ),
+        sorted(unresolved, key=str.lower),
+    )
 
 
 def _discover_nested_projects(
@@ -450,6 +726,11 @@ def _inspect_project_dir(
     context_files = _collect_context_files(project_path)
     stack = _detect_stack(project_path)
     git_facts = _gather_git_facts(project_path)
+    checkout_observation = (
+        _observe_checkout(project_path, workspace_root=workspace_root)
+        if git_facts.get("has_git")
+        else {}
+    )
     last_activity = git_facts.get("last_commit_at") or _latest_meaningful_mtime(project_path)
     context_analysis = analyze_project_context(project_path, context_files)
 
@@ -478,6 +759,7 @@ def _inspect_project_dir(
         "inferred_tool_provenance": _infer_tool_provenance(
             project_path, group_entry, context_files
         ),
+        "_checkout_observation": checkout_observation,
         "now": now,
     }
 
@@ -619,6 +901,148 @@ def _gather_git_facts(project_path: Path) -> dict[str, Any]:
         }
     except ValueError:
         return base
+
+
+def _observe_checkout(project_path: Path, *, workspace_root: Path) -> dict[str, Any]:
+    """Observe one discovered checkout without fetching or exposing file names."""
+    try:
+        bare = _git_read(project_path, "rev-parse", "--is-bare-repository") == "true"
+        common_dir = _git_read(
+            project_path,
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-common-dir",
+        )
+        head_candidate = _git_read_optional(project_path, "rev-parse", "HEAD")
+        head = (
+            head_candidate
+            if re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", head_candidate)
+            else ""
+        )
+        branch = (
+            _git_read_optional(project_path, "symbolic-ref", "--short", "HEAD")
+            if bare
+            else _git_read_optional(project_path, "branch", "--show-current")
+        )
+        if bare:
+            dirty: bool | None = None
+            dirty_path_count: int | None = None
+        else:
+            status = _git_read(
+                project_path,
+                "status",
+                "--porcelain",
+                "--untracked-files=all",
+            )
+            dirty = bool(status)
+            dirty_path_count = len(status.splitlines()) if status else 0
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        return {
+            "state": "unknown",
+            "head": None,
+            "branch": None,
+            "dirty": None,
+            "dirty_path_count": None,
+            "git_common_dir": None,
+            "declared_paths": _declared_canonical_paths(
+                project_path, workspace_root=workspace_root
+            ),
+        }
+    return {
+        "state": "observed",
+        "head": head or None,
+        "branch": branch or None,
+        "dirty": dirty,
+        "dirty_path_count": dirty_path_count,
+        "git_common_dir": common_dir or None,
+        "declared_paths": _declared_canonical_paths(
+            project_path, workspace_root=workspace_root
+        ),
+    }
+
+
+def _git_read(project_path: Path, *args: str) -> str:
+    result = subprocess.run(
+        ["git", "--no-optional-locks", "-C", str(project_path), *args],
+        capture_output=True,
+        text=True,
+        timeout=5,
+        check=False,
+        env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"},
+    )
+    if result.returncode != 0:
+        raise subprocess.CalledProcessError(
+            result.returncode,
+            result.args,
+            output=result.stdout,
+            stderr=result.stderr,
+        )
+    return result.stdout.strip()
+
+
+def _git_read_optional(project_path: Path, *args: str) -> str:
+    try:
+        return _git_read(project_path, *args)
+    except subprocess.CalledProcessError:
+        return ""
+
+
+def _declared_canonical_paths(
+    project_path: Path, *, workspace_root: Path
+) -> list[dict[str, str]]:
+    declarations: list[dict[str, str]] = []
+    resolved_workspace = workspace_root.resolve()
+    for source_file in ("AGENTS.md", "CLAUDE.md"):
+        path = project_path / source_file
+        try:
+            if not path.is_file() or path.stat().st_size > MAX_CONTEXT_BYTES:
+                continue
+            lines = path.read_text(errors="replace").splitlines()
+        except OSError:
+            continue
+
+        section_level: int | None = None
+        for line in lines:
+            heading = _MARKDOWN_HEADING.match(line.strip())
+            canonical_heading = _CANONICAL_PATHS_HEADING.match(line.strip())
+            if canonical_heading:
+                section_level = len(canonical_heading.group("marks"))
+                continue
+            if heading and section_level is not None:
+                if len(heading.group("marks")) <= section_level:
+                    section_level = None
+                continue
+            if section_level is None:
+                continue
+            for match in _ABSOLUTE_CODE_PATH.finditer(line):
+                candidate = Path(match.group("path")).resolve()
+                if not _path_is_within(candidate, resolved_workspace):
+                    continue
+                declarations.append(
+                    {
+                        "source_file": source_file,
+                        "absolute_path": str(candidate),
+                        "workspace_relative_path": candidate.relative_to(
+                            resolved_workspace
+                        ).as_posix(),
+                    }
+                )
+
+    unique = {
+        (item["source_file"], item["absolute_path"]): item for item in declarations
+    }
+    return sorted(
+        unique.values(),
+        key=lambda item: (item["source_file"], item["absolute_path"].lower()),
+    )
+
+
+def _path_is_within(candidate: Path, root: Path) -> bool:
+    try:
+        candidate.resolve().relative_to(root.resolve())
+        return True
+    except (OSError, ValueError):
+        return False
 
 
 def _is_bare_repository_root(project_path: Path) -> bool:

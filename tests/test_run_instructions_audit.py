@@ -230,6 +230,7 @@ def test_prepare_pilot_builds_records_and_reports_missing_dirs(tmp_path):
 
     result = prepare_pilot(str(snap_path), per_tier={"full": 4})
 
+    assert result["state"] == "ready"
     assert result["workspace_root"] == str(workspace)
     assert len(result["records"]) == 1
     assert len(result["errors"]) == 1
@@ -244,3 +245,57 @@ def test_prepare_pilot_builds_records_and_reports_missing_dirs(tmp_path):
     assert record["drifted"] is False  # no git repo → not drifted
     assert result["errors"][0]["error"] == "missing_dir"
     assert result["errors"][0]["project_key"] == "GhostRepo"
+
+
+def test_prepare_pilot_blocks_unknown_checkout_authority(tmp_path):
+    workspace = tmp_path / "ws"
+    repo = workspace / "ConflictedRepo"
+    repo.mkdir(parents=True)
+    (repo / "AGENTS.md").write_text("# ConflictedRepo\n")
+    snapshot = {
+        "workspace_root": str(workspace),
+        "generated_at": "2026-08-03T12:00:00+00:00",
+        "projects": [
+            {
+                "identity": {
+                    "project_key": "ConflictedRepo",
+                    "path": "ConflictedRepo",
+                    "display_name": "ConflictedRepo",
+                },
+                "derived": {
+                    "archived": False,
+                    "context_quality": "full",
+                    "context_files": ["AGENTS.md"],
+                    "run_instructions_present": False,
+                },
+                "repository_state": {
+                    "checkout_authority": {
+                        "schema_version": "CheckoutCollisionV1",
+                        "selection": {
+                            "state": "unknown",
+                            "reason_code": "declared_path_conflicts_with_representative",
+                            "representative_path": "ConflictedRepo",
+                            "selected_path": None,
+                        }
+                    }
+                },
+            }
+        ],
+    }
+    snap_path = tmp_path / "snap.json"
+    snap_path.write_text(json.dumps(snapshot))
+
+    result = prepare_pilot(str(snap_path), per_tier={"full": 1})
+
+    assert result["state"] == "blocked"
+    assert result["records"] == []
+    assert result["errors"] == [
+        {
+            "project_key": "ConflictedRepo",
+            "abs_path": str(repo),
+            "error": "checkout_authority_blocked",
+            "reason": (
+                "checkout-authority-unknown:declared_path_conflicts_with_representative"
+            ),
+        }
+    ]

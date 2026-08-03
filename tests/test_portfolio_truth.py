@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import time
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -502,13 +503,22 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     assert result.snapshot.inputs["catalog"]["sha256"]
     assert result.snapshot.inputs["notion"]["mode"] == "unavailable"
     assert result.snapshot.exclusions == {
-        "policy_version": "workspace_discovery.v2",
+        "policy_version": "workspace_discovery.v3",
         "counts": {},
     }
     assert (
         result.snapshot.source_summary["attention_state_counts"]["active-product"] == 1
     )
     assert result.snapshot.source_summary["attention_state_counts"]["parked"] == 1
+    assert result.snapshot.source_summary["checkout_collisions"] == {
+        "schema_version": "CheckoutCollisionSummaryV1",
+        "state": "observed",
+        "group_count": 0,
+        "full_clone_group_count": 0,
+        "ambiguous_group_count": 0,
+        "discarded_checkout_count": 0,
+        "groups": [],
+    }
 
     # Derived rollups are emitted so downstream consumers (command-center) read
     # them instead of re-deriving the auditor's risk/security logic.
@@ -561,6 +571,106 @@ def test_truth_snapshot_respects_declared_and_derived_fields(
     )
     # Per-project open_high_critical is emitted in the security block.
     assert "open_high_critical" in snapshot_dict["projects"][0]["security"]
+
+
+def test_checkout_collision_flows_through_truth_validation_and_report(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    root_clone = portfolio_workspace / "Widget"
+    nested_clone = portfolio_workspace / "Archive" / "Widget"
+    heads: list[str] = []
+    for index, clone in enumerate((root_clone, nested_clone), start=1):
+        clone.mkdir(parents=True)
+        _write(clone / "README.md", f"# Widget {index}\n")
+        subprocess.run(
+            ["git", "init", "-q", "-b", "main"],
+            cwd=clone,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "remote", "add", "origin", "git@github.com:owner/Widget.git"],
+            cwd=clone,
+            check=True,
+        )
+        subprocess.run(["git", "add", "README.md"], cwd=clone, check=True)
+        subprocess.run(
+            [
+                "git",
+                "-c",
+                "user.name=Test",
+                "-c",
+                "user.email=test@example.invalid",
+                "commit",
+                "-q",
+                "-m",
+                f"fixture {index}",
+            ],
+            cwd=clone,
+            check=True,
+        )
+        heads.append(
+            subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=clone,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+        )
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=datetime(2026, 8, 3, tzinfo=timezone.utc),
+    )
+
+    widget_projects = [
+        project
+        for project in result.snapshot.projects
+        if project.identity.repo_full_name == "owner/Widget"
+    ]
+    assert len(widget_projects) == 1
+    assert widget_projects[0].identity.path == "Widget"
+    summary = result.snapshot.source_summary["checkout_collisions"]
+    assert summary["group_count"] == 1
+    assert summary["ambiguous_group_count"] == 1
+    assert summary["discarded_checkout_count"] == 1
+    group = summary["groups"][0]
+    assert group["selection"]["state"] == "unknown"
+    assert group["selection"]["reason_code"] == "conflicting_full_clone_heads"
+    assert widget_projects[0].repository_state["checkout_authority"] == group
+    validate_truth_snapshot(result.snapshot)
+
+    markdown = render_portfolio_report_markdown(result.snapshot, "output/x.json")
+    assert "## Checkout Authority" in markdown
+    assert "`owner/Widget`" in markdown
+    assert "`conflicting_full_clone_heads`" in markdown
+    assert "`Archive/Widget`" in markdown
+    assert heads[1] in markdown
+    validate_portfolio_report_markdown(markdown)
+
+    duplicate_project = replace(
+        widget_projects[0],
+        identity=replace(
+            widget_projects[0].identity,
+            project_key="widget-duplicate",
+            path="Archive/Widget",
+        ),
+    )
+    duplicate_snapshot = replace(
+        result.snapshot,
+        projects=[*result.snapshot.projects, duplicate_project],
+    )
+    with pytest.raises(ValueError, match="one canonical project per origin"):
+        validate_truth_snapshot(duplicate_snapshot)
+
+    summary["discarded_checkout_count"] += 1
+    with pytest.raises(ValueError, match="discarded_checkout_count"):
+        validate_truth_snapshot(result.snapshot)
 
 
 def test_live_catalog_produces_exact_tier_zero_attention_semantics(
@@ -2913,6 +3023,7 @@ def test_report_subcommand_parses_security_cohort_count() -> None:
 def test_portfolio_truth_app_threads_security_cohort_count(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     from types import SimpleNamespace
 
@@ -2933,6 +3044,9 @@ def test_portfolio_truth_app_threads_security_cohort_count(
             project_count=0,
             registry_changed=False,
             report_changed=False,
+            checkout_collision_group_count=2,
+            checkout_authority_unknown_count=1,
+            discarded_checkout_count=4,
         )
 
     monkeypatch.setattr(
@@ -2970,6 +3084,10 @@ def test_portfolio_truth_app_threads_security_cohort_count(
     assert captured["max_age_hours"] == 12
     assert captured["expected_producer_commit"] is None
     assert captured["repo_status_cache"] is None
+    output = capsys.readouterr()
+    assert (
+        "Checkout authority: 2 same-origin groups, 1 UNKNOWN, 4 discarded checkouts"
+    ) in output.out + output.err
 
 
 def test_portfolio_truth_app_carries_security_receipt_binding_to_publisher(
@@ -3308,6 +3426,53 @@ def test_context_recovery_plan_freezes_and_filters_targets(
     assert targets["Fresh"].status == "eligible"
     assert targets["tmp-scaffold"].status == "excluded"
     assert targets["tmp-scaffold"].reason == "temporary-or-generated"
+
+
+def test_context_recovery_plan_skips_unknown_checkout_authority(
+    portfolio_workspace: Path,
+    portfolio_catalog: Path,
+    legacy_registry: Path,
+) -> None:
+    target_repo = portfolio_workspace / "FreshCollision"
+    target_repo.mkdir()
+    _write(target_repo / "README.md", "# FreshCollision\n\nFresh repo.\n")
+
+    result = build_portfolio_truth_snapshot(
+        workspace_root=portfolio_workspace,
+        catalog_path=portfolio_catalog,
+        legacy_registry_path=legacy_registry,
+        include_notion=False,
+        now=datetime.fromtimestamp(1_700_000_100, tz=timezone.utc),
+    )
+    projects = [
+        replace(
+            project,
+            repository_state={
+                **project.repository_state,
+                "checkout_authority": {
+                    "schema_version": "CheckoutCollisionV1",
+                    "selection": {
+                        "state": "unknown",
+                        "reason_code": "conflicting_full_clone_heads",
+                        "representative_path": project.identity.path,
+                        "selected_path": None,
+                    }
+                },
+            },
+        )
+        if project.identity.project_key == "FreshCollision"
+        else project
+        for project in result.snapshot.projects
+    ]
+    snapshot = replace(result.snapshot, projects=projects)
+
+    plan = build_context_recovery_plan(snapshot, workspace_root=portfolio_workspace)
+    target = next(
+        item for item in plan.projects if item.project_key == "FreshCollision"
+    )
+
+    assert target.status == "skipped"
+    assert target.reason == "checkout-authority-unknown:conflicting_full_clone_heads"
 
 
 def test_context_recovery_apply_writes_primary_context_and_catalog_seed(

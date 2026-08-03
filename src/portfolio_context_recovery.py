@@ -16,6 +16,7 @@ from src.portfolio_context_contract import (
     temporary_project_reason,
     upsert_managed_context_block,
 )
+from src.portfolio_checkout_authority import checkout_authority_blocker
 from src.portfolio_truth_types import (
     PortfolioTruthProject,
     PortfolioTruthSnapshot,
@@ -94,13 +95,21 @@ def build_context_recovery_plan(
         if reason:
             status = "excluded"
         else:
+            authority_reason = checkout_authority_blocker(
+                project,
+                workspace_root=workspace_root,
+            )
+            if authority_reason:
+                status = "skipped"
+                reason = authority_reason
             if not allow_dirty:
-                dirty_reason = _dirty_worktree_reason(
-                    project_path, project.identity.has_git
-                )
-                if dirty_reason:
-                    status = "skipped"
-                    reason = dirty_reason
+                if status == "eligible":
+                    dirty_reason = _dirty_worktree_reason(
+                        project_path, project.identity.has_git
+                    )
+                    if dirty_reason:
+                        status = "skipped"
+                        reason = dirty_reason
             if status == "eligible":
                 ambiguous_reason = _ambiguous_primary_context_reason(project_path)
                 if ambiguous_reason:
@@ -195,6 +204,12 @@ def apply_context_recovery_plan(
         project = project_index[target.project_key]
         project_path = workspace_root / project.identity.path
         try:
+            authority_reason = checkout_authority_blocker(
+                project,
+                workspace_root=workspace_root,
+            )
+            if authority_reason:
+                raise RuntimeError(authority_reason)
             write_managed_context_block(project, project_path)
             updated.append(target.project_key)
             if target.suggested_catalog_seed:

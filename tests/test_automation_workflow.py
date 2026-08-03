@@ -15,7 +15,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.automation_executor import CommandResult
+import pytest
+
+from src.automation_executor import AutomationExecutionError, CommandResult
 from src.automation_proposals import (
     ACTION_CATALOG_SEED,
     ACTION_CONTEXT_PR,
@@ -70,6 +72,7 @@ def _project(
     has_git: bool = True,
     primary_context_file: str = "AGENTS.md",
     default_branch: str = "",
+    repository_state: dict | None = None,
 ) -> PortfolioTruthProject:
     return PortfolioTruthProject(
         identity=IdentityFields(
@@ -93,6 +96,7 @@ def _project(
             archived=False,
             path_confidence="high",
         ),
+        repository_state=repository_state or {},
     )
 
 
@@ -176,6 +180,50 @@ def test_context_pr_plan_explicit_branch_overrides_repo_default() -> None:
         default_branch="trunk",
     )
     assert plan.default_branch == "trunk"
+
+
+def test_context_pr_plan_blocks_unknown_checkout_authority() -> None:
+    project = _project(
+        repository_state={
+            "checkout_authority": {
+                "schema_version": "CheckoutCollisionV1",
+                "selection": {
+                    "state": "unknown",
+                    "reason_code": "conflicting_full_clone_heads",
+                    "representative_path": "MyRepo",
+                    "selected_path": None,
+                }
+            }
+        }
+    )
+
+    with pytest.raises(
+        AutomationExecutionError,
+        match="checkout-authority-unknown:conflicting_full_clone_heads",
+    ):
+        build_context_pr_plan(project, workspace_root=Path("/ws"))
+
+
+def test_context_pr_plan_blocks_selected_path_mismatch() -> None:
+    project = _project(
+        repository_state={
+            "checkout_authority": {
+                "schema_version": "CheckoutCollisionV1",
+                "selection": {
+                    "state": "selected",
+                    "reason_code": "equivalent_full_clones",
+                    "representative_path": "Archive/MyRepo",
+                    "selected_path": "Archive/MyRepo",
+                }
+            }
+        }
+    )
+
+    with pytest.raises(
+        AutomationExecutionError,
+        match="checkout-authority-path-mismatch",
+    ):
+        build_context_pr_plan(project, workspace_root=Path("/ws"))
 
 
 def test_context_pr_plan_apply_change_writes_managed_block(tmp_path: Path) -> None:

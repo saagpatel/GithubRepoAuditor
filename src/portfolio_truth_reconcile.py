@@ -21,6 +21,7 @@ from src.portfolio_risk import build_risk_entry
 from src.portfolio_repository_state import observe_repository_state
 from src.portfolio_truth_sources import (
     WORKSPACE_DISCOVERY_POLICY_VERSION,
+    checkout_collision_summary,
     discover_workspace_projects,
     load_legacy_registry_rows,
     load_safe_notion_project_context,
@@ -263,11 +264,13 @@ def build_portfolio_truth_snapshot(
         )
 
     exclusion_counts: dict[str, int] = {}
+    checkout_collisions: list[dict[str, Any]] = []
     workspace_projects = discover_workspace_projects(
         workspace_root,
         catalog_data=catalog_data,
         now=now,
         exclusion_counts=exclusion_counts,
+        checkout_collisions=checkout_collisions,
     )
     workspace_projects = _merge_supplementary_discoveries(
         discovered=workspace_projects,
@@ -296,9 +299,11 @@ def build_portfolio_truth_snapshot(
         )
     )
 
+    collision_summary = checkout_collision_summary(checkout_collisions)
     source_summary = {
         "workspace_root": workspace_root.as_posix(),
         "project_count": len(projects),
+        "checkout_collisions": collision_summary,
         "catalog_errors": list(catalog_data.get("errors") or []),
         "catalog_warnings": list(catalog_data.get("warnings") or []),
         "legacy_registry_rows": len(legacy_rows),
@@ -332,6 +337,16 @@ def build_portfolio_truth_snapshot(
         warnings.append(
             "Duplicate project display names require path-qualified registry labels: "
             + ", ".join(duplicate_display_names)
+        )
+    ambiguous_checkout_origins = [
+        str(group["origin"])
+        for group in collision_summary["groups"]
+        if group["selection"]["state"] == "unknown"
+    ]
+    if ambiguous_checkout_origins:
+        warnings.append(
+            "Checkout authority is UNKNOWN for same-origin full-clone groups: "
+            + ", ".join(ambiguous_checkout_origins)
         )
 
     snapshot = PortfolioTruthSnapshot(
@@ -1247,6 +1262,12 @@ def _build_truth_project(
             },
         }
     )
+    checkout_authority = raw_project.get("checkout_authority")
+    if isinstance(checkout_authority, dict):
+        repository_state = {
+            **repository_state,
+            "checkout_authority": checkout_authority,
+        }
     return PortfolioTruthProject(
         identity=identity,
         declared=declared,

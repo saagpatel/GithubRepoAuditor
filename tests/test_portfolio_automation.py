@@ -27,9 +27,14 @@ def _project(
     activity_status: str = "active",
     path_confidence: str = "high",
     context_quality: str = "standard",
+    checkout_authority: dict | None = None,
 ) -> dict:
-    return {
-        "identity": {"display_name": display_name, "repo_full_name": repo_full_name},
+    project = {
+        "identity": {
+            "display_name": display_name,
+            "repo_full_name": repo_full_name,
+            "path": display_name,
+        },
         "declared": {"operating_path": "maintain"},
         "derived": {
             "activity_status": activity_status,
@@ -37,6 +42,9 @@ def _project(
             "context_quality": context_quality,
         },
     }
+    if checkout_authority is not None:
+        project["repository_state"] = {"checkout_authority": checkout_authority}
+    return project
 
 
 # --- evaluate_automation_eligibility ---------------------------------------
@@ -135,6 +143,55 @@ def test_multiple_blockers_accumulate() -> None:
         "path-confidence-not-high",
         "context-quality-too-weak",
     }
+
+
+def test_unknown_checkout_authority_blocks_automation_candidate() -> None:
+    result = evaluate_automation_eligibility(
+        _project(
+            checkout_authority={
+                "schema_version": "CheckoutCollisionV1",
+                "selection": {
+                    "state": "unknown",
+                    "reason_code": "conflicting_full_clone_heads",
+                    "representative_path": "Repo",
+                    "selected_path": None,
+                }
+            }
+        ),
+        decision_quality_status="trusted",
+    )
+
+    assert result.eligible is False
+    assert result.blockers == (
+        "checkout-authority-unknown:conflicting_full_clone_heads",
+    )
+
+
+def test_observed_selected_checkout_authority_remains_eligible() -> None:
+    result = evaluate_automation_eligibility(
+        _project(
+            checkout_authority={
+                "schema_version": "CheckoutCollisionV1",
+                "selection": {
+                    "state": "selected",
+                    "reason_code": "single_clone_topology",
+                    "representative_path": "Repo",
+                    "selected_path": "Repo",
+                },
+                "checkouts": [
+                    {
+                        "path": "Repo",
+                        "state": "observed",
+                        "relation": "representative",
+                    }
+                ],
+            }
+        ),
+        decision_quality_status="trusted",
+    )
+
+    assert result.eligible is True
+    assert result.blockers == ()
 
 
 # --- select_automation_candidates ------------------------------------------

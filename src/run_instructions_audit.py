@@ -14,6 +14,7 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
+from src.portfolio_checkout_authority import checkout_authority_blocker
 from src.portfolio_context_contract import (
     analyze_project_context,
     choose_primary_context_file,
@@ -137,8 +138,24 @@ def prepare_pilot(
     generated_at = snapshot["generated_at"]
     records: list[dict] = []
     errors: list[dict] = []
+    authority_blocked = False
     for project in select_pilot(snapshot["projects"], per_tier=per_tier):
         record = build_record(project, workspace_root)
+        authority_reason = checkout_authority_blocker(
+            project,
+            workspace_root=Path(workspace_root),
+        )
+        if authority_reason:
+            authority_blocked = True
+            errors.append(
+                {
+                    "project_key": record["project_key"],
+                    "abs_path": record["abs_path"],
+                    "error": "checkout_authority_blocked",
+                    "reason": authority_reason,
+                }
+            )
+            continue
         if not Path(record["abs_path"]).is_dir():
             errors.append(
                 {
@@ -152,6 +169,7 @@ def prepare_pilot(
         record["drifted"] = compute_drifted(record["abs_path"], generated_at)
         records.append(record)
     return {
+        "state": "blocked" if authority_blocked else "ready",
         "generated_at": generated_at,
         "workspace_root": workspace_root,
         "records": records,
@@ -165,7 +183,10 @@ def main() -> None:
     snapshot_path = (
         sys.argv[1] if len(sys.argv) > 1 else "output/portfolio-truth-latest.json"
     )
-    print(json.dumps(prepare_pilot(snapshot_path), indent=2))
+    result = prepare_pilot(snapshot_path)
+    print(json.dumps(result, indent=2))
+    if result["state"] == "blocked":
+        raise SystemExit(2)
 
 
 if __name__ == "__main__":

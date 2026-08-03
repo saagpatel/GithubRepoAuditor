@@ -48,6 +48,7 @@ from src.portfolio_context_recovery import (
     _suggested_catalog_seed,
     write_managed_context_block,
 )
+from src.portfolio_checkout_authority import checkout_authority_blocker
 from src.portfolio_truth_types import PortfolioTruthProject, PortfolioTruthSnapshot
 
 CONTRACT_VERSION = "automation_workflow_v1"
@@ -87,6 +88,12 @@ def build_context_pr_plan(
     precedence order: explicit ``default_branch`` arg, the repo's detected
     default branch, then the portfolio-wide fallback.
     """
+    authority_reason = checkout_authority_blocker(
+        project,
+        workspace_root=workspace_root,
+    )
+    if authority_reason:
+        raise AutomationExecutionError(authority_reason)
     repo_path = workspace_root / project.identity.path
     resolved_branch = default_branch or project.identity.default_branch or DEFAULT_DEFAULT_BRANCH
     display = project.identity.display_name
