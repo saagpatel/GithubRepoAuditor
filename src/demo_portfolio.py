@@ -690,12 +690,15 @@ def _pressure_alerts(spec: DemoProject, index: int, pressure: int) -> tuple[int,
 
 
 def build_projects(
-    generated_at: datetime, *, pressure: int = 0
+    generated_at: datetime,
+    *,
+    pressure: int = 0,
+    project_specs: tuple[DemoProject, ...] = DEMO_PROJECTS,
 ) -> list[dict[str, Any]]:
     """Build the synthetic project records for one point in time."""
     stamp = _iso(generated_at)
     projects: list[dict[str, Any]] = []
-    for index, spec in enumerate(DEMO_PROJECTS):
+    for index, spec in enumerate(project_specs):
         slug = _slug(spec.codename)
         context_quality = (
             "none"
@@ -790,9 +793,18 @@ def build_projects(
 
 
 
-def build_snapshot(generated_at: datetime, *, pressure: int = 0) -> dict[str, Any]:
+def build_snapshot(
+    generated_at: datetime,
+    *,
+    pressure: int = 0,
+    project_specs: tuple[DemoProject, ...] = DEMO_PROJECTS,
+) -> dict[str, Any]:
     """Build a complete portfolio-truth snapshot at the current schema."""
-    projects = build_projects(generated_at, pressure=pressure)
+    projects = build_projects(
+        generated_at,
+        pressure=pressure,
+        project_specs=project_specs,
+    )
 
     coverage_states = Counter(
         resolved_coverage_state(project["security"]) for project in projects

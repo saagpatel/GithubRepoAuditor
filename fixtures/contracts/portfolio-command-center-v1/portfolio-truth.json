@@ -1,0 +1,639 @@
+{
+  "contract_fixture": {
+    "contract_version": "ghra-pcc-portfolio-truth.v1",
+    "deterministic": true
+  },
+  "coverage": [
+    {
+      "project_count": 4,
+      "source": "workspace",
+      "state": "observed"
+    },
+    {
+      "complete_repo_count": 1,
+      "partial_repo_count": 1,
+      "project_count": 4,
+      "source": "github_security",
+      "stale_count": 1,
+      "state": "partial",
+      "unknown_count": 1
+    }
+  ],
+  "derivation_policy_version": "portfolio_attention.v3",
+  "exclusions": [],
+  "generated_at": "2026-08-01T00:00:00+00:00",
+  "inputs": [],
+  "precedence_matrix": {
+    "declared": [
+      "demo fixture"
+    ],
+    "derived": [
+      "demo fixture"
+    ],
+    "identity": [
+      "demo fixture"
+    ],
+    "risk": [
+      "demo fixture"
+    ],
+    "security": [
+      "demo fixture receipt"
+    ]
+  },
+  "producer": {
+    "checkout_role": "demo-fixture",
+    "dirty_path_count": 0,
+    "repository": "demo-org/portfolio-auditor",
+    "verified_at": "2026-08-01T00:00:00+00:00",
+    "worktree_clean": true
+  },
+  "projects": [
+    {
+      "additive_contract_canary": {
+        "consumer_behavior": "ignore-compatible-addition"
+      },
+      "advisory": {
+        "legacy_category": "platform",
+        "legacy_context_quality": "full",
+        "legacy_status": "active",
+        "legacy_tool_provenance": "",
+        "notion_current_state": "",
+        "notion_momentum": "",
+        "notion_portfolio_call": ""
+      },
+      "declared": {
+        "automation_eligible": false,
+        "category": "platform",
+        "criticality": "medium",
+        "doctor_standard": "",
+        "intended_disposition": "",
+        "lifecycle_state": "active",
+        "maturity_program": "maintain",
+        "notes": "",
+        "operating_path": "maintain",
+        "owner": "demo-operator",
+        "purpose": "Shared platform service other demo projects depend on.",
+        "review_cadence": "monthly",
+        "target_maturity": "operating",
+        "team": "",
+        "tool_provenance": "claude-code"
+      },
+      "derived": {
+        "activity_status": "active",
+        "archived": false,
+        "attention_state": "active-infra",
+        "context_file_count": 3,
+        "context_files": [
+          "README.md",
+          "docs/current-state.md",
+          "docs/architecture.md"
+        ],
+        "context_quality": "full",
+        "current_state_present": true,
+        "has_ci": true,
+        "has_license": true,
+        "has_tests": true,
+        "known_risks_present": true,
+        "last_meaningful_activity_at": "2026-07-30T00:00:00+00:00",
+        "next_recommended_move_present": true,
+        "path_confidence": "medium",
+        "path_override": "",
+        "path_rationale": "Stable path is maintain from explicit operating path.",
+        "primary_context_file": "README.md",
+        "project_summary_present": true,
+        "readme_char_count": 900,
+        "release_count": 0,
+        "run_instructions_present": true,
+        "stack": [
+          "Go"
+        ],
+        "stack_present": true
+      },
+      "identity": {
+        "default_branch": "main",
+        "display_name": "Dovetail Forge",
+        "group_key": "platform",
+        "group_label": "Platform and Infrastructure",
+        "has_git": true,
+        "path": "platform/dovetail-forge",
+        "project_key": "platform/dovetail-forge",
+        "repo_full_name": "demo-org/dovetail-forge",
+        "section_label": "Platform and Infrastructure",
+        "section_marker": "platform/",
+        "top_level_dir": "platform"
+      },
+      "risk": {
+        "context_risk": false,
+        "doctor_gap": false,
+        "path_risk": false,
+        "risk_factors": [],
+        "risk_summary": "No elevated pressure; routine cadence is sufficient.",
+        "risk_tier": "baseline",
+        "security_risk": false
+      },
+      "security": {
+        "alerts_available": true,
+        "code_scanning_critical": 0,
+        "code_scanning_high": 0,
+        "cohort_member": true,
+        "cohort_policy": "portfolio-default-attention-v1",
+        "coverage_state": "complete",
+        "dependabot_critical": 0,
+        "dependabot_high": 0,
+        "dependabot_low": 4,
+        "dependabot_medium": 2,
+        "open_high_critical": 0,
+        "providers": {
+          "code_scanning": {
+            "completed": true,
+            "conditional": {
+              "requested": true,
+              "result": "modified"
+            },
+            "counts": {
+              "critical": 0,
+              "high": 0,
+              "note": 0,
+              "warning": 0
+            },
+            "etag": null,
+            "http_classification": "ok",
+            "http_status": 200,
+            "last_modified": null,
+            "observed_at": "2026-08-01T00:00:00+00:00",
+            "pagination_complete": true,
+            "reason": "observed",
+            "reason_code": "observed",
+            "state": "observed",
+            "zero_findings": true
+          },
+          "dependabot": {
+            "completed": true,
+            "conditional": {
+              "requested": true,
+              "result": "modified"
+            },
+            "counts": {
+              "critical": 0,
+              "high": 0,
+              "low": 4,
+              "medium": 2
+            },
+            "etag": null,
+            "http_classification": "ok",
+            "http_status": 200,
+            "last_modified": null,
+            "observed_at": "2026-08-01T00:00:00+00:00",
+            "pagination_complete": true,
+            "reason": "observed",
+            "reason_code": "observed",
+            "state": "observed",
+            "zero_findings": false
+          },
+          "secret_scanning": {
+            "completed": true,
+            "conditional": {
+              "requested": true,
+              "result": "modified"
+            },
+            "counts": {
+              "open": 0
+            },
+            "etag": null,
+            "http_classification": "ok",
+            "http_status": 200,
+            "last_modified": null,
+            "observed_at": "2026-08-01T00:00:00+00:00",
+            "pagination_complete": true,
+            "reason": "observed",
+            "reason_code": "observed",
+            "state": "observed",
+            "zero_findings": true
+          }
+        },
+        "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
+        "receipt_state": "fresh",
+        "secret_scanning_open": 0,
+        "source_produced_at": "2026-08-01T00:00:00+00:00"
+      }
+    },
+    {
+      "advisory": {
+        "legacy_category": "studio",
+        "legacy_context_quality": "standard",
+        "legacy_status": "active",
+        "legacy_tool_provenance": "",
+        "notion_current_state": "",
+        "notion_momentum": "",
+        "notion_portfolio_call": ""
+      },
+      "declared": {
+        "automation_eligible": false,
+        "category": "studio",
+        "criticality": "medium",
+        "doctor_standard": "",
+        "intended_disposition": "",
+        "lifecycle_state": "active",
+        "maturity_program": "maintain",
+        "notes": "",
+        "operating_path": "finish",
+        "owner": "demo-operator",
+        "purpose": "Product experiment maintained on a manual cadence.",
+        "review_cadence": "monthly",
+        "target_maturity": "operating",
+        "team": "",
+        "tool_provenance": "codex"
+      },
+      "derived": {
+        "activity_status": "recent",
+        "archived": false,
+        "attention_state": "decision-needed",
+        "context_file_count": 2,
+        "context_files": [
+          "README.md",
+          "docs/current-state.md"
+        ],
+        "context_quality": "standard",
+        "current_state_present": true,
+        "has_ci": true,
+        "has_license": true,
+        "has_tests": true,
+        "known_risks_present": false,
+        "last_meaningful_activity_at": "2026-07-11T00:00:00+00:00",
+        "next_recommended_move_present": true,
+        "path_confidence": "medium",
+        "path_override": "",
+        "path_rationale": "Stable path is finish from explicit operating path.",
+        "primary_context_file": "README.md",
+        "project_summary_present": true,
+        "readme_char_count": 1037,
+        "release_count": 0,
+        "run_instructions_present": true,
+        "stack": [
+          "Ruby"
+        ],
+        "stack_present": true
+      },
+      "identity": {
+        "default_branch": "main",
+        "display_name": "Kestrel Loom",
+        "group_key": "studio",
+        "group_label": "Studio Projects",
+        "has_git": true,
+        "path": "studio/kestrel-loom",
+        "project_key": "studio/kestrel-loom",
+        "repo_full_name": "demo-org/kestrel-loom",
+        "section_label": "Studio Projects",
+        "section_marker": "studio/",
+        "top_level_dir": "studio"
+      },
+      "risk": {
+        "context_risk": false,
+        "doctor_gap": false,
+        "path_risk": true,
+        "risk_factors": [
+          "3 open high/critical security alerts"
+        ],
+        "risk_summary": "Open high or critical alerts need an operator decision.",
+        "risk_tier": "elevated",
+        "security_risk": true
+      },
+      "security": {
+        "alerts_available": false,
+        "code_scanning_critical": null,
+        "code_scanning_high": null,
+        "cohort_member": true,
+        "cohort_policy": "portfolio-default-attention-v1",
+        "coverage_state": "partial",
+        "dependabot_critical": 0,
+        "dependabot_high": 3,
+        "dependabot_low": 0,
+        "dependabot_medium": 1,
+        "open_high_critical": 3,
+        "providers": {
+          "code_scanning": {
+            "completed": false,
+            "conditional": {
+              "requested": false,
+              "result": "failed"
+            },
+            "counts": null,
+            "etag": null,
+            "http_classification": "github_not_found",
+            "http_status": 404,
+            "last_modified": null,
+            "observed_at": "2026-08-01T00:00:00+00:00",
+            "pagination_complete": false,
+            "reason": "github_not_found",
+            "reason_code": "endpoint_unsupported",
+            "state": "not_found",
+            "zero_findings": null
+          },
+          "dependabot": {
+            "completed": true,
+            "conditional": {
+              "requested": true,
+              "result": "modified"
+            },
+            "counts": {
+              "critical": 0,
+              "high": 3,
+              "low": 0,
+              "medium": 1
+            },
+            "etag": null,
+            "http_classification": "ok",
+            "http_status": 200,
+            "last_modified": null,
+            "observed_at": "2026-08-01T00:00:00+00:00",
+            "pagination_complete": true,
+            "reason": "observed",
+            "reason_code": "observed",
+            "state": "observed",
+            "zero_findings": false
+          },
+          "secret_scanning": {
+            "completed": false,
+            "conditional": {
+              "requested": false,
+              "result": "failed"
+            },
+            "counts": null,
+            "etag": null,
+            "http_classification": "github_not_found",
+            "http_status": 404,
+            "last_modified": null,
+            "observed_at": "2026-08-01T00:00:00+00:00",
+            "pagination_complete": false,
+            "reason": "github_not_found",
+            "reason_code": "endpoint_unsupported",
+            "state": "not_found",
+            "zero_findings": null
+          }
+        },
+        "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
+        "receipt_state": "fresh",
+        "secret_scanning_open": null,
+        "source_produced_at": "2026-08-01T00:00:00+00:00"
+      }
+    },
+    {
+      "advisory": {
+        "legacy_category": "lab",
+        "legacy_context_quality": "minimum-viable",
+        "legacy_status": "dormant",
+        "legacy_tool_provenance": "",
+        "notion_current_state": "",
+        "notion_momentum": "",
+        "notion_portfolio_call": ""
+      },
+      "declared": {
+        "automation_eligible": true,
+        "category": "lab",
+        "criticality": "medium",
+        "doctor_standard": "",
+        "intended_disposition": "",
+        "lifecycle_state": "dormant",
+        "maturity_program": "maintain",
+        "notes": "",
+        "operating_path": "maintain",
+        "owner": "demo-operator",
+        "purpose": "Exploratory prototype kept for reference only.",
+        "review_cadence": "monthly",
+        "target_maturity": "operating",
+        "team": "",
+        "tool_provenance": "claude-code"
+      },
+      "derived": {
+        "activity_status": "stale",
+        "archived": false,
+        "attention_state": "parked",
+        "context_file_count": 1,
+        "context_files": [
+          "README.md"
+        ],
+        "context_quality": "minimum-viable",
+        "current_state_present": false,
+        "has_ci": true,
+        "has_license": true,
+        "has_tests": true,
+        "known_risks_present": false,
+        "last_meaningful_activity_at": "2026-01-23T00:00:00+00:00",
+        "next_recommended_move_present": false,
+        "path_confidence": "medium",
+        "path_override": "",
+        "path_rationale": "Stable path is maintain from explicit operating path.",
+        "primary_context_file": "README.md",
+        "project_summary_present": true,
+        "readme_char_count": 1174,
+        "release_count": 0,
+        "run_instructions_present": true,
+        "stack": [
+          "Python"
+        ],
+        "stack_present": true
+      },
+      "identity": {
+        "default_branch": "main",
+        "display_name": "Quartz Signal",
+        "group_key": "lab",
+        "group_label": "Experiments Lab",
+        "has_git": true,
+        "path": "lab/quartz-signal",
+        "project_key": "lab/quartz-signal",
+        "repo_full_name": "demo-org/quartz-signal",
+        "section_label": "Experiments Lab",
+        "section_marker": "lab/",
+        "top_level_dir": "lab"
+      },
+      "risk": {
+        "context_risk": true,
+        "doctor_gap": false,
+        "path_risk": false,
+        "risk_factors": [
+          "thin project context",
+          "no meaningful activity in the recent window",
+          "security coverage unobserved"
+        ],
+        "risk_summary": "Context or coverage gaps are worth closing this cycle.",
+        "risk_tier": "moderate",
+        "security_risk": false
+      },
+      "security": {
+        "alerts_available": false,
+        "code_scanning_critical": null,
+        "code_scanning_high": null,
+        "cohort_member": true,
+        "cohort_policy": "portfolio-default-attention-v1",
+        "coverage_state": "stale",
+        "dependabot_critical": null,
+        "dependabot_high": null,
+        "dependabot_low": null,
+        "dependabot_medium": null,
+        "open_high_critical": 0,
+        "providers": {},
+        "receipt_schema_version": "GitHubSecurityCoverageReceiptV1",
+        "receipt_state": "stale",
+        "secret_scanning_open": null,
+        "source_produced_at": "2026-08-01T00:00:00+00:00"
+      }
+    },
+    {
+      "advisory": {
+        "legacy_category": "lab",
+        "legacy_context_quality": "boilerplate",
+        "legacy_status": "manual-only",
+        "legacy_tool_provenance": "",
+        "notion_current_state": "",
+        "notion_momentum": "",
+        "notion_portfolio_call": ""
+      },
+      "declared": {
+        "automation_eligible": true,
+        "category": "lab",
+        "criticality": "medium",
+        "doctor_standard": "",
+        "intended_disposition": "",
+        "lifecycle_state": "manual-only",
+        "maturity_program": "maintain",
+        "notes": "",
+        "operating_path": "maintain",
+        "owner": "demo-operator",
+        "purpose": "Exploratory prototype kept for reference only.",
+        "review_cadence": "monthly",
+        "target_maturity": "operating",
+        "team": "",
+        "tool_provenance": "codex"
+      },
+      "derived": {
+        "activity_status": "recent",
+        "archived": false,
+        "attention_state": "manual-only",
+        "context_file_count": 1,
+        "context_files": [
+          "README.md"
+        ],
+        "context_quality": "boilerplate",
+        "current_state_present": false,
+        "has_ci": true,
+        "has_license": true,
+        "has_tests": false,
+        "known_risks_present": false,
+        "last_meaningful_activity_at": "2026-07-11T00:00:00+00:00",
+        "next_recommended_move_present": false,
+        "path_confidence": "medium",
+        "path_override": "",
+        "path_rationale": "Stable path is maintain from explicit operating path.",
+        "primary_context_file": "README.md",
+        "project_summary_present": true,
+        "readme_char_count": 1311,
+        "release_count": 0,
+        "run_instructions_present": false,
+        "stack": [
+          "C"
+        ],
+        "stack_present": true
+      },
+      "identity": {
+        "default_branch": "main",
+        "display_name": "Solstice Cairn",
+        "group_key": "lab",
+        "group_label": "Experiments Lab",
+        "has_git": true,
+        "path": "lab/solstice-cairn",
+        "project_key": "lab/solstice-cairn",
+        "repo_full_name": "demo-org/solstice-cairn",
+        "section_label": "Experiments Lab",
+        "section_marker": "lab/",
+        "top_level_dir": "lab"
+      },
+      "risk": {
+        "context_risk": true,
+        "doctor_gap": false,
+        "path_risk": false,
+        "risk_factors": [
+          "no automated tests",
+          "thin project context",
+          "security coverage unobserved"
+        ],
+        "risk_summary": "Context or coverage gaps are worth closing this cycle.",
+        "risk_tier": "moderate",
+        "security_risk": false
+      },
+      "security": {
+        "alerts_available": false,
+        "code_scanning_critical": null,
+        "code_scanning_high": null,
+        "cohort_member": false,
+        "cohort_policy": "",
+        "coverage_state": "unknown",
+        "dependabot_critical": null,
+        "dependabot_high": null,
+        "dependabot_low": null,
+        "dependabot_medium": null,
+        "open_high_critical": 0,
+        "providers": {},
+        "receipt_schema_version": "",
+        "receipt_state": "unknown",
+        "secret_scanning_open": null,
+        "source_produced_at": ""
+      }
+    }
+  ],
+  "rollups": {
+    "decision": {
+      "decision_needed_count": 1,
+      "default_attention_count": 2
+    },
+    "risk_tier_counts": {
+      "baseline": 1,
+      "deferred": 0,
+      "elevated": 1,
+      "moderate": 2
+    },
+    "security": {
+      "complete_repo_count": 1,
+      "coverage_state": "partial",
+      "partial_repo_count": 1,
+      "repos_with_open_high_critical": 1,
+      "scanned_count": 1,
+      "stale_count": 1,
+      "total_open_critical": 0,
+      "total_open_high": 3,
+      "unknown_count": 1
+    }
+  },
+  "schema_version": "0.11.0",
+  "source_summary": {
+    "activity_status_counts": {
+      "active": 1,
+      "recent": 2,
+      "stale": 1
+    },
+    "archived_count": 0,
+    "attention_state_counts": {
+      "active-infra": 1,
+      "decision-needed": 1,
+      "manual-only": 1,
+      "parked": 1
+    },
+    "catalog_errors": [],
+    "catalog_warnings": [],
+    "context_quality_counts": {
+      "boilerplate": 1,
+      "full": 1,
+      "minimum-viable": 1,
+      "standard": 1
+    },
+    "duplicate_display_names": [],
+    "github_archived_count": 0,
+    "legacy_registry_rows": 4,
+    "notion_context_carried_forward": 0,
+    "notion_context_rows": 0,
+    "project_count": 4,
+    "unresolved_duplicate_display_names": [],
+    "workspace_root": "/demo-workspace"
+  },
+  "warnings": [],
+  "workspace_root": "/demo-workspace"
+}
