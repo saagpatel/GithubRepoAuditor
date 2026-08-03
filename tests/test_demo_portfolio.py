@@ -47,6 +47,31 @@ def test_schema_version_tracks_the_producer_constant() -> None:
     assert _snapshot()["schema_version"] == SCHEMA_VERSION
 
 
+def test_envelope_collection_shapes_match_the_canonical_serializer() -> None:
+    snapshot = _snapshot()
+
+    assert snapshot["inputs"] == {
+        "catalog": {
+            "source_id": "portfolio-catalog",
+            "sha256": None,
+            "observed_at": snapshot["generated_at"],
+        },
+        "workspace": {
+            "source_id": "projects-root",
+            "observed_at": snapshot["generated_at"],
+        },
+        "notion": {
+            "mode": "unavailable",
+            "observed_at": None,
+            "carried_from_generated_at": None,
+        },
+    }
+    assert snapshot["exclusions"] == {
+        "policy_version": "workspace_discovery.v2",
+        "counts": {},
+    }
+
+
 def test_generated_at_lands_inside_the_consumer_fresh_window() -> None:
     generated_at = datetime.fromisoformat(_snapshot()["generated_at"])
     age_hours = (NOW - generated_at).total_seconds() / 3600

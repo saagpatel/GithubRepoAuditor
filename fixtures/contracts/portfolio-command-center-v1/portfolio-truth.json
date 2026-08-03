@@ -20,9 +20,27 @@
     }
   ],
   "derivation_policy_version": "portfolio_attention.v3",
-  "exclusions": [],
+  "exclusions": {
+    "counts": {},
+    "policy_version": "workspace_discovery.v2"
+  },
   "generated_at": "2026-08-01T00:00:00+00:00",
-  "inputs": [],
+  "inputs": {
+    "catalog": {
+      "observed_at": "2026-08-01T00:00:00+00:00",
+      "sha256": null,
+      "source_id": "portfolio-catalog"
+    },
+    "notion": {
+      "carried_from_generated_at": null,
+      "mode": "unavailable",
+      "observed_at": null
+    },
+    "workspace": {
+      "observed_at": "2026-08-01T00:00:00+00:00",
+      "source_id": "projects-root"
+    }
+  },
   "precedence_matrix": {
     "declared": [
       "demo fixture"

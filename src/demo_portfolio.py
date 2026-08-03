@@ -877,8 +877,26 @@ def build_snapshot(
                 "unknown_count": coverage_states.get("unknown", 0),
             },
         ],
-        "exclusions": [],
-        "inputs": [],
+        "exclusions": {
+            "policy_version": "workspace_discovery.v2",
+            "counts": {},
+        },
+        "inputs": {
+            "catalog": {
+                "source_id": "portfolio-catalog",
+                "sha256": None,
+                "observed_at": _iso(generated_at),
+            },
+            "workspace": {
+                "source_id": "projects-root",
+                "observed_at": _iso(generated_at),
+            },
+            "notion": {
+                "mode": "unavailable",
+                "observed_at": None,
+                "carried_from_generated_at": None,
+            },
+        },
         "warnings": [],
         "projects": projects,
         "rollups": {
