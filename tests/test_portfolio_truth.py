@@ -825,13 +825,13 @@ repos:
 def test_attention_state_classifier_separates_activity_from_operator_attention() -> (
     None
 ):
-    from src.portfolio_truth_reconcile import _attention_state_for
+    from src.portfolio_truth_decisions import derive_attention_state
     from src.portfolio_truth_types import VALID_LIFECYCLE_STATES
 
     assert "manual-only" in VALID_LIFECYCLE_STATES
 
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="active",
             archived=False,
             lifecycle_state="active",
@@ -843,7 +843,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
         == "active-product"
     )
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="active",
             archived=False,
             lifecycle_state="active",
@@ -855,7 +855,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
         == "active-infra"
     )
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="active",
             archived=False,
             lifecycle_state="active",
@@ -867,7 +867,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
         == "decision-needed"
     )
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="stale",
             archived=False,
             lifecycle_state="active",
@@ -879,7 +879,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
         == "decision-needed"
     )
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="recent",
             archived=False,
             lifecycle_state="active",
@@ -891,7 +891,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
         == "decision-needed"
     )
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="active",
             archived=False,
             lifecycle_state="active",
@@ -903,7 +903,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
         == "manual-only"
     )
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="active",
             archived=False,
             lifecycle_state="dormant",
@@ -915,7 +915,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
         == "parked"
     )
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="stale",
             archived=False,
             lifecycle_state="dormant",
@@ -927,7 +927,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
         == "decision-needed"
     )
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="active",
             archived=False,
             lifecycle_state="active",
@@ -939,7 +939,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
         == "manual-only"
     )
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="active",
             archived=False,
             lifecycle_state="manual-only",
@@ -951,7 +951,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
         == "manual-only"
     )
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="active",
             archived=False,
             lifecycle_state="active",
@@ -963,7 +963,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
         == "manual-only"
     )
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="active",
             archived=False,
             lifecycle_state="active",
@@ -975,7 +975,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
         == "experiment"
     )
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="active",
             archived=True,
             lifecycle_state="archived",
@@ -987,7 +987,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
         == "archived"
     )
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="stale",
             archived=False,
             lifecycle_state="active",
@@ -999,7 +999,7 @@ def test_attention_state_classifier_separates_activity_from_operator_attention()
         == "decision-needed"
     )
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="stale",
             archived=False,
             lifecycle_state="active",
@@ -1026,7 +1026,7 @@ def test_attention_state_uses_resolved_catalog_operating_path(
     expected_attention: str,
 ) -> None:
     from src.portfolio_pathing import build_operating_path_entry
-    from src.portfolio_truth_reconcile import _attention_state_for
+    from src.portfolio_truth_decisions import derive_attention_state
 
     catalog_entry = build_operating_path_entry(
         {
@@ -1039,7 +1039,7 @@ def test_attention_state_uses_resolved_catalog_operating_path(
 
     assert catalog_entry["operating_path"] == operating_path
     assert (
-        _attention_state_for(
+        derive_attention_state(
             activity_status="active",
             archived=False,
             lifecycle_state="active",
