@@ -438,7 +438,8 @@
           "path": "/demo-workspace/lab/quartz-signal",
           "upstream": "origin/main",
           "upstream_branch": "main",
-          "upstream_observation_source": "local_tracking_ref"
+          "upstream_observation_source": "local_tracking_ref",
+          "upstream_remote": "origin"
         },
         "observed_at": "2026-08-01T00:00:00+00:00",
         "remote_default_branch": {
@@ -479,7 +480,8 @@
             "state": "observed",
             "upstream": "origin/main",
             "upstream_branch": "main",
-            "upstream_observation_source": "local_tracking_ref"
+            "upstream_observation_source": "local_tracking_ref",
+            "upstream_remote": "origin"
           }
         ]
       },
@@ -781,7 +783,8 @@
           "path": "/demo-workspace/lab/solstice-cairn",
           "upstream": "origin/main",
           "upstream_branch": "main",
-          "upstream_observation_source": "local_tracking_ref"
+          "upstream_observation_source": "local_tracking_ref",
+          "upstream_remote": "origin"
         },
         "observed_at": "2026-08-01T00:00:00+00:00",
         "remote_default_branch": {
@@ -817,7 +820,8 @@
             "state": "observed",
             "upstream": "origin/main",
             "upstream_branch": "main",
-            "upstream_observation_source": "local_tracking_ref"
+            "upstream_observation_source": "local_tracking_ref",
+            "upstream_remote": "origin"
           }
         ]
       },
@@ -1070,7 +1074,8 @@
           "path": "/demo-workspace/platform/dovetail-forge",
           "upstream": "origin/main",
           "upstream_branch": "main",
-          "upstream_observation_source": "local_tracking_ref"
+          "upstream_observation_source": "local_tracking_ref",
+          "upstream_remote": "origin"
         },
         "observed_at": "2026-08-01T00:00:00+00:00",
         "remote_default_branch": {
@@ -1114,7 +1119,8 @@
             "state": "observed",
             "upstream": "origin/main",
             "upstream_branch": "main",
-            "upstream_observation_source": "local_tracking_ref"
+            "upstream_observation_source": "local_tracking_ref",
+            "upstream_remote": "origin"
           }
         ]
       },
@@ -1429,7 +1435,8 @@
           "path": "/demo-workspace/studio/kestrel-loom",
           "upstream": "origin/main",
           "upstream_branch": "main",
-          "upstream_observation_source": "local_tracking_ref"
+          "upstream_observation_source": "local_tracking_ref",
+          "upstream_remote": "origin"
         },
         "observed_at": "2026-08-01T00:00:00+00:00",
         "remote_default_branch": {
@@ -1473,7 +1480,8 @@
             "state": "observed",
             "upstream": "origin/main",
             "upstream_branch": "main",
-            "upstream_observation_source": "local_tracking_ref"
+            "upstream_observation_source": "local_tracking_ref",
+            "upstream_remote": "origin"
           }
         ]
       },

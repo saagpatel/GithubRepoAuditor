@@ -1224,6 +1224,7 @@ def _validate_local(
         "dirty_path_count",
         "upstream",
         "upstream_branch",
+        "upstream_remote",
         "upstream_observation_source",
         "ahead",
         "behind",
@@ -1253,24 +1254,28 @@ def _validate_local(
         )
     upstream = value.get("upstream")
     upstream_branch = value.get("upstream_branch")
+    upstream_remote = value.get("upstream_remote")
     expected_source = "local_tracking_ref" if upstream else "unavailable"
     if (upstream is not None and not _valid_git_upstream(upstream)) or value.get(
         "upstream_observation_source"
     ) != expected_source:
         raise ValueError(f"Repository {label} upstream for {project_key} is invalid.")
     if upstream is None:
-        if upstream_branch is not None:
+        if upstream_branch is not None or upstream_remote is not None:
             raise ValueError(
-                f"Repository {label} upstream branch for {project_key} is invalid."
+                f"Repository {label} upstream identity for {project_key} is invalid."
             )
-    elif not _valid_git_branch(upstream_branch) or not (
-        upstream == upstream_branch
-        or _remote_upstream_matches_branch(upstream, upstream_branch)
+    elif not _valid_git_branch(upstream_branch) or not _valid_upstream_identity(
+        upstream=upstream,
+        upstream_branch=upstream_branch,
+        upstream_remote=upstream_remote,
     ):
         raise ValueError(
-            f"Repository {label} upstream branch for {project_key} is invalid."
+            f"Repository {label} upstream identity for {project_key} is invalid."
         )
-    if branch is None and (upstream is not None or upstream_branch is not None):
+    if branch is None and any(
+        item is not None for item in (upstream, upstream_branch, upstream_remote)
+    ):
         raise ValueError(
             f"Repository {label} detached upstream for {project_key} is invalid."
         )
@@ -1307,6 +1312,7 @@ def _validate_worktree(value: Any, *, project_key: str, index: int) -> None:
                 "dirty_path_count",
                 "upstream",
                 "upstream_branch",
+                "upstream_remote",
                 "upstream_observation_source",
                 "ahead",
                 "behind",
@@ -1396,12 +1402,18 @@ def _validate_worktree(value: Any, *, project_key: str, index: int) -> None:
     raise ValueError(f"Repository {label} state for {project_key} is invalid.")
 
 
-def _remote_upstream_matches_branch(upstream: str, upstream_branch: str) -> bool:
-    suffix = f"/{upstream_branch}"
-    if not upstream.endswith(suffix):
-        return False
-    remote_prefix = upstream[: -len(suffix)]
-    return _valid_git_branch(remote_prefix)
+def _valid_upstream_identity(
+    *,
+    upstream: str,
+    upstream_branch: str,
+    upstream_remote: Any,
+) -> bool:
+    if upstream_remote == ".":
+        return upstream == upstream_branch
+    return (
+        _valid_git_branch(upstream_remote)
+        and upstream == f"{upstream_remote}/{upstream_branch}"
+    )
 
 
 def _validate_coordinator(

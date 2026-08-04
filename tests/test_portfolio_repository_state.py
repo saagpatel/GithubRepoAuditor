@@ -76,6 +76,10 @@ def test_observation_reports_dirty_no_upstream_and_unknown_remote(
     assert state["local"]["dirty_path_count"] == 1
     assert state["local"]["upstream"] is None
     assert state["local"]["upstream_branch"] is None
+    assert state["local"]["upstream_remote"] is None
+    assert state["worktrees"][0]["upstream"] is None
+    assert state["worktrees"][0]["upstream_branch"] is None
+    assert state["worktrees"][0]["upstream_remote"] is None
     assert state["remote_default_branch"]["state"] == "unknown"
 
 
@@ -93,6 +97,7 @@ def test_local_branch_upstream_is_observed_and_divergence_fails_closed(
 
     assert state["local"]["upstream"] == "topic"
     assert state["local"]["upstream_branch"] == "topic"
+    assert state["local"]["upstream_remote"] == "."
     assert state["state"] == "unknown"
     assert (
         state["reason_code"]
@@ -122,6 +127,7 @@ def test_slash_branch_tracking_same_local_branch_stays_observed(
     assert state["local"]["branch"] == "feature/foo"
     assert state["local"]["upstream"] == "feature/foo"
     assert state["local"]["upstream_branch"] == "feature/foo"
+    assert state["local"]["upstream_remote"] == "."
     _validate_repository_state_shape(
         state,
         expected_remote=state["remote_default_branch"],
@@ -148,32 +154,36 @@ def test_branch_tracking_different_local_slash_branch_is_unknown(
     assert state["local"]["branch"] == "foo"
     assert state["local"]["upstream"] == "feature/foo"
     assert state["local"]["upstream_branch"] == "feature/foo"
+    assert state["local"]["upstream_remote"] == "."
     assert (
         state["reason_code"]
         == "nonstandard_upstream_requires_remote_default_evidence"
     )
 
 
+@pytest.mark.parametrize("remote_name", ("origin", "team/origin"))
 def test_remote_slash_branch_preserves_display_and_exact_branch(
     tmp_path: Path,
+    remote_name: str,
 ) -> None:
     repo = _repo(tmp_path)
     _git(repo, "checkout", "-b", "feature/foo")
-    _git(repo, "remote", "add", "origin", str(repo))
-    _git(repo, "update-ref", "refs/remotes/origin/feature/foo", "HEAD")
-    _git(repo, "config", "branch.feature/foo.remote", "origin")
+    _git(repo, "remote", "add", remote_name, str(repo))
+    _git(repo, "update-ref", f"refs/remotes/{remote_name}/feature/foo", "HEAD")
+    _git(repo, "config", "branch.feature/foo.remote", remote_name)
     _git(repo, "config", "branch.feature/foo.merge", "refs/heads/feature/foo")
-    assert (
-        _git(repo, "rev-parse", "--abbrev-ref", "@{upstream}")
-        == "origin/feature/foo"
+    expected_upstream = f"{remote_name}/feature/foo"
+    assert _git(repo, "rev-parse", "--abbrev-ref", "@{upstream}") == (
+        expected_upstream
     )
 
     observed_at = datetime(2026, 7, 12, tzinfo=UTC)
     state = observe_repository_state(repo, observed_at=observed_at)
 
     assert state["state"] == "observed"
-    assert state["local"]["upstream"] == "origin/feature/foo"
+    assert state["local"]["upstream"] == expected_upstream
     assert state["local"]["upstream_branch"] == "feature/foo"
+    assert state["local"]["upstream_remote"] == remote_name
     _validate_repository_state_shape(
         state,
         expected_remote=state["remote_default_branch"],
@@ -305,6 +315,7 @@ def test_recovery_tracking_does_not_impersonate_remote_default(
     assert state["local"]["head"] == recovery_head
     assert state["local"]["upstream"] == "origin/recovery/repo-main"
     assert state["local"]["upstream_branch"] == "recovery/repo-main"
+    assert state["local"]["upstream_remote"] == "origin"
     assert state["remote_default_branch"]["head_sha"] == remote_head
 
 
@@ -369,6 +380,7 @@ def test_remote_selection_can_choose_linked_when_configured_worktree_is_unknown(
         "dirty_path_count": 0,
         "upstream": "origin/main",
         "upstream_branch": "main",
+        "upstream_remote": "origin",
         "upstream_observation_source": "local_tracking_ref",
         "ahead": 0,
         "behind": 0,
